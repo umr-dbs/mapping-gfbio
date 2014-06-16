@@ -1,0 +1,28 @@
+
+* openCL 1.1 (?)
+* GDAL - http://www.gdal.org/ (libgdal-dev, X/MIT)
+* SQLite 3 - http://www.sqlite.org/ (libsqlite3-dev, public domain)
+* jsonCPP 0.6.x - http://jsoncpp.sourceforge.net/ (libjsoncpp-dev, public domain/MIT)
+* uriparser - http://uriparser.sourceforge.net/ (liburiparser-dev, new BSD)
+* xxd (part of vim)
+* GEOS - http://trac.osgeo.org/geos/ (libgeos++-dev, LGPL)
+* libpq++ - postgres (libpqxx3-dev, BSD?)
+* libcurl - (libcurl3-dev, MIT)
+* bzip2 - (libbz2-dev, ??)
+
+Unused:
+* Proj.4 - http://trac.osgeo.org/proj/ (MIT)
+
+
+Desired:
+* R - http://r-project.org (GPL)
+* ***REMOVED*** (Package r-cran-cpp) - http://***REMOVED***.org (GPL)
+
+
+
+R import:
+* jpeg, png, bmp, PGM/PPM, HDF5.
+* read/write with a (named) pipe? readBin/writeBin may work. Pipes can be passed by name, or stdin/stdout can be used.
+
+Security? RAppArmor?
+RServe? http://rforge.net/Rserve/ - LGPL, weniger startup-overhead, aber eigener Server

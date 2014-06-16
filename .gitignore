@@ -1,0 +1,11 @@
+.project
+.cproject
+.settings
+*.tmp.*
+_*
+datasources
+*.o
+*.cl.h
+htdocs/cgi-bin/*
+mapping/mapping_manager
+

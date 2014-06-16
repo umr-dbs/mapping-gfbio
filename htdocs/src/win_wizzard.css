@@ -1,0 +1,141 @@
+.wizzard {
+	display: flex !important;
+	flex-direction: row;
+	padding: 0px;
+	font-size: 14px;
+}
+
+.wizzard .searchPart {
+	/* layout */
+	height: 100%;
+	flex: 0 0 auto;
+	display: flex;
+	flex-direction: column;
+	/* color */
+	background: #F5F5F5;
+	border-right: 5px solid #A9A9A9;
+	color: #303030;
+}
+
+.wizzard .searchPart strong {
+	font-weight: bold;
+}
+
+.wizzard hr {
+	color: gray;
+	border: 1px solid #DCDCDC;
+	background-color: none;
+	margin: 0px 0px;
+}
+
+.wizzard .searchPart input,.wizzard .searchPart select,.wizzard .searchPart option,.wizzard .searchPart button
+	{
+	color: #000;
+}
+
+.wizzard button {
+	padding: 5px;
+}
+
+.wizzard .searchPart .general .time label {
+	width: 50px;
+	text-align: right;
+	margin-right: 10px;
+	float: left;
+}
+
+.wizzard .searchPart .general .location input {
+	margin-left: 10px;
+	margin-right: 10px;
+}
+
+.wizzard .searchPart .general .time input {
+	width: 150px;
+}
+
+.wizzard .datasetPart {
+	/* layout */
+	flex: 1 1 auto;
+	overflow-y: auto;
+	overflow-x: hidden;
+	/* color */
+	box-shadow: +10px 0 50px -10px #000000;
+}
+
+.wizzard .searchBox {
+	padding: 10px;
+}
+
+.wizzard .display-none {
+	display: none;
+}
+
+.wizzard .searchPart .search {
+	/* layout */
+	flex: 1 1 auto;
+	overflow-y: auto;
+	overflow-x: hidden;
+	padding-bottom: 5px;
+}
+
+.wizzard .search .searchButton {
+	margin-left: 2%;
+	width: 96%;
+}
+
+.wizzard .traits .traits td {
+	padding: 0px 5px;
+}
+
+.wizzard .traits .traits td:first-child {
+	padding-left: 0px;
+	padding-right: 5px;
+}
+
+.wizzard .traits .traits td:last-child {
+	padding-left: 5px;
+	padding-right: 0px;
+}
+
+.wizzard .mapPart {
+	flex: 0 0 auto;
+	height: 180px;
+	width: 345px;
+	margin-right: 5px;
+}
+
+.wizzard .datasetPart {
+	padding: 5px;
+}
+
+.wizzard .datasetPart .datasourceSelection,
+.wizzard .datasetPart .datasourceSelectionLabel {
+	margin-left: 15px;
+}
+
+.wizzard .datasetPart .addPointsToMap {
+	float: right;
+	clear: right;
+}
+
+.wizzard .datasetPart .activeFilters td {
+	padding: 0px 5px;
+}
+
+.wizzard .datasetPart .activeFilters td:first-child {
+	padding-left: 0px;
+	padding-right: 5px;
+}
+
+.wizzard .datasetPart .activeFilters td:last-child {
+	padding-left: 5px;
+	padding-right: 5px;
+}
+
+.wizzard .datasetPart .activeFilters tr:nth-child(odd) {
+  background-color: #EFEFEF;
+}
+
+.wizzard .datasetPart .activeFilters tr:nth-child(even) {
+  background-color: #DFDFDF;
+}

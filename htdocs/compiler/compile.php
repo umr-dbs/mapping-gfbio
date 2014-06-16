@@ -16,13 +16,35 @@ else if ($type == 'js') {
 	//echo "\"use strict\";\n\n";
 }
 else if ($type == 'soy') {
-	define('SOYCOMPILEDFILE', __DIR__.'/compiled.tmp.soy.js');
+	define('SOYCOMPILEDFILE', __DIR__.'/compiled.'.$project.'.tmp.soy.js');
 	define('JARFILE', __DIR__.'/SoyToJsSrcCompiler.jar');
 	header("content-type: application/javascript");
 }
 else
 	die('Unknown type');
 
+
+/**
+ * Displays an error message
+ * The message is formatted as a valid css or js file.
+ */
+function abort($message) {
+	global $type;
+
+	if ($type == 'css') {
+		$message = str_replace("\\", "\\\\", $message);
+		$message = str_replace(array("\r", "\r\n", "\n"), '\00000A', $message);
+		$message = str_replace("'", "\\'", $message);
+		$message = str_replace("\"", "\\", $message);
+		echo 'body { background-color: #ff6666; color: black; }';
+		echo 'body:after { position: absolute; top: 30px; white-space: pre-wrap; content:"'.$error.'"; }';
+	}
+	else {
+		$message = str_replace("\n", '< /br>', trim($message));
+		echo "document.open();document.write(\"<html><body style='background-color: red; color: black;'><pre>\"+".json_encode($message)."+\"</pre></body></html>\")";
+	}
+	die();
+}
 
 /**
  * Returns the modification time of a file, or 0 if file doesn't exist
@@ -55,7 +77,7 @@ function getFiles($directorypath, $extension, $calculate_mtime = false) {
 
 		$files[] = $filepath;
 		if ($calculate_mtime)
-			$latest_mtime = max($latest_mtime, mtime($path));
+			$latest_mtime = max($latest_mtime, mtime($filepath));
 	}
 	closedir($dir);
 	sort($files);

@@ -77,7 +77,9 @@ if ($action == 'sourcelist.get') {
 		$pathinfo = pathinfo($path);
 		$name = $pathinfo['filename'];
 
-		$result[$name] = json_decode(file_get_contents($path));
+		$source = json_decode(file_get_contents($path));
+		if ($source)
+			$result[$name] = $source;
 	}
 
 	respond(array(
@@ -87,36 +89,314 @@ if ($action == 'sourcelist.get') {
 
 
 if ($action == 'examplequerylist.get') {
-	$sourcespath = __DIR__ . '/../../queries/';
-	// read all sources
+	$result = json_decode(<<<EOS
+{
+"clouds": {
+	"colorizer": "grey",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
 
-	$dir = opendir($sourcespath);
-	if (!$dir)
-		respond_fail('Server could not read queries.');
+	"name": "Fake cloud-detection algorithm",
 
-	$files = array();
-	while (($file = readdir($dir)) !== false) {
-		$path = $sourcespath . $file;
-		if (!is_file($path))
-			continue;
-		$pathinfo = pathinfo($path);
-		if (!isset($pathinfo['extension']) || $pathinfo['extension'] != 'json')
-			continue;
-
-		$files[] = $path;
+	"query": {
+		"type": "projection",
+		"params": {
+			"src_epsg": 62866,
+			"dest_epsg": 3857
+		},
+		"sources": [{
+			"type": "expression",
+			"params": {
+				"expression": "value < 300 ? 1 : 0"
+			},
+			"sources": [{
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 6
+				}
+			}]
+		}]
 	}
-	closedir($dir);
+},
+"gfbio": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
 
-	$result = array();
-	foreach($files as $path) {
-		$pathinfo = pathinfo($path);
-		$name = $pathinfo['filename'];
+	"name": "Points of Puma sightings (gfbio-server)",
 
-		$query = json_decode(file_get_contents($path));
-		if ($query)
-			$result[$name] = $query;
+	"query": {
+		"type": "points2raster",
+		"params": {
+		},
+		"sources": [{
+			"type": "gfbiopointsource",
+			"params": {
+				"datasource": "GBIF",
+				"query": "{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"
+			}
+		}]
+	}
+},
+"kangaroos": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Points of Kangaroo sightings (gbif)",
+
+	"query": {
+		"type": "points2raster",
+		"params": {
+		},
+		"sources": [{
+			"type": "pgpointsource",
+			"params": {
+				"connection": "host = '10.0.9.3' dbname = 'postgres' user = 'postgres' password = 'test'",
+				"query": "x, y FROM (SELECT ST_X(t.geom) x, ST_Y(t.geom) y FROM (SELECT ST_TRANSFORM(location, 3857) geom FROM public.gbif_taxon_to_name JOIN public.gbif_lite_time ON (gbif_taxon_to_name.taxon = gbif_lite_time.taxon) WHERE name = 'Macropus rufus') t) t2"
+			}
+		}]
+	}
+},
+"msat0_1": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Average of msat channels 0 and 1",
+
+	"query": {
+		"type": "projection",
+		"params": {
+			"src_epsg": 62866,
+			"dest_epsg": 3857
+		},
+		"sources": [{
+			"type": "add",
+			"params": {
+			},
+			"sources": [{
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 0
+				}
+			}, {
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 1
+				}
+			}]
+		}]
 	}
 
+},
+"msat0_clexpression": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "A test-expression inverting a meteosat-layer",
+
+	"query": {
+		"type": "projection",
+		"params": {
+			"src_epsg": 62866,
+			"dest_epsg": 3857
+		},
+		"sources": [{
+			"type": "expression",
+			"params": {
+				"expression": "1024-value"
+			},
+			"sources": [{
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 0
+				}
+			}]
+		}]
+	}
+},
+"msat0_edge": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Edge detection to test the matrix operator",
+
+	"query": {
+		"type": "matrix",
+		"params": {
+			"matrix_size": 3,
+			"matrix": [-1,-1,-1,-1,8,-1,-1,-1,-1]
+		},
+		"sources": [{
+			"type": "projection",
+			"params": {
+				"src_epsg": 62866,
+				"dest_epsg": 3857
+			},
+			"sources": [{
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 0
+				}
+			}]
+		}]
+	}
+},
+"msat0_invertcl": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "A random opencl script on msat",
+
+	"query": {
+		"type": "projection",
+		"params": {
+			"src_epsg": 62866,
+			"dest_epsg": 3857
+		},
+		"sources": [{
+			"type": "opencl",
+			"params": {
+				"source": "test.cl",
+				"kernel": "testKernel"
+			},
+			"sources": [{
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 0
+				}
+			}]
+		}]
+	}
+},
+"msat0_invert": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "A specialized operator inverting a meteosat-layer",
+
+	"query": {
+		"type": "projection",
+		"params": {
+			"src_epsg": 62866,
+			"dest_epsg": 3857
+		},
+		"sources": [{
+			"type": "negate",
+			"params": {
+			},
+			"sources": [{
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 0
+				}
+			}]
+		}]
+	}
+},
+"pumas": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Points of Puma sightings",
+
+	"query": {
+		"type": "points2raster",
+		"params": {
+		},
+		"sources": [{
+			"type": "pgpointsource",
+			"params": {
+				"query": "x, y FROM locations"
+			}
+		}]
+	}
+},
+"pumasunderclouds": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Points of Pumas that are currently under clouds",
+
+	"query": {
+		"type": "points2raster",
+		"params": {
+		},
+		"sources": [{
+			"type": "filterpointsbyraster",
+			"params": {
+			},
+			"sources": [{
+				"type": "pgpointsource",
+				"params": {
+					"query": "x, y FROM locations"
+				}
+			},{
+				"type": "projection",
+				"params": {
+					"src_epsg": 62866,
+					"dest_epsg": 3857
+				},
+				"sources": [{
+					"type": "expression",
+					"params": {
+						"expression": "value < 300 ? 1 : 0"
+					},
+					"sources": [{
+						"type": "source",
+						"params": {
+							"sourcepath": "datasources/msat2.json",
+							"channel": 6
+						}
+					}]
+				}]
+			}]
+		}]
+	}
+},
+"rats2": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Points of Rats from gbif",
+
+	"query": {
+		"type": "points2raster",
+		"params": {
+		},
+		"sources": [{
+			"type": "pgpointsource",
+			"params": {
+				"connection": "host = '10.0.9.3' dbname = 'postgres' user = 'postgres' password = 'test'",
+				"query": "x, y FROM (SELECT ST_X(t.geom) x, ST_Y(t.geom) y FROM (SELECT ST_TRANSFORM(location, 3857) geom FROM public.gbif_taxon_to_name JOIN public.gbif_lite_time ON (gbif_taxon_to_name.taxon = gbif_lite_time.taxon) WHERE name = 'Rattus rattus') t) t2"
+			}
+		}]
+	}
+}
+}
+EOS
+	);
 	respond(array(
 		'querylist' => $result
 	));

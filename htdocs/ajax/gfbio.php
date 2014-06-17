@@ -17,8 +17,8 @@ session_start();
 ob_start();
 
 /* config settings */
-$base = "http://10.0.9.3:8080/gfbio-prototype/"; //set this to the url you want to scrape
-
+//$base = "http://10.0.9.3:8080/gfbio-prototype/"; //set this to the url you want to scrape
+$base = "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/"; //set this to the url you want to scrape
 
 
 /* all system code happens below - you should not need to edit it! */
@@ -37,6 +37,9 @@ $curlSession = curl_init();
 curl_setopt ($curlSession, CURLOPT_URL, $url);
 curl_setopt ($curlSession, CURLOPT_HEADER, 1);
 
+$proxy = 'www-cache.mathematik.uni-marburg.de:3128';
+if ($proxy)
+	curl_setopt($curlSession, CURLOPT_PROXY, $proxy);
 
 if($_SERVER['REQUEST_METHOD'] == 'POST'){
         curl_setopt ($curlSession, CURLOPT_POST, 1);

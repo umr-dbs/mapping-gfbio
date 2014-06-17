@@ -60,6 +60,9 @@ class PointCollection {
 		double getLocalMDValue(const Point &point, const std::string &key);
 		void setLocalMDString(Point &point, const std::string &key, const std::string &value);
 		void setLocalMDValue(Point &point, const std::string &key, double value);
+
+		// Export
+		std::string toGeoJSON();
 	private:
 		DirectMetadata<std::string> global_md_string;
 		DirectMetadata<double> global_md_value;

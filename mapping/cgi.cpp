@@ -1,4 +1,5 @@
 #include "raster/raster.h"
+#include "raster/pointcollection.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
@@ -221,6 +222,10 @@ void outputImageByQuery(const char *in_filename) {
 }
 
 
+void outputPointCollection(PointCollection *points) {
+	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON().c_str());
+}
+
 
 int main() {
 	//printf("Content-type: text/plain\r\n\r\nDebugging:\n");
@@ -234,11 +239,7 @@ int main() {
 		//printInfo();return 0;
 		std::map<std::string, std::string> params = parseQueryString(query_string);
 
-		// Beta-Ding
-		if (params.count("queryfromfile") > 0) {
-			outputImageByQuery(params["queryfromfile"].c_str());
-			return 0;
-		}
+		// direct loading of a query (obsolete?)
 		if (params.count("query") > 0) {
 			auto p = parseQuery(params["query"].c_str());
 
@@ -262,6 +263,28 @@ int main() {
 			outputImage(raster_guard.get(), false, false, colorizer);
 			return 0;
 		}
+
+		// PointCollection as GeoJSON
+		if (params.count("pointquery") > 0) {
+			auto p = parseQuery(params["pointquery"].c_str());
+
+			GenericOperator *graph = std::get<0>(p);
+			std::unique_ptr<GenericOperator> graph_guard(graph);
+
+			int timestamp = std::get<1>(p);
+
+			PointCollection *points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
+			std::unique_ptr<PointCollection> points_guard(points);
+
+#if RASTER_DO_PROFILE
+			printf("Profiling-header: ");
+			Profiler::print();
+			printf("\r\n");
+#endif
+			outputPointCollection(points);
+			return 0;
+		}
+
 
 		// WMS-Requests
 		if (params.count("service") > 0 && params["service"] == "WMS") {

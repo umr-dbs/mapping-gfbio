@@ -44,13 +44,14 @@ PointCollection *GFBioPointSourceOperator::getPoints(const QueryRectangle &rect)
 	std::ostringstream url;
 	//url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource?datasource" << datasource << "&query=" << query;
 
-	url << "http://10.0.9.3:8080/gfbio-prototype/rest/Wizzard/fetchDataSource/WKB?datasource=" << curl.escape(datasource) << "&query=" << curl.escape(query);
+	url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource/WKB?datasource=" << curl.escape(datasource) << "&query=" << curl.escape(query);
 
 	std::stringstream data;
 
 	curl.setOpt(CURLOPT_URL, url.str().c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
+	curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
 
 	curl.perform();
 

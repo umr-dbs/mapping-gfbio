@@ -1,5 +1,8 @@
 #include "raster/pointcollection.h"
 
+#include <sstream>
+#include <iomanip>
+
 
 Point::Point(double x, double y, uint16_t size_md_string, uint16_t size_md_value) : x(x), y(y), md_string(size_md_string), md_value(size_md_value) {
 }
@@ -101,3 +104,82 @@ void PointCollection::setLocalMDValue(Point &point, const std::string &key, doub
 	local_md_value.setValue(point.md_value, key, value);
 }
 
+/**
+ * Export
+ */
+#if 0
+// http://www.gdal.org/ogr_apitut.html
+#include "ogrsf_frmts.h"
+
+void gdal_init(); // implemented in raster/import_gdal.cpp
+
+void PointCollection::toOGR(const char *driver = "ESRI Shapefile") {
+	gdal_init();
+
+    GDALDriver *poDriver = GetGDALDriverManager()->GetDriverByName(pszDriverName );
+    if (poDriver == nullptr)
+    	throw ExporterException("OGR driver not available");
+
+    GDALDataset *poDS = poDriver->Create( "point_out.shp", 0, 0, 0, GDT_Unknown, NULL );
+    if (poDS == nullptr) {
+    	// TODO: free driver?
+    	throw ExporterException("Dataset creation failed");
+    }
+
+    OGRLayer *poLayer = poDS->CreateLayer( "point_out", NULL, wkbPoint, NULL );
+    if (poLayer == nullptr) {
+    	// TODO: free driver and dataset?
+    	throw ExporterException("Layer Creation failed");
+    }
+
+    // No attributes
+
+    // Loop over all points
+	for (const Point &p : collection) {
+		double x = p.x, y = p.y;
+
+		OGRFeature *poFeature = OGRFeature::CreateFeature(poLayer->GetLayerDefn());
+		//poFeature->SetField( "Name", szName );
+		OGRPoint pt;
+		pt.setX(p.x);
+		pt.setY(p.y);
+		poFeature->SetGeometry(&pt);
+
+        if (poLayer->CreateFeature( poFeature ) != OGRERR_NONE) {
+        	// TODO: free stuf..
+        	throw ExporterException("CreateFeature failed");
+        }
+
+        OGRFeature::DestroyFeature( poFeature );
+	}
+	GDALClose(poDS);
+}
+#endif
+
+
+std::string PointCollection::toGeoJSON() {
+/*
+	  { "type": "MultiPoint",
+	    "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
+	    }
+*/
+	std::ostringstream json;
+	json << std::fixed; // std::setprecision(4);
+
+	//json << "{ \"type\": \"MultiPoint\", \"coordinates\": [ ";
+	json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
+
+	bool first = true;
+	for (const Point &p : collection) {
+		if (first)
+			first = false;
+		else
+			json << ", ";
+
+		json << "[" << p.x << "," << p.y << "]";
+	}
+	//json << "] }";
+	json << "] }}]}";
+
+	return json.str();
+}

@@ -40,7 +40,7 @@ function abort($message) {
 		echo 'body:after { position: absolute; top: 30px; white-space: pre-wrap; content:"'.$error.'"; }';
 	}
 	else {
-		$message = str_replace("\n", '< /br>', trim($message));
+		$message = trim($message);
 		echo "document.open();document.write(\"<html><body style='background-color: red; color: black;'><pre>\"+".json_encode($message)."+\"</pre></body></html>\")";
 	}
 	die();
@@ -99,6 +99,7 @@ if ($type == 'css' || $type == 'js') {
 	outputFiles(SOURCEPATH.'external/', $type);
 	outputFiles(SOURCEPATH.$project.'/', $type);
 	outputFiles(SOURCEPATH, $type);
+	outputFiles(SOURCEPATH.'operators/', $type);
 }
 else if ($type == 'soy') {
 	$target_time = mtime(SOYCOMPILEDFILE);
@@ -108,9 +109,10 @@ else if ($type == 'soy') {
 
 	$res1 = getFiles(SOURCEPATH, 'soy', true);
 	$res2 = getFiles(SOURCEPATH.$project.'/', 'soy', true);
+	$res3 = getFiles(SOURCEPATH.'operators/', 'soy', true);
 
-	$latest_mtime = max($res1['mtime'], $res2['mtime']);
-	$sources = array_merge($res1['files'], $res2['files']);
+	$latest_mtime = max($res1['mtime'], $res2['mtime'], $res3['mtime']);
+	$sources = array_merge($res1['files'], $res2['files'], $res3['files']);
 
 	if (count($sources) == 0)
 		abort('No .soy files found');

@@ -388,10 +388,10 @@ int main() {
 				std::unique_ptr<GenericRaster> result_raster(raster);
 
 				/*
-				int cut_x1 = (int) (bbox_normalized[0] * result_raster->rastermeta.size[0]);
-				int cut_y1 = (int) ((1.0-bbox_normalized[3]) * result_raster->rastermeta.size[1]);
-				int cut_x2 = (int) (bbox_normalized[2] * result_raster->rastermeta.size[0]);
-				int cut_y2 = (int) ((1.0-bbox_normalized[1]) * result_raster->rastermeta.size[1]);
+				int cut_x1 = (int) (bbox_normalized[0] * result_raster->lcrs.size[0]);
+				int cut_y1 = (int) ((1.0-bbox_normalized[3]) * result_raster->lcrs.size[1]);
+				int cut_x2 = (int) (bbox_normalized[2] * result_raster->lcrs.size[0]);
+				int cut_y2 = (int) ((1.0-bbox_normalized[1]) * result_raster->lcrs.size[1]);
 
 				std::unique_ptr<GenericRaster> cut_raster(
 					result_raster->cut(cut_x1,cut_y1,cut_x2-cut_x1,cut_y2-cut_y1)
@@ -399,14 +399,14 @@ int main() {
 				result_raster.reset();
 				*/
 
-				if (result_raster->rastermeta.size[0] != (uint32_t) output_width || result_raster->rastermeta.size[1] != (uint32_t) output_height) {
+				if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
 					result_raster.reset( result_raster->scale(output_width, output_height) );
 				}
 
 				// output_width,output_height
 
-				bool flipx = (bbox[2] > bbox[0]) != (result_raster->rastermeta.scale[0] > 0);
-				bool flipy = (bbox[3] > bbox[1]) == (result_raster->rastermeta.scale[1] > 0);
+				bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
+				bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
 
 #if RASTER_DO_PROFILE
 				printf("Profiling-header: ");

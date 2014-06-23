@@ -11,28 +11,28 @@
  */
 ByteBuffer *RasterConverter::direct_encode(GenericRaster *raster, GenericRaster::Compression method) {
 	std::unique_ptr<RasterConverter> converter(
-		getConverter(raster->rastermeta, raster->valuemeta, method)
+		getConverter(raster->lcrs, raster->dd, method)
 	);
 
 	return converter->encode(raster);
 }
 
-GenericRaster *RasterConverter::direct_decode(const RasterMetadata &rastermetadata, const ValueMetadata &valuemetadata, ByteBuffer *buffer, GenericRaster::Compression method) {
+GenericRaster *RasterConverter::direct_decode(const LocalCRS &localcrs, const DataDescription &datadescriptor, ByteBuffer *buffer, GenericRaster::Compression method) {
 	std::unique_ptr<RasterConverter> converter(
-		getConverter(rastermetadata, valuemetadata, method)
+		getConverter(localcrs, datadescriptor, method)
 	);
 
 	return converter->decode(buffer);
 }
 
-RasterConverter *RasterConverter::getConverter(const RasterMetadata &rm, const ValueMetadata &vm, GenericRaster::Compression method) {
+RasterConverter *RasterConverter::getConverter(const LocalCRS &localcrs, const DataDescription &datadescriptor, GenericRaster::Compression method) {
 	switch (method) {
 		case GenericRaster::Compression::UNCOMPRESSED:
-			return new RawConverter(rm, vm);
+			return new RawConverter(localcrs, datadescriptor);
 		case GenericRaster::Compression::GZIP:
-			return new GzipConverter(rm, vm);
+			return new GzipConverter(localcrs, datadescriptor);
 		case GenericRaster::Compression::BZIP:
-			return new BzipConverter(rm, vm);
+			return new BzipConverter(localcrs, datadescriptor);
 		default:
 			throw ConverterException("Unsupported converter type");
 	}

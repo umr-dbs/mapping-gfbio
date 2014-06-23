@@ -98,23 +98,23 @@ REGISTER_OPERATOR(ProjectionOperator, "projection");
 
 template<typename T>
 struct raster_projection {
-	static GenericRaster *execute(Raster2D<T> *raster_src, void *transformer, RasterMetadata &rm_dest ) {
+	static GenericRaster *execute(Raster2D<T> *raster_src, void *transformer, LocalCRS &rm_dest ) {
 		raster_src->setRepresentation(GenericRaster::Representation::CPU);
 
-		ValueMetadata vm_dest = raster_src->valuemeta;
-		vm_dest.addNoData();
+		DataDescription out_dd = raster_src->dd;
+		out_dd.addNoData();
 
-		Raster2D<T> *raster_dest = (Raster2D<T> *) GenericRaster::create(rm_dest, vm_dest);
+		Raster2D<T> *raster_dest = (Raster2D<T> *) GenericRaster::create(rm_dest, out_dd);
 		std::unique_ptr<GenericRaster> raster_dest_guard(raster_dest);
 
-		T nodata = (T) vm_dest.no_data;
+		T nodata = (T) out_dd.no_data;
 
-		int width = raster_dest->rastermeta.size[0];
-		int height = raster_dest->rastermeta.size[1];
+		int width = raster_dest->lcrs.size[0];
+		int height = raster_dest->lcrs.size[1];
 		for (int y=0;y<height;y++) {
 			for (int x=0;x<width;x++) {
-				double px = raster_dest->rastermeta.PixelToWorldX(x);
-				double py = raster_dest->rastermeta.PixelToWorldY(y);
+				double px = raster_dest->lcrs.PixelToWorldX(x);
+				double py = raster_dest->lcrs.PixelToWorldY(y);
 				double pz = 0;
 
 				int success;
@@ -124,9 +124,9 @@ struct raster_projection {
 					continue;
 				}
 
-				int tx = round(raster_src->rastermeta.WorldToPixelX(px));
-				int ty = round(raster_src->rastermeta.WorldToPixelY(py));
-				if (tx >= 0 && ty >= 0 && tx < (int) raster_src->rastermeta.size[0] && ty < (int) raster_src->rastermeta.size[1]) {
+				int tx = round(raster_src->lcrs.WorldToPixelX(px));
+				int ty = round(raster_src->lcrs.WorldToPixelY(py));
+				if (tx >= 0 && ty >= 0 && tx < (int) raster_src->lcrs.size[0] && ty < (int) raster_src->lcrs.size[1]) {
 					raster_dest->set(x, y, raster_src->get(tx, ty));
 				}
 				else
@@ -143,10 +143,10 @@ static void geocoord2pixcoord(double longitude, double latitude, int *column, in
 
 template<typename T>
 struct raster_projection_from_msat {
-	static GenericRaster *execute(Raster2D<T> *raster_src, void *transformer, RasterMetadata &rm_dest ) {
+	static GenericRaster *execute(Raster2D<T> *raster_src, void *transformer, LocalCRS &rm_dest ) {
 		raster_src->setRepresentation(GenericRaster::Representation::CPU);
 
-		ValueMetadata vm_dest = raster_src->valuemeta;
+		DataDescription vm_dest = raster_src->dd;
 		vm_dest.addNoData();
 
 		Raster2D<T> *raster_dest = (Raster2D<T> *) GenericRaster::create(rm_dest, vm_dest);
@@ -154,12 +154,12 @@ struct raster_projection_from_msat {
 
 		T nodata = (T) vm_dest.no_data;
 
-		int width = raster_dest->rastermeta.size[0];
-		int height = raster_dest->rastermeta.size[1];
+		int width = raster_dest->lcrs.size[0];
+		int height = raster_dest->lcrs.size[1];
 		for (int y=0;y<height;y++) {
 			for (int x=0;x<width;x++) {
-				double px = raster_dest->rastermeta.PixelToWorldX(x);
-				double py = raster_dest->rastermeta.PixelToWorldY(y);
+				double px = raster_dest->lcrs.PixelToWorldX(x);
+				double py = raster_dest->lcrs.PixelToWorldY(y);
 				double pz = 0;
 
 				int success;
@@ -173,10 +173,10 @@ struct raster_projection_from_msat {
 				int tx, ty;
 				geocoord2pixcoord(px, py, &tx, &ty);
 
-				tx = round(raster_src->rastermeta.WorldToPixelX(tx));
-				ty = round(raster_src->rastermeta.WorldToPixelY(ty));
-				if (tx >= 0 && ty >= 0 && tx < (int) raster_src->rastermeta.size[0] && ty < (int) raster_src->rastermeta.size[1]) {
-					tx = raster_src->rastermeta.size[0] - tx;
+				tx = round(raster_src->lcrs.WorldToPixelX(tx));
+				ty = round(raster_src->lcrs.WorldToPixelY(ty));
+				if (tx >= 0 && ty >= 0 && tx < (int) raster_src->lcrs.size[0] && ty < (int) raster_src->lcrs.size[1]) {
+					tx = raster_src->lcrs.size[0] - tx;
 					raster_dest->set(x, y, raster_src->get(tx, ty));
 				}
 				else
@@ -262,10 +262,10 @@ GenericRaster *ProjectionOperator::getRaster(const QueryRectangle &rect) {
 	GenericRaster *raster = sources[0]->getRaster(src_rect);
 	std::unique_ptr<GenericRaster> raster_guard(raster);
 
-	if (src_epsg != raster->rastermeta.epsg)
+	if (src_epsg != raster->lcrs.epsg)
 		throw OperatorException("ProjectionOperator: Source Raster not in expected projection");
 
-	RasterMetadata rm_dest(rect);
+	LocalCRS rm_dest(rect);
 
 	Profiler::Profiler p("PROJECTION_OPERATOR");
 	GenericRaster *result_raster = nullptr;
@@ -569,19 +569,19 @@ struct meteosat_draw_latlong{
 	static GenericRaster *execute(Raster2D<T> *raster_src) {
 		std::unique_ptr<GenericRaster> raster_src_guard(raster_src);
 
-		if (raster_src->rastermeta.epsg != EPSG_METEOSAT2)
+		if (raster_src->lcrs.epsg != EPSG_METEOSAT2)
 			throw OperatorException("Source raster not in meteosat projection");
 
 		raster_src->setRepresentation(GenericRaster::Representation::CPU);
 
-		T max = raster_src->valuemeta.max*2;
-		ValueMetadata vm_dest(raster_src->valuemeta.datatype, raster_src->valuemeta.min, max, raster_src->valuemeta.has_no_data, raster_src->valuemeta.no_data);
-		Raster2D<T> *raster_dest = (Raster2D<T> *) GenericRaster::create(raster_src->rastermeta, vm_dest);
+		T max = raster_src->dd.max*2;
+		DataDescription vm_dest(raster_src->dd.datatype, raster_src->dd.min, max, raster_src->dd.has_no_data, raster_src->dd.no_data);
+		Raster2D<T> *raster_dest = (Raster2D<T> *) GenericRaster::create(raster_src->lcrs, vm_dest);
 		std::unique_ptr<GenericRaster> raster_dest_guard(raster_dest);
 
 		// erstmal alles kopieren
-		int width = raster_dest->rastermeta.size[0];
-		int height = raster_dest->rastermeta.size[1];
+		int width = raster_dest->lcrs.size[0];
+		int height = raster_dest->lcrs.size[1];
 		for (int y=0;y<height;y++) {
 			for (int x=0;x<width;x++) {
 				raster_dest->set(x, y, raster_src->get(x, y));

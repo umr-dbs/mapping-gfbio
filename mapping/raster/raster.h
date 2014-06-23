@@ -19,30 +19,30 @@ class QueryRectangle;
 
 
 // LocalCoordinateSystem - lcs
-class RasterMetadata {
+class LocalCRS {
 	public:
-		RasterMetadata(epsg_t epsg, uint32_t w, double origin_x, double scale_x)
+		LocalCRS(epsg_t epsg, uint32_t w, double origin_x, double scale_x)
 			: epsg(epsg), dimensions(1), size{w, 0, 0}, origin{origin_x, 0, 0}, scale{scale_x, 0, 0} {};
 
-		RasterMetadata(epsg_t epsg, uint32_t w, uint32_t h, double origin_x, double origin_y, double scale_x, double scale_y)
+		LocalCRS(epsg_t epsg, uint32_t w, uint32_t h, double origin_x, double origin_y, double scale_x, double scale_y)
 			: epsg(epsg), dimensions(2), size{w, h, 0}, origin{origin_x, origin_y, 0}, scale{scale_x, scale_y, 0} {};
 
-		RasterMetadata(epsg_t epsg, uint32_t w, uint32_t h, uint32_t d, double origin_x, double origin_y, double origin_z, double scale_x, double scale_y, double scale_z)
+		LocalCRS(epsg_t epsg, uint32_t w, uint32_t h, uint32_t d, double origin_x, double origin_y, double origin_z, double scale_x, double scale_y, double scale_z)
 			: epsg(epsg), dimensions(3), size{w, h, d}, origin{origin_x, origin_y, origin_z}, scale{scale_x, scale_y, scale_z} {};
 
-		RasterMetadata(const QueryRectangle &rect);
+		LocalCRS(const QueryRectangle &rect);
 
-		RasterMetadata() = delete;
-		~RasterMetadata() = default;
+		LocalCRS() = delete;
+		~LocalCRS() = default;
 		// Copy
-		RasterMetadata(const RasterMetadata &rm) = default;
-		RasterMetadata &operator=(const RasterMetadata &rm) = default;
+		LocalCRS(const LocalCRS &lcrs) = default;
+		LocalCRS &operator=(const LocalCRS &lcrs) = default;
 		// Move
-		RasterMetadata(RasterMetadata &&rm) = default;
-		RasterMetadata &operator=(RasterMetadata &&rm) = default;
+		LocalCRS(LocalCRS &&lcrs) = default;
+		LocalCRS &operator=(LocalCRS &&lcrs) = default;
 
 
-		bool operator==(const RasterMetadata &b) const;
+		bool operator==(const LocalCRS &b) const;
 		size_t getPixelCount() const;
 		void verify() const;
 
@@ -65,38 +65,36 @@ class RasterMetadata {
 		 * world_y = origin[1] + y * scale[1]
 		 */
 
-		friend std::ostream& operator<< (std::ostream &out, const RasterMetadata &rm);
+		friend std::ostream& operator<< (std::ostream &out, const LocalCRS &lcrs);
 };
 
-// DataDescription - dd
-class ValueMetadata {
+
+class DataDescription {
 	public:
-		ValueMetadata(GDALDataType datatype, double min, double max)
+		DataDescription(GDALDataType datatype, double min, double max)
 			: datatype(datatype), min(min), max(max), has_no_data(false), no_data(0.0) {};
 
-		ValueMetadata(GDALDataType datatype, double min, double max, bool has_no_data, double no_data)
+		DataDescription(GDALDataType datatype, double min, double max, bool has_no_data, double no_data)
 			: datatype(datatype), min(min), max(max), has_no_data(has_no_data), no_data(has_no_data ? no_data : 0.0) {};
 
-		ValueMetadata() = delete;
-		~ValueMetadata() = default;
+		DataDescription() = delete;
+		~DataDescription() = default;
 		// Copy
-		ValueMetadata(const ValueMetadata &rm) = default;
-		ValueMetadata &operator=(const ValueMetadata &rm) = delete;
+		DataDescription(const DataDescription &dd) = default;
+		DataDescription &operator=(const DataDescription &dd) = delete;
 		// Move
-		ValueMetadata(ValueMetadata &&rm) = delete;
-		ValueMetadata &operator=(ValueMetadata &&rm) = delete;
+		DataDescription(DataDescription &&dd) = delete;
+		DataDescription &operator=(DataDescription &&dd) = delete;
 
 		void addNoData();
 
-		bool operator==(const ValueMetadata &b) const;
+		bool operator==(const DataDescription &b) const;
 		void verify() const;
 		int getBPP() const; // Bytes per Pixel
 		double getMinByDatatype() const;
 		double getMaxByDatatype() const;
 
 		void print() const;
-
-		//double getNoData() const { if (has_no_data) return no_data; return min; }
 
 		GDALDataType datatype;
 		double min, max;
@@ -127,7 +125,7 @@ class GenericRaster {
 		virtual void setRepresentation(Representation r) = 0;
 		Representation getRepresentation() { return representation; }
 
-		static GenericRaster *create(const RasterMetadata &rastermetadata, const ValueMetadata &valuemetadata, Representation representation = Representation::CPU);
+		static GenericRaster *create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation = Representation::CPU);
 		static GenericRaster *fromGDAL(const char *filename, int rasterid, epsg_t epsg = EPSG_UNKNOWN);
 
 		virtual ~GenericRaster();
@@ -154,15 +152,15 @@ class GenericRaster {
 		GenericRaster *cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
 		virtual GenericRaster *scale(int width, int height=0, int depth=0) = 0;
 
-		const RasterMetadata rastermeta;
-		const ValueMetadata valuemeta;
+		const LocalCRS lcrs;
+		const DataDescription dd;
 
 		// MurmurHash3_x64_128
 		std::string hash();
 
 
 	protected:
-		GenericRaster(const RasterMetadata &rastermetadata, const ValueMetadata &valuemetadata);
+		GenericRaster(const LocalCRS &localcrs, const DataDescription &datadescription);
 		Representation representation;
 };
 

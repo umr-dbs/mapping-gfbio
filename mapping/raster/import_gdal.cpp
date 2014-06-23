@@ -72,12 +72,12 @@ static GenericRaster *GDALImporter_loadRaster(GDALDataset *dataset, int rasterid
 
 	epsg_t epsg = default_epsg; //EPSG_UNKNOWN;
 
-	RasterMetadata rastermeta(epsg, nXSize, nYSize, origin_x, origin_y, scale_x, scale_y);
+	LocalCRS rastermeta(epsg, nXSize, nYSize, origin_x, origin_y, scale_x, scale_y);
 	// TODO: Workaround für .rst mit falschen max-werten!
 	double maxvalue = adfMinMax[1];
 	if (maxvalue == 255 && type == GDT_Int16) maxvalue = 1023;
 	if (type == GDT_Byte) maxvalue = 255;
-	ValueMetadata valuemeta(type, adfMinMax[0], maxvalue, hasnodata, nodata);
+	DataDescription valuemeta(type, adfMinMax[0], maxvalue, hasnodata, nodata);
 	//printf("loading raster with %g -> %g valuerange\n", adfMinMax[0], adfMinMax[1]);
 
 	GenericRaster *raster = GenericRaster::create(rastermeta, valuemeta);

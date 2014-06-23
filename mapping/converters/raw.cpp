@@ -25,7 +25,7 @@ static void checkLittleEndian(void)
 /**
  * RawConverter: raw buffer, uncompressed
  */
-RawConverter::RawConverter(const RasterMetadata &rm, const ValueMetadata &vm) : RasterConverter(rm, vm) {
+RawConverter::RawConverter(const LocalCRS &rm, const DataDescription &vm) : RasterConverter(rm, vm) {
 	checkLittleEndian();
 }
 
@@ -38,7 +38,7 @@ ByteBuffer *RawConverter::encode(GenericRaster *raster) {
 }
 
 GenericRaster *RawConverter::decode(ByteBuffer *buffer) {
-	GenericRaster *raster = GenericRaster::create(rastermeta, valuemeta);
+	GenericRaster *raster = GenericRaster::create(localcrs, datadescription);
 	memcpy(raster->getDataForWriting(), buffer->data, buffer->size);
 	return raster;
 }
@@ -48,7 +48,7 @@ GenericRaster *RawConverter::decode(ByteBuffer *buffer) {
 /**
  * BzipConverter: raw buffer, compressed
  */
-BzipConverter::BzipConverter(const RasterMetadata &rm, const ValueMetadata &vm) : RasterConverter(rm, vm) {
+BzipConverter::BzipConverter(const LocalCRS &rm, const DataDescription &vm) : RasterConverter(rm, vm) {
 	checkLittleEndian();
 }
 
@@ -63,7 +63,7 @@ ByteBuffer *BzipConverter::encode(GenericRaster *raster) {
 		(char *) compressed, &compressed_size,
 		(char *) raster->getData(), raw_size,
 		9, 0, 0);
-	
+
 	if (res != BZ_OK) {
 		delete [] compressed;
 		throw ConverterException("Error on BZ2 compress");
@@ -74,7 +74,7 @@ ByteBuffer *BzipConverter::encode(GenericRaster *raster) {
 
 GenericRaster *BzipConverter::decode(ByteBuffer *buffer) {
 	Profiler::Profiler p("Bzip::decompress");
-	GenericRaster *raster = GenericRaster::create(rastermeta, valuemeta);
+	GenericRaster *raster = GenericRaster::create(localcrs, datadescription);
 	std::unique_ptr<GenericRaster> raster_guard(raster);
 
 	char *data = (char *) raster->getDataForWriting();
@@ -97,7 +97,7 @@ GenericRaster *BzipConverter::decode(ByteBuffer *buffer) {
 /**
  * GzipConverter: raw buffer, compressed
  */
-GzipConverter::GzipConverter(const RasterMetadata &rm, const ValueMetadata &vm) : RasterConverter(rm, vm) {
+GzipConverter::GzipConverter(const LocalCRS &rm, const DataDescription &vm) : RasterConverter(rm, vm) {
 	checkLittleEndian();
 }
 
@@ -137,7 +137,7 @@ ByteBuffer *GzipConverter::encode(GenericRaster *raster) {
 
 GenericRaster *GzipConverter::decode(ByteBuffer *buffer) {
 	Profiler::Profiler p("Gzip::decompress");
-	GenericRaster *raster = GenericRaster::create(rastermeta, valuemeta);
+	GenericRaster *raster = GenericRaster::create(localcrs, datadescription);
 	std::unique_ptr<GenericRaster> raster_guard(raster);
 
 	char *data = (char *) raster->getDataForWriting();

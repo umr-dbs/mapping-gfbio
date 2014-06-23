@@ -10,7 +10,7 @@
 template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &colorizer, bool flipx, bool flipy) {
 	if (!RasterTypeInfo<T>::isinteger)
 		throw new MetadataException("toPNG cannot write float rasters");
-	if (rastermeta.dimensions != 2)
+	if (lcrs.dimensions != 2)
 		throw new MetadataException("toPNG can only handle rasters with 2 dimensions");
 
 	this->setRepresentation(GenericRaster::Representation::CPU);
@@ -22,8 +22,8 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 			throw ExporterException("Could not write to file");
 	}
 
-	T max = valuemeta.max;
-	T min = valuemeta.min;
+	T max = dd.max;
+	T min = dd.min;
 	auto range = RasterTypeInfo<T>::getRange(min, max);
 
 	png_structp png_ptr = png_create_write_struct(
@@ -52,13 +52,13 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 	}
 
 	png_set_IHDR(png_ptr, info_ptr,
-		rastermeta.size[0],  rastermeta.size[1],
+		lcrs.size[0],  lcrs.size[1],
 		8, PNG_COLOR_TYPE_PALETTE,
 		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
 	);
 
 	uint32_t colors[256];
-	if (valuemeta.has_no_data) {
+	if (dd.has_no_data) {
 		colors[0] = color_from_rgba(0,0,0,0);
 		colorizer.setRange(254);
 		for (uint32_t i=1;i<256;i++) {
@@ -88,7 +88,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 
 /*	if (bpp == 32) {
 		png_set_IHDR(png_ptr, info_ptr,
-			rastermeta.size[0],  rastermeta.size[1],
+			lcrs.size[0],  lcrs.size[1],
 			8, PNG_COLOR_TYPE_RGB_ALPHA,
 			PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
 		);
@@ -97,15 +97,15 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 	png_write_info(png_ptr, info_ptr);
 	png_set_filter(png_ptr, PNG_FILTER_TYPE_BASE, PNG_FILTER_NONE | PNG_FILTER_PAETH);
 
-	int width = rastermeta.size[0];
-	int height = rastermeta.size[1];
+	int width = lcrs.size[0];
+	int height = lcrs.size[1];
 	uint8_t *row = new uint8_t[ width ];
 	for (int y=0;y<height;y++) {
 		int py = flipy ? height-y : y;
 		for (int x=0;x<width;x++) {
 			int px = flipx ? width-x : x;
 			T v = get(px, py);
-			if (valuemeta.has_no_data && v == valuemeta.no_data)
+			if (dd.has_no_data && v == dd.no_data)
 				row[x] = 0;
 			else {
 				row[x] = round(((float) v - min) / range * 254) + 1;
@@ -119,7 +119,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 
 /*
 	else if (bpp == 32) {
-		T nodata = (T) valuemeta.no_data;
+		T nodata = (T) dd.no_data;
 		uint32_t *row = new uint32_t[ width ];
 		for (int y=0;y<height;y++) {
 			int py = flipy ? height-y : y;
@@ -127,7 +127,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 				int px = flipx ? width-x : x;
 				T rawvalue = get(px, py);
 				uint32_t value = rawvalue - min;
-				if (valuemeta.has_no_data && rawvalue == nodata)
+				if (dd.has_no_data && rawvalue == nodata)
 					row[x] = color_from_rgba(0,0,0,0);
 				else
 					row[x] = colorizer.colorize32(value);

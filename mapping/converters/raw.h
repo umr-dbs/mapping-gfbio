@@ -4,7 +4,7 @@
 
 class RawConverter : public RasterConverter {
 	public:
-		RawConverter(const RasterMetadata &rm, const ValueMetadata &vm);
+		RawConverter(const LocalCRS &rm, const DataDescription &vm);
 		virtual ByteBuffer *encode(GenericRaster *raster);
 		virtual GenericRaster *decode(ByteBuffer *buffer);
 };
@@ -12,14 +12,14 @@ class RawConverter : public RasterConverter {
 
 class BzipConverter : public RasterConverter {
 	public:
-		BzipConverter(const RasterMetadata &rm, const ValueMetadata &vm);
+		BzipConverter(const LocalCRS &rm, const DataDescription &vm);
 		virtual ByteBuffer *encode(GenericRaster *raster);
 		virtual GenericRaster *decode(ByteBuffer *buffer);
 };
 
 class GzipConverter : public RasterConverter {
 	public:
-		GzipConverter(const RasterMetadata &rm, const ValueMetadata &vm);
+		GzipConverter(const LocalCRS &rm, const DataDescription &vm);
 		virtual ByteBuffer *encode(GenericRaster *raster);
 		virtual GenericRaster *decode(ByteBuffer *buffer);
 };

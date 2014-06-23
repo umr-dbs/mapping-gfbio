@@ -27,7 +27,7 @@
 
 
 RasterSource::RasterSource(const char *_filename, bool writeable)
-	: lockedfile(-1), writeable(writeable), filename_json(_filename), rastermeta(nullptr), channelcount(0), channels(nullptr), db(nullptr), refcount(0) {
+	: lockedfile(-1), writeable(writeable), filename_json(_filename), lcrs(nullptr), channelcount(0), channels(nullptr), db(nullptr), refcount(0) {
 	try {
 		init();
 	}
@@ -92,7 +92,7 @@ void RasterSource::init() {
 
 	epsg_t epsg = jrm.get("epsg", EPSG_UNKNOWN).asInt();
 	if (dimensions == 1) {
-		rastermeta = new RasterMetadata(
+		lcrs = new LocalCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(),
 			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(),
@@ -100,7 +100,7 @@ void RasterSource::init() {
 		);
 	}
 	else if (dimensions == 2) {
-		rastermeta = new RasterMetadata(
+		lcrs = new LocalCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 1, -1).asInt(),
 			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(), origins.get((Json::Value::ArrayIndex) 1, 0).asInt(),
@@ -108,7 +108,7 @@ void RasterSource::init() {
 		);
 	}
 	else if (dimensions == 3) {
-		rastermeta = new RasterMetadata(
+		lcrs = new LocalCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 1, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 2, -1).asInt(),
 			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(), origins.get((Json::Value::ArrayIndex) 1, 0).asInt(), origins.get((Json::Value::ArrayIndex) 2, 0).asInt(),
@@ -118,7 +118,7 @@ void RasterSource::init() {
 	else
 		throw SourceException("json invalid, dimensions not between 1 and 3");
 
-	rastermeta->verify();
+	lcrs->verify();
 
 	Json::Value channelinfo = root["channels"];
 	if (!channelinfo.isArray() || channelinfo.size() < 1) {
@@ -127,7 +127,7 @@ void RasterSource::init() {
 	}
 
 	channelcount = channelinfo.size();
-	channels = new ValueMetadata *[channelcount];
+	channels = new DataDescription *[channelcount];
 	for (int i=0;i<channelcount;i++)
 		channels[i] = nullptr;
 
@@ -142,7 +142,7 @@ void RasterSource::init() {
 			no_data = channel.get("nodata", 0).asDouble();
 		}
 
-		channels[i] = new ValueMetadata(
+		channels[i] = new DataDescription(
 			GDALGetDataTypeByName(datatype.c_str()),
 			channel.get("min", 0).asDouble(),
 			channel.get("max", -1).asDouble(),
@@ -193,9 +193,9 @@ void RasterSource::cleanup() {
 		close(lockedfile); // also removes the lock acquired by flock()
 		lockedfile = -1;
 	}
-	if (rastermeta) {
-		delete rastermeta;
-		rastermeta = nullptr;
+	if (lcrs) {
+		delete lcrs;
+		lcrs = nullptr;
 	}
 	if (channelcount && channels) {
 		for (int i=0;i<channelcount;i++) {
@@ -216,7 +216,7 @@ void RasterSource::import(const char *filename, int sourcechannel, int channelid
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	std::unique_ptr<GenericRaster> raster(
-		GenericRaster::fromGDAL(filename, sourcechannel, rastermeta->epsg)
+		GenericRaster::fromGDAL(filename, sourcechannel, lcrs->epsg)
 	);
 
 	import(raster.get(), channelid, timestamp, compression);
@@ -228,14 +228,14 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 		throw SourceException("Cannot import into a source opened as read-only");
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::import: unknown channel");
-	if (!(raster->rastermeta == *rastermeta)) {
-		std::cerr << raster->rastermeta << std::endl;
-		std::cerr << *rastermeta << std::endl;
+	if (!(raster->lcrs == *lcrs)) {
+		std::cerr << raster->lcrs << std::endl;
+		std::cerr << *lcrs << std::endl;
 		throw SourceException("RasterMetadata does not match RasterSource");
 	}
 
-	if (!(raster->valuemeta == *channels[channelid])) {
-		raster->valuemeta.print();
+	if (!(raster->dd == *channels[channelid])) {
+		raster->dd.print();
 		channels[channelid]->print();
 		throw SourceException("ValueMetadata does not match Channel's Metadata");
 	}
@@ -290,9 +290,9 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, 0) // x1
 		|| SQLITE_OK != sqlite3_bind_int(stmt, 4, 0) // y1
 		|| SQLITE_OK != sqlite3_bind_int(stmt, 5, 0) // z1
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 6, raster->rastermeta.size[0]) // x2
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 7, raster->rastermeta.size[1]) // y2
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 8, raster->rastermeta.size[2]) // z2
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 6, raster->lcrs.size[0]) // x2
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 7, raster->lcrs.size[1]) // y2
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 8, raster->lcrs.size[2]) // z2
 		|| SQLITE_OK != sqlite3_bind_int(stmt, 9, filenr) // filenr
 		|| SQLITE_OK != sqlite3_bind_int64(stmt, 10, fileoffset) // fileoffset
 		|| SQLITE_OK != sqlite3_bind_int64(stmt, 11, buffer->size)
@@ -320,11 +320,11 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 /*
 	x1 = std::max(x1, 0);
 	y1 = std::max(y1, 0);
-	x2 = std::min(x2, (int) rastermeta->size[0]);
-	y2 = std::min(y2, (int) rastermeta->size[1]);
+	x2 = std::min(x2, (int) lcrs->size[0]);
+	y2 = std::min(y2, (int) lcrs->size[1]);
 */
 	/*
-	if (x1 < 0 || y1 < 0 || (size_t) x2 > rastermeta->size[0] || (size_t) y2 > rastermeta->size[1]) {
+	if (x1 < 0 || y1 < 0 || (size_t) x2 > lcrs->size[0] || (size_t) y2 > lcrs->size[1]) {
 		std::stringstream ss;
 		ss << "RasterSource::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords out of bounds";
 		throw SourceException(ss.str());
@@ -364,11 +364,11 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 
 	Profiler::start("RasterSource::load: create");
 	// Create an empty raster of the desired size
-	RasterMetadata resultmetadata(
-		rastermeta->epsg,
+	LocalCRS resultmetadata(
+		lcrs->epsg,
 		x2-x1, y2-y1,
-		rastermeta->PixelToWorldX(x1), rastermeta->PixelToWorldY(y1),
-		rastermeta->scale[0], rastermeta->scale[1]
+		lcrs->PixelToWorldX(x1), lcrs->PixelToWorldY(y1),
+		lcrs->scale[0], lcrs->scale[1]
 	);
 	std::unique_ptr<GenericRaster> result(
 		GenericRaster::create(resultmetadata, *channels[channelid])
@@ -455,7 +455,7 @@ GenericRaster *RasterSource::load(int channelid, int fileid, size_t offset, size
 
 	// decode / decompress
 	Profiler::Profiler p("RasterSource::load: decompress");
-	return RasterConverter::direct_decode(*rastermeta, *channels[channelid], &buffer, method);
+	return RasterConverter::direct_decode(*lcrs, *channels[channelid], &buffer, method);
 }
 
 

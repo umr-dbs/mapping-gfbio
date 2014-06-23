@@ -43,7 +43,7 @@ REGISTER_OPERATOR(SourceOperator, "source");
 GenericRaster *SourceOperator::getRaster(const QueryRectangle &rect) {
 	Profiler::Profiler p("SOURCE_OPERATOR");
 
-	const RasterMetadata *rmd = rastersource->getRasterMetadata();
+	const LocalCRS *rmd = rastersource->getRasterMetadata();
 
 #if 0
 	return rastersource->load(channel, timestamp, rect.x1, rect.y1, rect.x2, rect.y2);

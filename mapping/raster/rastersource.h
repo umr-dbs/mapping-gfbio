@@ -26,7 +26,7 @@ class RasterSource {
 		GenericRaster *load(int channelid, int timestamp, int x1, int y1, int x2, int y2);
 		GenericRaster *load(int channelid, int fileid, size_t offset, size_t size, GenericRaster::Compression method);
 
-		const RasterMetadata *getRasterMetadata() const { return rastermeta; };
+		const LocalCRS *getRasterMetadata() const { return lcrs; };
 
 		bool isWriteable() const { return writeable; }
 
@@ -40,9 +40,9 @@ class RasterSource {
 		std::string filename_json;
 		std::string filename_data;
 		std::string filename_db;
-		RasterMetadata *rastermeta;
+		LocalCRS *lcrs;
 		int channelcount;
-		ValueMetadata **channels;
+		DataDescription **channels;
 		sqlite3 *db;
 		int refcount;
 };

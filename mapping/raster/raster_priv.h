@@ -5,10 +5,10 @@
 
 template<typename T, int dimensions> class Raster : public GenericRaster {
 	public:
-		Raster(const RasterMetadata &rastermetadata, const ValueMetadata &valuemetadata);
+		Raster(const LocalCRS &localcrs, const DataDescription &datadescription);
 		virtual ~Raster();
 
-		virtual size_t getDataSize() { return sizeof(T)*rastermeta.getPixelCount(); };
+		virtual size_t getDataSize() { return sizeof(T)*lcrs.getPixelCount(); };
 		virtual int getBPP() { return sizeof(T); }
 
 		virtual void setRepresentation(Representation);
@@ -29,8 +29,8 @@ class RasterOperator;
 
 template<typename T> class Raster2D : public Raster<T, 2> {
 	public:
-		Raster2D(const RasterMetadata &rastermetadata, const ValueMetadata &valuemetadata)
-			:Raster<T, 2>(rastermetadata, valuemetadata) {};
+		Raster2D(const LocalCRS &localcrs, const DataDescription &datadescription)
+			:Raster<T, 2>(localcrs, datadescription) {};
 		virtual ~Raster2D();
 
 		virtual void toPGM(const char *filename, bool avg);
@@ -47,19 +47,19 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 		virtual double getAsDouble(int x, int y=0, int z=0);
 
 		T get(int x, int y) const {
-			return data[y*this->rastermeta.size[0] + x];
+			return data[y*this->lcrs.size[0] + x];
 		}
 		T getSafe(int x, int y, T def = 0) const {
-			if (x > 0 && y > 0 && (uint32_t) x < rastermeta.size[0] && (uint32_t) y < rastermeta.size[1])
-				return data[y*this->rastermeta.size[0] + x];
+			if (x > 0 && y > 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
+				return data[y*this->lcrs.size[0] + x];
 			return def;
 		}
 		void set(int x, int y, T value) {
-			data[y*rastermeta.size[0] + x] = value;
+			data[y*lcrs.size[0] + x] = value;
 		}
 		void setSafe(int x, int y, T value) {
-			if (x > 0 && y > 0 && (uint32_t) x < rastermeta.size[0] && (uint32_t) y < rastermeta.size[1])
-				data[y*rastermeta.size[0] + x] = value;
+			if (x > 0 && y > 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
+				data[y*lcrs.size[0] + x] = value;
 		}
 
 		// create aliases for parent classes members
@@ -67,8 +67,8 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 		// see: two-phase lookup of dependant names
 	public:
 		using Raster<T, 2>::data;
-		using Raster<T, 2>::rastermeta;
-		using Raster<T, 2>::valuemeta;
+		using Raster<T, 2>::lcrs;
+		using Raster<T, 2>::dd;
 		using Raster<T, 2>::getDataSize;
 		using Raster<T, 2>::setRepresentation;
 };

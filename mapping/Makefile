@@ -41,8 +41,7 @@ DATASET_C7=data/2010/06/06/H-000-MSG2__-MSG2________-IR_097___-000001___-2010060
 DATASET_C8=data/2010/06/06/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061200-C_.rst
 DATASET_C9=data/2010/06/06/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061200-C_.rst
 DATASET_C10=data/2010/06/06/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061200-C_.rst
-DATASET_TMEAN=data/tmean_webmerc.tif
-DATASET_TMEAN2=data/tmean_1_10.tif
+DATASET_TMEAN=data/tmean_1_10.tif
 
 .SECONDARY: $(CL_HEADERS)
 
@@ -91,8 +90,8 @@ ${EXECGI}:	${OBJ_EXECGI}
 
 
 msat2datasource:	${EXE}
-	rm -f datasources/msat2*
-	./${EXE} createsource 62866 ${DATASET_C0} ${DATASET_C1} ${DATASET_C2} ${DATASET_C3} ${DATASET_C4} ${DATASET_C5} ${DATASET_C6} ${DATASET_C7} ${DATASET_C8} ${DATASET_C9} ${DATASET_C10} >datasources/msat2.json
+	rm -f datasources/msat2.dat datasources/msat2.db
+	#./${EXE} createsource 62866 ${DATASET_C0} ${DATASET_C1} ${DATASET_C2} ${DATASET_C3} ${DATASET_C4} ${DATASET_C5} ${DATASET_C6} ${DATASET_C7} ${DATASET_C8} ${DATASET_C9} ${DATASET_C10} >datasources/msat2.json
 	./${EXE} import datasources/msat2.json ${DATASET_C0} 1 0 42 RAW
 	./${EXE} import datasources/msat2.json ${DATASET_C1} 1 1 42 RAW
 	./${EXE} import datasources/msat2.json ${DATASET_C2} 1 2 42 RAW
@@ -106,11 +105,9 @@ msat2datasource:	${EXE}
 	./${EXE} import datasources/msat2.json ${DATASET_C10} 1 10 42 RAW
 
 tmeandatasource:	${EXE}
-	rm -f datasources/tmean*
-	./${EXE} createsource 3857 ${DATASET_TMEAN} >datasources/tmean.json
+	rm -f datasources/tmean*.dat datasources/tmean*.db
+	#./${EXE} createsource 3857 ${DATASET_TMEAN} >datasources/tmean.json
 	./${EXE} import datasources/tmean.json ${DATASET_TMEAN} 1 0 42 RAW
-	./${EXE} createsource 4326 ${DATASET_TMEAN2} >datasources/tmean2.json
-	./${EXE} import datasources/tmean2.json ${DATASET_TMEAN2} 1 0 42 RAW
 
 test: ${EXE}
 	valgrind --error-exitcode=4 ./${EXE} testquery queries/msat0.json

@@ -29,7 +29,7 @@ bool LocalCRS::operator==(const LocalCRS &b) const {
 			std::cerr << "origin mismatch: " << fabs(origin[i] - b.origin[i]) << std::endl;
 			return false;
 		}
-		if (fabs(scale[i] - b.scale[i]) > 0.00000001) {
+		if (fabs(scale[i] / b.scale[i] - 1.0) > 0.001) {
 			std::cerr << "scale mismatch" << std::endl;
 			return false;
 		}
@@ -60,7 +60,7 @@ size_t LocalCRS::getPixelCount() const {
 
 
 std::ostream& operator<< (std::ostream &out, const LocalCRS &rm) {
-	out << "RasterMetadata(epsg=" << rm.epsg << " dim=" << rm.dimensions << " size=["<<rm.size[0]<<","<<rm.size[1]<<"] origin=["<<rm.origin[0]<<","<<rm.origin[1]<<"] scale=["<<rm.scale[0]<<","<<rm.scale[1]<<"])";
+	out << "LocalCRS(epsg=" << rm.epsg << " dim=" << rm.dimensions << " size=["<<rm.size[0]<<","<<rm.size[1]<<"] origin=["<<rm.origin[0]<<","<<rm.origin[1]<<"] scale=["<<rm.scale[0]<<","<<rm.scale[1]<<"])";
 	return out;
 }
 
@@ -157,7 +157,17 @@ double DataDescription::getMaxByDatatype() const {
 }
 
 void DataDescription::print() const {
-	printf("Datatype: %d (%g - %g)\n", datatype, min, max);
+	printf("Datatype: %d (%g - %g), nodata = %s (%g)\n", datatype, min, max, has_no_data ? "yes" : "no", no_data);
+}
+
+std::ostream& operator<< (std::ostream &out, const DataDescription &dd) {
+	out << "Datatype: " << dd.datatype << " (" << dd.min << " - " << dd.max << ")";
+	if (dd.has_no_data)
+		out << " nodata = " << dd.no_data;
+	else
+		out << " no nodata";
+	out << std::endl;
+	return out;
 }
 
 void DataDescription::addNoData() {
@@ -327,9 +337,14 @@ void Raster2D<T>::clear(double _value) {
 
 
 template<typename T>
-void Raster2D<T>::blit(GenericRaster *genericraster, int destx, int desty, int) {
+void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty, int) {
 	if (genericraster->lcrs.dimensions != 2 || genericraster->lcrs.epsg != lcrs.epsg || genericraster->dd.datatype != dd.datatype)
 		throw MetadataException("blit with incompatible raster");
+
+	setRepresentation(GenericRaster::Representation::CPU);
+	if (genericraster->getRepresentation() != GenericRaster::Representation::CPU)
+		throw MetadataException("blit from raster that's not in a CPU buffer");
+
 	Raster2D<T> *raster = (Raster2D<T> *) genericraster;
 	int x1 = std::max(destx, 0);
 	int y1 = std::max(desty, 0);
@@ -344,7 +359,7 @@ void Raster2D<T>::blit(GenericRaster *genericraster, int destx, int desty, int) 
 	if (x1 >= x2 || y1 >= y2)
 		throw MetadataException("blit without overlapping region");
 
-#define BLIT_TYPE 2
+#define BLIT_TYPE 1
 #if BLIT_TYPE == 1 // 0.0286
 	for (int y=y1;y<y2;y++)
 		for (int x=x1;x<x2;x++)

@@ -40,7 +40,7 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 		virtual void toGDAL(const char *filename, const char *driver);
 
 		virtual void clear(double value);
-		virtual void blit(GenericRaster *raster, int x, int y=0, int z=0);
+		virtual void blit(const GenericRaster *raster, int x, int y=0, int z=0);
 		virtual GenericRaster *cut(int x, int y, int z, int width, int height, int depths);
 		virtual GenericRaster *scale(int width, int height=0, int depth=0);
 

@@ -45,9 +45,6 @@ GenericRaster *SourceOperator::getRaster(const QueryRectangle &rect) {
 
 	const LocalCRS *rmd = rastersource->getRasterMetadata();
 
-#if 0
-	return rastersource->load(channel, timestamp, rect.x1, rect.y1, rect.x2, rect.y2);
-#else
 	// world to pixel coordinates
 	double px1 = rmd->WorldToPixelX(rect.x1);
 	double py1 = rmd->WorldToPixelY(rect.y1);
@@ -56,8 +53,22 @@ GenericRaster *SourceOperator::getRaster(const QueryRectangle &rect) {
 	// TODO: ist px2 inclusive, exclusive? auf- oder abrunden?
 	//printf("SourceOperator: (%f, %f -> %f, %f) to (%d, %d -> %d, %d)\n", x1, y1, x2, y2, px1, py1, px2, py2);
 
-	// TODO: skalieren auf xres/yres, nach pyramide laden, oder was?
-	return rastersource->load(channel, rect.timestamp, std::floor(std::min(px1,px2)), std::floor(std::min(py1,py2)), std::ceil(std::max(px1,px2))+1, std::ceil(std::max(py1,py2))+1);
-#endif
+
+	// Figure out the desired zoom level
+	int pixel_x1 = std::floor(std::min(px1,px2));
+	int pixel_y1 = std::floor(std::min(py1,py2));
+	int pixel_x2 = std::ceil(std::max(px1,px2))+1;
+	int pixel_y2 = std::ceil(std::max(py1,py2))+1;
+
+	int zoom = 0;
+	int pixel_width = pixel_x2 - pixel_x1;
+	int pixel_height = pixel_y2 - pixel_y1;
+	while (pixel_width > 2*rect.xres && pixel_height > 2*rect.yres) {
+		zoom++;
+		pixel_width >>= 1;
+		pixel_height >>= 1;
+	}
+
+	return rastersource->load(channel, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom);
 }
 

@@ -30,6 +30,9 @@ class LocalCRS {
 		LocalCRS(epsg_t epsg, uint32_t w, uint32_t h, uint32_t d, double origin_x, double origin_y, double origin_z, double scale_x, double scale_y, double scale_z)
 			: epsg(epsg), dimensions(3), size{w, h, d}, origin{origin_x, origin_y, origin_z}, scale{scale_x, scale_y, scale_z} {};
 
+		LocalCRS(epsg_t epsg, int dimensions, uint32_t w, uint32_t h, uint32_t d, double origin_x, double origin_y, double origin_z, double scale_x, double scale_y, double scale_z)
+			: epsg(epsg), dimensions(dimensions), size{w, h, d}, origin{origin_x, origin_y, origin_z}, scale{scale_x, scale_y, scale_z} {};
+
 		LocalCRS(const QueryRectangle &rect);
 
 		LocalCRS() = delete;
@@ -95,6 +98,7 @@ class DataDescription {
 		double getMaxByDatatype() const;
 
 		void print() const;
+		friend std::ostream& operator<< (std::ostream &out, const DataDescription &dd);
 
 		GDALDataType datatype;
 		double min, max;
@@ -123,7 +127,7 @@ class GenericRaster {
 		};
 
 		virtual void setRepresentation(Representation r) = 0;
-		Representation getRepresentation() { return representation; }
+		Representation getRepresentation() const { return representation; }
 
 		static GenericRaster *create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation = Representation::CPU);
 		static GenericRaster *fromGDAL(const char *filename, int rasterid, epsg_t epsg = EPSG_UNKNOWN);
@@ -147,7 +151,7 @@ class GenericRaster {
 		virtual double getAsDouble(int x, int y=0, int z=0) = 0;
 
 		virtual void clear(double value) = 0;
-		virtual void blit(GenericRaster *raster, int x, int y=0, int z=0) = 0;
+		virtual void blit(const GenericRaster *raster, int x, int y=0, int z=0) = 0;
 		virtual GenericRaster *cut(int x, int y, int z, int width, int height, int depths) = 0;
 		GenericRaster *cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
 		virtual GenericRaster *scale(int width, int height=0, int depth=0) = 0;

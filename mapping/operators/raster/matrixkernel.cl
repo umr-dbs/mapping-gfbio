@@ -14,15 +14,24 @@ __kernel void matrixkernel(__global const IN_TYPE0 *in_data, __global const Rast
 			int source_x = clamp(posx+kx-matrix_offset, 0u, in_info->size[0]-1);
 			int source_y = clamp(posy+ky-matrix_offset, 0u, in_info->size[1]-1);
 
-			value += matrix[ky*matrix_size+kx] * R(in,source_x,source_y); //in_data[source_y*in_info->size[0]+source_x];
+			IN_TYPE0 v = R(in,source_x,source_y);
+			if (in_info->has_no_data && value == in_info->no_data) {
+				value = out_info->no_data;
+				kx = ky = matrix_size;
+				break;
+			}
+			value += matrix[ky*matrix_size+kx] * v;
 		}
 	}
 
 	OUT_TYPE0 max = out_info->max;
 	OUT_TYPE0 min = out_info->min;
 
-	if (value > max) value = max;
-	if (value < min) value = min;
+	// Clamp to [min, max] unless it is no_data
+	if (!(out_info->has_no_data && value == out_info->no_data)) {
+		if (value > max) value = max;
+		if (value < min) value = min;
+	}
 
 	out_data[gid] = value;
 }

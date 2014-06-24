@@ -1,11 +1,9 @@
-
 #map {
 	position: absolute;
 	top: 0%;
 	height: 100%;
-
 	left: 0px;
-	right: 350px;
+	right: 355px;
 	background-color: black;
 }
 
@@ -13,67 +11,91 @@
 	position: absolute;
 	top: 0%;
 	height: 100%;
-
 	right: 0px;
 	width: 350px;
-	background-color: white;
-	
-	overflow-y: auto;
+	border-left: 5px solid gray;
+	background: linear-gradient(to right, rgb(60, 60, 60) -5%,
+		rgb(97, 102, 97) 10%) repeat scroll 0% 0% transparent;
+	display: flex;
+    flex-direction: column;
 }
-
 
 .layerselection {
 	padding: 5px 4px;
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
 }
 
-
-
-.layer_control {
-	position: relative;
-	margin: 5px;
-	background-color: black;
+.layerselection hr {
+	visibility: hidden;
 }
 
-.layer_control_button {
-	position: absolute;
-	padding: 3px;
-	background-color: white;
-	border: 1px solid #999999;
-	border-radius: 5px;
+.layerselection a {
+	background: white;
 	color: black;
-}
-.layer_control_close {
-	position: absolute;
-	top: 5px;
-	right: 5px;
+	margin: 5px;
+	width: 25px;
+	height: 23px;
+	border: 1px outset black;
+	text-decoration: none;
 	text-align: center;
+	vertical-align: middle;
+	padding-top: 2px;
 }
 
-.layer_control_minimap {
-	width: 100%;
-	height: 160px;
-	background-color: #777777;
-	position: relative;
+.layerselection a:first-child {
+	margin-left: 0px;
 }
 
-.layer_control_minimap img {
-	position: absolute;
-	width: 100%;
-	height: 100%;
+.layerselection a:last-child {
+	margin-right: 0px;
 }
 
-.layer_control_name {
-	position: absolute;
-	top: 5px;
-	left: 5px;
-	max-width: 80%;
-	overflow: hidden;
+.layerselection a:hover {
+	border: 1px inset black;
+}
+
+#layerControls {
+	flex: 1 1 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.layerControl {
+	margin: 5px;
+}
+
+.layerControl .header,.layerControl .footer {
+	display: flex;
+	height: 20px;
+	background: #00F;
+}
+
+.layerControl .header .name {
+	flex: 1 1 0;
+	margin: 0;
 	text-overflow: ellipsis;
+	background: #F00;
 	white-space: nowrap;
 }
 
-.layer_control_showinnewtab {
+.layerControl .info,.layerControl .minMax,.layerControl .close {
+	flex: 0 0 25px;
+	background: #000;
+	color: #fff;
+	text-align: center;
+	cursor: pointer;
+}
+
+.layerControl .minimap {
+	position: relative; padding-bottom : 50%;
+	background: #000;
+	padding-bottom: 50%;
+}
+
+.layerControl .minimap img {
+	width: 100%;
+	height: 100%;
 	position: absolute;
-	bottom: 5px;
-	left: 5px;
 }

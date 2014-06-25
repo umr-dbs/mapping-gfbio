@@ -37,7 +37,7 @@ $curlSession = curl_init();
 curl_setopt ($curlSession, CURLOPT_URL, $url);
 curl_setopt ($curlSession, CURLOPT_HEADER, 1);
 
-$proxy = 'www-cache.mathematik.uni-marburg.de:3128';
+//$proxy = 'www-cache.mathematik.uni-marburg.de:3128';
 if ($proxy)
 	curl_setopt($curlSession, CURLOPT_PROXY, $proxy);
 

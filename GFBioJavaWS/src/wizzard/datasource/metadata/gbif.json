@@ -1,0 +1,115 @@
+{
+ "name": "GBif",
+ "columns":{
+  "id":{
+   "type": "integer",
+   "minvalue": 0
+   },
+  "dataset_id":{
+   "type": "uuid",
+   "regex": "xxxxxxxx-yyyyyyyy-zzzzzzzz"
+   },
+  "institution_code":{
+   "type": "text",
+   "autocomplete": false
+   },
+  "collection_code":{
+   "type": "text",
+   "autocomplete": false
+   },  
+  "basis_of_record":{
+   "type": "enum",
+   "enum_values": ["UNKNOWN","PRESERVED SPECIMEN","LIVING SPECIMEN","LITERATURE","OBSERVATION","FOSSIL SPECIMEN"],
+   "allow_multi_select": true
+   },
+  "scientific_name":{ 
+   "type": "text",
+   "autocomplete": true,
+   "autocomplete_service": "your.rest.url/here"
+   },
+  "scientific_name_author":{
+   "type": "text"
+   },
+  "taxon_id":{
+   "type": "integer",
+   "minvalue": 0
+   },
+  "kingdom":{
+   "type": "enum",
+   "enum_values": ["","Viruses","Metazoa","Chromalveolata","Plantae","Bacteria","Animalia","Fungi","Protozoa","Chromista","Archaea","incertae sedis"]
+   },
+  "phylum":{
+   "type": "text"
+   },   
+  "class":{
+   "type": "text"
+   },
+  "order":{
+   "type": "text"
+   },
+  "family":{
+   "type": "text"
+   },
+  "genus":{
+   "type":"text"
+   },   
+  "specific_epithet":{
+   "type":"text"
+   },
+  "country_code":{
+   "type": "text",
+   "minlength": 2,
+   "maxlength": 3
+   },
+  "host_country":{
+   "type":"text"
+   },
+  "year":{
+   "type": "integer",
+   "minvalue": 1980,
+   "maxvalue": 2014
+   },
+  "month":{
+   "type": "integer",
+   "minvalue": 1,
+   "maxvalue": 12
+   },
+  "event_date":{
+   "type": "date"
+   },
+  "elevation_in_meters":{
+   "type": "integer"
+   },
+  "depth_in_meters":{
+   "type": "integer"
+   },
+  "coordinate_precision":{
+   "type": "float"
+   },
+  "recorded_by":{
+   "type": "text"
+   },
+  "locality":{
+   "type":"text"
+   },
+  "day":{
+   "type":"integer",
+   "minvalue": 1,
+   "maxvalue": 31
+   },
+  "identified_by":{
+   "type": "text"
+   },
+  "date_identified":{
+   "type": "date"
+   },
+  "created": {
+   "type": "timestamp",
+   "withtimezone": false
+   },
+  "modified": {
+   "type": "timestamp",
+   "withtimezone": false
+   }
+ }
+}

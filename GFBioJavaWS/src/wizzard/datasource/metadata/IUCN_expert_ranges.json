@@ -1,0 +1,55 @@
+{
+ "name": "IUCN",
+ "columns":{
+    "id_no":{
+     "type":"integer"
+     },
+    "binomial":{
+     "type":"text"
+     },
+    "presence":{
+     "type":"enum",
+     "enum_values":[1,2,3,4,5]
+     },
+    "origin":{
+     "type":"enum",
+     "enum_values":[1,2,3,4,5]
+     },
+    "seasonal":{
+     "type":"enum",
+     "enum_values":[1,2,3,4,5]
+     },    
+    "compiler":{
+     "type":"text"
+     },
+    "year":{
+     "type":"integer"
+     },
+    "citation":{
+     "type":"text"
+     },
+    "source":{
+     "type":"text"
+     },
+    "dist_comm":{
+     "type":"text"
+     },
+    "island":{
+     "type":"text"
+     },
+    "subspecies":{
+     "type":"text"
+     },
+    "subpop":{
+     "type":"text"
+     },
+    "legend":{
+     "type":"enum",
+     "enum_values":["","Extant (resident)","Probably Extant (resident)","Not Mapped","Native (resident)","Introduced","Extinct","Reintroduced","Possibly Extinct"]
+     },
+    "tax_comm":{
+     "type":"text"
+     }
+ }
+}  
+

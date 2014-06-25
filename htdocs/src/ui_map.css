@@ -3,7 +3,7 @@
 	top: 0%;
 	height: 100%;
 	left: 0px;
-	right: 355px;
+	right: 351px;
 	background-color: black;
 }
 
@@ -13,11 +13,11 @@
 	height: 100%;
 	right: 0px;
 	width: 350px;
-	border-left: 5px solid gray;
-	background: linear-gradient(to right, rgb(60, 60, 60) -5%,
-		rgb(97, 102, 97) 10%) repeat scroll 0% 0% transparent;
+	border-left: 1px solid #E5E5E5;
+	background-color: #FFF;
 	display: flex;
-    flex-direction: column;
+	flex-direction: column;
+	font-size: 0.9em;
 }
 
 .layerselection {
@@ -27,21 +27,34 @@
 	justify-content: space-between;
 }
 
+.layerselection.top {
+	border-bottom: 1px solid #E5E5E5;
+}
+
+.layerselection.bottom {
+	border-top: 1px solid #E5E5E5;
+}
+
 .layerselection hr {
 	visibility: hidden;
 }
 
 .layerselection a {
-	background: white;
-	color: black;
+	background-color: #E5E5E5;
+	color: #333;
 	margin: 5px;
-	width: 25px;
+	/* width: 25px; */
+	padding-left: 5px;
+	padding-right: 5px;
 	height: 23px;
-	border: 1px outset black;
+	border: 1px solid rgb(230, 230, 230);
+	border-radius: 1px;
 	text-decoration: none;
 	text-align: center;
 	vertical-align: middle;
 	padding-top: 2px;
+	text-decoration: none;
+	height: 23px;
 }
 
 .layerselection a:first-child {
@@ -53,7 +66,8 @@
 }
 
 .layerselection a:hover {
-	border: 1px inset black;
+	border: 1px solid #C6C6C6;
+	box-shadow: 0px 1px 1px rgb(230, 230, 230);
 }
 
 #layerControls {
@@ -63,33 +77,57 @@
 }
 
 .layerControl {
-	margin: 5px;
+	margin: 10px;
+	border: 1px solid #C6C6C6;
+	border-radius: 1px;
+	background-color: #FFF;
+}
+
+.layerControl .header {
+	border-bottom: 1px solid #C6C6C6;
+}
+
+.layerControl .footer {
+	border-top: 1px solid #C6C6C6;
 }
 
 .layerControl .header,.layerControl .footer {
 	display: flex;
 	height: 20px;
-	background: #00F;
+	background: rgb(230, 230, 230);
 }
 
 .layerControl .header .name {
 	flex: 1 1 0;
 	margin: 0;
+	padding: 0px 5px;
 	text-overflow: ellipsis;
-	background: #F00;
 	white-space: nowrap;
+	text-overflow: ellipsis;
 }
 
-.layerControl .info,.layerControl .minMax,.layerControl .close {
+.layerControl .button {
 	flex: 0 0 25px;
-	background: #000;
-	color: #fff;
 	text-align: center;
 	cursor: pointer;
 }
 
+.layerControl .button:hover {
+	background-color: #C6C6C6;
+}
+
+.layerControl hr {
+	margin-top: 0px;
+	border-top: 0px;
+	border-left: 1px solid #C6C6C6;
+	border-right: 0px;
+	border-bottom: 0px;
+	height: 100%;
+}
+
 .layerControl .minimap {
-	position: relative; padding-bottom : 50%;
+	position: relative;
+	padding-bottom: 50%;
 	background: #000;
 	padding-bottom: 50%;
 }
@@ -98,4 +136,16 @@
 	width: 100%;
 	height: 100%;
 	position: absolute;
+}
+
+.ui-state-highlight {
+	margin: 0px 10px;
+	border: 3px dashed #C6C6C6;
+	background: none;
+	text-align: center;
+	color: #C6C6C6;
+}
+
+.ui-state-highlight:before {
+	content: "DROP";
 }

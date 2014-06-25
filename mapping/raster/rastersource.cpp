@@ -26,8 +26,10 @@
 #include <sqlite3.h>
 
 
+const int DEFAULT_TILE_SIZE = 2048;
+
 RasterSource::RasterSource(const char *_filename, bool writeable)
-	: lockedfile(-1), writeable(writeable), filename_json(_filename), rastermeta(nullptr), channelcount(0), channels(nullptr), db(nullptr), refcount(0) {
+	: lockedfile(-1), writeable(writeable), filename_json(_filename), lcrs(nullptr), channelcount(0), channels(nullptr), db(nullptr), refcount(0) {
 	try {
 		init();
 	}
@@ -92,7 +94,7 @@ void RasterSource::init() {
 
 	epsg_t epsg = jrm.get("epsg", EPSG_UNKNOWN).asInt();
 	if (dimensions == 1) {
-		rastermeta = new RasterMetadata(
+		lcrs = new LocalCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(),
 			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(),
@@ -100,7 +102,7 @@ void RasterSource::init() {
 		);
 	}
 	else if (dimensions == 2) {
-		rastermeta = new RasterMetadata(
+		lcrs = new LocalCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 1, -1).asInt(),
 			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(), origins.get((Json::Value::ArrayIndex) 1, 0).asInt(),
@@ -108,7 +110,7 @@ void RasterSource::init() {
 		);
 	}
 	else if (dimensions == 3) {
-		rastermeta = new RasterMetadata(
+		lcrs = new LocalCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 1, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 2, -1).asInt(),
 			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(), origins.get((Json::Value::ArrayIndex) 1, 0).asInt(), origins.get((Json::Value::ArrayIndex) 2, 0).asInt(),
@@ -118,7 +120,7 @@ void RasterSource::init() {
 	else
 		throw SourceException("json invalid, dimensions not between 1 and 3");
 
-	rastermeta->verify();
+	lcrs->verify();
 
 	Json::Value channelinfo = root["channels"];
 	if (!channelinfo.isArray() || channelinfo.size() < 1) {
@@ -127,7 +129,7 @@ void RasterSource::init() {
 	}
 
 	channelcount = channelinfo.size();
-	channels = new ValueMetadata *[channelcount];
+	channels = new DataDescription *[channelcount];
 	for (int i=0;i<channelcount;i++)
 		channels[i] = nullptr;
 
@@ -142,7 +144,7 @@ void RasterSource::init() {
 			no_data = channel.get("nodata", 0).asDouble();
 		}
 
-		channels[i] = new ValueMetadata(
+		channels[i] = new DataDescription(
 			GDALGetDataTypeByName(datatype.c_str()),
 			channel.get("min", 0).asDouble(),
 			channel.get("max", -1).asDouble(),
@@ -170,13 +172,14 @@ void RasterSource::init() {
 		" x2 INTEGER NOT NULL,"
 		" y2 INTEGER NOT NULL,"
 		" z2 INTEGER NOT NULL,"
+		" zoom INTEGER NOT NULL,"
 		" filenr INTEGER NOT NULL,"
 		" fileoffset INTEGER NOT NULL,"
 		" filebytes INTEGER NOT NULL,"
 		" compression INTEGER NOT NULL"
 		")"
 	);
-	dbexec("CREATE UNIQUE INDEX IF NOT EXISTS ctxy ON rasters (channel, timestamp, x1, y1)");
+	dbexec("CREATE UNIQUE INDEX IF NOT EXISTS ctxy ON rasters (channel, timestamp, x1, y1, z1, zoom)");
 }
 
 void RasterSource::dbexec(const char *query) {
@@ -193,9 +196,9 @@ void RasterSource::cleanup() {
 		close(lockedfile); // also removes the lock acquired by flock()
 		lockedfile = -1;
 	}
-	if (rastermeta) {
-		delete rastermeta;
-		rastermeta = nullptr;
+	if (lcrs) {
+		delete lcrs;
+		lcrs = nullptr;
 	}
 	if (channelcount && channels) {
 		for (int i=0;i<channelcount;i++) {
@@ -216,7 +219,7 @@ void RasterSource::import(const char *filename, int sourcechannel, int channelid
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	std::unique_ptr<GenericRaster> raster(
-		GenericRaster::fromGDAL(filename, sourcechannel, rastermeta->epsg)
+		GenericRaster::fromGDAL(filename, sourcechannel, lcrs->epsg)
 	);
 
 	import(raster.get(), channelid, timestamp, compression);
@@ -228,21 +231,73 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 		throw SourceException("Cannot import into a source opened as read-only");
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::import: unknown channel");
-	if (!(raster->rastermeta == *rastermeta)) {
-		std::cerr << raster->rastermeta << std::endl;
-		std::cerr << *rastermeta << std::endl;
-		throw SourceException("RasterMetadata does not match RasterSource");
+	if (!(raster->lcrs == *lcrs)) {
+		std::cerr << raster->lcrs << std::endl;
+		std::cerr << *lcrs << std::endl;
+		throw SourceException("Local CRS does not match RasterSource");
 	}
 
-	if (!(raster->valuemeta == *channels[channelid])) {
-		raster->valuemeta.print();
-		channels[channelid]->print();
-		throw SourceException("ValueMetadata does not match Channel's Metadata");
+	// If the no_data value is missing in the import raster, we assume this to be a GDAL error.
+	// In this case, we add the no_data value and continue as planned.
+	DataDescription rasterdd = raster->dd;
+	if (channels[channelid]->has_no_data && !rasterdd.has_no_data) {
+		rasterdd.has_no_data = true;
+		rasterdd.no_data = channels[channelid]->no_data;
+	}
+	if (!(rasterdd == *channels[channelid])) {
+		std::cerr << "imported raster: " << raster->dd << "expected:        " << *(channels[channelid]);
+		throw SourceException("DataDescription does not match Channel's DataDescription");
 	}
 
+	uint32_t tilesize = DEFAULT_TILE_SIZE;
+
+	for (int zoom=0;;zoom++) {
+		int zoomfactor = 1 << zoom;
+
+		if (lcrs->size[0] / zoomfactor < tilesize && lcrs->size[1] / zoomfactor < tilesize && lcrs->size[2] / zoomfactor < tilesize)
+			break;
+
+		GenericRaster *zoomedraster = raster;
+		if (zoom > 0)
+			zoomedraster = raster->scale(lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
+
+		for (uint32_t zoff = 0; zoff == 0 || zoff < zoomedraster->lcrs.size[2]; zoff += tilesize) {
+			uint32_t zsize = std::min(zoomedraster->lcrs.size[2] - zoff, tilesize);
+			for (uint32_t yoff = 0; yoff == 0 || yoff < zoomedraster->lcrs.size[1]; yoff += tilesize) {
+				uint32_t ysize = std::min(zoomedraster->lcrs.size[1] - yoff, tilesize);
+				for (uint32_t xoff = 0; xoff < zoomedraster->lcrs.size[0]; xoff += tilesize) {
+					uint32_t xsize = std::min(zoomedraster->lcrs.size[0] - xoff, tilesize);
+
+					LocalCRS tilelcrs(lcrs->epsg, lcrs->dimensions,
+						xsize, ysize, zsize,
+						zoomedraster->lcrs.PixelToWorldX(xoff), zoomedraster->lcrs.PixelToWorldY(yoff), zoomedraster->lcrs.PixelToWorldZ(zoff),
+						zoomedraster->lcrs.scale[0], zoomedraster->lcrs.scale[1], zoomedraster->lcrs.scale[2]
+					);
+
+					GenericRaster *tile = GenericRaster::create(tilelcrs, *channels[channelid]);
+					tile->blit(zoomedraster, -xoff, -yoff, -zoff);
+
+					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
+					importTile(tile, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp, compression);
+
+					delete tile;
+				}
+			}
+		}
+
+		if (zoom > 0)
+			delete zoomedraster;
+	}
+
+	//importTile(raster, 0, 0, 0, 0, channelid, timestamp, compression);
+}
+
+void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, int timestamp, GenericRaster::Compression compression) {
 	std::unique_ptr<ByteBuffer> buffer(
 		RasterConverter::direct_encode(raster, compression)
 	);
+
+	int zoomfactor = 1 << zoom;
 
 	printf("Method %d, size of data: %ld -> %ld (%f)\n", (int) compression, raster->getDataSize(), buffer->size, (double) buffer->size / raster->getDataSize());
 
@@ -277,7 +332,7 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 
   if (SQLITE_OK != sqlite3_prepare_v2(
 			db,
-			"INSERT INTO rasters (channel, timestamp, x1, y1, z1, x2, y2, z2, filenr, fileoffset, filebytes, compression) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+			"INSERT INTO rasters (channel, timestamp, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
 			-1, // read until '\0'
 			&stmt,
 			NULL
@@ -287,16 +342,17 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 
 	if ( SQLITE_OK != sqlite3_bind_int(stmt, 1, channelid)
 		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, timestamp)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, 0) // x1
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 4, 0) // y1
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 5, 0) // z1
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 6, raster->rastermeta.size[0]) // x2
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 7, raster->rastermeta.size[1]) // y2
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 8, raster->rastermeta.size[2]) // z2
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 9, filenr) // filenr
-		|| SQLITE_OK != sqlite3_bind_int64(stmt, 10, fileoffset) // fileoffset
-		|| SQLITE_OK != sqlite3_bind_int64(stmt, 11, buffer->size)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 12, compression) // compression method
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, offx) // x1
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 4, offy) // y1
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 5, offz) // z1
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 6, offx+raster->lcrs.size[0]*zoomfactor) // x2
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 7, offy+raster->lcrs.size[1]*zoomfactor) // y2
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 8, offz+raster->lcrs.size[2]*zoomfactor) // z2
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 9, zoom) // zoom
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 10, filenr) // filenr
+		|| SQLITE_OK != sqlite3_bind_int64(stmt, 11, fileoffset) // fileoffset
+		|| SQLITE_OK != sqlite3_bind_int64(stmt, 12, buffer->size)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 13, compression) // compression method
 		) {
 		throw SourceException("error binding");
 	}
@@ -310,21 +366,57 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 }
 
 
-GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, int x2, int y2) {
+GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, int x2, int y2, int zoom) {
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
 
 	Profiler::Profiler p_all("RasterSource::load");
 	// TODO: erstmal einen timestamp finden, der in der DB enthalten ist.
 
+	// TODO: schauen, ob der gewünschte zoom-level auch in der DB enthalten ist
+	sqlite3_stmt *stmt = nullptr;
+	if (SQLITE_OK != sqlite3_prepare_v2(
+			db,
+			"SELECT MAX(zoom) FROM rasters WHERE channel = ? AND timestamp = ? AND zoom <= ?",
+			-1, // read until '\0'
+			&stmt,
+			NULL
+		)) {
+		throw SourceException("Cannot prepare statement");
+	}
+
+	if ( SQLITE_OK != sqlite3_bind_int(stmt, 1, channelid)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, timestamp)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, zoom)
+		) {
+		throw SourceException("error binding");
+	}
+	int max_zoom = -1;
+	int res;
+	while ((res = sqlite3_step(stmt)) != SQLITE_DONE) {
+		if (res != SQLITE_ROW)
+			throw SourceException("error loading from DB");
+
+		max_zoom = sqlite3_column_int(stmt, 0);
+		break;
+	}
+	sqlite3_finalize(stmt);
+
+	if (max_zoom < 0) {
+		throw SourceException("No zoom level found for the given channel and timestamp");
+	}
+
+	zoom = std::min(zoom, max_zoom);
+	int zoomfactor = 1 << zoom;
+
 /*
 	x1 = std::max(x1, 0);
 	y1 = std::max(y1, 0);
-	x2 = std::min(x2, (int) rastermeta->size[0]);
-	y2 = std::min(y2, (int) rastermeta->size[1]);
+	x2 = std::min(x2, (int) lcrs->size[0]);
+	y2 = std::min(y2, (int) lcrs->size[1]);
 */
 	/*
-	if (x1 < 0 || y1 < 0 || (size_t) x2 > rastermeta->size[0] || (size_t) y2 > rastermeta->size[1]) {
+	if (x1 < 0 || y1 < 0 || (size_t) x2 > lcrs->size[0] || (size_t) y2 > lcrs->size[1]) {
 		std::stringstream ss;
 		ss << "RasterSource::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords out of bounds";
 		throw SourceException(ss.str());
@@ -339,11 +431,11 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 
 	// find all overlapping rasters in DB
 	Profiler::start("RasterSource::load: sqlite");
-	sqlite3_stmt *stmt = nullptr;
+	stmt = nullptr;
 
-  if (SQLITE_OK != sqlite3_prepare_v2(
+	if (SQLITE_OK != sqlite3_prepare_v2(
 			db,
-			"SELECT x1,y1,z1,filenr,fileoffset,filebytes,compression FROM rasters WHERE channel = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ?",
+			"SELECT x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM rasters WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ?",
 			-1, // read until '\0'
 			&stmt,
 			NULL
@@ -352,11 +444,12 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 	}
 
 	if ( SQLITE_OK != sqlite3_bind_int(stmt, 1, channelid)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, x2)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, y2)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 4, x1)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 5, y1)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 6, timestamp)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, zoom)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, x2)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 4, y2)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 5, x1)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 6, y1)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 7, timestamp)
 		) {
 		throw SourceException("error binding");
 	}
@@ -364,11 +457,12 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 
 	Profiler::start("RasterSource::load: create");
 	// Create an empty raster of the desired size
-	RasterMetadata resultmetadata(
-		rastermeta->epsg,
-		x2-x1, y2-y1,
-		rastermeta->PixelToWorldX(x1), rastermeta->PixelToWorldY(y1),
-		rastermeta->scale[0], rastermeta->scale[1]
+	LocalCRS resultmetadata(
+		lcrs->epsg,
+		lcrs->dimensions,
+		(x2-x1) >> zoom, (y2-y1) >> zoom, 0 /* (z2-z1) >> zoom */,
+		lcrs->PixelToWorldX(x1), lcrs->PixelToWorldY(y1), lcrs->PixelToWorldZ(0 /* z1 */),
+		lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
 	);
 	std::unique_ptr<GenericRaster> result(
 		GenericRaster::create(resultmetadata, *channels[channelid])
@@ -377,7 +471,7 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 	Profiler::stop("RasterSource::stop: create");
 
 	// Load all overlapping parts and blit them onto the empty raster
-	int res, tiles_found = 0;
+	int tiles_found = 0;
 	while ((res = sqlite3_step(stmt)) != SQLITE_DONE) {
 		if (res != SQLITE_ROW)
 			throw SourceException("error loading from DB");
@@ -385,17 +479,29 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 		int r_x1 = sqlite3_column_int(stmt, 0);
 		int r_y1 = sqlite3_column_int(stmt, 1);
 		//int r_z1 = sqlite3_column_int(stmt, 2);
-		int fileid = sqlite3_column_int(stmt, 3);
-		size_t fileoffset = sqlite3_column_int64(stmt, 4);
-		size_t filebytes = sqlite3_column_int64(stmt, 5);
-		GenericRaster::Compression method = (GenericRaster::Compression) sqlite3_column_int(stmt, 6);
+		int r_x2 = sqlite3_column_int(stmt, 3);
+		int r_y2 = sqlite3_column_int(stmt, 4);
+		//int r_z2 = sqlite3_column_int(stmt, 5);
+
+		int fileid = sqlite3_column_int(stmt, 6);
+		size_t fileoffset = sqlite3_column_int64(stmt, 7);
+		size_t filebytes = sqlite3_column_int64(stmt, 8);
+		GenericRaster::Compression method = (GenericRaster::Compression) sqlite3_column_int(stmt, 9);
 
 		//fprintf(stderr, "loading raster from %d,%d, blitting to %d, %d\n", r_x1, r_y1, x1, y1);
+		LocalCRS tilelcrs(
+			lcrs->epsg,
+			lcrs->dimensions,
+			(r_x2-r_x1) >> zoom, (r_y2-r_y1) >> zoom, 0 /* (r_z2-r_z1) >> zoom */,
+			lcrs->PixelToWorldX(r_x1), lcrs->PixelToWorldY(r_y1), lcrs->PixelToWorldZ(0 /* r_z1 */),
+			lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
+		);
 		std::unique_ptr<GenericRaster> tmpraster(
-			load(channelid, fileid, fileoffset, filebytes, method)
+			load(channelid, tilelcrs, fileid, fileoffset, filebytes, method)
 		);
 		Profiler::start("RasterSource::load: blit");
-		result->blit(tmpraster.get(), r_x1 - x1, r_y1 - y1, 0/*r_z1 - z1*/);
+
+		result->blit(tmpraster.get(), (r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
 		Profiler::stop("RasterSource::load: blit");
 		tiles_found++;
 	}
@@ -410,7 +516,7 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 }
 
 
-GenericRaster *RasterSource::load(int channelid, int fileid, size_t offset, size_t size, GenericRaster::Compression method) {
+GenericRaster *RasterSource::load(int channelid, const LocalCRS &tilecrs, int fileid, size_t offset, size_t size, GenericRaster::Compression method) {
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
 
@@ -455,7 +561,7 @@ GenericRaster *RasterSource::load(int channelid, int fileid, size_t offset, size
 
 	// decode / decompress
 	Profiler::Profiler p("RasterSource::load: decompress");
-	return RasterConverter::direct_decode(*rastermeta, *channels[channelid], &buffer, method);
+	return RasterConverter::direct_decode(tilecrs, *channels[channelid], &buffer, method);
 }
 
 

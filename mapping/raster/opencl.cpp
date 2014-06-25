@@ -218,22 +218,22 @@ static const std::string rasterinfo_source(
 
 void setKernelArgAsRasterinfo(cl::Kernel &kernel, cl_uint arg, GenericRaster *raster) {
 	RasterInfo ri;
-	for (int i=0;i<raster->rastermeta.dimensions;i++) {
-		ri.size[i] = raster->rastermeta.size[i];
-		ri.origin[i] = raster->rastermeta.origin[i];
-		ri.scale[i] = raster->rastermeta.scale[i];
+	for (int i=0;i<raster->lcrs.dimensions;i++) {
+		ri.size[i] = raster->lcrs.size[i];
+		ri.origin[i] = raster->lcrs.origin[i];
+		ri.scale[i] = raster->lcrs.scale[i];
 	}
-	for (int i=raster->rastermeta.dimensions;i<3;i++) {
+	for (int i=raster->lcrs.dimensions;i<3;i++) {
 		ri.size[i] = 1;
 		ri.origin[i] = 0.0;
 		ri.scale[i] = 1.0;
 	}
-	ri.epsg = raster->rastermeta.epsg;
+	ri.epsg = raster->lcrs.epsg;
 
-	ri.min = raster->valuemeta.min;
-	ri.max = raster->valuemeta.max;
-	ri.no_data = raster->valuemeta.has_no_data ? raster->valuemeta.no_data : 0.0;
-	ri.has_no_data = raster->valuemeta.has_no_data;
+	ri.min = raster->dd.min;
+	ri.max = raster->dd.max;
+	ri.no_data = raster->dd.has_no_data ? raster->dd.no_data : 0.0;
+	ri.has_no_data = raster->dd.has_no_data;
 
 	kernel.setArg(arg, sizeof(RasterInfo), &ri);
 }
@@ -241,22 +241,22 @@ void setKernelArgAsRasterinfo(cl::Kernel &kernel, cl_uint arg, GenericRaster *ra
 cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster) {
 	RasterInfo ri;
 	memset(&ri, 0, sizeof(RasterInfo));
-	for (int i=0;i<raster->rastermeta.dimensions;i++) {
-		ri.size[i] = raster->rastermeta.size[i];
-		ri.origin[i] = raster->rastermeta.origin[i];
-		ri.scale[i] = raster->rastermeta.scale[i];
+	for (int i=0;i<raster->lcrs.dimensions;i++) {
+		ri.size[i] = raster->lcrs.size[i];
+		ri.origin[i] = raster->lcrs.origin[i];
+		ri.scale[i] = raster->lcrs.scale[i];
 	}
-	for (int i=raster->rastermeta.dimensions;i<3;i++) {
+	for (int i=raster->lcrs.dimensions;i<3;i++) {
 		ri.size[i] = 1;
 		ri.origin[i] = 0.0;
 		ri.scale[i] = 1.0;
 	}
-	ri.epsg = raster->rastermeta.epsg;
+	ri.epsg = raster->lcrs.epsg;
 
-	ri.min = raster->valuemeta.min;
-	ri.max = raster->valuemeta.max;
-	ri.no_data = raster->valuemeta.has_no_data ? raster->valuemeta.no_data : 0.0;
-	ri.has_no_data = raster->valuemeta.has_no_data;
+	ri.min = raster->dd.min;
+	ri.max = raster->dd.max;
+	ri.no_data = raster->dd.has_no_data ? raster->dd.no_data : 0.0;
+	ri.has_no_data = raster->dd.has_no_data;
 
 	try {
 		cl::Buffer *buffer = new cl::Buffer(
@@ -374,7 +374,7 @@ void CLProgram::run() {
 		cl::Event event;
 		RasterOpenCL::getQueue()->enqueueNDRangeKernel(*kernel,
 			cl::NullRange, // Offset
-			cl::NDRange(out_rasters[0]->rastermeta.getPixelCount()), // Global
+			cl::NDRange(out_rasters[0]->lcrs.getPixelCount()), // Global
 			cl::NullRange, // local
 			nullptr, //events to wait for
 			&event //event to create

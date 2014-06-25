@@ -40,12 +40,12 @@ struct negate{
 	static GenericRaster *execute(Raster2D<T> *raster) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
-		T max = (T) raster->valuemeta.max;
-		T min = (T) raster->valuemeta.min;
-		T nodata = (T) raster->valuemeta.no_data;
+		T max = (T) raster->dd.max;
+		T min = (T) raster->dd.min;
+		T nodata = (T) raster->dd.no_data;
 #if 1
-		int size = raster->rastermeta.getPixelCount();
-		if (raster->valuemeta.has_no_data) {
+		int size = raster->lcrs.getPixelCount();
+		if (raster->dd.has_no_data) {
 			for (int i=0;i<size;i++) {
 				T d = raster->data[i];
 				// naja, ist auch nicht korrekt, aber egal
@@ -63,8 +63,8 @@ struct negate{
 			}
 		}
 #else
-		int width = raster->rastermeta.size[0];
-		int height = raster->rastermeta.size[1];
+		int width = raster->lcrs.size[0];
+		int height = raster->lcrs.size[1];
 		for (int y=0;y<height;y++) {
 			for (int x=0;x<width;x++) {
 				raster->set(x, y, max - (raster->get(x, y) - min));
@@ -104,8 +104,8 @@ struct add{
 		std::unique_ptr<GenericRaster> raster2_guard(raster2);
 
 		// nur ein Beispiel, nach der addition wird innerhalb des Wertebereichs normalisiert.
-		T1 min = (T1) raster1->valuemeta.min;
-		int size = raster1->rastermeta.getPixelCount();
+		T1 min = (T1) raster1->dd.min;
+		int size = raster1->lcrs.getPixelCount();
 		for (int i=0;i<size;i++) {
 			raster1->data[i] = ((raster1->data[i] - min) + (raster2->data[i] - min))/2 + min;
 		}
@@ -119,10 +119,10 @@ GenericRaster *AddOperator::getRaster(const QueryRectangle &rect) {
 	std::unique_ptr<GenericRaster> raster1( sources[0]->getRaster(rect) );
 	std::unique_ptr<GenericRaster> raster2( sources[1]->getRaster(rect) );
 
-	if (!(raster1->rastermeta == raster2->rastermeta))
-		throw OperatorException("add: rasters differ in rastermeta");
-	if (!(raster1->valuemeta == raster2->valuemeta))
-		throw OperatorException("add: rasters differ in valuemeta");
+	if (!(raster1->lcrs == raster2->lcrs))
+		throw OperatorException("add: rasters differ in lcrs");
+	if (!(raster1->dd == raster2->dd))
+		throw OperatorException("add: rasters differ in dd");
 
 	raster1->setRepresentation(GenericRaster::Representation::CPU);
 	raster2->setRepresentation(GenericRaster::Representation::CPU);

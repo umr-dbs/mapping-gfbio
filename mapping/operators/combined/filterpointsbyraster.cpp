@@ -41,16 +41,16 @@ PointCollection *FilterPointsByRaster::getPoints(const QueryRectangle &rect) {
 	std::unique_ptr<PointCollection> points_out_guard(points_out);
 
 	double no_data = 0.0; // 0 is always considered "false"
-	if (raster->valuemeta.has_no_data)
-		no_data = raster->valuemeta.no_data;
+	if (raster->dd.has_no_data)
+		no_data = raster->dd.no_data;
 
 	for (Point &p : points->collection) {
 		double x = p.x, y = p.y;
 
-		int px = floor(raster->rastermeta.WorldToPixelX(x));
-		int py = floor(raster->rastermeta.WorldToPixelY(y));
+		int px = floor(raster->lcrs.WorldToPixelX(x));
+		int py = floor(raster->lcrs.WorldToPixelY(y));
 
-		if (px >= 0 && py >= 0 && (size_t) px < raster->rastermeta.size[0] && (size_t) py < raster->rastermeta.size[1]) {
+		if (px >= 0 && py >= 0 && (size_t) px < raster->lcrs.size[0] && (size_t) py < raster->lcrs.size[1]) {
 			double value = raster->getAsDouble(px, py);
 
 			if (value != 0.0 && value != no_data)

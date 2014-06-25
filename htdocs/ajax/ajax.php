@@ -315,7 +315,22 @@ if ($action == 'examplequerylist.get') {
 	"endtime": 42,
 	"timeinterval": 1,
 
-	"name": "Points of Puma sightings",
+	"name": "Points of Puma sightings from PostGIS (as Points)",
+
+	"query": {
+		"type": "pgpointsource",
+		"params": {
+			"query": "x, y FROM locations"
+		}
+	}
+},
+"pumas2": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Points of Puma sightings from PostGIS (rastered)",
 
 	"query": {
 		"type": "points2raster",

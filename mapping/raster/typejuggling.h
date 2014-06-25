@@ -7,7 +7,7 @@
 template< template<typename T> class func, typename... V>
 auto callUnaryOperatorFunc(GenericRaster *raster, V... v)
 	-> decltype(func<uint8_t>::execute(nullptr, v...)) {
-	switch(raster->valuemeta.datatype) {
+	switch(raster->dd.datatype) {
 		case GDT_Byte:
 			return func<uint8_t>::execute((Raster2D<uint8_t> *) raster, v...);
 		case GDT_Int16:
@@ -27,7 +27,7 @@ auto callUnaryOperatorFunc(GenericRaster *raster, V... v)
 template< template<typename T1, typename T2> class func, typename T, typename... V>
 auto callBinaryOperatorFunc2(Raster2D<T> *raster1, GenericRaster *raster2, V... v)
 	-> decltype(func<uint8_t, uint8_t>::execute(nullptr,nullptr)) {
-	switch(raster2->valuemeta.datatype) {
+	switch(raster2->dd.datatype) {
 		case GDT_Byte:
 			return func<T, uint8_t>::execute(raster1, (Raster2D<uint8_t> *) raster2, v...);
 		case GDT_Int16:
@@ -47,7 +47,7 @@ auto callBinaryOperatorFunc2(Raster2D<T> *raster1, GenericRaster *raster2, V... 
 template< template<typename T1, typename T2> class func, typename... V>
 auto callBinaryOperatorFunc(GenericRaster *raster1, GenericRaster *raster2, V... v)
 	-> decltype(func<uint8_t, uint8_t>::execute(nullptr,nullptr)) {
-	switch(raster1->valuemeta.datatype) {
+	switch(raster1->dd.datatype) {
 		case GDT_Byte:
 			return callBinaryOperatorFunc2<func, uint8_t>((Raster2D<uint8_t> *) raster1, raster2, v...);
 		case GDT_Int16:

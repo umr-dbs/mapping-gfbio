@@ -15,7 +15,7 @@ template<typename T> void Raster2D<T>::toJPEG(const char *filename, Colorizer &c
 
 	if (!RasterTypeInfo<T>::isinteger)
 		throw new MetadataException("toJPEG cannot write float rasters");
-	if (rastermeta.dimensions != 2)
+	if (lcrs.dimensions != 2)
 		throw new MetadataException("toJPEG can only handle rasters with 2 dimensions");
 
 	this->setRepresentation(GenericRaster::Representation::CPU);
@@ -27,8 +27,8 @@ template<typename T> void Raster2D<T>::toJPEG(const char *filename, Colorizer &c
 			throw ExporterException("Could not write to file");
 	}
 
-	T max = valuemeta.max;
-	T min = valuemeta.min;
+	T max = dd.max;
+	T min = dd.min;
 	auto range = RasterTypeInfo<T>::getRange(min, max);
 
 	colorizer.setRange(range);
@@ -42,8 +42,8 @@ template<typename T> void Raster2D<T>::toJPEG(const char *filename, Colorizer &c
 
 	jpeg_stdio_dest(&cinfo, filename != nullptr ? file : stdout);
 
-	int width = rastermeta.size[0];
-	int height = rastermeta.size[1];
+	int width = lcrs.size[0];
+	int height = lcrs.size[1];
 
 	cinfo.image_width = width;
 	cinfo.image_height = height;
@@ -72,7 +72,7 @@ template<typename T> void Raster2D<T>::toJPEG(const char *filename, Colorizer &c
 			int py = flipy ? height-y : y;
 			for (int x=0;x<width;x++) {
 				int px = flipx ? width-x : x;
-				JSAMPLE color = colorizer.colorize8(get(px, py) - valuemeta.min);
+				JSAMPLE color = colorizer.colorize8(get(px, py) - dd.min);
 				if (x == 0 || y == 0 || x == width-1 || y == height-1)
 					color = 255;
 				row[x] = color;
@@ -90,7 +90,7 @@ template<typename T> void Raster2D<T>::toJPEG(const char *filename, Colorizer &c
 			int py = flipy ? height-y : y;
 			for (int x=0;x<width;x++) {
 				int px = flipx ? width-x : x;
-				uint32_t color = colorizer.colorize(get(px, py) - valuemeta.min);
+				uint32_t color = colorizer.colorize(get(px, py) - dd.min);
 				if (x == 0 || y == 0 || x == width-1 || y == height-1)
 					color = color_from_rgba(255,0,0,255);
 				row[3*x  ] = (color >>  0) & 0xff; // red

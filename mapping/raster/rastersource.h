@@ -23,14 +23,16 @@ class RasterSource {
 		void import(const char *filename, int sourcechannel, int channelid, int timestamp, GenericRaster::Compression compression = GenericRaster::Compression::PREDICTED);
 		void import(GenericRaster *raster, int channelid, int timestamp, GenericRaster::Compression compression = GenericRaster::Compression::PREDICTED);
 
-		GenericRaster *load(int channelid, int timestamp, int x1, int y1, int x2, int y2);
-		GenericRaster *load(int channelid, int fileid, size_t offset, size_t size, GenericRaster::Compression method);
+		GenericRaster *load(int channelid, int timestamp, int x1, int y1, int x2, int y2, int zoom = 0);
 
-		const RasterMetadata *getRasterMetadata() const { return rastermeta; };
+		const LocalCRS *getRasterMetadata() const { return lcrs; };
 
 		bool isWriteable() const { return writeable; }
 
 	private:
+		void importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, int timestamp, GenericRaster::Compression compression = GenericRaster::Compression::PREDICTED);
+		GenericRaster *load(int channelid, const LocalCRS &tilecrs, int fileid, size_t offset, size_t size, GenericRaster::Compression method);
+
 		void init();
 		void cleanup();
 		void dbexec(const char *query);
@@ -40,9 +42,9 @@ class RasterSource {
 		std::string filename_json;
 		std::string filename_data;
 		std::string filename_db;
-		RasterMetadata *rastermeta;
+		LocalCRS *lcrs;
 		int channelcount;
-		ValueMetadata **channels;
+		DataDescription **channels;
 		sqlite3 *db;
 		int refcount;
 };

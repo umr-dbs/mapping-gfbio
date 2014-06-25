@@ -39,7 +39,7 @@ static void convert(int argc, char *argv[]) {
 	try {
 		raster = GenericRaster::fromGDAL(argv[2], 1);
 	}
-	catch (ImporterException e) {
+	catch (ImporterException &e) {
 		printf("%s\n", e.what());
 		exit(5);
 	}
@@ -60,7 +60,7 @@ static void createsource(int argc, char *argv[]) {
 
 	Json::Value channels(Json::arrayValue);
 
-	RasterMetadata *rastermeta = nullptr;
+	LocalCRS *lcrs = nullptr;
 
 	epsg_t epsg = atoi(argv[2]);
 
@@ -68,24 +68,24 @@ static void createsource(int argc, char *argv[]) {
 		try {
 			raster = GenericRaster::fromGDAL(argv[i+3], 1, epsg);
 		}
-		catch (ImporterException e) {
+		catch (ImporterException &e) {
 			printf("%s\n", e.what());
 			exit(5);
 		}
 
 		if (i == 0) {
-			rastermeta = new RasterMetadata(raster->rastermeta);
+			lcrs = new LocalCRS(raster->lcrs);
 
 			Json::Value coords(Json::objectValue);
 			Json::Value sizes(Json::arrayValue);
 			Json::Value origins(Json::arrayValue);
 			Json::Value scales(Json::arrayValue);
-			for (int d=0;d<rastermeta->dimensions;d++) {
-				sizes[d] = rastermeta->size[d];
-				origins[d] = rastermeta->origin[d];
-				scales[d] = rastermeta->scale[d];
+			for (int d=0;d<lcrs->dimensions;d++) {
+				sizes[d] = lcrs->size[d];
+				origins[d] = lcrs->origin[d];
+				scales[d] = lcrs->scale[d];
 			}
-			coords["epsg"] = rastermeta->epsg;
+			coords["epsg"] = lcrs->epsg;
 			coords["size"] = sizes;
 			coords["origin"] = origins;
 			coords["scale"] = scales;
@@ -93,26 +93,26 @@ static void createsource(int argc, char *argv[]) {
 			root["coords"] = coords;
 		}
 		else {
-			if (!(*rastermeta == raster->rastermeta)) {
+			if (!(*lcrs == raster->lcrs)) {
 				printf("Channel %d has a different coordinate system than the first channel\n", i);
 				exit(5);
 			}
 		}
 
 		Json::Value channel(Json::objectValue);
-		channel["datatype"] = GDALGetDataTypeName(raster->valuemeta.datatype);
-		channel["min"] = raster->valuemeta.min;
-		channel["max"] = raster->valuemeta.max;
-		if (raster->valuemeta.has_no_data)
-			channel["nodata"] = raster->valuemeta.no_data;
+		channel["datatype"] = GDALGetDataTypeName(raster->dd.datatype);
+		channel["min"] = raster->dd.min;
+		channel["max"] = raster->dd.max;
+		if (raster->dd.has_no_data)
+			channel["nodata"] = raster->dd.no_data;
 
 		channels.append(channel);
 
 		delete raster;
 		raster = nullptr;
 	}
-	delete rastermeta;
-	rastermeta = nullptr;
+	delete lcrs;
+	lcrs = nullptr;
 
 	root["channels"] = channels;
 

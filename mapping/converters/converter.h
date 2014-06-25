@@ -18,22 +18,22 @@ class ByteBuffer {
 
 class RasterConverter {
 	protected:
-		RasterConverter(const RasterMetadata &rastermetadata, const ValueMetadata &valuemetadata)
-			: rastermeta(rastermetadata), valuemeta(valuemetadata) {};
+		RasterConverter(const LocalCRS &localcrs, const DataDescription &datadescription)
+			: localcrs(localcrs), datadescription(datadescription) {};
 	public:
 		virtual ~RasterConverter() { }
 
 		static ByteBuffer *direct_encode(GenericRaster *raster, GenericRaster::Compression method);
-		static GenericRaster *direct_decode(const RasterMetadata &rastermetadata, const ValueMetadata &valuemetadata, ByteBuffer *buffer, GenericRaster::Compression method);
+		static GenericRaster *direct_decode(const LocalCRS &rastermetadata, const DataDescription &valuemetadata, ByteBuffer *buffer, GenericRaster::Compression method);
 
-		static RasterConverter *getConverter(const RasterMetadata &rastermetadata, const ValueMetadata &valuemetadata, GenericRaster::Compression method);
+		static RasterConverter *getConverter(const LocalCRS &rastermetadata, const DataDescription &valuemetadata, GenericRaster::Compression method);
 
 		virtual ByteBuffer *encode(GenericRaster *raster) = 0;
 		virtual GenericRaster *decode(ByteBuffer *buffer) = 0;
 
 
-		const RasterMetadata rastermeta;
-		const ValueMetadata valuemeta;
+		const LocalCRS localcrs;
+		const DataDescription datadescription;
 };
 
 

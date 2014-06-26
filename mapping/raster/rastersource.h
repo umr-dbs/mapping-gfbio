@@ -7,8 +7,7 @@
 #include <mutex>
 
 #include "raster/raster.h"
-
-class sqlite3;
+#include "util/sqlite.h"
 
 class RasterSource {
 	public:
@@ -35,7 +34,6 @@ class RasterSource {
 
 		void init();
 		void cleanup();
-		void dbexec(const char *query);
 
 		int lockedfile;
 		bool writeable;
@@ -45,7 +43,7 @@ class RasterSource {
 		LocalCRS *lcrs;
 		int channelcount;
 		DataDescription **channels;
-		sqlite3 *db;
+		SQLite db;
 		int refcount;
 };
 

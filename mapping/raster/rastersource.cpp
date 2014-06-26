@@ -3,6 +3,8 @@
 #include "raster/rastersource.h"
 #include "raster/profiler.h"
 #include "converters/converter.h"
+#include "util/sqlite.h"
+
 
 #include <limits.h>
 #include <stdio.h>
@@ -20,16 +22,13 @@
 #include <memory>
 #include <string>
 
-
-
 #include <json/json.h>
-#include <sqlite3.h>
 
 
 const int DEFAULT_TILE_SIZE = 2048;
 
 RasterSource::RasterSource(const char *_filename, bool writeable)
-	: lockedfile(-1), writeable(writeable), filename_json(_filename), lcrs(nullptr), channelcount(0), channels(nullptr), db(nullptr), refcount(0) {
+	: lockedfile(-1), writeable(writeable), filename_json(_filename), lcrs(nullptr), channelcount(0), channels(nullptr), refcount(0) {
 	try {
 		init();
 	}
@@ -156,13 +155,9 @@ void RasterSource::init() {
 	/*
 	 * Step #2: open the .db file and initialize it if needed
 	 */
-	int rc = sqlite3_open(filename_db.c_str(), &db);
-	if (rc) {
-		printf("Can't open database %s: %s\n", filename_db.c_str(), sqlite3_errmsg(db));
-		throw SourceException(sqlite3_errmsg(db));
-	}
+	db.open(filename_db.c_str());
 
-	dbexec("CREATE TABLE IF NOT EXISTS rasters("
+	db.exec("CREATE TABLE IF NOT EXISTS rasters("
 		" id INTEGER PRIMARY KEY,"
 		" channel INTEGER NOT NULL,"
 		" timestamp INTEGER NOT NULL,"
@@ -179,9 +174,9 @@ void RasterSource::init() {
 		" compression INTEGER NOT NULL"
 		")"
 	);
-	dbexec("CREATE UNIQUE INDEX IF NOT EXISTS ctxyzz ON rasters (channel, timestamp, x1, y1, z1, zoom)");
+	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ctxyzz ON rasters (channel, timestamp, x1, y1, z1, zoom)");
 
-	dbexec("CREATE TABLE IF NOT EXISTS metadata("
+	db.exec("CREATE TABLE IF NOT EXISTS metadata("
 		" id INTEGER PRIMARY KEY,"
 		" channel INTEGER NOT NULL,"
 		" timestamp INTEGER NOT NULL,"
@@ -191,17 +186,9 @@ void RasterSource::init() {
 		")"
 	);
 
-	dbexec("CREATE UNIQUE INDEX IF NOT EXISTS ctik ON metadata (channel, timestamp, isstring, key)");
+	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ctik ON metadata (channel, timestamp, isstring, key)");
 }
 
-void RasterSource::dbexec(const char *query) {
-	char *error = 0;
-	if (SQLITE_OK != sqlite3_exec(db, query, NULL, NULL, &error)) {
-		printf("Error on query %s: %s\n", query, error);
-		sqlite3_free(error);
-		throw SourceException("db error");
-	}
-}
 
 void RasterSource::cleanup() {
 	if (lockedfile != -1) {
@@ -217,11 +204,6 @@ void RasterSource::cleanup() {
 			delete channels[i];
 		}
 		delete [] channels;
-	}
-
-	if (db) {
-		sqlite3_close(db);
-		db = nullptr;
 	}
 }
 
@@ -304,62 +286,35 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 			delete zoomedraster;
 	}
 
-	sqlite3_stmt *stmt = nullptr;
-	if (SQLITE_OK != sqlite3_prepare_v2(
-			db,
-			"INSERT INTO metadata (channel, timestamp, isstring, key, value) VALUES (?,?,?,?,?)",
-			-1, // read until '\0'
-			&stmt,
-			NULL
-		)) {
-		throw SourceException("Cannot prepare statement");
-	}
-
-	if ( SQLITE_OK != sqlite3_bind_int(stmt, 1, channelid)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, timestamp)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, 1) // isstring
-		) {
-		throw SourceException("error binding (1)");
-	}
+	SQLiteStatement stmt(db);
+	stmt.prepare("INSERT INTO metadata (channel, timestamp, isstring, key, value) VALUES (?,?,?,?,?)");
+	stmt.bind(1, channelid);
+	stmt.bind(2, timestamp);
+	stmt.bind(3, 1); // isstring
 
 	// import metadata
 	for (auto md : raster->md_string) {
 		auto key = md.first;
 		auto value = md.second;
 
-		if ( SQLITE_OK != sqlite3_bind_text(stmt, 4, key.c_str(), -1, SQLITE_TRANSIENT)
-			|| SQLITE_OK != sqlite3_bind_text(stmt, 5, value.c_str(), -1, SQLITE_TRANSIENT)
-			) {
-			throw SourceException("error binding (2)");
-		}
-		if (SQLITE_DONE != sqlite3_step(stmt))
-			throw SourceException("error inserting string metadata into DB");
-		if (SQLITE_OK != sqlite3_reset(stmt))
-			throw SourceException("error resetting for string metadata");
+		stmt.bind(4, key);
+		stmt.bind(5, value);
 
+		stmt.exec();
 		printf("inserting string md: %s = %s\n", key.c_str(), value.c_str());
 	}
-	if ( SQLITE_OK != sqlite3_bind_int(stmt, 3, 0) ) // isstring
-		throw SourceException("error binding (3)");
+	stmt.bind(3, 0); // isstring
 
 	for (auto md : raster->md_value) {
 		auto key = md.first;
 		auto value = md.second;
 
-		if ( SQLITE_OK != sqlite3_bind_text(stmt, 4, key.c_str(), -1, SQLITE_TRANSIENT)
-			|| SQLITE_OK != sqlite3_bind_double(stmt, 5, value)
-			) {
-			throw SourceException("error binding (4)");
-		}
-		if (SQLITE_DONE != sqlite3_step(stmt))
-			throw SourceException("error inserting value metadata into DB");
-		if (SQLITE_OK != sqlite3_reset(stmt))
-			throw SourceException("error resetting for value metadata");
+		stmt.bind(4, key);
+		stmt.bind(5, value);
 
+		stmt.exec();
 		printf("inserting value md: %s = %f\n", key.c_str(), value);
 	}
-	sqlite3_finalize(stmt);
-	stmt = nullptr;
 	//importTile(raster, 0, 0, 0, 0, channelid, timestamp, compression);
 }
 
@@ -399,41 +354,26 @@ void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int off
 
 
 	// Step 2: insert into DB
-	sqlite3_stmt *stmt = nullptr;
+	SQLiteStatement stmt(db);
 
-	if (SQLITE_OK != sqlite3_prepare_v2(
-			db,
-			"INSERT INTO rasters (channel, timestamp, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-			-1, // read until '\0'
-			&stmt,
-			NULL
-		)) {
-		throw SourceException("Cannot prepare statement");
-	}
+	stmt.prepare("INSERT INTO rasters (channel, timestamp, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression)"
+		" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
 
-	if ( SQLITE_OK != sqlite3_bind_int(stmt, 1, channelid)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, timestamp)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, offx) // x1
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 4, offy) // y1
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 5, offz) // z1
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 6, offx+raster->lcrs.size[0]*zoomfactor) // x2
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 7, offy+raster->lcrs.size[1]*zoomfactor) // y2
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 8, offz+raster->lcrs.size[2]*zoomfactor) // z2
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 9, zoom) // zoom
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 10, filenr) // filenr
-		|| SQLITE_OK != sqlite3_bind_int64(stmt, 11, fileoffset) // fileoffset
-		|| SQLITE_OK != sqlite3_bind_int64(stmt, 12, buffer->size)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 13, compression) // compression method
-		) {
-		throw SourceException("error binding");
-	}
+	stmt.bind(1, channelid);
+	stmt.bind(2, timestamp);
+	stmt.bind(3, offx); // x1
+	stmt.bind(4, offy); // y1
+	stmt.bind(5, offz); // z1
+	stmt.bind(6, (int32_t) (offx+raster->lcrs.size[0]*zoomfactor)); // x2
+	stmt.bind(7, (int32_t) (offy+raster->lcrs.size[1]*zoomfactor)); // y2
+	stmt.bind(8, (int32_t) (offz+raster->lcrs.size[2]*zoomfactor)); // z2
+	stmt.bind(9, zoom);
+	stmt.bind(10, (int32_t) filenr);
+	stmt.bind(11, (int64_t) fileoffset);
+	stmt.bind(12, (int64_t) buffer->size);
+	stmt.bind(13, compression);
 
-	if (SQLITE_DONE != sqlite3_step(stmt)) {
-		throw SourceException("error inserting into DB");
-	}
-
-	sqlite3_finalize(stmt);
-	stmt = nullptr;
+	stmt.exec();
 }
 
 
@@ -445,37 +385,21 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 	// TODO: erstmal einen timestamp finden, der in der DB enthalten ist.
 
 	// TODO: schauen, ob der gewünschte zoom-level auch in der DB enthalten ist
-	sqlite3_stmt *stmt = nullptr;
-	if (SQLITE_OK != sqlite3_prepare_v2(
-			db,
-			"SELECT MAX(zoom) FROM rasters WHERE channel = ? AND timestamp = ? AND zoom <= ?",
-			-1, // read until '\0'
-			&stmt,
-			NULL
-		)) {
-		throw SourceException("Cannot prepare statement");
-	}
+	SQLiteStatement stmt(db);
 
-	if ( SQLITE_OK != sqlite3_bind_int(stmt, 1, channelid)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, timestamp)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, zoom)
-		) {
-		throw SourceException("error binding");
-	}
+	stmt.prepare("SELECT MAX(zoom) FROM rasters WHERE channel = ? AND timestamp = ? AND zoom <= ?");
+
+	stmt.bind(1, channelid);
+	stmt.bind(2, timestamp);
+	stmt.bind(3, zoom);
+
 	int max_zoom = -1;
-	int res;
-	while ((res = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if (res != SQLITE_ROW)
-			throw SourceException("error loading from DB");
+	if (stmt.next())
+		max_zoom = stmt.getInt(0);
+	stmt.finalize();
 
-		max_zoom = sqlite3_column_int(stmt, 0);
-		break;
-	}
-	sqlite3_finalize(stmt);
-
-	if (max_zoom < 0) {
+	if (max_zoom < 0)
 		throw SourceException("No zoom level found for the given channel and timestamp");
-	}
 
 	zoom = std::min(zoom, max_zoom);
 	int zoomfactor = 1 << zoom;
@@ -502,28 +426,16 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 
 	// find all overlapping rasters in DB
 	Profiler::start("RasterSource::load: sqlite");
-	stmt = nullptr;
+	stmt.prepare("SELECT x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM rasters"
+		" WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ?");
 
-	if (SQLITE_OK != sqlite3_prepare_v2(
-			db,
-			"SELECT x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM rasters WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ?",
-			-1, // read until '\0'
-			&stmt,
-			NULL
-		)) {
-		throw SourceException("Cannot prepare statement");
-	}
-
-	if ( SQLITE_OK != sqlite3_bind_int(stmt, 1, channelid)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, zoom)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, x2)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 4, y2)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 5, x1)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 6, y1)
-		|| SQLITE_OK != sqlite3_bind_int(stmt, 7, timestamp)
-		) {
-		throw SourceException("error binding");
-	}
+	stmt.bind(1, channelid);
+	stmt.bind(2, zoom);
+	stmt.bind(3, x2);
+	stmt.bind(4, y2);
+	stmt.bind(5, x1);
+	stmt.bind(6, y1);
+	stmt.bind(7, timestamp);
 	Profiler::stop("RasterSource::load: sqlite");
 
 	Profiler::start("RasterSource::load: create");
@@ -543,21 +455,18 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 
 	// Load all overlapping parts and blit them onto the empty raster
 	int tiles_found = 0;
-	while ((res = sqlite3_step(stmt)) != SQLITE_DONE) {
-		if (res != SQLITE_ROW)
-			throw SourceException("error loading from DB");
+	while (stmt.next()) {
+		int r_x1 = stmt.getInt(0);
+		int r_y1 = stmt.getInt(1);
+		//int r_z1 = stmt.getInt(2);
+		int r_x2 = stmt.getInt(3);
+		int r_y2 = stmt.getInt(4);
+		//int r_z2 = stmt.getInt(5);
 
-		int r_x1 = sqlite3_column_int(stmt, 0);
-		int r_y1 = sqlite3_column_int(stmt, 1);
-		//int r_z1 = sqlite3_column_int(stmt, 2);
-		int r_x2 = sqlite3_column_int(stmt, 3);
-		int r_y2 = sqlite3_column_int(stmt, 4);
-		//int r_z2 = sqlite3_column_int(stmt, 5);
-
-		int fileid = sqlite3_column_int(stmt, 6);
-		size_t fileoffset = sqlite3_column_int64(stmt, 7);
-		size_t filebytes = sqlite3_column_int64(stmt, 8);
-		GenericRaster::Compression method = (GenericRaster::Compression) sqlite3_column_int(stmt, 9);
+		int fileid = stmt.getInt(6);
+		size_t fileoffset = stmt.getInt64(7);
+		size_t filebytes = stmt.getInt64(8);
+		GenericRaster::Compression method = (GenericRaster::Compression) stmt.getInt(9);
 
 		//fprintf(stderr, "loading raster from %d,%d, blitting to %d, %d\n", r_x1, r_y1, x1, y1);
 		LocalCRS tilelcrs(
@@ -577,8 +486,7 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 		tiles_found++;
 	}
 
-	sqlite3_finalize(stmt);
-	stmt = nullptr;
+	stmt.finalize();
 
 	if (tiles_found == 0)
 		throw SourceException("RasterSource::load(): No matching tiles found in DB");

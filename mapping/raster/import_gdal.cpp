@@ -2,7 +2,9 @@
 #include "raster/raster_priv.h"
 
 #include <stdint.h>
+#include <cstdlib>
 #include <mutex>
+#include <string>
 #include <sstream>
 
 
@@ -72,19 +74,28 @@ static GenericRaster *GDALImporter_loadRaster(GDALDataset *dataset, int rasterid
 
 	epsg_t epsg = default_epsg; //EPSG_UNKNOWN;
 
-	LocalCRS rastermeta(epsg, nXSize, nYSize, origin_x, origin_y, scale_x, scale_y);
-	// TODO: Workaround für MSAT2 .rst mit falschen max-werten!
+	LocalCRS lcrs(epsg, nXSize, nYSize, origin_x, origin_y, scale_x, scale_y);
+	double minvalue = adfMinMax[0];
 	double maxvalue = adfMinMax[1];
-	if (maxvalue == 255 && type == GDT_Int16) {
+
+	// TODO: Workaround für MSAT2 .rst mit falschen max-werten!
+	if (epsg == EPSG_METEOSAT2) {
 		maxvalue = 1023;
 		hasnodata = true;
 		nodata = 0;
+		type = GDT_Int16; // TODO: sollte GDT_UInt16 sein!
+
+		lcrs.origin[0] = 0;
+		lcrs.origin[1] = 3711;
+		lcrs.scale[0] = 1.0;
+		lcrs.scale[1] = -1.0;
 	}
-	if (type == GDT_Byte) maxvalue = 255;
-	DataDescription valuemeta(type, adfMinMax[0], maxvalue, hasnodata, nodata);
+	//if (type == GDT_Byte) maxvalue = 255;
+
+	DataDescription dd(type, minvalue, maxvalue, hasnodata, nodata);
 	//printf("loading raster with %g -> %g valuerange\n", adfMinMax[0], adfMinMax[1]);
 
-	GenericRaster *raster = GenericRaster::create(rastermeta, valuemeta);
+	GenericRaster *raster = GenericRaster::create(lcrs, dd);
 	void *buffer = raster->getDataForWriting();
 	//int bpp = raster->getBPP();
 
@@ -100,6 +111,28 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 	poBand->RasterIO( GF_Read, 0, 0, nXSize, nYSize,
 		buffer, nXSize, nYSize, type, 0, 0);
 
+	// Selectively read metadata
+	//char **mdList = GDALGetMetadata(poBand, "msg");
+	if (epsg == EPSG_METEOSAT2) {
+		char **mdList = poBand->GetMetadata("msg");
+		for (int i = 0; mdList && mdList[i] != nullptr; i++ ) {
+			printf("GDALImport: got Metadata %s\n", mdList[i]);
+			std::string md(mdList[i]);
+			size_t split = md.find('=');
+			if (split == std::string::npos)
+				continue;
+
+			std::string key = md.substr(0, split);
+			std::string value = md.substr(split+1, std::string::npos);
+
+			if (key == "TimeStamp")
+				raster->md_string.set(key, value);
+			else if (key == "CalibrationOffset" || key == "CalibrationSlope") {
+				double dvalue = std::strtod(value.c_str(), nullptr);
+				raster->md_value.set(key, dvalue);
+			}
+		}
+	}
 
 	return raster;
 }
@@ -156,21 +189,15 @@ GenericRaster *GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_
 		throw ImporterException("rasterid not found");
 	}
 
-	GenericRaster *raster = GDALImporter_loadRaster(dataset, rasterid, adfGeoTransform[0], adfGeoTransform[3], adfGeoTransform[1], adfGeoTransform[5], epsg);
 
-	/*
-	char** md = dataset->GetMetadataDomainList();
-	if (md) {
-		char** iter = md;
-		int count = 0;
-		while (iter != nullptr && *iter != nullptr) {
-			printf("Metadata domain: %s\n", *iter);
-			count++;
-		}
-		CSLDestroy(md);
-		printf("Found %d Metadata domains\n", count);
+	const char *drivername = dataset->GetDriverName();
+	//printf("Driver: %s\n", drivername);
+	if (strcmp(drivername, "MSG") == 0) {
+		if (epsg != EPSG_METEOSAT2)
+			throw ImporterException("MSG driver can only import rasters in MSG projection");
 	}
-	*/
+
+	GenericRaster *raster = GDALImporter_loadRaster(dataset, rasterid, adfGeoTransform[0], adfGeoTransform[3], adfGeoTransform[1], adfGeoTransform[5], epsg);
 
 	GDALClose(dataset);
 

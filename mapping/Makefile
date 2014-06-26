@@ -3,10 +3,12 @@
 # clang
 # real    0m22.968s
 
+LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
+CPATH := /usr/local/include/:$(CPATH)
 
 #CPP=g++
 CPP=clang++
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-I/usr/include/gdal/
+CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl
 LDFLAGS_CGI=-luriparser
 CL_SOURCES=$(wildcard operators/*/*.cl)
@@ -25,22 +27,18 @@ OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
 EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 
-DATASET=data/2010/06/06/H-000-MSG2__-MSG2________-IR_108___-000001___-201006060000-C_.rst
-DATASET2=data/cal/201109011200_mt09s_cr01rd004_na001_1000_rg01de_003000.rst
-DATASET8=data/2010/06/06/yuv/png_from_yuv/00000001.png
-DATASETNOISE=data/random/noise_image.png
 
-DATASET_C0=data/2010/06/06/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061200-C_.rst
-DATASET_C1=data/2010/06/06/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061200-C_.rst
-DATASET_C2=data/2010/06/06/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061200-C_.rst
-DATASET_C3=data/2010/06/06/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061200-C_.rst
-DATASET_C4=data/2010/06/06/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061200-C_.rst
-DATASET_C5=data/2010/06/06/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061200-C_.rst
-DATASET_C6=data/2010/06/06/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061200-C_.rst
-DATASET_C7=data/2010/06/06/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061200-C_.rst
-DATASET_C8=data/2010/06/06/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061200-C_.rst
-DATASET_C9=data/2010/06/06/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061200-C_.rst
-DATASET_C10=data/2010/06/06/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061200-C_.rst
+DATASET_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061200-C_
+DATASET_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061200-C_
+DATASET_C2=data/xrit2/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061200-C_
+DATASET_C3=data/xrit2/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061200-C_
+DATASET_C4=data/xrit2/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061200-C_
+DATASET_C5=data/xrit2/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061200-C_
+DATASET_C6=data/xrit2/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061200-C_
+DATASET_C7=data/xrit2/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061200-C_
+DATASET_C8=data/xrit2/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061200-C_
+DATASET_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061200-C_
+DATASET_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061200-C_
 DATASET_TMEAN=data/tmean_1_10.tif
 
 .SECONDARY: $(CL_HEADERS)

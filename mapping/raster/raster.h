@@ -7,6 +7,7 @@
 #include <ostream>
 
 #include "raster/exceptions.h"
+#include "raster/metadata.h"
 
 #define EPSG_UNKNOWN 0
 #define EPSG_METEOSAT2 0xF592  // 62866  // 0xFE1E05A1
@@ -57,11 +58,11 @@ class LocalCRS {
 		double WorldToPixelY(double wy) const { return (wy - origin[1]) / scale[1]; }
 		double WorldToPixelZ(double wz) const { return (wz - origin[2]) / scale[2]; }
 
-		const epsg_t epsg;
-		const uint8_t dimensions; // 1 .. 3
-		const uint32_t size[3]; // size of the raster in pixels
-		const double origin[3]; // world coordinates of the point at pixel coordinates (0,0)
-		const double scale[3]; // size of each pixel
+		epsg_t epsg;
+		uint8_t dimensions; // 1 .. 3
+		uint32_t size[3]; // size of the raster in pixels
+		double origin[3]; // world coordinates of the point at pixel coordinates (0,0)
+		double scale[3]; // size of each pixel
 		/*
 		 * World coordinates of the pixel at (x, y) are:
 		 * world_x = origin[0] + x * scale[0]
@@ -156,12 +157,14 @@ class GenericRaster {
 		GenericRaster *cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
 		virtual GenericRaster *scale(int width, int height=0, int depth=0) = 0;
 
+		std::string hash();
+
+
 		const LocalCRS lcrs;
 		const DataDescription dd;
 
-		// MurmurHash3_x64_128
-		std::string hash();
-
+		DirectMetadata<std::string> md_string;
+		DirectMetadata<double> md_value;
 
 	protected:
 		GenericRaster(const LocalCRS &localcrs, const DataDescription &datadescription);

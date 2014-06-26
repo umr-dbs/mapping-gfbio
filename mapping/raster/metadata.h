@@ -16,6 +16,12 @@ class DirectMetadata {
 		void set(const std::string &key, const T &value);
 		const T &get(const std::string &key);
 		const T &get(const std::string &key, const T &defaultvalue);
+
+		//typename std::map<std::string, T>::iterator begin() { return data.begin(); }
+		typename std::map<std::string, T>::const_iterator begin() const { return data.begin(); }
+
+	    //typename std::map<std::string, T>::iterator end() { return data.end(); }
+		typename std::map<std::string, T>::const_iterator end() const { return data.end(); }
 	private:
 		std::map<std::string, T> data;
 };

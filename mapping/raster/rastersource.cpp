@@ -179,7 +179,19 @@ void RasterSource::init() {
 		" compression INTEGER NOT NULL"
 		")"
 	);
-	dbexec("CREATE UNIQUE INDEX IF NOT EXISTS ctxy ON rasters (channel, timestamp, x1, y1, z1, zoom)");
+	dbexec("CREATE UNIQUE INDEX IF NOT EXISTS ctxyzz ON rasters (channel, timestamp, x1, y1, z1, zoom)");
+
+	dbexec("CREATE TABLE IF NOT EXISTS metadata("
+		" id INTEGER PRIMARY KEY,"
+		" channel INTEGER NOT NULL,"
+		" timestamp INTEGER NOT NULL,"
+		" isstring INTEGER NOT NULL,"
+		" key STRING NOT NULL,"
+		" value STRING NOT NULL"
+		")"
+	);
+
+	dbexec("CREATE UNIQUE INDEX IF NOT EXISTS ctik ON metadata (channel, timestamp, isstring, key)");
 }
 
 void RasterSource::dbexec(const char *query) {
@@ -231,11 +243,13 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 		throw SourceException("Cannot import into a source opened as read-only");
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::import: unknown channel");
+	/*
 	if (!(raster->lcrs == *lcrs)) {
-		std::cerr << raster->lcrs << std::endl;
-		std::cerr << *lcrs << std::endl;
+		std::cerr << "Imported CRS: " << raster->lcrs << std::endl;
+		std::cerr << "Expected CRS: " << *lcrs << std::endl;
 		throw SourceException("Local CRS does not match RasterSource");
 	}
+	*/
 
 	// If the no_data value is missing in the import raster, we assume this to be a GDAL error.
 	// In this case, we add the no_data value and continue as planned.
@@ -244,11 +258,12 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 		rasterdd.has_no_data = true;
 		rasterdd.no_data = channels[channelid]->no_data;
 	}
+/*
 	if (!(rasterdd == *channels[channelid])) {
 		std::cerr << "imported raster: " << raster->dd << "expected:        " << *(channels[channelid]);
 		throw SourceException("DataDescription does not match Channel's DataDescription");
 	}
-
+*/
 	uint32_t tilesize = DEFAULT_TILE_SIZE;
 
 	for (int zoom=0;;zoom++) {
@@ -289,6 +304,62 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 			delete zoomedraster;
 	}
 
+	sqlite3_stmt *stmt = nullptr;
+	if (SQLITE_OK != sqlite3_prepare_v2(
+			db,
+			"INSERT INTO metadata (channel, timestamp, isstring, key, value) VALUES (?,?,?,?,?)",
+			-1, // read until '\0'
+			&stmt,
+			NULL
+		)) {
+		throw SourceException("Cannot prepare statement");
+	}
+
+	if ( SQLITE_OK != sqlite3_bind_int(stmt, 1, channelid)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 2, timestamp)
+		|| SQLITE_OK != sqlite3_bind_int(stmt, 3, 1) // isstring
+		) {
+		throw SourceException("error binding (1)");
+	}
+
+	// import metadata
+	for (auto md : raster->md_string) {
+		auto key = md.first;
+		auto value = md.second;
+
+		if ( SQLITE_OK != sqlite3_bind_text(stmt, 4, key.c_str(), -1, SQLITE_TRANSIENT)
+			|| SQLITE_OK != sqlite3_bind_text(stmt, 5, value.c_str(), -1, SQLITE_TRANSIENT)
+			) {
+			throw SourceException("error binding (2)");
+		}
+		if (SQLITE_DONE != sqlite3_step(stmt))
+			throw SourceException("error inserting string metadata into DB");
+		if (SQLITE_OK != sqlite3_reset(stmt))
+			throw SourceException("error resetting for string metadata");
+
+		printf("inserting string md: %s = %s\n", key.c_str(), value.c_str());
+	}
+	if ( SQLITE_OK != sqlite3_bind_int(stmt, 3, 0) ) // isstring
+		throw SourceException("error binding (3)");
+
+	for (auto md : raster->md_value) {
+		auto key = md.first;
+		auto value = md.second;
+
+		if ( SQLITE_OK != sqlite3_bind_text(stmt, 4, key.c_str(), -1, SQLITE_TRANSIENT)
+			|| SQLITE_OK != sqlite3_bind_double(stmt, 5, value)
+			) {
+			throw SourceException("error binding (4)");
+		}
+		if (SQLITE_DONE != sqlite3_step(stmt))
+			throw SourceException("error inserting value metadata into DB");
+		if (SQLITE_OK != sqlite3_reset(stmt))
+			throw SourceException("error resetting for value metadata");
+
+		printf("inserting value md: %s = %f\n", key.c_str(), value);
+	}
+	sqlite3_finalize(stmt);
+	stmt = nullptr;
 	//importTile(raster, 0, 0, 0, 0, channelid, timestamp, compression);
 }
 
@@ -330,7 +401,7 @@ void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int off
 	// Step 2: insert into DB
 	sqlite3_stmt *stmt = nullptr;
 
-  if (SQLITE_OK != sqlite3_prepare_v2(
+	if (SQLITE_OK != sqlite3_prepare_v2(
 			db,
 			"INSERT INTO rasters (channel, timestamp, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
 			-1, // read until '\0'

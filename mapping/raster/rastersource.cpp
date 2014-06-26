@@ -8,7 +8,7 @@
 
 #include <limits.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <string.h>
 #include <sys/file.h>
 #include <sys/types.h>
@@ -490,6 +490,22 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 
 	if (tiles_found == 0)
 		throw SourceException("RasterSource::load(): No matching tiles found in DB");
+
+	stmt.prepare("SELECT isstring, key, value FROM metadata"
+		" WHERE channel = ? AND timestamp = ?");
+	stmt.bind(1, channelid);
+	stmt.bind(2, timestamp);
+	while (stmt.next()) {
+		int isstring = stmt.getInt(0);
+		std::string key(stmt.getString(1));
+		const char *value = stmt.getString(2);
+		if (isstring == 0) {
+			double dvalue = std::strtod(value, nullptr);
+			result->md_value.set(key, dvalue);
+		}
+		else
+			result->md_string.set(key, std::string(value));
+	}
 
 	return result.release();
 }

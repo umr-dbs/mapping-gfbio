@@ -125,12 +125,20 @@ bool SQLiteStatement::next() {
 	}
 	throw SQLiteException("SQLiteStatement::next failed");
 }
+
+
 int32_t SQLiteStatement::getInt(int column) {
 	return sqlite3_column_int(stmt, column);
 }
+
 int64_t SQLiteStatement::getInt64(int column) {
 	return sqlite3_column_int64(stmt, column);
 }
+const char *SQLiteStatement::getString(int column) {
+	return (const char *) sqlite3_column_text(stmt, column);
+}
+
+
 void SQLiteStatement::finalize() {
 	if (stmt) {
 		sqlite3_finalize(stmt);

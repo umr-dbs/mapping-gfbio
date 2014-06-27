@@ -188,11 +188,12 @@
 }
 
 .ui-state-highlight {
-	margin: 0px 10px;
+	margin: 10px 10px;
 	border: 3px dashed #C6C6C6;
 	background: none;
 	text-align: center;
 	color: #C6C6C6;
+	padding: 0px;
 }
 
 .ui-state-highlight:before {

@@ -15,35 +15,37 @@
 	width: 350px;
 	border-left: 1px solid #E5E5E5;
 	background-color: #FFF;
-	display: flex;
-	flex-direction: column;
-	font-size: 0.9em;
+	font-size: 14px;
+}
+
+#overview.collapsed {
+	display: none;
 }
 
 .layerselection {
+	position: absolute;
+	left: 0px;
+	right: 0px;
 	padding: 5px 4px;
-	display: flex;
-	flex-direction: row;
-	justify-content: space-between;
+	height: 39px;
 }
 
 .layerselection.top {
+	top: 0px;
 	border-bottom: 1px solid #E5E5E5;
+	clear: both;
 }
 
 .layerselection.bottom {
+	bottom: 0px;
 	border-top: 1px solid #E5E5E5;
-}
-
-.layerselection hr {
-	visibility: hidden;
+	clear: both;
 }
 
 .layerselection a {
 	background-color: #E5E5E5;
 	color: #333;
 	margin: 5px;
-	/* width: 25px; */
 	padding-left: 5px;
 	padding-right: 5px;
 	height: 23px;
@@ -70,8 +72,21 @@
 	box-shadow: 0px 1px 1px rgb(230, 230, 230);
 }
 
+.layerselection .left {
+	float: left;
+}
+
+.layerselection .right {
+	float: right;
+}
+
 #layerControls {
-	flex: 1 1 0;
+	position: absolute;
+	top: 50px;
+	bottom: 50px;
+	left: 0px;
+	right: 0px;
+	
 	overflow-y: auto;
 	overflow-x: hidden;
 }
@@ -81,35 +96,66 @@
 	border: 1px solid #C6C6C6;
 	border-radius: 1px;
 	background-color: #FFF;
+	cursor: pointer;
 }
 
 .layerControl .header {
 	border-bottom: 1px solid #C6C6C6;
+	padding-bottom: 2px;
+	position: relative;
 }
 
 .layerControl .footer {
 	border-top: 1px solid #C6C6C6;
+	position: relative;
+}
+
+.layerControl ul {
+    list-style: none;
+    margin: 0px;
+    padding: 0px;
+}
+
+.layerControl li {
+	display: inline-block;
+}
+
+.layerControl ul.left {
+	position: absolute;
+	left: 0px;
+	width: 58px;
+}
+
+.layerControl ul.right {
+	position: absolute;
+    right: 0px;
+    width: 87px;
 }
 
 .layerControl .header,.layerControl .footer {
-	display: flex;
 	height: 20px;
 	background: rgb(230, 230, 230);
 }
 
 .layerControl .header .name {
-	flex: 1 1 0;
+	position: absolute;
+	left: 58px;
+	right: 87px;
+	
 	margin: 0;
 	padding: 0px 5px;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	text-overflow: ellipsis;
+	overflow: hidden;
 }
 
 .layerControl .button {
-	flex: 0 0 25px;
+	width: 20px;
 	text-align: center;
-	cursor: pointer;
+}
+
+.layerControl .button.active {
+    background-color: #CCCCCC;
 }
 
 .layerControl .button:hover {
@@ -123,6 +169,8 @@
 	border-right: 0px;
 	border-bottom: 0px;
 	height: 100%;
+	width: 1px;
+	display: inline;
 }
 
 .layerControl .minimap {
@@ -130,6 +178,7 @@
 	padding-bottom: 50%;
 	background: #000;
 	padding-bottom: 50%;
+	clear: both;
 }
 
 .layerControl .minimap img {
@@ -148,4 +197,38 @@
 
 .ui-state-highlight:before {
 	content: "DROP";
+}
+
+#collapseOverview {
+	height: 12px;
+	width: 8px;
+	right: 344px;
+	position: absolute;
+	
+	padding: 16px 1px;
+	font-size: 14px;
+	z-index: 100;
+	
+	color: #000;
+	top: 50%;
+	background-color: #E5E5E5;
+	border: 1px solid #FFF;
+	border-radius: 5px;
+	
+	cursor: pointer;
+}
+
+#collapseOverview:hover {
+	background-color: #C6C6C6;
+	border: 1px solid rgb(230, 230, 230);
+}
+
+#collapseOverview.collapsed {
+	right: 0px;
+	border-top-right-radius: 0px;
+    border-bottom-right-radius: 0px;
+}
+
+#collapseOverview.collapsed:before {
+	content: "";
 }

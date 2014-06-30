@@ -353,36 +353,31 @@ if ($action == 'examplequerylist.get') {
 	"name": "Points of Pumas that are currently under clouds",
 
 	"query": {
-		"type": "points2raster",
+		"type": "filterpointsbyraster",
 		"params": {
 		},
 		"sources": [{
-			"type": "filterpointsbyraster",
+			"type": "pgpointsource",
 			"params": {
+				"query": "x, y FROM locations"
+			}
+		},{
+			"type": "projection",
+			"params": {
+				"src_epsg": 62866,
+				"dest_epsg": 3857
 			},
 			"sources": [{
-				"type": "pgpointsource",
+				"type": "expression",
 				"params": {
-					"query": "x, y FROM locations"
-				}
-			},{
-				"type": "projection",
-				"params": {
-					"src_epsg": 62866,
-					"dest_epsg": 3857
+					"expression": "value < 300 ? 1 : 0"
 				},
 				"sources": [{
-					"type": "expression",
+					"type": "source",
 					"params": {
-						"expression": "value < 300 ? 1 : 0"
-					},
-					"sources": [{
-						"type": "source",
-						"params": {
-							"sourcepath": "datasources/msat2.json",
-							"channel": 6
-						}
-					}]
+						"sourcepath": "datasources/msat2.json",
+						"channel": 6
+					}
 				}]
 			}]
 		}]

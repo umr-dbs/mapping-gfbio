@@ -182,9 +182,8 @@
 
 .layerControl .minimap {
 	position: relative;
-	padding-bottom: 50%;
 	background: #000;
-	padding-bottom: 50%;
+	padding-bottom: 100%;
 	clear: both;
 }
 

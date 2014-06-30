@@ -23,7 +23,7 @@
 
 .win_addlayer_channel {
 	float: left;
-	width: 200px;
+	width: 150px;
 	text-align: center;
 	border: 1px solid #dddddd;
 	overflow: hidden;
@@ -33,6 +33,6 @@
 
 .win_addlayer_channel img {
 	margin: 0 auto;
-	width: 200px;
-	height: 100px;
+	width: 150px;
+	height: 150px;
 }

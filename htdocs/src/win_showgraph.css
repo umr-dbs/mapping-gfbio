@@ -8,13 +8,14 @@
 	height: 900px;
 }
 
+.win_showgraph_overlay{
+	transform-origin: top left;
+}
+
 .win_showgraph_svg {
 	left: 600px !important;
 	width: 600px !important;
-}
-
-svg {
-    overflow: hidden;
+	overflow: hidden;
 }
 
 .node rect {
@@ -35,4 +36,68 @@ svg {
     stroke: #333333;
     stroke-width: 1.5px;
     fill: none;
+}
+
+
+
+.win_showgraph_opnode {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	width: 100px;
+	height: 136px;
+	background-color: white;
+	border: 2px solid black;
+	overflow: hidden;
+}
+
+.win_showgraph_opnode_name {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	right: 0px;
+	height: 20px;
+	line-height: 20px;
+	text-align: center;
+	font-size: 16px;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.win_showgraph_opnode_type {
+	position: absolute;
+	top: 20px;
+	left: 0px;
+	right: 0px;
+	height: 16px;
+	line-height: 16px;
+	text-align: center;
+	font-size: 12px;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.win_showgraph_opnode_preview {
+	position: absolute;
+	display: block;
+	top: 36px;
+	left: 0px;
+	width: 100px;
+	height: 100px;
+	background-color: black;
+}
+
+.win_showgraph_opnode_params {
+	position: absolute;
+	left: 100px;
+	top: 36px;
+	width: 200px;
+	font-size: 14px;
+}
+
+.win_showgraph_opnode:hover {
+	width: 300px;
+	overflow: visible;
+	z-index: 9999;
 }

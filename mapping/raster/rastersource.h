@@ -24,7 +24,7 @@ class RasterSource {
 
 		GenericRaster *load(int channelid, int timestamp, int x1, int y1, int x2, int y2, int zoom = 0);
 
-		const LocalCRS *getRasterMetadata() const { return lcrs; };
+		const LocalCRS *getLocalCRS() const { return lcrs; };
 
 		bool isWriteable() const { return writeable; }
 

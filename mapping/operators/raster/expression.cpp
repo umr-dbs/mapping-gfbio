@@ -22,31 +22,15 @@ class ExpressionOperator : public GenericOperator {
 	private:
 		std::string expression;
 		GDALDataType output_type;
+		bool has_manual_value_range;
+		double output_min, output_max;
 };
 
 
-/*
-static std::string StringReplaceAll(std::string subject, const std::string& search, const std::string& replace) {
-    size_t pos = 0;
-    while ((pos = subject.find(search, pos)) != std::string::npos) {
-         subject.replace(pos, search.length(), replace);
-         pos += replace.length();
-    }
-    return subject;
-}
-*/
 
 #include "operators/raster/expression_header.cl.h"
-#include "operators/raster/expression_header_nodata.cl.h"
 #include "operators/raster/expression_footer.cl.h"
 
-
-template<typename T>
-struct getCLTypeName {
-	static const char *execute(Raster2D<T> *) {
-		return RasterTypeInfo<T>::cltypename;
-	}
-};
 
 template<typename T>
 struct isIntegerType {
@@ -59,7 +43,21 @@ struct isIntegerType {
 ExpressionOperator::ExpressionOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
 	assumeSources(1);
 	expression = params.get("expression", "value").asString();
-	output_type = GDALGetDataTypeByName(params.get("datatype", "x").asString().c_str()); // Byte, UInt16, Int32, Float32, ..
+	std::string datatype = params.get("datatype", "input").asString();
+	if (datatype == "input")
+		output_type = GDT_Unknown;
+	else {
+		output_type = GDALGetDataTypeByName(datatype.c_str()); // Byte, UInt16, Int32, Float32, ..
+		if (output_type == GDT_Unknown)
+			throw OperatorException(std::string("ExpressionOperator:: Invalid output data type ") + datatype);
+	}
+	has_manual_value_range = false;
+	output_min = output_max = 0.0;
+	if (params.isMember("min") && params.isMember("max")) {
+		has_manual_value_range = true;
+		output_min = params.get("min", 0.0).asDouble();
+		output_max = params.get("max", 0.0).asDouble();
+	}
 }
 ExpressionOperator::~ExpressionOperator() {
 }
@@ -119,12 +117,14 @@ GenericRaster *ExpressionOperator::getRaster(const QueryRectangle &rect) {
 	std::unique_ptr<GenericRaster> raster_guard(raster);
 
 
-	if (!callUnaryOperatorFunc<isIntegerType>(raster))
-		throw OperatorException("Cannot use ExpressionOperator on floating point values yet (TODO)");
+	if (!has_manual_value_range) {
+		if (!callUnaryOperatorFunc<isIntegerType>(raster))
+			throw OperatorException("ExpressionOperator on floating point values required a manual value range");
 
-	double drange = raster->dd.max - raster->dd.min;
-	if (drange > 4096 || drange <= 0)
-		throw OperatorException("Cannot use ExpressionOperator on raster with range > 4096 yet (TODO)");
+		double drange = raster->dd.max - raster->dd.min;
+		if (drange > 4096 || drange <= 0)
+			throw OperatorException("ExpressionOperator on raster with range > 4096 required a manual value range");
+	}
 
 	GDALDataType output_type = this->output_type;
 	if (output_type == GDT_Unknown)
@@ -139,59 +139,58 @@ GenericRaster *ExpressionOperator::getRaster(const QueryRectangle &rect) {
 	 * So, first things first: let's assemble our code
 	 */
 	std::stringstream ss_sourcecode;
-	if (raster->dd.has_no_data)
-		ss_sourcecode << operators_raster_expression_header_nodata;
-	else
-		ss_sourcecode << operators_raster_expression_header;
+	ss_sourcecode << operators_raster_expression_header;
 	ss_sourcecode << expression;
 	ss_sourcecode << operators_raster_expression_footer;
 
 	std::string sourcecode(ss_sourcecode.str());
 
+
 	/**
-	 * We need to figure out the new value range, i.e. dd.min and dd.max
-	 * Unless we want to pick the formula apart, differentiate and fine minima and maxima, we'll just brute force
-	 * We'll fill a (range x 1) raster with all values from 0 .. range-1, apply the expression,
+	 * Maybe we need to figure out the new value range, i.e. dd.min and dd.max
+	 * Unless we want to pick the formula apart, differentiate and find minima and maxima, we'll just brute force
+	 * We'll fill a (range x 1) raster with all values from min .. max, apply the expression,
 	 * then find the smallest and largest value.
 	 */
-	GenericRaster *value_raster = callUnaryOperatorFunc<createValueRaster>(raster);
-	std::unique_ptr<GenericRaster> value_raster_guard(value_raster);
+	double newmin, newmax;
+	if (!has_manual_value_range) {
+		GenericRaster *value_raster = callUnaryOperatorFunc<createValueRaster>(raster);
+		std::unique_ptr<GenericRaster> value_raster_guard(value_raster);
 
-	GenericRaster *value_output_raster = GenericRaster::create(value_raster->lcrs, output_dd, GenericRaster::Representation::OPENCL);
-	std::unique_ptr<GenericRaster> value_output_raster_guard(value_output_raster);
+		GenericRaster *value_output_raster = GenericRaster::create(value_raster->lcrs, output_dd, GenericRaster::Representation::OPENCL);
+		std::unique_ptr<GenericRaster> value_output_raster_guard(value_output_raster);
 
 
-	RasterOpenCL::CLProgram prog;
-	prog.addInRaster(value_raster);
-	prog.addOutRaster(value_output_raster);
-	prog.compile(sourcecode, "expressionkernel");
-	prog.run();
+		RasterOpenCL::CLProgram prog;
+		prog.addInRaster(value_raster);
+		prog.addOutRaster(value_output_raster);
+		prog.compile(sourcecode, "expressionkernel");
+		prog.run();
 
-	value_raster_guard.reset();
-	value_raster = nullptr;
+		value_raster_guard.reset();
+		value_raster = nullptr;
 
-	// TODO: we could of course try to get the min/max via opencl..
-	value_output_raster->setRepresentation(GenericRaster::CPU);
+		// TODO: we could of course try to get the min/max via opencl..
+		value_output_raster->setRepresentation(GenericRaster::CPU);
 
-	double newmin = raster->dd.min;
-	double newmax = raster->dd.max;
-	callUnaryOperatorFunc<getActualMinMax>(value_output_raster, &newmin, &newmax);
-
-	value_output_raster_guard.reset();
-	value_output_raster = nullptr;
-
+		callUnaryOperatorFunc<getActualMinMax>(value_output_raster, &newmin, &newmax);
+	}
+	else {
+		newmin = output_min;
+		newmax = output_max;
+	}
 
 	/*
 	 * Now that we got our new min and max.. time to do this.
 	 */
-	DataDescription out_dd(output_type, newmin, newmax); // no no_data //raster->dd.has_no_data, output_no_data);
+	DataDescription out_dd(output_type, newmin, newmax);
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
 	GenericRaster *raster_out = GenericRaster::create(raster->lcrs, out_dd);
 	std::unique_ptr<GenericRaster> raster_out_guard(raster_out);
 
-	prog.reset();
+	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster);
 	prog.addOutRaster(raster_out);
 	prog.compile(sourcecode, "expressionkernel");

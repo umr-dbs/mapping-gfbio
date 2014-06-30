@@ -18,6 +18,8 @@ auto callUnaryOperatorFunc(GenericRaster *raster, V... v)
 			return func<int32_t>::execute((Raster2D<int32_t> *) raster, v...);
 		case GDT_UInt32:
 			return func<uint32_t>::execute((Raster2D<uint32_t> *) raster, v...);
+		case GDT_Float32:
+			return func<float>::execute((Raster2D<float> *) raster, v...);
 		default:
 			throw MetadataException("Cannot call operator with this data type");
 	}
@@ -38,6 +40,8 @@ auto callBinaryOperatorFunc2(Raster2D<T> *raster1, GenericRaster *raster2, V... 
 			return func<T, int32_t>::execute(raster1, (Raster2D<int32_t> *) raster2, v...);
 		case GDT_UInt32:
 			return func<T, uint32_t>::execute(raster1, (Raster2D<uint32_t> *) raster2, v...);
+		case GDT_Float32:
+			return func<T, float>::execute(raster1, (Raster2D<float> *) raster2, v...);
 		default:
 			throw MetadataException("Cannot call operator with this data type");
 	}
@@ -58,6 +62,8 @@ auto callBinaryOperatorFunc(GenericRaster *raster1, GenericRaster *raster2, V...
 			return callBinaryOperatorFunc2<func, int32_t>((Raster2D<int32_t> *) raster1, raster2, v...);
 		case GDT_UInt32:
 			return callBinaryOperatorFunc2<func, uint32_t>((Raster2D<uint32_t> *) raster1, raster2, v...);
+		case GDT_Float32:
+			return callBinaryOperatorFunc2<func, float>((Raster2D<float> *) raster1, raster2, v...);
 		default:
 			throw MetadataException("Cannot call operator with this data type");
 	}
@@ -120,6 +126,7 @@ template<> struct RasterTypeInfo<float> {
 	static const bool issigned = true;
 	typedef double accumulator_type;
 	typedef double signed_accumulator_type;
+	static double getRange(float min, float max) { return (double) max-min; }
 };
 /*
 template<> struct RasterTypeInfo<double> {

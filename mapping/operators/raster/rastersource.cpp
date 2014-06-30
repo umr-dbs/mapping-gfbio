@@ -43,13 +43,16 @@ REGISTER_OPERATOR(SourceOperator, "source");
 GenericRaster *SourceOperator::getRaster(const QueryRectangle &rect) {
 	Profiler::Profiler p("SOURCE_OPERATOR");
 
-	const LocalCRS *rmd = rastersource->getRasterMetadata();
+	const LocalCRS *lcrs = rastersource->getLocalCRS();
+
+	if (lcrs->epsg != rect.epsg)
+		throw OperatorException("SourceOperator: wrong epsg requested");
 
 	// world to pixel coordinates
-	double px1 = rmd->WorldToPixelX(rect.x1);
-	double py1 = rmd->WorldToPixelY(rect.y1);
-	double px2 = rmd->WorldToPixelX(rect.x2);
-	double py2 = rmd->WorldToPixelY(rect.y2);
+	double px1 = lcrs->WorldToPixelX(rect.x1);
+	double py1 = lcrs->WorldToPixelY(rect.y1);
+	double px2 = lcrs->WorldToPixelX(rect.x2);
+	double py2 = lcrs->WorldToPixelY(rect.y2);
 	// TODO: ist px2 inclusive, exclusive? auf- oder abrunden?
 	//printf("SourceOperator: (%f, %f -> %f, %f) to (%d, %d -> %d, %d)\n", x1, y1, x2, y2, px1, py1, px2, py2);
 

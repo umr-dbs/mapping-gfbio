@@ -8,8 +8,6 @@
 
 
 template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &colorizer, bool flipx, bool flipy) {
-	if (!RasterTypeInfo<T>::isinteger)
-		throw new MetadataException("toPNG cannot write float rasters");
 	if (lcrs.dimensions != 2)
 		throw new MetadataException("toPNG can only handle rasters with 2 dimensions");
 
@@ -105,7 +103,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 		for (int x=0;x<width;x++) {
 			int px = flipx ? width-x : x;
 			T v = get(px, py);
-			if (dd.has_no_data && v == dd.no_data)
+			if (dd.is_no_data(v))
 				row[x] = 0;
 			else {
 				row[x] = round(((float) v - min) / range * 254) + 1;
@@ -148,9 +146,5 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 	}
 }
 
-
-template<> void Raster2D<float>::toPNG(const char *, Colorizer &, bool, bool) {
-	throw ConverterException("toPNG cannot write float rasters");
-}
 
 RASTER_PRIV_INSTANTIATE_ALL

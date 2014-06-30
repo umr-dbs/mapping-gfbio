@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <gdal_priv.h>
 
+#include <cmath>
 #include <ostream>
 
 #include "raster/exceptions.h"
@@ -98,7 +99,24 @@ class DataDescription {
 		double getMinByDatatype() const;
 		double getMaxByDatatype() const;
 
-		void print() const;
+		template<typename T> bool is_no_data(T val) const {
+			return (has_no_data && val == (T) no_data);
+		}
+		bool is_no_data(float val) const {
+			if (!has_no_data)
+				return false;
+			if (std::isnan(no_data) && std::isnan(val))
+				return true;
+			return (val == (float) no_data);
+		}
+		bool is_no_data(double val) const {
+			if (!has_no_data)
+				return false;
+			if (std::isnan(no_data) && std::isnan(val))
+				return true;
+			return (val == no_data);
+		}
+
 		friend std::ostream& operator<< (std::ostream &out, const DataDescription &dd);
 
 		GDALDataType datatype;

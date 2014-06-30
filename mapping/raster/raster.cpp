@@ -72,18 +72,23 @@ bool DataDescription::operator==(const DataDescription &b) const {
 }
 
 void DataDescription::verify() const {
+	if (!std::isfinite(min) || !std::isfinite(max))
+		throw MetadataException("ValueMetadata::verify: min or max not finite");
 	if (min >= max)
 		throw MetadataException("ValueMetadata::verify: min >= max");
 	if (min < getMinByDatatype() || max > getMaxByDatatype())
 		throw MetadataException("ValueMetadata::verify: min or max outside of range allowed by datatype");
 
 	if (has_no_data) {
-		/*
-		if (no_data < min || no_data > max)
-			throw MetadataException("ValueMetadata::verify: no_data not in [min, max]");
-		*/
-		if (no_data < getMinByDatatype() || no_data > getMaxByDatatype())
+		if (datatype == GDT_Float32 && std::isnan(no_data)) {
+			// valid
+		}
+		else if (!std::isfinite(no_data)) {
+			throw MetadataException("ValueMetadata::verify: no_data neither finite nor NaN");
+		}
+		else if (no_data < getMinByDatatype() || no_data > getMaxByDatatype()) {
 			throw MetadataException("ValueMetadata::verify: no_data outside of range allowed by datatype");
+		}
 	}
 }
 
@@ -117,7 +122,7 @@ double DataDescription::getMinByDatatype() const {
 		case GDT_UInt16: return std::numeric_limits<uint16_t>::min();
 		case GDT_Int32: return std::numeric_limits<int32_t>::min();
 		case GDT_UInt32: return std::numeric_limits<uint32_t>::min();
-		case GDT_Float32: return std::numeric_limits<float>::min();
+		case GDT_Float32: return std::numeric_limits<float>::lowest();
 		case GDT_Float64:
 			throw MetadataException("Unsupported data type: Float64");
 		case GDT_CInt16:
@@ -156,9 +161,6 @@ double DataDescription::getMaxByDatatype() const {
 	}
 }
 
-void DataDescription::print() const {
-	printf("Datatype: %d (%g - %g), nodata = %s (%g)\n", datatype, min, max, has_no_data ? "yes" : "no", no_data);
-}
 
 std::ostream& operator<< (std::ostream &out, const DataDescription &dd) {
 	out << "Datatype: " << dd.datatype << " (" << dd.min << " - " << dd.max << ")";
@@ -173,6 +175,12 @@ std::ostream& operator<< (std::ostream &out, const DataDescription &dd) {
 void DataDescription::addNoData() {
 	if (has_no_data)
 		return;
+
+	if (datatype == GDT_Float32 || datatype == GDT_Float64) {
+		no_data = std::numeric_limits<double>::quiet_NaN();
+		has_no_data = true;
+		return;
+	}
 
 	double real_min = getMinByDatatype();
 	double real_max = getMaxByDatatype();

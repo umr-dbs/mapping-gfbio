@@ -311,6 +311,13 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 	assembled_source << RasterOpenCL::getRasterInfoStructSource();
 	for (decltype(in_rasters.size()) idx = 0; idx < in_rasters.size(); idx++) {
 		assembled_source << "typedef " << callUnaryOperatorFunc<getCLTypeName>(in_rasters[idx]) << " IN_TYPE" << idx << ";\n";
+		// TODO: the first case is an optimization that may reduce our ability to cache programs.
+		if (!in_rasters[idx]->dd.has_no_data)
+			assembled_source << "#define ISNODATA"<<idx<<"(v,i) (false)\n";
+		else if (in_rasters[idx]->dd.datatype == GDT_Float32 || in_rasters[idx]->dd.datatype == GDT_Float64)
+			assembled_source << "#define ISNODATA"<<idx<<"(v,i) (i->has_no_data && (isnan(v) || v == i->no_data))\n";
+		else
+			assembled_source << "#define ISNODATA"<<idx<<"(v,i) (i->has_no_data && v == i->no_data)\n";
 	}
 	for (decltype(out_rasters.size()) idx = 0; idx < out_rasters.size(); idx++) {
 		assembled_source << "typedef " << callUnaryOperatorFunc<getCLTypeName>(out_rasters[idx]) << " OUT_TYPE" << idx << ";\n";

@@ -38,20 +38,24 @@ REGISTER_OPERATOR(GFBioPointSourceOperator, "gfbiopointsource");
 
 PointCollection *GFBioPointSourceOperator::getPoints(const QueryRectangle &rect) {
 
-	if (rect.epsg != EPSG_LATLON)
-		throw OperatorException("GFBioPointSourceOperator: Shouldn't load points in a projection other than latlon");
+	if (rect.epsg != EPSG_LATLON) {
+		std::ostringstream msg;
+		msg << "GFBioPointSourceOperator: Shouldn't load points in a projection other than latlon (got " << rect.epsg << ", expected " << EPSG_LATLON;
+		throw OperatorException(msg.str());
+	}
 
 	std::ostringstream url;
 	//url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource?datasource" << datasource << "&query=" << query;
 
-	url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource/WKB?datasource=" << curl.escape(datasource) << "&query=" << curl.escape(query);
+	url << "http://pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/WKB?datasource=" << curl.escape(datasource) << "&query=" << curl.escape(query);
 
 	std::stringstream data;
+
 
 	curl.setOpt(CURLOPT_URL, url.str().c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
-	curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
+	//curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
 
 	curl.perform();
 

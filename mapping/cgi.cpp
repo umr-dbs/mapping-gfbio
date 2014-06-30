@@ -383,8 +383,16 @@ int main() {
 				if (params.count("colors") > 0)
 					colorizer = params["colors"];
 
+				epsg_t epsg = EPSG_WEBMERCATOR;
+				if (params.count("crs") > 0) {
+					std::string crs = params["crs"];
+					if (crs.compare(0,5,"EPSG:") == 0) {
+						epsg = atoi(crs.substr(5, std::string::npos).c_str());
+					}
+				}
+
 				// TODO: y umdrehen, weil png von oben nach unten geht?
-				GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, EPSG_WEBMERCATOR));
+				GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, epsg));
 				std::unique_ptr<GenericRaster> result_raster(raster);
 
 				/*

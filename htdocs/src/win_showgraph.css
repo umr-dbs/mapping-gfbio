@@ -1,5 +1,18 @@
 
 
+.win_showgraph_canvas, .win_showgraph_overlay, .win_showgraph_svg {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	width: 1200px;
+	height: 900px;
+}
+
+.win_showgraph_svg {
+	left: 600px !important;
+	width: 600px !important;
+}
+
 svg {
     overflow: hidden;
 }

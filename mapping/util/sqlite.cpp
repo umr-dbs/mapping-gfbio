@@ -24,7 +24,7 @@ void SQLite::open(const char *filename) {
 		throw SQLiteException("DB already open");
 
 	int rc = sqlite3_open(filename, &db);
-	if (rc) {
+	if (rc != SQLITE_OK) {
 		std::ostringstream msg;
 		msg << "Can't open database " << filename << ": " << sqlite3_errmsg(db);
 		throw SQLiteException(msg.str());

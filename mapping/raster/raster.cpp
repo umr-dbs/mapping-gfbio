@@ -438,6 +438,8 @@ GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
 	if (width <= 0 || height <= 0)
 		throw MetadataException("scale() to empty area not allowed");
 
+	this->setRepresentation(GenericRaster::CPU);
+
 	LocalCRS newrmd(lcrs.epsg, width, height,
 		lcrs.PixelToWorldX(0), lcrs.PixelToWorldY(0),
 		lcrs.scale[0] * (double) width / lcrs.size[0], lcrs.scale[1] * (double) height / lcrs.size[0]

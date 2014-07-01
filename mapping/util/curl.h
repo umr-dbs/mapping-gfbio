@@ -13,7 +13,7 @@ class cURL {
 		template<typename T>
 			void setOpt(CURLoption option, T value) {
 				curl_easy_setopt(handle, option, value);
-			};
+			}
 		void perform();
 		std::string escape(const std::string &input);
 

@@ -20,7 +20,8 @@ OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl
 OBJ_OPERATORS_POINTS=o/operators_points_pgpointsource.o o/operators_points_gfbiopointsource.o
 OBJ_OPERATORS_GEOMETRY=
 OBJ_OPERATORS_COMBINED=o/operators_combined_points2raster.o o/operators_combined_filterpointsbyraster.o
-OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED)
+OBJ_OPERATORS_MSAT=o/operators_msat_radiance.o o/operators_msat_temperature.o
+OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT)
 OBJ_COMMON=${OBJ_RASTER} ${OBJ_CONVERTERS} ${OBJ_OPERATORS}  ${OBJ_UTIL}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
@@ -62,6 +63,9 @@ o/operators_%.o: operators/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
 o/operators_raster_%.o: operators/raster/%.cpp $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} -c $< -o $@
+
+o/operators_msat_%.o: operators/msat/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
 o/operators_points_%.o: operators/points/%.cpp $(CL_HEADERS)

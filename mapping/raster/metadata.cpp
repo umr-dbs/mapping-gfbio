@@ -17,14 +17,14 @@ DirectMetadata<T>::~DirectMetadata() {
 template<typename T>
 void DirectMetadata<T>::set(const std::string &key, const T &value) {
 	if (data.count(key) > 0)
-		throw MetadataException("Tried to set metadata that's already been set.");
+		throw MetadataException("Tried to set metadata '" + key + "' that's already been set.");
 	data[key] = value;
 }
 
 template<typename T>
 const T &DirectMetadata<T>::get(const std::string &key) {
 	if (data.count(key) < 1)
-		throw MetadataException("DirectMetadata::get(): No value stored for the given key.");
+		throw MetadataException("DirectMetadata::get(): No value stored for key '" + key + "'");
 	return data.at(key);
 }
 

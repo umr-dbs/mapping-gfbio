@@ -507,6 +507,7 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 			result->md_string.set(key, std::string(value));
 	}
 
+	result->md_value.set("Channel", channelid);
 	return result.release();
 }
 

@@ -91,6 +91,46 @@ if ($action == 'sourcelist.get') {
 if ($action == 'examplequerylist.get') {
 	$result = json_decode(<<<EOS
 {
+"reflectance": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "_MSat2 #0 Radiance",
+
+	"query": {
+		"type": "msatradiance",
+		"params": {
+		},
+		"sources": [{
+			"type": "source",
+			"params": {
+				"sourcepath": "datasources/msat2.json",
+				"channel": 0
+			}
+		}]
+	}
+},
+"temperature": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "_MSat2 #0 Temperature",
+
+	"query": {
+		"type": "msattemperature",
+		"params": {
+		},
+		"sources": [{
+			"type": "source",
+			"params": {
+				"sourcepath": "datasources/msat2.json",
+				"channel": 6
+			}
+		}]
+	}
+},
 "clouds": {
 	"colorizer": "grey",
 	"starttime": 42,

@@ -1,5 +1,6 @@
 #include "raster/raster.h"
 #include "raster/pointcollection.h"
+#include "raster/histogram.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
@@ -391,38 +392,39 @@ int main() {
 					}
 				}
 
-				// TODO: y umdrehen, weil png von oben nach unten geht?
-				GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, epsg));
-				std::unique_ptr<GenericRaster> result_raster(raster);
 
-				/*
-				int cut_x1 = (int) (bbox_normalized[0] * result_raster->lcrs.size[0]);
-				int cut_y1 = (int) ((1.0-bbox_normalized[3]) * result_raster->lcrs.size[1]);
-				int cut_x2 = (int) (bbox_normalized[2] * result_raster->lcrs.size[0]);
-				int cut_y2 = (int) ((1.0-bbox_normalized[1]) * result_raster->lcrs.size[1]);
-
-				std::unique_ptr<GenericRaster> cut_raster(
-					result_raster->cut(cut_x1,cut_y1,cut_x2-cut_x1,cut_y2-cut_y1)
-				);
-				result_raster.reset();
-				*/
-
-				if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
-					result_raster.reset( result_raster->scale(output_width, output_height) );
+				std::string format("image/png");
+				if (params.count("format") > 0) {
+					format = params["format"];
 				}
 
-				// output_width,output_height
+				QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, epsg);
 
-				bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
-				bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
+				if (format == "application/json") {
+					Histogram *histogram = graph->getHistogram(qrect);
+					std::unique_ptr<Histogram> histogram_guard(histogram);
+
+					printf("content-type: application/json\r\n\r\n");
+					histogram->print();
+				}
+				else {
+					GenericRaster *raster = graph->getRaster(qrect);
+					std::unique_ptr<GenericRaster> result_raster(raster);
+
+					if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
+						result_raster.reset( result_raster->scale(output_width, output_height) );
+					}
+
+					bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
+					bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
 
 #if RASTER_DO_PROFILE
-				printf("Profiling-header: ");
-				Profiler::print();
-				printf("\r\n");
+					printf("Profiling-header: ");
+					Profiler::print();
+					printf("\r\n");
 #endif
-				outputImage(result_raster.get(), flipx, flipy, colorizer);
-
+					outputImage(result_raster.get(), flipx, flipy, colorizer);
+				}
 				// cut into pieces
 
 

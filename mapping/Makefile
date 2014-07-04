@@ -13,10 +13,10 @@ LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -
 LDFLAGS_CGI=-luriparser
 CL_SOURCES=$(wildcard operators/*/*.cl)
 CL_HEADERS=$(CL_SOURCES:.cl=.cl.h)
-OBJ_RASTER=o/raster_raster.o o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o o/raster_metadata.o o/raster_import_gdal.o o/raster_export_pgm.o o/raster_export_yuv.o o/raster_export_png.o o/raster_export_jpeg.o o/raster_pointcollection.o
+OBJ_RASTER=o/raster_raster.o o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o o/raster_metadata.o o/raster_import_gdal.o o/raster_export_pgm.o o/raster_export_yuv.o o/raster_export_png.o o/raster_export_jpeg.o o/raster_pointcollection.o o/raster_histogram.o
 OBJ_UTIL=o/util_hash.o o/util_curl.o o/util_sqlite.o
 OBJ_CONVERTERS=o/converters_converter.o o/converters_raw.o
-OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_playground.o
+OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_playground.o o/operators_raster_histogram.o
 OBJ_OPERATORS_POINTS=o/operators_points_pgpointsource.o o/operators_points_gfbiopointsource.o
 OBJ_OPERATORS_GEOMETRY=
 OBJ_OPERATORS_COMBINED=o/operators_combined_points2raster.o o/operators_combined_filterpointsbyraster.o
@@ -110,6 +110,14 @@ tmeandatasource:	${EXE}
 	rm -f datasources/tmean*.dat datasources/tmean*.db
 	#./${EXE} createsource 3857 ${DATASET_TMEAN} >datasources/tmean.json
 	./${EXE} import datasources/tmean.json ${DATASET_TMEAN} 1 0 42 RAW
+
+worldclimdatasource:	${EXE}
+	rm -f datasources/worldclim*.dat datasources/worldclim*.db
+	./${EXE} import datasources/worldclim.json data/worldclim/tmin_1.bil 1 0 42 RAW
+	./${EXE} import datasources/worldclim.json data/worldclim/tmax_1.bil 1 1 42 RAW
+	./${EXE} import datasources/worldclim.json data/worldclim/tmean_1.bil 1 2 42 RAW
+	./${EXE} import datasources/worldclim.json data/worldclim/prec_1.bil 1 3 42 RAW
+
 
 test: ${EXE}
 	valgrind --error-exitcode=4 ./${EXE} testquery queries/msat0.json

@@ -87,6 +87,9 @@ PointCollection *GenericOperator::getPoints(const QueryRectangle &) {
 GenericGeometry *GenericOperator::getGeometry(const QueryRectangle &) {
 	throw OperatorException("getGeometry() called on an operator that doesn't return geometries");
 }
+Histogram *GenericOperator::getHistogram(const QueryRectangle &rect) {
+	throw OperatorException("getHistogram() called on an operator that doesn't return histogram");
+}
 
 
 // JSON constructor

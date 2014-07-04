@@ -96,7 +96,7 @@ if ($action == 'examplequerylist.get') {
 	"endtime": 42,
 	"timeinterval": 1,
 
-	"name": "_MSat2 #0 Radiance",
+	"name": "_MSat2 #6 Radiance",
 
 	"query": {
 		"type": "msatradiance",
@@ -106,7 +106,7 @@ if ($action == 'examplequerylist.get') {
 			"type": "source",
 			"params": {
 				"sourcepath": "datasources/msat2.json",
-				"channel": 0
+				"channel": 6
 			}
 		}]
 	}
@@ -116,7 +116,7 @@ if ($action == 'examplequerylist.get') {
 	"endtime": 42,
 	"timeinterval": 1,
 
-	"name": "_MSat2 #0 Temperature",
+	"name": "_MSat2 #6 Temperature",
 
 	"query": {
 		"type": "msattemperature",

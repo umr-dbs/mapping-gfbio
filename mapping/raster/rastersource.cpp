@@ -344,7 +344,7 @@ void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int off
 		throw SourceException("tell failed");
 	}
 
-	printf("writing to file starting at position %ld\n", fileoffset);
+	//printf("writing to file starting at position %ld\n", fileoffset);
 	size_t written = fwrite(buffer->data, sizeof(unsigned char), buffer->size, f);
 
 	fclose(f);

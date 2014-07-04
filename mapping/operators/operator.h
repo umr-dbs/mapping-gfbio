@@ -8,6 +8,7 @@ namespace Json {
 class GenericRaster;
 class PointCollection;
 class GenericGeometry;
+class Histogram;
 
 class QueryRectangle {
 	public:
@@ -31,7 +32,8 @@ class GenericOperator {
 		enum class Type {
 			RASTER,
 			POINTS,
-			GEOMETRY
+			GEOMETRY,
+			HISTOGRAM
 		};
 		static const int MAX_SOURCES = 5;
 		static GenericOperator *fromJSON(Json::Value &json);
@@ -41,6 +43,7 @@ class GenericOperator {
 		virtual GenericRaster *getRaster(const QueryRectangle &rect);
 		virtual PointCollection *getPoints(const QueryRectangle &rect);
 		virtual GenericGeometry *getGeometry(const QueryRectangle &rect);
+		virtual Histogram *getHistogram(const QueryRectangle &rect);
 
 	protected:
 		GenericOperator(Type type, int sourcecount, GenericOperator *sources[]);

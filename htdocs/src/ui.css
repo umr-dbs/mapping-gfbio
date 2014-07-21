@@ -12,6 +12,7 @@ body {
 	top: 200px;
 	width: 400px;
 	height: 300px;
+	z-index: 100;
 }
 
 .window_title {

@@ -1,5 +1,5 @@
-#ifndef RASTER_HASH_H
-#define RASTER_HASH_H
+#ifndef UTIL_HASH_H
+#define UTIL_HASH_H
 
 #include <string>
 #include <stdint.h>

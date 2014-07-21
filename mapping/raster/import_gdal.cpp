@@ -1,26 +1,13 @@
 
 #include "raster/raster_priv.h"
+#include "util/gdal.h"
 
 #include <stdint.h>
 #include <cstdlib>
-#include <mutex>
 #include <string>
 #include <sstream>
 
 
-static std::mutex gdal_init_mutex;
-static bool gdal_is_initialized = false;
-
-void gdal_init() {
-	if (gdal_is_initialized)
-		return;
-	std::lock_guard<std::mutex> guard(gdal_init_mutex);
-	if (gdal_is_initialized)
-		return;
-	gdal_is_initialized = true;
-	GDALAllRegister();
-	//GetGDALDriverManager()->AutoLoadDrivers();
-}
 
 
 static GenericRaster *GDALImporter_loadRaster(GDALDataset *dataset, int rasteridx, double origin_x, double origin_y, double scale_x, double scale_y, epsg_t default_epsg) {
@@ -138,7 +125,7 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 }
 
 GenericRaster *GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_t epsg) {
-	gdal_init();
+	GDAL::init();
 
 	GDALDataset *dataset = (GDALDataset *) GDALOpen(filename, GA_ReadOnly);
 
@@ -211,7 +198,7 @@ template<typename T> void Raster2D<T>::toGDAL(const char *, const char *) {
 }
 #if 0
 template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *drivername) {
-	gdal_init();
+	GDAL::init();
 
 
 	GDALDriver *poDriver;

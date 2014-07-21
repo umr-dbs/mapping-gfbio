@@ -49,14 +49,12 @@ struct pointRasterHistogram {
 
 			if (px >= 0 && py >= 0 && (size_t) px < raster->lcrs.size[0]
 					&& (size_t) py < raster->lcrs.size[1]) {
-				double v = raster->getAsDouble(px, py);
+				T value = raster->get(px, py);
 
-				if (raster->dd.is_no_data(v))
-					histogram->nodata_count++;
+				if (raster->dd.is_no_data(value))
+					histogram->addNoDataEntry();
 				else {
-					uint32_t value = (v - min);
-					if (value >= 0 && value < range)
-						histogram->counts[value]++;
+					histogram->add(value);
 				}
 			}
 		}

@@ -13,3 +13,14 @@ void Histogram::print() {
 	}
 	printf("]}");
 }
+
+
+void Histogram::add(double value) {
+	if (value >= min && value < max) {
+		counts[(value - min) / bucketSize]++;
+	}
+}
+
+void Histogram::addNoDataEntry() {
+	nodata_count++;
+}

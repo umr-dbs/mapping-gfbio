@@ -6,12 +6,13 @@
 #include <algorithm>
 #include <memory>
 #include <unordered_map>
+#include <sstream>
 
 #include <json/json.h>
 
 
 // The magic of type registration, see REGISTER_OPERATOR in operator.h
-typedef GenericOperator * (*OPConstructor)(int sourcecount, GenericOperator *sources[], Json::Value &params);
+typedef std::unique_ptr<GenericOperator> (*OPConstructor)(int sourcecount, GenericOperator *sources[], Json::Value &params);
 
 static std::unordered_map< std::string, OPConstructor > *getRegisteredConstructorsMap() {
 	static std::unordered_map< std::string, OPConstructor > registered_constructors;
@@ -93,7 +94,7 @@ std::unique_ptr<Histogram> GenericOperator::getHistogram(const QueryRectangle &r
 
 
 // JSON constructor
-GenericOperator *GenericOperator::fromJSON(Json::Value &json) {
+std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json) {
 	// recursively create all sources
 	Json::Value sourcelist = json["sources"];
 	Json::Value params = json["params"];
@@ -103,7 +104,7 @@ GenericOperator *GenericOperator::fromJSON(Json::Value &json) {
 		if (sourcelist.isArray() && sourcelist.size() > 0) {
 			sourcecount = sourcelist.size();
 			for (int i=0;i<sourcecount;i++) {
-				sources[i] = GenericOperator::fromJSON(sourcelist[(Json::Value::ArrayIndex) i]);
+				sources[i] = GenericOperator::fromJSON(sourcelist[(Json::Value::ArrayIndex) i]).release();
 			}
 		}
 
@@ -130,3 +131,12 @@ GenericOperator *GenericOperator::fromJSON(Json::Value &json) {
 }
 
 
+std::unique_ptr<GenericOperator> GenericOperator::fromJSON(const std::string &json) {
+	std::istringstream iss(json);
+	Json::Reader reader(Json::Features::strictMode());
+	Json::Value root;
+	if (!reader.parse(iss, root))
+		throw OperatorException("unable to parse json");
+
+	return GenericOperator::fromJSON(root);
+}

@@ -5,20 +5,38 @@
 #include "raster/profiler.h"
 #include "operators/operator.h"
 
-//#include <cstdlib>
 #include <cstdio>
 #include <cmath> // isnan
 #include <string>
 #include <fstream>
 #include <sstream>
-#include <exception>
 #include <algorithm>
 #include <map>
 #include <memory>
-#include <tuple>
 
 #include <uriparser/Uri.h>
 #include <json/json.h>
+
+/*
+A few benchmarks:
+SAVE_PNG8:   0.052097
+SAVE_PNG32:  0.249503
+SAVE_JPEG8:  0.021444 (90%)
+SAVE_JPEG32: 0.060772 (90%)
+SAVE_JPEG8:  0.021920 (100%)
+SAVE_JPEG32: 0.060187 (100%)
+
+Sizes:
+JPEG8:  200526 (100%)
+PNG8:   159504
+JPEG8:  124698 (95%)
+JPEG8:   92284 (90%)
+
+PNG32:  366925
+JPEG32: 308065 (100%)
+JPEG32: 168333 (95%)
+JPEG32: 120703 (90%)
+*/
 
 
 [[noreturn]] static void abort(const char *msg) {
@@ -101,45 +119,6 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 }
 
 
-std::tuple<GenericOperator *, int, std::string>loadQuery(const char *in_filename) {
-	/*
-	 * Step #1: open the query.json file and parse it
-	 */
-	std::ostringstream complete_in_filename;
-	complete_in_filename << "queries/" << in_filename  << ".json";
-	std::ifstream file(complete_in_filename.str());
-	if (!file.is_open()) {
-		throw ArgumentException(std::string("unable to open query file: ") + complete_in_filename.str());
-	}
-
-	Json::Reader reader(Json::Features::strictMode());
-	Json::Value root;
-	if (!reader.parse(file, root)) {
-		abort("unable to parse json");
-	}
-
-	int timestamp = root.get("starttime", 0).asInt();
-
-	GenericOperator *graph = GenericOperator::fromJSON(root["query"]);
-
-	return std::make_tuple(graph, timestamp, root.get("colorizer", "").asString());
-}
-
-std::tuple<GenericOperator *, int, std::string>parseQuery(const char *query) {
-	std::istringstream iss(query);
-	Json::Reader reader(Json::Features::strictMode());
-	Json::Value root;
-	if (!reader.parse(iss, root)) {
-		abort("unable to parse json");
-	}
-
-	int timestamp = 42;
-
-	GenericOperator *graph = GenericOperator::fromJSON(root);
-
-	return std::make_tuple(graph, timestamp, "");
-}
-
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "") {
 
 	std::unique_ptr<Colorizer> colorizer;
@@ -157,68 +136,6 @@ void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, 
 
 	raster->toJPEG(nullptr, *colorizer, flipx, flipy); //"/tmp/xyz.tmp.jpg");
 #endif
-}
-
-void outputImageByQuery(const char *in_filename) {
-	auto p = loadQuery(in_filename);
-
-	GenericOperator *graph = std::get<0>(p);
-	std::unique_ptr<GenericOperator> graph_guard(graph);
-
-	int timestamp = std::get<1>(p);
-	std::string colors = std::get<2>(p);
-
-	auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
-
-#if RASTER_DO_PROFILE && false
-	/*
-	// SAVE_PNG8:   0.052097
-	// SAVE_PNG32:  0.249503
-	// SAVE_JPEG8:  0.021444 (90%)
-	// SAVE_JPEG32: 0.060772 (90%)
-	// SAVE_JPEG8:  0.021920 (100%)
-	// SAVE_JPEG32: 0.060187 (100%)
-
-	Sizes:
-	JPEG8:  200526 (100%)
-	PNG8:   159504
-	JPEG8:  124698 (95%)
-	JPEG8:   92284 (90%)
-
-	PNG32:  366925
-	JPEG32: 308065 (100%)
-	JPEG32: 168333 (95%)
-	JPEG32: 120703 (90%)
-	*/
-
-	bool flipx = false;
-	bool flipy = false;
-	GreyscaleColorizer c1;
-	HSVColorizer c2;
-	{
-		Profiler::Profiler p("SAVE_PNG8");
-		raster->toPNG("/tmp/testimage1.png", c1, flipx, flipy);
-	}
-	{
-		Profiler::Profiler p("SAVE_PNG32");
-		raster->toPNG("/tmp/testimage2.png", c2, flipx, flipy);
-	}
-	{
-		Profiler::Profiler p("SAVE_JPEG8");
-		raster->toJPEG("/tmp/testimage1.jpg", c1, flipx, flipy);
-	}
-	{
-		Profiler::Profiler p("SAVE_JPEG32");
-		raster->toJPEG("/tmp/testimage2.jpg", c2, flipx, flipy);
-	}
-#endif
-#if RASTER_DO_PROFILE
-	printf("Profiling-header: ");
-	Profiler::print();
-	printf("\r\n");
-#endif
-
-	outputImage(raster.get(), false, false, colors);
 }
 
 
@@ -241,13 +158,8 @@ int main() {
 
 		// direct loading of a query (obsolete?)
 		if (params.count("query") > 0) {
-			auto p = parseQuery(params["query"].c_str());
-
-			GenericOperator *graph = std::get<0>(p);
-			std::unique_ptr<GenericOperator> graph_guard(graph);
-
-			int timestamp = std::get<1>(p);
-			//std::string colors = std::get<2>(p);
+			auto graph = GenericOperator::fromJSON(params["query"]);
+			int timestamp = 42;
 			std::string colorizer;
 			if (params.count("colors") > 0)
 				colorizer = params["colors"];
@@ -265,12 +177,8 @@ int main() {
 
 		// PointCollection as GeoJSON
 		if (params.count("pointquery") > 0) {
-			auto p = parseQuery(params["pointquery"].c_str());
-
-			GenericOperator *graph = std::get<0>(p);
-			std::unique_ptr<GenericOperator> graph_guard(graph);
-
-			int timestamp = std::get<1>(p);
+			auto graph = GenericOperator::fromJSON(params["pointquery"]);
+			int timestamp = 42;
 
 			auto points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
 
@@ -366,17 +274,8 @@ int main() {
 					abort("output_width not valid");
 				}
 
-				const char *query_name = params["layers"].c_str();
-
-				decltype(loadQuery(nullptr)) p;
-				p = parseQuery(query_name);
-				//p = loadQuery(query_name);
-
-				GenericOperator *graph = std::get<0>(p);
-				std::unique_ptr<GenericOperator> graph_guard(graph);
-
-				int timestamp = std::get<1>(p);
-				//std::string colors = std::get<2>(p);
+				auto graph = GenericOperator::fromJSON(params["layers"]);
+				int timestamp = 42;
 				std::string colorizer;
 				if (params.count("colors") > 0)
 					colorizer = params["colors"];

@@ -1,7 +1,9 @@
 #ifndef OPERATORS_OPERATOR_H
 #define OPERATORS_OPERATOR_H
 
+#include <string>
 #include <memory>
+#include "util/make_unique.h"
 
 namespace Json {
 	class Value;
@@ -38,7 +40,8 @@ class GenericOperator {
 			HISTOGRAM
 		};
 		static const int MAX_SOURCES = 5;
-		static GenericOperator *fromJSON(Json::Value &json);
+		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json);
+		static std::unique_ptr<GenericOperator> fromJSON(Json::Value &json);
 
 		virtual ~GenericOperator();
 
@@ -62,10 +65,10 @@ class GenericOperator {
 
 class OperatorRegistration {
 	public:
-		OperatorRegistration(const char *name, GenericOperator * (*constructor)(int sourcecount, GenericOperator *sources[], Json::Value &params));
+		OperatorRegistration(const char *name, std::unique_ptr<GenericOperator> (*constructor)(int sourcecount, GenericOperator *sources[], Json::Value &params));
 };
 
-#define REGISTER_OPERATOR(classname, name) static GenericOperator *create##classname(int sourcecount, GenericOperator *sources[], Json::Value &params) { return new classname(sourcecount, sources, params); } static OperatorRegistration register_##classname(name, create##classname)
+#define REGISTER_OPERATOR(classname, name) static std::unique_ptr<GenericOperator> create##classname(int sourcecount, GenericOperator *sources[], Json::Value &params) { return std::make_unique<classname>(sourcecount, sources, params); } static OperatorRegistration register_##classname(name, create##classname)
 
 
 #endif

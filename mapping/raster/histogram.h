@@ -4,17 +4,19 @@
 #include <vector>
 
 class Histogram {
-	private:
-		int nodata_count;
-		std::vector<int> counts;
-		double min, max;
-		double bucketSize;
 	public:
-		Histogram(int numberOfBuckets, double min, double max) : counts(numberOfBuckets), nodata_count(0), min(min), max(max), bucketSize((max-min)/numberOfBuckets) { }
-		~Histogram() {}
+		Histogram(int number_of_buckets, double min, double max);
+		~Histogram();
 		void print();
-		void add(double value);
-		void addNoDataEntry();
+		void inc(double value);
+		void incNoData();
+
+		static const int DEFAULT_NUMBER_OF_BUCKETS = 10000;
+
+	private:
+		std::vector<int> counts;
+		int nodata_count;
+		double min, max;
 };
 
 #endif

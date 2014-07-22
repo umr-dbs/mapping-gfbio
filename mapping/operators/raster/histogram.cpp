@@ -4,10 +4,10 @@
 #include "raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
+#include "util/make_unique.h"
 
 #include <memory>
 #include <cmath>
-//#include <algorithm>
 #include <json/json.h>
 
 
@@ -37,16 +37,15 @@ struct histogram{
 		T min = (T) raster->dd.min;
 
 		auto range = RasterTypeInfo<T>::getRange(min, max);
-
-		std::unique_ptr<Histogram> histogram( new Histogram(range, min, max) );
+		auto histogram = std::make_unique<Histogram>(range, min, max);
 
 		int size = raster->lcrs.getPixelCount();
 		for (int i=0;i<size;i++) {
 			T v = raster->data[i];
 			if (raster->dd.is_no_data(v))
-				histogram->addNoDataEntry();
+				histogram->incNoData();
 			else {
-				histogram->add(v);
+				histogram->inc(v);
 			}
 		}
 

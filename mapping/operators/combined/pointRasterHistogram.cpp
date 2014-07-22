@@ -26,7 +26,7 @@ PointRasterHistogramOperator::PointRasterHistogramOperator(int sourcecount,
 		GenericOperator(Type::POINTS, sourcecount, sources) {
 	assumeSources(2);
 
-	numberOfBuckets = params.get("numberOfBuckets", UINT_MAX).asUInt();
+	numberOfBuckets = params.get("numberOfBuckets", Histogram::DEFAULT_NUMBER_OF_BUCKETS).asUInt();
 }
 
 PointRasterHistogramOperator::~PointRasterHistogramOperator() {
@@ -42,8 +42,7 @@ struct pointRasterHistogram {
 		T min = (T) raster->dd.min;
 
 		auto range = RasterTypeInfo<T>::getRange(min, max);
-
-		if(range < numberOfBuckets) {
+		if (RasterTypeInfo<T>::isinteger && range < numberOfBuckets) {
 			numberOfBuckets = range;
 		}
 		auto histogram = std::make_unique<Histogram>(numberOfBuckets, min, max);
@@ -59,9 +58,9 @@ struct pointRasterHistogram {
 				T value = raster->get(px, py);
 
 				if (raster->dd.is_no_data(value))
-					histogram->addNoDataEntry();
+					histogram->incNoData();
 				else {
-					histogram->add(value);
+					histogram->inc(value);
 				}
 			}
 		}

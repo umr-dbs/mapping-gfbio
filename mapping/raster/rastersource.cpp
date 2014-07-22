@@ -315,9 +315,7 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 }
 
 void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, int timestamp, GenericRaster::Compression compression) {
-	std::unique_ptr<ByteBuffer> buffer(
-		RasterConverter::direct_encode(raster, compression)
-	);
+	auto buffer = RasterConverter::direct_encode(raster, compression);
 
 	int zoomfactor = 1 << zoom;
 

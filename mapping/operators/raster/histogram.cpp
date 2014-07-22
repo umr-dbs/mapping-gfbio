@@ -43,11 +43,9 @@ struct histogram{
 		for (int i=0;i<size;i++) {
 			T v = raster->data[i];
 			if (raster->dd.is_no_data(v))
-				histogram->nodata_count++;
+				histogram->addNoDataEntry();
 			else {
-				uint32_t value = (v - min);
-				if (value >= 0 && value < range)
-					histogram->counts[value]++;
+				histogram->add(v);
 			}
 		}
 

@@ -10,7 +10,7 @@ class Histogram {
 		double min, max;
 		double bucketSize;
 	public:
-		Histogram(int n, double min, double max) : counts(n), nodata_count(0), min(min), max(max), bucketSize((max-min)/n) { }
+		Histogram(int numberOfBuckets, double min, double max) : counts(numberOfBuckets), nodata_count(0), min(min), max(max), bucketSize((max-min)/numberOfBuckets) { }
 		~Histogram() {}
 		void print();
 		void add(double value);

@@ -11,6 +11,8 @@
 #include <json/json.h>
 
 class PointRasterHistogramOperator: public GenericOperator {
+private:
+	unsigned int numberOfBuckets;
 public:
 	PointRasterHistogramOperator(int sourcecount, GenericOperator *sources[],
 			Json::Value &params);
@@ -23,6 +25,8 @@ PointRasterHistogramOperator::PointRasterHistogramOperator(int sourcecount,
 		GenericOperator *sources[], Json::Value &params) :
 		GenericOperator(Type::POINTS, sourcecount, sources) {
 	assumeSources(2);
+
+	numberOfBuckets = params.get("numberOfBuckets", UINT_MAX).asUInt();
 }
 
 PointRasterHistogramOperator::~PointRasterHistogramOperator() {
@@ -31,7 +35,7 @@ REGISTER_OPERATOR(PointRasterHistogramOperator, "pointRasterHistogram");
 
 template<typename T>
 struct pointRasterHistogram {
-	static std::unique_ptr<Histogram> execute(Raster2D<T>* raster, PointCollection* points) {
+	static std::unique_ptr<Histogram> execute(Raster2D<T>* raster, PointCollection* points, unsigned int numberOfBuckets) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
 		T max = (T) raster->dd.max;
@@ -39,7 +43,10 @@ struct pointRasterHistogram {
 
 		auto range = RasterTypeInfo<T>::getRange(min, max);
 
-		auto histogram = std::make_unique<Histogram>(range, min, max);
+		if(range < numberOfBuckets) {
+			numberOfBuckets = range;
+		}
+		auto histogram = std::make_unique<Histogram>(numberOfBuckets, min, max);
 
 		for (Point &p : points->collection) {
 			double x = p.x, y = p.y;
@@ -63,11 +70,10 @@ struct pointRasterHistogram {
 	}
 };
 
-std::unique_ptr<Histogram> PointRasterHistogramOperator::getHistogram(
-		const QueryRectangle &rect) {
+std::unique_ptr<Histogram> PointRasterHistogramOperator::getHistogram(const QueryRectangle &rect) {
 	auto points = sources[0]->getPoints(rect);
 	auto raster = sources[1]->getRaster(rect);
 
 	Profiler::Profiler p("POINT_RASTER_HISTOGRAM_OPERATOR");
-	return callUnaryOperatorFunc<pointRasterHistogram>(raster.get(), points.get());
+	return callUnaryOperatorFunc<pointRasterHistogram>(raster.get(), points.get(), numberOfBuckets);
 }

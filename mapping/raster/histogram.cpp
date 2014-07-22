@@ -17,7 +17,15 @@ void Histogram::print() {
 
 void Histogram::add(double value) {
 	if (value >= min && value < max) {
-		counts[(value - min) / bucketSize]++;
+		unsigned int bucket = (value - min) / bucketSize;
+
+		// prevent overflows
+		if (bucket >= counts.size())
+			bucket = counts.size() - 1;
+		//if (bucket < 0)
+		//	bucket = 0;
+
+		counts[bucket]++;
 	}
 }
 

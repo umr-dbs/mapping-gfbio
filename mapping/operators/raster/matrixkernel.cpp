@@ -15,7 +15,7 @@ class MatrixKernelOperator : public GenericOperator {
 		MatrixKernelOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~MatrixKernelOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
 		int matrixsize, *matrix;
 };
@@ -52,9 +52,7 @@ template<typename T> T cap(T v, T min, T max) {
 
 template<typename T>
 struct matrixkernel{
-	static GenericRaster *execute(Raster2D<T> *raster_src, int matrix_size, int *matrix) {
-		std::unique_ptr<GenericRaster> raster_src_guard(raster_src);
-
+	static std::unique_ptr<GenericRaster> execute(Raster2D<T> *raster_src, int matrix_size, int *matrix) {
 		raster_src->setRepresentation(GenericRaster::Representation::CPU);
 
 		auto raster_dest_guard = GenericRaster::create(raster_src->lcrs, raster_src->dd, GenericRaster::Representation::CPU);
@@ -85,28 +83,28 @@ struct matrixkernel{
 			}
 		}
 
-		return raster_dest_guard.release();
+		return raster_dest_guard;
 	}
 };
 
 #include "operators/raster/matrixkernel.cl.h"
 
-GenericRaster *MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
-	GenericRaster *raster = sources[0]->getRaster(rect);
+std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
+	auto raster_in = sources[0]->getRaster(rect);
 
 #if 1
 	RasterOpenCL::init();
 	Profiler::Profiler p("MATRIXKERNEL_CL_OPERATOR");
-	raster->setRepresentation(GenericRaster::Representation::OPENCL);
+	raster_in->setRepresentation(GenericRaster::Representation::OPENCL);
 
-	auto raster_out = GenericRaster::create(raster->lcrs, raster->dd, GenericRaster::Representation::OPENCL);
+	auto raster_out = GenericRaster::create(raster_in->lcrs, raster_in->dd, GenericRaster::Representation::OPENCL);
 
 	size_t matrix_count = (size_t) matrixsize*matrixsize;
 	size_t matrix_buffer_size = sizeof(matrix[0]) * matrix_count;
 
 	try {
 		RasterOpenCL::CLProgram prog;
-		prog.addInRaster(raster);
+		prog.addInRaster(raster_in.get());
 		prog.addOutRaster(raster_out.get());
 		prog.compile(operators_raster_matrixkernel, "matrixkernel");
 		prog.addArg((cl_int) matrixsize);
@@ -127,11 +125,11 @@ GenericRaster *MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
 		throw;
 	}
 
-	return raster_out.release();
+	return raster_out;
 
 #else
 	Profiler::Profiler p("MATRIXKERNEL_OPERATOR");
-	return callUnaryOperatorFunc<matrixkernel>(raster, matrixsize, matrix);
+	return callUnaryOperatorFunc<matrixkernel>(raster_in.get(), matrixsize, matrix);
 #endif
 }
 

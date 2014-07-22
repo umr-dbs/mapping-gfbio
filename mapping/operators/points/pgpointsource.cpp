@@ -1,5 +1,6 @@
 #include "raster/pointcollection.h"
 #include "operators/operator.h"
+#include "util/make_unique.h"
 
 #include <pqxx/pqxx>
 #include <string>
@@ -12,7 +13,7 @@ class PGPointSourceOperator : public GenericOperator {
 		PGPointSourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~PGPointSourceOperator();
 
-		virtual PointCollection *getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 	private:
 		std::string connectionstring;
 		std::string querystring;
@@ -39,7 +40,8 @@ PGPointSourceOperator::~PGPointSourceOperator() {
 }
 REGISTER_OPERATOR(PGPointSourceOperator, "pgpointsource");
 
-PointCollection *PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
+
+std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
 
 	if (rect.epsg != EPSG_WEBMERCATOR)
 		throw OperatorException("PGPointSourceOperator: Shouldn't load points in a projection other than webmercator");
@@ -50,8 +52,7 @@ PointCollection *PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
 	pqxx::work transaction(*connection, "load_points");
 	pqxx::result points = transaction.exec(sql.str());
 
-	PointCollection *points_out = new PointCollection();
-	std::unique_ptr<PointCollection> points_guard(points_out);
+	auto points_out = std::make_unique<PointCollection>();
 
 	auto column_count = points.columns();
 	for (pqxx::result::size_type c = 2;c<column_count;c++) {
@@ -70,5 +71,5 @@ PointCollection *PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
 		}
 	}
 
-	return points_guard.release();
+	return points_out;
 }

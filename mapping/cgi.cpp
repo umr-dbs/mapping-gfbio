@@ -168,8 +168,7 @@ void outputImageByQuery(const char *in_filename) {
 	int timestamp = std::get<1>(p);
 	std::string colors = std::get<2>(p);
 
-	GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
-	std::unique_ptr<GenericRaster> raster_guard(raster);
+	auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
 
 #if RASTER_DO_PROFILE && false
 	/*
@@ -219,7 +218,7 @@ void outputImageByQuery(const char *in_filename) {
 	printf("\r\n");
 #endif
 
-	outputImage(raster_guard.get(), false, false, colors);
+	outputImage(raster.get(), false, false, colors);
 }
 
 
@@ -253,15 +252,14 @@ int main() {
 			if (params.count("colors") > 0)
 				colorizer = params["colors"];
 
-			GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
-			std::unique_ptr<GenericRaster> raster_guard(raster);
+			auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
 			Profiler::print();
 			printf("\r\n");
 #endif
-			outputImage(raster_guard.get(), false, false, colorizer);
+			outputImage(raster.get(), false, false, colorizer);
 			return 0;
 		}
 
@@ -274,15 +272,14 @@ int main() {
 
 			int timestamp = std::get<1>(p);
 
-			PointCollection *points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
-			std::unique_ptr<PointCollection> points_guard(points);
+			auto points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
 			Profiler::print();
 			printf("\r\n");
 #endif
-			outputPointCollection(points);
+			outputPointCollection(points.get());
 			return 0;
 		}
 
@@ -401,15 +398,13 @@ int main() {
 				QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, epsg);
 
 				if (format == "application/json") {
-					Histogram *histogram = graph->getHistogram(qrect);
-					std::unique_ptr<Histogram> histogram_guard(histogram);
+					auto histogram = graph->getHistogram(qrect);
 
 					printf("content-type: application/json\r\n\r\n");
 					histogram->print();
 				}
 				else {
-					GenericRaster *raster = graph->getRaster(qrect);
-					std::unique_ptr<GenericRaster> result_raster(raster);
+					auto result_raster = graph->getRaster(qrect);
 
 					if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
 						result_raster = result_raster->scale(output_width, output_height);

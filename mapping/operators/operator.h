@@ -1,6 +1,8 @@
 #ifndef OPERATORS_OPERATOR_H
 #define OPERATORS_OPERATOR_H
 
+#include <memory>
+
 namespace Json {
 	class Value;
 }
@@ -40,10 +42,10 @@ class GenericOperator {
 
 		virtual ~GenericOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
-		virtual PointCollection *getPoints(const QueryRectangle &rect);
-		virtual GenericGeometry *getGeometry(const QueryRectangle &rect);
-		virtual Histogram *getHistogram(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
+		virtual std::unique_ptr<Histogram> getHistogram(const QueryRectangle &rect);
 
 	protected:
 		GenericOperator(Type type, int sourcecount, GenericOperator *sources[]);

@@ -16,7 +16,7 @@ class HistogramOperator : public GenericOperator {
 		HistogramOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~HistogramOperator();
 
-		virtual Histogram *getHistogram(const QueryRectangle &rect);
+		virtual std::unique_ptr<Histogram> getHistogram(const QueryRectangle &rect);
 };
 
 
@@ -27,9 +27,10 @@ HistogramOperator::~HistogramOperator() {
 }
 REGISTER_OPERATOR(HistogramOperator, "histogram");
 
+
 template<typename T>
 struct histogram{
-	static Histogram *execute(Raster2D<T> *raster) {
+	static std::unique_ptr<Histogram> execute(Raster2D<T> *raster) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
 		T max = (T) raster->dd.max;
@@ -49,17 +50,14 @@ struct histogram{
 			}
 		}
 
-		return histogram.release();
+		return histogram;
 	}
 };
 
 
-Histogram *HistogramOperator::getHistogram(const QueryRectangle &rect) {
-	std::unique_ptr<GenericRaster> raster(sources[0]->getRaster(rect));
+std::unique_ptr<Histogram> HistogramOperator::getHistogram(const QueryRectangle &rect) {
+	auto raster = sources[0]->getRaster(rect);
 
 	Profiler::Profiler p("HISTOGRAM_OPERATOR");
 	return callUnaryOperatorFunc<histogram>(raster.get());
 }
-
-
-

@@ -38,7 +38,7 @@ class ROperator : public GenericOperator {
 	ROperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~ROperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
 };
 
@@ -65,11 +65,9 @@ SEXP testfunc(SEXP x) {
 }
 */
 
-GenericRaster *ROperator::getRaster(const QueryRectangle &rect) {
-	GenericRaster *raster = sources[0]->getRaster(rect);
-	std::unique_ptr<GenericRaster> raster_guard(raster);
-
-	raster->setRepresentation(GenericRaster::Representation::CPU);
+std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect) {
+	auto raster_in = sources[0]->getRaster(rect);
+	raster_in->setRepresentation(GenericRaster::Representation::CPU);
 
 	***REMOVED*** R;
 
@@ -84,15 +82,15 @@ GenericRaster *ROperator::getRaster(const QueryRectangle &rect) {
 		throw OperatorException("result != 42!");
 	*/
 
-	auto pixels = raster->lcrs.getPixelCount();
-	int width = raster->lcrs.size[0];
-	int height = raster->lcrs.size[1];
+	auto pixels = raster_in->lcrs.getPixelCount();
+	int width = raster_in->lcrs.size[0];
+	int height = raster_in->lcrs.size[1];
 
 	// TODO: use IntegerMatrix for integer datatypes?
     ***REMOVED***::NumericMatrix M_in(width, height);
     for (int y=0;y<height;y++)
     	for (int x=0;x<width;x++)
-    		M_in(x,y) = raster->getAsDouble(x, y);
+    		M_in(x,y) = raster_in->getAsDouble(x, y);
 
 	R["raster"] = M_in;
 
@@ -101,15 +99,15 @@ GenericRaster *ROperator::getRaster(const QueryRectangle &rect) {
 	***REMOVED***::NumericMatrix M_out = R["raster"];
 
 
-	DataDescription out_dd = raster->dd;
+	DataDescription out_dd = raster_in->dd;
 	out_dd.datatype = GDT_Float32;
 
-	auto raster_out_guard = GenericRaster::create(raster->lcrs, out_dd);
+	auto raster_out_guard = GenericRaster::create(raster_in->lcrs, out_dd);
 	Raster2D<float> *raster_out = (Raster2D<float> *) raster_out_guard.get();
 
     for (int y=0;y<height;y++)
     	for (int x=0;x<width;x++)
     		raster_out->set(x, y, (float) M_out(x,y));
 
-	return raster_out_guard.release();
+	return raster_out_guard;
 }

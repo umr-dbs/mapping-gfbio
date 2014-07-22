@@ -2,6 +2,7 @@
 
 #include "raster/pointcollection.h"
 #include "operators/operator.h"
+#include "util/make_unique.h"
 
 #include <pqxx/pqxx>
 #include <geos/geom/GeometryFactory.h>
@@ -15,7 +16,7 @@ class PGPointSourceOperator : public GenericOperator {
 		PGPointSourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~PGPointSourceOperator();
 
-		virtual PointCollection *getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 	private:
 		pqxx::connection *connection;
 };
@@ -37,7 +38,8 @@ PGPointSourceOperator::~PGPointSourceOperator() {
 }
 REGISTER_OPERATOR(PGPointSourceOperator, "pggeometrysource");
 
-PointCollection *PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
+
+std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
 
 #define EPSG_AS_STRING2(e) #e
 #define EPSG_AS_STRING(e) EPSG_AS_STRING2(e)
@@ -54,8 +56,7 @@ PointCollection *PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
 	geos::io::WKBReader wkbreader(*gf);
 
 
-	PointCollection *points_out = new PointCollection();
-	std::unique_ptr<PointCollection> points_guard(points_out);
+	auto points_out = std::make_unique<PointCollection>();
 
 	for (pqxx::result::size_type i=0; i < points.size();i++) {
 		// location is points[i][0]
@@ -81,5 +82,5 @@ PointCollection *PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
 		gf->destroyGeometry(point);
 	}
 
-	return points_guard.release();
+	return points_out;
 }

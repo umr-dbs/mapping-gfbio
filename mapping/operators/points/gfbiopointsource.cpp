@@ -1,6 +1,7 @@
 #include "raster/pointcollection.h"
 #include "operators/operator.h"
 #include "util/curl.h"
+#include "util/make_unique.h"
 
 #include <string>
 #include <sstream>
@@ -15,7 +16,7 @@ class GFBioPointSourceOperator : public GenericOperator {
 		GFBioPointSourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~GFBioPointSourceOperator();
 
-		virtual PointCollection *getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 	private:
 		std::string datasource;
 		std::string query;
@@ -36,7 +37,7 @@ GFBioPointSourceOperator::~GFBioPointSourceOperator() {
 }
 REGISTER_OPERATOR(GFBioPointSourceOperator, "gfbiopointsource");
 
-PointCollection *GFBioPointSourceOperator::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect) {
 
 	if (rect.epsg != EPSG_LATLON) {
 		std::ostringstream msg;
@@ -67,9 +68,7 @@ PointCollection *GFBioPointSourceOperator::getPoints(const QueryRectangle &rect)
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKBReader wkbreader(*gf);
 
-	PointCollection *points_out = new PointCollection(EPSG_LATLON);
-	std::unique_ptr<PointCollection> points_guard(points_out);
-
+	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
 
 	data.seekg(0);
 	geos::geom::Geometry *points = wkbreader.read(data);
@@ -88,5 +87,5 @@ PointCollection *GFBioPointSourceOperator::getPoints(const QueryRectangle &rect)
 
 	gf->destroyGeometry(points);
 
-	return points_guard.release();
+	return points_out;
 }

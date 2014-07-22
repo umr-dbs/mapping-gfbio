@@ -78,16 +78,16 @@ void GenericOperator::assumeSources(int n) {
 		throw OperatorException("Wrong amount of sources");
 }
 
-GenericRaster *GenericOperator::getRaster(const QueryRectangle &) {
+std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &) {
 	throw OperatorException("getRaster() called on an operator that doesn't return rasters");
 }
-PointCollection *GenericOperator::getPoints(const QueryRectangle &) {
+std::unique_ptr<PointCollection> GenericOperator::getPoints(const QueryRectangle &) {
 	throw OperatorException("getPoints() called on an operator that doesn't return points");
 }
-GenericGeometry *GenericOperator::getGeometry(const QueryRectangle &) {
+std::unique_ptr<GenericGeometry> GenericOperator::getGeometry(const QueryRectangle &) {
 	throw OperatorException("getGeometry() called on an operator that doesn't return geometries");
 }
-Histogram *GenericOperator::getHistogram(const QueryRectangle &rect) {
+std::unique_ptr<Histogram> GenericOperator::getHistogram(const QueryRectangle &rect) {
 	throw OperatorException("getHistogram() called on an operator that doesn't return histogram");
 }
 

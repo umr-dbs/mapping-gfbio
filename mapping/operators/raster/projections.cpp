@@ -5,6 +5,7 @@
 #include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/gdal.h"
+#include "util/make_unique.h"
 
 #include <memory>
 #include <sstream>
@@ -17,8 +18,8 @@ class ProjectionOperator : public GenericOperator {
 		ProjectionOperator(int sourcecount, GenericOperator *sources[], Json::Value params);
 		virtual ~ProjectionOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
-		virtual PointCollection *getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 	private:
 		QueryRectangle projectQueryRectangle(const QueryRectangle &rect, const GDAL::CRSTransformer &transformer);
 		epsg_t src_epsg, dest_epsg;
@@ -31,7 +32,7 @@ class MeteosatLatLongOperator : public GenericOperator {
 	MeteosatLatLongOperator(int sourcecount, GenericOperator *sources[]);
 		virtual ~MeteosatLatLongOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 };
 #endif
 
@@ -51,7 +52,7 @@ REGISTER_OPERATOR(ProjectionOperator, "projection");
 
 template<typename T>
 struct raster_projection {
-	static GenericRaster *execute(Raster2D<T> *raster_src, const GDAL::CRSTransformer *transformer, LocalCRS &rm_dest ) {
+	static std::unique_ptr<GenericRaster> execute(Raster2D<T> *raster_src, const GDAL::CRSTransformer *transformer, LocalCRS &rm_dest ) {
 		raster_src->setRepresentation(GenericRaster::Representation::CPU);
 
 		DataDescription out_dd = raster_src->dd;
@@ -85,7 +86,7 @@ struct raster_projection {
 			}
 		}
 
-		return raster_dest_guard.release();
+		return raster_dest_guard;
 	}
 };
 
@@ -132,7 +133,7 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 }
 
 //GenericRaster *ProjectionOperator::execute(int timestamp, double x1, double y1, double x2, double y2, int xres, int yres) {
-GenericRaster *ProjectionOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> ProjectionOperator::getRaster(const QueryRectangle &rect) {
 	if (dest_epsg != rect.epsg) {
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 	}
@@ -147,23 +148,19 @@ GenericRaster *ProjectionOperator::getRaster(const QueryRectangle &rect) {
 
 	QueryRectangle src_rect = projectQueryRectangle(rect, transformer);
 
-	GenericRaster *raster = sources[0]->getRaster(src_rect);
-	std::unique_ptr<GenericRaster> raster_guard(raster);
+	auto raster_in = sources[0]->getRaster(src_rect);
 
-	if (src_epsg != raster->lcrs.epsg)
+	if (src_epsg != raster_in->lcrs.epsg)
 		throw OperatorException("ProjectionOperator: Source Raster not in expected projection");
 
 	LocalCRS rm_dest(rect);
 
 	Profiler::Profiler p("PROJECTION_OPERATOR");
-	GenericRaster *result_raster = nullptr;
-	result_raster = callUnaryOperatorFunc<raster_projection>(raster, &transformer, rm_dest);
-
-	return result_raster;
+	return callUnaryOperatorFunc<raster_projection>(raster_in.get(), &transformer, rm_dest);
 }
 
 
-PointCollection *ProjectionOperator::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectangle &rect) {
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 	if (src_epsg == dest_epsg)
@@ -181,14 +178,12 @@ PointCollection *ProjectionOperator::getPoints(const QueryRectangle &rect) {
 	GDAL::CRSTransformer transformer(src_epsg, dest_epsg);
 
 
-	PointCollection *points_in = sources[0]->getPoints(src_rect);
-	std::unique_ptr<PointCollection> points_in_guard(points_in);
+	auto points_in = sources[0]->getPoints(src_rect);
 
 	if (src_epsg != points_in->epsg)
 		throw OperatorException("ProjectionOperator: Source Points not in expected projection");
 
-	PointCollection *points_out = new PointCollection(dest_epsg);
-	std::unique_ptr<PointCollection> points_out_guard(points_out);
+	auto points_out = std::make_unique<PointCollection>(dest_epsg);
 
 	// TODO: copy global metadata
 	// TODO: copy local metadata indexes
@@ -205,7 +200,7 @@ PointCollection *ProjectionOperator::getPoints(const QueryRectangle &rect) {
 		// TODO: copy local metadata
 	}
 
-	return points_out_guard.release();
+	return points_out;
 }
 
 
@@ -215,9 +210,7 @@ PointCollection *ProjectionOperator::getPoints(const QueryRectangle &rect) {
 #if 0
 template<typename T>
 struct meteosat_draw_latlong{
-	static GenericRaster *execute(Raster2D<T> *raster_src) {
-		std::unique_ptr<GenericRaster> raster_src_guard(raster_src);
-
+	static std::unique_ptr<GenericRaster> execute(Raster2D<T> *raster_src) {
 		if (raster_src->lcrs.epsg != EPSG_METEOSAT2)
 			throw OperatorException("Source raster not in meteosat projection");
 
@@ -259,7 +252,7 @@ struct meteosat_draw_latlong{
 			}
 		}
 
-		return raster_dest_guard.release();
+		return raster_dest_guard;
 	}
 };
 
@@ -270,12 +263,12 @@ MeteosatLatLongOperator::MeteosatLatLongOperator(int sourcecount, GenericOperato
 MeteosatLatLongOperator::~MeteosatLatLongOperator() {
 }
 
-GenericRaster *MeteosatLatLongOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> MeteosatLatLongOperator::getRaster(const QueryRectangle &rect) {
 
-	GenericRaster *raster = sources[0]->getRaster(rect);
+	auto raster_in = sources[0]->getRaster(rect);
 
 	Profiler::Profiler p("METEOSAT_DRAW_LATLONG_OPERATOR");
-	return callUnaryOperatorFunc<meteosat_draw_latlong>(raster);
+	return callUnaryOperatorFunc<meteosat_draw_latlong>(raster_in);
 }
 
 #endif

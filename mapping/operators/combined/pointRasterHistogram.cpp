@@ -5,8 +5,8 @@
 #include "raster/profiler.h"
 #include "raster/pointcollection.h"
 #include "operators/operator.h"
+#include "util/make_unique.h"
 
-#include <memory>
 #include <cmath>
 #include <json/json.h>
 
@@ -16,7 +16,7 @@ public:
 			Json::Value &params);
 	virtual ~PointRasterHistogramOperator();
 
-	virtual Histogram *getHistogram(const QueryRectangle &rect);
+	virtual std::unique_ptr<Histogram> getHistogram(const QueryRectangle &rect);
 };
 
 PointRasterHistogramOperator::PointRasterHistogramOperator(int sourcecount,
@@ -31,7 +31,7 @@ REGISTER_OPERATOR(PointRasterHistogramOperator, "pointRasterHistogram");
 
 template<typename T>
 struct pointRasterHistogram {
-	static Histogram* execute(Raster2D<T>* raster, PointCollection* points) {
+	static std::unique_ptr<Histogram> execute(Raster2D<T>* raster, PointCollection* points) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
 		T max = (T) raster->dd.max;
@@ -39,7 +39,7 @@ struct pointRasterHistogram {
 
 		auto range = RasterTypeInfo<T>::getRange(min, max);
 
-		std::unique_ptr<Histogram> histogram(new Histogram(range, min, max));
+		auto histogram = std::make_unique<Histogram>(range, min, max);
 
 		for (Point &p : points->collection) {
 			double x = p.x, y = p.y;
@@ -59,14 +59,14 @@ struct pointRasterHistogram {
 			}
 		}
 
-		return histogram.release();
+		return histogram;
 	}
 };
 
-Histogram *PointRasterHistogramOperator::getHistogram(
+std::unique_ptr<Histogram> PointRasterHistogramOperator::getHistogram(
 		const QueryRectangle &rect) {
-	std::unique_ptr<PointCollection> points(sources[0]->getPoints(rect));
-	std::unique_ptr<GenericRaster> raster(sources[1]->getRaster(rect));
+	auto points = sources[0]->getPoints(rect);
+	auto raster = sources[1]->getRaster(rect);
 
 	Profiler::Profiler p("POINT_RASTER_HISTOGRAM_OPERATOR");
 	return callUnaryOperatorFunc<pointRasterHistogram>(raster.get(), points.get());

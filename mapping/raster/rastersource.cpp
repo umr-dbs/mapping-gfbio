@@ -212,9 +212,7 @@ void RasterSource::cleanup() {
 void RasterSource::import(const char *filename, int sourcechannel, int channelid, int timestamp, GenericRaster::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
-	std::unique_ptr<GenericRaster> raster(
-		GenericRaster::fromGDAL(filename, sourcechannel, lcrs->epsg)
-	);
+	auto raster = GenericRaster::fromGDAL(filename, sourcechannel, lcrs->epsg);
 
 	import(raster.get(), channelid, timestamp, compression);
 }
@@ -271,13 +269,11 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 						zoomedraster->lcrs.scale[0], zoomedraster->lcrs.scale[1], zoomedraster->lcrs.scale[2]
 					);
 
-					GenericRaster *tile = GenericRaster::create(tilelcrs, *channels[channelid]);
+					auto tile = GenericRaster::create(tilelcrs, *channels[channelid]);
 					tile->blit(zoomedraster, -xoff, -yoff, -zoff);
 
 					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
-					importTile(tile, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp, compression);
-
-					delete tile;
+					importTile(tile.get(), xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp, compression);
 				}
 			}
 		}
@@ -447,9 +443,7 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 		lcrs->PixelToWorldX(x1), lcrs->PixelToWorldY(y1), lcrs->PixelToWorldZ(0 /* z1 */),
 		lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
 	);
-	std::unique_ptr<GenericRaster> result(
-		GenericRaster::create(resultmetadata, *channels[channelid])
-	);
+	auto result = GenericRaster::create(resultmetadata, *channels[channelid]);
 	result->clear(channels[channelid]->no_data);
 	Profiler::stop("RasterSource::stop: create");
 

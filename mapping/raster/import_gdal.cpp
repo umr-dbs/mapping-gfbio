@@ -10,7 +10,7 @@
 
 
 
-static GenericRaster *GDALImporter_loadRaster(GDALDataset *dataset, int rasteridx, double origin_x, double origin_y, double scale_x, double scale_y, epsg_t default_epsg) {
+static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *dataset, int rasteridx, double origin_x, double origin_y, double scale_x, double scale_y, epsg_t default_epsg) {
 	GDALRasterBand  *poBand;
 	int             nBlockXSize, nBlockYSize;
 	int             bGotMin, bGotMax;
@@ -82,7 +82,7 @@ static GenericRaster *GDALImporter_loadRaster(GDALDataset *dataset, int rasterid
 	DataDescription dd(type, minvalue, maxvalue, hasnodata, nodata);
 	//printf("loading raster with %g -> %g valuerange\n", adfMinMax[0], adfMinMax[1]);
 
-	GenericRaster *raster = GenericRaster::create(lcrs, dd);
+	auto raster = GenericRaster::create(lcrs, dd);
 	void *buffer = raster->getDataForWriting();
 	//int bpp = raster->getBPP();
 
@@ -124,7 +124,7 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 	return raster;
 }
 
-GenericRaster *GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_t epsg) {
+std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_t epsg) {
 	GDAL::init();
 
 	GDALDataset *dataset = (GDALDataset *) GDALOpen(filename, GA_ReadOnly);
@@ -184,7 +184,7 @@ GenericRaster *GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_
 			throw ImporterException("MSG driver can only import rasters in MSG projection");
 	}
 
-	GenericRaster *raster = GDALImporter_loadRaster(dataset, rasterid, adfGeoTransform[0], adfGeoTransform[3], adfGeoTransform[1], adfGeoTransform[5], epsg);
+	auto raster = GDALImporter_loadRaster(dataset, rasterid, adfGeoTransform[0], adfGeoTransform[3], adfGeoTransform[1], adfGeoTransform[5], epsg);
 
 	GDALClose(dataset);
 

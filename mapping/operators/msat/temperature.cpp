@@ -179,15 +179,14 @@ GenericRaster *MSATTemperatureOperator::getRaster(const QueryRectangle &rect) {
 			lut[no_data] = out_dd.no_data;
 	}
 
-	GenericRaster *raster_out = GenericRaster::create(raster->lcrs, out_dd);
-	std::unique_ptr<GenericRaster> raster_out_guard(raster_out);
+	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster);
-	prog.addOutRaster(raster_out);
+	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_msat_temperature, "temperaturekernel");
 	prog.addArg(lut_buffer);
 	prog.run();
 
-	return raster_out_guard.release();
+	return raster_out.release();
 }

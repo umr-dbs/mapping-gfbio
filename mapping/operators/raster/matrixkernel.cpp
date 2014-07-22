@@ -55,10 +55,10 @@ struct matrixkernel{
 	static GenericRaster *execute(Raster2D<T> *raster_src, int matrix_size, int *matrix) {
 		std::unique_ptr<GenericRaster> raster_src_guard(raster_src);
 
-		Raster2D<T> *raster_dest = (Raster2D<T> *) GenericRaster::create(raster_src->lcrs, raster_src->dd);
-		std::unique_ptr<GenericRaster> raster_dest_guard(raster_dest);
 		raster_src->setRepresentation(GenericRaster::Representation::CPU);
-		raster_dest->setRepresentation(GenericRaster::Representation::CPU);
+
+		auto raster_dest_guard = GenericRaster::create(raster_src->lcrs, raster_src->dd, GenericRaster::Representation::CPU);
+		Raster2D<T> *raster_dest = (Raster2D<T> *) raster_dest_guard.get();
 
 		T max = (T) raster_src->valuemeta.max;
 		T min = (T) raster_src->valuemeta.min;
@@ -99,8 +99,7 @@ GenericRaster *MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
 	Profiler::Profiler p("MATRIXKERNEL_CL_OPERATOR");
 	raster->setRepresentation(GenericRaster::Representation::OPENCL);
 
-	GenericRaster *raster_out = GenericRaster::create(raster->lcrs, raster->dd, GenericRaster::Representation::OPENCL);
-	std::unique_ptr<GenericRaster> raster_out_guard(raster_out);
+	auto raster_out = GenericRaster::create(raster->lcrs, raster->dd, GenericRaster::Representation::OPENCL);
 
 	size_t matrix_count = (size_t) matrixsize*matrixsize;
 	size_t matrix_buffer_size = sizeof(matrix[0]) * matrix_count;
@@ -108,7 +107,7 @@ GenericRaster *MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
 	try {
 		RasterOpenCL::CLProgram prog;
 		prog.addInRaster(raster);
-		prog.addOutRaster(raster_out);
+		prog.addOutRaster(raster_out.get());
 		prog.compile(operators_raster_matrixkernel, "matrixkernel");
 		prog.addArg((cl_int) matrixsize);
 
@@ -128,7 +127,7 @@ GenericRaster *MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
 		throw;
 	}
 
-	return raster_out_guard.release();
+	return raster_out.release();
 
 #else
 	Profiler::Profiler p("MATRIXKERNEL_OPERATOR");

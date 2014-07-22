@@ -38,14 +38,12 @@ GenericRaster *OpenCLOperator::getRaster(const QueryRectangle &rect) {
 
 	raster->setRepresentation(GenericRaster::OPENCL);
 
-	GenericRaster *raster2 = GenericRaster::create(raster->lcrs, raster->dd);
-	std::unique_ptr<GenericRaster> raster2_guard(raster2);
-	raster2->setRepresentation(GenericRaster::OPENCL);
+	auto raster_out = GenericRaster::create(raster->lcrs, raster->dd, GenericRaster::OPENCL);
 
 
 	cl::Kernel kernel = RasterOpenCL::addProgramFromFile("operators/cl/test.cl", "testKernel");
 	kernel.setArg(0, *raster->getCLBuffer());
-	kernel.setArg(1, *raster2->getCLBuffer());
+	kernel.setArg(1, *raster_out->getCLBuffer());
 	kernel.setArg(2, (int) raster->lcrs.size[0]);
 	kernel.setArg(3, (int) raster->lcrs.size[1]);
 	//kernel.setArg(2, (int) raster->lcrs.getPixelCount());
@@ -69,6 +67,6 @@ GenericRaster *OpenCLOperator::getRaster(const QueryRectangle &rect) {
 	}
 
 	event.wait();
-	return raster2_guard.release();
+	return raster_out.release();
 }
 

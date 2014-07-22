@@ -104,8 +104,8 @@ GenericRaster *ROperator::getRaster(const QueryRectangle &rect) {
 	DataDescription out_dd = raster->dd;
 	out_dd.datatype = GDT_Float32;
 
-	Raster2D<float> *raster_out = (Raster2D<float> *) GenericRaster::create(raster->lcrs, out_dd);
-	std::unique_ptr<GenericRaster> raster_out_guard(raster_out);
+	auto raster_out_guard = GenericRaster::create(raster->lcrs, out_dd);
+	Raster2D<float> *raster_out = (Raster2D<float> *) raster_out_guard.get();
 
     for (int y=0;y<height;y++)
     	for (int x=0;x<width;x++)

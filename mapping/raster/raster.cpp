@@ -204,7 +204,7 @@ void DataDescription::addNoData() {
 
 
 
-GenericRaster *GenericRaster::create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation)
+std::unique_ptr<GenericRaster> GenericRaster::create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation)
 {
 	if (localcrs.dimensions != 2)
 		throw MetadataException("Cannot instantiate raster with dimensions != 2 yet");
@@ -247,7 +247,7 @@ GenericRaster *GenericRaster::create(const LocalCRS &localcrs, const DataDescrip
 	}
 
 	result->setRepresentation(representation);
-	return result;
+	return std::unique_ptr<GenericRaster>(result);
 }
 
 GenericRaster::GenericRaster(const LocalCRS &localcrs, const DataDescription &datadescription)
@@ -407,7 +407,8 @@ GenericRaster *Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, i
 		lcrs.scale[0], lcrs.scale[1]
 	);
 
-	Raster2D<T> *outputraster = (Raster2D<T> *) GenericRaster::create(newrmd, dd);
+	auto outputraster_generic = GenericRaster::create(newrmd, dd);
+	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_generic.get();
 
 /*
 #define BLIT_TYPE 2
@@ -433,7 +434,7 @@ GenericRaster *Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, i
 	}
 #endif
 */
-	return outputraster;
+	return outputraster_generic.release();
 }
 
 template<typename T>
@@ -453,7 +454,8 @@ GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
 		lcrs.scale[0] * (double) width / lcrs.size[0], lcrs.scale[1] * (double) height / lcrs.size[0]
 	);
 
-	Raster2D<T> *outputraster = (Raster2D<T> *) GenericRaster::create(newrmd, dd);
+	auto outputraster_generic = GenericRaster::create(newrmd, dd);
+	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_generic.get();
 
 	int src_width = lcrs.size[0], src_height = lcrs.size[1];
 
@@ -465,7 +467,7 @@ GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
 		}
 	}
 
-	return outputraster;
+	return outputraster_generic.release();
 }
 
 

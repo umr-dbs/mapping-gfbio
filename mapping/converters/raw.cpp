@@ -38,9 +38,9 @@ ByteBuffer *RawConverter::encode(GenericRaster *raster) {
 }
 
 GenericRaster *RawConverter::decode(ByteBuffer *buffer) {
-	GenericRaster *raster = GenericRaster::create(localcrs, datadescription);
+	auto raster = GenericRaster::create(localcrs, datadescription);
 	memcpy(raster->getDataForWriting(), buffer->data, buffer->size);
-	return raster;
+	return raster.release();
 }
 
 
@@ -74,8 +74,7 @@ ByteBuffer *BzipConverter::encode(GenericRaster *raster) {
 
 GenericRaster *BzipConverter::decode(ByteBuffer *buffer) {
 	Profiler::Profiler p("Bzip::decompress");
-	GenericRaster *raster = GenericRaster::create(localcrs, datadescription);
-	std::unique_ptr<GenericRaster> raster_guard(raster);
+	auto raster = GenericRaster::create(localcrs, datadescription);
 
 	char *data = (char *) raster->getDataForWriting();
 	unsigned int result_size = raster->getDataSize();
@@ -88,7 +87,7 @@ GenericRaster *BzipConverter::decode(ByteBuffer *buffer) {
 	if (res != BZ_OK || result_size != raster->getDataSize())
 		throw SourceException("Error on BZ2 decompress");
 
-	return raster_guard.release();
+	return raster.release();
 }
 
 
@@ -137,8 +136,7 @@ ByteBuffer *GzipConverter::encode(GenericRaster *raster) {
 
 GenericRaster *GzipConverter::decode(ByteBuffer *buffer) {
 	Profiler::Profiler p("Gzip::decompress");
-	GenericRaster *raster = GenericRaster::create(localcrs, datadescription);
-	std::unique_ptr<GenericRaster> raster_guard(raster);
+	auto raster = GenericRaster::create(localcrs, datadescription);
 
 	char *data = (char *) raster->getDataForWriting();
 	unsigned int result_size = raster->getDataSize();
@@ -164,5 +162,5 @@ GenericRaster *GzipConverter::decode(ByteBuffer *buffer) {
 	}
 	inflateEnd(&stream);
 
-	return raster_guard.release();
+	return raster.release();
 }

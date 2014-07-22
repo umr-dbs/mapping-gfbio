@@ -74,8 +74,8 @@ struct createValueRaster {
 		if (raster->dd.has_no_data && no_data >= min && no_data <= max)
 			range--;
 		LocalCRS value_rm(EPSG_UNKNOWN, range, 1,  0.0, 0.0, 1.0, 1.0);
-		Raster2D<T> *value_raster = (Raster2D<T> *) GenericRaster::create(value_rm, raster->dd);
-		std::unique_ptr<GenericRaster> value_raster_guard(value_raster);
+		auto value_raster_guard = GenericRaster::create(value_rm, raster->dd);
+		Raster2D<T> *value_raster = (Raster2D<T> *) value_raster_guard.get();
 
 		uint32_t x = 0;
 		// the extra condition protects against cases, where we're iterating 0..255 on uint8
@@ -157,13 +157,11 @@ GenericRaster *ExpressionOperator::getRaster(const QueryRectangle &rect) {
 		GenericRaster *value_raster = callUnaryOperatorFunc<createValueRaster>(raster);
 		std::unique_ptr<GenericRaster> value_raster_guard(value_raster);
 
-		GenericRaster *value_output_raster = GenericRaster::create(value_raster->lcrs, output_dd, GenericRaster::Representation::OPENCL);
-		std::unique_ptr<GenericRaster> value_output_raster_guard(value_output_raster);
-
+		auto value_output_raster = GenericRaster::create(value_raster->lcrs, output_dd, GenericRaster::Representation::OPENCL);
 
 		RasterOpenCL::CLProgram prog;
 		prog.addInRaster(value_raster);
-		prog.addOutRaster(value_output_raster);
+		prog.addOutRaster(value_output_raster.get());
 		prog.compile(sourcecode, "expressionkernel");
 		prog.run();
 
@@ -173,7 +171,7 @@ GenericRaster *ExpressionOperator::getRaster(const QueryRectangle &rect) {
 		// TODO: we could of course try to get the min/max via opencl..
 		value_output_raster->setRepresentation(GenericRaster::CPU);
 
-		callUnaryOperatorFunc<getActualMinMax>(value_output_raster, &newmin, &newmax);
+		callUnaryOperatorFunc<getActualMinMax>(value_output_raster.get(), &newmin, &newmax);
 	}
 	else {
 		newmin = output_min;
@@ -187,14 +185,13 @@ GenericRaster *ExpressionOperator::getRaster(const QueryRectangle &rect) {
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
-	GenericRaster *raster_out = GenericRaster::create(raster->lcrs, out_dd);
-	std::unique_ptr<GenericRaster> raster_out_guard(raster_out);
+	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster);
-	prog.addOutRaster(raster_out);
+	prog.addOutRaster(raster_out.get());
 	prog.compile(sourcecode, "expressionkernel");
 	prog.run();
 
-	return raster_out_guard.release();
+	return raster_out.release();
 }

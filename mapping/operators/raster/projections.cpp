@@ -57,8 +57,8 @@ struct raster_projection {
 		DataDescription out_dd = raster_src->dd;
 		out_dd.addNoData();
 
-		Raster2D<T> *raster_dest = (Raster2D<T> *) GenericRaster::create(rm_dest, out_dd);
-		std::unique_ptr<GenericRaster> raster_dest_guard(raster_dest);
+		auto raster_dest_guard = GenericRaster::create(rm_dest, out_dd);
+		Raster2D<T> *raster_dest = (Raster2D<T> *) raster_dest_guard.get();
 
 		T nodata = (T) out_dd.no_data;
 
@@ -225,8 +225,8 @@ struct meteosat_draw_latlong{
 
 		T max = raster_src->dd.max*2;
 		DataDescription vm_dest(raster_src->dd.datatype, raster_src->dd.min, max, raster_src->dd.has_no_data, raster_src->dd.no_data);
-		Raster2D<T> *raster_dest = (Raster2D<T> *) GenericRaster::create(raster_src->lcrs, vm_dest);
-		std::unique_ptr<GenericRaster> raster_dest_guard(raster_dest);
+		auto raster_dest_guard = GenericRaster::create(raster_src->lcrs, vm_dest);
+		Raster2D<T> *raster_dest = (Raster2D<T> *) raster_dest_guard.get();
 
 		// erstmal alles kopieren
 		int width = raster_dest->lcrs.size[0];

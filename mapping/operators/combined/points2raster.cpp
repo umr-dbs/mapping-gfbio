@@ -43,8 +43,8 @@ GenericRaster *PointsToRasterOperator::getRaster(const QueryRectangle &rect) {
 
 	LocalCRS rm(rect);
 	DataDescription vm(GDT_Byte, 0, MAX, true, 0);
-	Raster2D<T> *raster_out = (Raster2D<T> *) GenericRaster::create(rm, vm, GenericRaster::Representation::CPU);
-	std::unique_ptr<GenericRaster> raster_out_guard(raster_out);
+	auto raster_out_guard = GenericRaster::create(rm, vm, GenericRaster::Representation::CPU);
+	Raster2D<T> *raster_out = (Raster2D<T> *) raster_out_guard.get();
 
 	raster_out->clear(0);
 	for (Point &p : points->collection) {

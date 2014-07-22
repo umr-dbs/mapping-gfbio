@@ -30,37 +30,33 @@ static void usage() {
 
 
 static void convert(int argc, char *argv[]) {
-	GenericRaster *raster = nullptr;
-
 	if (argc < 3) {
 		usage();
 	}
 
 	try {
-		raster = GenericRaster::fromGDAL(argv[2], 1);
+		auto raster = GenericRaster::fromGDAL(argv[2], 1);
+		GreyscaleColorizer c;
+		raster->toPNG(argv[3], c);
+
 	}
 	catch (ImporterException &e) {
 		printf("%s\n", e.what());
 		exit(5);
 	}
-
-	GreyscaleColorizer c;
-	raster->toPNG(argv[3], c);
-
-	delete raster;
 }
 
 /**
  * Erstellt eine neue Rasterquelle basierend auf ein paar Beispielbildern
  */
 static void createsource(int argc, char *argv[]) {
-	GenericRaster *raster = nullptr;
+	std::unique_ptr<GenericRaster> raster;
 
 	Json::Value root(Json::objectValue);
 
 	Json::Value channels(Json::arrayValue);
 
-	LocalCRS *lcrs = nullptr;
+	std::unique_ptr<LocalCRS> lcrs;
 
 	epsg_t epsg = atoi(argv[2]);
 
@@ -74,7 +70,7 @@ static void createsource(int argc, char *argv[]) {
 		}
 
 		if (i == 0) {
-			lcrs = new LocalCRS(raster->lcrs);
+			lcrs.reset(new LocalCRS(raster->lcrs));
 
 			Json::Value coords(Json::objectValue);
 			Json::Value sizes(Json::arrayValue);
@@ -107,12 +103,7 @@ static void createsource(int argc, char *argv[]) {
 			channel["nodata"] = raster->dd.no_data;
 
 		channels.append(channel);
-
-		delete raster;
-		raster = nullptr;
 	}
-	delete lcrs;
-	lcrs = nullptr;
 
 	root["channels"] = channels;
 

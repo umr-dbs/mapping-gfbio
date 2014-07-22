@@ -25,7 +25,7 @@ if ($action == 'login.login') {
 	$password = trim($_GET['password']);
 
 	// TODO: lower() prevents using the index. Postgres has column type "citext", but is that what we want?
-	$rows = DB::query('SELECT id FROM users WHERE lower(name) = lower(?) AND password_unhashed = ?', $username, $password);
+	$rows = DB::query('SELECT id, ui FROM users WHERE lower(name) = lower(?) AND password_unhashed = ?', $username, $password);
 	if (count($rows) < 1)
 		respond_fail('User or password wrong');
 	$id = $rows[0]->id;
@@ -34,7 +34,8 @@ if ($action == 'login.login') {
 	DB::exec('UPDATE users SET session = ? WHERE id = ?', $sessiontoken, $id);
 	respond(array(
 		'userid' => $id,
-		'session' => $sessiontoken
+		'session' => $sessiontoken,
+		'ui' => $rows[0]->ui
 	));
 }
 

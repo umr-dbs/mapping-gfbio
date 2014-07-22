@@ -1,4 +1,4 @@
-#map {
+.map_container {
 	position: absolute;
 	top: 0%;
 	height: 100%;
@@ -7,7 +7,7 @@
 	background-color: black;
 }
 
-#overview {
+.map_sidebar {
 	position: absolute;
 	top: 0%;
 	height: 100%;
@@ -18,7 +18,7 @@
 	font-size: 14px;
 }
 
-#overview.collapsed {
+.map_sidebar.collapsed {
 	display: none;
 }
 
@@ -85,10 +85,21 @@
     padding-bottom: 10px;
 }
 
-#layerControls {
+.layerControls {
 	position: absolute;
 	top: 50px;
 	bottom: 50px;
+	left: 0px;
+	right: 0px;
+	
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.layerControls_simple {
+	position: absolute;
+	top: 10px;
+	bottom: 10px;
 	left: 0px;
 	right: 0px;
 	
@@ -226,7 +237,7 @@
 	content: "DROP";
 }
 
-#collapseOverview {
+.collapseSidebar {
 	height: 12px;
 	width: 8px;
 	right: 344px;
@@ -245,17 +256,17 @@
 	cursor: pointer;
 }
 
-#collapseOverview:hover {
+.collapseSidebar:hover {
 	background-color: #C6C6C6;
 	border: 1px solid rgb(230, 230, 230);
 }
 
-#collapseOverview.collapsed {
+.collapseSidebar.collapsed {
 	right: 0px;
 	border-top-right-radius: 0px;
     border-bottom-right-radius: 0px;
 }
 
-#collapseOverview.collapsed:before {
+.collapseSidebar.collapsed:before {
 	content: "";
 }

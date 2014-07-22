@@ -11,6 +11,8 @@
 #include <json/json.h>
 
 class PointRasterHistogramOperator: public GenericOperator {
+private:
+	unsigned int numberOfBuckets;
 public:
 	PointRasterHistogramOperator(int sourcecount, GenericOperator *sources[],
 			Json::Value &params);
@@ -23,6 +25,8 @@ PointRasterHistogramOperator::PointRasterHistogramOperator(int sourcecount,
 		GenericOperator *sources[], Json::Value &params) :
 		GenericOperator(Type::POINTS, sourcecount, sources) {
 	assumeSources(2);
+
+	numberOfBuckets = params.get("numberOfBuckets", UINT_MAX).asUInt();
 }
 
 PointRasterHistogramOperator::~PointRasterHistogramOperator() {
@@ -31,7 +35,7 @@ REGISTER_OPERATOR(PointRasterHistogramOperator, "pointRasterHistogram");
 
 template<typename T>
 struct pointRasterHistogram {
-	static Histogram* execute(Raster2D<T>* raster, PointCollection* points) {
+	static Histogram* execute(Raster2D<T>* raster, PointCollection* points, unsigned int numberOfBuckets) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
 		T max = (T) raster->dd.max;
@@ -39,7 +43,10 @@ struct pointRasterHistogram {
 
 		auto range = RasterTypeInfo<T>::getRange(min, max);
 
-		std::unique_ptr<Histogram> histogram(new Histogram(range, min, max));
+		if(range < numberOfBuckets) {
+			numberOfBuckets = range;
+		}
+		std::unique_ptr<Histogram> histogram(new Histogram(numberOfBuckets, min, max));
 
 		for (Point &p : points->collection) {
 			double x = p.x, y = p.y;
@@ -69,5 +76,5 @@ Histogram *PointRasterHistogramOperator::getHistogram(
 	std::unique_ptr<GenericRaster> raster(sources[1]->getRaster(rect));
 
 	Profiler::Profiler p("POINT_RASTER_HISTOGRAM_OPERATOR");
-	return callUnaryOperatorFunc<pointRasterHistogram>(raster.get(), points.get());
+	return callUnaryOperatorFunc<pointRasterHistogram>(raster.get(), points.get(), numberOfBuckets);
 }

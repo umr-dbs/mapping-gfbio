@@ -392,7 +392,7 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 
 
 template<typename T>
-GenericRaster *Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, int depth) {
+std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, int depth) {
 	if (lcrs.dimensions != 2)
 		throw MetadataException("cut() only works on 2d rasters");
 	if (z1 != 0 || depth != 0)
@@ -407,8 +407,8 @@ GenericRaster *Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, i
 		lcrs.scale[0], lcrs.scale[1]
 	);
 
-	auto outputraster_generic = GenericRaster::create(newrmd, dd);
-	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_generic.get();
+	auto outputraster_guard = GenericRaster::create(newrmd, dd);
+	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();
 
 /*
 #define BLIT_TYPE 2
@@ -434,11 +434,11 @@ GenericRaster *Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, i
 	}
 #endif
 */
-	return outputraster_generic.release();
+	return outputraster_guard;
 }
 
 template<typename T>
-GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
+std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int depth) {
 	if (lcrs.dimensions != 2)
 		throw MetadataException("scale() only works on 2d rasters");
 	if (depth != 0)
@@ -454,8 +454,8 @@ GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
 		lcrs.scale[0] * (double) width / lcrs.size[0], lcrs.scale[1] * (double) height / lcrs.size[0]
 	);
 
-	auto outputraster_generic = GenericRaster::create(newrmd, dd);
-	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_generic.get();
+	auto outputraster_guard = GenericRaster::create(newrmd, dd);
+	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();
 
 	int src_width = lcrs.size[0], src_height = lcrs.size[1];
 
@@ -467,7 +467,7 @@ GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
 		}
 	}
 
-	return outputraster_generic.release();
+	return outputraster_guard;
 }
 
 

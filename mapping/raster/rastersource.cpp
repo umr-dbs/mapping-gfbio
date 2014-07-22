@@ -253,8 +253,11 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 			break;
 
 		GenericRaster *zoomedraster = raster;
-		if (zoom > 0)
-			zoomedraster = raster->scale(lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
+		std::unique_ptr<GenericRaster> zoomedraster_guard;
+		if (zoom > 0) {
+			zoomedraster_guard = raster->scale(lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
+			zoomedraster = zoomedraster_guard.get();
+		}
 
 		for (uint32_t zoff = 0; zoff == 0 || zoff < zoomedraster->lcrs.size[2]; zoff += tilesize) {
 			uint32_t zsize = std::min(zoomedraster->lcrs.size[2] - zoff, tilesize);
@@ -277,9 +280,6 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 				}
 			}
 		}
-
-		if (zoom > 0)
-			delete zoomedraster;
 	}
 
 	SQLiteStatement stmt(db);

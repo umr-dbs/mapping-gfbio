@@ -172,9 +172,9 @@ class GenericRaster {
 
 		virtual void clear(double value) = 0;
 		virtual void blit(const GenericRaster *raster, int x, int y=0, int z=0) = 0;
-		virtual GenericRaster *cut(int x, int y, int z, int width, int height, int depths) = 0; // TODO: unique_ptr
-		GenericRaster *cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
-		virtual GenericRaster *scale(int width, int height=0, int depth=0) = 0;
+		virtual std::unique_ptr<GenericRaster> cut(int x, int y, int z, int width, int height, int depths) = 0;
+		std::unique_ptr<GenericRaster> cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
+		virtual std::unique_ptr<GenericRaster> scale(int width, int height=0, int depth=0) = 0;
 
 		std::string hash();
 

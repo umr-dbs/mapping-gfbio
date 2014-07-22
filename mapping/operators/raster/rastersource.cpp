@@ -72,6 +72,7 @@ GenericRaster *SourceOperator::getRaster(const QueryRectangle &rect) {
 		pixel_height >>= 1;
 	}
 
-	return rastersource->load(channel, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom);
+	auto result = rastersource->load(channel, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom);
+	return result.release();
 }
 

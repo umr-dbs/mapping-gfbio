@@ -4,6 +4,7 @@
 #include "raster/profiler.h"
 
 #include <memory>
+#include "util/make_unique.h"
 #include <bzlib.h>
 #include <zlib.h>
 
@@ -29,18 +30,18 @@ RawConverter::RawConverter(const LocalCRS &rm, const DataDescription &vm) : Rast
 	checkLittleEndian();
 }
 
-ByteBuffer *RawConverter::encode(GenericRaster *raster) {
+std::unique_ptr<ByteBuffer> RawConverter::encode(GenericRaster *raster) {
 	size_t size = raster->getDataSize();
 	unsigned char *copy = new unsigned char[size];
 	memcpy(copy, raster->getData(), size);
 
-	return new ByteBuffer(copy, size);
+	return std::make_unique<ByteBuffer>(copy, size);
 }
 
-GenericRaster *RawConverter::decode(ByteBuffer *buffer) {
+std::unique_ptr<GenericRaster> RawConverter::decode(ByteBuffer *buffer) {
 	auto raster = GenericRaster::create(localcrs, datadescription);
 	memcpy(raster->getDataForWriting(), buffer->data, buffer->size);
-	return raster.release();
+	return raster;
 }
 
 
@@ -52,7 +53,7 @@ BzipConverter::BzipConverter(const LocalCRS &rm, const DataDescription &vm) : Ra
 	checkLittleEndian();
 }
 
-ByteBuffer *BzipConverter::encode(GenericRaster *raster) {
+std::unique_ptr<ByteBuffer> BzipConverter::encode(GenericRaster *raster) {
 	Profiler::Profiler p("Bzip::compress");
 	size_t raw_size = raster->getDataSize();
 	// per documentation, this amount of space is guaranteed to fit the compressed stream
@@ -69,10 +70,10 @@ ByteBuffer *BzipConverter::encode(GenericRaster *raster) {
 		throw ConverterException("Error on BZ2 compress");
 	}
 
-	return new ByteBuffer(compressed, compressed_size);
+	return std::make_unique<ByteBuffer>(compressed, compressed_size);
 }
 
-GenericRaster *BzipConverter::decode(ByteBuffer *buffer) {
+std::unique_ptr<GenericRaster> BzipConverter::decode(ByteBuffer *buffer) {
 	Profiler::Profiler p("Bzip::decompress");
 	auto raster = GenericRaster::create(localcrs, datadescription);
 
@@ -87,7 +88,7 @@ GenericRaster *BzipConverter::decode(ByteBuffer *buffer) {
 	if (res != BZ_OK || result_size != raster->getDataSize())
 		throw SourceException("Error on BZ2 decompress");
 
-	return raster.release();
+	return raster;
 }
 
 
@@ -100,7 +101,7 @@ GzipConverter::GzipConverter(const LocalCRS &rm, const DataDescription &vm) : Ra
 	checkLittleEndian();
 }
 
-ByteBuffer *GzipConverter::encode(GenericRaster *raster) {
+std::unique_ptr<ByteBuffer> GzipConverter::encode(GenericRaster *raster) {
 	Profiler::Profiler p("Gzip::compress");
 	size_t raw_size = raster->getDataSize();
 	// per documentation, this amount of space is guaranteed to fit the compressed stream
@@ -131,10 +132,10 @@ ByteBuffer *GzipConverter::encode(GenericRaster *raster) {
 	unsigned int real_size = compressed_size - stream.avail_out;
 	deflateEnd(&stream);
 
-	return new ByteBuffer(compressed, real_size);
+	return std::make_unique<ByteBuffer>(compressed, real_size);
 }
 
-GenericRaster *GzipConverter::decode(ByteBuffer *buffer) {
+std::unique_ptr<GenericRaster> GzipConverter::decode(ByteBuffer *buffer) {
 	Profiler::Profiler p("Gzip::decompress");
 	auto raster = GenericRaster::create(localcrs, datadescription);
 
@@ -162,5 +163,5 @@ GenericRaster *GzipConverter::decode(ByteBuffer *buffer) {
 	}
 	inflateEnd(&stream);
 
-	return raster.release();
+	return raster;
 }

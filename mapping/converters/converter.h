@@ -23,14 +23,13 @@ class RasterConverter {
 	public:
 		virtual ~RasterConverter() { }
 
-		static ByteBuffer *direct_encode(GenericRaster *raster, GenericRaster::Compression method);
-		static GenericRaster *direct_decode(const LocalCRS &rastermetadata, const DataDescription &valuemetadata, ByteBuffer *buffer, GenericRaster::Compression method);
+		static std::unique_ptr<ByteBuffer> direct_encode(GenericRaster *raster, GenericRaster::Compression method);
+		static std::unique_ptr<GenericRaster> direct_decode(const LocalCRS &rastermetadata, const DataDescription &valuemetadata, ByteBuffer *buffer, GenericRaster::Compression method);
 
-		static RasterConverter *getConverter(const LocalCRS &rastermetadata, const DataDescription &valuemetadata, GenericRaster::Compression method);
+		static std::unique_ptr<RasterConverter> getConverter(const LocalCRS &rastermetadata, const DataDescription &valuemetadata, GenericRaster::Compression method);
 
-		virtual ByteBuffer *encode(GenericRaster *raster) = 0;
-		virtual GenericRaster *decode(ByteBuffer *buffer) = 0;
-
+		virtual std::unique_ptr<ByteBuffer> encode(GenericRaster *raster) = 0;
+		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer *buffer) = 0;
 
 		const LocalCRS localcrs;
 		const DataDescription datadescription;

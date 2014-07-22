@@ -8,15 +8,15 @@ CPATH := /usr/local/include/:$(CPATH)
 
 #CPP=g++
 CPP=clang++
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/
-LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl
+CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
+LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl -L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-luriparser
 CL_SOURCES=$(wildcard operators/*/*.cl)
 CL_HEADERS=$(CL_SOURCES:.cl=.cl.h)
 OBJ_RASTER=o/raster_raster.o o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o o/raster_metadata.o o/raster_import_gdal.o o/raster_export_pgm.o o/raster_export_yuv.o o/raster_export_png.o o/raster_export_jpeg.o o/raster_pointcollection.o o/raster_histogram.o
 OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o
 OBJ_CONVERTERS=o/converters_converter.o o/converters_raw.o
-OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_playground.o o/operators_raster_histogram.o
+OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_playground.o o/operators_raster_histogram.o o/operators_raster_r.o
 OBJ_OPERATORS_POINTS=o/operators_points_pgpointsource.o o/operators_points_gfbiopointsource.o
 OBJ_OPERATORS_GEOMETRY=
 OBJ_OPERATORS_COMBINED=o/operators_combined_points2raster.o o/operators_combined_filterpointsbyraster.o

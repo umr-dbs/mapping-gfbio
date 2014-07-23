@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta http-equiv="content-type" content="text/html; charset=utf-8">
+		<title>GFBio prototype</title>
+
+		<link rel="stylesheet" href="compiler/compile.php?type=css&project=gfbio" type="text/css">
+		<script src="compiler/compile.php?type=js&project=gfbio" type="text/javascript"></script>
+		<script src="compiler/compile.php?type=soy&project=gfbio" type="text/javascript"></script>
+		<script type="text/javascript">
+			$(function() {
+				window.addEventListener('message', receiveMessage);
+
+				function receiveMessage(event) {
+					console.log("<<Receive>>", event.origin, event.data);
+				}
+			});
+		</script>
+	</head>
+	<body onload="{UI.showUI(UI_Login);Session.attemptLogin('simple', 'simple', UI.showError);}">
+		<div id="container_ui"></div>
+		<div id="container_windows"></div>
+	</body>
+</html>

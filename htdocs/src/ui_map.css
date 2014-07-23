@@ -270,3 +270,8 @@
 .collapseSidebar.collapsed:before {
 	content: "";
 }
+
+.ol3Control_backgroundLayer {
+	bottom: 0.5em;
+	left: 0.5em;
+}

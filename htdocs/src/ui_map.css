@@ -95,7 +95,7 @@
 	overflow-x: hidden;
 }
 
-.layerControls_simple {
+.layerControls_mini {
 	position: absolute;
 	top: 10px;
 	bottom: 10px;
@@ -221,6 +221,23 @@
 .layerControl .layerControlOption .ui-slider {
 	margin-left: 95px;
 	margin-right: 10px;
+}
+
+.layerControl_mini{
+	background-color: transparent;
+	color: #FFF;	
+	border-width: 0;
+	margin: 5px;		
+}
+
+.layerControl_mini i {
+    text-align: center;
+}
+
+.layerControl_mini .dynamicColorizedIcon {
+	border-radius: 5px;
+	padding: 3px;
+	background-color: #000;
 }
 
 .ui-state-highlight {

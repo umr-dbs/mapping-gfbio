@@ -156,6 +156,15 @@ int main() {
 		//printInfo();return 0;
 		std::map<std::string, std::string> params = parseQueryString(query_string);
 
+		epsg_t query_epsg = EPSG_WEBMERCATOR;
+		if (params.count("crs") > 0) {
+			std::string crs = params["crs"];
+			if (crs.compare(0,5,"EPSG:") == 0) {
+				query_epsg = atoi(crs.substr(5, std::string::npos).c_str());
+			}
+		}
+
+
 		// direct loading of a query (obsolete?)
 		if (params.count("query") > 0) {
 			auto graph = GenericOperator::fromJSON(params["query"]);
@@ -164,7 +173,7 @@ int main() {
 			if (params.count("colors") > 0)
 				colorizer = params["colors"];
 
-			auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
+			auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
@@ -180,7 +189,7 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 			int timestamp = 42;
 
-			auto points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
+			auto points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
@@ -280,21 +289,22 @@ int main() {
 				if (params.count("colors") > 0)
 					colorizer = params["colors"];
 
-				epsg_t epsg = EPSG_WEBMERCATOR;
-				if (params.count("crs") > 0) {
-					std::string crs = params["crs"];
-					if (crs.compare(0,5,"EPSG:") == 0) {
-						epsg = atoi(crs.substr(5, std::string::npos).c_str());
-					}
-				}
-
-
 				std::string format("image/png");
 				if (params.count("format") > 0) {
 					format = params["format"];
 				}
 
-				QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, epsg);
+				/*
+				 * OpenLayers insists on sending latitude in x and longitude in y.
+				 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
+				 * The simple solution is to swap the x and y coordinates.
+				 */
+				if (query_epsg == EPSG_LATLON) {
+					std::swap(bbox[0], bbox[1]);
+					std::swap(bbox[2], bbox[3]);
+				}
+
+				QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
 
 				if (format == "application/json") {
 					auto histogram = graph->getHistogram(qrect);
@@ -317,7 +327,22 @@ int main() {
 					Profiler::print();
 					printf("\r\n");
 #endif
-					outputImage(result_raster.get(), flipx, flipy, colorizer);
+					// Flip if required
+					if (flipx || flipy)
+						result_raster = std::move(result_raster->flip(flipx, flipy));
+
+					// Write debug info
+					std::ostringstream msg_tl;
+					msg_tl << bbox[0] << ", " << bbox[1];
+					result_raster->print(4, 4, result_raster->dd.max, msg_tl.str().c_str());
+
+					std::ostringstream msg_br;
+					msg_br << bbox[2] << ", " << bbox[3];
+					std::string msg_brs = msg_br.str();
+					result_raster->print(result_raster->lcrs.size[1]-4-8*msg_brs.length(), result_raster->lcrs.size[1]-12, result_raster->dd.max, msg_brs.c_str());
+
+
+					outputImage(result_raster.get(), false, false, colorizer);
 				}
 				// cut into pieces
 

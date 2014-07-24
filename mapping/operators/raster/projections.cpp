@@ -95,8 +95,26 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 	double src_x1, src_y1, src_x2, src_y2;
 	int src_xres = rect.xres, src_yres = rect.yres;
 
-	if (src_epsg == EPSG_METEOSAT2) {
-		// Meteosat: ALWAYS load the full raster.
+	if (dest_epsg == EPSG_METEOSAT2) {
+		// We're loading some points and would like to display them in the msg projection. Why? Well, why not?
+		if (src_epsg == EPSG_WEBMERCATOR) {
+			src_x1 = -20037508.34;
+			src_y1 = -20037508.34;
+			src_x2 = 20037508.34;
+			src_y2 = 20037508.34;
+		}
+		else if (src_epsg == EPSG_LATLON) {
+			src_x1 = -180;
+			src_y1 = -90;
+			src_x2 = 180;
+			src_y2 = 90;
+		}
+		else
+			throw OperatorException("Cannot transform to METEOSAT2 projection from this projection");
+	}
+	else if (src_epsg == EPSG_METEOSAT2) {
+		// We're loading a msg raster. ALWAYS load the full raster.
+		// TODO: optimize
 		src_x1 = 0;
 		src_y1 = 0;
 		src_x2 = 3711;
@@ -166,8 +184,8 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 	if (src_epsg == dest_epsg)
 		return sources[0]->getPoints(rect);
 
-	if (src_epsg == EPSG_METEOSAT2 || dest_epsg == EPSG_METEOSAT2)
-		throw OperatorException("Cannot transform Points from or to Meteosat Projection. Why would you want that?");
+	//if (src_epsg == EPSG_METEOSAT2 || dest_epsg == EPSG_METEOSAT2)
+	//	throw OperatorException("Cannot transform Points from or to Meteosat Projection. Why would you want that?");
 
 
 	// Need to transform "backwards" to project the query rectangle..
@@ -180,8 +198,11 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 
 	auto points_in = sources[0]->getPoints(src_rect);
 
-	if (src_epsg != points_in->epsg)
-		throw OperatorException("ProjectionOperator: Source Points not in expected projection");
+	if (src_epsg != points_in->epsg) {
+		std::ostringstream msg;
+		msg << "ProjectionOperator: Source Points not in expected projection, expected " << src_epsg << " got " << points_in->epsg;
+		throw OperatorException(msg.str());
+	}
 
 	auto points_out = std::make_unique<PointCollection>(dest_epsg);
 
@@ -268,7 +289,7 @@ std::unique_ptr<GenericRaster> MeteosatLatLongOperator::getRaster(const QueryRec
 	auto raster_in = sources[0]->getRaster(rect);
 
 	Profiler::Profiler p("METEOSAT_DRAW_LATLONG_OPERATOR");
-	return callUnaryOperatorFunc<meteosat_draw_latlong>(raster_in);
+	return callUnaryOperatorFunc<meteosat_draw_latlong>(raster_in.get());
 }
 
 #endif

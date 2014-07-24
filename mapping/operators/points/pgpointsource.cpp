@@ -52,7 +52,7 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRec
 	pqxx::work transaction(*connection, "load_points");
 	pqxx::result points = transaction.exec(sql.str());
 
-	auto points_out = std::make_unique<PointCollection>();
+	auto points_out = std::make_unique<PointCollection>(EPSG_WEBMERCATOR);
 
 	auto column_count = points.columns();
 	for (pqxx::result::size_type c = 2;c<column_count;c++) {

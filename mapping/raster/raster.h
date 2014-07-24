@@ -52,9 +52,9 @@ class LocalCRS {
 		size_t getPixelCount() const;
 		void verify() const;
 
-		double PixelToWorldX(int x) const { return origin[0] + x * scale[0]; }
-		double PixelToWorldY(int y) const { return origin[1] + y * scale[1]; }
-		double PixelToWorldZ(int z) const { return origin[2] + z * scale[2]; }
+		double PixelToWorldX(int px) const { return origin[0] + px * scale[0]; }
+		double PixelToWorldY(int py) const { return origin[1] + py * scale[1]; }
+		double PixelToWorldZ(int pz) const { return origin[2] + pz * scale[2]; }
 
 		double WorldToPixelX(double wx) const { return (wx - origin[0]) / scale[0]; }
 		double WorldToPixelY(double wy) const { return (wy - origin[1]) / scale[1]; }
@@ -175,6 +175,9 @@ class GenericRaster {
 		virtual std::unique_ptr<GenericRaster> cut(int x, int y, int z, int width, int height, int depths) = 0;
 		std::unique_ptr<GenericRaster> cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
 		virtual std::unique_ptr<GenericRaster> scale(int width, int height=0, int depth=0) = 0;
+		virtual std::unique_ptr<GenericRaster> flip(bool flipx, bool flipy) = 0;
+
+		virtual void print(int x, int y, double value, const char *text) = 0;
 
 		std::string hash();
 

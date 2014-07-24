@@ -470,6 +470,25 @@ std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int dep
 	return outputraster_guard;
 }
 
+template<typename T>
+std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
+	if (lcrs.dimensions != 2)
+		throw MetadataException("flip() only works on 2d rasters");
+
+	auto flipped_raster = GenericRaster::create(lcrs, dd);
+	Raster2D<T> *r = (Raster2D<T> *) flipped_raster.get();
+
+	int width = lcrs.size[0];
+	int height = lcrs.size[1];
+	for (int y=0;y<height;y++) {
+		int py = flipy ? height-y : y;
+		for (int x=0;x<width;x++) {
+			int px = flipx ? width-x : x;
+			r->set(x, y, get(px, py));
+		}
+	}
+	return flipped_raster;
+}
 
 
 template<typename T>
@@ -486,6 +505,36 @@ std::string GenericRaster::hash() {
 
 	return calculateHash(data, len).asHex();
 }
+
+
+#include "raster_font.h"
+template<typename T>
+void Raster2D<T>::print(int dest_x, int dest_y, double dvalue, const char *text) {
+	if (lcrs.dimensions != 2)
+		throw MetadataException("print() only works on 2d rasters");
+
+	T value = (T) dvalue;
+
+	this->setRepresentation(GenericRaster::CPU);
+
+	for (;*text;text++) {
+		int src_x = (*text % 16) * 8;
+		int src_y = (*text / 16) * 8;
+		for (int y=0;y<8;y++) {
+			for (int x=0;x<8;x++) {
+				int font_pixel = (x + src_x) + (y + src_y) * 128;
+				int font_byte = font_pixel / 8;
+				int font_bit = font_pixel % 8;
+
+				int f = raster_font_bits[font_byte] & (1 << font_bit);
+				if (f)
+					this->setSafe(x+dest_x, y+dest_y, value);
+			}
+		}
+		dest_x += 8;
+	}
+}
+
 
 
 RASTER_PRIV_INSTANTIATE_ALL

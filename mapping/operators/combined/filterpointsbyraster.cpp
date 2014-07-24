@@ -34,7 +34,7 @@ std::unique_ptr<PointCollection> FilterPointsByRaster::getPoints(const QueryRect
 	auto raster = sources[1]->getRaster(rect);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 
-	auto points_out = std::make_unique<PointCollection>();
+	auto points_out = std::make_unique<PointCollection>(rect.epsg);
 
 	double no_data = 0.0; // 0 is always considered "false"
 	if (raster->dd.has_no_data)

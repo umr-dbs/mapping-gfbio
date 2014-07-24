@@ -101,8 +101,10 @@ bool CRSTransformer::transform(double &px, double &py, double &pz) const {
 		if (px < -180.0 || py < -90.0)
 			return false;
 	}
-	if (!GDALReprojectionTransform(transformer, false, 1, &px, &py, &pz, &success) || !success)
-		return false;
+	if (in_epsg != out_epsg) {
+		if (!GDALReprojectionTransform(transformer, false, 1, &px, &py, &pz, &success) || !success)
+			return false;
+	}
 	if (out_epsg == EPSG_METEOSAT2) {
 		// coords from latlon to MSAT
 		int tx, ty;

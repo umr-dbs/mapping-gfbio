@@ -509,15 +509,18 @@ std::string GenericRaster::hash() {
 
 #include "raster_font.h"
 template<typename T>
-void Raster2D<T>::print(int dest_x, int dest_y, double dvalue, const char *text) {
+void Raster2D<T>::print(int dest_x, int dest_y, double dvalue, const char *text, int maxlen) {
 	if (lcrs.dimensions != 2)
 		throw MetadataException("print() only works on 2d rasters");
+
+	if (maxlen < 0)
+		maxlen = strlen(text);
 
 	T value = (T) dvalue;
 
 	this->setRepresentation(GenericRaster::CPU);
 
-	for (;*text;text++) {
+	for (;maxlen > 0 && *text;text++, maxlen--) {
 		int src_x = (*text % 16) * 8;
 		int src_y = (*text / 16) * 8;
 		for (int y=0;y<8;y++) {
@@ -535,6 +538,28 @@ void Raster2D<T>::print(int dest_x, int dest_y, double dvalue, const char *text)
 	}
 }
 
+
+void GenericRaster::printCentered(double dvalue, const char *text) {
+	if (lcrs.dimensions != 2)
+		throw MetadataException("print() only works on 2d rasters");
+
+	const int BORDER = 16;
+
+	int len = strlen(text);
+
+	int width = lcrs.size[0] - 2*BORDER;
+	int height = lcrs.size[1] - 2*BORDER;
+
+	int max_chars_x = width / 8;
+	int max_chars_y = height / 8;
+
+	int lines_required = (len + max_chars_x - 1) / max_chars_x;
+	int offset_y = (height - 8*lines_required) / 2;
+
+	for (int line=0;line < max_chars_y && line*max_chars_x < len;line++) {
+		print(BORDER, BORDER+offset_y+8*line, 255, &text[line*max_chars_x], max_chars_x);
+	}
+}
 
 
 RASTER_PRIV_INSTANTIATE_ALL

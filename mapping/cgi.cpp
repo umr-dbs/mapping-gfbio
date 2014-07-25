@@ -214,137 +214,151 @@ int main() {
 				if (params["version"] != "1.3.0")
 					abort("Invalid version");
 
-				// Wir ignorieren:
-				// format
-				// transparent
-				// &CRS=EPSG%3A3857
-
-				// Unbekannt:
-				// &STYLES=dem
-
-
-				//if (params["tiled"] != "true")
-				//	abort("only tiled for now");
-
-				std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
-				double bbox[4];
-
-				{
-					std::string delimiters = " ,";
-					size_t current, next = -1;
-					int element = 0;
-					do {
-					  current = next + 1;
-					  next = bbox_str.find_first_of(delimiters, current);
-					  double value = std::stod( bbox_str.substr(current, next - current) );
-					  if (isnan(value))
-						  abort("BBOX value is NaN");
-					  bbox[element++] = value;
-					} while (element < 4 && next != std::string::npos);
-
-					if (element != 4)
-						abort("BBOX does not contain 4 doubles");
-				}
-
-				// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
-				                //    minx          miny         maxx         maxy
-				double extent[4] {-20037508.34, -20037508.34, 20037508.34, 20037508.34};
-				double bbox_normalized[4];
-				for (int i=0;i<4;i+=2) {
-					bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
-					bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
-				}
-
-				// Koordinaten können leicht ausserhalb liegen, z.B.
-				// 20037508.342789, 20037508.342789
-				for (int i=0;i<4;i++) {
-					if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
-						bbox_normalized[i] = 0.0;
-					else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
-						bbox_normalized[i] = 1.0;
-				}
-
-				for (int i=0;i<4;i++) {
-					if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0) {
-						printf("Content-type: text/plain\r\n\r\n");
-						printf("extent: (%f, %f) -> (%f, %f)\n", extent[0], extent[1], extent[2], extent[3]);
-						printf("   raw: (%f, %f) -> (%f, %f)\n", bbox[0], bbox[1], bbox[2], bbox[3]);
-						printf("normal: (%10f, %10f) -> (%10f, %10f)\n", bbox_normalized[0], bbox_normalized[1], bbox_normalized[2], bbox_normalized[3]);
-						abort("bbox outside of extent");
-					}
-				}
-
-				//bbox_normalized[1] = 1.0 - bbox_normalized[1];
-				//bbox_normalized[3] = 1.0 - bbox_normalized[3];
-
 				int output_width = atoi(params["width"].c_str());
 				int output_height = atoi(params["height"].c_str());
 				if (output_width <= 0 || output_height <= 0) {
 					abort("output_width not valid");
 				}
 
-				auto graph = GenericOperator::fromJSON(params["layers"]);
-				int timestamp = 42;
-				std::string colorizer;
-				if (params.count("colors") > 0)
-					colorizer = params["colors"];
+				try {
+					// Wir ignorieren:
+					// format
+					// transparent
 
-				std::string format("image/png");
-				if (params.count("format") > 0) {
-					format = params["format"];
-				}
+					// Unbekannt:
+					// &STYLES=dem
 
-				/*
-				 * OpenLayers insists on sending latitude in x and longitude in y.
-				 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
-				 * The simple solution is to swap the x and y coordinates.
-				 */
-				if (query_epsg == EPSG_LATLON) {
-					std::swap(bbox[0], bbox[1]);
-					std::swap(bbox[2], bbox[3]);
-				}
+					//if (params["tiled"] != "true")
+					//	abort("only tiled for now");
 
-				QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
+					std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
+					double bbox[4];
 
-				if (format == "application/json") {
-					auto histogram = graph->getHistogram(qrect);
+					{
+						std::string delimiters = " ,";
+						size_t current, next = -1;
+						int element = 0;
+						do {
+						  current = next + 1;
+						  next = bbox_str.find_first_of(delimiters, current);
+						  double value = std::stod( bbox_str.substr(current, next - current) );
+						  if (isnan(value))
+							  abort("BBOX value is NaN");
+						  bbox[element++] = value;
+						} while (element < 4 && next != std::string::npos);
 
-					printf("content-type: application/json\r\n\r\n");
-					histogram->print();
-				}
-				else {
-					auto result_raster = graph->getRaster(qrect);
-
-					if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
-						result_raster = result_raster->scale(output_width, output_height);
+						if (element != 4)
+							abort("BBOX does not contain 4 doubles");
 					}
 
-					bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
-					bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
+					// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
+									//    minx          miny         maxx         maxy
+					double extent[4] {-20037508.34, -20037508.34, 20037508.34, 20037508.34};
+					double bbox_normalized[4];
+					for (int i=0;i<4;i+=2) {
+						bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
+						bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
+					}
+
+					// Koordinaten können leicht ausserhalb liegen, z.B.
+					// 20037508.342789, 20037508.342789
+					for (int i=0;i<4;i++) {
+						if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
+							bbox_normalized[i] = 0.0;
+						else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
+							bbox_normalized[i] = 1.0;
+					}
+
+					for (int i=0;i<4;i++) {
+						if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0) {
+							printf("Content-type: text/plain\r\n\r\n");
+							printf("extent: (%f, %f) -> (%f, %f)\n", extent[0], extent[1], extent[2], extent[3]);
+							printf("   raw: (%f, %f) -> (%f, %f)\n", bbox[0], bbox[1], bbox[2], bbox[3]);
+							printf("normal: (%10f, %10f) -> (%10f, %10f)\n", bbox_normalized[0], bbox_normalized[1], bbox_normalized[2], bbox_normalized[3]);
+							abort("bbox outside of extent");
+						}
+					}
+
+					//bbox_normalized[1] = 1.0 - bbox_normalized[1];
+					//bbox_normalized[3] = 1.0 - bbox_normalized[3];
+
+					auto graph = GenericOperator::fromJSON(params["layers"]);
+					int timestamp = 42;
+					std::string colorizer;
+					if (params.count("colors") > 0)
+						colorizer = params["colors"];
+
+					std::string format("image/png");
+					if (params.count("format") > 0) {
+						format = params["format"];
+					}
+
+					/*
+					 * OpenLayers insists on sending latitude in x and longitude in y.
+					 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
+					 * The simple solution is to swap the x and y coordinates.
+					 */
+					if (query_epsg == EPSG_LATLON) {
+						std::swap(bbox[0], bbox[1]);
+						std::swap(bbox[2], bbox[3]);
+					}
+
+					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
+
+					if (format == "application/json") {
+						auto histogram = graph->getHistogram(qrect);
+
+						printf("content-type: application/json\r\n\r\n");
+						histogram->print();
+					}
+					else {
+						auto result_raster = graph->getRaster(qrect);
+
+						if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
+							result_raster = result_raster->scale(output_width, output_height);
+						}
+
+						bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
+						bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
 
 #if RASTER_DO_PROFILE
-					printf("Profiling-header: ");
-					Profiler::print();
-					printf("\r\n");
+						printf("Profiling-header: ");
+						Profiler::print();
+						printf("\r\n");
 #endif
-					// Flip if required
-					if (flipx || flipy)
-						result_raster = std::move(result_raster->flip(flipx, flipy));
+						// Flip if required
+						if (flipx || flipy)
+							result_raster = std::move(result_raster->flip(flipx, flipy));
 
-					// Write debug info
-					std::ostringstream msg_tl;
-					msg_tl.precision(2);
-					msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
-					result_raster->print(4, 4, result_raster->dd.max, msg_tl.str().c_str());
+						// Write debug info
+						std::ostringstream msg_tl;
+						msg_tl.precision(2);
+						msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
+						result_raster->print(4, 4, result_raster->dd.max, msg_tl.str().c_str());
 
-					std::ostringstream msg_br;
-					msg_br.precision(2);
-					msg_br << std::fixed << bbox[2] << ", " << bbox[3];
-					std::string msg_brs = msg_br.str();
-					result_raster->print(result_raster->lcrs.size[1]-4-8*msg_brs.length(), result_raster->lcrs.size[1]-12, result_raster->dd.max, msg_brs.c_str());
+						std::ostringstream msg_br;
+						msg_br.precision(2);
+						msg_br << std::fixed << bbox[2] << ", " << bbox[3];
+						std::string msg_brs = msg_br.str();
+						result_raster->print(result_raster->lcrs.size[1]-4-8*msg_brs.length(), result_raster->lcrs.size[1]-12, result_raster->dd.max, msg_brs.c_str());
 
+						outputImage(result_raster.get(), false, false, colorizer);
+					}
+				}
+				catch (const std::exception &e) {
+					// Alright, something went wrong.
+					// We're still in a WMS request though, so do our best to output an image with a clear error message.
 
-					outputImage(result_raster.get(), false, false, colorizer);
+					DataDescription dd(GDT_Byte, 0, 255, true, 0);
+					LocalCRS lcrs(EPSG_UNKNOWN, output_width, output_height, 0.0, 0.0, 1.0, 1.0);
+
+					auto errorraster = GenericRaster::create(lcrs, dd);
+					errorraster->clear(0);
+
+					auto msg = e.what();
+					errorraster->printCentered(1, msg);
+
+					outputImage(errorraster.get(), false, false, "hsv");
 				}
 				// cut into pieces
 

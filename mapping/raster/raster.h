@@ -177,7 +177,8 @@ class GenericRaster {
 		virtual std::unique_ptr<GenericRaster> scale(int width, int height=0, int depth=0) = 0;
 		virtual std::unique_ptr<GenericRaster> flip(bool flipx, bool flipy) = 0;
 
-		virtual void print(int x, int y, double value, const char *text) = 0;
+		virtual void print(int x, int y, double value, const char *text, int maxlen = -1) = 0;
+		virtual void printCentered(double value, const char *text);
 
 		std::string hash();
 

@@ -333,11 +333,13 @@ int main() {
 
 					// Write debug info
 					std::ostringstream msg_tl;
-					msg_tl << bbox[0] << ", " << bbox[1];
+					msg_tl.precision(2);
+					msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
 					result_raster->print(4, 4, result_raster->dd.max, msg_tl.str().c_str());
 
 					std::ostringstream msg_br;
-					msg_br << bbox[2] << ", " << bbox[3];
+					msg_br.precision(2);
+					msg_br << std::fixed << bbox[2] << ", " << bbox[3];
 					std::string msg_brs = msg_br.str();
 					result_raster->print(result_raster->lcrs.size[1]-4-8*msg_brs.length(), result_raster->lcrs.size[1]-12, result_raster->dd.max, msg_brs.c_str());
 

@@ -146,7 +146,7 @@
     width: 87px;
 }
 
-.layerControl .header,.layerControl .footer {
+.layerControl .header {
 	height: 20px;
 	background: rgb(230, 230, 230);
 }
@@ -204,11 +204,16 @@
 }
 
 .layerControl .footer {
+	background: rgb(230, 230, 230);
 	padding: 5px;
 }
 
+.layerControl .layerControlOption {
+	clear: both;
+}
+
 .layerControl .layerControlOption .content {
-	margin-left: 85px;
+	margin-left: 95px;
 }
 
 .layerControl .layerControlOption label {
@@ -219,8 +224,15 @@
 }
 
 .layerControl .layerControlOption .ui-slider {
-	margin-left: 95px;
 	margin-right: 10px;
+}
+
+.layerControl .layerControlOption .colorPicker {
+   width: 16px;
+   height: 16px;
+   border: 2px solid black;
+   cursor: pointer;
+   font-size: 0px;
 }
 
 .layerControl_mini{

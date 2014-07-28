@@ -1,6 +1,7 @@
 
 #include "raster/raster.h"
 #include "raster/pointcollection.h"
+#include "raster/geometry.h"
 #include "raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
@@ -20,6 +21,7 @@ class ProjectionOperator : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
 	private:
 		QueryRectangle projectQueryRectangle(const QueryRectangle &rect, const GDAL::CRSTransformer &transformer);
 		epsg_t src_epsg, dest_epsg;
@@ -224,6 +226,14 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 	return points_out;
 }
 
+
+std::unique_ptr<GenericGeometry> ProjectionOperator::getGeometry(const QueryRectangle &rect) {
+	// TODO: actually reproject. ol3js can reproject on its own, but we'll need to do it ourselves.
+	GDAL::CRSTransformer qrect_transformer(dest_epsg, src_epsg);
+	QueryRectangle src_rect = projectQueryRectangle(rect, qrect_transformer);
+
+	return sources[0]->getGeometry(src_rect);
+}
 
 
 

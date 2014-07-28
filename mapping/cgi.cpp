@@ -1,5 +1,6 @@
 #include "raster/raster.h"
 #include "raster/pointcollection.h"
+#include "raster/geometry.h"
 #include "raster/histogram.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
@@ -143,6 +144,10 @@ void outputPointCollection(PointCollection *points) {
 	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON().c_str());
 }
 
+void outputGeometry(GenericGeometry *geometry) {
+	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
+}
+
 
 int main() {
 	//printf("Content-type: text/plain\r\n\r\nDebugging:\n");
@@ -197,6 +202,22 @@ int main() {
 			printf("\r\n");
 #endif
 			outputPointCollection(points.get());
+			return 0;
+		}
+
+		// Geometry as GeoJSON
+		if (params.count("geometryquery") > 0) {
+			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
+			int timestamp = 42;
+
+			auto geometry = graph->getGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+
+#if RASTER_DO_PROFILE
+			printf("Profiling-header: ");
+			Profiler::print();
+			printf("\r\n");
+#endif
+			outputGeometry(geometry.get());
 			return 0;
 		}
 

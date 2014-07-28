@@ -1,4 +1,6 @@
 #include "raster/pointcollection.h"
+#include "raster/geometry.h"
+
 #include "operators/operator.h"
 #include "util/curl.h"
 #include "util/make_unique.h"
@@ -17,13 +19,13 @@ class GFBioPointSourceOperator : public GenericOperator {
 		virtual ~GFBioPointSourceOperator();
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
 	private:
+		std::unique_ptr<geos::geom::Geometry> loadGeometryFromServer(const QueryRectangle &qrect);
 		std::string datasource;
 		std::string query;
 		cURL curl;
 };
-
-
 
 
 GFBioPointSourceOperator::GFBioPointSourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
@@ -37,21 +39,60 @@ GFBioPointSourceOperator::~GFBioPointSourceOperator() {
 }
 REGISTER_OPERATOR(GFBioPointSourceOperator, "gfbiopointsource");
 
-std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect) {
+class GFBioGeometrySourceOperator : public GFBioPointSourceOperator {
+	public:
+		GFBioGeometrySourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GFBioPointSourceOperator(sourcecount, sources, params) {};
+};
+REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
+
+std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect) {
+	auto points = loadGeometryFromServer(rect);
+
+	if (points->getDimension() != 0)
+		throw OperatorException("Result from GBif is not a point collection");
+
+	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
+	geos::geom::CoordinateSequence *coords = points->getCoordinates();
+
+	size_t count = coords->getSize();
+	for (size_t i=0;i<count;i++) {
+		const geos::geom::Coordinate &coord = coords->getAt(i); //[i];
+		points_out->addPoint(coord.x, coord.y);
+	}
+	delete coords; // TODO: is this correct?
+
+	return points_out;
+}
+
+
+// pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/WKB?datasource=IUCN&query={"globalAttributes":{"speciesName":"Puma concolor"}}
+std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const QueryRectangle &rect) {
+	auto geom = loadGeometryFromServer(rect);
+
+	auto geom_out = std::make_unique<GenericGeometry>(EPSG_LATLON);
+	geom_out->setGeom(geom.release());
+
+	return geom_out;
+}
+
+
+
+std::unique_ptr<geos::geom::Geometry> GFBioPointSourceOperator::loadGeometryFromServer(const QueryRectangle &rect) {
 	if (rect.epsg != EPSG_LATLON) {
 		std::ostringstream msg;
-		msg << "GFBioPointSourceOperator: Shouldn't load points in a projection other than latlon (got " << rect.epsg << ", expected " << EPSG_LATLON;
+		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << rect.epsg << ", expected " << EPSG_LATLON << ")";
 		throw OperatorException(msg.str());
 	}
 
 	std::ostringstream url;
 	//url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource?datasource" << datasource << "&query=" << query;
 
-	url << "http://pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/WKB?datasource=" << curl.escape(datasource) << "&query=" << curl.escape(query);
+	url << "http://pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/WKB?datasource=" << curl.escape(datasource)
+		<< "&query=" << curl.escape(query)
+		<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << "," << rect.x2 << "," << rect.y2;
 
 	std::stringstream data;
-
 
 	curl.setOpt(CURLOPT_URL, url.str().c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
@@ -68,24 +109,8 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const Query
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKBReader wkbreader(*gf);
 
-	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
-
 	data.seekg(0);
-	geos::geom::Geometry *points = wkbreader.read(data);
+	geos::geom::Geometry *geom = wkbreader.read(data);
 
-	if (points->getDimension() != 0)
-		throw OperatorException("Result from GBif is not a point collection");
-
-	geos::geom::CoordinateSequence *coords = points->getCoordinates();
-
-	size_t count = coords->getSize();
-	for (size_t i=0;i<count;i++) {
-		const geos::geom::Coordinate &coord = coords->getAt(i); //[i];
-		points_out->addPoint(coord.x, coord.y);
-	}
-	delete coords; // TODO: is this correct?
-
-	gf->destroyGeometry(points);
-
-	return points_out;
+	return std::unique_ptr<geos::geom::Geometry>(geom);
 }

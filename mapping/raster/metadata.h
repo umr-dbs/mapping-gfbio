@@ -40,6 +40,9 @@ class MetadataIndex {
 		void setValue(IndexedMetadata<T> &object, const std::string &key, const T &value);
 		const T &getValue(const IndexedMetadata<T> &object, const std::string &key);
 		metadata_index_t size() { return index.size(); }
+
+		typename std::map<std::string, metadata_index_t>::const_iterator begin() const { return index.begin(); }
+		typename std::map<std::string, metadata_index_t>::const_iterator end() const { return index.end(); }
 	private:
 		std::map<std::string, metadata_index_t> index;
 		bool index_is_locked;

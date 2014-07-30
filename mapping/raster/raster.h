@@ -168,7 +168,7 @@ class GenericRaster {
 		virtual cl::Buffer *getCLInfoBuffer() = 0;
 		virtual void *getDataForWriting() = 0;
 		virtual int getBPP() = 0; // Bytes per Pixel
-		virtual double getAsDouble(int x, int y=0, int z=0) = 0;
+		virtual double getAsDouble(int x, int y=0, int z=0) const = 0;
 
 		virtual void clear(double value) = 0;
 		virtual void blit(const GenericRaster *raster, int x, int y=0, int z=0) = 0;

@@ -46,7 +46,7 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 		virtual std::unique_ptr<GenericRaster> flip(bool flipx, bool flipy);
 		virtual void print(int x, int y, double value, const char *text, int maxlen = -1);
 
-		virtual double getAsDouble(int x, int y=0, int z=0);
+		virtual double getAsDouble(int x, int y=0, int z=0) const;
 
 		T get(int x, int y) const {
 			return data[y*this->lcrs.size[0] + x];

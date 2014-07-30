@@ -492,7 +492,7 @@ std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
 
 
 template<typename T>
-double Raster2D<T>::getAsDouble(int x, int y, int) {
+double Raster2D<T>::getAsDouble(int x, int y, int) const {
 	return (double) get(x, y);
 }
 

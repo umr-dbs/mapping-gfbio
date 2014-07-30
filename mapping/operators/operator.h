@@ -1,6 +1,10 @@
 #ifndef OPERATORS_OPERATOR_H
 #define OPERATORS_OPERATOR_H
 
+#include <string>
+#include <memory>
+#include "util/make_unique.h"
+
 namespace Json {
 	class Value;
 }
@@ -36,14 +40,15 @@ class GenericOperator {
 			HISTOGRAM
 		};
 		static const int MAX_SOURCES = 5;
-		static GenericOperator *fromJSON(Json::Value &json);
+		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json);
+		static std::unique_ptr<GenericOperator> fromJSON(Json::Value &json);
 
 		virtual ~GenericOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
-		virtual PointCollection *getPoints(const QueryRectangle &rect);
-		virtual GenericGeometry *getGeometry(const QueryRectangle &rect);
-		virtual Histogram *getHistogram(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
+		virtual std::unique_ptr<Histogram> getHistogram(const QueryRectangle &rect);
 
 	protected:
 		GenericOperator(Type type, int sourcecount, GenericOperator *sources[]);
@@ -60,10 +65,10 @@ class GenericOperator {
 
 class OperatorRegistration {
 	public:
-		OperatorRegistration(const char *name, GenericOperator * (*constructor)(int sourcecount, GenericOperator *sources[], Json::Value &params));
+		OperatorRegistration(const char *name, std::unique_ptr<GenericOperator> (*constructor)(int sourcecount, GenericOperator *sources[], Json::Value &params));
 };
 
-#define REGISTER_OPERATOR(classname, name) static GenericOperator *create##classname(int sourcecount, GenericOperator *sources[], Json::Value &params) { return new classname(sourcecount, sources, params); } static OperatorRegistration register_##classname(name, create##classname)
+#define REGISTER_OPERATOR(classname, name) static std::unique_ptr<GenericOperator> create##classname(int sourcecount, GenericOperator *sources[], Json::Value &params) { return std::make_unique<classname>(sourcecount, sources, params); } static OperatorRegistration register_##classname(name, create##classname)
 
 
 #endif

@@ -30,37 +30,33 @@ static void usage() {
 
 
 static void convert(int argc, char *argv[]) {
-	GenericRaster *raster = nullptr;
-
 	if (argc < 3) {
 		usage();
 	}
 
 	try {
-		raster = GenericRaster::fromGDAL(argv[2], 1);
+		auto raster = GenericRaster::fromGDAL(argv[2], 1);
+		GreyscaleColorizer c;
+		raster->toPNG(argv[3], c);
+
 	}
 	catch (ImporterException &e) {
 		printf("%s\n", e.what());
 		exit(5);
 	}
-
-	GreyscaleColorizer c;
-	raster->toPNG(argv[3], c);
-
-	delete raster;
 }
 
 /**
  * Erstellt eine neue Rasterquelle basierend auf ein paar Beispielbildern
  */
 static void createsource(int argc, char *argv[]) {
-	GenericRaster *raster = nullptr;
+	std::unique_ptr<GenericRaster> raster;
 
 	Json::Value root(Json::objectValue);
 
 	Json::Value channels(Json::arrayValue);
 
-	LocalCRS *lcrs = nullptr;
+	std::unique_ptr<LocalCRS> lcrs;
 
 	epsg_t epsg = atoi(argv[2]);
 
@@ -74,7 +70,7 @@ static void createsource(int argc, char *argv[]) {
 		}
 
 		if (i == 0) {
-			lcrs = new LocalCRS(raster->lcrs);
+			lcrs.reset(new LocalCRS(raster->lcrs));
 
 			Json::Value coords(Json::objectValue);
 			Json::Value sizes(Json::arrayValue);
@@ -107,12 +103,7 @@ static void createsource(int argc, char *argv[]) {
 			channel["nodata"] = raster->dd.no_data;
 
 		channels.append(channel);
-
-		delete raster;
-		raster = nullptr;
 	}
-	delete lcrs;
-	lcrs = nullptr;
 
 	root["channels"] = channels;
 
@@ -189,15 +180,13 @@ static void runquery(int argc, char *argv[]) {
 		exit(5);
 	}
 
-	GenericOperator *graph = GenericOperator::fromJSON(root["query"]);
+	auto graph = GenericOperator::fromJSON(root["query"]);
 
 	int timestamp = root.get("starttime", 0).asInt();
-	GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, -20037508, -20037508, 20037508, 20037508, 1920, 1200, EPSG_WEBMERCATOR));
+	auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, -20037508, 20037508, 20037508, 1920, 1200, EPSG_WEBMERCATOR));
 
 	GreyscaleColorizer c;
 	raster->toPNG(out_filename, c);
-	delete raster;
-	delete graph;
 }
 
 static int testquery(int argc, char *argv[]) {
@@ -230,13 +219,11 @@ static int testquery(int argc, char *argv[]) {
 	int xres = root.get("query_xres", 1000).asInt();
 	int yres = root.get("query_yres", 1000).asInt();
 
-	GenericOperator *graph = GenericOperator::fromJSON(root["query"]);
+	auto graph = GenericOperator::fromJSON(root["query"]);
 	int timestamp = root.get("starttime", 0).asInt();
-	GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, EPSG_WEBMERCATOR));
-	delete graph;
+	auto raster = graph->getRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, EPSG_WEBMERCATOR));
 
 	std::string real_hash = raster->hash();
-	delete raster;
 	printf("Expected: %s\nResult  : %s\n", expected_hash.c_str(), real_hash.c_str());
 
 	if (expected_hash != real_hash) {

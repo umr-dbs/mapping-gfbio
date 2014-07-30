@@ -14,7 +14,7 @@ class NegateOperator : public GenericOperator {
 		NegateOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~NegateOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 };
 
 
@@ -23,7 +23,7 @@ class AddOperator : public GenericOperator {
 		AddOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~AddOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 };
 
 
@@ -37,7 +37,7 @@ REGISTER_OPERATOR(NegateOperator, "negate");
 
 template<typename T>
 struct negate{
-	static GenericRaster *execute(Raster2D<T> *raster) {
+	static void execute(Raster2D<T> *raster) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
 		T max = (T) raster->dd.max;
@@ -71,16 +71,16 @@ struct negate{
 			}
 		}
 #endif
-		return raster;
 	}
 };
 
 
-GenericRaster *NegateOperator::getRaster(const QueryRectangle &rect) {
-	GenericRaster *raster = sources[0]->getRaster(rect);
+std::unique_ptr<GenericRaster> NegateOperator::getRaster(const QueryRectangle &rect) {
+	auto raster = sources[0]->getRaster(rect);
 
 	Profiler::Profiler p("NEGATE_OPERATOR");
-	return callUnaryOperatorFunc<negate>(raster);
+	callUnaryOperatorFunc<negate>(raster.get());
+	return raster;
 }
 
 
@@ -99,25 +99,20 @@ REGISTER_OPERATOR(AddOperator, "add");
 
 template<typename T1, typename T2>
 struct add{
-	static GenericRaster *execute(Raster2D<T1> *raster1, Raster2D<T2> *raster2) {
-		std::unique_ptr<GenericRaster> raster1_guard(raster1);
-		std::unique_ptr<GenericRaster> raster2_guard(raster2);
-
+	static void execute(Raster2D<T1> *raster1, Raster2D<T2> *raster2) {
 		// nur ein Beispiel, nach der addition wird innerhalb des Wertebereichs normalisiert.
 		T1 min = (T1) raster1->dd.min;
 		int size = raster1->lcrs.getPixelCount();
 		for (int i=0;i<size;i++) {
 			raster1->data[i] = ((raster1->data[i] - min) + (raster2->data[i] - min))/2 + min;
 		}
-
-		return raster1_guard.release();
 	};
 };
 
 
-GenericRaster *AddOperator::getRaster(const QueryRectangle &rect) {
-	std::unique_ptr<GenericRaster> raster1( sources[0]->getRaster(rect) );
-	std::unique_ptr<GenericRaster> raster2( sources[1]->getRaster(rect) );
+std::unique_ptr<GenericRaster> AddOperator::getRaster(const QueryRectangle &rect) {
+	auto raster1 = sources[0]->getRaster(rect);
+	auto raster2 = sources[1]->getRaster(rect);
 
 	if (!(raster1->lcrs == raster2->lcrs))
 		throw OperatorException("add: rasters differ in lcrs");
@@ -128,6 +123,6 @@ GenericRaster *AddOperator::getRaster(const QueryRectangle &rect) {
 	raster2->setRepresentation(GenericRaster::Representation::CPU);
 
 	Profiler::Profiler p("ADD_OPERATOR");
-	return callBinaryOperatorFunc<add>(raster1.release(), raster2.release());
+	callBinaryOperatorFunc<add>(raster1.get(), raster2.get());
+	return raster1;
 }
-

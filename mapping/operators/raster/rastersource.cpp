@@ -17,7 +17,7 @@ class SourceOperator : public GenericOperator {
 		SourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~SourceOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
 		RasterSource *rastersource;
 		int channel;
@@ -39,8 +39,8 @@ SourceOperator::~SourceOperator() {
 
 REGISTER_OPERATOR(SourceOperator, "source");
 
-//GenericRaster *SourceOperator::execute(int timestamp, double x1, double y1, double x2, double y2, int xres, int yres) {
-GenericRaster *SourceOperator::getRaster(const QueryRectangle &rect) {
+
+std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &rect) {
 	Profiler::Profiler p("SOURCE_OPERATOR");
 
 	const LocalCRS *lcrs = rastersource->getLocalCRS();

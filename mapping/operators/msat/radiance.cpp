@@ -18,7 +18,7 @@ class MSATRadianceOperator : public GenericOperator {
 		MSATRadianceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATRadianceOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
 };
 
@@ -35,10 +35,9 @@ MSATRadianceOperator::~MSATRadianceOperator() {
 REGISTER_OPERATOR(MSATRadianceOperator, "msatradiance");
 
 
-GenericRaster *MSATRadianceOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
-	GenericRaster *raster = sources[0]->getRaster(rect);
-	std::unique_ptr<GenericRaster> raster_guard(raster);
+	auto raster = sources[0]->getRaster(rect);
 
 	float offset = raster->md_value.get("CalibrationOffset");
 	float slope = raster->md_value.get("CalibrationSlope");
@@ -53,16 +52,15 @@ GenericRaster *MSATRadianceOperator::getRaster(const QueryRectangle &rect) {
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
-	GenericRaster *raster_out = GenericRaster::create(raster->lcrs, out_dd);
-	std::unique_ptr<GenericRaster> raster_out_guard(raster_out);
+	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
-	prog.addInRaster(raster);
-	prog.addOutRaster(raster_out);
+	prog.addInRaster(raster.get());
+	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_msat_radiance, "radiancekernel");
 	prog.addArg(offset);
 	prog.addArg(slope);
 	prog.run();
 
-	return raster_out_guard.release();
+	return raster_out;
 }

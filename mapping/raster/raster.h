@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <ostream>
+#include <memory>
 
 #include "raster/exceptions.h"
 #include "raster/metadata.h"
@@ -51,9 +52,9 @@ class LocalCRS {
 		size_t getPixelCount() const;
 		void verify() const;
 
-		double PixelToWorldX(int x) const { return origin[0] + x * scale[0]; }
-		double PixelToWorldY(int y) const { return origin[1] + y * scale[1]; }
-		double PixelToWorldZ(int z) const { return origin[2] + z * scale[2]; }
+		double PixelToWorldX(int px) const { return origin[0] + px * scale[0]; }
+		double PixelToWorldY(int py) const { return origin[1] + py * scale[1]; }
+		double PixelToWorldZ(int pz) const { return origin[2] + pz * scale[2]; }
 
 		double WorldToPixelX(double wx) const { return (wx - origin[0]) / scale[0]; }
 		double WorldToPixelY(double wy) const { return (wy - origin[1]) / scale[1]; }
@@ -148,8 +149,8 @@ class GenericRaster {
 		virtual void setRepresentation(Representation r) = 0;
 		Representation getRepresentation() const { return representation; }
 
-		static GenericRaster *create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation = Representation::CPU);
-		static GenericRaster *fromGDAL(const char *filename, int rasterid, epsg_t epsg = EPSG_UNKNOWN);
+		static std::unique_ptr<GenericRaster> create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation = Representation::CPU);
+		static std::unique_ptr<GenericRaster> fromGDAL(const char *filename, int rasterid, epsg_t epsg = EPSG_UNKNOWN);
 
 		virtual ~GenericRaster();
 		GenericRaster(const GenericRaster &) = delete;
@@ -167,13 +168,17 @@ class GenericRaster {
 		virtual cl::Buffer *getCLInfoBuffer() = 0;
 		virtual void *getDataForWriting() = 0;
 		virtual int getBPP() = 0; // Bytes per Pixel
-		virtual double getAsDouble(int x, int y=0, int z=0) = 0;
+		virtual double getAsDouble(int x, int y=0, int z=0) const = 0;
 
 		virtual void clear(double value) = 0;
 		virtual void blit(const GenericRaster *raster, int x, int y=0, int z=0) = 0;
-		virtual GenericRaster *cut(int x, int y, int z, int width, int height, int depths) = 0;
-		GenericRaster *cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
-		virtual GenericRaster *scale(int width, int height=0, int depth=0) = 0;
+		virtual std::unique_ptr<GenericRaster> cut(int x, int y, int z, int width, int height, int depths) = 0;
+		std::unique_ptr<GenericRaster> cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
+		virtual std::unique_ptr<GenericRaster> scale(int width, int height=0, int depth=0) = 0;
+		virtual std::unique_ptr<GenericRaster> flip(bool flipx, bool flipy) = 0;
+
+		virtual void print(int x, int y, double value, const char *text, int maxlen = -1) = 0;
+		virtual void printCentered(double value, const char *text);
 
 		std::string hash();
 

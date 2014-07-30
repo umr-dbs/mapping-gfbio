@@ -1,24 +1,43 @@
 #include "raster/raster.h"
 #include "raster/pointcollection.h"
+#include "raster/geometry.h"
 #include "raster/histogram.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
 
-//#include <cstdlib>
 #include <cstdio>
 #include <cmath> // isnan
 #include <string>
 #include <fstream>
 #include <sstream>
-#include <exception>
 #include <algorithm>
 #include <map>
 #include <memory>
-#include <tuple>
 
 #include <uriparser/Uri.h>
 #include <json/json.h>
+
+/*
+A few benchmarks:
+SAVE_PNG8:   0.052097
+SAVE_PNG32:  0.249503
+SAVE_JPEG8:  0.021444 (90%)
+SAVE_JPEG32: 0.060772 (90%)
+SAVE_JPEG8:  0.021920 (100%)
+SAVE_JPEG32: 0.060187 (100%)
+
+Sizes:
+JPEG8:  200526 (100%)
+PNG8:   159504
+JPEG8:  124698 (95%)
+JPEG8:   92284 (90%)
+
+PNG32:  366925
+JPEG32: 308065 (100%)
+JPEG32: 168333 (95%)
+JPEG32: 120703 (90%)
+*/
 
 
 [[noreturn]] static void abort(const char *msg) {
@@ -101,45 +120,6 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 }
 
 
-std::tuple<GenericOperator *, int, std::string>loadQuery(const char *in_filename) {
-	/*
-	 * Step #1: open the query.json file and parse it
-	 */
-	std::ostringstream complete_in_filename;
-	complete_in_filename << "queries/" << in_filename  << ".json";
-	std::ifstream file(complete_in_filename.str());
-	if (!file.is_open()) {
-		throw ArgumentException(std::string("unable to open query file: ") + complete_in_filename.str());
-	}
-
-	Json::Reader reader(Json::Features::strictMode());
-	Json::Value root;
-	if (!reader.parse(file, root)) {
-		abort("unable to parse json");
-	}
-
-	int timestamp = root.get("starttime", 0).asInt();
-
-	GenericOperator *graph = GenericOperator::fromJSON(root["query"]);
-
-	return std::make_tuple(graph, timestamp, root.get("colorizer", "").asString());
-}
-
-std::tuple<GenericOperator *, int, std::string>parseQuery(const char *query) {
-	std::istringstream iss(query);
-	Json::Reader reader(Json::Features::strictMode());
-	Json::Value root;
-	if (!reader.parse(iss, root)) {
-		abort("unable to parse json");
-	}
-
-	int timestamp = 42;
-
-	GenericOperator *graph = GenericOperator::fromJSON(root);
-
-	return std::make_tuple(graph, timestamp, "");
-}
-
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "") {
 
 	std::unique_ptr<Colorizer> colorizer;
@@ -159,72 +139,13 @@ void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, 
 #endif
 }
 
-void outputImageByQuery(const char *in_filename) {
-	auto p = loadQuery(in_filename);
-
-	GenericOperator *graph = std::get<0>(p);
-	std::unique_ptr<GenericOperator> graph_guard(graph);
-
-	int timestamp = std::get<1>(p);
-	std::string colors = std::get<2>(p);
-
-	GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
-	std::unique_ptr<GenericRaster> raster_guard(raster);
-
-#if RASTER_DO_PROFILE && false
-	/*
-	// SAVE_PNG8:   0.052097
-	// SAVE_PNG32:  0.249503
-	// SAVE_JPEG8:  0.021444 (90%)
-	// SAVE_JPEG32: 0.060772 (90%)
-	// SAVE_JPEG8:  0.021920 (100%)
-	// SAVE_JPEG32: 0.060187 (100%)
-
-	Sizes:
-	JPEG8:  200526 (100%)
-	PNG8:   159504
-	JPEG8:  124698 (95%)
-	JPEG8:   92284 (90%)
-
-	PNG32:  366925
-	JPEG32: 308065 (100%)
-	JPEG32: 168333 (95%)
-	JPEG32: 120703 (90%)
-	*/
-
-	bool flipx = false;
-	bool flipy = false;
-	GreyscaleColorizer c1;
-	HSVColorizer c2;
-	{
-		Profiler::Profiler p("SAVE_PNG8");
-		raster->toPNG("/tmp/testimage1.png", c1, flipx, flipy);
-	}
-	{
-		Profiler::Profiler p("SAVE_PNG32");
-		raster->toPNG("/tmp/testimage2.png", c2, flipx, flipy);
-	}
-	{
-		Profiler::Profiler p("SAVE_JPEG8");
-		raster->toJPEG("/tmp/testimage1.jpg", c1, flipx, flipy);
-	}
-	{
-		Profiler::Profiler p("SAVE_JPEG32");
-		raster->toJPEG("/tmp/testimage2.jpg", c2, flipx, flipy);
-	}
-#endif
-#if RASTER_DO_PROFILE
-	printf("Profiling-header: ");
-	Profiler::print();
-	printf("\r\n");
-#endif
-
-	outputImage(raster_guard.get(), false, false, colors);
-}
-
 
 void outputPointCollection(PointCollection *points) {
 	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON().c_str());
+}
+
+void outputGeometry(GenericGeometry *geometry) {
+	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
 }
 
 
@@ -240,49 +161,63 @@ int main() {
 		//printInfo();return 0;
 		std::map<std::string, std::string> params = parseQueryString(query_string);
 
+		epsg_t query_epsg = EPSG_WEBMERCATOR;
+		if (params.count("crs") > 0) {
+			std::string crs = params["crs"];
+			if (crs.compare(0,5,"EPSG:") == 0) {
+				query_epsg = atoi(crs.substr(5, std::string::npos).c_str());
+			}
+		}
+
+
 		// direct loading of a query (obsolete?)
 		if (params.count("query") > 0) {
-			auto p = parseQuery(params["query"].c_str());
-
-			GenericOperator *graph = std::get<0>(p);
-			std::unique_ptr<GenericOperator> graph_guard(graph);
-
-			int timestamp = std::get<1>(p);
-			//std::string colors = std::get<2>(p);
+			auto graph = GenericOperator::fromJSON(params["query"]);
+			int timestamp = 42;
 			std::string colorizer;
 			if (params.count("colors") > 0)
 				colorizer = params["colors"];
 
-			GenericRaster *raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
-			std::unique_ptr<GenericRaster> raster_guard(raster);
+			auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
 			Profiler::print();
 			printf("\r\n");
 #endif
-			outputImage(raster_guard.get(), false, false, colorizer);
+			outputImage(raster.get(), false, false, colorizer);
 			return 0;
 		}
 
 		// PointCollection as GeoJSON
 		if (params.count("pointquery") > 0) {
-			auto p = parseQuery(params["pointquery"].c_str());
+			auto graph = GenericOperator::fromJSON(params["pointquery"]);
+			int timestamp = 42;
 
-			GenericOperator *graph = std::get<0>(p);
-			std::unique_ptr<GenericOperator> graph_guard(graph);
-
-			int timestamp = std::get<1>(p);
-
-			PointCollection *points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, EPSG_WEBMERCATOR));
-			std::unique_ptr<PointCollection> points_guard(points);
+			auto points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
 			Profiler::print();
 			printf("\r\n");
 #endif
-			outputPointCollection(points);
+			outputPointCollection(points.get());
+			return 0;
+		}
+
+		// Geometry as GeoJSON
+		if (params.count("geometryquery") > 0) {
+			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
+			int timestamp = 42;
+
+			auto geometry = graph->getGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+
+#if RASTER_DO_PROFILE
+			printf("Profiling-header: ");
+			Profiler::print();
+			printf("\r\n");
+#endif
+			outputGeometry(geometry.get());
 			return 0;
 		}
 
@@ -300,130 +235,151 @@ int main() {
 				if (params["version"] != "1.3.0")
 					abort("Invalid version");
 
-				// Wir ignorieren:
-				// format
-				// transparent
-				// &CRS=EPSG%3A3857
-
-				// Unbekannt:
-				// &STYLES=dem
-
-
-				//if (params["tiled"] != "true")
-				//	abort("only tiled for now");
-
-				std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
-				double bbox[4];
-
-				{
-					std::string delimiters = " ,";
-					size_t current, next = -1;
-					int element = 0;
-					do {
-					  current = next + 1;
-					  next = bbox_str.find_first_of(delimiters, current);
-					  double value = std::stod( bbox_str.substr(current, next - current) );
-					  if (isnan(value))
-						  abort("BBOX value is NaN");
-					  bbox[element++] = value;
-					} while (element < 4 && next != std::string::npos);
-
-					if (element != 4)
-						abort("BBOX does not contain 4 doubles");
-				}
-
-				// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
-				                //    minx          miny         maxx         maxy
-				double extent[4] {-20037508.34, -20037508.34, 20037508.34, 20037508.34};
-				double bbox_normalized[4];
-				for (int i=0;i<4;i+=2) {
-					bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
-					bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
-				}
-
-				// Koordinaten können leicht ausserhalb liegen, z.B.
-				// 20037508.342789, 20037508.342789
-				for (int i=0;i<4;i++) {
-					if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
-						bbox_normalized[i] = 0.0;
-					else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
-						bbox_normalized[i] = 1.0;
-				}
-
-				for (int i=0;i<4;i++) {
-					if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0) {
-						printf("Content-type: text/plain\r\n\r\n");
-						printf("extent: (%f, %f) -> (%f, %f)\n", extent[0], extent[1], extent[2], extent[3]);
-						printf("   raw: (%f, %f) -> (%f, %f)\n", bbox[0], bbox[1], bbox[2], bbox[3]);
-						printf("normal: (%10f, %10f) -> (%10f, %10f)\n", bbox_normalized[0], bbox_normalized[1], bbox_normalized[2], bbox_normalized[3]);
-						abort("bbox outside of extent");
-					}
-				}
-
-				//bbox_normalized[1] = 1.0 - bbox_normalized[1];
-				//bbox_normalized[3] = 1.0 - bbox_normalized[3];
-
 				int output_width = atoi(params["width"].c_str());
 				int output_height = atoi(params["height"].c_str());
 				if (output_width <= 0 || output_height <= 0) {
 					abort("output_width not valid");
 				}
 
-				const char *query_name = params["layers"].c_str();
+				try {
+					// Wir ignorieren:
+					// format
+					// transparent
 
-				decltype(loadQuery(nullptr)) p;
-				p = parseQuery(query_name);
-				//p = loadQuery(query_name);
+					// Unbekannt:
+					// &STYLES=dem
 
-				GenericOperator *graph = std::get<0>(p);
-				std::unique_ptr<GenericOperator> graph_guard(graph);
+					//if (params["tiled"] != "true")
+					//	abort("only tiled for now");
 
-				int timestamp = std::get<1>(p);
-				//std::string colors = std::get<2>(p);
-				std::string colorizer;
-				if (params.count("colors") > 0)
-					colorizer = params["colors"];
+					std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
+					double bbox[4];
 
-				epsg_t epsg = EPSG_WEBMERCATOR;
-				if (params.count("crs") > 0) {
-					std::string crs = params["crs"];
-					if (crs.compare(0,5,"EPSG:") == 0) {
-						epsg = atoi(crs.substr(5, std::string::npos).c_str());
-					}
-				}
+					{
+						std::string delimiters = " ,";
+						size_t current, next = -1;
+						int element = 0;
+						do {
+						  current = next + 1;
+						  next = bbox_str.find_first_of(delimiters, current);
+						  double value = std::stod( bbox_str.substr(current, next - current) );
+						  if (isnan(value))
+							  abort("BBOX value is NaN");
+						  bbox[element++] = value;
+						} while (element < 4 && next != std::string::npos);
 
-
-				std::string format("image/png");
-				if (params.count("format") > 0) {
-					format = params["format"];
-				}
-
-				QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, epsg);
-
-				if (format == "application/json") {
-					Histogram *histogram = graph->getHistogram(qrect);
-					std::unique_ptr<Histogram> histogram_guard(histogram);
-
-					printf("content-type: application/json\r\n\r\n");
-					histogram->print();
-				}
-				else {
-					GenericRaster *raster = graph->getRaster(qrect);
-					std::unique_ptr<GenericRaster> result_raster(raster);
-
-					if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
-						result_raster.reset( result_raster->scale(output_width, output_height) );
+						if (element != 4)
+							abort("BBOX does not contain 4 doubles");
 					}
 
-					bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
-					bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
+					// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
+									//    minx          miny         maxx         maxy
+					double extent[4] {-20037508.34, -20037508.34, 20037508.34, 20037508.34};
+					double bbox_normalized[4];
+					for (int i=0;i<4;i+=2) {
+						bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
+						bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
+					}
+
+					// Koordinaten können leicht ausserhalb liegen, z.B.
+					// 20037508.342789, 20037508.342789
+					for (int i=0;i<4;i++) {
+						if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
+							bbox_normalized[i] = 0.0;
+						else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
+							bbox_normalized[i] = 1.0;
+					}
+
+					for (int i=0;i<4;i++) {
+						if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0) {
+							printf("Content-type: text/plain\r\n\r\n");
+							printf("extent: (%f, %f) -> (%f, %f)\n", extent[0], extent[1], extent[2], extent[3]);
+							printf("   raw: (%f, %f) -> (%f, %f)\n", bbox[0], bbox[1], bbox[2], bbox[3]);
+							printf("normal: (%10f, %10f) -> (%10f, %10f)\n", bbox_normalized[0], bbox_normalized[1], bbox_normalized[2], bbox_normalized[3]);
+							abort("bbox outside of extent");
+						}
+					}
+
+					//bbox_normalized[1] = 1.0 - bbox_normalized[1];
+					//bbox_normalized[3] = 1.0 - bbox_normalized[3];
+
+					auto graph = GenericOperator::fromJSON(params["layers"]);
+					int timestamp = 42;
+					std::string colorizer;
+					if (params.count("colors") > 0)
+						colorizer = params["colors"];
+
+					std::string format("image/png");
+					if (params.count("format") > 0) {
+						format = params["format"];
+					}
+
+					/*
+					 * OpenLayers insists on sending latitude in x and longitude in y.
+					 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
+					 * The simple solution is to swap the x and y coordinates.
+					 */
+					if (query_epsg == EPSG_LATLON) {
+						std::swap(bbox[0], bbox[1]);
+						std::swap(bbox[2], bbox[3]);
+					}
+
+					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
+
+					if (format == "application/json") {
+						auto histogram = graph->getHistogram(qrect);
+
+						printf("content-type: application/json\r\n\r\n");
+						histogram->print();
+					}
+					else {
+						auto result_raster = graph->getRaster(qrect);
+
+						if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
+							result_raster = result_raster->scale(output_width, output_height);
+						}
+
+						bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
+						bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
 
 #if RASTER_DO_PROFILE
-					printf("Profiling-header: ");
-					Profiler::print();
-					printf("\r\n");
+						printf("Profiling-header: ");
+						Profiler::print();
+						printf("\r\n");
 #endif
-					outputImage(result_raster.get(), flipx, flipy, colorizer);
+						// Flip if required
+						if (flipx || flipy)
+							result_raster = std::move(result_raster->flip(flipx, flipy));
+
+						// Write debug info
+						std::ostringstream msg_tl;
+						msg_tl.precision(2);
+						msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
+						result_raster->print(4, 4, result_raster->dd.max, msg_tl.str().c_str());
+
+						std::ostringstream msg_br;
+						msg_br.precision(2);
+						msg_br << std::fixed << bbox[2] << ", " << bbox[3];
+						std::string msg_brs = msg_br.str();
+						result_raster->print(result_raster->lcrs.size[1]-4-8*msg_brs.length(), result_raster->lcrs.size[1]-12, result_raster->dd.max, msg_brs.c_str());
+
+						outputImage(result_raster.get(), false, false, colorizer);
+					}
+				}
+				catch (const std::exception &e) {
+					// Alright, something went wrong.
+					// We're still in a WMS request though, so do our best to output an image with a clear error message.
+
+					DataDescription dd(GDT_Byte, 0, 255, true, 0);
+					LocalCRS lcrs(EPSG_UNKNOWN, output_width, output_height, 0.0, 0.0, 1.0, 1.0);
+
+					auto errorraster = GenericRaster::create(lcrs, dd);
+					errorraster->clear(0);
+
+					auto msg = e.what();
+					errorraster->printCentered(1, msg);
+
+					outputImage(errorraster.get(), false, false, "hsv");
 				}
 				// cut into pieces
 

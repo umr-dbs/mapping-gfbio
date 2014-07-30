@@ -1,29 +1,16 @@
 
 #include "raster/raster_priv.h"
+#include "util/gdal.h"
 
 #include <stdint.h>
 #include <cstdlib>
-#include <mutex>
 #include <string>
 #include <sstream>
 
 
-static std::mutex gdal_init_mutex;
-static bool gdal_is_initialized = false;
-
-void gdal_init() {
-	if (gdal_is_initialized)
-		return;
-	std::lock_guard<std::mutex> guard(gdal_init_mutex);
-	if (gdal_is_initialized)
-		return;
-	gdal_is_initialized = true;
-	GDALAllRegister();
-	//GetGDALDriverManager()->AutoLoadDrivers();
-}
 
 
-static GenericRaster *GDALImporter_loadRaster(GDALDataset *dataset, int rasteridx, double origin_x, double origin_y, double scale_x, double scale_y, epsg_t default_epsg) {
+static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *dataset, int rasteridx, double origin_x, double origin_y, double scale_x, double scale_y, epsg_t default_epsg) {
 	GDALRasterBand  *poBand;
 	int             nBlockXSize, nBlockYSize;
 	int             bGotMin, bGotMax;
@@ -95,7 +82,7 @@ static GenericRaster *GDALImporter_loadRaster(GDALDataset *dataset, int rasterid
 	DataDescription dd(type, minvalue, maxvalue, hasnodata, nodata);
 	//printf("loading raster with %g -> %g valuerange\n", adfMinMax[0], adfMinMax[1]);
 
-	GenericRaster *raster = GenericRaster::create(lcrs, dd);
+	auto raster = GenericRaster::create(lcrs, dd);
 	void *buffer = raster->getDataForWriting();
 	//int bpp = raster->getBPP();
 
@@ -137,8 +124,8 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 	return raster;
 }
 
-GenericRaster *GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_t epsg) {
-	gdal_init();
+std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_t epsg) {
+	GDAL::init();
 
 	GDALDataset *dataset = (GDALDataset *) GDALOpen(filename, GA_ReadOnly);
 
@@ -197,7 +184,7 @@ GenericRaster *GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_
 			throw ImporterException("MSG driver can only import rasters in MSG projection");
 	}
 
-	GenericRaster *raster = GDALImporter_loadRaster(dataset, rasterid, adfGeoTransform[0], adfGeoTransform[3], adfGeoTransform[1], adfGeoTransform[5], epsg);
+	auto raster = GDALImporter_loadRaster(dataset, rasterid, adfGeoTransform[0], adfGeoTransform[3], adfGeoTransform[1], adfGeoTransform[5], epsg);
 
 	GDALClose(dataset);
 
@@ -211,7 +198,7 @@ template<typename T> void Raster2D<T>::toGDAL(const char *, const char *) {
 }
 #if 0
 template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *drivername) {
-	gdal_init();
+	GDAL::init();
 
 
 	GDALDriver *poDriver;

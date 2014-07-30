@@ -204,7 +204,7 @@ void DataDescription::addNoData() {
 
 
 
-GenericRaster *GenericRaster::create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation)
+std::unique_ptr<GenericRaster> GenericRaster::create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation)
 {
 	if (localcrs.dimensions != 2)
 		throw MetadataException("Cannot instantiate raster with dimensions != 2 yet");
@@ -247,7 +247,7 @@ GenericRaster *GenericRaster::create(const LocalCRS &localcrs, const DataDescrip
 	}
 
 	result->setRepresentation(representation);
-	return result;
+	return std::unique_ptr<GenericRaster>(result);
 }
 
 GenericRaster::GenericRaster(const LocalCRS &localcrs, const DataDescription &datadescription)
@@ -392,7 +392,7 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 
 
 template<typename T>
-GenericRaster *Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, int depth) {
+std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, int depth) {
 	if (lcrs.dimensions != 2)
 		throw MetadataException("cut() only works on 2d rasters");
 	if (z1 != 0 || depth != 0)
@@ -407,7 +407,8 @@ GenericRaster *Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, i
 		lcrs.scale[0], lcrs.scale[1]
 	);
 
-	Raster2D<T> *outputraster = (Raster2D<T> *) GenericRaster::create(newrmd, dd);
+	auto outputraster_guard = GenericRaster::create(newrmd, dd);
+	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();
 
 /*
 #define BLIT_TYPE 2
@@ -433,11 +434,11 @@ GenericRaster *Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, i
 	}
 #endif
 */
-	return outputraster;
+	return outputraster_guard;
 }
 
 template<typename T>
-GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
+std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int depth) {
 	if (lcrs.dimensions != 2)
 		throw MetadataException("scale() only works on 2d rasters");
 	if (depth != 0)
@@ -453,7 +454,8 @@ GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
 		lcrs.scale[0] * (double) width / lcrs.size[0], lcrs.scale[1] * (double) height / lcrs.size[0]
 	);
 
-	Raster2D<T> *outputraster = (Raster2D<T> *) GenericRaster::create(newrmd, dd);
+	auto outputraster_guard = GenericRaster::create(newrmd, dd);
+	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();
 
 	int src_width = lcrs.size[0], src_height = lcrs.size[1];
 
@@ -465,13 +467,32 @@ GenericRaster *Raster2D<T>::scale(int width, int height, int depth) {
 		}
 	}
 
-	return outputraster;
+	return outputraster_guard;
+}
+
+template<typename T>
+std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
+	if (lcrs.dimensions != 2)
+		throw MetadataException("flip() only works on 2d rasters");
+
+	auto flipped_raster = GenericRaster::create(lcrs, dd);
+	Raster2D<T> *r = (Raster2D<T> *) flipped_raster.get();
+
+	int width = lcrs.size[0];
+	int height = lcrs.size[1];
+	for (int y=0;y<height;y++) {
+		int py = flipy ? height-y : y;
+		for (int x=0;x<width;x++) {
+			int px = flipx ? width-x : x;
+			r->set(x, y, get(px, py));
+		}
+	}
+	return flipped_raster;
 }
 
 
-
 template<typename T>
-double Raster2D<T>::getAsDouble(int x, int y, int) {
+double Raster2D<T>::getAsDouble(int x, int y, int) const {
 	return (double) get(x, y);
 }
 
@@ -483,6 +504,61 @@ std::string GenericRaster::hash() {
 	const uint8_t * data = (const uint8_t*) getData();
 
 	return calculateHash(data, len).asHex();
+}
+
+
+#include "raster_font.h"
+template<typename T>
+void Raster2D<T>::print(int dest_x, int dest_y, double dvalue, const char *text, int maxlen) {
+	if (lcrs.dimensions != 2)
+		throw MetadataException("print() only works on 2d rasters");
+
+	if (maxlen < 0)
+		maxlen = strlen(text);
+
+	T value = (T) dvalue;
+
+	this->setRepresentation(GenericRaster::CPU);
+
+	for (;maxlen > 0 && *text;text++, maxlen--) {
+		int src_x = (*text % 16) * 8;
+		int src_y = (*text / 16) * 8;
+		for (int y=0;y<8;y++) {
+			for (int x=0;x<8;x++) {
+				int font_pixel = (x + src_x) + (y + src_y) * 128;
+				int font_byte = font_pixel / 8;
+				int font_bit = font_pixel % 8;
+
+				int f = raster_font_bits[font_byte] & (1 << font_bit);
+				if (f)
+					this->setSafe(x+dest_x, y+dest_y, value);
+			}
+		}
+		dest_x += 8;
+	}
+}
+
+
+void GenericRaster::printCentered(double dvalue, const char *text) {
+	if (lcrs.dimensions != 2)
+		throw MetadataException("print() only works on 2d rasters");
+
+	const int BORDER = 16;
+
+	int len = strlen(text);
+
+	int width = lcrs.size[0] - 2*BORDER;
+	int height = lcrs.size[1] - 2*BORDER;
+
+	int max_chars_x = width / 8;
+	int max_chars_y = height / 8;
+
+	int lines_required = (len + max_chars_x - 1) / max_chars_x;
+	int offset_y = (height - 8*lines_required) / 2;
+
+	for (int line=0;line < max_chars_y && line*max_chars_x < len;line++) {
+		print(BORDER, BORDER+offset_y+8*line, 255, &text[line*max_chars_x], max_chars_x);
+	}
 }
 
 

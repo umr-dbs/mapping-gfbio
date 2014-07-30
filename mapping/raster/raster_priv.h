@@ -41,10 +41,12 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 
 		virtual void clear(double value);
 		virtual void blit(const GenericRaster *raster, int x, int y=0, int z=0);
-		virtual GenericRaster *cut(int x, int y, int z, int width, int height, int depths);
-		virtual GenericRaster *scale(int width, int height=0, int depth=0);
+		virtual std::unique_ptr<GenericRaster> cut(int x, int y, int z, int width, int height, int depths);
+		virtual std::unique_ptr<GenericRaster> scale(int width, int height=0, int depth=0);
+		virtual std::unique_ptr<GenericRaster> flip(bool flipx, bool flipy);
+		virtual void print(int x, int y, double value, const char *text, int maxlen = -1);
 
-		virtual double getAsDouble(int x, int y=0, int z=0);
+		virtual double getAsDouble(int x, int y=0, int z=0) const;
 
 		T get(int x, int y) const {
 			return data[y*this->lcrs.size[0] + x];

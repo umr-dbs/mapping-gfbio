@@ -16,7 +16,7 @@ class OpenCLOperator : public GenericOperator {
 		OpenCLOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~OpenCLOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 };
 
 
@@ -29,25 +29,21 @@ OpenCLOperator::~OpenCLOperator() {
 REGISTER_OPERATOR(OpenCLOperator, "opencl");
 
 
-GenericRaster *OpenCLOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> OpenCLOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
-	GenericRaster *raster = sources[0]->getRaster(rect);
-	std::unique_ptr<GenericRaster> raster_guard(raster);
+	auto raster_in = sources[0]->getRaster(rect);
 
 	Profiler::Profiler p("CL_OPERATOR");
+	raster_in->setRepresentation(GenericRaster::OPENCL);
 
-	raster->setRepresentation(GenericRaster::OPENCL);
-
-	GenericRaster *raster2 = GenericRaster::create(raster->lcrs, raster->dd);
-	std::unique_ptr<GenericRaster> raster2_guard(raster2);
-	raster2->setRepresentation(GenericRaster::OPENCL);
+	auto raster_out = GenericRaster::create(raster_in->lcrs, raster_in->dd, GenericRaster::OPENCL);
 
 
 	cl::Kernel kernel = RasterOpenCL::addProgramFromFile("operators/cl/test.cl", "testKernel");
-	kernel.setArg(0, *raster->getCLBuffer());
-	kernel.setArg(1, *raster2->getCLBuffer());
-	kernel.setArg(2, (int) raster->lcrs.size[0]);
-	kernel.setArg(3, (int) raster->lcrs.size[1]);
+	kernel.setArg(0, *raster_in->getCLBuffer());
+	kernel.setArg(1, *raster_out->getCLBuffer());
+	kernel.setArg(2, (int) raster_in->lcrs.size[0]);
+	kernel.setArg(3, (int) raster_in->lcrs.size[1]);
 	//kernel.setArg(2, (int) raster->lcrs.getPixelCount());
 
 
@@ -56,7 +52,7 @@ GenericRaster *OpenCLOperator::getRaster(const QueryRectangle &rect) {
 		Profiler::Profiler p("CL_EXECUTE");
 		RasterOpenCL::getQueue()->enqueueNDRangeKernel(kernel,
 			cl::NullRange, // Offset
-			cl::NDRange(raster->lcrs.getPixelCount()), // Global
+			cl::NDRange(raster_in->lcrs.getPixelCount()), // Global
 			cl::NullRange, // cl::NDRange(1, 1), // local
 			nullptr, //events
 			&event //event
@@ -69,6 +65,5 @@ GenericRaster *OpenCLOperator::getRaster(const QueryRectangle &rect) {
 	}
 
 	event.wait();
-	return raster2_guard.release();
+	return raster_out;
 }
-

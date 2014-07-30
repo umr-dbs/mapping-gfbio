@@ -4,35 +4,29 @@
 #include "converters/raw.h"
 
 #include <memory>
-
+#include "util/make_unique.h"
 
 /**
  * static helper functions
  */
-ByteBuffer *RasterConverter::direct_encode(GenericRaster *raster, GenericRaster::Compression method) {
-	std::unique_ptr<RasterConverter> converter(
-		getConverter(raster->lcrs, raster->dd, method)
-	);
-
+std::unique_ptr<ByteBuffer>RasterConverter::direct_encode(GenericRaster *raster, GenericRaster::Compression method) {
+	auto converter = getConverter(raster->lcrs, raster->dd, method);
 	return converter->encode(raster);
 }
 
-GenericRaster *RasterConverter::direct_decode(const LocalCRS &localcrs, const DataDescription &datadescriptor, ByteBuffer *buffer, GenericRaster::Compression method) {
-	std::unique_ptr<RasterConverter> converter(
-		getConverter(localcrs, datadescriptor, method)
-	);
-
+std::unique_ptr<GenericRaster> RasterConverter::direct_decode(const LocalCRS &localcrs, const DataDescription &datadescriptor, ByteBuffer *buffer, GenericRaster::Compression method) {
+	auto converter = getConverter(localcrs, datadescriptor, method);
 	return converter->decode(buffer);
 }
 
-RasterConverter *RasterConverter::getConverter(const LocalCRS &localcrs, const DataDescription &datadescriptor, GenericRaster::Compression method) {
+std::unique_ptr<RasterConverter> RasterConverter::getConverter(const LocalCRS &localcrs, const DataDescription &datadescriptor, GenericRaster::Compression method) {
 	switch (method) {
 		case GenericRaster::Compression::UNCOMPRESSED:
-			return new RawConverter(localcrs, datadescriptor);
+			return std::make_unique<RawConverter>(localcrs, datadescriptor);
 		case GenericRaster::Compression::GZIP:
-			return new GzipConverter(localcrs, datadescriptor);
+			return std::make_unique<GzipConverter>(localcrs, datadescriptor);
 		case GenericRaster::Compression::BZIP:
-			return new BzipConverter(localcrs, datadescriptor);
+			return std::make_unique<BzipConverter>(localcrs, datadescriptor);
 		default:
 			throw ConverterException("Unsupported converter type");
 	}

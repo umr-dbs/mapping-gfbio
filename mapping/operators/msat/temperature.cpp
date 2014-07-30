@@ -82,26 +82,6 @@ static RadianceTable *getRadianceTable(int channel) {
 }
 
 /*
-int channelNumber = Integer.parseInt(raster.getMetadata().get("ChannelNumber"));
-double calibrationOffset = Double.parseDouble(raster.getMetadata().get("CalibrationOffset"));
-double calibrationSlope = Double.parseDouble(raster.getMetadata().get("CalibrationSlope"));
-
-System.out.println("Preparing look-up table");
-long start = System.currentTimeMillis();
-double[] mapping = new double[1024];
-for (int i = 0; i < 1024; i++) {
-double radiance = calibrationOffset + i * calibrationSlope;
-double temp = Meteosat9.getTemperatureFromEffectiveRadiance(radiance, channelNumber);
-
-if (celsius) {
-	temp -= 273.15;
-}
-
-mapping[i] = temp;
-}
-*/
-
-/*
 
 Reflektanz:
 * für jeden Pixel lat/lon ausrechnen
@@ -115,7 +95,7 @@ class MSATTemperatureOperator : public GenericOperator {
 		MSATTemperatureOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATTemperatureOperator();
 
-		virtual GenericRaster *getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
 };
 
@@ -132,10 +112,9 @@ MSATTemperatureOperator::~MSATTemperatureOperator() {
 REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
 
 
-GenericRaster *MSATTemperatureOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
-	GenericRaster *raster = sources[0]->getRaster(rect);
-	std::unique_ptr<GenericRaster> raster_guard(raster);
+	auto raster = sources[0]->getRaster(rect);
 
 	if (raster->dd.min != 0 && raster->dd.max != 1024)
 		throw OperatorException("Input raster does not appear to be a meteosat raster");
@@ -179,15 +158,14 @@ GenericRaster *MSATTemperatureOperator::getRaster(const QueryRectangle &rect) {
 			lut[no_data] = out_dd.no_data;
 	}
 
-	GenericRaster *raster_out = GenericRaster::create(raster->lcrs, out_dd);
-	std::unique_ptr<GenericRaster> raster_out_guard(raster_out);
+	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
-	prog.addInRaster(raster);
-	prog.addOutRaster(raster_out);
+	prog.addInRaster(raster.get());
+	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_msat_temperature, "temperaturekernel");
 	prog.addArg(lut_buffer);
 	prog.run();
 
-	return raster_out_guard.release();
+	return raster_out;
 }

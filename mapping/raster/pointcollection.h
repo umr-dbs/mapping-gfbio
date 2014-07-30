@@ -44,7 +44,10 @@ class PointCollection {
 		// global MetaData (stored on the PointCollection)
 		const std::string &getGlobalMDString(const std::string &key);
 		double getGlobalMDValue(const std::string &key);
-
+		DirectMetadata<double>* getGlobalMDValueIterator();
+		DirectMetadata<std::string>* getGlobalMDStringIterator();
+		std::vector<std::string> getGlobalMDValueKeys();
+		std::vector<std::string> getGlobalMDStringKeys();
 		void setGlobalMDString(const std::string &key, const std::string &value);
 		void setGlobalMDValue(const std::string &key, double value);
 
@@ -58,6 +61,8 @@ class PointCollection {
 		// local MetaData (stored on the Points)
 		const std::string &getLocalMDString(const Point &point, const std::string &key);
 		double getLocalMDValue(const Point &point, const std::string &key);
+		std::vector<std::string> getLocalMDValueKeys();
+		std::vector<std::string> getLocalMDStringKeys();
 		void setLocalMDString(Point &point, const std::string &key, const std::string &value);
 		void setLocalMDValue(Point &point, const std::string &key, double value);
 

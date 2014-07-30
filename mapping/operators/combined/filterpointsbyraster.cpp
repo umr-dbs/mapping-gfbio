@@ -4,15 +4,15 @@
 #include "raster/pointcollection.h"
 #include "operators/operator.h"
 
-#include <memory>
+#include "util/make_unique.h"
 
 
 class FilterPointsByRaster : public GenericOperator {
 	public:
-	FilterPointsByRaster(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		FilterPointsByRaster(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~FilterPointsByRaster();
 
-		virtual PointCollection *getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 };
 
 
@@ -27,18 +27,14 @@ FilterPointsByRaster::~FilterPointsByRaster() {
 REGISTER_OPERATOR(FilterPointsByRaster, "filterpointsbyraster");
 
 
-PointCollection *FilterPointsByRaster::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> FilterPointsByRaster::getPoints(const QueryRectangle &rect) {
 
-	PointCollection *points = sources[0]->getPoints(rect);
-	std::unique_ptr<PointCollection> points_guard(points);
+	auto points = sources[0]->getPoints(rect);
 
-	GenericRaster *raster = sources[1]->getRaster(rect);
-	std::unique_ptr<GenericRaster> raster_guard(raster);
+	auto raster = sources[1]->getRaster(rect);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 
-
-	PointCollection *points_out = new PointCollection();
-	std::unique_ptr<PointCollection> points_out_guard(points_out);
+	auto points_out = std::make_unique<PointCollection>(rect.epsg);
 
 	double no_data = 0.0; // 0 is always considered "false"
 	if (raster->dd.has_no_data)
@@ -58,5 +54,5 @@ PointCollection *FilterPointsByRaster::getPoints(const QueryRectangle &rect) {
 		}
 	}
 
-	return points_out_guard.release();
+	return points_out;
 }

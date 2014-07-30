@@ -1,4 +1,4 @@
-#map {
+.map_container {
 	position: absolute;
 	top: 0%;
 	height: 100%;
@@ -7,7 +7,7 @@
 	background-color: black;
 }
 
-#overview {
+.map_sidebar {
 	position: absolute;
 	top: 0%;
 	height: 100%;
@@ -18,7 +18,7 @@
 	font-size: 14px;
 }
 
-#overview.collapsed {
+.map_sidebar.collapsed {
 	display: none;
 }
 
@@ -48,15 +48,14 @@
 	margin: 5px;
 	padding-left: 5px;
 	padding-right: 5px;
-	height: 23px;
 	border: 1px solid rgb(230, 230, 230);
 	border-radius: 1px;
 	text-decoration: none;
 	text-align: center;
 	vertical-align: middle;
-	padding-top: 2px;
 	text-decoration: none;
-	height: 23px;
+	height: 25px;
+	line-height: 25px;
 }
 
 .layerselection a:first-child {
@@ -85,10 +84,21 @@
     padding-bottom: 10px;
 }
 
-#layerControls {
+.layerControls {
 	position: absolute;
 	top: 50px;
 	bottom: 50px;
+	left: 0px;
+	right: 0px;
+	
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.layerControls_mini {
+	position: absolute;
+	top: 10px;
+	bottom: 10px;
 	left: 0px;
 	right: 0px;
 	
@@ -136,7 +146,7 @@
     width: 87px;
 }
 
-.layerControl .header,.layerControl .footer {
+.layerControl .header {
 	height: 20px;
 	background: rgb(230, 230, 230);
 }
@@ -194,11 +204,16 @@
 }
 
 .layerControl .footer {
+	background: rgb(230, 230, 230);
 	padding: 5px;
 }
 
+.layerControl .layerControlOption {
+	clear: both;
+}
+
 .layerControl .layerControlOption .content {
-	margin-left: 85px;
+	margin-left: 95px;
 }
 
 .layerControl .layerControlOption label {
@@ -209,8 +224,32 @@
 }
 
 .layerControl .layerControlOption .ui-slider {
-	margin-left: 95px;
 	margin-right: 10px;
+}
+
+.layerControl .layerControlOption .colorPicker {
+   width: 16px;
+   height: 16px;
+   border: 2px solid black;
+   cursor: pointer;
+   font-size: 0px;
+}
+
+.layerControl_mini{
+	background-color: transparent;
+	color: #FFF;	
+	border-width: 0;
+	margin: 5px;		
+}
+
+.layerControl_mini i {
+    text-align: center;
+}
+
+.layerControl_mini .dynamicColorizedIcon {
+	border-radius: 5px;
+	padding: 3px;
+	background-color: #000;
 }
 
 .ui-state-highlight {
@@ -226,7 +265,7 @@
 	content: "DROP";
 }
 
-#collapseOverview {
+.collapseSidebar {
 	height: 12px;
 	width: 8px;
 	right: 344px;
@@ -234,7 +273,7 @@
 	
 	padding: 16px 1px;
 	font-size: 14px;
-	z-index: 100;
+	z-index: 99;
 	
 	color: #000;
 	top: 50%;
@@ -245,17 +284,22 @@
 	cursor: pointer;
 }
 
-#collapseOverview:hover {
+.collapseSidebar:hover {
 	background-color: #C6C6C6;
 	border: 1px solid rgb(230, 230, 230);
 }
 
-#collapseOverview.collapsed {
+.collapseSidebar.collapsed {
 	right: 0px;
 	border-top-right-radius: 0px;
     border-bottom-right-radius: 0px;
 }
 
-#collapseOverview.collapsed:before {
+.collapseSidebar.collapsed:before {
 	content: "";
+}
+
+.ol3Control_backgroundLayer {
+	bottom: 0.5em;
+	left: 0.5em;
 }

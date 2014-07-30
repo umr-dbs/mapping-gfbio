@@ -72,6 +72,38 @@ double PointCollection::getGlobalMDValue(const std::string &key) {
 	return global_md_value.get(key);
 }
 
+DirectMetadata<std::string>* PointCollection::getGlobalMDStringIterator() {
+	return &global_md_string;
+}
+
+DirectMetadata<double>* PointCollection::getGlobalMDValueIterator() {
+	return &global_md_value;
+}
+
+std::vector<std::string> PointCollection::getGlobalMDValueKeys() {
+	std::vector<std::string> keys;
+	for (auto keyValue : global_md_value) {
+		keys.push_back(keyValue.first);
+	}
+	return keys;
+}
+
+std::vector<std::string> PointCollection::getGlobalMDStringKeys() {
+	std::vector<std::string> keys;
+	for (auto keyValue : global_md_string) {
+		keys.push_back(keyValue.first);
+	}
+	return keys;
+}
+
+void PointCollection::setGlobalMDString(const std::string &key, const std::string &value) {
+	global_md_string.set(key, value);
+}
+
+void PointCollection::setGlobalMDValue(const std::string &key, double value) {
+	global_md_value.set(key, value);
+}
+
 
 /**
  * Local meta-metadata
@@ -94,6 +126,22 @@ const std::string &PointCollection::getLocalMDString(const Point &point, const s
 
 double PointCollection::getLocalMDValue(const Point &point, const std::string &key) {
 	return local_md_value.getValue(point.md_value, key);
+}
+
+std::vector<std::string> PointCollection::getLocalMDStringKeys() {
+	std::vector<std::string> keys;
+	for(auto keyValue : local_md_string) {
+		keys.push_back(keyValue.first);
+	}
+	return keys;
+}
+
+std::vector<std::string> PointCollection::getLocalMDValueKeys() {
+	std::vector<std::string> keys;
+	for (auto keyValue : local_md_value) {
+		keys.push_back(keyValue.first);
+	}
+	return keys;
 }
 
 void PointCollection::setLocalMDString(Point &point, const std::string &key, const std::string &value) {

@@ -24,33 +24,49 @@ if ($action == 'login.login') {
 	$username = trim($_GET['username']);
 	$password = trim($_GET['password']);
 
+	$sessiontoken = md5(mt_rand()); // TODO: not much entropy..
+
+	// guest login..
+	if ($username == 'guest' && $password == 'guest') {
+		respond(array(
+			'userid' => -1,
+			'session' => $sessiontoken,
+			'ui' => 'previews'
+		));
+	}
+
+
 	// TODO: lower() prevents using the index. Postgres has column type "citext", but is that what we want?
-	$rows = DB::query('SELECT id FROM users WHERE lower(name) = lower(?) AND password_unhashed = ?', $username, $password);
+	$rows = DB::query('SELECT id, ui FROM users WHERE lower(name) = lower(?) AND password_unhashed = ?', $username, $password);
 	if (count($rows) < 1)
 		respond_fail('User or password wrong');
 	$id = $rows[0]->id;
 
-	$sessiontoken = md5(mt_rand()); // TODO: not much entropy..
 	DB::exec('UPDATE users SET session = ? WHERE id = ?', $sessiontoken, $id);
 	respond(array(
 		'userid' => $id,
-		'session' => $sessiontoken
+		'session' => $sessiontoken,
+		'ui' => $rows[0]->ui
 	));
 }
 
 
 // Check login
-/*
 $userid = $_GET['userid'];
 $sessiontoken = $_GET['session'];
 
-$userrows = DB::query('SELECT * FROM users WHERE id = ? AND session = ?', $userid, $sessiontoken);
-if (count($userrows) < 1) {
-	respond_fail('Session invalid');
+if ($userid == -1) {
+	// Guest login, it's ok..
 }
-*/
+else {
+	$userrows = DB::query('SELECT * FROM users WHERE id = ? AND session = ?', $userid, $sessiontoken);
+	if (count($userrows) < 1) {
+		respond_fail('Session invalid');
+	}
+}
 
 
+// Do whatever is required
 if ($action == 'sourcelist.get') {
 	$sourcespath = __DIR__ . '/../cgi-bin/datasources/';
 	// read all sources

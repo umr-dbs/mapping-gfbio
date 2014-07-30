@@ -5,9 +5,15 @@
 
 class Histogram {
 	public:
-		Histogram(int n, double min, double max) : counts(n), nodata_count(0), min(min), max(max) {}
-		~Histogram() {}
+		Histogram(int number_of_buckets, double min, double max);
+		~Histogram();
 		void print();
+		void inc(double value);
+		void incNoData();
+
+		static const int DEFAULT_NUMBER_OF_BUCKETS = 10000;
+
+	private:
 		std::vector<int> counts;
 		int nodata_count;
 		double min, max;

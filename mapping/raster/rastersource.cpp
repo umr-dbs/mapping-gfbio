@@ -212,9 +212,7 @@ void RasterSource::cleanup() {
 void RasterSource::import(const char *filename, int sourcechannel, int channelid, int timestamp, GenericRaster::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
-	std::unique_ptr<GenericRaster> raster(
-		GenericRaster::fromGDAL(filename, sourcechannel, lcrs->epsg)
-	);
+	auto raster = GenericRaster::fromGDAL(filename, sourcechannel, lcrs->epsg);
 
 	import(raster.get(), channelid, timestamp, compression);
 }
@@ -255,8 +253,11 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 			break;
 
 		GenericRaster *zoomedraster = raster;
-		if (zoom > 0)
-			zoomedraster = raster->scale(lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
+		std::unique_ptr<GenericRaster> zoomedraster_guard;
+		if (zoom > 0) {
+			zoomedraster_guard = raster->scale(lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
+			zoomedraster = zoomedraster_guard.get();
+		}
 
 		for (uint32_t zoff = 0; zoff == 0 || zoff < zoomedraster->lcrs.size[2]; zoff += tilesize) {
 			uint32_t zsize = std::min(zoomedraster->lcrs.size[2] - zoff, tilesize);
@@ -271,19 +272,14 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 						zoomedraster->lcrs.scale[0], zoomedraster->lcrs.scale[1], zoomedraster->lcrs.scale[2]
 					);
 
-					GenericRaster *tile = GenericRaster::create(tilelcrs, *channels[channelid]);
+					auto tile = GenericRaster::create(tilelcrs, *channels[channelid]);
 					tile->blit(zoomedraster, -xoff, -yoff, -zoff);
 
 					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
-					importTile(tile, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp, compression);
-
-					delete tile;
+					importTile(tile.get(), xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp, compression);
 				}
 			}
 		}
-
-		if (zoom > 0)
-			delete zoomedraster;
 	}
 
 	SQLiteStatement stmt(db);
@@ -319,9 +315,7 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 }
 
 void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, int timestamp, GenericRaster::Compression compression) {
-	std::unique_ptr<ByteBuffer> buffer(
-		RasterConverter::direct_encode(raster, compression)
-	);
+	auto buffer = RasterConverter::direct_encode(raster, compression);
 
 	int zoomfactor = 1 << zoom;
 
@@ -377,7 +371,7 @@ void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int off
 }
 
 
-GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, int x2, int y2, int zoom) {
+std::unique_ptr<GenericRaster> RasterSource::load(int channelid, int timestamp, int x1, int y1, int x2, int y2, int zoom) {
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
 
@@ -447,9 +441,7 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 		lcrs->PixelToWorldX(x1), lcrs->PixelToWorldY(y1), lcrs->PixelToWorldZ(0 /* z1 */),
 		lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
 	);
-	std::unique_ptr<GenericRaster> result(
-		GenericRaster::create(resultmetadata, *channels[channelid])
-	);
+	auto result = GenericRaster::create(resultmetadata, *channels[channelid]);
 	result->clear(channels[channelid]->no_data);
 	Profiler::stop("RasterSource::stop: create");
 
@@ -476,12 +468,10 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 			lcrs->PixelToWorldX(r_x1), lcrs->PixelToWorldY(r_y1), lcrs->PixelToWorldZ(0 /* r_z1 */),
 			lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
 		);
-		std::unique_ptr<GenericRaster> tmpraster(
-			load(channelid, tilelcrs, fileid, fileoffset, filebytes, method)
-		);
+		auto tile = loadTile(channelid, tilelcrs, fileid, fileoffset, filebytes, method);
 		Profiler::start("RasterSource::load: blit");
 
-		result->blit(tmpraster.get(), (r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
+		result->blit(tile.get(), (r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
 		Profiler::stop("RasterSource::load: blit");
 		tiles_found++;
 	}
@@ -508,11 +498,11 @@ GenericRaster *RasterSource::load(int channelid, int timestamp, int x1, int y1, 
 	}
 
 	result->md_value.set("Channel", channelid);
-	return result.release();
+	return result;
 }
 
 
-GenericRaster *RasterSource::load(int channelid, const LocalCRS &tilecrs, int fileid, size_t offset, size_t size, GenericRaster::Compression method) {
+std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, const LocalCRS &tilecrs, int fileid, size_t offset, size_t size, GenericRaster::Compression method) {
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
 

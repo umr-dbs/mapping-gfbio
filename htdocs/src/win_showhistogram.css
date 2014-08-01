@@ -1,3 +1,7 @@
+.container {
+	fill: white;
+}
+
 .chart {
 	font: 10px sans-serif;
 }

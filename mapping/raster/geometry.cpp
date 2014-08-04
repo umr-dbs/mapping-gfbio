@@ -32,7 +32,6 @@ std::string GenericGeometry::toWKT() {
 	return wktwriter.write(geom);
 }
 
-
 static void geomToGeoJSONCoordinates(const geos::geom::Geometry *geom, std::ostringstream &output, int depth) {
 	output << "[";
 	if (depth > 0) {
@@ -102,25 +101,22 @@ static void geomToGeoJSONGeometry(const geos::geom::Geometry *geom, std::ostring
 			output << "}";
 			break;
 		// geometry is an array of arrays of coordinates
-		case geos::geom::GeometryTypeId::GEOS_POLYGON: {
+		case geos::geom::GeometryTypeId::GEOS_POLYGON:
 			output << "{ \"type\": \"Polygon\", \"coordinates\": ";
 			geomToGeoJSONCoordinates(geom, output, 1);
 			output << "}";
 			break;
-		}
-		case geos::geom::GeometryTypeId::GEOS_MULTILINESTRING: {
+		case geos::geom::GeometryTypeId::GEOS_MULTILINESTRING:
 			output << "{ \"type\": \"MultiLineString\", \"coordinates\": ";
 			geomToGeoJSONCoordinates(geom, output, 1);
 			output << "}";
 			break;
-		}
 		// geometry is a multi-dimensional array
-		case geos::geom::GeometryTypeId::GEOS_MULTIPOLYGON: {
+		case geos::geom::GeometryTypeId::GEOS_MULTIPOLYGON:
 			output << "{ \"type\": \"MultiPolygon\", \"coordinates\": ";
 			geomToGeoJSONCoordinates(geom, output, 2);
 			output << "}";
 			break;
-		}
 		// no geometry, just more geometries
 		case geos::geom::GeometryTypeId::GEOS_GEOMETRYCOLLECTION: {
 			output << "{ \"type\": \"GeometryCollection\", \"geometries\": [";

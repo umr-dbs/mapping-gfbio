@@ -11,8 +11,9 @@
 #include <memory>
 #include <sstream>
 #include <cmath>
+#include <vector>
 #include <json/json.h>
-
+#include <geos/geom/util/GeometryTransformer.h>
 
 class ProjectionOperator : public GenericOperator {
 	public:
@@ -227,12 +228,85 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 }
 
 
+
+class ProjectionTransformer: public geos::geom::util::GeometryTransformer {
+	public:
+		ProjectionTransformer(const GDAL::CRSTransformer &transformer) : geos::geom::util::GeometryTransformer(), transformer(transformer) {};
+		virtual ~ProjectionTransformer() {};
+
+	protected:
+		virtual geos::geom::CoordinateSequence::AutoPtr transformCoordinates(const geos::geom::CoordinateSequence* coords, const geos::geom::Geometry* parent) {
+			size_t size = coords->getSize();
+
+			auto coords_out = std::auto_ptr<std::vector<geos::geom::Coordinate> >(new std::vector<geos::geom::Coordinate>());
+			coords_out->reserve(size);
+
+			for (size_t i=0;i<size;i++) {
+				const geos::geom::Coordinate &c = coords->getAt(i);
+				double x = c.x, y = c.y, z = c.z;
+				if (transformer.transform(x, y, z))
+					coords_out->push_back(geos::geom::Coordinate(x+1, y, z));
+				// TODO: if too few coordinates remain, this will throw an exception rather than skip the invalid geometry
+			}
+
+			return createCoordinateSequence(coords_out);
+		}
+
+
+		/*
+		virtual geos::geom::Geometry::AutoPtr transformPoint(const geos::geom::Point* geom,
+				const geos::geom::Geometry* parent);
+
+		virtual geos::geom::Geometry::AutoPtr transformMultiPoint(const geos::geom::MultiPoint* geom,
+				const geos::geom::Geometry* parent);
+
+		virtual geos::geom::Geometry::AutoPtr transformLinearRing(const geos::geom::LinearRing* geom,
+				const geos::geom::Geometry* parent);
+
+		virtual geos::geom::Geometry::AutoPtr transformLineString(const geos::geom::LineString* geom,
+				const geos::geom::Geometry* parent);
+
+		virtual geos::geom::Geometry::AutoPtr transformMultiLineString(
+				const geos::geom::MultiLineString* geom, const geos::geom::Geometry* parent);
+
+		virtual geos::geom::Geometry::AutoPtr transformPolygon(const geos::geom::Polygon* geom,
+				const geos::geom::Geometry* parent);
+
+		virtual geos::geom::Geometry::AutoPtr transformMultiPolygon(const geos::geom::MultiPolygon* geom,
+				const geos::geom::Geometry* parent);
+
+		virtual geos::geom::Geometry::AutoPtr transformGeometryCollection(
+				const geos::geom::GeometryCollection* geom, const geos::geom::Geometry* parent);
+		*/
+	private:
+		const GDAL::CRSTransformer &transformer;
+};
+
+
 std::unique_ptr<GenericGeometry> ProjectionOperator::getGeometry(const QueryRectangle &rect) {
-	// TODO: actually reproject. ol3js can reproject on its own, but we'll need to do it ourselves.
+	if (src_epsg == EPSG_METEOSAT2 || dest_epsg == EPSG_METEOSAT2)
+		throw OperatorException("Projection: cannot transform Geometries to or from MSAT2 projection");
+	if (dest_epsg != rect.epsg)
+		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
+
 	GDAL::CRSTransformer qrect_transformer(dest_epsg, src_epsg);
 	QueryRectangle src_rect = projectQueryRectangle(rect, qrect_transformer);
 
-	return sources[0]->getGeometry(src_rect);
+	auto geom_in = sources[0]->getGeometry(src_rect);
+	if (src_epsg != geom_in->epsg) {
+		std::ostringstream msg;
+		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << src_epsg << " got " << geom_in->epsg;
+		throw OperatorException(msg.str());
+	}
+
+	GDAL::CRSTransformer geom_transformer(src_epsg, dest_epsg);
+	ProjectionTransformer pt(geom_transformer);
+	auto geom_out = pt.transform(geom_in->getGeometry());
+
+	auto out = std::make_unique<GenericGeometry>(dest_epsg);
+	out->setGeom(geom_out.release());
+
+	return out;
 }
 
 

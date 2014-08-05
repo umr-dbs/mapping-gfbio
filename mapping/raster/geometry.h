@@ -4,7 +4,9 @@
 #include "raster/raster.h" // epsg_t
 
 #include <geos/geom/Geometry.h>
+#include <geos/geom/Coordinate.h>
 #include <string>
+#include <functional>
 
 
 class GenericGeometry {
@@ -20,11 +22,14 @@ class GenericGeometry {
 		GenericGeometry(GenericGeometry &&dd) = delete;
 		GenericGeometry &operator=(GenericGeometry &&dd) = delete;
 
+		const geos::geom::Geometry *getGeometry() { return geom; }
+
 		void setGeom(geos::geom::Geometry *new_geom);
 		std::string toWKT();
 		std::string toGeoJSON();
+
+		const epsg_t epsg;
 	private:
-		epsg_t epsg;
 		geos::geom::Geometry *geom;
 };
 

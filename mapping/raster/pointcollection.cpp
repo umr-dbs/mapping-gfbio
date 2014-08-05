@@ -231,3 +231,36 @@ std::string PointCollection::toGeoJSON() {
 
 	return json.str();
 }
+
+PointCollectionMetadataCopier::PointCollectionMetadataCopier(PointCollection& pointsOld, PointCollection& pointsNew) : pointsOld(pointsOld), pointsNew(pointsNew) {
+}
+
+void PointCollectionMetadataCopier::copyGlobalMetadata() {
+	for (auto pair : *(pointsOld.getGlobalMDValueIterator())) {
+		pointsNew.setGlobalMDValue(pair.first, pair.second);
+	}
+	for (auto pair : *(pointsOld.getGlobalMDStringIterator())) {
+		pointsNew.setGlobalMDString(pair.first, pair.second);
+	}
+}
+
+void PointCollectionMetadataCopier::initLocalMetadataFields() {
+	localMDStringKeys = pointsOld.getLocalMDStringKeys();
+	for (auto key : localMDStringKeys) {
+		pointsNew.addLocalMDString(key);
+	}
+
+	localMDValueKeys = pointsOld.getLocalMDValueKeys();
+	for (auto key : localMDValueKeys) {
+		pointsNew.addLocalMDValue(key);
+	}
+}
+
+void PointCollectionMetadataCopier::copyLocalMetadata(const Point& pointOld, Point& pointNew) {
+	for (auto key : localMDStringKeys) {
+		pointsNew.setLocalMDString(pointNew, key, pointsOld.getLocalMDString(pointOld, key));
+	}
+	for (auto key : localMDValueKeys) {
+		pointsNew.setLocalMDValue(pointNew, key, pointsOld.getLocalMDValue(pointOld, key));
+	}
+}

@@ -75,4 +75,15 @@ class PointCollection {
 		MetadataIndex<double> local_md_value;
 };
 
+class PointCollectionMetadataCopier {
+	public:
+		PointCollectionMetadataCopier(PointCollection& pointsOld, PointCollection& pointsNew);
+		void copyGlobalMetadata();
+		void initLocalMetadataFields();
+		void copyLocalMetadata(const Point& pointOld, Point& pointNew);
+	private:
+		PointCollection &pointsOld, &pointsNew;
+		std::vector<std::string> localMDStringKeys, localMDValueKeys;
+};
+
 #endif

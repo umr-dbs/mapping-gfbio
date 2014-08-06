@@ -63,7 +63,7 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 				double delta = RADIUS-std::sqrt(dx*dx + dy*dy);
 				if (delta <= 0)
 					continue;
-				raster_out->setSafe(circle->getX()+dx, circle->getY()+dy, MAX);
+				raster_out->setSafe(circle->getX()+dx, circle->getY()+dy, std::min(circle->getNumberOfPoints(), MAX));
 			}
 	}
 

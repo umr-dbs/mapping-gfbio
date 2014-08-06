@@ -107,6 +107,20 @@ if ($action == 'sourcelist.get') {
 if ($action == 'examplequerylist.get') {
 	$result = json_decode(<<<EOS
 {
+"geometrytest": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Geometry test",
+
+	"query": {
+		"type": "testgeometrysource",
+		"params": {
+		},
+		"sources": []
+	}
+},
 "reflectance": {
 	"starttime": 42,
 	"endtime": 42,

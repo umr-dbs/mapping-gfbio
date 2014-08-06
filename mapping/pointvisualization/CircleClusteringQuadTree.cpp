@@ -1,10 +1,10 @@
-#include "QuadTree.h"
+#include "CircleClusteringQuadTree.h"
 
 using namespace pv;
 
-QuadTree::QuadTree(BoundingBox boundingBox, size_t nodeCapacity) : head(std::make_shared<QuadTreeNode>(boundingBox, nodeCapacity)) {}
+CircleClusteringQuadTree::CircleClusteringQuadTree(BoundingBox boundingBox, size_t nodeCapacity) : head(std::make_shared<QuadTreeNode>(boundingBox, nodeCapacity)) {}
 
-void QuadTree::insert(std::shared_ptr<Circle> circle) {
+void CircleClusteringQuadTree::insert(std::shared_ptr<Circle> circle) {
 	FindResult probeResult = head->find(*circle);
 
 	if (probeResult.isInsertible()) {
@@ -19,7 +19,7 @@ void QuadTree::insert(std::shared_ptr<Circle> circle) {
 	}
 }
 
-std::vector<std::shared_ptr<Circle>> QuadTree::getCircles() const {
+std::vector<std::shared_ptr<Circle>> CircleClusteringQuadTree::getCircles() const {
 	std::vector<std::shared_ptr<Circle>> circles;
 	std::queue<std::shared_ptr<QuadTreeNode>> queue;
 	queue.push(head);
@@ -41,7 +41,7 @@ std::vector<std::shared_ptr<Circle>> QuadTree::getCircles() const {
 	return circles;
 }
 
-std::vector<BoundingBox> QuadTree::getBoundingBoxes() const {
+std::vector<BoundingBox> CircleClusteringQuadTree::getBoundingBoxes() const {
 	std::vector<BoundingBox> boxes;
 	std::queue<std::shared_ptr<QuadTreeNode>> queue;
 	queue.push(head);

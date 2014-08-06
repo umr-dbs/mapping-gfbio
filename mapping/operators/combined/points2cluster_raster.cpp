@@ -4,7 +4,7 @@
 #include "raster/pointcollection.h"
 #include "raster/typejuggling.h"
 #include "operators/operator.h"
-#include "pointvisualization/QuadTree.h"
+#include "pointvisualization/CircleClusteringQuadTree.h"
 
 #include <memory>
 #include <cmath>
@@ -40,7 +40,7 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 	LocalCRS rm(rect);
 	DataDescription vm(GDT_Byte, 0, MAX, true, 0);
 
-	pv::QuadTree clusterer(pv::BoundingBox(pv::Coordinate((rect.x2 + rect.x1) / 2, (rect.y2 + rect.y2) / 2), pv::Dimension((rect.x2 - rect.x1) / 2, (rect.y2 - rect.y2) / 2), 1), 1);
+	pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(pv::Coordinate((rect.x2 + rect.x1) / 2, (rect.y2 + rect.y2) / 2), pv::Dimension((rect.x2 - rect.x1) / 2, (rect.y2 - rect.y2) / 2), 1), 1);
 	for (Point &p : points->collection) {
 		double x = p.x, y = p.y;
 

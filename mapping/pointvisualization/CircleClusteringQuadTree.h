@@ -14,17 +14,17 @@
 namespace pv {
 
 /**
- * QuadTree that contains non-overlapping cirles.
+ * QuadTree that contains non-overlapping circles.
  * It merges circles automatically upon insert if there are overlapping ones contained in the tree.
  */
-class QuadTree {
+class CircleClusteringQuadTree {
 	public:
 		/**
 		 * Construct a QuadTree by specifying a bounding box and a node capacity.
 		 * @param boundingBox
 		 * @param nodeCapacity Specifies the node capacity and split point.
 		 */
-		QuadTree(BoundingBox boundingBox, size_t nodeCapacity);
+		CircleClusteringQuadTree(BoundingBox boundingBox, size_t nodeCapacity);
 
 		/**
 		 * Inserts a circle and merges it if it overlaps with an existing one.

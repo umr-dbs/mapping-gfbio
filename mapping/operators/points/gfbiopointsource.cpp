@@ -22,9 +22,7 @@ class GFBioPointSourceOperator : public GenericOperator {
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
 	private:
 		std::unique_ptr<geos::geom::Geometry> loadGeometryFromServer(const QueryRectangle &qrect);
-		void getStringFromServer(const std::ostringstream& url,
-			const QueryRectangle& rect, std::stringstream& data);
-		void getStringFromServer(const QueryRectangle& rect, std::stringstream& data);
+		void getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format);
 		std::string datasource;
 		std::string query;
 		cURL curl;
@@ -78,7 +76,7 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const Query
 	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
 
 	std::stringstream data;
-	getStringFromServer(rect, data);
+	getStringFromServer(rect, data, "CSV");
 
 	std::string line;
 
@@ -115,10 +113,10 @@ std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const Que
 	return geom_out;
 }
 
-void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, std::stringstream& data) {
+void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format) {
 	std::ostringstream url;
 	url
-			<< "http://pc12285:8081/GFBioJavaWS/Wizzard/fetchDataSource/CSV?datasource="
+			<< "http://pc12285:8081/GFBioJavaWS/Wizzard/fetchDataSource/" << format << "?datasource="
 			<< curl.escape(datasource) << "&query=" << curl.escape(query)
 			<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
 			<< rect.x2 << "," << rect.y2;
@@ -142,7 +140,7 @@ std::unique_ptr<geos::geom::Geometry> GFBioPointSourceOperator::loadGeometryFrom
 	//url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource?datasource" << datasource << "&query=" << query;
 	std::stringstream data;
 	
-	getStringFromServer(rect, data);
+	getStringFromServer(rect, data, "WKB");
 	//curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
 
 	// result should now be in our stringstream

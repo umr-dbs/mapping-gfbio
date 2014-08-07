@@ -116,7 +116,7 @@ std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const Que
 void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format) {
 	std::ostringstream url;
 	url
-			<< "http://pc12285:8081/GFBioJavaWS/Wizzard/fetchDataSource/" << format << "?datasource="
+			<< "http://pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/" << format << "?datasource="
 			<< curl.escape(datasource) << "&query=" << curl.escape(query)
 			<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
 			<< rect.x2 << "," << rect.y2;

@@ -22,9 +22,13 @@ class GFBioPointSourceOperator : public GenericOperator {
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
 	private:
 		std::unique_ptr<geos::geom::Geometry> loadGeometryFromServer(const QueryRectangle &qrect);
+		void getStringFromServer(const std::ostringstream& url,
+			const QueryRectangle& rect, std::stringstream& data);
+		void getStringFromServer(const QueryRectangle& rect, std::stringstream& data);
 		std::string datasource;
 		std::string query;
 		cURL curl;
+		std::vector<std::string> parseCSVLine(std::string line);
 };
 
 
@@ -45,23 +49,58 @@ class GFBioGeometrySourceOperator : public GFBioPointSourceOperator {
 };
 REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
+std::vector<std::string> GFBioPointSourceOperator::parseCSVLine(std::string line){
+	//TODO: use array
+	std::vector<std::string> csv;
+
+	//parse csv line, can't handle embedded quotes
+	int start = 0;
+	bool inQuote = false;
+	char separator = ',';
+	char quote = '\"';
+	for (int i = 0 ; i <= line.length(); i++)  {
+		if(line[i] == separator || i == line.length() ){
+			if(!inQuote){
+				//token goes from start to i
+				csv.push_back(line.substr(start, i-start));
+
+				start = i+1;
+			}
+		} else if(line[i] == quote){
+			inQuote = !inQuote;
+		}
+	}
+
+	return csv;
+}
 
 std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect) {
-	auto points = loadGeometryFromServer(rect);
-
-	if (points->getDimension() != 0)
-		throw OperatorException("Result from GBif is not a point collection");
-
 	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
-	geos::geom::CoordinateSequence *coords = points->getCoordinates();
 
-	size_t count = coords->getSize();
-	for (size_t i=0;i<count;i++) {
-		const geos::geom::Coordinate &coord = coords->getAt(i); //[i];
-		points_out->addPoint(coord.x, coord.y);
+	std::stringstream data;
+	getStringFromServer(rect, data);
+
+	std::string line;
+
+	//header
+	std::getline(data,line);
+	auto header = parseCSVLine(line);
+	//TODO: distinguish between double and string properties
+	for(int i=2; i < header.size(); i++){
+		points_out->addLocalMDString(header[i]);
 	}
-	delete coords; // TODO: is this correct?
 
+	while(std::getline(data,line)){
+			auto csv = parseCSVLine(line);
+
+			Point& point = points_out->addPoint(std::stod(csv[0]),std::stod(csv[1]));
+			//double year = std::atof(csv[3].c_str());
+
+			for(int i=2; i < csv.size(); i++){
+				points_out->setLocalMDString(point, header[i], csv[i]);
+			}
+	}
+	//fprintf(stderr, data.str().c_str());
 	return points_out;
 }
 
@@ -76,7 +115,21 @@ std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const Que
 	return geom_out;
 }
 
+void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, std::stringstream& data) {
+	std::ostringstream url;
+	url
+			<< "http://pc12285:8081/GFBioJavaWS/Wizzard/fetchDataSource/CSV?datasource="
+			<< curl.escape(datasource) << "&query=" << curl.escape(query)
+			<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
+			<< rect.x2 << "," << rect.y2;
 
+	fprintf(stderr, query.c_str());
+	curl.setOpt(CURLOPT_URL, url.str().c_str());
+	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
+	curl.setOpt(CURLOPT_WRITEDATA, &data);
+
+	curl.perform();
+}
 
 std::unique_ptr<geos::geom::Geometry> GFBioPointSourceOperator::loadGeometryFromServer(const QueryRectangle &rect) {
 	if (rect.epsg != EPSG_LATLON) {
@@ -85,21 +138,12 @@ std::unique_ptr<geos::geom::Geometry> GFBioPointSourceOperator::loadGeometryFrom
 		throw OperatorException(msg.str());
 	}
 
-	std::ostringstream url;
+
 	//url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource?datasource" << datasource << "&query=" << query;
-
-	url << "http://pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/WKB?datasource=" << curl.escape(datasource)
-		<< "&query=" << curl.escape(query)
-		<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << "," << rect.x2 << "," << rect.y2;
-
 	std::stringstream data;
-
-	curl.setOpt(CURLOPT_URL, url.str().c_str());
-	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
-	curl.setOpt(CURLOPT_WRITEDATA, &data);
+	
+	getStringFromServer(rect, data);
 	//curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
-
-	curl.perform();
 
 	// result should now be in our stringstream
 

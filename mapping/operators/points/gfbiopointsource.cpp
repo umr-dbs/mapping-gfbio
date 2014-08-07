@@ -27,6 +27,7 @@ class GFBioPointSourceOperator : public GenericOperator {
 		std::string query;
 		cURL curl;
 		std::vector<std::string> parseCSVLine(std::string line);
+		std::string includeMetadata;
 };
 
 
@@ -35,6 +36,9 @@ GFBioPointSourceOperator::GFBioPointSourceOperator(int sourcecount, GenericOpera
 
 	datasource = params.get("datasource", "").asString();
 	query = params.get("query", "").asString();
+	params.get("includeMetadata", "false");
+	includeMetadata = params.get("includeMetadata", "false").asString();
+	//fprintf(stderr, params.get("includeMetadata", "hahahaha").asCString());
 }
 
 GFBioPointSourceOperator::~GFBioPointSourceOperator() {
@@ -119,7 +123,7 @@ void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, s
 			<< "http://pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/" << format << "?datasource="
 			<< curl.escape(datasource) << "&query=" << curl.escape(query)
 			<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
-			<< rect.x2 << "," << rect.y2;
+			<< rect.x2 << "," << rect.y2 << "&includeMetadata=" << includeMetadata;
 
 	fprintf(stderr, query.c_str());
 	curl.setOpt(CURLOPT_URL, url.str().c_str());

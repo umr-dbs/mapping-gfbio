@@ -15,10 +15,10 @@ public:
 	Points2HistogramOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 	virtual ~Points2HistogramOperator();
 
-	virtual std::unique_ptr<Histogram> getHistogram(const QueryRectangle &rect);
+	virtual std::unique_ptr<DataVector> getDataVector(const QueryRectangle &rect);
 };
 
-Points2HistogramOperator::Points2HistogramOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::POINTS, sourcecount, sources) {
+Points2HistogramOperator::Points2HistogramOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::DATAVECTOR, sourcecount, sources) {
 	assumeSources(1);
 
 	name = params.get("name", "raster").asString();
@@ -30,7 +30,7 @@ Points2HistogramOperator::~Points2HistogramOperator() {
 REGISTER_OPERATOR(Points2HistogramOperator, "points2histogram");
 
 
-std::unique_ptr<Histogram> Points2HistogramOperator::getHistogram(const QueryRectangle &rect) {
+std::unique_ptr<DataVector> Points2HistogramOperator::getDataVector(const QueryRectangle &rect) {
 	auto points = sources[0]->getPoints(rect);
 
 	double raster_max = points->getGlobalMDValue(name + "_max");
@@ -49,5 +49,5 @@ std::unique_ptr<Histogram> Points2HistogramOperator::getHistogram(const QueryRec
 		}
 	}
 
-	return histogram;
+	return std::unique_ptr<DataVector>(std::move(histogram));
 }

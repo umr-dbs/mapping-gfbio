@@ -48,3 +48,16 @@ void Histogram::inc(double value) {
 void Histogram::incNoData() {
 	nodata_count++;
 }
+
+std::string Histogram::toJSON() {
+	std::stringstream buffer;
+	buffer << "{\"type\": \"histogram\", ";
+	buffer << "\"metadata\": {\"min\": " << min << ", \"max\": " << max << ", \"nodata\": " << nodata_count << ", \"numberOfBuckets\": " << counts.size() << "}, ";
+	buffer << "\"data\": [";
+	for(int& bucket : counts) {
+		buffer << bucket << ",";
+	}
+	buffer.seekp(((long) buffer.tellp()) - 1);
+	buffer << "]}";
+	return buffer.str();
+}

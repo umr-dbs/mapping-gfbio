@@ -2,14 +2,21 @@
 #define RASTER_HISTOGRAM_H
 
 #include <vector>
+#include <sstream>
+#include <string>
 
-class Histogram {
+#include "datavector.h"
+
+class Histogram : public DataVector {
 	public:
 		Histogram(int number_of_buckets, double min, double max);
 		~Histogram();
-		void print();
+
 		void inc(double value);
 		void incNoData();
+
+		void print();
+		std::string toJSON();
 
 		static const int DEFAULT_NUMBER_OF_BUCKETS = 10000;
 

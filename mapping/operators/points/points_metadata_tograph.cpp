@@ -7,28 +7,28 @@
 #include <json/json.h>
 #include <limits>
 
-class PointsFilterByRangeOperator: public GenericOperator {
+class PointsMetadataToGraph: public GenericOperator {
 private:
 	std::string nameX, nameY;
 
 public:
-	PointsFilterByRangeOperator(int sourcecount, GenericOperator *sources[],	Json::Value &params);
-	virtual ~PointsFilterByRangeOperator();
+	PointsMetadataToGraph(int sourcecount, GenericOperator *sources[],	Json::Value &params);
+	virtual ~PointsMetadataToGraph();
 
 	virtual std::unique_ptr<DataVector> getDataVector(const QueryRectangle &rect);
 };
 
-PointsFilterByRangeOperator::PointsFilterByRangeOperator(int sourcecount,	GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::DATAVECTOR, sourcecount, sources) {
+PointsMetadataToGraph::PointsMetadataToGraph(int sourcecount,	GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::DATAVECTOR, sourcecount, sources) {
 	assumeSources(1);
 
 	nameX = params.get("nameX", "raster").asString();
 	nameY = params.get("nameY", "raster").asString();
 }
 
-PointsFilterByRangeOperator::~PointsFilterByRangeOperator() {}
-REGISTER_OPERATOR(PointsFilterByRangeOperator, "points_filter_by_range");
+PointsMetadataToGraph::~PointsMetadataToGraph() {}
+REGISTER_OPERATOR(PointsMetadataToGraph, "points_metadata_to_graph");
 
-std::unique_ptr<DataVector> PointsFilterByRangeOperator::getDataVector(const QueryRectangle &rect) {
+std::unique_ptr<DataVector> PointsMetadataToGraph::getDataVector(const QueryRectangle &rect) {
 	auto points = sources[0]->getPoints(rect);
 	auto xygraph = std::make_unique<XYGraph<2>>();
 

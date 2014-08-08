@@ -26,7 +26,7 @@ class XYGraph : public DataVector {
 				for(double& element : point) {
 					buffer << element << ",";
 				}
-				buffer.unget();
+				buffer.seekp(((long) buffer.tellp()) - 1);
 				buffer << "],";
 
 			}

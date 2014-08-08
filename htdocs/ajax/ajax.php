@@ -107,6 +107,20 @@ if ($action == 'sourcelist.get') {
 if ($action == 'examplequerylist.get') {
 	$result = json_decode(<<<EOS
 {
+"OSM": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "OSM: primary roads of spain",
+
+	"query": {
+		"type": "osmgeometrysource",
+		"params": {
+		},
+		"sources": []
+	}
+},
 "geometrytest": {
 	"starttime": 42,
 	"endtime": 42,

@@ -144,6 +144,10 @@ void outputPointCollection(PointCollection *points) {
 	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON().c_str());
 }
 
+void outputPointCollectionCSV(PointCollection *points) {
+	printf("Content-type: text/csv\r\n\r\n%s", points->toCSV().c_str());
+}
+
 void outputGeometry(GenericGeometry *geometry) {
 	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
 }
@@ -201,7 +205,13 @@ int main() {
 			Profiler::print();
 			printf("\r\n");
 #endif
-			outputPointCollection(points.get());
+			if(params.count("format") > 0){
+				if(params["format"] == "csv"){
+					outputPointCollectionCSV(points.get());
+				}
+			} else {
+				outputPointCollection(points.get());
+			}
 			return 0;
 		}
 

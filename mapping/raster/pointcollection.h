@@ -68,6 +68,7 @@ class PointCollection {
 
 		// Export
 		std::string toGeoJSON();
+		std::string toCSV();
 	private:
 		DirectMetadata<std::string> global_md_string;
 		DirectMetadata<double> global_md_value;

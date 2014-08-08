@@ -16,11 +16,11 @@ class HistogramOperator : public GenericOperator {
 		HistogramOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
 		virtual ~HistogramOperator();
 
-		virtual std::unique_ptr<Histogram> getHistogram(const QueryRectangle &rect);
+		virtual std::unique_ptr<DataVector> getDataVector(const QueryRectangle &rect);
 };
 
 
-HistogramOperator::HistogramOperator(int sourcecount, GenericOperator *sources[], Json::Value &) : GenericOperator(Type::HISTOGRAM, sourcecount, sources) {
+HistogramOperator::HistogramOperator(int sourcecount, GenericOperator *sources[], Json::Value &) : GenericOperator(Type::DATAVECTOR, sourcecount, sources) {
 	assumeSources(1);
 }
 HistogramOperator::~HistogramOperator() {
@@ -30,7 +30,7 @@ REGISTER_OPERATOR(HistogramOperator, "histogram");
 
 template<typename T>
 struct histogram{
-	static std::unique_ptr<Histogram> execute(Raster2D<T> *raster) {
+	static std::unique_ptr<DataVector> execute(Raster2D<T> *raster) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
 		T max = (T) raster->dd.max;
@@ -49,12 +49,12 @@ struct histogram{
 			}
 		}
 
-		return histogram;
+		return std::unique_ptr<DataVector>(std::move(histogram));
 	}
 };
 
 
-std::unique_ptr<Histogram> HistogramOperator::getHistogram(const QueryRectangle &rect) {
+std::unique_ptr<DataVector> HistogramOperator::getDataVector(const QueryRectangle &rect) {
 	auto raster = sources[0]->getRaster(rect);
 
 	Profiler::Profiler p("HISTOGRAM_OPERATOR");

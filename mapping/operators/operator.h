@@ -12,7 +12,7 @@ namespace Json {
 class GenericRaster;
 class PointCollection;
 class GenericGeometry;
-class Histogram;
+class DataVector;
 
 class QueryRectangle {
 	public:
@@ -37,7 +37,7 @@ class GenericOperator {
 			RASTER,
 			POINTS,
 			GEOMETRY,
-			HISTOGRAM
+			DATAVECTOR
 		};
 		static const int MAX_SOURCES = 5;
 		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json);
@@ -48,7 +48,7 @@ class GenericOperator {
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
-		virtual std::unique_ptr<Histogram> getHistogram(const QueryRectangle &rect);
+		virtual std::unique_ptr<DataVector> getDataVector(const QueryRectangle &rect);
 
 	protected:
 		GenericOperator(Type type, int sourcecount, GenericOperator *sources[]);

@@ -20,8 +20,7 @@ PointsDifferenceOperator::PointsDifferenceOperator(int sourcecount,	GenericOpera
 	assumeSources(2);
 }
 
-PointsDifferenceOperator::~PointsDifferenceOperator() {
-}
+PointsDifferenceOperator::~PointsDifferenceOperator() {}
 REGISTER_OPERATOR(PointsDifferenceOperator, "points_difference");
 
 std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const QueryRectangle &rect) {
@@ -34,12 +33,10 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 	metadataCopier.copyGlobalMetadata();
 	metadataCopier.initLocalMetadataFields();
 
-	// insert and remove fake point to LOCK collection
-	pointsOut->addPoint(0, 0);
-	pointsOut->collection.clear();
+	pointsOut->lock();
 
 	// comparator that compares first to x1 < x2 and then to y1 < y2
-	std::function<bool(const Point&, const Point&)> compareFunction = [](const Point& p1, const Point& p2) -> bool {
+	auto compareFunction = [](const Point& p1, const Point& p2) -> bool {
 		return (p1.x < p2.x) || ((std::fabs(p1.x - p2.x) < std::numeric_limits<double>::epsilon()) && (p1.y < p2.y));
 	};
 

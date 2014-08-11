@@ -56,6 +56,7 @@ class PointCollection {
 		// The collection just keeps a list of the allowed keys and their index.
 		void addLocalMDString(const std::string &key);
 		void addLocalMDValue(const std::string &key);
+		auto lock() -> void;
 
 
 		// local MetaData (stored on the Points)

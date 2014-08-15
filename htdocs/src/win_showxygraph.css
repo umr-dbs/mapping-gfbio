@@ -1,3 +1,7 @@
+.linechart {
+	font: 10px sans-serif;
+}
+
 .line {
     fill: none;
     stroke: steelblue;

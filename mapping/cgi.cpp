@@ -122,12 +122,7 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "") {
-
-	std::unique_ptr<Colorizer> colorizer;
-	if (colors == "hsv")
-		colorizer.reset(new HSVColorizer());
-	else
-		colorizer.reset(new GreyscaleColorizer());
+	auto colorizer = Colorizer::make(colors);
 
 #if 1
 	printf("Content-type: image/png\r\n\r\n");

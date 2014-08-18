@@ -147,7 +147,7 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 	}
 
 	QueryRectangle result(rect.timestamp, src_x1, src_y1, src_x2, src_y2, src_xres, src_yres, src_epsg);
-	result.enlarge(1);
+	result.enlarge(2);
 	return result;
 }
 

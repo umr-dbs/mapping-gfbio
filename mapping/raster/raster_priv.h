@@ -49,19 +49,19 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 		virtual double getAsDouble(int x, int y=0, int z=0) const;
 
 		T get(int x, int y) const {
-			return data[y*this->lcrs.size[0] + x];
+			return data[(size_t) y*this->lcrs.size[0] + x];
 		}
 		T getSafe(int x, int y, T def = 0) const {
 			if (x > 0 && y > 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
-				return data[y*this->lcrs.size[0] + x];
+				return data[(size_t) y*this->lcrs.size[0] + x];
 			return def;
 		}
 		void set(int x, int y, T value) {
-			data[y*lcrs.size[0] + x] = value;
+			data[(size_t) y*lcrs.size[0] + x] = value;
 		}
 		void setSafe(int x, int y, T value) {
 			if (x > 0 && y > 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
-				data[y*lcrs.size[0] + x] = value;
+				data[(size_t) y*lcrs.size[0] + x] = value;
 		}
 
 		// create aliases for parent classes members

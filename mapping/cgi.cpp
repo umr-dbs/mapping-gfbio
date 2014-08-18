@@ -7,6 +7,7 @@
 #include "operators/operator.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cmath> // isnan
 #include <string>
 #include <fstream>
@@ -168,6 +169,10 @@ int main() {
 				query_epsg = atoi(crs.substr(5, std::string::npos).c_str());
 			}
 		}
+		time_t timestamp = 42;
+		if (params.count("timestamp") > 0) {
+			timestamp = atol(params["timestamp"].c_str());
+		}
 
 
 		// direct loading of a query (obsolete?)
@@ -192,7 +197,6 @@ int main() {
 		// PointCollection as GeoJSON
 		if (params.count("pointquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
-			int timestamp = 42;
 
 			auto points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
@@ -208,7 +212,6 @@ int main() {
 		// Geometry as GeoJSON
 		if (params.count("geometryquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
-			int timestamp = 42;
 
 			auto geometry = graph->getGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
@@ -232,7 +235,7 @@ int main() {
 			// GetMap
 			else if (request == "GetMap") {
 				std::string version = params["version"];
-				if (params["version"] != "1.3.0")
+				if (version != "1.3.0")
 					abort("Invalid version");
 
 				int output_width = atoi(params["width"].c_str());
@@ -304,7 +307,6 @@ int main() {
 					//bbox_normalized[3] = 1.0 - bbox_normalized[3];
 
 					auto graph = GenericOperator::fromJSON(params["layers"]);
-					int timestamp = 42;
 					std::string colorizer;
 					if (params.count("colors") > 0)
 						colorizer = params["colors"];

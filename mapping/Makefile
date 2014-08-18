@@ -113,11 +113,34 @@ tmeandatasource:	${EXE}
 
 worldclimdatasource:	${EXE}
 	rm -f datasources/worldclim*.dat datasources/worldclim*.db
-	./${EXE} import datasources/worldclim.json data/worldclim/tmin_1.bil 1 0 42 RAW
-	./${EXE} import datasources/worldclim.json data/worldclim/tmax_1.bil 1 1 42 RAW
-	./${EXE} import datasources/worldclim.json data/worldclim/tmean_1.bil 1 2 42 RAW
-	./${EXE} import datasources/worldclim.json data/worldclim/prec_1.bil 1 3 42 RAW
+	./${EXE} import datasources/worldclim.json data/worldclim/tmin_1.bil 1 0 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/tmax_1.bil 1 1 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/tmean_1.bil 1 2 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/prec_1.bil 1 3 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/alt.bil 1 4 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_1.bil 1 5 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_2.bil 1 6 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_3.bil 1 7 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_4.bil 1 8 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_5.bil 1 9 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_6.bil 1 10 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_7.bil 1 11 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_8.bil 1 12 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_9.bil 1 13 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_10.bil 1 14 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_11.bil 1 15 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_12.bil 1 16 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_13.bil 1 17 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_14.bil 1 18 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_15.bil 1 19 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_16.bil 1 20 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_17.bil 1 21 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_18.bil 1 22 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_19.bil 1 23 42 GZIP
 
+srtmdatasource:	${EXE}
+	rm -f datasources/srtm.dat datasources/srtm.db
+	./${EXE} import datasources/srtm.json data/srtm/srtm_all_index.out 1 0 42 GZIP
 
 test: ${EXE}
 	valgrind --error-exitcode=4 ./${EXE} testquery queries/msat0.json

@@ -19,17 +19,18 @@ class RasterSource {
 		friend class RasterSourceManager;
 
 	public:
-		void import(const char *filename, int sourcechannel, int channelid, int timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
-		void import(GenericRaster *raster, int channelid, int timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
+		void import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
+		void import(GenericRaster *raster, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
 
-		std::unique_ptr<GenericRaster> load(int channelid, int timestamp, int x1, int y1, int x2, int y2, int zoom = 0);
+		std::unique_ptr<GenericRaster> load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom = 0);
 
 		const LocalCRS *getLocalCRS() const { return lcrs; };
 
 		bool isWriteable() const { return writeable; }
 
 	private:
-		void importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, int timestamp, GenericRaster::Compression compression = GenericRaster::Compression::PREDICTED);
+		bool hasTile(const LocalCRS &lcrs, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp);
+		void importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::PREDICTED);
 		std::unique_ptr<GenericRaster> loadTile(int channelid, const LocalCRS &tilecrs, int fileid, size_t offset, size_t size, GenericRaster::Compression method);
 
 		void init();

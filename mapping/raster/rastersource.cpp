@@ -209,7 +209,7 @@ void RasterSource::cleanup() {
 
 
 
-void RasterSource::import(const char *filename, int sourcechannel, int channelid, int timestamp, GenericRaster::Compression compression) {
+void RasterSource::import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	auto raster = GenericRaster::fromGDAL(filename, sourcechannel, lcrs->epsg);
@@ -218,7 +218,7 @@ void RasterSource::import(const char *filename, int sourcechannel, int channelid
 }
 
 
-void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, GenericRaster::Compression compression) {
+void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp, GenericRaster::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	if (channelid < 0 || channelid >= channelcount)
@@ -249,14 +249,16 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 	for (int zoom=0;;zoom++) {
 		int zoomfactor = 1 << zoom;
 
-		if (lcrs->size[0] / zoomfactor < tilesize && lcrs->size[1] / zoomfactor < tilesize && lcrs->size[2] / zoomfactor < tilesize)
+		if (zoom > 0 && lcrs->size[0] / zoomfactor < tilesize && lcrs->size[1] / zoomfactor < tilesize && lcrs->size[2] / zoomfactor < tilesize)
 			break;
 
 		GenericRaster *zoomedraster = raster;
 		std::unique_ptr<GenericRaster> zoomedraster_guard;
 		if (zoom > 0) {
+			printf("Scaling for zoom %d to %u x %u x %u pixels\n", zoom, lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
 			zoomedraster_guard = raster->scale(lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
 			zoomedraster = zoomedraster_guard.get();
+			printf("done scaling\n");
 		}
 
 		for (uint32_t zoff = 0; zoff == 0 || zoff < zoomedraster->lcrs.size[2]; zoff += tilesize) {
@@ -272,11 +274,18 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 						zoomedraster->lcrs.scale[0], zoomedraster->lcrs.scale[1], zoomedraster->lcrs.scale[2]
 					);
 
+					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
+					if (hasTile(tilelcrs, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp)) {
+						printf(" skipping..\n");
+						continue;
+					}
+
 					auto tile = GenericRaster::create(tilelcrs, *channels[channelid]);
 					tile->blit(zoomedraster, -xoff, -yoff, -zoff);
+					printf("done blitting\n");
 
-					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
 					importTile(tile.get(), xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp, compression);
+					printf("done importing\n");
 				}
 			}
 		}
@@ -314,7 +323,32 @@ void RasterSource::import(GenericRaster *raster, int channelid, int timestamp, G
 	//importTile(raster, 0, 0, 0, 0, channelid, timestamp, compression);
 }
 
-void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, int timestamp, GenericRaster::Compression compression) {
+bool RasterSource::hasTile(const LocalCRS &lcrs, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp) {
+	int zoomfactor = 1 << zoom;
+
+	SQLiteStatement stmt(db);
+
+	stmt.prepare("SELECT 1 FROM rasters WHERE channel = ? AND timestamp = ? AND x1 = ? AND y1 = ? AND z1 = ? AND x2 = ? AND y2 = ? AND z2 = ? AND zoom = ?");
+
+	stmt.bind(1, channelid);
+	stmt.bind(2, timestamp);
+	stmt.bind(3, offx); // x1
+	stmt.bind(4, offy); // y1
+	stmt.bind(5, offz); // z1
+	stmt.bind(6, (int32_t) (offx+lcrs.size[0]*zoomfactor)); // x2
+	stmt.bind(7, (int32_t) (offy+lcrs.size[1]*zoomfactor)); // y2
+	stmt.bind(8, (int32_t) (offz+lcrs.size[2]*zoomfactor)); // z2
+	stmt.bind(9, zoom);
+
+	bool result = false;
+	if (stmt.next())
+		result = true;
+	stmt.finalize();
+
+	return result;
+}
+
+void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp, GenericRaster::Compression compression) {
 	auto buffer = RasterConverter::direct_encode(raster, compression);
 
 	int zoomfactor = 1 << zoom;
@@ -371,26 +405,35 @@ void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int off
 }
 
 
-std::unique_ptr<GenericRaster> RasterSource::load(int channelid, int timestamp, int x1, int y1, int x2, int y2, int zoom) {
+std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom) {
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
 
 	Profiler::Profiler p_all("RasterSource::load");
-	// TODO: erstmal einen timestamp finden, der in der DB enthalten ist.
 
-	// TODO: schauen, ob der gewünschte zoom-level auch in der DB enthalten ist
-	SQLiteStatement stmt(db);
+	// find the most recent raster at the requested timestamp
+	// TODO: maximal zulässige alter?
+	SQLiteStatement stmt_t(db);
+	stmt_t.prepare("SELECT timestamp FROM rasters WHERE channel = ? AND timestamp <= ? ORDER BY timestamp DESC limit 1");
+	stmt_t.bind(1, channelid);
+	stmt_t.bind(2, timestamp);
+	if (!stmt_t.next())
+		throw SourceException("No raster found for the given timestamp");
 
-	stmt.prepare("SELECT MAX(zoom) FROM rasters WHERE channel = ? AND timestamp = ? AND zoom <= ?");
+	timestamp = stmt_t.getInt64(0);
+	stmt_t.finalize();
 
-	stmt.bind(1, channelid);
-	stmt.bind(2, timestamp);
-	stmt.bind(3, zoom);
+	// find the best available zoom level
+	SQLiteStatement stmt_z(db);
+	stmt_z.prepare("SELECT MAX(zoom) FROM rasters WHERE channel = ? AND timestamp = ? AND zoom <= ?");
+	stmt_z.bind(1, channelid);
+	stmt_z.bind(2, timestamp);
+	stmt_z.bind(3, zoom);
 
 	int max_zoom = -1;
-	if (stmt.next())
-		max_zoom = stmt.getInt(0);
-	stmt.finalize();
+	if (stmt_z.next())
+		max_zoom = stmt_z.getInt(0);
+	stmt_z.finalize();
 
 	if (max_zoom < 0)
 		throw SourceException("No zoom level found for the given channel and timestamp");
@@ -420,6 +463,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, int timestamp, 
 
 	// find all overlapping rasters in DB
 	Profiler::start("RasterSource::load: sqlite");
+	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM rasters"
 		" WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ?");
 

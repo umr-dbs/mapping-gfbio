@@ -56,6 +56,7 @@ class PointCollection {
 		// The collection just keeps a list of the allowed keys and their index.
 		void addLocalMDString(const std::string &key);
 		void addLocalMDValue(const std::string &key);
+		auto lock() -> void;
 
 
 		// local MetaData (stored on the Points)
@@ -68,6 +69,7 @@ class PointCollection {
 
 		// Export
 		std::string toGeoJSON();
+		std::string toCSV();
 	private:
 		DirectMetadata<std::string> global_md_string;
 		DirectMetadata<double> global_md_value;

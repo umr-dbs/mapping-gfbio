@@ -12,9 +12,6 @@ private:
 	std::string name;
 	bool includeNoData;
 	double rangeMin, rangeMax;
-
-	void copyGlobalMetadata(PointCollection* pointsOld, PointCollection* pointsNew);
-	void copyLocalMetadata(PointCollection* pointsOld, PointCollection* pointsNew, std::vector<std::string>* localMDStringKeys, std::vector<std::string>* localMDValueKeys, Point* pointOld, Point* pointNew);
 public:
 	PointsFilterByRangeOperator(int sourcecount, GenericOperator *sources[],	Json::Value &params);
 	virtual ~PointsFilterByRangeOperator();

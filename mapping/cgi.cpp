@@ -1,7 +1,7 @@
 #include "raster/raster.h"
 #include "raster/pointcollection.h"
 #include "raster/geometry.h"
-#include "raster/histogram.h"
+#include "raster/datavector.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
@@ -145,6 +145,10 @@ void outputPointCollection(PointCollection *points) {
 	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON().c_str());
 }
 
+void outputPointCollectionCSV(PointCollection *points) {
+	printf("Content-type: text/csv\r\n\r\n%s", points->toCSV().c_str());
+}
+
 void outputGeometry(GenericGeometry *geometry) {
 	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
 }
@@ -205,7 +209,13 @@ int main() {
 			Profiler::print();
 			printf("\r\n");
 #endif
-			outputPointCollection(points.get());
+			if(params.count("format") > 0){
+				if(params["format"] == "csv"){
+					outputPointCollectionCSV(points.get());
+				}
+			} else {
+				outputPointCollection(points.get());
+			}
 			return 0;
 		}
 
@@ -329,10 +339,10 @@ int main() {
 					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
 
 					if (format == "application/json") {
-						auto histogram = graph->getHistogram(qrect);
+						std::unique_ptr<DataVector> dataVector = graph->getDataVector(qrect);
 
 						printf("content-type: application/json\r\n\r\n");
-						histogram->print();
+						printf(dataVector->toJSON().c_str());
 					}
 					else {
 						auto result_raster = graph->getRaster(qrect);

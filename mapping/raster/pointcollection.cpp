@@ -116,6 +116,11 @@ void PointCollection::addLocalMDValue(const std::string &key) {
 	local_md_value.addKey(key);
 }
 
+auto PointCollection::lock() -> void {
+	local_md_string.lock();
+	local_md_value.lock();
+}
+
 
 /**
  * Local Metadata on points
@@ -230,6 +235,33 @@ std::string PointCollection::toGeoJSON() {
 	json << "] }}]}";
 
 	return json.str();
+}
+
+std::string PointCollection::toCSV() {
+	std::ostringstream csv;
+	csv << std::fixed; // std::setprecision(4);
+
+
+	//header
+	csv << "lon" << "," << "lat";
+	for(std::string key : getLocalMDStringKeys()){
+		csv << "," << key;
+	}
+	csv << std::endl;
+
+
+	bool first = true;
+	for (const Point &p : collection) {
+		csv << p.x << "," << p.y;
+
+		for(std::string key : getLocalMDStringKeys()){
+				csv << "," << getLocalMDString(p, key);
+		}
+
+		csv << std::endl;
+	}
+
+	return csv.str();
 }
 
 PointCollectionMetadataCopier::PointCollectionMetadataCopier(PointCollection& pointsOld, PointCollection& pointsNew) : pointsOld(pointsOld), pointsNew(pointsNew) {

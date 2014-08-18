@@ -209,8 +209,9 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 
 	auto points_out = std::make_unique<PointCollection>(dest_epsg);
 
-	// TODO: copy global metadata
-	// TODO: copy local metadata indexes
+	PointCollectionMetadataCopier copier(*points_in, *points_out);
+	copier.copyGlobalMetadata();
+	copier.initLocalMetadataFields();
 
 	//printf("content-type: text/plain\r\n\r\n");
 	for (Point &point : points_in->collection) {
@@ -221,7 +222,7 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 
 		//printf("%f, %f -> %f, %f\n", point.x, point.y, x, y);
 		Point &p = points_out->addPoint(x, y);
-		// TODO: copy local metadata
+		copier.copyLocalMetadata(point,p);
 	}
 
 	return points_out;

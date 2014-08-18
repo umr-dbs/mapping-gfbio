@@ -107,6 +107,20 @@ if ($action == 'sourcelist.get') {
 if ($action == 'examplequerylist.get') {
 	$result = json_decode(<<<EOS
 {
+"OSM": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "OSM: primary roads of spain",
+
+	"query": {
+		"type": "osmgeometrysource",
+		"params": {
+		},
+		"sources": []
+	}
+},
 "geometrytest": {
 	"starttime": 42,
 	"endtime": 42,
@@ -473,6 +487,21 @@ if ($action == 'examplequerylist.get') {
 			}
 		}]
 	}
+},
+"metadata": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Pumas with metadata",
+			
+	"query": {"type":"raster_metadata_to_points","params":{"name":"raster2"},"sources":
+				[{"type":"raster_metadata_to_points","params":{"name":"raster"},"sources":
+					[{"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"},"sources":[]},
+					{"type":"source","params":{"sourcepath":"datasources/worldclim.json","channel":2},"sources":[]}]},
+				{"type":"source","params":{"sourcepath":"datasources/worldclim.json","channel":4},"sources":[]}]
+			}
 }
 }
 EOS

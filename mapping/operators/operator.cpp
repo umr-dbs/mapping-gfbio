@@ -88,8 +88,8 @@ std::unique_ptr<PointCollection> GenericOperator::getPoints(const QueryRectangle
 std::unique_ptr<GenericGeometry> GenericOperator::getGeometry(const QueryRectangle &) {
 	throw OperatorException("getGeometry() called on an operator that doesn't return geometries");
 }
-std::unique_ptr<Histogram> GenericOperator::getHistogram(const QueryRectangle &rect) {
-	throw OperatorException("getHistogram() called on an operator that doesn't return histogram");
+std::unique_ptr<DataVector> GenericOperator::getDataVector(const QueryRectangle &rect) {
+	throw OperatorException("getDataVector() called on an operator that doesn't return data vectors");
 }
 
 

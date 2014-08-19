@@ -5,9 +5,9 @@
 
 #include <png.h>
 #include <stdio.h>
+#include <sstream>
 
-
-template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &colorizer, bool flipx, bool flipy) {
+template<typename T> void Raster2D<T>::toPNG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy) {
 	if (lcrs.dimensions != 2)
 		throw new MetadataException("toPNG can only handle rasters with 2 dimensions");
 
@@ -22,7 +22,6 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 
 	T max = dd.max;
 	T min = dd.min;
-	auto range = RasterTypeInfo<T>::getRange(min, max);
 
 	png_structp png_ptr = png_create_write_struct(
 			PNG_LIBPNG_VER_STRING,
@@ -55,20 +54,43 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
 	);
 
+	T actual_min = min;
+	T actual_max = max;
+	if (colorizer.is_absolute) {
+		// calculate the actual min/max so we can include only the range we require
+		actual_min = (T) dd.getMaxByDatatype();
+		actual_max = (T) dd.getMinByDatatype();
+		bool found_pixel = false;
+		auto size = lcrs.getPixelCount();
+		for (size_t i=0;i<size;i++) {
+			T v = data[i];
+			if (dd.is_no_data(v))
+				continue;
+			// TODO: this is the color used for text output.. we wish to skip it. Unless it occured naturally.
+			if (v == dd.max)
+				continue;
+			actual_min = std::min(actual_min, v);
+			actual_max = std::max(actual_max, v);
+			found_pixel = true;
+		}
+		if (!found_pixel) {
+			actual_min = 0;
+			actual_max = 1;
+		}
+	}
+	auto actual_range = RasterTypeInfo<T>::getRange(actual_min, actual_max);
+
 	uint32_t colors[256];
-	if (dd.has_no_data) {
-		colors[0] = color_from_rgba(0,0,0,0);
-		colorizer.setRange(254);
-		for (uint32_t i=1;i<256;i++) {
-			colors[i] = colorizer.colorize(i-1);
-		}
+	colors[0] = color_from_rgba(0,0,0,0);
+	colorizer.fillPalette(&colors[1], 255, actual_min, actual_max);
+
+	{
+		colors[255] = color_from_rgba(255,0,255,255);
+		std::ostringstream msg;
+		msg << "(" << actual_min << " - " << actual_max << ")";
+		this->printCentered(dd.max, msg.str().c_str());
 	}
-	else {
-		colorizer.setRange(255);
-		for (uint32_t i=0;i<256;i++) {
-			colors[i] = colorizer.colorize(i);
-		}
-	}
+
 
 	// transform into png_color array to set PLTE chunk
 	png_color colors_rgb[256];
@@ -103,13 +125,17 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, Colorizer &co
 		for (int x=0;x<width;x++) {
 			int px = flipx ? width-x : x;
 			T v = get(px, py);
-			if (dd.is_no_data(v))
+			if (dd.is_no_data(v)) {
 				row[x] = 0;
-			else {
-				row[x] = round(((float) v - min) / range * 254) + 1;
 			}
-			if (x == 0 || y == 0 || x == width-1 || y == height-1)
+			else if (v < actual_min || v > actual_max) {
 				row[x] = 255;
+			}
+			else {
+				row[x] = round(254.0 * ((float) v - actual_min) / actual_range) + 1;
+			}
+			//if (x == 0 || y == 0 || x == width-1 || y == height-1)
+			//	row[x] = 255;
 		}
 		png_write_row(png_ptr, (png_bytep) row);
 	}

@@ -6,48 +6,78 @@
 #include <string>
 #include <json/json.h>
 #include <limits>
+#include <vector>
+#include <array>
 
 class PointsMetadataToGraph: public GenericOperator {
 private:
-	std::string nameX, nameY;
+	std::vector<std::string> names;
+
+	template<std::size_t size>
+	auto createDataVector(PointCollection& points) -> std::unique_ptr<DataVector>;
 
 public:
 	PointsMetadataToGraph(int sourcecount, GenericOperator *sources[],	Json::Value &params);
 	virtual ~PointsMetadataToGraph();
 
-	virtual std::unique_ptr<DataVector> getDataVector(const QueryRectangle &rect);
+	virtual auto getDataVector(const QueryRectangle &rect) -> std::unique_ptr<DataVector>;
 };
 
 PointsMetadataToGraph::PointsMetadataToGraph(int sourcecount,	GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::DATAVECTOR, sourcecount, sources) {
 	assumeSources(1);
 
-	nameX = params.get("nameX", "raster").asString();
-	nameY = params.get("nameY", "raster").asString();
+	Json::Value inputNames =  params.get("names", Json::Value(Json::arrayValue));
+	for (Json::ArrayIndex index = 0; index < inputNames.size(); ++index) {
+		names.push_back(inputNames.get(index, "raster").asString());
+	}
 }
 
 PointsMetadataToGraph::~PointsMetadataToGraph() {}
 REGISTER_OPERATOR(PointsMetadataToGraph, "points_metadata_to_graph");
 
-std::unique_ptr<DataVector> PointsMetadataToGraph::getDataVector(const QueryRectangle &rect) {
-	auto points = sources[0]->getPoints(rect);
-	auto xygraph = std::make_unique<XYGraph<2>>();
+template<std::size_t size>
+auto PointsMetadataToGraph::createDataVector(PointCollection& points) -> std::unique_ptr<DataVector> {
+	auto xygraph = std::make_unique<XYGraph<size>>();
 
-	double raster_no_data_X = points->getGlobalMDValue(nameX + "_no_data");
-	bool raster_has_no_data_X = points->getGlobalMDValue(nameX + "_has_no_data");
+	std::vector<bool> hasNoData;
+	std::vector<double> noDataValue;
 
-	double raster_no_data_Y = points->getGlobalMDValue(nameY + "_no_data");
-	bool raster_has_no_data_Y = points->getGlobalMDValue(nameY + "_has_no_data");
+	for (std::string& name : names) {
+		hasNoData.push_back(points.getGlobalMDValue(name + "_has_no_data"));
+		noDataValue.push_back(points.getGlobalMDValue(name + "_no_data"));
+	}
 
-	for (Point &point : points->collection) {
-		double valueX = points->getLocalMDValue(point, nameX);
-		double valueY = points->getLocalMDValue(point, nameY);
+	for (Point &point : points.collection) {
+		std::array<double, size> value;
+		bool hasData = true;
 
-		if ((raster_has_no_data_X && valueX == raster_no_data_X) || (raster_has_no_data_Y && valueX == raster_no_data_Y)) {
-			xygraph->incNoData();
+		for (std::size_t index = 0; index < size; ++index) {
+			value[index] = points.getLocalMDValue(point, names[index]);
+
+			if(hasNoData[index] && (std::fabs(value[index] - noDataValue[index]) < std::numeric_limits<double>::epsilon())) {
+				hasData = false;
+				break;
+			}
+		}
+
+		if(hasData) {
+			xygraph->addPoint(value);
 		} else {
-			xygraph->addPoint({{valueX, valueY}});
+			xygraph->incNoData();
 		}
 	}
 
-	return std::unique_ptr<DataVector>(std::move(xygraph));
+	return std::move(xygraph);
+}
+
+auto PointsMetadataToGraph::getDataVector(const QueryRectangle &rect) -> std::unique_ptr<DataVector> {
+	auto points = sources[0]->getPoints(rect);
+
+	// TODO: GENERALIZE
+	if(names.size() == 3) {
+		return createDataVector<3>(*points);
+	} else {
+		return createDataVector<2>(*points);
+	}
+
 }

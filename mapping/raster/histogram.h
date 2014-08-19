@@ -5,7 +5,7 @@
 #include <sstream>
 #include <string>
 
-#include "datavector.h"
+#include "raster/datavector.h"
 
 class Histogram : public DataVector {
 	public:
@@ -15,7 +15,6 @@ class Histogram : public DataVector {
 		void inc(double value);
 		void incNoData();
 
-		void print();
 		std::string toJSON();
 
 		static const int DEFAULT_NUMBER_OF_BUCKETS = 10000;

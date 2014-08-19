@@ -158,8 +158,8 @@ class GenericRaster {
 
 		virtual void toPGM(const char *filename, bool avg = false) = 0;
 		virtual void toYUV(const char *filename) = 0;
-		virtual void toPNG(const char *filename, Colorizer &colorizer, bool flipx = false, bool flipy = false) = 0;
-		virtual void toJPEG(const char *filename, Colorizer &colorizer, bool flipx = false, bool flipy = false) = 0;
+		virtual void toPNG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false) = 0;
+		virtual void toJPEG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false) = 0;
 		virtual void toGDAL(const char *filename, const char *driver) = 0;
 
 		virtual const void *getData() = 0;

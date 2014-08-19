@@ -116,6 +116,11 @@ void PointCollection::addLocalMDValue(const std::string &key) {
 	local_md_value.addKey(key);
 }
 
+auto PointCollection::lock() -> void {
+	local_md_string.lock();
+	local_md_value.lock();
+}
+
 
 /**
  * Local Metadata on points

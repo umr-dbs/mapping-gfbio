@@ -41,7 +41,7 @@ void LocalCRS::verify() const {
 	if (dimensions < 1 || dimensions > 3)
 		throw MetadataException("Amount of dimensions not between 1 and 3");
 	for (int i=0;i<dimensions;i++) {
-		if (/*size[i] < 0 || */ size[i] > 1<<16)
+		if (/*size[i] < 0 || */ size[i] > 1<<24)
 			throw MetadataException("Size out of limits");
 		if (scale[i] == 0)
 			throw MetadataException("Scale cannot be 0");
@@ -370,8 +370,10 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 #define BLIT_TYPE 1
 #if BLIT_TYPE == 1 // 0.0286
 	for (int y=y1;y<y2;y++)
-		for (int x=x1;x<x2;x++)
-			set(x, y, raster->get(x-destx, y-desty));
+		for (int x=x1;x<x2;x++) {
+			//set(x, y, raster->get(x-destx, y-desty));
+			setSafe(x, y, raster->getSafe(x-destx, y-desty));
+		}
 #elif BLIT_TYPE == 2 // 0.0246
 	int blitwidth = x2-x1;
 	for (int y=y1;y<y2;y++) {
@@ -410,17 +412,15 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 	auto outputraster_guard = GenericRaster::create(newrmd, dd);
 	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();
 
-/*
-#define BLIT_TYPE 2
-#if BLIT_TYPE == 1 // 0.0286
-	for (int y=y1;y<y2;y++)
-		for (int x=x1;x<x2;x++)
-			set(x, y, raster->get(x-destx, y-desty));
-#elif BLIT_TYPE == 2 // 0.0246
-*/
+#define CUT_TYPE 2
+#if CUT_TYPE == 1 // 0.0286
+	for (int y=0;y<height;y++)
+		for (int x=0;x<width;x++)
+			outputraster->set(x, y, getSafe(x+x1, y+y1));
+#elif CUT_TYPE == 2 // 0.0246
 	for (int y=0;y<height;y++) {
-		int rowoffset_src = (y+y1) * lcrs.size[0] + x1;
-		int rowoffset_dest = y * width;
+		size_t rowoffset_src = (size_t) (y+y1) * lcrs.size[0] + x1;
+		size_t rowoffset_dest = (size_t) y * width;
 		memcpy(&outputraster->data[rowoffset_dest], &data[rowoffset_src], width * sizeof(T));
 	}
 /*
@@ -432,8 +432,8 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 		for (int x=0;x<blitwidth;x++)
 			data[rowoffset_dest+x] = raster->data[rowoffset_src+x];
 	}
-#endif
 */
+#endif
 	return outputraster_guard;
 }
 
@@ -454,15 +454,27 @@ std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int dep
 		lcrs.scale[0] * (double) width / lcrs.size[0], lcrs.scale[1] * (double) height / lcrs.size[0]
 	);
 
+	//printf("Scaling to %d x %d\n", width, height);
 	auto outputraster_guard = GenericRaster::create(newrmd, dd);
 	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();
+	//outputraster->clear(dd.no_data);
+	//printf("allocated\n");
 
-	int src_width = lcrs.size[0], src_height = lcrs.size[1];
+	int64_t src_width = lcrs.size[0], src_height = lcrs.size[1];
 
 	for (int y=0;y<height;y++) {
+		//printf("going for line %lu\n", y);
 		for (int x=0;x<width;x++) {
-			int px = (x * src_width / width);
-			int py = (y * src_height / height);
+			int px = ((int64_t) x * src_width / width);
+			int py = ((int64_t) y * src_height / height);
+/*
+			if (px < 0 || py < 0 || px >= src_width || py >= src_height) {
+				fprintf(stderr, "point outside: size (%ld, %ld) -> (%d, %d), point (%d, %d) -> (%d, %d)\n",
+					src_width, src_height, width, height,
+					x, y, px, py
+				);
+			}
+*/
 			outputraster->set(x, y, get(px, py));
 		}
 	}
@@ -481,9 +493,9 @@ std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
 	int width = lcrs.size[0];
 	int height = lcrs.size[1];
 	for (int y=0;y<height;y++) {
-		int py = flipy ? height-y : y;
+		int py = flipy ? height-y-1 : y;
 		for (int x=0;x<width;x++) {
-			int px = flipx ? width-x : x;
+			int px = flipx ? width-x-1 : x;
 			r->set(x, y, get(px, py));
 		}
 	}
@@ -557,7 +569,7 @@ void GenericRaster::printCentered(double dvalue, const char *text) {
 	int offset_y = (height - 8*lines_required) / 2;
 
 	for (int line=0;line < max_chars_y && line*max_chars_x < len;line++) {
-		print(BORDER, BORDER+offset_y+8*line, 255, &text[line*max_chars_x], max_chars_x);
+		print(BORDER, BORDER+offset_y+8*line, dvalue, &text[line*max_chars_x], max_chars_x);
 	}
 }
 

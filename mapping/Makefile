@@ -18,7 +18,7 @@ OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o
 OBJ_POINTVISUALIZATION=o/pointvisualization_BoundingBox.o o/pointvisualization_Circle.o o/pointvisualization_Coordinate.o o/pointvisualization_Dimension.o o/pointvisualization_FindResult.o o/pointvisualization_QuadTreeNode.o o/pointvisualization_CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters_converter.o o/converters_raw.o
 OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_playground.o o/operators_raster_histogram.o #o/operators_raster_r.o
-OBJ_OPERATORS_POINTS=o/operators_points_pgpointsource.o o/operators_points_gfbiopointsource.o o/operators_points_points2histogram.o o/operators_points_points_filter_by_range.o o/operators_points_points_metadata_tograph.o
+OBJ_OPERATORS_POINTS=o/operators_points_pgpointsource.o o/operators_points_gfbiopointsource.o o/operators_points_points2histogram.o o/operators_points_points_filter_by_range.o o/operators_points_points_metadata_tograph.o o/operators_points_points_difference.o
 OBJ_OPERATORS_GEOMETRY=o/operators_geometry_testgeometrysource.o o/operators_geometry_osmgeometrysource.o
 OBJ_OPERATORS_COMBINED=o/operators_combined_points2raster.o o/operators_combined_filterpointsbyraster.o o/operators_combined_raster_metadata_to_points.o o/operators_combined_points2cluster_raster.o o/operators_combined_filterpointsbygeometry.o
 OBJ_OPERATORS_MSAT=o/operators_msat_radiance.o o/operators_msat_temperature.o
@@ -117,11 +117,34 @@ tmeandatasource:	${EXE}
 
 worldclimdatasource:	${EXE}
 	rm -f datasources/worldclim*.dat datasources/worldclim*.db
-	./${EXE} import datasources/worldclim.json data/worldclim/tmin_1.bil 1 0 42 RAW
-	./${EXE} import datasources/worldclim.json data/worldclim/tmax_1.bil 1 1 42 RAW
-	./${EXE} import datasources/worldclim.json data/worldclim/tmean_1.bil 1 2 42 RAW
-	./${EXE} import datasources/worldclim.json data/worldclim/prec_1.bil 1 3 42 RAW
+	./${EXE} import datasources/worldclim.json data/worldclim/tmin_1.bil 1 0 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/tmax_1.bil 1 1 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/tmean_1.bil 1 2 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/prec_1.bil 1 3 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/alt.bil 1 4 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_1.bil 1 5 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_2.bil 1 6 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_3.bil 1 7 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_4.bil 1 8 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_5.bil 1 9 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_6.bil 1 10 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_7.bil 1 11 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_8.bil 1 12 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_9.bil 1 13 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_10.bil 1 14 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_11.bil 1 15 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_12.bil 1 16 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_13.bil 1 17 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_14.bil 1 18 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_15.bil 1 19 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_16.bil 1 20 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_17.bil 1 21 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_18.bil 1 22 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_19.bil 1 23 42 GZIP
 
+srtmdatasource:	${EXE}
+	rm -f datasources/srtm.dat datasources/srtm.db
+	./${EXE} import datasources/srtm.json data/srtm/srtm_all_index.out 1 0 42 GZIP
 
 test: ${EXE}
 	valgrind --error-exitcode=4 ./${EXE} testquery queries/msat0.json

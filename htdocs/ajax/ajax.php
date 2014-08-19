@@ -225,27 +225,6 @@ if ($action == 'examplequerylist.get') {
 		}]
 	}
 },
-"kangaroos": {
-	"colorizer": "hsv",
-	"starttime": 42,
-	"endtime": 42,
-	"timeinterval": 1,
-
-	"name": "Points of Kangaroo sightings (gbif)",
-
-	"query": {
-		"type": "points2raster",
-		"params": {
-		},
-		"sources": [{
-			"type": "pgpointsource",
-			"params": {
-				"connection": "host = '10.0.9.3' dbname = 'postgres' user = 'postgres' password = 'test'",
-				"query": "x, y FROM (SELECT ST_X(t.geom) x, ST_Y(t.geom) y FROM (SELECT ST_TRANSFORM(location, 3857) geom FROM public.gbif_taxon_to_name JOIN public.gbif_lite_time ON (gbif_taxon_to_name.taxon = gbif_lite_time.taxon) WHERE name = 'Macropus rufus') t) t2"
-			}
-		}]
-	}
-},
 "msat0_1": {
 	"starttime": 42,
 	"endtime": 42,
@@ -495,7 +474,7 @@ if ($action == 'examplequerylist.get') {
 	"timeinterval": 1,
 
 	"name": "Pumas with metadata",
-			
+
 	"query": {"type":"raster_metadata_to_points","params":{"name":"raster2"},"sources":
 				[{"type":"raster_metadata_to_points","params":{"name":"raster"},"sources":
 					[{"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"},"sources":[]},

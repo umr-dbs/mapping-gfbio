@@ -21,6 +21,7 @@ class SourceOperator : public GenericOperator {
 	private:
 		RasterSource *rastersource;
 		int channel;
+		bool transform;
 };
 
 
@@ -30,6 +31,7 @@ SourceOperator::SourceOperator(int sourcecount, GenericOperator *sources[], Json
 	std::string filename = params.get("sourcepath", "").asString();
 	rastersource = RasterSourceManager::open(filename.c_str());
 	channel = params.get("channel", 0).asInt();
+	transform = params.get("transform", true).asBool();
 }
 
 SourceOperator::~SourceOperator() {
@@ -72,6 +74,6 @@ std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &r
 		pixel_height >>= 1;
 	}
 
-	return rastersource->load(channel, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom);
+	return rastersource->load(channel, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform);
 }
 

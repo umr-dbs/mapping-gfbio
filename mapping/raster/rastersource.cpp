@@ -512,7 +512,7 @@ static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, 
 	callBinaryOperatorFunc<raster_transformed_blit>(dest, src, destx, desty, destz, offset, scale);
 }
 
-std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom) {
+std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform) {
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
 
@@ -613,8 +613,8 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 		lcrs->PixelToWorldX(x1), lcrs->PixelToWorldY(y1), lcrs->PixelToWorldZ(0 /* z1 */),
 		lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
 	);
-	// TODO: transforms!
-	DataDescription transformed_dd = channels[channelid]->getTransformedDD(result_md_value);
+
+	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_md_value) : channels[channelid]->dd;
 	auto result = GenericRaster::create(resultmetadata, transformed_dd);
 	result->clear(transformed_dd.no_data);
 	result->md_value = std::move(result_md_value);
@@ -647,7 +647,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 		auto tile = loadTile(channelid, tilelcrs, fileid, fileoffset, filebytes, method);
 		Profiler::start("RasterSource::load: blit");
 
-		if (channels[channelid]->hasTransform()) {
+		if (transform && channels[channelid]->hasTransform()) {
 			transformedBlit(
 				result.get(), tile.get(),
 				(r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,

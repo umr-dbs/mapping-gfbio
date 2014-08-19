@@ -138,9 +138,9 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 	int height = lcrs.size[1];
 	uint8_t *row = new uint8_t[ width ];
 	for (int y=0;y<height;y++) {
-		int py = flipy ? height-y : y;
+		int py = flipy ? height-y-1 : y;
 		for (int x=0;x<width;x++) {
-			int px = flipx ? width-x : x;
+			int px = flipx ? width-x-1 : x;
 			T v = get(px, py);
 			if (overlay && overlay->get(x, y) == 1) {
 				row[x] = 1;

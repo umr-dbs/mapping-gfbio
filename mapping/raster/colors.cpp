@@ -148,12 +148,12 @@ void HeightColorizer::fillPalette(uint32_t *colors, int num_colors, double min, 
 			color = color_from_rgba(255, scale, 0);
 		}
 		else if (value <= 1600) { // #BF7F3F
-			double scale = 40*((value-1400)/200);
+			double scale = 64*((value-1400)/200);
 			color = color_from_rgba(255-scale, 127, scale);
 		}
 		else if (value <= 2000) { // 000000
-			double scale = ((value-1600)/400);
-			color = color_from_rgba(0xbf*scale, 0x7f*scale, 0x3f*scale);
+			double scale = 1-((value-1600)/400);
+			color = color_from_rgba(191*scale, 127*scale, 64);
 		}
 		else
 			color = color_from_rgba(0, 0, 0);

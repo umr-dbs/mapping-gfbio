@@ -2,6 +2,7 @@
 #include "raster/raster.h"
 #include "raster/rastersource.h"
 #include "raster/profiler.h"
+#include "raster/typejuggling.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
 
@@ -26,6 +27,65 @@
 
 
 const int DEFAULT_TILE_SIZE = 2048;
+
+
+
+class RasterSourceChannel {
+	public:
+		//friend class RasterSource;
+
+		RasterSourceChannel(const DataDescription &dd) : dd(dd), has_transform(false) {}
+		~RasterSourceChannel() {}
+
+		void setTransform(GDALDataType datatype, double offset, double scale, const std::string &offset_metadata, const std::string &scale_metadata) {
+			has_transform = true;
+			transform_offset = offset;
+			transform_scale = scale;
+			transform_offset_metadata = offset_metadata;
+			transform_scale_metadata = scale_metadata;
+			transform_datatype = datatype == GDT_Unknown ? dd.datatype : datatype;
+		}
+		double getOffset(const DirectMetadata<double> &md) {
+			if (!has_transform)
+				return 0;
+			if (transform_offset_metadata.length() > 0)
+				return md.get(transform_offset_metadata, 0.0);
+			return transform_offset;
+		}
+		double getScale(const DirectMetadata<double> &md) {
+			if (!has_transform)
+				return 0;
+			if (transform_scale_metadata.length() > 0)
+				return md.get(transform_scale_metadata, 1.0);
+			return transform_scale;
+		}
+		DataDescription getTransformedDD(const DirectMetadata<double> &md) {
+			if (!has_transform)
+				return dd;
+			double offset = getOffset(md);
+			double scale = getScale(md);
+			double transformed_min = dd.min * scale + offset;
+			double transformed_max = dd.max * scale + offset;
+			DataDescription transformed_dd(transform_datatype, transformed_min, transformed_max);
+			transformed_dd.addNoData();
+			transformed_dd.verify();
+			return transformed_dd;
+		}
+
+		bool hasTransform() { return has_transform; }
+
+		const DataDescription dd;
+	private:
+		bool has_transform;
+		GDALDataType transform_datatype;
+		double transform_offset;
+		double transform_scale;
+		std::string transform_offset_metadata;
+		std::string transform_scale_metadata;
+
+};
+
+
 
 RasterSource::RasterSource(const char *_filename, bool writeable)
 	: lockedfile(-1), writeable(writeable), filename_json(_filename), lcrs(nullptr), channelcount(0), channels(nullptr), refcount(0) {
@@ -128,7 +188,7 @@ void RasterSource::init() {
 	}
 
 	channelcount = channelinfo.size();
-	channels = new DataDescription *[channelcount];
+	channels = new RasterSourceChannel *[channelcount];
 	for (int i=0;i<channelcount;i++)
 		channels[i] = nullptr;
 
@@ -143,13 +203,26 @@ void RasterSource::init() {
 			no_data = channel.get("nodata", 0).asDouble();
 		}
 
-		channels[i] = new DataDescription(
+		channels[i] = new RasterSourceChannel(DataDescription(
 			GDALGetDataTypeByName(datatype.c_str()),
 			channel.get("min", 0).asDouble(),
 			channel.get("max", -1).asDouble(),
 			has_no_data, no_data
-		);
-		channels[i]->verify();
+		));
+		if (channel.isMember("transform")) {
+			Json::Value transform = channel["transform"];
+			Json::Value offset = transform["offset"];
+			Json::Value scale = transform["scale"];
+			channels[i]->setTransform(
+				GDALGetDataTypeByName(transform.get("datatype", "unknown").asString().c_str()),
+				offset.type() != Json::stringValue ? offset.asDouble() : 0.0,
+				scale.type()  != Json::stringValue ? scale.asDouble()  : 0.0,
+				offset.type() == Json::stringValue ? offset.asString() : "",
+				scale.type()  == Json::stringValue ? scale.asString()  : ""
+			);
+
+		}
+		channels[i]->dd.verify();
 	}
 
 	/*
@@ -234,9 +307,9 @@ void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp
 	// If the no_data value is missing in the import raster, we assume this to be a GDAL error.
 	// In this case, we add the no_data value and continue as planned.
 	DataDescription rasterdd = raster->dd;
-	if (channels[channelid]->has_no_data && !rasterdd.has_no_data) {
+	if (channels[channelid]->dd.has_no_data && !rasterdd.has_no_data) {
 		rasterdd.has_no_data = true;
-		rasterdd.no_data = channels[channelid]->no_data;
+		rasterdd.no_data = channels[channelid]->dd.no_data;
 	}
 /*
 	if (!(rasterdd == *channels[channelid])) {
@@ -280,7 +353,7 @@ void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp
 						continue;
 					}
 
-					auto tile = GenericRaster::create(tilelcrs, *channels[channelid]);
+					auto tile = GenericRaster::create(tilelcrs, channels[channelid]->dd);
 					tile->blit(zoomedraster, -xoff, -yoff, -zoff);
 					printf("done blitting\n");
 
@@ -405,6 +478,40 @@ void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int off
 }
 
 
+template<typename T1, typename T2>
+struct raster_transformed_blit {
+	static void execute(Raster2D<T1> *raster_dest, Raster2D<T2> *raster_src, int destx, int desty, int destz, double offset, double scale) {
+		int x1 = std::max(destx, 0);
+		int y1 = std::max(desty, 0);
+		int x2 = std::min(raster_dest->lcrs.size[0], destx+raster_src->lcrs.size[0]);
+		int y2 = std::min(raster_dest->lcrs.size[1], desty+raster_src->lcrs.size[1]);
+
+		if (x1 >= x2 || y1 >= y2)
+			throw MetadataException("transformedBlit without overlapping region");
+
+		for (int y=y1;y<y2;y++) {
+			for (int x=x1;x<x2;x++) {
+				T2 val = raster_src->get(x-destx, y-desty);
+				if (raster_src->dd.is_no_data(val))
+					raster_dest->set(x, y, raster_dest->dd.no_data);
+				else
+					raster_dest->set(x, y, ((T1) val) * scale + offset);
+			}
+		}
+	}
+};
+
+
+static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, int desty, int destz, double offset, double scale) {
+	if (src->lcrs.dimensions != 2 || dest->lcrs.dimensions != 2 || src->lcrs.epsg != dest->lcrs.epsg)
+		throw MetadataException("transformedBlit with incompatible rasters");
+
+	if (src->getRepresentation() != GenericRaster::Representation::CPU || dest->getRepresentation() != GenericRaster::Representation::CPU)
+		throw MetadataException("transformedBlit from raster that's not in a CPU buffer");
+
+	callBinaryOperatorFunc<raster_transformed_blit>(dest, src, destx, desty, destz, offset, scale);
+}
+
 std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom) {
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
@@ -476,7 +583,28 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	stmt.bind(7, timestamp);
 	Profiler::stop("RasterSource::load: sqlite");
 
+	Profiler::start("RasterSource::load: metadata");
+	decltype(GenericRaster::md_value) result_md_value;
+	decltype(GenericRaster::md_string) result_md_string;
+	SQLiteStatement stmt_md(db);
+	stmt_md.prepare("SELECT isstring, key, value FROM metadata"
+		" WHERE channel = ? AND timestamp = ?");
+	stmt_md.bind(1, channelid);
+	stmt_md.bind(2, timestamp);
+	while (stmt_md.next()) {
+		int isstring = stmt_md.getInt(0);
+		std::string key(stmt_md.getString(1));
+		const char *value = stmt_md.getString(2);
+		if (isstring == 0) {
+			double dvalue = std::strtod(value, nullptr);
+			result_md_value.set(key, dvalue);
+		}
+		else
+			result_md_string.set(key, std::string(value));
+	}
+	Profiler::stop("RasterSource::load: metadata");
 	Profiler::start("RasterSource::load: create");
+
 	// Create an empty raster of the desired size
 	LocalCRS resultmetadata(
 		lcrs->epsg,
@@ -485,8 +613,12 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 		lcrs->PixelToWorldX(x1), lcrs->PixelToWorldY(y1), lcrs->PixelToWorldZ(0 /* z1 */),
 		lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
 	);
-	auto result = GenericRaster::create(resultmetadata, *channels[channelid]);
-	result->clear(channels[channelid]->no_data);
+	// TODO: transforms!
+	DataDescription transformed_dd = channels[channelid]->getTransformedDD(result_md_value);
+	auto result = GenericRaster::create(resultmetadata, transformed_dd);
+	result->clear(transformed_dd.no_data);
+	result->md_value = std::move(result_md_value);
+	result->md_string = std::move(result_md_string);
 	Profiler::stop("RasterSource::stop: create");
 
 	// Load all overlapping parts and blit them onto the empty raster
@@ -515,7 +647,14 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 		auto tile = loadTile(channelid, tilelcrs, fileid, fileoffset, filebytes, method);
 		Profiler::start("RasterSource::load: blit");
 
-		result->blit(tile.get(), (r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
+		if (channels[channelid]->hasTransform()) {
+			transformedBlit(
+				result.get(), tile.get(),
+				(r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
+				channels[channelid]->getOffset(result->md_value), channels[channelid]->getScale(result->md_value));
+		}
+		else
+			result->blit(tile.get(), (r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
 		Profiler::stop("RasterSource::load: blit");
 		tiles_found++;
 	}
@@ -524,22 +663,6 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 
 	if (tiles_found == 0)
 		throw SourceException("RasterSource::load(): No matching tiles found in DB");
-
-	stmt.prepare("SELECT isstring, key, value FROM metadata"
-		" WHERE channel = ? AND timestamp = ?");
-	stmt.bind(1, channelid);
-	stmt.bind(2, timestamp);
-	while (stmt.next()) {
-		int isstring = stmt.getInt(0);
-		std::string key(stmt.getString(1));
-		const char *value = stmt.getString(2);
-		if (isstring == 0) {
-			double dvalue = std::strtod(value, nullptr);
-			result->md_value.set(key, dvalue);
-		}
-		else
-			result->md_string.set(key, std::string(value));
-	}
 
 	result->md_value.set("Channel", channelid);
 	return result;
@@ -591,7 +714,7 @@ std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, const Local
 
 	// decode / decompress
 	Profiler::Profiler p("RasterSource::load: decompress");
-	return RasterConverter::direct_decode(tilecrs, *channels[channelid], &buffer, method);
+	return RasterConverter::direct_decode(tilecrs, channels[channelid]->dd, &buffer, method);
 }
 
 

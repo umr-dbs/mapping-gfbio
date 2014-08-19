@@ -90,9 +90,9 @@ template<typename T> void Raster2D<T>::toJPEG(const char *filename, const Colori
 		JSAMPLE *row = new JSAMPLE[ row_stride ];
 		while (cinfo.next_scanline < cinfo.image_height) {
 			int y = cinfo.next_scanline;
-			int py = flipy ? height-y : y;
+			int py = flipy ? height-y-1 : y;
 			for (int x=0;x<width;x++) {
-				int px = flipx ? width-x : x;
+				int px = flipx ? width-x-1 : x;
 				uint32_t color = colorizer.colorize(get(px, py) - dd.min);
 				if (x == 0 || y == 0 || x == width-1 || y == height-1)
 					color = color_from_rgba(255,0,0,255);

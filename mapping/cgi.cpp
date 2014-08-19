@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <map>
 #include <memory>
+#include <string>
 
 #include <uriparser/Uri.h>
 #include <json/json.h>
@@ -137,8 +138,8 @@ void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, 
 }
 
 
-void outputPointCollection(PointCollection *points) {
-	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON().c_str());
+void outputPointCollection(PointCollection *points, bool displayMetadata = false) {
+	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON(displayMetadata).c_str());
 }
 
 void outputPointCollectionCSV(PointCollection *points) {
@@ -149,6 +150,63 @@ void outputGeometry(GenericGeometry *geometry) {
 	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
 }
 
+auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, time_t timestamp) -> int {
+	if(params["request"] == "GetFeature") {
+		std::string version = params["version"];
+		if (version != "2.0.0")
+			abort("Invalid version");
+
+		int output_width = atoi(params["width"].c_str());
+		int output_height = atoi(params["height"].c_str());
+		if (output_width <= 0 || output_height <= 0) {
+			abort("output_width not valid");
+		}
+
+		std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
+		double bbox[4];
+
+		{
+			std::string delimiters = " ,";
+			size_t current, next = -1;
+			int element = 0;
+			do {
+			  current = next + 1;
+			  next = bbox_str.find_first_of(delimiters, current);
+			  double value = std::stod( bbox_str.substr(current, next - current) );
+			  if (isnan(value))
+				  abort("BBOX value is NaN");
+			  bbox[element++] = value;
+			} while (element < 4 && next != std::string::npos);
+
+			if (element != 4)
+				abort("BBOX does not contain 4 doubles");
+		}
+
+		/*
+		 * OpenLayers insists on sending latitude in x and longitude in y.
+		 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
+		 * The simple solution is to swap the x and y coordinates.
+		 */
+		if (query_epsg == EPSG_LATLON) {
+			std::swap(bbox[0], bbox[1]);
+			std::swap(bbox[2], bbox[3]);
+		}
+
+		auto graph = GenericOperator::fromJSON(params["layers"]);
+
+		auto points = graph->getPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg));
+
+		#if RASTER_DO_PROFILE
+					printf("Profiling-header: ");
+					Profiler::print();
+					printf("\r\n");
+		#endif
+
+		outputPointCollection(points.get(), true);
+
+		return 0;
+	}
+}
 
 int main() {
 	//printf("Content-type: text/plain\r\n\r\nDebugging:\n");
@@ -228,6 +286,10 @@ int main() {
 #endif
 			outputGeometry(geometry.get());
 			return 0;
+		}
+
+		if(params.count("service") > 0 && params["service"] == "WFS") {
+			return processWFS(params, query_epsg, timestamp);
 		}
 
 

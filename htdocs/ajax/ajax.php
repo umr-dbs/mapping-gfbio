@@ -481,6 +481,34 @@ if ($action == 'examplequerylist.get') {
 					{"type":"source","params":{"sourcepath":"datasources/worldclim.json","channel":2},"sources":[]}]},
 				{"type":"source","params":{"sourcepath":"datasources/worldclim.json","channel":4},"sources":[]}]
 			}
+},
+"wfs": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Puma clustered WFS",
+			
+	"query": {   "type": "points_cluster",
+	          "sources": [{"type": "projection","params": {"src_epsg": 4326,"dest_epsg": 3857}, "sources": [
+	                      {"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"},"sources":[]}
+	                     ]}]
+	         }
+},
+"epiphite_cluster": {
+	"colorizer": "hsv",
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Epiphites clustered WFS",
+			
+	"query": {   "type": "points_cluster",
+	          "sources": [{"type": "projection","params": {"src_epsg": 4326,"dest_epsg": 3857}, "sources": [
+	                      {"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"traits\":[{\"datasource\":\"TRY\", \"trait\":\"epiphyte\", \"value\":\"epiphyte\"}],\"localAttributes\":{}}"},"sources":[]}
+	                     ]}]
+	         }
 }
 }
 EOS

@@ -210,7 +210,7 @@ void PointCollection::toOGR(const char *driver = "ESRI Shapefile") {
 #endif
 
 
-std::string PointCollection::toGeoJSON() {
+std::string PointCollection::toGeoJSON(bool displayMetadata) {
 /*
 	  { "type": "MultiPoint",
 	    "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
@@ -219,20 +219,48 @@ std::string PointCollection::toGeoJSON() {
 	std::ostringstream json;
 	json << std::fixed; // std::setprecision(4);
 
-	//json << "{ \"type\": \"MultiPoint\", \"coordinates\": [ ";
-	json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
+	if(displayMetadata && (local_md_value.size() > 0 || local_md_string.size() > 0)) {
 
-	bool first = true;
-	for (const Point &p : collection) {
-		if (first)
-			first = false;
-		else
-			json << ", ";
+		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << epsg <<"\"}},\"features\":[";
 
-		json << "[" << p.x << "," << p.y << "]";
+		for (const Point &p : collection) {
+			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]},\"properties\":{";
+
+			for (auto key : getLocalMDStringKeys()) {
+				json << "\"" << key << "\":\"" << getLocalMDString(p, key) << "\",";
+			}
+
+			//p.dump_md_values();
+			for (auto key : getLocalMDValueKeys()) {
+				double value = getLocalMDValue(p, key);
+				json << "\"" << key << "\":" << value << ",";
+			}
+
+			json.seekp(((long) json.tellp()) - 1); // delete last ,
+			json << "}},";
+		}
+
+		json.seekp(((long) json.tellp()) - 1); // delete last ,
+		json << "]}";
+
+	} else {
+
+		//json << "{ \"type\": \"MultiPoint\", \"coordinates\": [ ";
+		json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
+
+		bool first = true;
+		for (const Point &p : collection) {
+			if (first)
+				first = false;
+			else
+				json << ", ";
+
+			json << "[" << p.x << "," << p.y << "]";
+		}
+		//json << "] }";
+		json << "] }}]}";
+
 	}
-	//json << "] }";
-	json << "] }}]}";
 
 	return json.str();
 }

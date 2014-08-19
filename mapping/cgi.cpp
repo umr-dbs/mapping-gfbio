@@ -1,4 +1,5 @@
 #include "raster/raster.h"
+#include "raster/raster_priv.h"
 #include "raster/pointcollection.h"
 #include "raster/geometry.h"
 #include "raster/datavector.h"
@@ -121,13 +122,13 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 }
 
 
-void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "") {
+void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
 	auto colorizer = Colorizer::make(colors);
 
 #if 1
 	printf("Content-type: image/png\r\n\r\n");
 
-	raster->toPNG(nullptr, *colorizer, flipx, flipy); //"/tmp/xyz.tmp.png");
+	raster->toPNG(nullptr, *colorizer, flipx, flipy, overlay); //"/tmp/xyz.tmp.png");
 #else
 	printf("Content-type: image/jpeg\r\n\r\n");
 
@@ -354,23 +355,25 @@ int main() {
 						Profiler::print();
 						printf("\r\n");
 #endif
-						// Flip if required
-						if (flipx || flipy)
-							result_raster = std::move(result_raster->flip(flipx, flipy));
+
+						std::unique_ptr<Raster2D<uint8_t>> overlay;
+						DataDescription dd_overlay(GDT_Byte, 0, 1);
+						overlay.reset( (Raster2D<uint8_t> *) GenericRaster::create(result_raster->lcrs, dd_overlay).release());
+						overlay->clear(0);
 
 						// Write debug info
 						std::ostringstream msg_tl;
 						msg_tl.precision(2);
 						msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
-						result_raster->print(4, 4, result_raster->dd.max, msg_tl.str().c_str());
+						overlay->print(4, 4, 1, msg_tl.str().c_str());
 
 						std::ostringstream msg_br;
 						msg_br.precision(2);
 						msg_br << std::fixed << bbox[2] << ", " << bbox[3];
 						std::string msg_brs = msg_br.str();
-						result_raster->print(result_raster->lcrs.size[1]-4-8*msg_brs.length(), result_raster->lcrs.size[1]-12, result_raster->dd.max, msg_brs.c_str());
+						overlay->print(overlay->lcrs.size[1]-4-8*msg_brs.length(), overlay->lcrs.size[1]-12, overlay->dd.max, msg_brs.c_str());
 
-						outputImage(result_raster.get(), false, false, colorizer);
+						outputImage(result_raster.get(), flipx, flipy, colorizer, overlay.get());
 					}
 				}
 				catch (const std::exception &e) {

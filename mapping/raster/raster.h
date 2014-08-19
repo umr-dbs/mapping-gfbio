@@ -132,6 +132,8 @@ namespace cl {
 
 class Colorizer;
 
+template<typename T> class Raster2D;
+
 class GenericRaster {
 	public:
 		enum Representation {
@@ -158,7 +160,7 @@ class GenericRaster {
 
 		virtual void toPGM(const char *filename, bool avg = false) = 0;
 		virtual void toYUV(const char *filename) = 0;
-		virtual void toPNG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false) = 0;
+		virtual void toPNG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false, Raster2D<uint8_t> *overlay = nullptr) = 0;
 		virtual void toJPEG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false) = 0;
 		virtual void toGDAL(const char *filename, const char *driver) = 0;
 

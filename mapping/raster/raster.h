@@ -87,10 +87,10 @@ class DataDescription {
 		~DataDescription() = default;
 		// Copy
 		DataDescription(const DataDescription &dd) = default;
-		DataDescription &operator=(const DataDescription &dd) = delete;
+		DataDescription &operator=(const DataDescription &dd) = default;
 		// Move
-		DataDescription(DataDescription &&dd) = delete;
-		DataDescription &operator=(DataDescription &&dd) = delete;
+		DataDescription(DataDescription &&dd) = default;
+		DataDescription &operator=(DataDescription &&dd) = default;
 
 		void addNoData();
 

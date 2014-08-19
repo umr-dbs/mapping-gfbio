@@ -2,6 +2,7 @@
 
 #include "raster/colors.h"
 #include "raster/exceptions.h"
+#include "util/make_unique.h"
 
 #include <cmath>
 
@@ -54,33 +55,109 @@ uint32_t color_from_hsva(uint16_t h, uint8_t s, uint8_t v, uint8_t a) {
     }
 }
 
-Colorizer::Colorizer() : range(0) {
+Colorizer::Colorizer(bool is_absolute) : is_absolute(is_absolute) {
 }
 
 Colorizer::~Colorizer() {
 }
 
+std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
+	if (name == "hsv")
+		return std::make_unique<HSVColorizer>();
+	if (name == "temperature")
+		return std::make_unique<TemperatureColorizer>();
+	if (name == "height")
+		return std::make_unique<HeightColorizer>();
+	return std::make_unique<GreyscaleColorizer>();
+}
 
 
 
-GreyscaleColorizer::GreyscaleColorizer() : Colorizer() {
+
+GreyscaleColorizer::GreyscaleColorizer() : Colorizer(false) {
 }
 
 GreyscaleColorizer::~GreyscaleColorizer() {
 }
 
-uint32_t GreyscaleColorizer::colorize(uint32_t data) {
-	uint8_t color = (uint8_t) (255.0*data/range);
-	return color_from_rgba(color, color, color, 255);
+void GreyscaleColorizer::fillPalette(uint32_t *colors, int num_colors, double, double) const {
+	for (int c = 0; c < num_colors; c++) {
+		uint8_t color = (uint8_t) (255.0*c/num_colors);
+		colors[c] = color_from_rgba(color, color, color, 255);
+	}
 }
 
 
-HSVColorizer::HSVColorizer() : Colorizer() {
+
+HSVColorizer::HSVColorizer() : Colorizer(false) {
 }
 
 HSVColorizer::~HSVColorizer() {
 }
 
-uint32_t HSVColorizer::colorize(uint32_t data) {
-	return color_from_hsva((uint16_t) (120.0-(120.0*data/range)), 150, 255, 255);
+void HSVColorizer::fillPalette(uint32_t *colors, int num_colors, double, double) const {
+	for (int c = 0; c < num_colors; c++) {
+		double frac = (double) c / num_colors;
+		colors[c] = color_from_hsva((uint16_t) (120.0-(120.0*frac)), 150, 255);
+	}
+}
+
+
+
+TemperatureColorizer::TemperatureColorizer() : Colorizer(true) {
+}
+
+TemperatureColorizer::~TemperatureColorizer() {
+}
+
+void TemperatureColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+	double step = (max - min) / num_colors;
+	for (int c = 0; c < num_colors; c++) {
+		double value = min + c*step;
+
+		value = std::max(-120.0, std::min(180.0, value/4)); // -30 to +45° C
+		colors[c] = color_from_hsva(180.0-value, 150, 255);
+	}
+}
+
+
+HeightColorizer::HeightColorizer() : Colorizer(true) {
+}
+
+HeightColorizer::~HeightColorizer() {
+}
+
+void HeightColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+	double step = (max - min) / (num_colors-1);
+	for (int c = 0; c < num_colors; c++) {
+		double value = min + c*step;
+		uint32_t color;
+		if (value <= 0) { // #AAFFAA
+			color = color_from_rgba(170, 255, 170);
+		}
+		else if (value <= 1000) { // #00FF00
+			double scale = 170-(170*value/1000);
+			color = color_from_rgba(scale, 255, scale);
+		}
+		else if (value <= 1200) { // #FFFF00
+			double scale = 255*((value-1000)/200);
+			color = color_from_rgba(scale, 255, 0);
+		}
+		else if (value <= 1400) { // #FF7F00
+			double scale = 255-128*((value-1200)/200);
+			color = color_from_rgba(255, scale, 0);
+		}
+		else if (value <= 1600) { // #BF7F3F
+			double scale = 40*((value-1400)/200);
+			color = color_from_rgba(255-scale, 127, scale);
+		}
+		else if (value <= 2000) { // 000000
+			double scale = ((value-1600)/400);
+			color = color_from_rgba(0xbf*scale, 0x7f*scale, 0x3f*scale);
+		}
+		else
+			color = color_from_rgba(0, 0, 0);
+
+		colors[c] = color;
+	}
 }

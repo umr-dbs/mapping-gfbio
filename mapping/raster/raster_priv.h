@@ -35,8 +35,8 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 
 		virtual void toPGM(const char *filename, bool avg);
 		virtual void toYUV(const char *filename);
-		virtual void toPNG(const char *filename, Colorizer &colorizer, bool flipx = false, bool flipy = false);
-		virtual void toJPEG(const char *filename, Colorizer &colorizer, bool flipx = false, bool flipy = false);
+		virtual void toPNG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false);
+		virtual void toJPEG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false);
 		virtual void toGDAL(const char *filename, const char *driver);
 
 		virtual void clear(double value);
@@ -52,15 +52,16 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 			return data[(size_t) y*this->lcrs.size[0] + x];
 		}
 		T getSafe(int x, int y, T def = 0) const {
-			if (x > 0 && y > 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
+			if (x >= 0 && y >= 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
 				return data[(size_t) y*this->lcrs.size[0] + x];
+			//fprintf(stderr, "getSafe(%d, %d) outside of range (%u, %u)\n", x, y, lcrs.size[0], lcrs.size[1]);
 			return def;
 		}
 		void set(int x, int y, T value) {
 			data[(size_t) y*lcrs.size[0] + x] = value;
 		}
 		void setSafe(int x, int y, T value) {
-			if (x > 0 && y > 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
+			if (x >= 0 && y >= 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
 				data[(size_t) y*lcrs.size[0] + x] = value;
 		}
 

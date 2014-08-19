@@ -81,11 +81,7 @@ struct raster_projection {
 
 				int tx = round(raster_src->lcrs.WorldToPixelX(px));
 				int ty = round(raster_src->lcrs.WorldToPixelY(py));
-				if (tx >= 0 && ty >= 0 && tx < (int) raster_src->lcrs.size[0] && ty < (int) raster_src->lcrs.size[1]) {
-					raster_dest->set(x, y, raster_src->get(tx, ty));
-				}
-				else
-					raster_dest->set(x, y, nodata);
+				raster_dest->set(x, y, raster_src->getSafe(tx, ty, nodata));
 			}
 		}
 
@@ -150,7 +146,9 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 */
 	}
 
-	return QueryRectangle(rect.timestamp, src_x1, src_y1, src_x2, src_y2, src_xres, src_yres, src_epsg);
+	QueryRectangle result(rect.timestamp, src_x1, src_y1, src_x2, src_y2, src_xres, src_yres, src_epsg);
+	result.enlarge(2);
+	return result;
 }
 
 //GenericRaster *ProjectionOperator::execute(int timestamp, double x1, double y1, double x2, double y2, int xres, int yres) {

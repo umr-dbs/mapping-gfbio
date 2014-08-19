@@ -10,9 +10,12 @@
 
 // adopted from http://svn.code.sf.net/p/libjpeg-turbo/code/trunk/example.c
 // TODO: Error handling
-template<typename T> void Raster2D<T>::toJPEG(const char *filename, Colorizer &colorizer, bool flipx, bool flipy) {
+template<typename T> void Raster2D<T>::toJPEG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy) {
 	const int quality = 95;
 
+	throw ConverterException("toJPEG currently broken; do not use");
+	// The Colorizers have changed.
+#if 0
 	if (!RasterTypeInfo<T>::isinteger)
 		throw new MetadataException("toJPEG cannot write float rasters");
 	if (lcrs.dimensions != 2)
@@ -110,10 +113,11 @@ template<typename T> void Raster2D<T>::toJPEG(const char *filename, Colorizer &c
 		fclose(file);
 
 	jpeg_destroy_compress(&cinfo);
+#endif
 }
 
 
-template<> void Raster2D<float>::toJPEG(const char *, Colorizer &, bool, bool) {
+template<> void Raster2D<float>::toJPEG(const char *, const Colorizer &, bool, bool) {
 	throw ConverterException("toJPEG cannot write float rasters");
 }
 

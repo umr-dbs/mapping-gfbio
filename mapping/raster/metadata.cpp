@@ -22,14 +22,14 @@ void DirectMetadata<T>::set(const std::string &key, const T &value) {
 }
 
 template<typename T>
-const T &DirectMetadata<T>::get(const std::string &key) {
+const T &DirectMetadata<T>::get(const std::string &key) const {
 	if (data.count(key) < 1)
 		throw MetadataException("DirectMetadata::get(): No value stored for key '" + key + "'");
 	return data.at(key);
 }
 
 template<typename T>
-const T &DirectMetadata<T>::get(const std::string &key, const T &defaultvalue) {
+const T &DirectMetadata<T>::get(const std::string &key, const T &defaultvalue) const {
 	if (data.count(key) < 1)
 		return defaultvalue;
 	return data.at(key);

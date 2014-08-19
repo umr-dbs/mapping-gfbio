@@ -371,8 +371,7 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 #if BLIT_TYPE == 1 // 0.0286
 	for (int y=y1;y<y2;y++)
 		for (int x=x1;x<x2;x++) {
-			//set(x, y, raster->get(x-destx, y-desty));
-			setSafe(x, y, raster->getSafe(x-destx, y-desty));
+			set(x, y, raster->get(x-destx, y-desty));
 		}
 #elif BLIT_TYPE == 2 // 0.0246
 	int blitwidth = x2-x1;

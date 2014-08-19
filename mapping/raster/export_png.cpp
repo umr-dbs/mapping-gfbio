@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <sstream>
 
-template<typename T> void Raster2D<T>::toPNG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy) {
+template<typename T> void Raster2D<T>::toPNG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy, Raster2D<uint8_t> *overlay) {
 	if (lcrs.dimensions != 2)
 		throw new MetadataException("toPNG can only handle rasters with 2 dimensions");
 
@@ -18,6 +18,26 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 		file = fopen(filename, "w");
 		if (!file)
 			throw ExporterException("Could not write to file");
+	}
+
+	if (overlay) {
+		// do not use the overlay if the size does not match
+		if (overlay->lcrs.dimensions != 2 || overlay->lcrs.size[0] != lcrs.size[0] || overlay->lcrs.size[1] != lcrs.size[1])
+			overlay = nullptr;
+	}
+
+	if (overlay) {
+		// Write debug info
+		std::ostringstream msg_tl;
+		msg_tl.precision(2);
+		//msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
+		overlay->print(4, 4, 1, msg_tl.str().c_str());
+
+		std::ostringstream msg_br;
+		msg_br.precision(2);
+		//msg_br << std::fixed << bbox[2] << ", " << bbox[3];
+		std::string msg_brs = msg_br.str();
+		overlay->print(overlay->lcrs.size[1]-4-8*msg_brs.length(), overlay->lcrs.size[1]-12, overlay->dd.max, msg_brs.c_str());
 	}
 
 	T max = dd.max;
@@ -66,9 +86,6 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 			T v = data[i];
 			if (dd.is_no_data(v))
 				continue;
-			// TODO: this is the color used for text output.. we wish to skip it. Unless it occured naturally.
-			if (v == dd.max)
-				continue;
 			actual_min = std::min(actual_min, v);
 			actual_max = std::max(actual_max, v);
 			found_pixel = true;
@@ -82,13 +99,13 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 
 	uint32_t colors[256];
 	colors[0] = color_from_rgba(0,0,0,0);
-	colorizer.fillPalette(&colors[1], 255, actual_min, actual_max);
+	colors[1] = color_from_rgba(255,0,255,255);
+	colorizer.fillPalette(&colors[2], 254, actual_min, actual_max);
 
-	{
-		colors[255] = color_from_rgba(255,0,255,255);
+	if (overlay) {
 		std::ostringstream msg;
-		msg << "(" << actual_min << " - " << actual_max << ")";
-		this->printCentered(dd.max, msg.str().c_str());
+		msg << GDALGetDataTypeName(dd.datatype) << " (" << actual_min << " - " << actual_max << ")";
+		overlay->print(4, 16, 1, msg.str().c_str());
 	}
 
 
@@ -121,21 +138,24 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 	int height = lcrs.size[1];
 	uint8_t *row = new uint8_t[ width ];
 	for (int y=0;y<height;y++) {
-		int py = flipy ? height-y : y;
+		int py = flipy ? height-y-1 : y;
 		for (int x=0;x<width;x++) {
-			int px = flipx ? width-x : x;
+			int px = flipx ? width-x-1 : x;
 			T v = get(px, py);
-			if (dd.is_no_data(v)) {
+			if (overlay && overlay->get(x, y) == 1) {
+				row[x] = 1;
+			}
+			else if (dd.is_no_data(v)) {
 				row[x] = 0;
 			}
 			else if (v < actual_min || v > actual_max) {
-				row[x] = 255;
+				row[x] = 1;
 			}
 			else {
-				row[x] = round(254.0 * ((float) v - actual_min) / actual_range) + 1;
+				row[x] = round(253.0 * ((float) v - actual_min) / actual_range) + 2;
 			}
-			//if (x == 0 || y == 0 || x == width-1 || y == height-1)
-			//	row[x] = 255;
+			if (x == 0 || y == 0 || x == width-1 || y == height-1)
+				row[x] = 1;
 		}
 		png_write_row(png_ptr, (png_bytep) row);
 	}

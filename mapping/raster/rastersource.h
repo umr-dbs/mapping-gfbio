@@ -9,6 +9,8 @@
 #include "raster/raster.h"
 #include "util/sqlite.h"
 
+class RasterSourceChannel;
+
 class RasterSource {
 	public:
 		static const bool READ_ONLY = false;
@@ -43,7 +45,7 @@ class RasterSource {
 		std::string filename_db;
 		LocalCRS *lcrs;
 		int channelcount;
-		DataDescription **channels;
+		RasterSourceChannel **channels;
 		SQLite db;
 		int refcount;
 };

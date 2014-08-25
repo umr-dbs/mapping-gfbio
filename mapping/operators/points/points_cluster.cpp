@@ -10,13 +10,13 @@ class PointsClusterOperator: public GenericOperator {
 private:
 
 public:
-	PointsClusterOperator(int sourcecount, GenericOperator *sources[],	Json::Value &params);
+	PointsClusterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 	virtual ~PointsClusterOperator();
 
 	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 };
 
-PointsClusterOperator::PointsClusterOperator(int sourcecount,	GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::POINTS, sourcecount, sources) {
+PointsClusterOperator::PointsClusterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 }
 
@@ -27,7 +27,7 @@ REGISTER_OPERATOR(PointsClusterOperator, "points_cluster");
 std::unique_ptr<PointCollection> PointsClusterOperator::getPoints(const QueryRectangle &rect) {
 	// TODO: EXPECT EPSG:3857
 
-	auto pointsOld = sources[0]->getPoints(rect);
+	auto pointsOld = getPointsFromSource(0, rect);
 	auto pointsNew = std::make_unique<PointCollection>(rect.epsg);
 
 	//PointCollectionMetadataCopier metadataCopier(*pointsOld, *pointsNew);

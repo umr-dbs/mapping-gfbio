@@ -183,7 +183,7 @@ static void runquery(int argc, char *argv[]) {
 	auto graph = GenericOperator::fromJSON(root["query"]);
 
 	int timestamp = root.get("starttime", 0).asInt();
-	auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, -20037508, 20037508, 20037508, 1920, 1200, EPSG_WEBMERCATOR));
+	auto raster = graph->getCachedRaster(QueryRectangle(timestamp, -20037508, -20037508, 20037508, 20037508, 1920, 1200, EPSG_WEBMERCATOR));
 
 	GreyscaleColorizer c;
 	raster->toPNG(out_filename, c);
@@ -221,7 +221,7 @@ static int testquery(int argc, char *argv[]) {
 
 	auto graph = GenericOperator::fromJSON(root["query"]);
 	int timestamp = root.get("starttime", 0).asInt();
-	auto raster = graph->getRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, EPSG_WEBMERCATOR));
+	auto raster = graph->getCachedRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, EPSG_WEBMERCATOR));
 
 	std::string real_hash = raster->hash();
 	printf("Expected: %s\nResult  : %s\n", expected_hash.c_str(), real_hash.c_str());

@@ -117,8 +117,7 @@ if ($action == 'examplequerylist.get') {
 	"query": {
 		"type": "osmgeometrysource",
 		"params": {
-		},
-		"sources": []
+		}
 	}
 },
 "geometrytest": {
@@ -131,8 +130,7 @@ if ($action == 'examplequerylist.get') {
 	"query": {
 		"type": "testgeometrysource",
 		"params": {
-		},
-		"sources": []
+		}
 	}
 },
 "reflectance": {
@@ -146,11 +144,12 @@ if ($action == 'examplequerylist.get') {
 		"type": "msatradiance",
 		"params": {
 		},
-		"sources": [{
+		"sources_raster": [{
 			"type": "source",
 			"params": {
 				"sourcepath": "datasources/msat2.json",
-				"channel": 6
+				"channel": 6,
+				"transform": false
 			}
 		}]
 	}
@@ -166,11 +165,12 @@ if ($action == 'examplequerylist.get') {
 		"type": "msattemperature",
 		"params": {
 		},
-		"sources": [{
+		"sources_raster": [{
 			"type": "source",
 			"params": {
 				"sourcepath": "datasources/msat2.json",
-				"channel": 6
+				"channel": 6,
+				"transform": false
 			}
 		}]
 	}
@@ -189,12 +189,12 @@ if ($action == 'examplequerylist.get') {
 			"src_epsg": 62866,
 			"dest_epsg": 3857
 		},
-		"sources": [{
+		"sources_raster": [{
 			"type": "expression",
 			"params": {
 				"expression": "value < 300 ? 1 : 0"
 			},
-			"sources": [{
+			"sources_raster": [{
 				"type": "source",
 				"params": {
 					"sourcepath": "datasources/msat2.json",
@@ -216,7 +216,7 @@ if ($action == 'examplequerylist.get') {
 		"type": "points2raster",
 		"params": {
 		},
-		"sources": [{
+		"sources_points": [{
 			"type": "gfbiopointsource",
 			"params": {
 				"datasource": "GBIF",
@@ -224,40 +224,6 @@ if ($action == 'examplequerylist.get') {
 			}
 		}]
 	}
-},
-"msat0_1": {
-	"starttime": 42,
-	"endtime": 42,
-	"timeinterval": 1,
-
-	"name": "Average of msat channels 0 and 1",
-
-	"query": {
-		"type": "projection",
-		"params": {
-			"src_epsg": 62866,
-			"dest_epsg": 3857
-		},
-		"sources": [{
-			"type": "add",
-			"params": {
-			},
-			"sources": [{
-				"type": "source",
-				"params": {
-					"sourcepath": "datasources/msat2.json",
-					"channel": 0
-				}
-			}, {
-				"type": "source",
-				"params": {
-					"sourcepath": "datasources/msat2.json",
-					"channel": 1
-				}
-			}]
-		}]
-	}
-
 },
 "msat0_clexpression": {
 	"starttime": 42,
@@ -272,12 +238,12 @@ if ($action == 'examplequerylist.get') {
 			"src_epsg": 62866,
 			"dest_epsg": 3857
 		},
-		"sources": [{
+		"sources_raster": [{
 			"type": "expression",
 			"params": {
 				"expression": "1024-value"
 			},
-			"sources": [{
+			"sources_raster": [{
 				"type": "source",
 				"params": {
 					"sourcepath": "datasources/msat2.json",
@@ -300,13 +266,13 @@ if ($action == 'examplequerylist.get') {
 			"matrix_size": 3,
 			"matrix": [-1,-1,-1,-1,8,-1,-1,-1,-1]
 		},
-		"sources": [{
+		"sources_raster": [{
 			"type": "projection",
 			"params": {
 				"src_epsg": 62866,
 				"dest_epsg": 3857
 			},
-			"sources": [{
+			"sources_raster": [{
 				"type": "source",
 				"params": {
 					"sourcepath": "datasources/msat2.json",
@@ -329,40 +295,13 @@ if ($action == 'examplequerylist.get') {
 			"src_epsg": 62866,
 			"dest_epsg": 3857
 		},
-		"sources": [{
+		"sources_raster": [{
 			"type": "opencl",
 			"params": {
 				"source": "test.cl",
 				"kernel": "testKernel"
 			},
-			"sources": [{
-				"type": "source",
-				"params": {
-					"sourcepath": "datasources/msat2.json",
-					"channel": 0
-				}
-			}]
-		}]
-	}
-},
-"msat0_invert": {
-	"starttime": 42,
-	"endtime": 42,
-	"timeinterval": 1,
-
-	"name": "A specialized operator inverting a meteosat-layer",
-
-	"query": {
-		"type": "projection",
-		"params": {
-			"src_epsg": 62866,
-			"dest_epsg": 3857
-		},
-		"sources": [{
-			"type": "negate",
-			"params": {
-			},
-			"sources": [{
+			"sources_raster": [{
 				"type": "source",
 				"params": {
 					"sourcepath": "datasources/msat2.json",
@@ -399,7 +338,7 @@ if ($action == 'examplequerylist.get') {
 		"type": "points2raster",
 		"params": {
 		},
-		"sources": [{
+		"sources_points": [{
 			"type": "pgpointsource",
 			"params": {
 				"query": "x, y FROM locations"
@@ -419,23 +358,24 @@ if ($action == 'examplequerylist.get') {
 		"type": "filterpointsbyraster",
 		"params": {
 		},
-		"sources": [{
+		"sources_points": [{
 			"type": "pgpointsource",
 			"params": {
 				"query": "x, y FROM locations"
 			}
-		},{
+		}],
+		"sources_raster": [{
 			"type": "projection",
 			"params": {
 				"src_epsg": 62866,
 				"dest_epsg": 3857
 			},
-			"sources": [{
+			"sources_raster": [{
 				"type": "expression",
 				"params": {
 					"expression": "value < 300 ? 1 : 0"
 				},
-				"sources": [{
+				"sources_raster": [{
 					"type": "source",
 					"params": {
 						"sourcepath": "datasources/msat2.json",
@@ -458,7 +398,7 @@ if ($action == 'examplequerylist.get') {
 		"type": "points2raster",
 		"params": {
 		},
-		"sources": [{
+		"sources_points": [{
 			"type": "pgpointsource",
 			"params": {
 				"connection": "host = '10.0.9.3' dbname = 'postgres' user = 'postgres' password = 'test'",
@@ -489,7 +429,7 @@ if ($action == 'examplequerylist.get') {
 	"timeinterval": 1,
 
 	"name": "Puma clustered WFS",
-			
+
 	"query": {   "type": "points_cluster",
 	          "sources": [{"type": "projection","params": {"src_epsg": 4326,"dest_epsg": 3857}, "sources": [
 	                      {"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"},"sources":[]}
@@ -503,7 +443,7 @@ if ($action == 'examplequerylist.get') {
 	"timeinterval": 1,
 
 	"name": "Epiphites clustered WFS",
-			
+
 	"query": {   "type": "points_cluster",
 	          "sources": [{"type": "projection","params": {"src_epsg": 4326,"dest_epsg": 3857}, "sources": [
 	                      {"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"traits\":[{\"datasource\":\"TRY\", \"trait\":\"epiphyte\", \"value\":\"epiphyte\"}],\"localAttributes\":{}}"},"sources":[]}

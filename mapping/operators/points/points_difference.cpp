@@ -10,13 +10,13 @@
 
 class PointsDifferenceOperator: public GenericOperator {
 public:
-	PointsDifferenceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+	PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 	virtual ~PointsDifferenceOperator();
 
 	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 };
 
-PointsDifferenceOperator::PointsDifferenceOperator(int sourcecount,	GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::POINTS, sourcecount, sources) {
+PointsDifferenceOperator::PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(2);
 }
 
@@ -24,8 +24,8 @@ PointsDifferenceOperator::~PointsDifferenceOperator() {}
 REGISTER_OPERATOR(PointsDifferenceOperator, "points_difference");
 
 std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const QueryRectangle &rect) {
-	auto pointsMinuend = sources[0]->getPoints(rect);
-	auto pointsSubtrahend = sources[1]->getPoints(rect);
+	auto pointsMinuend = getPointsFromSource(0, rect);
+	auto pointsSubtrahend = getPointsFromSource(1, rect);
 
 	auto pointsOut = std::make_unique<PointCollection>(pointsMinuend->epsg);
 

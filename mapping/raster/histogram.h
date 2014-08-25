@@ -5,9 +5,9 @@
 #include <sstream>
 #include <string>
 
-#include "raster/datavector.h"
+#include "raster/plot.h"
 
-class Histogram : public DataVector {
+class Histogram : public GenericPlot {
 	public:
 		Histogram(int number_of_buckets, double min, double max);
 		~Histogram();

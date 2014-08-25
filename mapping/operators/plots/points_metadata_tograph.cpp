@@ -14,19 +14,19 @@ private:
 	std::vector<std::string> names;
 
 	template<std::size_t size>
-	auto createDataVector(PointCollection& points) -> std::unique_ptr<DataVector>;
+		std::unique_ptr<GenericPlot> createXYGraph(PointCollection& points);
 
 public:
-	PointsMetadataToGraph(int sourcecount, GenericOperator *sources[],	Json::Value &params);
+	PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 	virtual ~PointsMetadataToGraph();
 
-	virtual auto getDataVector(const QueryRectangle &rect) -> std::unique_ptr<DataVector>;
+	virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
 };
 
-PointsMetadataToGraph::PointsMetadataToGraph(int sourcecount,	GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::DATAVECTOR, sourcecount, sources) {
+PointsMetadataToGraph::PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
-	Json::Value inputNames =  params.get("names", Json::Value(Json::arrayValue));
+	Json::Value inputNames = params.get("names", Json::Value(Json::arrayValue));
 	for (Json::ArrayIndex index = 0; index < inputNames.size(); ++index) {
 		names.push_back(inputNames.get(index, "raster").asString());
 	}
@@ -36,7 +36,7 @@ PointsMetadataToGraph::~PointsMetadataToGraph() {}
 REGISTER_OPERATOR(PointsMetadataToGraph, "points_metadata_to_graph");
 
 template<std::size_t size>
-auto PointsMetadataToGraph::createDataVector(PointCollection& points) -> std::unique_ptr<DataVector> {
+auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::unique_ptr<GenericPlot> {
 	auto xygraph = std::make_unique<XYGraph<size>>();
 
 	std::vector<bool> hasNoData;
@@ -70,14 +70,14 @@ auto PointsMetadataToGraph::createDataVector(PointCollection& points) -> std::un
 	return std::move(xygraph);
 }
 
-auto PointsMetadataToGraph::getDataVector(const QueryRectangle &rect) -> std::unique_ptr<DataVector> {
-	auto points = sources[0]->getPoints(rect);
+std::unique_ptr<GenericPlot> PointsMetadataToGraph::getPlot(const QueryRectangle &rect) {
+	auto points = getPointsFromSource(0, rect);
 
 	// TODO: GENERALIZE
 	if(names.size() == 3) {
-		return createDataVector<3>(*points);
+		return createXYGraph<3>(*points);
 	} else {
-		return createDataVector<2>(*points);
+		return createXYGraph<2>(*points);
 	}
 
 }

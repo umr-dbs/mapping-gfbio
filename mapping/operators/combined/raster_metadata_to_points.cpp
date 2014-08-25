@@ -12,16 +12,17 @@
 #include <algorithm>
 
 class RasterMetaDataToPoints: public GenericOperator {
-private:
-	std::string name;
-public:
-	RasterMetaDataToPoints(int sourcecount, GenericOperator *sources[], Json::Value &params);
-	virtual ~RasterMetaDataToPoints();
+	public:
+		RasterMetaDataToPoints(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
+		virtual ~RasterMetaDataToPoints();
 
-	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+
+	private:
+		std::string name;
 };
 
-RasterMetaDataToPoints::RasterMetaDataToPoints(int sourcecount,	GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::POINTS, sourcecount, sources) {
+RasterMetaDataToPoints::RasterMetaDataToPoints(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(2);
 
 	name = params.get("name", "raster").asString();
@@ -75,10 +76,9 @@ struct PointDataEnhancement {
 	}
 };
 
-std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(
-		const QueryRectangle &rect) {
-	auto points = sources[0]->getPoints(rect);
-	auto raster = sources[1]->getRaster(rect);
+std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRectangle &rect) {
+	auto points = getPointsFromSource(0, rect);
+	auto raster = getRasterFromSource(0, rect);
 
 	Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
 	return callUnaryOperatorFunc<PointDataEnhancement>(raster.get(), points.get(), name);

@@ -92,7 +92,7 @@ Reflektanz:
 
 class MSATTemperatureOperator : public GenericOperator {
 	public:
-		MSATTemperatureOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATTemperatureOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -104,7 +104,7 @@ class MSATTemperatureOperator : public GenericOperator {
 
 
 
-MSATTemperatureOperator::MSATTemperatureOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+MSATTemperatureOperator::MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 }
 MSATTemperatureOperator::~MSATTemperatureOperator() {
@@ -114,7 +114,7 @@ REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
 
 std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
-	auto raster = sources[0]->getRaster(rect);
+	auto raster = getRasterFromSource(0, rect);
 
 	if (raster->dd.min != 0 && raster->dd.max != 1024)
 		throw OperatorException("Input raster does not appear to be a meteosat raster");

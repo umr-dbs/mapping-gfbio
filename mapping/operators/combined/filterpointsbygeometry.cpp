@@ -19,7 +19,7 @@
 
 class FilterPointsByGeometry : public GenericOperator {
 	public:
-		FilterPointsByGeometry(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		FilterPointsByGeometry(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~FilterPointsByGeometry();
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
@@ -28,7 +28,7 @@ class FilterPointsByGeometry : public GenericOperator {
 
 
 
-FilterPointsByGeometry::FilterPointsByGeometry(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::POINTS, sourcecount, sources) {
+FilterPointsByGeometry::FilterPointsByGeometry(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(2);
 }
 
@@ -43,11 +43,11 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRe
 	geos::geom::GeometryFactory gf = geos::geom::GeometryFactory(&pm, 4326);
 	geos::geom::GeometryFactory* geometryFactory = &gf;
 
-	auto points = sources[0]->getPoints(rect);
+	auto points = getPointsFromSource(0, rect);
 
-	auto generic_geometry = sources[1]->getGeometry(rect);
+	auto generic_geometry = getGeometryFromSource(0, rect);
 	auto geometry = generic_geometry->getGeometry();
-	fprintf(stderr,"getGeom >> %f", geometry->getArea());
+	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 
 	auto points_out = std::make_unique<PointCollection>(rect.epsg);
 

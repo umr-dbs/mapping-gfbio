@@ -4,12 +4,14 @@
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
-#include "util/SunPos.h"
+//#include "util/SunPos.h"
 
 
 #include <limits>
 #include <memory>
 #include <sstream>
+#include <ctime>        // struct std::tm
+#include <time.h>
 #include <json/json.h>
 #include <gdal_priv.h>
 
@@ -40,10 +42,19 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	RasterOpenCL::init();
 	auto raster = sources[0]->getRaster(rect);
 
+	// get the timestamp of the MSG scene from the raster metadata
 	std::string timestamp = raster->md_string.get("TimeStamp");
-	//float offset = raster->md_value.get("CalibrationOffset");
-	//float slope = raster->md_value.get("CalibrationSlope");
-	std::cerr <<"MSAT timestamp is: " << timestamp << std::endl;
+	// create and store a real time object
+	std::tm timeDate;
+
+	/** TODO: This would be the c++11 way to do it. Sadly GCC does not implement it...
+	std::istringstream ss(timestamp);
+	ss >> std::get_time(&time, "%Y%m%d%H%M%S");
+	*/
+	strptime(timestamp.c_str(),"%y-%m-%d %H:%M", &timeDate);
+
+
+
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
 //	raster->setRepresentation(GenericRaster::OPENCL);
 //

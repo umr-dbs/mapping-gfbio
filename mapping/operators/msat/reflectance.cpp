@@ -4,7 +4,7 @@
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
-#include "util/SunPos.h"
+#include "util/sunpos.h"
 
 
 #include <limits>
@@ -51,16 +51,15 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	std::istringstream ss(timestamp);
 	ss >> std::get_time(&time, "%Y%m%d%H%M%S");
 	*/
-	//strptime(timestamp.c_str(),"%y-%m-%d %H:%M", &timeDate);
-
-	std::cerr<<timeDate.tm_mday<<" "<<timeDate.tm_mon<<" "<<timeDate.tm_year<<" "<<timeDate.tm_hour<<" "<<timeDate.tm_min<<"  ORIGINAL:"<<timestamp<<std::endl;
+	strptime(timestamp.c_str(),"%Y%m%d%H%M", &timeDate);
+	std::cerr<<"timeDate.tm_mday:"<<timeDate.tm_mday<<"|timeDate.tm_mon:"<<timeDate.tm_mon<<"|timeDate.tm_year:"<<timeDate.tm_year<<"|timeDate.tm_hour:"<<timeDate.tm_hour<<"|timeDate.tm_min:"<<timeDate.tm_min<<"|ORIGINAL:"<<timestamp<<std::endl;
 
 	//now calculate the intermediate values using PSA algorithm
-	cIntermediateVariables psaIntermediateValues = sunposIntermediate(cTime(timeDate.tm_year,timeDate.tm_mon+1,timeDate.tm_mday,timeDate.tm_hour,timeDate.tm_min,timeDate.tm_sec));
-
-	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
-	raster->setRepresentation(GenericRaster::OPENCL);
+	cIntermediateVariables psaIntermediateValues = sunposIntermediate(timeDate.tm_year+1900, timeDate.tm_mon+1,	timeDate.tm_mday, timeDate.tm_hour, timeDate.tm_min, 0.0);
 	std::cerr<<"GMST: "<<psaIntermediateValues.dGreenwichMeanSiderealTime<<" dRightAscension: "<<psaIntermediateValues.dRightAscension<<" dDeclination: "<<psaIntermediateValues.dDeclination<<std::endl;
+
+	//Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
+	//raster->setRepresentation(GenericRaster::OPENCL);
 
 //
 //	DataDescription out_dd(GDT_Float32, newmin, newmax); // no no_data //raster->dd.has_no_data, output_no_data);

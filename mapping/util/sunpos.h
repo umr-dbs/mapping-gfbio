@@ -42,6 +42,5 @@ struct cIntermediateVariables{
 };
 
 //void sunpos(cTime udtTime, cLocation udtLocation, cSunCoordinates *udtSunCoordinates);
-cIntermediateVariables sunposIntermediate(cTime udtTime);
-
+cIntermediateVariables sunposIntermediate(int iYear, int iMonth, int iDay, double dHours, double dMinutes, double dSeconds);
 #endif

@@ -3,7 +3,7 @@
 #include "sunpos.h"
 #include <math.h>
 
-cIntermediateVariables sunpos(cTime udtTime)
+cIntermediateVariables sunposIntermediate(int iYear, int iMonth, int iDay, double dHours, double dMinutes, double dSeconds)
 {
 	// Main variables
 	double dElapsedJulianDays;
@@ -27,13 +27,12 @@ cIntermediateVariables sunpos(cTime udtTime)
 		long int liAux1;
 		long int liAux2;
 		// Calculate time of the day in UT decimal hours
-		dDecimalHours = udtTime.dHours + (udtTime.dMinutes
-			+ udtTime.dSeconds / 60.0 ) / 60.0;
+		dDecimalHours = dHours + (dMinutes + dSeconds / 60.0 ) / 60.0;
 		// Calculate current Julian Day
-		liAux1 =(udtTime.iMonth-14)/12;
-		liAux2=(1461*(udtTime.iYear + 4800 + liAux1))/4 + (367*(udtTime.iMonth 
-			- 2-12*liAux1))/12- (3*((udtTime.iYear + 4900 
-		+ liAux1)/100))/4+udtTime.iDay-32075;
+		liAux1 =(iMonth-14)/12;
+		liAux2=(1461*(iYear + 4800 + liAux1))/4 + (367*(iMonth
+			- 2-12*liAux1))/12- (3*((iYear + 4900
+		+ liAux1)/100))/4+iDay-32075;
 		dJulianDate=(double)(liAux2)-0.5+dDecimalHours/24.0;
 		// Calculate difference between current Julian Day and JD 2451545.0 
 		dElapsedJulianDays = dJulianDate-2451545.0;
@@ -80,10 +79,12 @@ cIntermediateVariables sunpos(cTime udtTime)
 		double dCos_Latitude;
 		double dSin_Latitude;
 		double dCos_HourAngle;
-	*/	double dParallax;
+		double dParallax;
+		*/
 	    intermediateValues.dGreenwichMeanSiderealTime = 6.6974243242 +
 			0.0657098283*dElapsedJulianDays 
 			+ dDecimalHours;
+	    return intermediateValues;
 		/*
 		dLocalMeanSiderealTime = (dGreenwichMeanSiderealTime*15 
 			+ udtLocation.dLongitude)*rad;

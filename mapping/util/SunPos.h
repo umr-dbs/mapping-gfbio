@@ -36,13 +36,12 @@ struct cSunCoordinates
 
 //This struct holds the intermediate variables
 struct cIntermediateVariables{
-	double dElapsedJulianDays;
-	double dDecimalHours;
+	double dGreenwichMeanSiderealTime;
 	double dRightAscension;
 	double dDeclination;
 };
 
 //void sunpos(cTime udtTime, cLocation udtLocation, cSunCoordinates *udtSunCoordinates);
-void sunposIntermediate(cTime udtTime, cLocation udtLocation, cIntermediateVariables *udtSunCoordinates);
+cIntermediateVariables sunposIntermediate(cTime udtTime);
 
 #endif

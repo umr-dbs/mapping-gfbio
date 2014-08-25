@@ -3,11 +3,11 @@
 #include "sunpos.h"
 #include <math.h>
 
-void sunpos(cTime udtTime,cLocation udtLocation, cIntermediateVariables *udtSunCoordinates)
+cIntermediateVariables sunpos(cTime udtTime)
 {
 	// Main variables
-	//double dElapsedJulianDays;
-	//double dDecimalHours;
+	double dElapsedJulianDays;
+	double dDecimalHours;
 	double dEclipticLongitude;
 	double dEclipticObliquity;
 	//double dRightAscension;
@@ -17,6 +17,9 @@ void sunpos(cTime udtTime,cLocation udtLocation, cIntermediateVariables *udtSunC
 	double dY;
 	double dX;
 
+	//Intermediate / result variables
+	cIntermediateVariables intermediateValues;
+
 	// Calculate difference in days between the current Julian Day 
 	// and JD 2451545.0, which is noon 1 January 2000 Universal Time
 	{
@@ -24,16 +27,16 @@ void sunpos(cTime udtTime,cLocation udtLocation, cIntermediateVariables *udtSunC
 		long int liAux1;
 		long int liAux2;
 		// Calculate time of the day in UT decimal hours
-		udtSunCoordinates->dDecimalHours = udtTime.dHours + (udtTime.dMinutes
+		dDecimalHours = udtTime.dHours + (udtTime.dMinutes
 			+ udtTime.dSeconds / 60.0 ) / 60.0;
 		// Calculate current Julian Day
 		liAux1 =(udtTime.iMonth-14)/12;
 		liAux2=(1461*(udtTime.iYear + 4800 + liAux1))/4 + (367*(udtTime.iMonth 
 			- 2-12*liAux1))/12- (3*((udtTime.iYear + 4900 
 		+ liAux1)/100))/4+udtTime.iDay-32075;
-		dJulianDate=(double)(liAux2)-0.5+udtSunCoordinates->dDecimalHours/24.0;
+		dJulianDate=(double)(liAux2)-0.5+dDecimalHours/24.0;
 		// Calculate difference between current Julian Day and JD 2451545.0 
-		udtSunCoordinates->dElapsedJulianDays = dJulianDate-2451545.0;
+		dElapsedJulianDays = dJulianDate-2451545.0;
 	}
 
 	// Calculate ecliptic coordinates (ecliptic longitude and obliquity of the 
@@ -43,13 +46,13 @@ void sunpos(cTime udtTime,cLocation udtLocation, cIntermediateVariables *udtSunC
 		double dMeanLongitude;
 		double dMeanAnomaly;
 		double dOmega;
-		dOmega=2.1429-0.0010394594*udtSunCoordinates->dElapsedJulianDays;
-		dMeanLongitude = 4.8950630+ 0.017202791698*udtSunCoordinates->dElapsedJulianDays; // Radians
-		dMeanAnomaly = 6.2400600+ 0.0172019699*udtSunCoordinates->dElapsedJulianDays;
+		dOmega=2.1429-0.0010394594*dElapsedJulianDays;
+		dMeanLongitude = 4.8950630+ 0.017202791698*dElapsedJulianDays; // Radians
+		dMeanAnomaly = 6.2400600+ 0.0172019699*dElapsedJulianDays;
 		dEclipticLongitude = dMeanLongitude + 0.03341607*sin( dMeanAnomaly ) 
 			+ 0.00034894*sin( 2*dMeanAnomaly )-0.0001134
 			-0.0000203*sin(dOmega);
-		dEclipticObliquity = 0.4090928 - 6.2140e-9*udtSunCoordinates->dElapsedJulianDays
+		dEclipticObliquity = 0.4090928 - 6.2140e-9*dElapsedJulianDays
 			+0.0000396*cos(dOmega);
 	}
 
@@ -61,9 +64,9 @@ void sunpos(cTime udtTime,cLocation udtLocation, cIntermediateVariables *udtSunC
 		dSin_EclipticLongitude= sin( dEclipticLongitude );
 		dY = cos( dEclipticObliquity ) * dSin_EclipticLongitude;
 		dX = cos( dEclipticLongitude );
-		udtSunCoordinates->dRightAscension = atan2( dY,dX );
-		if( udtSunCoordinates->dRightAscension < 0.0 ) udtSunCoordinates->dRightAscension = udtSunCoordinates->dRightAscension + twopi;
-		udtSunCoordinates->dDeclination = asin( sin( dEclipticObliquity )*dSin_EclipticLongitude );
+		intermediateValues.dRightAscension = atan2( dY,dX );
+		if( intermediateValues.dRightAscension < 0.0 ) intermediateValues.dRightAscension = intermediateValues.dRightAscension + twopi;
+		intermediateValues.dDeclination = asin( sin( dEclipticObliquity )*dSin_EclipticLongitude );
 	}
 
 	/*
@@ -77,10 +80,11 @@ void sunpos(cTime udtTime,cLocation udtLocation, cIntermediateVariables *udtSunC
 		double dCos_Latitude;
 		double dSin_Latitude;
 		double dCos_HourAngle;
-		double dParallax;
-		dGreenwichMeanSiderealTime = 6.6974243242 + 
+	*/	double dParallax;
+	    intermediateValues.dGreenwichMeanSiderealTime = 6.6974243242 +
 			0.0657098283*dElapsedJulianDays 
 			+ dDecimalHours;
+		/*
 		dLocalMeanSiderealTime = (dGreenwichMeanSiderealTime*15 
 			+ udtLocation.dLongitude)*rad;
 		dHourAngle = dLocalMeanSiderealTime - dRightAscension;

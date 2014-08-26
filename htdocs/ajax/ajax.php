@@ -413,7 +413,7 @@ if ($action == 'examplequerylist.get') {
 	"endtime": 42,
 	"timeinterval": 1,
 
-	"name": "Pumas with metadata",
+	"name": "Pumas with metadata (FIXME!)",
 
 	"query": {"type":"raster_metadata_to_points","params":{"name":"raster2"},"sources":
 				[{"type":"raster_metadata_to_points","params":{"name":"raster"},"sources":
@@ -428,7 +428,7 @@ if ($action == 'examplequerylist.get') {
 	"endtime": 42,
 	"timeinterval": 1,
 
-	"name": "Puma clustered WFS",
+	"name": "Puma clustered WFS (FIXME!)",
 
 	"query": {   "type": "points_cluster",
 	          "sources": [{"type": "projection","params": {"src_epsg": 4326,"dest_epsg": 3857}, "sources": [
@@ -442,7 +442,7 @@ if ($action == 'examplequerylist.get') {
 	"endtime": 42,
 	"timeinterval": 1,
 
-	"name": "Epiphites clustered WFS",
+	"name": "Epiphites clustered WFS (FIXME!)",
 
 	"query": {   "type": "points_cluster",
 	          "sources": [{"type": "projection","params": {"src_epsg": 4326,"dest_epsg": 3857}, "sources": [

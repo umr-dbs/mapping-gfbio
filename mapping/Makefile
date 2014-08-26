@@ -31,18 +31,17 @@ EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 
 
-DATASET_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061200-C_
-DATASET_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061200-C_
-DATASET_C2=data/xrit2/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061200-C_
-DATASET_C3=data/xrit2/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061200-C_
-DATASET_C4=data/xrit2/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061200-C_
-DATASET_C5=data/xrit2/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061200-C_
-DATASET_C6=data/xrit2/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061200-C_
-DATASET_C7=data/xrit2/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061200-C_
-DATASET_C8=data/xrit2/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061200-C_
-DATASET_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061200-C_
-DATASET_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061200-C_
-DATASET_TMEAN=data/tmean_1_10.tif
+DATASET_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061800-C_
+DATASET_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061800-C_
+DATASET_C2=data/xrit2/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061800-C_
+DATASET_C3=data/xrit2/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061800-C_
+DATASET_C4=data/xrit2/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061800-C_
+DATASET_C5=data/xrit2/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061800-C_
+DATASET_C6=data/xrit2/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061800-C_
+DATASET_C7=data/xrit2/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061800-C_
+DATASET_C8=data/xrit2/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061800-C_
+DATASET_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061800-C_
+DATASET_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061800-C_
 
 .SECONDARY: $(CL_HEADERS)
 
@@ -113,11 +112,6 @@ msat2datasource:	${EXE}
 	./${EXE} import datasources/msat2.json ${DATASET_C8} 1 8 42 RAW
 	./${EXE} import datasources/msat2.json ${DATASET_C9} 1 9 42 RAW
 	./${EXE} import datasources/msat2.json ${DATASET_C10} 1 10 42 RAW
-
-tmeandatasource:	${EXE}
-	rm -f datasources/tmean*.dat datasources/tmean*.db
-	#./${EXE} createsource 3857 ${DATASET_TMEAN} >datasources/tmean.json
-	./${EXE} import datasources/tmean.json ${DATASET_TMEAN} 1 0 42 RAW
 
 worldclimdatasource:	${EXE}
 	rm -f datasources/worldclim*.dat datasources/worldclim*.db

@@ -84,9 +84,18 @@
     padding-bottom: 10px;
 }
 
-.layerControls {
+.layerselection_tabs {
 	position: absolute;
 	top: 50px;
+	height: 20px;
+	left: 0px;
+	right: 0px;
+	text-align: center;
+}
+
+.layerControls, .plotControls {
+	position: absolute;
+	top: 70px;
 	bottom: 50px;
 	left: 0px;
 	right: 0px;

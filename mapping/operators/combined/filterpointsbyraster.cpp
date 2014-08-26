@@ -9,7 +9,7 @@
 
 class FilterPointsByRaster : public GenericOperator {
 	public:
-		FilterPointsByRaster(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		FilterPointsByRaster(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~FilterPointsByRaster();
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
@@ -18,7 +18,7 @@ class FilterPointsByRaster : public GenericOperator {
 
 
 
-FilterPointsByRaster::FilterPointsByRaster(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::POINTS, sourcecount, sources) {
+FilterPointsByRaster::FilterPointsByRaster(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(2);
 }
 
@@ -29,9 +29,8 @@ REGISTER_OPERATOR(FilterPointsByRaster, "filterpointsbyraster");
 
 std::unique_ptr<PointCollection> FilterPointsByRaster::getPoints(const QueryRectangle &rect) {
 
-	auto points = sources[0]->getPoints(rect);
-
-	auto raster = sources[1]->getRaster(rect);
+	auto points = getPointsFromSource(0, rect);
+	auto raster = getRasterFromSource(0, rect);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 
 	auto points_out = std::make_unique<PointCollection>(rect.epsg);

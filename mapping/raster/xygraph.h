@@ -8,10 +8,10 @@
 #include <algorithm>
 #include <limits>
 
-#include "datavector.h"
+#include "plot.h"
 
 template<std::size_t dimensions>
-class XYGraph : public DataVector {
+class XYGraph : public GenericPlot {
 	public:
 		XYGraph() {
 			rangeMin.fill(std::numeric_limits<double>::max());

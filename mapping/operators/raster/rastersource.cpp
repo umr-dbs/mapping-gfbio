@@ -14,7 +14,7 @@
 // RasterSource Operator
 class SourceOperator : public GenericOperator {
 	public:
-		SourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~SourceOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -26,7 +26,7 @@ class SourceOperator : public GenericOperator {
 
 
 // RasterSource Operator
-SourceOperator::SourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources), rastersource(nullptr) {
+SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rastersource(nullptr) {
 	assumeSources(0);
 	std::string filename = params.get("sourcepath", "").asString();
 	rastersource = RasterSourceManager::open(filename.c_str());

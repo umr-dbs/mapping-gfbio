@@ -15,7 +15,7 @@
 
 class MSATRadianceOperator : public GenericOperator {
 	public:
-		MSATRadianceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		MSATRadianceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATRadianceOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -27,17 +27,18 @@ class MSATRadianceOperator : public GenericOperator {
 
 
 
-MSATRadianceOperator::MSATRadianceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+MSATRadianceOperator::MSATRadianceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 }
 MSATRadianceOperator::~MSATRadianceOperator() {
 }
-REGISTER_OPERATOR(MSATRadianceOperator, "msatradiance");
+// We do not need this operator any more, the raster source can scale automatically.
+//REGISTER_OPERATOR(MSATRadianceOperator, "msatradiance");
 
 
 std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
-	auto raster = sources[0]->getRaster(rect);
+	auto raster = getRasterFromSource(0, rect);
 
 	float offset = raster->md_value.get("CalibrationOffset");
 	float slope = raster->md_value.get("CalibrationSlope");

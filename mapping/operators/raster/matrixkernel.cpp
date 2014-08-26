@@ -12,7 +12,7 @@
 
 class MatrixKernelOperator : public GenericOperator {
 	public:
-		MatrixKernelOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		MatrixKernelOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MatrixKernelOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -22,7 +22,7 @@ class MatrixKernelOperator : public GenericOperator {
 
 
 
-MatrixKernelOperator::MatrixKernelOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources), matrixsize(0), matrix(nullptr) {
+MatrixKernelOperator::MatrixKernelOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), matrixsize(0), matrix(nullptr) {
 	assumeSources(1);
 
 	matrixsize = params.get("matrix_size", 0).asInt();
@@ -90,7 +90,7 @@ struct matrixkernel{
 #include "operators/raster/matrixkernel.cl.h"
 
 std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
-	auto raster_in = sources[0]->getRaster(rect);
+	auto raster_in = getRasterFromSource(0, rect);
 
 #if 1
 	RasterOpenCL::init();

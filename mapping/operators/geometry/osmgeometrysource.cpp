@@ -11,7 +11,7 @@
 
 class OSMGeometrySourceOperator : public GenericOperator {
 	public:
-		OSMGeometrySourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		OSMGeometrySourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~OSMGeometrySourceOperator();
 
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
@@ -24,7 +24,7 @@ class OSMGeometrySourceOperator : public GenericOperator {
 
 
 
-OSMGeometrySourceOperator::OSMGeometrySourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+OSMGeometrySourceOperator::OSMGeometrySourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
 
 	connectionstring = "host = 'localhost' dbname = 'gfbio' user = 'gfbio' password = '***REMOVED***'";

@@ -13,7 +13,7 @@ namespace Json {
 class GenericRaster;
 class PointCollection;
 class GenericGeometry;
-class DataVector;
+class GenericPlot;
 
 class QueryRectangle {
 	public:
@@ -38,38 +38,49 @@ class GenericOperator {
 			RASTER,
 			POINTS,
 			GEOMETRY,
-			DATAVECTOR
+
+			PLOT = 100
 		};
+		static const int MAX_INPUT_TYPES = 3;
 		static const int MAX_SOURCES = 5;
 		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json);
 		static std::unique_ptr<GenericOperator> fromJSON(Json::Value &json);
 
 		virtual ~GenericOperator();
 
+		virtual std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getCachedPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericGeometry> getCachedGeometry(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect);
+
+	protected:
+		GenericOperator(int sourcecounts[], GenericOperator *sources[]);
+		void assumeSources(int rasters, int pointcollections=0, int geometries=0);
+
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
-		virtual std::unique_ptr<DataVector> getDataVector(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
 
-	protected:
-		GenericOperator(Type type, int sourcecount, GenericOperator *sources[]);
-		Type type;
-		int sourcecount;
-		GenericOperator *sources[MAX_SOURCES];
-
-		void assumeSources(int n);
+		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect);
+		std::unique_ptr<PointCollection> getPointsFromSource(int idx, const QueryRectangle &rect);
+		std::unique_ptr<GenericGeometry> getGeometryFromSource(int idx, const QueryRectangle &rect);
+		// there is no getPlotFromSource, because plots are by definition the final step of a chain
 
 	private:
+		int sourcecounts[MAX_INPUT_TYPES];
+		GenericOperator *sources[MAX_SOURCES];
+
 		void operator=(GenericOperator &) = delete;
 };
 
 
 class OperatorRegistration {
 	public:
-		OperatorRegistration(const char *name, std::unique_ptr<GenericOperator> (*constructor)(int sourcecount, GenericOperator *sources[], Json::Value &params));
+		OperatorRegistration(const char *name, std::unique_ptr<GenericOperator> (*constructor)(int sourcecounts[], GenericOperator *sources[], Json::Value &params));
 };
 
-#define REGISTER_OPERATOR(classname, name) static std::unique_ptr<GenericOperator> create##classname(int sourcecount, GenericOperator *sources[], Json::Value &params) { return std::make_unique<classname>(sourcecount, sources, params); } static OperatorRegistration register_##classname(name, create##classname)
+#define REGISTER_OPERATOR(classname, name) static std::unique_ptr<GenericOperator> create##classname(int sourcecounts[], GenericOperator *sources[], Json::Value &params) { return std::make_unique<classname>(sourcecounts, sources, params); } static OperatorRegistration register_##classname(name, create##classname)
 
 
 #endif

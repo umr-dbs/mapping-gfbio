@@ -5,13 +5,16 @@
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/sunpos.h"
+#include "msg_constants.h"
 
 
 #include <limits>
 #include <memory>
+#include <math.h>
 #include <sstream>
 #include <ctime>        // struct std::tm
-#include <time.h>
+//#include <time.h>
+#include <iterator>
 #include <json/json.h>
 #include <gdal_priv.h>
 
@@ -26,7 +29,7 @@ class MSATReflectanceOperator : public GenericOperator {
 };
 
 
-//#include "operators/msat/reflectance.cl.h"
+#include "operators/msat/reflectance.cl.h"
 
 
 
@@ -37,6 +40,36 @@ MSATReflectanceOperator::~MSATReflectanceOperator() {
 }
 REGISTER_OPERATOR(MSATReflectanceOperator, "msatreflectance");
 
+
+double calculateDevisorFor(int channel, int dayOfYear) {
+	int index = 0;
+	if(channel>=1 && channel <=3)
+		index = channel-1;
+	else if(channel == 12)
+		index = 3;
+	else
+		throw ArgumentException("MSG: radiance only valid for channels 1-3 and 12!");
+
+	//calculate ESD?
+	double dESD = 1.0 - 0.0167 * cos(2.0 * acos(-1.0) * ((dayOfYear - 3.0) / 365.0));
+	/*
+	//get the central wavelength
+	double cwl = msg::dCwl[channel - 1];
+	// calculate the ETSR?
+	double etsr = msg::dETSRconst[index] * 10 / (dESD*dESD) * (cwl*cwl);
+	//now we can precalculate the devisior we need to change radiance to reflectance
+	double div = (cwl*cwl) * etsr;
+	// reflectance is radiance * 10 / div
+	return 10/div;
+	*/
+
+	//y not this? //TODO check if 1/something produces a problem
+	return 1 / msg::dETSRconst[index] / dESD;
+}
+
+double calculateESD(int dayOfYear){
+	return 1.0 - 0.0167 * cos(2.0 * acos(-1.0) * ((dayOfYear - 3.0) / 365.0));
+}
 
 std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
@@ -58,23 +91,54 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	cIntermediateVariables psaIntermediateValues = sunposIntermediate(timeDate.tm_year+1900, timeDate.tm_mon+1,	timeDate.tm_mday, timeDate.tm_hour, timeDate.tm_min, 0.0);
 	std::cerr<<"GMST: "<<psaIntermediateValues.dGreenwichMeanSiderealTime<<" dRightAscension: "<<psaIntermediateValues.dRightAscension<<" dDeclination: "<<psaIntermediateValues.dDeclination<<std::endl;
 
-	//Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
-	//raster->setRepresentation(GenericRaster::OPENCL);
+	//get more information about the raster dimensions of the processed tile
+	LocalCRS lcrs = raster->lcrs;
+	std::cerr<<"epsg:"<<lcrs.epsg<<"|dimensions:"<<lcrs.dimensions<<"|origin:";
+    //print the origin
+	std::copy(std::begin(lcrs.origin),
+    		  std::end(lcrs.origin),
+              std::ostream_iterator<double>(std::cerr,",")
+             );
+	std::cerr<<"direct:"<<lcrs.origin[0]<<lcrs.origin[1]<<lcrs.origin[2]<<std::endl;
+	//print the scale
+	std::cerr<<"|scale:";
+	std::copy(std::begin(lcrs.scale),
+    		  std::end(lcrs.scale),
+              std::ostream_iterator<double>(std::cerr,",")
+             );
+	//print the size
+	std::cerr<<"|size:";
+	std::copy(std::begin(lcrs.size),
+    		  std::end(lcrs.size),
+              std::ostream_iterator<int>(std::cerr,",")
+             );
+	std::cerr<<std::endl;
 
-//
-//	DataDescription out_dd(GDT_Float32, newmin, newmax); // no no_data //raster->dd.has_no_data, output_no_data);
-//	if (raster->dd.has_no_data)
-//		out_dd.addNoData();
-//
-//	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
-//
-//	RasterOpenCL::CLProgram prog;
-//	prog.addInRaster(raster.get());
-//	prog.addOutRaster(raster_out.get());
-//	prog.compile(operators_msat_radiance, "radiancekernel");
-//	prog.addArg(offset);
-//	prog.addArg(slope);
-//	prog.run();
+	// now we need the channelNumber to calculate ETSR and ESD
+	int channel = (int) raster->md_value.get("Channel");
+	double dETSRconst = msg::dETSRconst[channel-1];
+	double dESD = calculateESD(timeDate.tm_yday+1);
+
+	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
+	raster->setRepresentation(GenericRaster::OPENCL);
+
+	//
+	DataDescription out_dd(GDT_Float32, 0.0, 1.0); // no no_data //raster->dd.has_no_data, output_no_data);
+	if (raster->dd.has_no_data)
+		out_dd.addNoData();
+
+	auto raster_out = GenericRaster::create(lcrs, out_dd);
+
+	RasterOpenCL::CLProgram prog;
+	prog.addInRaster(raster.get());
+	prog.addOutRaster(raster_out.get());
+	prog.compile(operators_msat_reflectance, "reflectancekernel");
+	prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
+	prog.addArg(psaIntermediateValues.dRightAscension);
+	prog.addArg(psaIntermediateValues.dDeclination);
+	prog.addArg(dETSRconst);
+	prog.addArg(dESD);
+	prog.run();
 
 	return raster;
 }

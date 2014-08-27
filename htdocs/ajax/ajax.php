@@ -144,14 +144,16 @@ if ($action == 'examplequerylist.get') {
 		"type": "msatradiance",
 		"params": {
 		},
-		"sources_raster": [{
-			"type": "source",
-			"params": {
-				"sourcepath": "datasources/msat2.json",
-				"channel": 6,
-				"transform": false
-			}
-		}]
+		"sources": {
+			"raster": [{
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 6,
+					"transform": false
+				}
+			}]
+		}
 	}
 },
 "temperature": {
@@ -165,14 +167,16 @@ if ($action == 'examplequerylist.get') {
 		"type": "msattemperature",
 		"params": {
 		},
-		"sources_raster": [{
-			"type": "source",
-			"params": {
-				"sourcepath": "datasources/msat2.json",
-				"channel": 6,
-				"transform": false
-			}
-		}]
+		"sources": {
+			"raster": [{
+				"type": "source",
+				"params": {
+					"sourcepath": "datasources/msat2.json",
+					"channel": 6,
+					"transform": false
+				}
+			}]
+		}
 	}
 },
 "clouds": {
@@ -189,19 +193,23 @@ if ($action == 'examplequerylist.get') {
 			"src_epsg": 62866,
 			"dest_epsg": 3857
 		},
-		"sources_raster": [{
-			"type": "expression",
-			"params": {
-				"expression": "value < 300 ? 1 : 0"
-			},
-			"sources_raster": [{
-				"type": "source",
+		"sources": {
+			"raster": [{
+				"type": "expression",
 				"params": {
-					"sourcepath": "datasources/msat2.json",
-					"channel": 6
+					"expression": "value < 300 ? 1 : 0"
+				},
+				"sources": {
+					"raster": [{
+						"type": "source",
+						"params": {
+							"sourcepath": "datasources/msat2.json",
+							"channel": 6
+						}
+					}]
 				}
 			}]
-		}]
+		}
 	}
 },
 "gfbio": {
@@ -216,13 +224,15 @@ if ($action == 'examplequerylist.get') {
 		"type": "points2raster",
 		"params": {
 		},
-		"sources_points": [{
-			"type": "gfbiopointsource",
-			"params": {
-				"datasource": "GBIF",
-				"query": "{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"
-			}
-		}]
+		"sources": {
+			"points": [{
+				"type": "gfbiopointsource",
+				"params": {
+					"datasource": "GBIF",
+					"query": "{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"
+				}
+			}]
+		}
 	}
 },
 "msat0_clexpression": {
@@ -238,19 +248,23 @@ if ($action == 'examplequerylist.get') {
 			"src_epsg": 62866,
 			"dest_epsg": 3857
 		},
-		"sources_raster": [{
-			"type": "expression",
-			"params": {
-				"expression": "1024-value"
-			},
-			"sources_raster": [{
-				"type": "source",
+		"sources": {
+			"raster": [{
+				"type": "expression",
 				"params": {
-					"sourcepath": "datasources/msat2.json",
-					"channel": 0
+					"expression": "1024-value"
+				},
+				"sources": {
+					"raster": [{
+						"type": "source",
+						"params": {
+							"sourcepath": "datasources/msat2.json",
+							"channel": 0
+						}
+					}]
 				}
 			}]
-		}]
+		}
 	}
 },
 "msat0_edge": {
@@ -266,20 +280,24 @@ if ($action == 'examplequerylist.get') {
 			"matrix_size": 3,
 			"matrix": [-1,-1,-1,-1,8,-1,-1,-1,-1]
 		},
-		"sources_raster": [{
-			"type": "projection",
-			"params": {
-				"src_epsg": 62866,
-				"dest_epsg": 3857
-			},
-			"sources_raster": [{
-				"type": "source",
+		"sources": {
+			"raster": [{
+				"type": "projection",
 				"params": {
-					"sourcepath": "datasources/msat2.json",
-					"channel": 0
+					"src_epsg": 62866,
+					"dest_epsg": 3857
+				},
+				"sources": {
+					"raster": [{
+						"type": "source",
+						"params": {
+							"sourcepath": "datasources/msat2.json",
+							"channel": 0
+						}
+					}]
 				}
 			}]
-		}]
+		}
 	}
 },
 "msat0_invertcl": {
@@ -295,20 +313,24 @@ if ($action == 'examplequerylist.get') {
 			"src_epsg": 62866,
 			"dest_epsg": 3857
 		},
-		"sources_raster": [{
-			"type": "opencl",
-			"params": {
-				"source": "test.cl",
-				"kernel": "testKernel"
-			},
-			"sources_raster": [{
-				"type": "source",
+		"sources": {
+			"raster": [{
+				"type": "opencl",
 				"params": {
-					"sourcepath": "datasources/msat2.json",
-					"channel": 0
+					"source": "test.cl",
+					"kernel": "testKernel"
+				},
+				"sources": {
+					"raster": [{
+						"type": "source",
+						"params": {
+							"sourcepath": "datasources/msat2.json",
+							"channel": 0
+						}
+					}]
 				}
 			}]
-		}]
+		}
 	}
 },
 "pumas": {
@@ -338,12 +360,14 @@ if ($action == 'examplequerylist.get') {
 		"type": "points2raster",
 		"params": {
 		},
-		"sources_points": [{
-			"type": "pgpointsource",
-			"params": {
-				"query": "x, y FROM locations"
-			}
-		}]
+		"sources": {
+			"points": [{
+				"type": "pgpointsource",
+				"params": {
+					"query": "x, y FROM locations"
+				}
+			}]
+		}
 	}
 },
 "pumasunderclouds": {
@@ -358,32 +382,38 @@ if ($action == 'examplequerylist.get') {
 		"type": "filterpointsbyraster",
 		"params": {
 		},
-		"sources_points": [{
-			"type": "pgpointsource",
-			"params": {
-				"query": "x, y FROM locations"
-			}
-		}],
-		"sources_raster": [{
-			"type": "projection",
-			"params": {
-				"src_epsg": 62866,
-				"dest_epsg": 3857
-			},
-			"sources_raster": [{
-				"type": "expression",
+		"sources": {
+			"points": [{
+				"type": "pgpointsource",
 				"params": {
-					"expression": "value < 300 ? 1 : 0"
+					"query": "x, y FROM locations"
+				}
+			}],
+			"raster": [{
+				"type": "projection",
+				"params": {
+					"src_epsg": 62866,
+					"dest_epsg": 3857
 				},
-				"sources_raster": [{
-					"type": "source",
-					"params": {
-						"sourcepath": "datasources/msat2.json",
-						"channel": 6
-					}
-				}]
+				"sources": {
+					"raster": [{
+						"type": "expression",
+						"params": {
+							"expression": "value < 300 ? 1 : 0"
+						},
+						"sources": {
+							"raster": [{
+								"type": "source",
+								"params": {
+									"sourcepath": "datasources/msat2.json",
+									"channel": 6
+								}
+							}]
+						}
+					}]
+				}
 			}]
-		}]
+		}
 	}
 },
 "rats2": {
@@ -398,13 +428,15 @@ if ($action == 'examplequerylist.get') {
 		"type": "points2raster",
 		"params": {
 		},
-		"sources_points": [{
-			"type": "pgpointsource",
-			"params": {
-				"connection": "host = '10.0.9.3' dbname = 'postgres' user = 'postgres' password = 'test'",
-				"query": "x, y FROM (SELECT ST_X(t.geom) x, ST_Y(t.geom) y FROM (SELECT ST_TRANSFORM(location, 3857) geom FROM public.gbif_taxon_to_name JOIN public.gbif_lite_time ON (gbif_taxon_to_name.taxon = gbif_lite_time.taxon) WHERE name = 'Rattus rattus') t) t2"
-			}
-		}]
+		"sources": {
+			"points": [{
+				"type": "pgpointsource",
+				"params": {
+					"connection": "host = '10.0.9.3' dbname = 'postgres' user = 'postgres' password = 'test'",
+					"query": "x, y FROM (SELECT ST_X(t.geom) x, ST_Y(t.geom) y FROM (SELECT ST_TRANSFORM(location, 3857) geom FROM public.gbif_taxon_to_name JOIN public.gbif_lite_time ON (gbif_taxon_to_name.taxon = gbif_lite_time.taxon) WHERE name = 'Rattus rattus') t) t2"
+				}
+			}]
+		}
 	}
 },
 "metadata": {

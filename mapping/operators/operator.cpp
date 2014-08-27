@@ -153,15 +153,15 @@ static int parseSourcesFromJSON(Json::Value &sourcelist, GenericOperator *source
 
 std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json) {
 	// recursively create all sources
-	Json::Value sourcelist = json["sources_raster"];
+	Json::Value sourcelist = json["sources"];
 	Json::Value params = json["params"];
 	int sourcecount = 0;
 	int sourcecounts[MAX_INPUT_TYPES] = {0};
 	GenericOperator *sources[MAX_SOURCES] = {nullptr};
 	try {
-		sourcecounts[0] = parseSourcesFromJSON(json["sources_raster"], sources, sourcecount);
-		sourcecounts[1] = parseSourcesFromJSON(json["sources_points"], sources, sourcecount);
-		sourcecounts[2] = parseSourcesFromJSON(json["sources_geometry"], sources, sourcecount);
+		sourcecounts[0] = parseSourcesFromJSON(sourcelist["raster"], sources, sourcecount);
+		sourcecounts[1] = parseSourcesFromJSON(sourcelist["points"], sources, sourcecount);
+		sourcecounts[2] = parseSourcesFromJSON(sourcelist["geometry"], sources, sourcecount);
 
 		// now check the operator name and instantiate the correct class
 		std::string type = json["type"].asString();

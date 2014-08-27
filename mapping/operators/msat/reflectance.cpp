@@ -4,24 +4,25 @@
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
-#include "util/sunpos.h"
 #include "msg_constants.h"
+#include "util/sunpos.h"
+
 
 
 #include <limits>
 #include <memory>
 #include <math.h>
-#include <sstream>
+//#include <sstream>
 #include <ctime>        // struct std::tm
 //#include <time.h>
-#include <iterator>
+//#include <iterator>
 #include <json/json.h>
 #include <gdal_priv.h>
 
 
 class MSATReflectanceOperator : public GenericOperator {
 	public:
-		MSATReflectanceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		MSATReflectanceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATReflectanceOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -33,7 +34,7 @@ class MSATReflectanceOperator : public GenericOperator {
 
 
 
-MSATReflectanceOperator::MSATReflectanceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+MSATReflectanceOperator::MSATReflectanceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 }
 MSATReflectanceOperator::~MSATReflectanceOperator() {
@@ -73,24 +74,25 @@ double calculateESD(int dayOfYear){
 
 std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
-	auto raster = sources[0]->getRaster(rect);
+	auto raster = getRasterFromSource(0, rect);
 
 	// get the timestamp of the MSG scene from the raster metadata
 	std::string timestamp = raster->md_string.get("TimeStamp");
 	// create and store a real time object
 	std::tm timeDate;
 
-	/** TODO: This would be the c++11 way to do it. Sadly GCC does not implement it...
+	/** TODO: This would be the c++11 way to do it. Sadly this is not implemented in GCC 4.8...
 	std::istringstream ss(timestamp);
 	ss >> std::get_time(&time, "%Y%m%d%H%M%S");
 	*/
 	strptime(timestamp.c_str(),"%Y%m%d%H%M", &timeDate);
-	std::cerr<<"timeDate.tm_mday:"<<timeDate.tm_mday<<"|timeDate.tm_mon:"<<timeDate.tm_mon<<"|timeDate.tm_year:"<<timeDate.tm_year<<"|timeDate.tm_hour:"<<timeDate.tm_hour<<"|timeDate.tm_min:"<<timeDate.tm_min<<"|ORIGINAL:"<<timestamp<<std::endl;
+	//std::cerr<<"timeDate.tm_mday:"<<timeDate.tm_mday<<"|timeDate.tm_mon:"<<timeDate.tm_mon<<"|timeDate.tm_year:"<<timeDate.tm_year<<"|timeDate.tm_hour:"<<timeDate.tm_hour<<"|timeDate.tm_min:"<<timeDate.tm_min<<"|ORIGINAL:"<<timestamp<<std::endl;
 
 	//now calculate the intermediate values using PSA algorithm
 	cIntermediateVariables psaIntermediateValues = sunposIntermediate(timeDate.tm_year+1900, timeDate.tm_mon+1,	timeDate.tm_mday, timeDate.tm_hour, timeDate.tm_min, 0.0);
-	std::cerr<<"GMST: "<<psaIntermediateValues.dGreenwichMeanSiderealTime<<" dRightAscension: "<<psaIntermediateValues.dRightAscension<<" dDeclination: "<<psaIntermediateValues.dDeclination<<std::endl;
+	//std::cerr<<"GMST: "<<psaIntermediateValues.dGreenwichMeanSiderealTime<<" dRightAscension: "<<psaIntermediateValues.dRightAscension<<" dDeclination: "<<psaIntermediateValues.dDeclination<<std::endl;
 
+	/* DEBUG infos
 	//get more information about the raster dimensions of the processed tile
 	LocalCRS lcrs = raster->lcrs;
 	std::cerr<<"epsg:"<<lcrs.epsg<<"|dimensions:"<<lcrs.dimensions<<"|origin:";
@@ -113,12 +115,13 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
               std::ostream_iterator<int>(std::cerr,",")
              );
 	std::cerr<<std::endl;
+	*/
 
 	// now we need the channelNumber to calculate ETSR and ESD
 	int channel = (int) raster->md_value.get("Channel");
 	double dETSRconst = msg::dETSRconst[channel];
 	double dESD = calculateESD(timeDate.tm_yday+1);
-	std::cerr<<"channel:"<<channel<<"|dETSRconst"<<dETSRconst<<"|dESD:"<<dESD<<std::endl;
+	//std::cerr<<"channel:"<<channel<<"|dETSRconst"<<dETSRconst<<"|dESD:"<<dESD<<std::endl;
 
 
 

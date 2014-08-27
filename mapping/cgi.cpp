@@ -232,6 +232,10 @@ int main() {
 			timestamp = atol(params["timestamp"].c_str());
 		}
 
+		bool debug = true;
+		if (params.count("debug") > 0) {
+			debug = params["debug"] == "1";
+		}
 
 		// direct loading of a query (obsolete?)
 		if (params.count("query") > 0) {
@@ -419,21 +423,34 @@ int main() {
 #endif
 
 						std::unique_ptr<Raster2D<uint8_t>> overlay;
-						DataDescription dd_overlay(GDT_Byte, 0, 1);
-						overlay.reset( (Raster2D<uint8_t> *) GenericRaster::create(result_raster->lcrs, dd_overlay).release());
-						overlay->clear(0);
+						if (debug) {
+							DataDescription dd_overlay(GDT_Byte, 0, 1);
+							overlay.reset( (Raster2D<uint8_t> *) GenericRaster::create(result_raster->lcrs, dd_overlay).release());
+							overlay->clear(0);
 
-						// Write debug info
-						std::ostringstream msg_tl;
-						msg_tl.precision(2);
-						msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
-						overlay->print(4, 4, 1, msg_tl.str().c_str());
+							// Write debug info
+							std::ostringstream msg_tl;
+							msg_tl.precision(2);
+							msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
+							overlay->print(4, 4, 1, msg_tl.str().c_str());
 
-						std::ostringstream msg_br;
-						msg_br.precision(2);
-						msg_br << std::fixed << bbox[2] << ", " << bbox[3];
-						std::string msg_brs = msg_br.str();
-						overlay->print(overlay->lcrs.size[1]-4-8*msg_brs.length(), overlay->lcrs.size[1]-12, overlay->dd.max, msg_brs.c_str());
+							std::ostringstream msg_br;
+							msg_br.precision(2);
+							msg_br << std::fixed << bbox[2] << ", " << bbox[3];
+							std::string msg_brs = msg_br.str();
+							overlay->print(overlay->lcrs.size[1]-4-8*msg_brs.length(), overlay->lcrs.size[1]-12, overlay->dd.max, msg_brs.c_str());
+
+#if RASTER_DO_PROFILE
+							if (result_raster->lcrs.size[1] >= 512) {
+								auto profile = Profiler::get();
+								int ypos = 36;
+								for (auto &msg : profile) {
+									overlay->print(4, ypos, overlay->dd.max, msg.c_str());
+									ypos += 10;
+								}
+							}
+#endif
+						}
 
 						outputImage(result_raster.get(), flipx, flipy, colorizer, overlay.get());
 					}

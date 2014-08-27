@@ -5,11 +5,16 @@
 #define RASTER_DO_PROFILE 1
 #endif
 
+#if RASTER_DO_PROFILE
+#include <string>
+#include <vector>
+#endif
 
 namespace Profiler {
 #if RASTER_DO_PROFILE
 	void start(const char *msg);
 	void stop(const char *msg);
+	std::vector<std::string> get();
 	void print();
 	class Profiler {
 		public:

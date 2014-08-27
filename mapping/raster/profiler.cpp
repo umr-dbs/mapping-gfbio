@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <sstream>
 
 
 
@@ -43,6 +44,17 @@ namespace Profiler {
 		double elapsed_time = getTimestamp() - starttime;
 
 		finished_timers.push_back( std::make_pair(key, elapsed_time) );
+	}
+
+	std::vector<std::string> get() {
+		std::vector<std::string> result;
+		for (auto it = finished_timers.begin() ; it != finished_timers.end(); ++it) {
+			std::ostringstream msg;
+			msg.precision(4);
+			msg << std::fixed << it->first << ": " << it->second;
+			result.push_back(msg.str());
+		}
+		return result;
 	}
 
 	void print() {

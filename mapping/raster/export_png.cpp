@@ -28,16 +28,10 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 
 	if (overlay) {
 		// Write debug info
-		std::ostringstream msg_tl;
-		msg_tl.precision(2);
-		//msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
-		overlay->print(4, 4, 1, msg_tl.str().c_str());
-
-		std::ostringstream msg_br;
-		msg_br.precision(2);
-		//msg_br << std::fixed << bbox[2] << ", " << bbox[3];
-		std::string msg_brs = msg_br.str();
-		overlay->print(overlay->lcrs.size[1]-4-8*msg_brs.length(), overlay->lcrs.size[1]-12, overlay->dd.max, msg_brs.c_str());
+		std::ostringstream msg_scale;
+		msg_scale.precision(2);
+		msg_scale << std::fixed << "scale: " << lcrs.scale[0] << ", " << lcrs.scale[1];
+		overlay->print(4, 26, overlay->dd.max, msg_scale.str().c_str());
 	}
 
 	T max = dd.max;
@@ -154,7 +148,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 			else {
 				row[x] = round(253.0 * ((float) v - actual_min) / actual_range) + 2;
 			}
-			if (x == 0 || y == 0 || x == width-1 || y == height-1)
+			if (overlay && (x == 0 || y == 0 || x == width-1 || y == height-1))
 				row[x] = 1;
 		}
 		png_write_row(png_ptr, (png_bytep) row);

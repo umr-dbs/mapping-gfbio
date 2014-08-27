@@ -43,8 +43,8 @@ REGISTER_OPERATOR(MSATReflectanceOperator, "msatreflectance");
 
 double calculateDevisorFor(int channel, int dayOfYear) {
 	int index = 0;
-	if(channel>=1 && channel <=3)
-		index = channel-1;
+	if(channel>=0 && channel <=2)
+		index = channel;
 	else if(channel == 12)
 		index = 3;
 	else
@@ -63,8 +63,8 @@ double calculateDevisorFor(int channel, int dayOfYear) {
 	return 10/div;
 	*/
 
-	//y not this? //TODO check if 1/something produces a problem
-	return 1 / msg::dETSRconst[index] / dESD;
+	//y not zoidberg? //TODO check if 1/something produces a problem
+	return 1 / msg::dETSRconst[index] / (dESD*dESD);
 }
 
 double calculateESD(int dayOfYear){
@@ -116,18 +116,21 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 
 	// now we need the channelNumber to calculate ETSR and ESD
 	int channel = (int) raster->md_value.get("Channel");
-	double dETSRconst = msg::dETSRconst[channel-1];
+	double dETSRconst = msg::dETSRconst[channel];
 	double dESD = calculateESD(timeDate.tm_yday+1);
+	std::cerr<<"channel:"<<channel<<"|dETSRconst"<<dETSRconst<<"|dESD:"<<dESD<<std::endl;
+
+
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
 
 	//
-	DataDescription out_dd(GDT_Float32, 0.0, 1.0); // no no_data //raster->dd.has_no_data, output_no_data);
+	DataDescription out_dd(GDT_Float32, -0.1, 4.0); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
-	auto raster_out = GenericRaster::create(lcrs, out_dd);
+	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster.get());
@@ -140,5 +143,5 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	prog.addArg(dESD);
 	prog.run();
 
-	return raster;
+	return raster_out;
 }

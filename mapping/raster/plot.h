@@ -6,9 +6,9 @@
 /**
  * Abstract base class for all output data vector types.
  */
-class DataVector {
+class GenericPlot {
 public:
-	virtual ~DataVector() {};
+	virtual ~GenericPlot() {};
 
 	/**
 	 * Creates a JSON representation of the data vector.

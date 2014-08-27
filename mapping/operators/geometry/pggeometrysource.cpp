@@ -13,7 +13,7 @@
 
 class PGPointSourceOperator : public GenericOperator {
 	public:
-		PGPointSourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PGPointSourceOperator();
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
@@ -24,7 +24,7 @@ class PGPointSourceOperator : public GenericOperator {
 
 
 
-PGPointSourceOperator::PGPointSourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources), connection(nullptr) {
+PGPointSourceOperator::PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), connection(nullptr) {
 	assumeSources(0);
 
 	const char *connectionstring = "host = 'localhost' dbname = 'idessa' user = 'idessa' password = 'idessa' "; // host = 'localhost'

@@ -13,13 +13,13 @@ private:
 	bool includeNoData;
 	double rangeMin, rangeMax;
 public:
-	PointsFilterByRangeOperator(int sourcecount, GenericOperator *sources[],	Json::Value &params);
+	PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 	virtual ~PointsFilterByRangeOperator();
 
 	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 };
 
-PointsFilterByRangeOperator::PointsFilterByRangeOperator(int sourcecount,	GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::POINTS, sourcecount, sources) {
+PointsFilterByRangeOperator::PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
 	name = params.get("name", "raster").asString();
@@ -33,7 +33,7 @@ PointsFilterByRangeOperator::~PointsFilterByRangeOperator() {
 REGISTER_OPERATOR(PointsFilterByRangeOperator, "points_filter_by_range");
 
 std::unique_ptr<PointCollection> PointsFilterByRangeOperator::getPoints(const QueryRectangle &rect) {
-	auto pointsOld = sources[0]->getPoints(rect);
+	auto pointsOld = getPointsFromSource(0, rect);
 	auto pointsNew = std::make_unique<PointCollection>(pointsOld->epsg);
 
 	PointCollectionMetadataCopier metadataCopier(*pointsOld, *pointsNew);

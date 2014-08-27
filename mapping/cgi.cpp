@@ -2,7 +2,7 @@
 #include "raster/raster_priv.h"
 #include "raster/pointcollection.h"
 #include "raster/geometry.h"
-#include "raster/datavector.h"
+#include "raster/plot.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
@@ -194,7 +194,7 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 
 		auto graph = GenericOperator::fromJSON(params["layers"]);
 
-		auto points = graph->getPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg));
+		auto points = graph->getCachedPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg));
 
 		#if RASTER_DO_PROFILE
 					printf("Profiling-header: ");
@@ -241,7 +241,7 @@ int main() {
 			if (params.count("colors") > 0)
 				colorizer = params["colors"];
 
-			auto raster = graph->getRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			auto raster = graph->getCachedRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
@@ -256,7 +256,7 @@ int main() {
 		if (params.count("pointquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 
-			auto points = graph->getPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			auto points = graph->getCachedPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
@@ -277,7 +277,7 @@ int main() {
 		if (params.count("geometryquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
 
-			auto geometry = graph->getGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			auto geometry = graph->getCachedGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
 
 #if RASTER_DO_PROFILE
 			printf("Profiling-header: ");
@@ -397,13 +397,13 @@ int main() {
 					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
 
 					if (format == "application/json") {
-						std::unique_ptr<DataVector> dataVector = graph->getDataVector(qrect);
+						std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect);
 
 						printf("content-type: application/json\r\n\r\n");
 						printf(dataVector->toJSON().c_str());
 					}
 					else {
-						auto result_raster = graph->getRaster(qrect);
+						auto result_raster = graph->getCachedRaster(qrect);
 
 						if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
 							result_raster = result_raster->scale(output_width, output_height);

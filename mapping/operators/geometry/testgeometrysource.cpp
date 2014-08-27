@@ -10,7 +10,7 @@
 
 class TestGeometrySourceOperator : public GenericOperator {
 	public:
-		TestGeometrySourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		TestGeometrySourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~TestGeometrySourceOperator();
 
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
@@ -19,7 +19,7 @@ class TestGeometrySourceOperator : public GenericOperator {
 
 
 
-TestGeometrySourceOperator::TestGeometrySourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+TestGeometrySourceOperator::TestGeometrySourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
 }
 

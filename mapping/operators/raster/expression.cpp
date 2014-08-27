@@ -15,7 +15,7 @@
 
 class ExpressionOperator : public GenericOperator {
 	public:
-		ExpressionOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ExpressionOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -40,7 +40,7 @@ struct isIntegerType {
 };
 
 
-ExpressionOperator::ExpressionOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+ExpressionOperator::ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 	expression = params.get("expression", "value").asString();
 	std::string datatype = params.get("datatype", "input").asString();
@@ -113,7 +113,7 @@ struct getActualMinMax {
 
 std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
-	auto raster_in = sources[0]->getRaster(rect);
+	auto raster_in = getRasterFromSource(0, rect);
 
 	if (!has_manual_value_range) {
 		if (!callUnaryOperatorFunc<isIntegerType>(raster_in.get()))

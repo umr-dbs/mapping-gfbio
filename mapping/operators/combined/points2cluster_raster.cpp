@@ -12,7 +12,7 @@
 
 class PointsToClusterRasterOperator : public GenericOperator {
 	public:
-	PointsToClusterRasterOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		PointsToClusterRasterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PointsToClusterRasterOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -21,7 +21,7 @@ class PointsToClusterRasterOperator : public GenericOperator {
 
 
 
-PointsToClusterRasterOperator::PointsToClusterRasterOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+PointsToClusterRasterOperator::PointsToClusterRasterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 }
 
@@ -35,7 +35,7 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 	const int MAX = 255;
 	typedef uint8_t T;
 
-	std::unique_ptr<PointCollection> points = sources[0]->getPoints(rect);
+	std::unique_ptr<PointCollection> points = getPointsFromSource(0, rect);
 
 	LocalCRS rm(rect);
 	DataDescription vm(GDT_Byte, 0, MAX, true, 0);

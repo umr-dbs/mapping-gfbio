@@ -11,7 +11,7 @@
 
 class PointsToRasterOperator : public GenericOperator {
 	public:
-	PointsToRasterOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		PointsToRasterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PointsToRasterOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -20,7 +20,7 @@ class PointsToRasterOperator : public GenericOperator {
 
 
 
-PointsToRasterOperator::PointsToRasterOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+PointsToRasterOperator::PointsToRasterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 }
 
@@ -39,7 +39,7 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 	QueryRectangle rect2 = rect;
 	rect2.enlarge(RADIUS);
 
-	auto points = sources[0]->getPoints(rect2);
+	auto points = getPointsFromSource(0, rect2);
 
 	LocalCRS rm(rect);
 	DataDescription vm(GDT_Byte, 0, MAX, true, 0);

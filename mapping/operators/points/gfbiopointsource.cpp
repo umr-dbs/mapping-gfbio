@@ -15,7 +15,7 @@
 
 class GFBioPointSourceOperator : public GenericOperator {
 	public:
-		GFBioPointSourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		GFBioPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~GFBioPointSourceOperator();
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
@@ -31,7 +31,7 @@ class GFBioPointSourceOperator : public GenericOperator {
 };
 
 
-GFBioPointSourceOperator::GFBioPointSourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+GFBioPointSourceOperator::GFBioPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
 
 	datasource = params.get("datasource", "").asString();
@@ -47,7 +47,7 @@ REGISTER_OPERATOR(GFBioPointSourceOperator, "gfbiopointsource");
 
 class GFBioGeometrySourceOperator : public GFBioPointSourceOperator {
 	public:
-		GFBioGeometrySourceOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GFBioPointSourceOperator(sourcecount, sources, params) {};
+		GFBioGeometrySourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GFBioPointSourceOperator(sourcecounts, sources, params) {};
 };
 REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
@@ -143,7 +143,7 @@ std::unique_ptr<geos::geom::Geometry> GFBioPointSourceOperator::loadGeometryFrom
 
 	//url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource?datasource" << datasource << "&query=" << query;
 	std::stringstream data;
-	
+
 	getStringFromServer(rect, data, "WKB");
 	//curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
 

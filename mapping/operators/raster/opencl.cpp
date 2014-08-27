@@ -13,7 +13,7 @@
 
 class OpenCLOperator : public GenericOperator {
 	public:
-		OpenCLOperator(int sourcecount, GenericOperator *sources[], Json::Value &params);
+		OpenCLOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~OpenCLOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
@@ -21,7 +21,7 @@ class OpenCLOperator : public GenericOperator {
 
 
 
-OpenCLOperator::OpenCLOperator(int sourcecount, GenericOperator *sources[], Json::Value &params) : GenericOperator(Type::RASTER, sourcecount, sources) {
+OpenCLOperator::OpenCLOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 }
 OpenCLOperator::~OpenCLOperator() {
@@ -31,7 +31,7 @@ REGISTER_OPERATOR(OpenCLOperator, "opencl");
 
 std::unique_ptr<GenericRaster> OpenCLOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
-	auto raster_in = sources[0]->getRaster(rect);
+	auto raster_in = getRasterFromSource(0, rect);
 
 	Profiler::Profiler p("CL_OPERATOR");
 	raster_in->setRepresentation(GenericRaster::OPENCL);

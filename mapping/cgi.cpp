@@ -156,8 +156,8 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 		if (version != "2.0.0")
 			abort("Invalid version");
 
-		int output_width = atoi(params["width"].c_str());
-		int output_height = atoi(params["height"].c_str());
+		int output_width = std::stoi(params["width"]);
+		int output_height = std::stoi(params["height"]);
 		if (output_width <= 0 || output_height <= 0) {
 			abort("output_width not valid");
 		}
@@ -224,12 +224,12 @@ int main() {
 		if (params.count("crs") > 0) {
 			std::string crs = params["crs"];
 			if (crs.compare(0,5,"EPSG:") == 0) {
-				query_epsg = atoi(crs.substr(5, std::string::npos).c_str());
+				query_epsg = std::stoi(crs.substr(5, std::string::npos));
 			}
 		}
 		time_t timestamp = 42;
 		if (params.count("timestamp") > 0) {
-			timestamp = atol(params["timestamp"].c_str());
+			timestamp = std::stol(params["timestamp"]);
 		}
 
 		bool debug = true;
@@ -310,8 +310,8 @@ int main() {
 				if (version != "1.3.0")
 					abort("Invalid version");
 
-				int output_width = atoi(params["width"].c_str());
-				int output_height = atoi(params["height"].c_str());
+				int output_width = std::stoi(params["width"]);
+				int output_height = std::stoi(params["height"]);
 				if (output_width <= 0 || output_height <= 0) {
 					abort("output_width not valid");
 				}

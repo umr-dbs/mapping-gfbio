@@ -202,14 +202,12 @@
 .layerControl .minimap {
 	position: relative;
 	background: #000;
-	padding-bottom: 100%;
 	clear: both;
 }
 
 .layerControl .minimap img {
 	width: 100%;
 	height: 100%;
-	position: absolute;
 }
 
 .layerControl .footer {

@@ -34,13 +34,6 @@ class QueryRectangle {
 
 class GenericOperator {
 	public:
-		enum class Type {
-			RASTER,
-			POINTS,
-			GEOMETRY,
-
-			PLOT = 100
-		};
 		static const int MAX_INPUT_TYPES = 3;
 		static const int MAX_SOURCES = 5;
 		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json);
@@ -56,6 +49,10 @@ class GenericOperator {
 	protected:
 		GenericOperator(int sourcecounts[], GenericOperator *sources[]);
 		void assumeSources(int rasters, int pointcollections=0, int geometries=0);
+
+		int getRasterSourceCount() { return sourcecounts[0]; }
+		int getPointsSourceCount() { return sourcecounts[1]; }
+		int getGeometrySourceCount() { return sourcecounts[2]; }
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);

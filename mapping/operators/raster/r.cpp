@@ -42,15 +42,24 @@ namespace ***REMOVED*** {
 
 class ROperator : public GenericOperator {
 	public:
-	ROperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
+		ROperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ROperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
+
+		SEXP runScript(const QueryRectangle &rect);
 	private:
+		friend std::unique_ptr<GenericRaster> query_raster_source(ROperator *op, int childidx, const QueryRectangle &rect);
+
+		std::string source;
+		std::string result_type;
 };
 
 ROperator::ROperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
-	assumeSources(1);
+	source = params["source"].asString();
+	result_type = params["result"].asString();
 }
 ROperator::~ROperator() {
 }
@@ -58,82 +67,61 @@ REGISTER_OPERATOR(ROperator, "r");
 
 
 static std::mutex r_running_mutex;
-static GenericOperator *r_running_operator = nullptr;
-static std::unique_ptr<GenericRaster> query_raster_source(const QueryRectangle &rect) {
-	auto raster = r_running_operator->getRaster(rect);
-	raster->setRepresentation(GenericRaster::Representation::CPU);
-	return raster;
-}
 
-static std::unique_ptr<GenericRaster> query_raster_source2(void *user_data, const QueryRectangle &rect) {
-	GenericOperator *op = (GenericOperator *) user_data;
-	auto raster = op->getRaster(rect);
-	raster->setRepresentation(GenericRaster::Representation::CPU);
-	return raster;
-}
-
-static std::unique_ptr<GenericRaster> query_raster_source3(GenericOperator *op, int childidx, const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> query_raster_source(ROperator *op, int childidx, const QueryRectangle &rect) {
 	auto raster = op->getRasterFromSource(childidx, rect);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 	return raster;
 }
 
+SEXP ROperator::runScript(const QueryRectangle &rect) {
+	std::lock_guard<std::mutex> guard(r_running_mutex);
+	Profiler::Profiler p("R_OPERATOR");
 
-static void test_func(int bind, int value) {
-	return;
+	Profiler::start("R_OPERATOR: construct");
+	***REMOVED*** R;
+	Profiler::stop("R_OPERATOR: construct");
+
+	Profiler::start("R_OPERATOR: load libraries");
+	R.parseEvalQ("library(\"raster\")");
+	Profiler::stop("R_OPERATOR: load libraries");
+
+	Profiler::start("R_OPERATOR: environment");
+	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_source = std::bind(query_raster_source, this, std::placeholders::_1, std::placeholders::_2);
+	R["mapping.rastercount"] = getRasterSourceCount();
+	R["mapping.loadRaster"] = ***REMOVED***::InternalFunction( bound_source );;
+	R["mapping.qrect"] = rect;
+	Profiler::stop("R_OPERATOR: environment");
+
+	Profiler::start("R_OPERATOR: executing script");
+	auto result = R.parseEval(source);
+	Profiler::stop("R_OPERATOR: executing script");
+
+	return result;
 }
 
+
 std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect) {
-	std::lock_guard<std::mutex> guard(r_running_mutex);
+	if (result_type != "raster")
+		throw OperatorException("This R script does not return rasters");
 
-	***REMOVED*** R;
+	return ***REMOVED***::as<std::unique_ptr<GenericRaster>>(runScript(rect));
+}
 
-	//R.parseEvalQ("library(\"sp\");");
-	//R.parseEvalQ("library(\"raster\")");
+std::unique_ptr<PointCollection> ROperator::getPoints(const QueryRectangle &rect) {
+	if (result_type != "points")
+		throw OperatorException("This R script does not return a point collection");
 
-#if 0
-	r_running_operator = sources[0];
-	R["mapping.source"] = ***REMOVED***::InternalFunction( &query_raster_source );
-#elif true
-	std::function<std::unique_ptr<GenericRaster>(const QueryRectangle &rect)> bound_source = std::bind(query_raster_source3, this, 0, std::placeholders::_1);
-	R["mapping.source"] = ***REMOVED***::InternalFunction( bound_source );
-	//R["mapping.source"] = bound_source;
+	throw OperatorException("TODO");
+	//return runScript(rect);
+}
 
-	std::function<void(int)> bound_test = std::bind(test_func, 42, std::placeholders::_1);
-	R["test_func"] = ***REMOVED***::InternalFunction( bound_test );
+std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect) {
+	if (result_type != "plot")
+		throw OperatorException("This R script does not return a plot");
 
-	std::pair<double, int> pair;
-	R["pair"] = pair;
-	//R["test_func"] = bound_test;
-	//R["test_func2"] = &test_func;
-#endif
-	R["mapping.qrect"] = rect;
-
-	auto result = R.parseEval(
-//		"test_func(1);"
-//		"test_func2(1,2);"
-		"raster = mapping.source(mapping.qrect);"
-		"raster <- -raster;"
-		"raster;"
-	);
-
-	std::unique_ptr<GenericRaster> raster_out_guard = result;
-
-	// TODO: reuse crs from QueryRectangle?
-	// We're violating encapsulation here, just to
-	LocalCRS qrect_crs(rect);
-	LocalCRS &raster_crs = const_cast<LocalCRS &>(raster_out_guard->lcrs);
-	raster_crs.epsg = qrect_crs.epsg;
-	for (int i=0;i<3;i++) {
-		raster_crs.origin[i] = qrect_crs.origin[i];
-		raster_crs.scale[i] = qrect_crs.scale[i];
-	}
-	raster_crs.scale[1] *= -1;
-	raster_crs.verify();
-
-
-
-	return raster_out_guard;
+	throw OperatorException("TODO");
+	//return runScript(rect);
 }
 
 
@@ -142,6 +130,7 @@ std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect) 
 namespace ***REMOVED*** {
 	// QueryRectangle
 	template<> SEXP wrap(const QueryRectangle &rect) {
+		Profiler::Profiler p("R_OPERATOR: wrapping qrect");
 		***REMOVED***::List list;
 
 		list["timestamp"] = rect.timestamp;
@@ -156,6 +145,7 @@ namespace ***REMOVED*** {
 		return ***REMOVED***::wrap(list);
 	}
 	template<> QueryRectangle as(SEXP sexp) {
+		Profiler::Profiler p("R_OPERATOR: unwrapping qrect");
 		***REMOVED***::List list = ***REMOVED***::as<***REMOVED***::List>(sexp);
 
 		return QueryRectangle(
@@ -172,61 +162,127 @@ namespace ***REMOVED*** {
 
 	// Raster
 	template<> SEXP wrap(const GenericRaster &raster) {
+		Profiler::Profiler p("R_OPERATOR: wrapping raster");
 		int width = raster.lcrs.size[0];
 		int height = raster.lcrs.size[1];
+
+		***REMOVED***::NumericVector pixels(raster.lcrs.getPixelCount());
+		int pos = 0;
+		for (int y=0;y<height;y++) {
+			for (int x=0;x<width;x++) {
+				double val = raster.getAsDouble(x, y);
+				if (raster.dd.is_no_data(val))
+					pixels[pos++] = NAN;
+				else
+					pixels[pos++] = val;
+			}
+		}
+
+		***REMOVED***::S4 data(".SingleLayerData");
+		data.slot("values") = pixels;
+		data.slot("inmemory") = true;
+		data.slot("fromdisk") = false;
+		data.slot("haveminmax") = true;
+		data.slot("min") = raster.dd.min;
+		data.slot("max") = raster.dd.max;
+
+		***REMOVED***::S4 extent("Extent");
+		extent.slot("xmin") = raster.lcrs.origin[0];
+		extent.slot("ymin") = raster.lcrs.origin[1];
+		extent.slot("xmax") = raster.lcrs.PixelToWorldX(raster.lcrs.size[0]);
+		extent.slot("ymax") = raster.lcrs.PixelToWorldY(raster.lcrs.size[1]);
+
+		***REMOVED***::S4 crs("CRS");
+		std::ostringstream epsg;
+		epsg << "EPSG:" << raster.lcrs.epsg;
+		crs.slot("projargs") = epsg.str();
+
+		***REMOVED***::S4 rasterlayer("RasterLayer");
+		rasterlayer.slot("data") = data;
+		rasterlayer.slot("extent") = extent;
+		rasterlayer.slot("crs") = crs;
+		rasterlayer.slot("nrows") = raster.lcrs.size[0];
+		rasterlayer.slot("ncols") = raster.lcrs.size[1];
+
+		return ***REMOVED***::wrap(rasterlayer);
 
 		/*
 		 * Thomas sagt: "Raster" und "Spatial Data Frame"?
 		 */
 
-		/*
-		 * Spatial Grid
-		 * grid: GridTopology
-		 * bbox: Matrix, bounding box
-		 * proj4string: CRS
-		 *
-		 * GridTopology:
-		 * cellcentre.offset: vector, origin
-		 * cellsize: vector, scale
-		 * cells.dim: vector, size
-		 *
-		 * CRS:
-		 * projargs: string
-		 */
+/*
+class       : RasterLayer
+dimensions  : 180, 360, 64800  (nrow, ncol, ncell)
+resolution  : 1, 1  (x, y)
+extent      : -180, 180, -90, 90  (xmin, xmax, ymin, ymax)
+coord. ref. : +proj=longlat +datum=WGS84
 
-		// TODO: use IntegerMatrix for integer datatypes?
-		***REMOVED***::NumericMatrix M(width, height);
-		for (int y=0;y<height;y++)
-			for (int x=0;x<width;x++) {
-				double val = raster.getAsDouble(x, y);
-				if (raster.dd.is_no_data(val))
-					M(x,y) = NAN;
-				else
-					M(x,y) = val;
-			}
-		return ***REMOVED***::wrap(M);
+attributes(r)
+$history: list()
+$file: class .RasterFile
+$data: class .SingleLayerData  (hat haveminmax, min, max!)
+$legend: class .RasterLegend
+$title: character(0)
+$extent: class Extent (xmin, xmax, ymin, ymax)
+$rotated: FALSE
+$rotation: class .Rotation
+$ncols: int
+$nrows: int
+$crs: CRS arguments: +proj=longlat +datum=WGS84
+$z: list()
+$class: c("RasterLayer", "raster")
+
+ */
 	}
 	template<> SEXP wrap(const std::unique_ptr<GenericRaster> &raster) {
 		return ***REMOVED***::wrap(*raster);
 	}
 	template<> std::unique_ptr<GenericRaster> as(SEXP sexp) {
-		***REMOVED***::NumericMatrix M = ***REMOVED***::as<***REMOVED***::NumericMatrix>(sexp);
+		Profiler::Profiler p("R_OPERATOR: unwrapping raster");
+		***REMOVED***::S4 rasterlayer(sexp);
+		if (!rasterlayer.is("RasterLayer"))
+			throw OperatorException("R: Result is not a RasterLayer");
 
-		int width = M.nrow(); // In R Matrixes, the first dimension is "rows"..
-		int height = M.ncol();
+		int width = rasterlayer.slot("ncols");
+		int height = rasterlayer.slot("nrows");
 
-		// TODO: the R raster must have a CRS
-		LocalCRS lcrs(EPSG_UNKNOWN, width, height, 0, 0, 1, 1);
-		// TODO: the R raster must have min/max values
-		DataDescription dd(GDT_Float32, -1024, 1024);
+		***REMOVED***::S4 crs = rasterlayer.slot("crs");
+		std::string epsg_string = crs.slot("projargs");
+		epsg_t epsg = EPSG_UNKNOWN;
+		if (epsg_string.compare(0,5,"EPSG:") == 0)
+			epsg = std::stoi(epsg_string.substr(5, std::string::npos));
+		if (epsg == EPSG_UNKNOWN)
+			throw OperatorException("R: result raster has no projection of form EPSG:1234 set");
 
-		auto raster_out_guard = GenericRaster::create(lcrs, dd);
-		Raster2D<float> *raster_out = (Raster2D<float> *) raster_out_guard.get();
+		***REMOVED***::S4 extent = rasterlayer.slot("extent");
+		double xmin = extent.slot("xmin"), ymin = extent.slot("ymin"), xmax = extent.slot("xmax"), ymax = extent.slot("ymax");
 
-	    for (int y=0;y<height;y++)
-	    	for (int x=0;x<width;x++)
-	    		raster_out->set(x, y, (float) M(x,y));
+		LocalCRS lcrs(epsg, width, height, xmin, ymin, (xmax-xmin)/width, (ymax-ymin)/height);
 
-		return raster_out_guard;
+		***REMOVED***::S4 data = rasterlayer.slot("data");
+		if ((bool) data.slot("inmemory") != true)
+			throw OperatorException("R: result raster not inmemory");
+		if ((bool) data.slot("haveminmax") != true)
+			throw OperatorException("R: result raster does not have min/max");
+
+		double min = data.slot("min");
+		double max = data.slot("max");
+
+		DataDescription dd(GDT_Float32, min, max, true, NAN);
+
+		lcrs.verify();
+		dd.verify();
+		auto raster_out = GenericRaster::create(lcrs, dd, GenericRaster::Representation::CPU);
+		Raster2D<float> *raster2d = (Raster2D<float> *) raster_out.get();
+
+		***REMOVED***::NumericVector pixels = data.slot("values");
+		int pos = 0;
+		for (int y=0;y<height;y++) {
+			for (int x=0;x<width;x++) {
+				float val = pixels[pos++];
+				raster2d->set(x, y, val);
+			}
+		}
+		return raster_out;
 	}
 }

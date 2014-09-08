@@ -1,6 +1,5 @@
 #include "raster/raster.h"
 #include "raster/raster_priv.h"
-#include "raster/histogram.h"
 #include "raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/pointcollection.h"

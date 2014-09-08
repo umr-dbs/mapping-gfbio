@@ -1,11 +1,11 @@
-#ifndef RASTER_HISTOGRAM_H
-#define RASTER_HISTOGRAM_H
+#ifndef PLOT_HISTOGRAM_H
+#define PLOT_HISTOGRAM_H
 
 #include <vector>
 #include <sstream>
 #include <string>
 
-#include "raster/plot.h"
+#include "plot/plot.h"
 
 class Histogram : public GenericPlot {
 	public:

@@ -2,7 +2,7 @@
 #include "raster/raster_priv.h"
 #include "raster/pointcollection.h"
 #include "raster/geometry.h"
-#include "raster/plot.h"
+#include "plot/plot.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"

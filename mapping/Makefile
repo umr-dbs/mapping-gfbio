@@ -13,7 +13,8 @@ LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -
 LDFLAGS_CGI=-luriparser
 CL_SOURCES=$(wildcard operators/*/*.cl)
 CL_HEADERS=$(CL_SOURCES:.cl=.cl.h)
-OBJ_RASTER=o/raster_raster.o o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o o/raster_metadata.o o/raster_import_gdal.o o/raster_export_pgm.o o/raster_export_yuv.o o/raster_export_png.o o/raster_export_jpeg.o o/raster_pointcollection.o o/raster_histogram.o o/raster_geometry.o
+OBJ_RASTER=o/raster_raster.o o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o o/raster_metadata.o o/raster_import_gdal.o o/raster_export_pgm.o o/raster_export_yuv.o o/raster_export_png.o o/raster_export_jpeg.o o/raster_pointcollection.o o/raster_geometry.o
+OBJ_PLOT=o/plot_histogram.o
 OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o
 OBJ_POINTVISUALIZATION=o/pointvisualization_BoundingBox.o o/pointvisualization_Circle.o o/pointvisualization_Coordinate.o o/pointvisualization_Dimension.o o/pointvisualization_FindResult.o o/pointvisualization_QuadTreeNode.o o/pointvisualization_CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters_converter.o o/converters_raw.o
@@ -24,7 +25,7 @@ OBJ_OPERATORS_COMBINED=o/operators_combined_points2raster.o o/operators_combined
 OBJ_OPERATORS_MSAT=o/operators_msat_radiance.o o/operators_msat_temperature.o o/operators_msat_reflectance.o
 OBJ_OPERATORS_PLOTS=o/operators_plots_histogram.o o/operators_plots_points2histogram.o o/operators_plots_points_metadata_tograph.o
 OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS)
-OBJ_COMMON=${OBJ_RASTER} ${OBJ_CONVERTERS} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS}  ${OBJ_UTIL}
+OBJ_COMMON=${OBJ_RASTER} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
 EXE=mapping_manager
@@ -61,6 +62,9 @@ o/raster_%.o: raster/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
 o/converters_%.o: converters/%.cpp
+	${CPP} ${CPPFLAGS} -c $+ -o $@
+
+o/plot_%.o: plot/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
 o/operators_%.o: operators/%.cpp $(CL_HEADERS)

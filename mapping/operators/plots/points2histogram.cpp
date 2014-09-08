@@ -1,7 +1,7 @@
 #include "raster/pointcollection.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
-#include "raster/histogram.h"
+#include "plot/histogram.h"
 
 #include <string>
 #include <json/json.h>

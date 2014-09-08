@@ -79,7 +79,7 @@ void MetadataIndex<T>::setValue(IndexedMetadata<T> &object, const std::string &k
 }
 
 template<typename T>
-const T &MetadataIndex<T>::getValue(const IndexedMetadata<T> &object, const std::string &key) {
+const T &MetadataIndex<T>::getValue(const IndexedMetadata<T> &object, const std::string &key) const {
 	if (!index_is_locked)
 		throw MetadataException("The MetadataIndex needs to be lock()ed before getting values.");
 	if (object.size != index.size())

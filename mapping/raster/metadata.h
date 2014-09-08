@@ -38,7 +38,7 @@ class MetadataIndex {
 		void addKey(const std::string &key);
 		void lock();
 		void setValue(IndexedMetadata<T> &object, const std::string &key, const T &value);
-		const T &getValue(const IndexedMetadata<T> &object, const std::string &key);
+		const T &getValue(const IndexedMetadata<T> &object, const std::string &key) const;
 		metadata_index_t size() { return index.size(); }
 
 		typename std::map<std::string, metadata_index_t>::const_iterator begin() const { return index.begin(); }

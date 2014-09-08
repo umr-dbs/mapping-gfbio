@@ -64,11 +64,11 @@ Point &PointCollection::addPoint(double x, double y) {
 /**
  * Global Metadata
  */
-const std::string &PointCollection::getGlobalMDString(const std::string &key) {
+const std::string &PointCollection::getGlobalMDString(const std::string &key) const {
 	return global_md_string.get(key);
 }
 
-double PointCollection::getGlobalMDValue(const std::string &key) {
+double PointCollection::getGlobalMDValue(const std::string &key) const {
 	return global_md_value.get(key);
 }
 
@@ -80,7 +80,7 @@ DirectMetadata<double>* PointCollection::getGlobalMDValueIterator() {
 	return &global_md_value;
 }
 
-std::vector<std::string> PointCollection::getGlobalMDValueKeys() {
+std::vector<std::string> PointCollection::getGlobalMDValueKeys() const {
 	std::vector<std::string> keys;
 	for (auto keyValue : global_md_value) {
 		keys.push_back(keyValue.first);
@@ -88,7 +88,7 @@ std::vector<std::string> PointCollection::getGlobalMDValueKeys() {
 	return keys;
 }
 
-std::vector<std::string> PointCollection::getGlobalMDStringKeys() {
+std::vector<std::string> PointCollection::getGlobalMDStringKeys() const {
 	std::vector<std::string> keys;
 	for (auto keyValue : global_md_string) {
 		keys.push_back(keyValue.first);
@@ -125,15 +125,15 @@ auto PointCollection::lock() -> void {
 /**
  * Local Metadata on points
  */
-const std::string &PointCollection::getLocalMDString(const Point &point, const std::string &key) {
+const std::string &PointCollection::getLocalMDString(const Point &point, const std::string &key) const {
 	return local_md_string.getValue(point.md_string, key);
 }
 
-double PointCollection::getLocalMDValue(const Point &point, const std::string &key) {
+double PointCollection::getLocalMDValue(const Point &point, const std::string &key) const {
 	return local_md_value.getValue(point.md_value, key);
 }
 
-std::vector<std::string> PointCollection::getLocalMDStringKeys() {
+std::vector<std::string> PointCollection::getLocalMDStringKeys() const {
 	std::vector<std::string> keys;
 	for(auto keyValue : local_md_string) {
 		keys.push_back(keyValue.first);
@@ -141,7 +141,7 @@ std::vector<std::string> PointCollection::getLocalMDStringKeys() {
 	return keys;
 }
 
-std::vector<std::string> PointCollection::getLocalMDValueKeys() {
+std::vector<std::string> PointCollection::getLocalMDValueKeys() const {
 	std::vector<std::string> keys;
 	for (auto keyValue : local_md_value) {
 		keys.push_back(keyValue.first);

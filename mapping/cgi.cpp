@@ -143,7 +143,7 @@ void outputPointCollection(PointCollection *points, bool displayMetadata = false
 }
 
 void outputPointCollectionCSV(PointCollection *points) {
-	printf("Content-type: text/csv\r\n\r\n%s", points->toCSV().c_str());
+	printf("Content-type: text/csv\r\nContent-Disposition: attachment; filename=\"export.csv\"\r\n\r\n%s", points->toCSV().c_str());
 }
 
 void outputGeometry(GenericGeometry *geometry) {

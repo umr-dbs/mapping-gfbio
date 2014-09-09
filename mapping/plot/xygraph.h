@@ -18,6 +18,9 @@ class XYGraph : public GenericPlot {
 			rangeMax.fill(std::numeric_limits<double>::min());
 		};
 
+		virtual ~XYGraph() {
+		};
+
 		auto addPoint(std::array<double, dimensions> point) -> void {
 			points.push_back(point);
 			sorted = false;

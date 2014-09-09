@@ -1,9 +1,10 @@
-
 #include "raster/raster.h"
 #include "raster/typejuggling.h"
+#include "raster/pointcollection.h"
+#include "plot/text.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
-
+#include "util/make_unique.h"
 
 #include <limits>
 #include <memory>
@@ -32,10 +33,22 @@ namespace ***REMOVED*** {
 	template<> SEXP wrap(const GenericRaster &raster);
 	template<> SEXP wrap(const std::unique_ptr<GenericRaster> &raster);
 	template<> std::unique_ptr<GenericRaster> as(SEXP sexp);
+
+	// PointCollection
+	template<> SEXP wrap(const PointCollection &points);
+	template<> SEXP wrap(const std::unique_ptr<PointCollection> &points);
+	//template<> std::unique_ptr<PointCollection> as(SEXP sexp); // TODO
+
 }
 
 #include <***REMOVED***.h>
 #include <***REMOVED***.h>
+#if !defined(RINSIDE_CALLBACKS)
+#error "***REMOVED*** was not compiled with RINSIDE_CALLBACKS"
+#endif
+#if !defined(RCPP_USING_CXX11)
+#error "***REMOVED*** didn't detect C++11 support (RCPP_USING_CXX11 is not defined)"
+#endif
 
 #pragma clang diagnostic pop // ignored "-Wunused-parameter"
 
@@ -49,9 +62,10 @@ class ROperator : public GenericOperator {
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
 
-		SEXP runScript(const QueryRectangle &rect);
+		SEXP runScript(const QueryRectangle &rect, Callbacks *callbacks = nullptr);
 	private:
 		friend std::unique_ptr<GenericRaster> query_raster_source(ROperator *op, int childidx, const QueryRectangle &rect);
+		friend std::unique_ptr<PointCollection> query_points_source(ROperator *op, int childidx, const QueryRectangle &rect);
 
 		std::string source;
 		std::string result_type;
@@ -74,12 +88,70 @@ std::unique_ptr<GenericRaster> query_raster_source(ROperator *op, int childidx, 
 	return raster;
 }
 
-SEXP ROperator::runScript(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> query_points_source(ROperator *op, int childidx, const QueryRectangle &rect) {
+	auto points = op->getPointsFromSource(childidx, rect);
+	return points;
+}
+
+
+class ***REMOVED***Callbacks : public Callbacks {
+	public:
+		// see inst/includes/Callbacks.h for a list of all overrideable methods
+		virtual std::string ReadConsole( const char* prompt, bool addtohistory ) {
+			return "";
+		};
+
+		virtual void WriteConsole( const std::string& line, int type ) {
+			output_buffer << line << std::endl;
+		};
+
+		virtual void FlushConsole() {
+		};
+
+		virtual void ResetConsole() {
+		};
+
+		virtual void CleanerrConsole() {
+		};
+
+		virtual void Busy( bool is_busy ) {
+		};
+
+		virtual void ShowMessage(const char* message) {
+
+		};
+
+		virtual void Suicide(const char* message) {
+			throw OperatorException(message); // TODO: is this the correct way to handle suicides?
+		};
+
+
+		virtual bool has_ReadConsole() { return true; };
+		virtual bool has_WriteConsole() { return true; };
+		virtual bool has_FlushConsole(){ return true; };
+		virtual bool has_ResetConsole() { return true; };
+		virtual bool has_CleanerrConsole() { return true; };
+		virtual bool has_Busy() { return true; };
+		virtual bool has_ShowMessage() { return true; };
+		virtual bool has_Suicide() { return true; };
+
+		std::string getConsoleOutput() {
+			return output_buffer.str();
+		}
+	private:
+		std::ostringstream output_buffer;
+};
+
+
+
+SEXP ROperator::runScript(const QueryRectangle &rect, Callbacks *callbacks) {
 	std::lock_guard<std::mutex> guard(r_running_mutex);
 	Profiler::Profiler p("R_OPERATOR");
 
 	Profiler::start("R_OPERATOR: construct");
 	***REMOVED*** R;
+	if (callbacks)
+		R.set_callbacks( callbacks );
 	Profiler::stop("R_OPERATOR: construct");
 
 	Profiler::start("R_OPERATOR: load libraries");
@@ -87,9 +159,14 @@ SEXP ROperator::runScript(const QueryRectangle &rect) {
 	Profiler::stop("R_OPERATOR: load libraries");
 
 	Profiler::start("R_OPERATOR: environment");
-	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_source = std::bind(query_raster_source, this, std::placeholders::_1, std::placeholders::_2);
+	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, this, std::placeholders::_1, std::placeholders::_2);
 	R["mapping.rastercount"] = getRasterSourceCount();
-	R["mapping.loadRaster"] = ***REMOVED***::InternalFunction( bound_source );;
+	R["mapping.loadRaster"] = ***REMOVED***::InternalFunction( bound_raster_source );
+
+	std::function<std::unique_ptr<PointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, this, std::placeholders::_1, std::placeholders::_2);
+	R["mapping.pointscount"] = getPointsSourceCount();
+	R["mapping.loadPoints"] = ***REMOVED***::InternalFunction( bound_points_source );
+
 	R["mapping.qrect"] = rect;
 	Profiler::stop("R_OPERATOR: environment");
 
@@ -105,7 +182,8 @@ std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect) 
 	if (result_type != "raster")
 		throw OperatorException("This R script does not return rasters");
 
-	return ***REMOVED***::as<std::unique_ptr<GenericRaster>>(runScript(rect));
+	auto callbacks = std::make_unique<***REMOVED***Callbacks>();
+	return ***REMOVED***::as<std::unique_ptr<GenericRaster>>(runScript(rect, callbacks.get()));
 }
 
 std::unique_ptr<PointCollection> ROperator::getPoints(const QueryRectangle &rect) {
@@ -117,11 +195,13 @@ std::unique_ptr<PointCollection> ROperator::getPoints(const QueryRectangle &rect
 }
 
 std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect) {
-	if (result_type != "plot")
+	if (result_type != "text")
 		throw OperatorException("This R script does not return a plot");
 
-	throw OperatorException("TODO");
-	//return runScript(rect);
+	auto callbacks = std::make_unique<***REMOVED***Callbacks>();
+	runScript(rect, callbacks.get());
+
+	return std::unique_ptr<GenericPlot>(new TextPlot(callbacks->getConsoleOutput()));
 }
 
 
@@ -162,6 +242,29 @@ namespace ***REMOVED*** {
 
 	// Raster
 	template<> SEXP wrap(const GenericRaster &raster) {
+		/*
+		class	   : RasterLayer
+		dimensions  : 180, 360, 64800  (nrow, ncol, ncell)
+		resolution  : 1, 1  (x, y)
+		extent	  : -180, 180, -90, 90  (xmin, xmax, ymin, ymax)
+		coord. ref. : +proj=longlat +datum=WGS84
+
+		attributes(r)
+		$history: list()
+		$file: class .RasterFile
+		$data: class .SingleLayerData  (hat haveminmax, min, max!)
+		$legend: class .RasterLegend
+		$title: character(0)
+		$extent: class Extent (xmin, xmax, ymin, ymax)
+		$rotated: FALSE
+		$rotation: class .Rotation
+		$ncols: int
+		$nrows: int
+		$crs: CRS arguments: +proj=longlat +datum=WGS84
+		$z: list()
+		$class: c("RasterLayer", "raster")
+
+		 */
 		Profiler::Profiler p("R_OPERATOR: wrapping raster");
 		int width = raster.lcrs.size[0];
 		int height = raster.lcrs.size[1];
@@ -201,38 +304,10 @@ namespace ***REMOVED*** {
 		rasterlayer.slot("data") = data;
 		rasterlayer.slot("extent") = extent;
 		rasterlayer.slot("crs") = crs;
-		rasterlayer.slot("nrows") = raster.lcrs.size[0];
-		rasterlayer.slot("ncols") = raster.lcrs.size[1];
+		rasterlayer.slot("ncols") = raster.lcrs.size[0];
+		rasterlayer.slot("nrows") = raster.lcrs.size[1];
 
 		return ***REMOVED***::wrap(rasterlayer);
-
-		/*
-		 * Thomas sagt: "Raster" und "Spatial Data Frame"?
-		 */
-
-/*
-class       : RasterLayer
-dimensions  : 180, 360, 64800  (nrow, ncol, ncell)
-resolution  : 1, 1  (x, y)
-extent      : -180, 180, -90, 90  (xmin, xmax, ymin, ymax)
-coord. ref. : +proj=longlat +datum=WGS84
-
-attributes(r)
-$history: list()
-$file: class .RasterFile
-$data: class .SingleLayerData  (hat haveminmax, min, max!)
-$legend: class .RasterLegend
-$title: character(0)
-$extent: class Extent (xmin, xmax, ymin, ymax)
-$rotated: FALSE
-$rotation: class .Rotation
-$ncols: int
-$nrows: int
-$crs: CRS arguments: +proj=longlat +datum=WGS84
-$z: list()
-$class: c("RasterLayer", "raster")
-
- */
 	}
 	template<> SEXP wrap(const std::unique_ptr<GenericRaster> &raster) {
 		return ***REMOVED***::wrap(*raster);
@@ -285,4 +360,64 @@ $class: c("RasterLayer", "raster")
 		}
 		return raster_out;
 	}
+
+
+	// PointCollection
+	template<> SEXP wrap(const PointCollection &points) {
+		/*
+		new("SpatialPointsDataFrame"
+			, data = structure(list(), .Names = character(0), row.names = integer(0), class = "data.frame")
+			, coords.nrs = numeric(0)
+			, coords = structure(NA, .Dim = c(1L, 1L))
+			, bbox = structure(NA, .Dim = c(1L, 1L))
+			, proj4string = new("CRS"
+			, projargs = NA_character_
+		)
+		*/
+		Profiler::Profiler p("R_OPERATOR: wrapping pointcollection");
+		***REMOVED***::S4 SPDF("SpatialPointsDataFrame");
+
+		auto size = points.collection.size();
+
+		***REMOVED***::DataFrame data;
+		auto keys = points.getLocalMDValueKeys();
+		for(auto key : keys) {
+			***REMOVED***::NumericVector vec(size);
+			for (decltype(size) i=0;i<size;i++) {
+				const Point &p = points.collection[i];
+				double value = points.getLocalMDValue(p, key);
+				vec[i] = value;
+			}
+			data[key] = vec;
+		}
+
+		***REMOVED***::NumericMatrix coords(size, 2);
+		for (decltype(size) i=0;i<size;i++) {
+			const Point &p = points.collection[i];
+			coords(i, 0) = p.x;
+			coords(i, 1) = p.y;
+		}
+
+		***REMOVED***::NumericMatrix bbox(2,2); // TODO ?
+
+		***REMOVED***::S4 crs("CRS");
+		std::ostringstream epsg;
+		epsg << "EPSG:" << points.epsg;
+		crs.slot("projargs") = epsg.str();
+
+
+		SPDF.slot("data") = data;
+		SPDF.slot("coords.nrs") = true;
+		SPDF.slot("coords") = coords;
+		SPDF.slot("bbox") = bbox;
+		SPDF.slot("proj4string") = crs;
+
+		return SPDF;
+	}
+	template<> SEXP wrap(const std::unique_ptr<PointCollection> &points) {
+		return ***REMOVED***::wrap(*points);
+	}
+	//template<> std::unique_ptr<PointCollection> as(SEXP sexp) {
+	//}
+
 }

@@ -1,5 +1,5 @@
-#ifndef DATAVECTOR_H_
-#define DATAVECTOR_H_
+#ifndef PLOT_PLOT_H
+#define PLOT_PLOT_H
 
 #include <string>
 

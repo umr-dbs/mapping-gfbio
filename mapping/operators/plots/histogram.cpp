@@ -1,6 +1,6 @@
 
 #include "raster/raster.h"
-#include "raster/histogram.h"
+#include "plot/histogram.h"
 #include "raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"

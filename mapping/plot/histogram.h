@@ -10,7 +10,7 @@
 class Histogram : public GenericPlot {
 	public:
 		Histogram(int number_of_buckets, double min, double max);
-		~Histogram();
+		virtual ~Histogram();
 
 		void inc(double value);
 		void incNoData();

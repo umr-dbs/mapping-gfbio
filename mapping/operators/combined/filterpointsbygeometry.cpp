@@ -53,6 +53,10 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRe
 
 	auto prep = geos::geom::prep::PreparedGeometryFactory();
 
+	PointCollectionMetadataCopier metadataCopier(*points, *points_out);
+	metadataCopier.copyGlobalMetadata();
+	metadataCopier.initLocalMetadataFields();
+
 	for (int i=0; i<geometry->getNumGeometries(); i++){
 
 		auto preparedGeometry = prep.prepare(geometry->getGeometryN(i));
@@ -64,7 +68,8 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRe
 
 			if(preparedGeometry->contains(pointGeom)){
 				//TODO copy metadata
-				points_out->addPoint(x, y);
+				Point& p_new = points_out->addPoint(x, y);
+				metadataCopier.copyLocalMetadata(p, p_new);
 				geometryFactory->destroyGeometry(pointGeom);
 				continue;
 				//TODO: dont check this point again

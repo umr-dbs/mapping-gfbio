@@ -91,15 +91,15 @@
 	left: 0px;
 	right: 0px;
 	text-align: center;
-	border-bottom: 1px solid black;
+	border-bottom: 1px solid #C6C6C6;
 }
 
 .layerselection_tabs .tab {
 	display: inline-block;
 	height: 20px;
 	background-color: #E5E5E5;
-	border-radius: 3px 3px 0px 0px;
-	border: 1px solid black;
+	border-radius: 1px 1px 0px 0px;
+	border: 1px solid #C6C6C6;
 	margin: 0px 5px;
 	padding: 0px 5px;
 	
@@ -116,7 +116,7 @@
 .layerselection_tabs .tab_active {
 	background-color: white;
 	border-width: 1px 1px 0px 1px;
-	border-color: black;
+	border-color: #C6C6C6;
 	height: 21px;
 	
 	cursor: auto;
@@ -305,7 +305,7 @@
 .collapseSidebar {
 	height: 12px;
 	width: 8px;
-	right: 347px;
+	right: 345px;
 	position: absolute;
 	
 	padding: 16px 1px;

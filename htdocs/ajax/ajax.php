@@ -455,18 +455,36 @@ if ($action == 'examplequerylist.get') {
 			}
 },
 "wfs": {
-	"colorizer": "hsv",
-	"starttime": 42,
-	"endtime": 42,
-	"timeinterval": 1,
-
-	"name": "Puma clustered WFS (FIXME!)",
-
-	"query": {   "type": "points_cluster",
-	          "sources": [{"type": "projection","params": {"src_epsg": 4326,"dest_epsg": 3857}, "sources": [
-	                      {"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"},"sources":[]}
-	                     ]}]
-	         }
+    "colorizer": "hsv",
+    "starttime": 42,
+    "endtime": 42,
+    "timeinterval": 1,
+    "name": "Puma clustered WFS",
+    "query": {
+        "type": "points_cluster",
+        "sources": {
+            "points": [
+                {
+                    "type": "projection",
+                    "params": {
+                        "src_epsg": 4326,
+                        "dest_epsg": 3857
+                    },
+                    "sources": {
+                        "points": [
+                            {
+                                "type": "gfbiopointsource",
+                                "params": {
+                                    "datasource": "GBIF",
+                                    "query": "{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
 },
 "epiphite_cluster": {
 	"colorizer": "hsv",

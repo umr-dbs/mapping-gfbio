@@ -8,6 +8,7 @@
 #include <limits>
 #include <vector>
 #include <array>
+#include <cmath>
 
 class PointsMetadataToGraph: public GenericOperator {
 private:
@@ -54,7 +55,8 @@ auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::uniqu
 		for (std::size_t index = 0; index < size; ++index) {
 			value[index] = points.getLocalMDValue(point, names[index]);
 
-			if(hasNoData[index] && (std::fabs(value[index] - noDataValue[index]) < std::numeric_limits<double>::epsilon())) {
+			if((hasNoData[index] && (std::fabs(value[index] - noDataValue[index]) < std::numeric_limits<double>::epsilon())) // no data
+					|| std::isnan(value[index])) /* is NaN */ {
 				hasData = false;
 				break;
 			}

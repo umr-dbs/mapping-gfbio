@@ -267,3 +267,9 @@
 .hcolumns .icon-file:before {
     content: "\f15b";
 }
+
+.ui-dialog-titlebar {
+	background-color: #e6e6e6 ;
+	color : black;
+	border-color: #c6c6c6;
+}

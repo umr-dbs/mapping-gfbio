@@ -445,13 +445,52 @@ if ($action == 'examplequerylist.get') {
 	"endtime": 42,
 	"timeinterval": 1,
 
-	"name": "Pumas with metadata (FIXME!)",
+	"name": "Pumas with metadata",
 
-	"query": {"type":"raster_metadata_to_points","params":{"name":"raster2"},"sources":
-				[{"type":"raster_metadata_to_points","params":{"name":"raster"},"sources":
-					[{"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"},"sources":[]},
-					{"type":"source","params":{"sourcepath":"datasources/worldclim.json","channel":2},"sources":[]}]},
-				{"type":"source","params":{"sourcepath":"datasources/worldclim.json","channel":4},"sources":[]}]
+	"query": {
+			    "type": "raster_metadata_to_points",
+			    "params": {
+			        "name": "raster2"
+			    },
+			    "sources": {
+			        "points": [
+			            {
+			                "type": "raster_metadata_to_points",
+			                "params": {
+			                    "name": "raster"
+			                },
+			                "sources": {
+			                    "points": [
+			                        {
+			                            "type": "gfbiopointsource",
+			                            "params": {
+			                                "datasource": "GBIF",
+			                                "query": "{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"
+			                            }
+			                        }
+			                    ],
+			                    "raster": [
+			                        {
+			                            "type": "source",
+			                            "params": {
+			                                "sourcepath": "datasources/worldclim.json",
+			                                "channel": 2
+			                            }
+			                        }
+			                    ]
+			                }
+			            }
+			        ],
+			        "raster": [
+			            {
+			                "type": "source",
+			                "params": {
+			                    "sourcepath": "datasources/worldclim.json",
+			                    "channel": 4
+			                }
+			            }
+			        ]
+			    }
 			}
 },
 "wfs": {

@@ -2,6 +2,7 @@
 
 #include <sstream>
 #include <iomanip>
+#include <iostream>
 
 
 Point::Point(double x, double y, uint16_t size_md_string, uint16_t size_md_value) : x(x), y(y), md_string(size_md_string), md_value(size_md_value) {
@@ -109,11 +110,21 @@ void PointCollection::setGlobalMDValue(const std::string &key, double value) {
  * Local meta-metadata
  */
 void PointCollection::addLocalMDString(const std::string &key) {
-	local_md_string.addKey(key);
+	try{
+		local_md_string.addKey(key);
+	}
+	catch(MetadataException& e){
+		std::cerr << "Exception in PointCollection::addLocalMDString. Key: >"<< key << "< Msg: "<< e.what() << std::endl;
+	}
 }
 
 void PointCollection::addLocalMDValue(const std::string &key) {
-	local_md_value.addKey(key);
+	try{
+		local_md_value.addKey(key);
+	}
+	catch(MetadataException& e){
+		std::cerr << "Exception in PointCollection::addLocalMDValue. Key: >"<< key << "< Msg: "<< e.what() << std::endl;
+	}
 }
 
 auto PointCollection::lock() -> void {

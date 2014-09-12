@@ -284,7 +284,6 @@
 .datasourceSelectionLabel {
 	border-radius: 1px;
     color: #333;
-    background-color: #E9967A !important;
     border: 1px solid rgb(230, 230, 230);
 }
 
@@ -297,5 +296,5 @@
 }
 
 .datasourceSelectionLabel.ui-state-active {
-	background-color: #90EE90 !important;
+	background-color: #90EE90;
 }

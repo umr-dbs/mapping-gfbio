@@ -283,11 +283,19 @@
 
 .datasourceSelectionLabel {
 	border-radius: 1px;
-    border: 1px solid rgb(230, 230, 230);
     color: #333;
-    background-color: #E9967A;
+    background-color: #E9967A !important;
+    border: 1px solid rgb(230, 230, 230);
+}
+
+.datasourceSelectionLabel.ui-state-focus {
+	border: 1px solid rgb(200, 200, 200);
+}
+
+.datasourceSelectionLabel:hover {
+	border: 1px solid rgb(130, 130, 130);
 }
 
 .datasourceSelectionLabel.ui-state-active {
-	background-color: #90EE90;
+	background-color: #90EE90 !important;
 }

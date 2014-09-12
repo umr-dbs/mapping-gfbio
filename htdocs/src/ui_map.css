@@ -358,6 +358,54 @@
 	background-color: #F5F5F5;
 }
 
+.ui-accordion .ui-accordion-header.ui-state-focus {
+    border: 1px solid rgb(130, 130, 130);
+}
+
 .ui-accordion .ui-accordion-content {
 	border-radius: 0px 0px 1px 1px;
+}
+
+.ui-dialog {
+	border-radius: 1px;
+    border: 1px solid rgb(230, 230, 230);
+}
+
+.ui-dialog .ui-dialog-titlebar {
+	border-radius: 1px;
+    border: 1px solid rgb(230, 230, 230);
+}
+
+.ui-button {
+	border-radius: 1px;
+}
+
+.ui-button.ui-state-focus {
+	border-radius: 1px;
+    border: 1px solid rgb(130, 130, 130);
+    background-color: #F6F6F6;
+}
+
+.ui-button.ui-state-hover {
+    border-radius: 1px;
+    border: 1px solid rgb(130, 130, 130);
+    background-color: #D6D6D6;
+}
+
+.ui-button .ui-icon-closethick:before {
+	content: "\f00d";
+    display: inline-block;
+    font-family: FontAwesome;
+    font-style: normal;
+    font-weight: normal;
+    line-height: 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: #555;
+}
+
+.ui-dialog-titlebar-close .ui-icon {
+	top: -2px;
+    margin-top: 0px;
+    text-indent: 0px;
 }

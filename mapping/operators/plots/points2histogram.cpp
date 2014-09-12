@@ -5,7 +5,7 @@
 
 #include <string>
 #include <json/json.h>
-
+#include <cmath>
 
 class Points2HistogramOperator : public GenericOperator {
 private:
@@ -42,7 +42,8 @@ std::unique_ptr<GenericPlot> Points2HistogramOperator::getPlot(const QueryRectan
 
 	for (Point &point : points->collection) {
 		double value = points->getLocalMDValue(point, name);
-		if (raster_has_no_data && value == raster_no_data)
+		if ((raster_has_no_data && value == raster_no_data) // no data
+				|| std::isnan(value) /* is NaN */)
 			histogram->incNoData();
 		else {
 			histogram->inc(value);

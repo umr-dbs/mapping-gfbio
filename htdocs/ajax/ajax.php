@@ -445,28 +445,85 @@ if ($action == 'examplequerylist.get') {
 	"endtime": 42,
 	"timeinterval": 1,
 
-	"name": "Pumas with metadata (FIXME!)",
+	"name": "Pumas with metadata",
 
-	"query": {"type":"raster_metadata_to_points","params":{"name":"raster2"},"sources":
-				[{"type":"raster_metadata_to_points","params":{"name":"raster"},"sources":
-					[{"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"},"sources":[]},
-					{"type":"source","params":{"sourcepath":"datasources/worldclim.json","channel":2},"sources":[]}]},
-				{"type":"source","params":{"sourcepath":"datasources/worldclim.json","channel":4},"sources":[]}]
+	"query": {
+			    "type": "raster_metadata_to_points",
+			    "params": {
+			        "name": "raster2"
+			    },
+			    "sources": {
+			        "points": [
+			            {
+			                "type": "raster_metadata_to_points",
+			                "params": {
+			                    "name": "raster"
+			                },
+			                "sources": {
+			                    "points": [
+			                        {
+			                            "type": "gfbiopointsource",
+			                            "params": {
+			                                "datasource": "GBIF",
+			                                "query": "{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"
+			                            }
+			                        }
+			                    ],
+			                    "raster": [
+			                        {
+			                            "type": "source",
+			                            "params": {
+			                                "sourcepath": "datasources/worldclim.json",
+			                                "channel": 2
+			                            }
+			                        }
+			                    ]
+			                }
+			            }
+			        ],
+			        "raster": [
+			            {
+			                "type": "source",
+			                "params": {
+			                    "sourcepath": "datasources/worldclim.json",
+			                    "channel": 4
+			                }
+			            }
+			        ]
+			    }
 			}
 },
 "wfs": {
-	"colorizer": "hsv",
-	"starttime": 42,
-	"endtime": 42,
-	"timeinterval": 1,
-
-	"name": "Puma clustered WFS (FIXME!)",
-
-	"query": {   "type": "points_cluster",
-	          "sources": [{"type": "projection","params": {"src_epsg": 4326,"dest_epsg": 3857}, "sources": [
-	                      {"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"},"sources":[]}
-	                     ]}]
-	         }
+    "colorizer": "hsv",
+    "starttime": 42,
+    "endtime": 42,
+    "timeinterval": 1,
+    "name": "Puma clustered WFS",
+    "query": {
+        "type": "points_cluster",
+        "sources": {
+            "points": [
+                {
+                    "type": "projection",
+                    "params": {
+                        "src_epsg": 4326,
+                        "dest_epsg": 3857
+                    },
+                    "sources": {
+                        "points": [
+                            {
+                                "type": "gfbiopointsource",
+                                "params": {
+                                    "datasource": "GBIF",
+                                    "query": "{\"globalAttributes\":{\"speciesName\":\"Puma concolor\"},\"localAttributes\":{}}"
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
+        }
+    }
 },
 "epiphite_cluster": {
 	"colorizer": "hsv",

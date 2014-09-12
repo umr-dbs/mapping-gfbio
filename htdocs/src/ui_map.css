@@ -3,7 +3,7 @@
 	top: 0%;
 	height: 100%;
 	left: 0px;
-	right: 351px;
+	right: 353px;
 	background-color: black;
 }
 
@@ -12,7 +12,7 @@
 	top: 0%;
 	height: 100%;
 	right: 0px;
-	width: 350px;
+	width: 352px;
 	border-left: 1px solid #E5E5E5;
 	background-color: #FFF;
 	font-size: 14px;
@@ -339,4 +339,25 @@
 .ol3Control_backgroundLayer {
 	bottom: 0.5em;
 	left: 0.5em;
+}
+
+.ui-accordion .ui-accordion-header {
+	border-radius: 1px;
+	color: #333;
+	background-color: #E5E5E5;
+}
+
+.ui-accordion .ui-accordion-header:hover {
+    background-color: #C6C6C6;
+    border: 1px solid rgb(230, 230, 230);
+}
+
+.ui-accordion .ui-accordion-header.ui-accordion-header-active {
+	border-radius: 0px;
+	border: 1px solid rgb(230, 230, 230);
+	background-color: #F5F5F5;
+}
+
+.ui-accordion .ui-accordion-content {
+	border-radius: 0px 0px 1px 1px;
 }

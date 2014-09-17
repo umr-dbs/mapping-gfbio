@@ -8,14 +8,16 @@ CPATH := /usr/local/include/:$(CPATH)
 
 #CPP=g++
 CPP=clang++
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
+CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
+CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl -L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
+LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-luriparser
-CL_SOURCES=$(wildcard operators/*/*.cl)
-CL_HEADERS=$(CL_SOURCES:.cl=.cl.h)
+CL_SOURCES:=$(wildcard operators/*/*.cl)
+CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 OBJ_RASTER=o/raster_raster.o o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o o/raster_metadata.o o/raster_import_gdal.o o/raster_export_pgm.o o/raster_export_yuv.o o/raster_export_png.o o/raster_export_jpeg.o o/raster_pointcollection.o o/raster_geometry.o
 OBJ_PLOT=o/plot_histogram.o o/plot_text.o
-OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o
+OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_socket.o
 OBJ_POINTVISUALIZATION=o/pointvisualization_BoundingBox.o o/pointvisualization_Circle.o o/pointvisualization_Coordinate.o o/pointvisualization_Dimension.o o/pointvisualization_FindResult.o o/pointvisualization_QuadTreeNode.o o/pointvisualization_CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters_converter.o o/converters_raw.o
 OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_r.o
@@ -28,9 +30,11 @@ OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POI
 OBJ_COMMON=${OBJ_RASTER} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
+# TODO: more fine grained selection of the required objects
+OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_UTIL}
 EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
-
+EXERSERVER=r_server
 
 DATASET_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061800-C_
 DATASET_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061800-C_
@@ -67,6 +71,9 @@ o/converters_%.o: converters/%.cpp
 o/plot_%.o: plot/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
+o/rserver_%.o: rserver/%.cpp
+	${CPP} ${CPPFLAGS} ${CPPFLAGS_R} -c $+ -o $@
+
 o/operators_%.o: operators/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
@@ -93,7 +100,7 @@ o/main_%.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
 
-all: ${EXE} ${EXECGI}
+all: ${EXE} ${EXECGI} ${EXERSERVER}
 
 ${EXE}:	${OBJ_EXE}
 	${CPP} $+ ${LDFLAGS} -o $@
@@ -101,6 +108,8 @@ ${EXE}:	${OBJ_EXE}
 ${EXECGI}:	${OBJ_EXECGI}
 	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CGI} -o $@
 
+${EXERSERVER}:	${OBJ_RSERVER}
+	${CPP} ${LDFLAGS} ${LDFLAGS_R} $+ -o $@
 
 msat2datasource:	${EXE}
 	rm -f datasources/msat2.dat datasources/msat2.db
@@ -160,4 +169,4 @@ docs:
 	doxygen Doxyfile
 
 clean:
-	rm -f o/*.o ${EXE} ${EXECGI} $(CL_HEADERS)
+	rm -f o/*.o ${EXE} ${EXECGI} ${EXERSERVER} $(CL_HEADERS)

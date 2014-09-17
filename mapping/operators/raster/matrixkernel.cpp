@@ -1,4 +1,3 @@
-
 #include "raster/raster.h"
 #include "raster/typejuggling.h"
 #include "raster/profiler.h"
@@ -92,7 +91,7 @@ struct matrixkernel{
 std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
 	auto raster_in = getRasterFromSource(0, rect);
 
-#if 1
+#ifndef MAPPING_NO_OPENCL
 	RasterOpenCL::init();
 	Profiler::Profiler p("MATRIXKERNEL_CL_OPERATOR");
 	raster_in->setRepresentation(GenericRaster::Representation::OPENCL);
@@ -126,7 +125,6 @@ std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectan
 	}
 
 	return raster_out;
-
 #else
 	Profiler::Profiler p("MATRIXKERNEL_OPERATOR");
 	return callUnaryOperatorFunc<matrixkernel>(raster_in.get(), matrixsize, matrix);

@@ -1,6 +1,8 @@
 #ifndef RASTER_OPENCL_H
 #define RASTER_OPENCL_H
 
+#ifndef MAPPING_NO_OPENCL
+
 //#define __NO_STD_VECTOR // Use cl::vector instead of STL version
 #include <vector>
 #define __CL_ENABLE_EXCEPTIONS
@@ -65,5 +67,7 @@ namespace RasterOpenCL {
 	};
 }
 
+
+#endif
 
 #endif

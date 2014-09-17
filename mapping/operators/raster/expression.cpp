@@ -1,3 +1,4 @@
+#ifndef MAPPING_NO_OPENCL
 
 #include "raster/raster.h"
 #include "raster/typejuggling.h"
@@ -190,3 +191,5 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 
 	return raster_out;
 }
+
+#endif

@@ -20,6 +20,7 @@
 typedef uint16_t epsg_t;
 
 class QueryRectangle;
+class Socket;
 
 
 // LocalCoordinateSystem - lcs
@@ -38,6 +39,7 @@ class LocalCRS {
 			: epsg(epsg), dimensions(dimensions), size{w, h, d}, origin{origin_x, origin_y, origin_z}, scale{scale_x, scale_y, scale_z} {};
 
 		LocalCRS(const QueryRectangle &rect);
+		LocalCRS(Socket &pipe);
 
 		LocalCRS() = delete;
 		~LocalCRS() = default;
@@ -52,6 +54,8 @@ class LocalCRS {
 		bool operator==(const LocalCRS &b) const;
 		size_t getPixelCount() const;
 		void verify() const;
+
+		void toSocket(Socket &socket) const;
 
 		double PixelToWorldX(int px) const { return origin[0] + px * scale[0]; }
 		double PixelToWorldY(int py) const { return origin[1] + py * scale[1]; }
@@ -84,6 +88,8 @@ class DataDescription {
 		DataDescription(GDALDataType datatype, double min, double max, bool has_no_data, double no_data)
 			: datatype(datatype), min(min), max(max), has_no_data(has_no_data), no_data(has_no_data ? no_data : 0.0) {};
 
+		DataDescription(Socket &socket);
+
 		DataDescription() = delete;
 		~DataDescription() = default;
 		// Copy
@@ -97,6 +103,9 @@ class DataDescription {
 
 		bool operator==(const DataDescription &b) const;
 		void verify() const;
+
+		void toSocket(Socket &socket) const;
+
 		int getBPP() const; // Bytes per Pixel
 		double getMinByDatatype() const;
 		double getMaxByDatatype() const;
@@ -158,6 +167,9 @@ class GenericRaster {
 		virtual ~GenericRaster();
 		GenericRaster(const GenericRaster &) = delete;
 		GenericRaster &operator=(const GenericRaster &) = delete;
+
+		void toSocket(Socket &socket);
+		static std::unique_ptr<GenericRaster> fromSocket(Socket &socket);
 
 		virtual void toPGM(const char *filename, bool avg = false) = 0;
 		virtual void toYUV(const char *filename) = 0;

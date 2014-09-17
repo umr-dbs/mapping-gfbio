@@ -1,3 +1,4 @@
+#ifndef MAPPING_NO_OPENCL
 
 #include "raster/raster.h"
 #include "raster/typejuggling.h"
@@ -67,3 +68,5 @@ std::unique_ptr<GenericRaster> OpenCLOperator::getRaster(const QueryRectangle &r
 	event.wait();
 	return raster_out;
 }
+
+#endif

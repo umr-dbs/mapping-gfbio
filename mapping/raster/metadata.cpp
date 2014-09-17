@@ -1,6 +1,8 @@
 
 #include "raster/exceptions.h"
 #include "raster/metadata.h"
+#include "util/socket.h"
+
 
 /*
  * DirectMetadata
@@ -35,6 +37,34 @@ const T &DirectMetadata<T>::get(const std::string &key, const T &defaultvalue) c
 	return data.at(key);
 }
 
+template<typename T>
+DirectMetadata<T>::DirectMetadata(Socket &socket) {
+	fromSocket(socket);
+}
+
+template<typename T>
+void DirectMetadata<T>::fromSocket(Socket &socket) {
+	size_t count;
+	socket.read(&count);
+	for (size_t i=0;i<count;i++) {
+		std::string key;
+		socket.read(&key);
+		T value;
+		socket.read(&value);
+		data[key] = value;
+	}
+}
+
+template<typename T>
+void DirectMetadata<T>::toSocket(Socket &socket) const {
+	size_t count = data.size();
+	socket.write(count);
+	for (auto &e : data) {
+		socket.write(e.first);
+		socket.write(e.second);
+	}
+}
+
 
 /**
  * MetadataIndex
@@ -47,6 +77,38 @@ MetadataIndex<T>::MetadataIndex() : index_is_locked(false) {
 template<typename T>
 MetadataIndex<T>::~MetadataIndex() {
 }
+
+template<typename T>
+MetadataIndex<T>::MetadataIndex(Socket &socket) : index_is_locked(false) {
+	fromSocket(socket);
+	index_is_locked = true;
+}
+
+template<typename T>
+void MetadataIndex<T>::fromSocket(Socket &socket) {
+	if (index_is_locked || index.size() > 0)
+		throw MetadataException("Cannot fromSocket() a MetadataIndex that already contains values.");
+	size_t count;
+	socket.read(&count);
+	for (size_t i=0;i<count;i++) {
+		std::string key;
+		socket.read(&key);
+		metadata_index_t value;
+		socket.read(&value);
+		index[key] = value;
+	}
+}
+
+template<typename T>
+void MetadataIndex<T>::toSocket(Socket &socket) const {
+	size_t count = index.size();
+	socket.write(count);
+	for (auto &e : index) {
+		socket.write(e.first);
+		socket.write(e.second);
+	}
+}
+
 
 template<typename T>
 void MetadataIndex<T>::addKey(const std::string &key) {
@@ -105,6 +167,29 @@ template<typename T>
 IndexedMetadata<T>::~IndexedMetadata() {
 	delete [] data;
 	data = nullptr;
+}
+
+template<typename T>
+IndexedMetadata<T>::IndexedMetadata(Socket &socket) : size(0), data(nullptr) {
+	fromSocket(socket);
+}
+
+template<typename T>
+void IndexedMetadata<T>::fromSocket(Socket &socket) {
+	if (size > 0 || data)
+		throw MetadataException("Cannot fromSocket() an IndexedMetadata that already contains values.");
+	socket.read(&size);
+	if (size > 0)
+		data = new T[size];
+	for (metadata_index_t i=0;i<size;i++)
+		socket.read(&data[i]);
+}
+
+template<typename T>
+void IndexedMetadata<T>::toSocket(Socket &socket) const {
+	socket.write(size);
+	for (metadata_index_t i=0;i<size;i++)
+		socket.write(data[i]);
 }
 
 

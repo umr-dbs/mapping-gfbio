@@ -3,7 +3,8 @@
 #include "raster/typejuggling.h"
 #include "raster/opencl.h"
 #include "util/hash.h"
-#include "operators/operator.h"
+#include "util/socket.h"
+#include "operators/operator.h" // for QueryRectangle
 
 #include <memory>
 #include <cmath>
@@ -62,6 +63,30 @@ size_t LocalCRS::getPixelCount() const {
 std::ostream& operator<< (std::ostream &out, const LocalCRS &rm) {
 	out << "LocalCRS(epsg=" << rm.epsg << " dim=" << rm.dimensions << " size=["<<rm.size[0]<<","<<rm.size[1]<<"] origin=["<<rm.origin[0]<<","<<rm.origin[1]<<"] scale=["<<rm.scale[0]<<","<<rm.scale[1]<<"])";
 	return out;
+}
+
+void LocalCRS::toSocket(Socket &socket) const {
+	socket.write(epsg);
+	socket.write(dimensions);
+	for (int i=0;i<dimensions;i++) {
+		socket.write(size[i]);
+		socket.write(origin[i]);
+		socket.write(scale[i]);
+	}
+}
+LocalCRS::LocalCRS(Socket &socket) {
+	for (int i=0;i<3;i++) {
+		size[i] = 0;
+		origin[i] = 0;
+		scale[i] = 0;
+	}
+	socket.read(&epsg);
+	socket.read(&dimensions);
+	for (int i=0;i<dimensions;i++) {
+		socket.read(&size[i]);
+		socket.read(&origin[i]);
+		socket.read(&scale[i]);
+	}
 }
 
 
@@ -201,6 +226,24 @@ void DataDescription::addNoData() {
 	has_no_data = true;
 }
 
+void DataDescription::toSocket(Socket &socket) const {
+	socket.write(datatype);
+	socket.write(min);
+	socket.write(max);
+	socket.write(has_no_data);
+	if (has_no_data)
+		socket.write(no_data);
+}
+DataDescription::DataDescription(Socket &socket) {
+	socket.read(&datatype);
+	socket.read(&min);
+	socket.read(&max);
+	socket.read(&has_no_data);
+	if (has_no_data)
+		socket.read(&no_data);
+	else
+		no_data = 0.0;
+}
 
 
 
@@ -257,6 +300,29 @@ GenericRaster::GenericRaster(const LocalCRS &localcrs, const DataDescription &da
 GenericRaster::~GenericRaster() {
 }
 
+void GenericRaster::toSocket(Socket &socket) {
+	const char *data = (const char *) getData();
+	size_t len = getDataSize();
+	socket.write(lcrs);
+	socket.write(dd);
+	socket.write(data, len);
+	// TODO: Metadata
+}
+
+std::unique_ptr<GenericRaster> GenericRaster::fromSocket(Socket &socket) {
+	LocalCRS lcrs(socket);
+	DataDescription dd(socket);
+
+	auto raster = GenericRaster::create(lcrs, dd);
+	char *data = (char *) raster->getDataForWriting();
+	size_t len = raster->getDataSize();
+	socket.read(data, len);
+	// TODO: Metadata
+
+	return raster;
+}
+
+
 
 
 
@@ -293,8 +359,10 @@ template<typename T, int dimensions>
 void Raster<T, dimensions>::setRepresentation(Representation r) {
 	if (r == representation)
 		return;
-
 	if (r == Representation::OPENCL) {
+#ifdef MAPPING_NO_OPENCL
+		throw PlatformException("No OpenCL support");
+#else
 		//printf("Migrating raster to GPU\n");
 		// https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/clCreateBuffer.html
 		try {
@@ -315,14 +383,19 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 		clbuffer_info = RasterOpenCL::getBufferWithRasterinfo(this);
 
 		// TODO: data löschen?
+#endif
 	}
 	else if (r == Representation::CPU) {
+#ifdef MAPPING_NO_OPENCL
+		throw PlatformException("No OpenCL support");
+#else
 		//printf("Migrating raster back to CPU\n");
 		RasterOpenCL::getQueue()->enqueueReadBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
 		delete clbuffer;
 		clbuffer = nullptr;
 		delete clbuffer_info;
 		clbuffer_info = nullptr;
+#endif
 	}
 	else
 		throw MetadataException("Invalid representation chosen");

@@ -3,6 +3,7 @@
 #include "raster/pointcollection.h"
 #include "raster/geometry.h"
 #include "plot/plot.h"
+#include "util/socket.h"
 
 #include "operators/operator.h"
 
@@ -31,6 +32,30 @@ OperatorRegistration::OperatorRegistration(const char *name, OPConstructor const
 		printf(" contains %s\n", i.first.c_str());
 	}
 */
+}
+
+
+
+QueryRectangle::QueryRectangle(Socket &socket) {
+	socket.read(&timestamp);
+	socket.read(&x1);
+	socket.read(&y1);
+	socket.read(&x2);
+	socket.read(&y2);
+	socket.read(&xres);
+	socket.read(&yres);
+	socket.read(&epsg);
+}
+
+void QueryRectangle::toSocket(Socket &socket) const {
+	socket.write(timestamp);
+	socket.write(x1);
+	socket.write(y1);
+	socket.write(x2);
+	socket.write(y2);
+	socket.write(xres);
+	socket.write(yres);
+	socket.write(epsg);
 }
 
 

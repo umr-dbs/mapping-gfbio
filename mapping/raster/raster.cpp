@@ -306,7 +306,8 @@ void GenericRaster::toSocket(Socket &socket) {
 	socket.write(lcrs);
 	socket.write(dd);
 	socket.write(data, len);
-	// TODO: Metadata
+	socket.write(md_string);
+	socket.write(md_value);
 }
 
 std::unique_ptr<GenericRaster> GenericRaster::fromSocket(Socket &socket) {
@@ -317,7 +318,8 @@ std::unique_ptr<GenericRaster> GenericRaster::fromSocket(Socket &socket) {
 	char *data = (char *) raster->getDataForWriting();
 	size_t len = raster->getDataSize();
 	socket.read(data, len);
-	// TODO: Metadata
+	raster->md_string.fromSocket(socket);
+	raster->md_value.fromSocket(socket);
 
 	return raster;
 }

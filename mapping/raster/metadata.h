@@ -7,12 +7,18 @@
 #include <string>
 #include <sys/types.h>
 
+class Socket;
 
 template<typename T>
 class DirectMetadata {
 	public:
 		DirectMetadata();
+		DirectMetadata(Socket &socket);
 		~DirectMetadata();
+
+		void fromSocket(Socket &socket);
+		void toSocket(Socket &socket) const;
+
 		void set(const std::string &key, const T &value);
 		const T &get(const std::string &key) const;
 		const T &get(const std::string &key, const T &defaultvalue) const;
@@ -34,7 +40,12 @@ class MetadataIndex {
 	public:
 		typedef uint8_t metadata_index_t;
 		MetadataIndex();
+		MetadataIndex(Socket &socket);
 		~MetadataIndex();
+
+		void fromSocket(Socket &socket);
+		void toSocket(Socket &socket) const;
+
 		void addKey(const std::string &key);
 		void lock();
 		void setValue(IndexedMetadata<T> &object, const std::string &key, const T &value);
@@ -54,8 +65,12 @@ class IndexedMetadata {
 	public:
 		typedef typename MetadataIndex<T>::metadata_index_t metadata_index_t;
 		IndexedMetadata(metadata_index_t count);
+		IndexedMetadata(Socket &socket);
 		//IndexedMetadata(const MetadataIndex &index);
 		~IndexedMetadata();
+
+		void fromSocket(Socket &socket);
+		void toSocket(Socket &socket) const;
 
 		// Copy
 		IndexedMetadata(const IndexedMetadata<T> &imd);

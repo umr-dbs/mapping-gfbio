@@ -1,4 +1,5 @@
 #include "raster/pointcollection.h"
+#include "util/socket.h"
 
 #include <sstream>
 #include <iomanip>
@@ -10,6 +11,20 @@ Point::Point(double x, double y, uint16_t size_md_string, uint16_t size_md_value
 
 Point::~Point() {
 }
+
+Point::Point(Socket &socket) : md_string(0), md_value(0) {
+	socket.read(&x);
+	socket.read(&y);
+	md_string.fromSocket(socket);
+	md_value.fromSocket(socket);
+}
+void Point::toSocket(Socket &socket) {
+	socket.write(x);
+	socket.write(y);
+	socket.write(md_string);
+	socket.write(md_value);
+}
+
 
 #if 0 // Default implementations should be equal
 // Copy constructors
@@ -52,6 +67,38 @@ PointCollection::PointCollection(epsg_t epsg) : epsg(epsg) {
 PointCollection::~PointCollection() {
 
 }
+
+PointCollection::PointCollection(Socket &socket) : epsg(EPSG_UNKNOWN) {
+	socket.read(&epsg);
+	size_t count;
+	socket.read(&count);
+	collection.reserve(count);
+
+	global_md_string.fromSocket(socket);
+	global_md_value.fromSocket(socket);
+	local_md_string.fromSocket(socket);
+	local_md_value.fromSocket(socket);
+
+	for (size_t i=0;i<count;i++) {
+		collection.push_back( Point(socket) );
+	}
+}
+
+void PointCollection::toSocket(Socket &socket) {
+	socket.write(epsg);
+	size_t count = collection.size();
+	socket.write(count);
+
+	socket.write(global_md_string);
+	socket.write(global_md_value);
+	socket.write(local_md_string);
+	socket.write(local_md_value);
+
+	for (size_t i=0;i<count;i++) {
+		collection[i].toSocket(socket);
+	}
+}
+
 
 Point &PointCollection::addPoint(double x, double y) {
 	local_md_string.lock();

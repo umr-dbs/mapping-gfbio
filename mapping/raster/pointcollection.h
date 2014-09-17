@@ -8,10 +8,13 @@
 #include <string>
 #include <sys/types.h>
 
+class Socket;
 
 class Point {
 	private:
 		Point(double x, double y, uint16_t size_md_string = 0, uint16_t size_md_value = 0);
+		Point(Socket &socket);
+		void toSocket(Socket &socket);
 	public:
 		Point() = delete;
 		~Point();
@@ -34,7 +37,11 @@ class Point {
 class PointCollection {
 	public:
 		PointCollection(epsg_t epsg = EPSG_UNKNOWN);
+		PointCollection(Socket &socket);
 		~PointCollection();
+
+		void toSocket(Socket &socket);
+
 		epsg_t epsg;
 		std::vector<Point> collection;
 

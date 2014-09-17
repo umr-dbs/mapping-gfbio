@@ -121,6 +121,16 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 		src_xres = 3712;
 		src_yres = 3712;
 	}
+	else if (src_epsg == EPSG_GEOSMSG) {
+		// We're loading a msg raster. ALWAYS load the full raster.
+		// TODO: optimize
+		src_x1 = -5568748.276;
+		src_y1 = -5568748.276;
+		src_x2 = 5568748.276;
+		src_y2 = 5568748.276;
+		src_xres = 5568748.276*2;
+		src_yres = 5568748.276*2;
+	}
 	else {
 		// Transform the upper left and bottom right corner, use those as the source bounding box
 		// That'll only work on transformations where rectangles remain rectangles..

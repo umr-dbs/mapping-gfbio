@@ -67,6 +67,10 @@ void ROperator::runScript(Socket &socket, const QueryRectangle &rect, char reque
 				auto raster = getRasterFromSource(childidx, qrect);
 				socket.write(*raster);
 			}
+			else if (type == RSERVER_TYPE_POINTS) {
+				auto points = getPointsFromSource(childidx, qrect);
+				socket.write(*points);
+			}
 			else {
 				throw OperatorException("R: invalid data type requested by server");
 			}

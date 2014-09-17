@@ -3,11 +3,12 @@
 #include "rserver/rserver.h"
 
 #include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "raster/raster_priv.h"
 #include "raster/pointcollection.h"
 #include "plot/text.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
+#include "util/make_unique.h"
 
 
 #include <cstdlib>
@@ -63,6 +64,17 @@ std::unique_ptr<GenericRaster> query_raster_source(Socket &socket, int childidx,
 	return raster;
 }
 
+std::unique_ptr<PointCollection> query_points_source(Socket &socket, int childidx, const QueryRectangle &rect) {
+	Profiler::Profiler("requesting Points");
+	log("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	socket.write((char) RSERVER_TYPE_POINTS);
+	socket.write(childidx);
+	socket.write(rect);
+
+	auto points = std::make_unique<PointCollection>(socket);
+	return points;
+}
+
 
 
 void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
@@ -88,6 +100,10 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(socket), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.rastercount"] = rastersourcecount;
 	R["mapping.loadRaster"] = ***REMOVED***::InternalFunction( bound_raster_source );
+
+	std::function<std::unique_ptr<PointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, std::ref(socket), std::placeholders::_1, std::placeholders::_2);
+	R["mapping.pointscount"] = pointssourcecount;
+	R["mapping.loadPoints"] = ***REMOVED***::InternalFunction( bound_points_source );
 
 	R["mapping.qrect"] = qrect;
 

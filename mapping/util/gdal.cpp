@@ -45,11 +45,15 @@ std::string SRSFromEPSG(epsg_t epsg) {
 		CPLErrorReset();
 
 		hSRS = OSRNewSpatialReference( NULL );
-		if( OSRSetFromUserInput( hSRS, epsg_name_str.c_str() ) == OGRERR_NONE )
+
+		if((epsg == EPSG_GEOSMSG) && (OSRSetGEOS(hSRS, 0, 35785831, 0, 0) == OGRERR_NONE)) //this is valid for meteosat: lon, height, easting, northing (gdal notation)!
+				OSRExportToWkt(hSRS, &pszResult);
+
+		else if( OSRSetFromUserInput( hSRS, epsg_name_str.c_str() ) == OGRERR_NONE )
 				OSRExportToWkt( hSRS, &pszResult );
 		else {
 			std::ostringstream msg;
-			msg << "SRS could not be parsed for epsg " << epsg;
+			msg << "SRS could not be created for epsg " << epsg;
 			throw GDALException(msg.str());
 			/*
 				CPLError( CE_Failure, CPLE_AppDefined,

@@ -1,4 +1,6 @@
 
+#ifndef MAPPING_NO_OPENCL
+
 #include "raster/raster.h"
 #include "raster/raster_priv.h"
 #include "raster/typejuggling.h"
@@ -408,3 +410,5 @@ void CLProgram::reset() {
 
 
 } // End namespace RasterOpenCL
+
+#endif

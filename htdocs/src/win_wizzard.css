@@ -269,7 +269,32 @@
 }
 
 .ui-dialog-titlebar {
-	background-color: #e6e6e6 ;
+	background-color: #e6e6e6;
 	color : black;
 	border-color: #c6c6c6;
+}
+
+.ui-autocomplete .ui-menu-item a.ui-state-focus {
+	border-radius: 1px;
+    border: 1px solid rgb(130, 130, 130);
+    background-color: #d6d6d6;
+    color: #555;
+}
+
+.datasourceSelectionLabel {
+	border-radius: 1px;
+    color: #333;
+    border: 1px solid rgb(230, 230, 230);
+}
+
+.datasourceSelectionLabel.ui-state-focus {
+	border: 1px solid rgb(200, 200, 200);
+}
+
+.datasourceSelectionLabel:hover {
+	border: 1px solid rgb(130, 130, 130);
+}
+
+.datasourceSelectionLabel.ui-state-active {
+	background-color: #90EE90;
 }

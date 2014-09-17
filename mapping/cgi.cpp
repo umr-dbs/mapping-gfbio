@@ -172,9 +172,23 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 			do {
 			  current = next + 1;
 			  next = bbox_str.find_first_of(delimiters, current);
-			  double value = std::stod( bbox_str.substr(current, next - current) );
-			  if (isnan(value))
-				  abort("BBOX value is NaN");
+			  std::string stringValue = bbox_str.substr(current, next - current);
+			  double value = 0;
+
+			  if(stringValue == "Infinity") {
+				  if (query_epsg == EPSG_WEBMERCATOR) {
+					  value = 20037508.34;
+				  }
+			  } else if(stringValue == "-Infinity") {
+				  if (query_epsg == EPSG_WEBMERCATOR) {
+					  value = -20037508.34;
+				  }
+			  } else {
+				  value = std::stod(stringValue);
+				  if (isnan(value))
+				  	abort("BBOX value is NaN");
+			  }
+
 			  bbox[element++] = value;
 			} while (element < 4 && next != std::string::npos);
 

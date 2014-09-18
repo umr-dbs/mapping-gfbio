@@ -128,8 +128,8 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 		src_y1 = -5568748.276;
 		src_x2 = 5568748.276;
 		src_y2 = 5568748.276;
-		src_xres = 5568748.276*2;
-		src_yres = 5568748.276*2;
+		src_xres = 3712;
+		src_yres = 3712;
 	}
 	else {
 		// Transform the upper left and bottom right corner, use those as the source bounding box

@@ -267,14 +267,16 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 	copier.copyGlobalMetadata();
 	copier.initLocalMetadataFields();
 
-	//printf("content-type: text/plain\r\n\r\n");
+	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
 	for (Point &point : points_in->collection) {
 		double x = point.x, y = point.y;
 		if (!transformer.transform(x, y)) {
 			continue;
 		}
+		if (x < minx || x > maxx || y < miny || y > maxy) {
+			continue;
+		}
 
-		//printf("%f, %f -> %f, %f\n", point.x, point.y, x, y);
 		Point &p = points_out->addPoint(x, y);
 		copier.copyLocalMetadata(point,p);
 	}

@@ -94,9 +94,23 @@ function outputFiles($directorypath, $extension) {
 	}
 }
 
+function outputJSVariables($directorypath) {
+	$files = getFiles($directorypath, 'jstxt');
+	foreach($files as $path) {
+		$txt = str_replace('\r', '', file_get_contents($path));
+		$filename = basename($path, '.jstxt');
+		$varname = str_replace('/', '_', strtoupper($filename));
+		echo "var $varname = " . json_encode($txt) . ";\n";
+	}
+}
 
 if ($type == 'css' || $type == 'js') {
 	outputFiles(SOURCEPATH.'external/', $type);
+	if ($type == 'js') {
+		outputJSVariables(SOURCEPATH.$project.'/');
+		outputJSVariables(SOURCEPATH);
+		outputJSVariables(SOURCEPATH.'operators/');
+	}
 	outputFiles(SOURCEPATH.$project.'/', $type);
 	outputFiles(SOURCEPATH, $type);
 	outputFiles(SOURCEPATH.'operators/', $type);

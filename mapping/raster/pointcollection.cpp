@@ -335,8 +335,6 @@ std::string PointCollection::toCSV() {
 	}
 	csv << std::endl;
 
-
-	bool first = true;
 	for (const Point &p : collection) {
 		csv << p.x << "," << p.y;
 

@@ -57,7 +57,8 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRe
 	metadataCopier.copyGlobalMetadata();
 	metadataCopier.initLocalMetadataFields();
 
-	for (int i=0; i<geometry->getNumGeometries(); i++){
+	size_t numgeom = geometry->getNumGeometries();
+	for (size_t i=0; i< numgeom; i++){
 
 		auto preparedGeometry = prep.prepare(geometry->getGeometryN(i));
 		for (Point &p : points->collection) {

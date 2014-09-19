@@ -84,7 +84,7 @@ struct createValueRaster {
 			if (raster->dd.has_no_data && no_data == value)
 				continue;
 			if (x >= value_rm.size[0]) {
-				fprintf(stderr, "%d -> %d, nodata(%d) = %d, value = %d, x = %d, max = %d", min, max, raster->dd.has_no_data ? 1 : 0, no_data, value, x, value_rm.size[0]);
+				fprintf(stderr, "%f -> %f, nodata(%d) = %f, value = %f, x = %u, max = %u", (float) min, (float) max, raster->dd.has_no_data ? 1 : 0, (float) no_data, (float) value, x, value_rm.size[0]);
 				throw OperatorException("Internal Error: createValueRaster() is bugged, call a bug hunter.");
 			}
 			value_raster->set(x++, 0, value);

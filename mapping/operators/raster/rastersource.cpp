@@ -66,8 +66,8 @@ std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &r
 	int pixel_y2 = std::ceil(std::max(py1,py2))+1;
 
 	int zoom = 0;
-	int pixel_width = pixel_x2 - pixel_x1;
-	int pixel_height = pixel_y2 - pixel_y1;
+	uint32_t pixel_width = pixel_x2 - pixel_x1;
+	uint32_t pixel_height = pixel_y2 - pixel_y1;
 	while (pixel_width > 2*rect.xres && pixel_height > 2*rect.yres) {
 		zoom++;
 		pixel_width >>= 1;

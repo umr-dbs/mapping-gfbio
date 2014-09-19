@@ -60,8 +60,9 @@ std::vector<std::string> GFBioPointSourceOperator::parseCSVLine(std::string line
 	bool inQuote = false;
 	char separator = ',';
 	char quote = '\"';
-	for (int i = 0 ; i <= line.length(); i++)  {
-		if(line[i] == separator || i == line.length() ){
+	size_t linelen = line.length();
+	for (size_t i = 0; i <= linelen; i++) {
+		if (line[i] == separator || i == linelen) {
 			if(!inQuote){
 				//token goes from start to i
 				csv.push_back(line.substr(start, i-start));

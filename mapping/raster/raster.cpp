@@ -100,7 +100,7 @@ void DataDescription::verify() const {
 	if (!std::isfinite(min) || !std::isfinite(max))
 		throw MetadataException("ValueMetadata::verify: min or max not finite");
 	if (min >= max)
-		throw MetadataException("ValueMetadata::verify: min >= max");
+		throw MetadataException("ValueMetadata::verify: min >= max " + std::to_string(min) + ", " + std::to_string(max));
 	if (min < getMinByDatatype() || max > getMaxByDatatype())
 		throw MetadataException("ValueMetadata::verify: min or max outside of range allowed by datatype");
 

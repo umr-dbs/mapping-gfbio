@@ -45,12 +45,26 @@ std::string SRSFromEPSG(epsg_t epsg) {
 		CPLErrorReset();
 
 		hSRS = OSRNewSpatialReference( NULL );
+		bool success = false;
 
-		if((epsg == EPSG_GEOSMSG) && (OSRSetGEOS(hSRS, 0, 35785831, 0, 0) == OGRERR_NONE)) //this is valid for meteosat: lon, height, easting, northing (gdal notation)!
-				OSRExportToWkt(hSRS, &pszResult);
+		if((epsg == EPSG_GEOSMSG)){
+			//MSG handling
+			success = (OSRSetGEOS(hSRS, 0, 35785831, 0, 0) == OGRERR_NONE); //this is valid for meteosat: lon, height, easting, northing (gdal notation)!
+			success = (OSRSetWellKnownGeogCS(hSRS, "WGS84" ) == OGRERR_NONE);
+			/*
+			 * GDAL also uses the following lines:
+			 *     oSRS.SetGeogCS( NULL, NULL, NULL, 6378169, 295.488065897, NULL, 0, NULL, 0 );
+    		 *     oSRS.SetGeogCS( "unnamed ellipse", "unknown", "unnamed", 6378169, 295.488065897, "Greenwich", 0.0);
+			 */
+		}
+		else {
+			//others
+			success = (OSRSetFromUserInput( hSRS, epsg_name_str.c_str() ) == OGRERR_NONE );
+		}
 
-		else if( OSRSetFromUserInput( hSRS, epsg_name_str.c_str() ) == OGRERR_NONE )
-				OSRExportToWkt( hSRS, &pszResult );
+		if(success)
+			//check for success and throw an exception if something went wrong
+			OSRExportToWkt( hSRS, &pszResult );
 		else {
 			std::ostringstream msg;
 			msg << "SRS could not be created for epsg " << epsg;

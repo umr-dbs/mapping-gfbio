@@ -36,17 +36,18 @@ EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
 
-DATASET_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061800-C_
-DATASET_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061800-C_
-DATASET_C2=data/xrit2/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061800-C_
-DATASET_C3=data/xrit2/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061800-C_
-DATASET_C4=data/xrit2/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061800-C_
-DATASET_C5=data/xrit2/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061800-C_
-DATASET_C6=data/xrit2/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061800-C_
-DATASET_C7=data/xrit2/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061800-C_
-DATASET_C8=data/xrit2/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061800-C_
-DATASET_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061800-C_
-DATASET_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061800-C_
+DATASET_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061200-C_
+DATASET_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061200-C_
+DATASET_C2=data/xrit2/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061200-C_
+DATASET_C3=data/xrit2/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061200-C_
+DATASET_C4=data/xrit2/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061200-C_
+DATASET_C5=data/xrit2/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061200-C_
+DATASET_C6=data/xrit2/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061200-C_
+DATASET_C7=data/xrit2/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061200-C_
+DATASET_C8=data/xrit2/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061200-C_
+DATASET_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061200-C_
+DATASET_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061200-C_
+DATASET_HRV=data/xrit2/H-000-MSG2__-MSG2________-HRV______-000001___-201006061200-C_
 
 .SECONDARY: $(CL_HEADERS)
 
@@ -125,6 +126,25 @@ msat2datasource:	${EXE}
 	./${EXE} import datasources/msat2.json ${DATASET_C8} 1 8 42 RAW
 	./${EXE} import datasources/msat2.json ${DATASET_C9} 1 9 42 RAW
 	./${EXE} import datasources/msat2.json ${DATASET_C10} 1 10 42 RAW
+	
+msg9_geosdatasource:	${EXE}
+	rm -f datasources/msg9_geos.dat datasources/msg9_geos.db
+	#./${EXE} createsource 62866 ${DATASET_C0} ${DATASET_C1} ${DATASET_C2} ${DATASET_C3} ${DATASET_C4} ${DATASET_C5} ${DATASET_C6} ${DATASET_C7} ${DATASET_C8} ${DATASET_C9} ${DATASET_C10} >datasources/msat2.json
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C0} 1 0 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C1} 1 1 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C2} 1 2 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C3} 1 3 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C4} 1 4 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C5} 1 5 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C6} 1 6 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C7} 1 7 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C8} 1 8 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C9} 1 9 42 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C10} 1 10 42 RAW
+	
+msg9_geos_hrvdatasource:	${EXE}
+	rm -f datasources/msg9_geos_hrv.dat datasources/msg9_geos_hrv.db
+	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET_HRV} 1 0 42 RAW
 
 worldclimdatasource:	${EXE}
 	rm -f datasources/worldclim*.dat datasources/worldclim*.db

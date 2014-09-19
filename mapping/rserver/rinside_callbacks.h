@@ -6,7 +6,7 @@ class ***REMOVED***Callbacks : public Callbacks {
 			return "";
 		};
 
-		virtual void WriteConsole( const std::string& line, int type ) {
+		virtual void WriteConsole( const std::string& line, int /*type*/ ) {
 			output_buffer << line << std::endl;
 		};
 
@@ -19,10 +19,10 @@ class ***REMOVED***Callbacks : public Callbacks {
 		virtual void CleanerrConsole() {
 		};
 
-		virtual void Busy( bool is_busy ) {
+		virtual void Busy( bool /*is_busy*/ ) {
 		};
 
-		virtual void ShowMessage(const char* message) {
+		virtual void ShowMessage(const char* /*message*/) {
 
 		};
 

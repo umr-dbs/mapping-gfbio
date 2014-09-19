@@ -122,12 +122,58 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 		src_yres = 3712;
 	}
 	else if (src_epsg == EPSG_GEOSMSG) {
-		// We're loading a msg raster. ALWAYS load the full raster.
-		// TODO: optimize
+		/*
+		 * We're loading a msg raster. Since a rectangle in latlon or mercator does not map to
+		 * an exact rectangle in MSG, we need to use some heuristics
+		 */
+		const double MSG_MAX_LAT = 79.0;  // north/south
+		const double MSG_MAX_LONG = 76.0; // east/west
+
+		double tlx = rect.x1, tly = rect.y1, brx = rect.x2, bry = rect.y2;
+
+		if (dest_epsg != EPSG_LATLON) {
+			GDAL::CRSTransformer transformer_tolatlon(dest_epsg, EPSG_LATLON);
+			double pz=0;
+			if (!transformer_tolatlon.transform(tlx, tly, pz))
+				throw OperatorException("Transformation of top left corner failed");
+			if (!transformer_tolatlon.transform(brx, bry, pz))
+				throw OperatorException("Transformation of bottom right corner failed");
+		}
+
+		double top = std::max(tly, bry);
+		double bottom = std::min(tly, bry);
+		double left = std::min(tlx, brx);
+		double right = std::max(tlx, brx);
+
+		// First optimization: see if we're on a part of the earth visible by the satellite
+		if (bottom > MSG_MAX_LAT || top < -MSG_MAX_LAT || right < -MSG_MAX_LONG || left > MSG_MAX_LONG) {
+			/*
+			std::ostringstream msg;
+			msg << "Projection: there is no source data here (" << left << "," << top << ") -> (" << right << "," << bottom << ")";
+			throw OperatorException(msg.str());
+			*/
+
+			// return a very small source rectangle with minimum resolution
+			QueryRectangle result(rect.timestamp, 0, 0, 1, 1, 1, 1, src_epsg);
+			return result;
+		}
+
+		// By default: pick the whole raster
 		src_x1 = -5568748.276;
 		src_y1 = -5568748.276;
 		src_x2 = 5568748.276;
 		src_y2 = 5568748.276;
+		// Second optimization: see if we can restrict us to a quarter of the globe
+		if (left > 0)
+			src_x1 = 0;
+		if (right < 0)
+			src_x2 = 0;
+		if (top < 0)
+			src_y2 = 0;
+		if (bottom > 0)
+			src_y1 = 0;
+
+
 		src_xres = 3712;
 		src_yres = 3712;
 	}
@@ -221,14 +267,16 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 	copier.copyGlobalMetadata();
 	copier.initLocalMetadataFields();
 
-	//printf("content-type: text/plain\r\n\r\n");
+	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
 	for (Point &point : points_in->collection) {
 		double x = point.x, y = point.y;
 		if (!transformer.transform(x, y)) {
 			continue;
 		}
+		if (x < minx || x > maxx || y < miny || y > maxy) {
+			continue;
+		}
 
-		//printf("%f, %f -> %f, %f\n", point.x, point.y, x, y);
 		Point &p = points_out->addPoint(x, y);
 		copier.copyLocalMetadata(point,p);
 	}

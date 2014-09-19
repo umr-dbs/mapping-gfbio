@@ -66,7 +66,7 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *datas
 	double maxvalue = adfMinMax[1];
 
 	// TODO: Workaround für MSAT2 .rst mit falschen max-werten!
-	if (epsg == EPSG_METEOSAT2 || epsg == EPSG_GEOSMSG) {
+	if (epsg == EPSG_METEOSAT2) {
 		maxvalue = 1023;
 		minvalue = 1;
 		hasnodata = true;
@@ -79,6 +79,12 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *datas
 		lcrs.scale[1] = -1.0;
 	}
 	//if (type == GDT_Byte) maxvalue = 255;
+	if(epsg == EPSG_GEOSMSG){
+		hasnodata = true;
+		nodata = 0;
+		type = GDT_Int16; // TODO: sollte GDT_UInt16 sein!
+	}
+
 
 	DataDescription dd(type, minvalue, maxvalue, hasnodata, nodata);
 	//printf("loading raster with %g -> %g valuerange\n", adfMinMax[0], adfMinMax[1]);

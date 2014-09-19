@@ -66,8 +66,9 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *datas
 	double maxvalue = adfMinMax[1];
 
 	// TODO: Workaround für MSAT2 .rst mit falschen max-werten!
-	if (epsg == EPSG_METEOSAT2) {
+	if (epsg == EPSG_METEOSAT2 || epsg == EPSG_GEOSMSG) {
 		maxvalue = 1023;
+		minvalue = 1;
 		hasnodata = true;
 		nodata = 0;
 		type = GDT_Int16; // TODO: sollte GDT_UInt16 sein!
@@ -100,7 +101,7 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 
 	// Selectively read metadata
 	//char **mdList = GDALGetMetadata(poBand, "msg");
-	if (epsg == EPSG_METEOSAT2) {
+	if (epsg == EPSG_METEOSAT2 || epsg == EPSG_GEOSMSG) {
 		char **mdList = poBand->GetMetadata("msg");
 		for (int i = 0; mdList && mdList[i] != nullptr; i++ ) {
 			printf("GDALImport: got Metadata %s\n", mdList[i]);
@@ -180,7 +181,7 @@ std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int
 	const char *drivername = dataset->GetDriverName();
 	//printf("Driver: %s\n", drivername);
 	if (strcmp(drivername, "MSG") == 0) {
-		if (epsg != EPSG_METEOSAT2)
+		if (epsg != EPSG_METEOSAT2 && epsg != EPSG_GEOSMSG)
 			throw ImporterException("MSG driver can only import rasters in MSG projection");
 	}
 

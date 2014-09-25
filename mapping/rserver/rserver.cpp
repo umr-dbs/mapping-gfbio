@@ -20,6 +20,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/wait.h>
+#include <poll.h>
 
 
 #pragma clang diagnostic push
@@ -167,10 +169,34 @@ int main()
 	// Start listening and fork()
 	listen(listen_fd, 5);
 	while (true) {
+		// try to reap our children
+		int status;
+		while (waitpid(-1, &status, WNOHANG) > 0) {
+			// a child exited somehow
+		}
+
+		struct pollfd pollfds[1];
+		pollfds[0].fd = listen_fd;
+		pollfds[0].events = POLLIN;
+		//int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+
+		int poll_res = poll(pollfds, /* count = */ 1, /* timeout in ms = */ 5000);
+		if (poll_res < 0) {
+			perror("poll() failed");
+			exit(1);
+		}
+		if (poll_res == 0)
+			continue;
+		if ((pollfds[0].revents & POLLIN) == 0)
+			continue;
+
+		// select()/pselect() or poll()/ppoll()
 		struct sockaddr_un client_addr;
 		socklen_t client_addr_len = sizeof(client_addr);
 		int client_fd = accept(listen_fd, (struct sockaddr *) &client_addr, &client_addr_len);
 		if (client_fd < 0) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				continue;
 			perror("accept() failed");
 			exit(1);
 		}
@@ -189,7 +215,12 @@ int main()
 			auto start_c = clock();
 			struct timespec start_t;
 			clock_gettime(CLOCK_MONOTONIC, &start_t);
-			client(client_fd, R, *Rcallbacks);
+			try {
+				client(client_fd, R, *Rcallbacks);
+			}
+			catch (const std::exception &e) {
+				log("Exception: %s", e.what());
+			}
 			auto end_c = clock();
 			struct timespec end_t;
 			clock_gettime(CLOCK_MONOTONIC, &end_t);

@@ -190,7 +190,6 @@ int main()
 		if ((pollfds[0].revents & POLLIN) == 0)
 			continue;
 
-		// select()/pselect() or poll()/ppoll()
 		struct sockaddr_un client_addr;
 		socklen_t client_addr_len = sizeof(client_addr);
 		int client_fd = accept(listen_fd, (struct sockaddr *) &client_addr, &client_addr_len);

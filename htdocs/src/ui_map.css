@@ -41,6 +41,22 @@
 	text-align: center;	
 }
 
+.layerControls_emptymsg, .plotControls_emptymsg {
+	display: none;
+
+	position: absolute;
+	top: 50%;
+	margin-top: -2em;
+	left: 20px;
+	right: 20px;
+	text-align: center;
+
+	padding: 5px;
+	
+	background-color: #E5E5E5;
+	border: 1px solid #C6C6C6;
+	border-radius: 15px;
+}
 
 
 .layerControl {

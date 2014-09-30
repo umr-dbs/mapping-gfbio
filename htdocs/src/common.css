@@ -12,6 +12,11 @@ body {
 .tab {
 	transition: background-color 0.3s ease, border-color 0.3s ease;
 	white-space: nowrap;
+
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
 }
 
 
@@ -20,31 +25,29 @@ body {
  */
 a.button {
 	background-color: #E5E5E5;
-	color: #333;
+	color: #333333;
 	margin: 5px;
-	padding-left: 5px;
-	padding-right: 5px;
-	border: 1px solid rgb(230, 230, 230);
-	border-radius: 1px;
+	padding: 0 5px;
+
+	border: 1px solid #C6C6C6;
+	border-radius: 3px;
+
 	text-decoration: none;
 	text-align: center;
 	vertical-align: middle;
-	text-decoration: none;
+	white-space: nowrap;
+
 	height: 25px;
 	line-height: 25px;
-	
-	white-space: nowrap;
-}
 
-a.button:first-child {
-	margin-left: 0px;
-}
+	transition: background-color 0.3s ease;
 
-a.button:last-child {
-	margin-right: 0px;
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
 }
 
 a.button:hover {
-	border: 1px solid #C6C6C6;
-	box-shadow: 0px 1px 1px rgb(230, 230, 230);
+	background-color: white;
 }

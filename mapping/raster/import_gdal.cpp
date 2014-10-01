@@ -213,34 +213,34 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
     char **papszMetadata;
 
 	int count = GetGDALDriverManager()->GetDriverCount();
-	printf("GDAL has %d drivers\n", count);
-	for (int i=0;i<count;i++) {
-		poDriver = GetGDALDriverManager()->GetDriver(i);
-
-		if( poDriver == NULL ) {
-			continue;
-		}
-
-		papszMetadata = poDriver->GetMetadata();
-		if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATE, FALSE ) )
-			printf( "Driver %d supports Create() method.\n", i );
-		if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATECOPY, FALSE ) )
-			printf( "Driver %d supports CreateCopy() method.\n", i );
-
-	}
+//	printf("GDAL has %d drivers\n", count);
+//	for (int i=0;i<count;i++) {
+//		poDriver = GetGDALDriverManager()->GetDriver(i);
+//
+//		if( poDriver == NULL ) {
+//			continue;
+//		}
+//
+//		papszMetadata = poDriver->GetMetadata();
+//		if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATE, FALSE ) )
+//			printf( "Driver %d supports Create() method.\n", i );
+//		if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATECOPY, FALSE ) )
+//			printf( "Driver %d supports CreateCopy() method.\n", i );
+//
+//	}
 
 	poDriver = GetGDALDriverManager()->GetDriverByName(gdalFormatName);
 
-	if( poDriver == NULL ) {
-		printf( "No Driver found for FormatName %s.\n", gdalFormatName);
-		return;
-	}
-
-	papszMetadata = poDriver->GetMetadata();
-	if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATE, FALSE ) )
-		printf( "Driver %s supports Create() method.\n", gdalFormatName);
-	if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATECOPY, FALSE ) )
-		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
+//	if( poDriver == NULL ) {
+//		printf( "No Driver found for FormatName %s.\n", gdalFormatName);
+//		return;
+//	}
+//
+//	papszMetadata = poDriver->GetMetadata();
+//	if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATE, FALSE ) )
+//		printf( "Driver %s supports Create() method.\n", gdalFormatName);
+//	if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATECOPY, FALSE ) )
+//		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
 
 	//now create a GDAL dataset using the driver for gdalFormatName
 	poDstDS = poDriver->Create( filename, size[0], size[1], size[2], dd.datatype, NULL);
@@ -254,7 +254,8 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 	//get the dataset -> TODO: we only have one band at the moment
 	poBand = poDstDS->GetRasterBand(1);
 	poBand->RasterIO( GF_Write, 0, 0, size[0], size[1], getData(), size[0], size[1], dd.datatype, 0, 0 );
-
+	//add the metadata to the dataset
+	poDstDS->SetMetadataItem("test1","test2","UMR_MAPPING");
 	//close all GDAL
 	GDALClose( (GDALDatasetH) poDstDS );
 

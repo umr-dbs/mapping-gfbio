@@ -238,9 +238,9 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 
 	papszMetadata = poDriver->GetMetadata();
 	if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATE, FALSE ) )
-		printf( "Driver %s supports Create() method.\n", drivername );
+		printf( "Driver %s supports Create() method.\n", gdalFormatName);
 	if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATECOPY, FALSE ) )
-		printf( "Driver %s supports CreateCopy() method.\n", drivername );
+		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
 
 	// ...
 }

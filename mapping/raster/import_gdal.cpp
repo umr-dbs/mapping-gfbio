@@ -237,7 +237,7 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 //		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
 
 	//now create a GDAL dataset using the driver for gdalFormatName
-	poDstDS = poDriver->Create( filename, lcrs.size[0], lcrs.size[1], lcrs.size[2], dd.datatype, NULL);
+	poDstDS = poDriver->Create( filename, lcrs.size[0], lcrs.size[1], 1, dd.datatype, NULL);
 
 	//set the affine transformation coefficients for pixel <-> world conversion and create the spatial reference and
 	double adfGeoTransform[6]{ lcrs.origin[0], lcrs.scale[0], 0, lcrs.origin[1], 0, lcrs.scale[1] };
@@ -248,7 +248,13 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 	//get the dataset -> TODO: we only have one band at the moment
 	void * data = const_cast<void *>(this->getData());
 	poBand = poDstDS->GetRasterBand(1);
+
+	if (dd.has_no_data){
+			poBand->SetNoDataValue(dd.no_data);
+	}
+
 	poBand->RasterIO( GF_Write, 0, 0, lcrs.size[0], lcrs.size[1], data, lcrs.size[0], lcrs.size[1], dd.datatype, 0, 0 );
+
 
 	//add the metadata to the dataset
 	poDstDS->SetMetadataItem("test1","test2","UMR_MAPPING");

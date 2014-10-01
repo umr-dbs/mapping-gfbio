@@ -207,10 +207,10 @@ template<typename T> void Raster2D<T>::toGDAL(const char *, const char *) {
 template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *gdalFormatName) {
 	GDAL::init();
 
-
 	GDALDriver *poDriver;
-	char **papszMetadata;
-
+	GDALDataset *poDstDS;
+    GDALRasterBand *poBand;
+    char **papszMetadata;
 
 	int count = GetGDALDriverManager()->GetDriverCount();
 	printf("GDAL has %d drivers\n", count);
@@ -242,7 +242,22 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 	if( CSLFetchBoolean( papszMetadata, GDAL_DCAP_CREATECOPY, FALSE ) )
 		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
 
-	// ...
+	//now create a GDAL dataset using the driver for gdalFormatName
+	poDstDS = poDriver->Create( filename, size[0], size[1], size[2], dd.datatype, NULL);
+
+	//set the affine transformation coefficients for pixel <-> world conversion and create the spatial reference and
+	double adfGeoTransform[6]{ lcrs.origin[0], lcrs.scale[0], 0, lcrs.origin[1], 0, lcrs.scale[1] };
+	std::string srs = GDAL::SRSFromEPSG(epsg);
+	//set dataset parameters
+	poDstDS->SetGeoTransform(adfGeoTransform);
+	poDstDS->SetProjection(srs.c_str());
+	//get the dataset -> TODO: we only have one band at the moment
+	poBand = poDstDS->GetRasterBand(1);
+	poBand->RasterIO( GF_Write, 0, 0, size[0], size[1], getData(), size[0], size[1], dd.datatype, 0, 0 );
+
+	//close all GDAL
+	GDALClose( (GDALDatasetH) poDstDS );
+
 }
 
 RASTER_PRIV_INSTANTIATE_ALL

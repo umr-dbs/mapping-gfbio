@@ -1,8 +1,53 @@
 body {
 	background-color: black;
+	overflow: hidden;
+	font-family: "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans",
+		"Helvetica Neue", Arial, sans-serif;
 }
 
-.hidden {
-	visibility: hidden;
+
+/*
+ * Tabs
+ */
+.tab {
+	transition: background-color 0.3s ease, border-color 0.3s ease;
+	white-space: nowrap;
+
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
 }
 
+
+/*
+ * Buttons
+ */
+a.button {
+	background-color: #E5E5E5;
+	color: #333333;
+	margin: 5px;
+	padding: 0 5px;
+
+	border: 1px solid #C6C6C6;
+	border-radius: 3px;
+
+	text-decoration: none;
+	text-align: center;
+	vertical-align: middle;
+	white-space: nowrap;
+
+	height: 25px;
+	line-height: 25px;
+
+	transition: background-color 0.3s ease;
+
+	-moz-user-select: none;
+	-webkit-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+
+a.button:hover {
+	background-color: white;
+}

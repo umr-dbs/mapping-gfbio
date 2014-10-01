@@ -1,9 +1,147 @@
-body {
-	overflow: hidden;
-	font-family: "Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans",
-		"Helvetica Neue", Arial, sans-serif;
+
+/*
+ * Sidebars
+ */
+
+#container_main, .container_ui, .mainui_middlecolumn {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	right: 0px;
+	bottom: 0px;
 }
 
+.mainui_sidebar_top, .mainui_sidebar_right, .mainui_sidebar_bottom, .mainui_sidebar_left {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	right: 0px;
+	bottom: 0px;
+	background-color: white;
+}
+.mainui_tabbar_top, .mainui_tabbar_right, .mainui_tabbar_bottom, .mainui_tabbar_left {
+	display: none;
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	right: 0px;
+	bottom: 0px;
+
+	/*overflow: hidden;   -> overflow doesn't include the border */
+	background-color: white;
+}
+	
+.mainui_sidebar_top, .mainui_tabbar_top {
+	bottom: auto !important;
+	height: 0px;
+}
+.mainui_sidebar_right, .mainui_tabbar_right {
+	left: auto !important;
+	width: 0px;
+}
+.mainui_sidebar_bottom, .mainui_tabbar_bottom {
+	top: auto !important;
+	height: 0px;
+}
+.mainui_sidebar_left, .mainui_tabbar_left {
+	right: auto !important;
+	width: 0px;
+}
+
+.mainui_sidebar_widgetcontainer {
+	position: absolute;
+	left: 0px;
+	top: 0px;
+	right: 0px;
+	bottom: 0px;
+	overflow: auto;
+}
+/*
+ * each tab is 120 x 25 px, including borders and padding, positioned 5px from the screen edge
+ * the sidebar is 30px wide, including its border
+ */
+.mainui_tabbar_top {
+	height: 29px;
+	border-bottom: 1px solid #C6C6C6;
+}
+.mainui_tabbar_right {
+	width: 29px;
+	border-left: 1px solid #C6C6C6;
+}
+.mainui_tabbar_bottom {
+	height: 29px;
+	border-top: 1px solid #C6C6C6;
+}
+.mainui_tabbar_left {
+	width: 29px;
+	border-right: 1px solid #C6C6C6;
+}
+
+.mainui_sidebar_tab {
+	display: block;
+	width: 108px; /* + 2*5 padding + 2*1 border */
+
+	height: 23px; /* + 2px border */
+	line-height: 23px;
+
+	background-color: #E5E5E5;
+	border-radius: 3px 3px 0px 0px;
+	border: 1px solid #C6C6C6;
+	padding: 0px 5px;
+
+	color: black;
+	text-decoration: none;
+	text-align: center;
+	
+	cursor: pointer;
+}
+
+.mainui_sidebar_tab:hover {
+	background-color: white;
+}
+
+.mainui_sidebar_tab.tab_active {
+	background-color: white;
+	border-bottom-color: white;
+	
+	cursor: auto;
+}
+
+
+.mainui_tabbar_top .tab {
+	float: left;
+	margin: 5px 5px 0px 5px;
+}
+
+.mainui_tabbar_right .tab {
+	margin: 5px 0 100px 0;
+	
+	/* TODO: -webkit- prefixes etc */
+	transform-origin: 12px 12px;
+	transform: rotate(90deg);
+}
+
+.mainui_tabbar_bottom .tab {
+	float: left;
+	margin: -1px 5px 5px 5px;
+	border-radius: 0px 0px 3px 3px;
+}
+.mainui_tabbar_bottom .tab_active {
+	border-bottom-color: #C6C6C6 !important;
+	border-top-color: white !important;
+}
+
+.mainui_tabbar_left .tab {
+	margin: 125px 0 -25px 5px;
+	
+	transform-origin: top left;
+	transform: rotate(270deg);
+}
+
+
+/*
+ * Windows
+ */
 .window_border {
 	position: absolute;
 	border: 2px solid #C6C6C6;

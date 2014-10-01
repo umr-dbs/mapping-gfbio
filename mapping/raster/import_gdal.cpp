@@ -203,8 +203,8 @@ std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int
 template<typename T> void Raster2D<T>::toGDAL(const char *, const char *) {
 
 }
-#if 0
-template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *drivername) {
+
+template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *gdalFormatName) {
 	GDAL::init();
 
 
@@ -229,10 +229,10 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 
 	}
 
-	poDriver = GetGDALDriverManager()->GetDriverByName(drivername);
+	poDriver = GetGDALDriverManager()->GetDriverByName(gdalFormatName);
 
 	if( poDriver == NULL ) {
-		printf( "Driver %s not found.\n", drivername);
+		printf( "No Driver found for FormatName %s.\n", gdalFormatName);
 		return;
 	}
 
@@ -244,6 +244,5 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 
 	// ...
 }
-#endif
 
 RASTER_PRIV_INSTANTIATE_ALL

@@ -198,13 +198,7 @@ std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int
 	return raster;
 }
 
-
-
-template<typename T> void Raster2D<T>::toGDAL(const char *, const char *) {
-
-}
-
-template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *gdalFormatName) {
+template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *gdalDriverName) {
 	GDAL::init();
 
 	GDALDriver *poDriver;
@@ -229,7 +223,7 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 //
 //	}
 
-	poDriver = GetGDALDriverManager()->GetDriverByName(gdalFormatName);
+	poDriver = GetGDALDriverManager()->GetDriverByName(gdalDriverName);
 
 //	if( poDriver == NULL ) {
 //		printf( "No Driver found for FormatName %s.\n", gdalFormatName);
@@ -243,17 +237,19 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 //		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
 
 	//now create a GDAL dataset using the driver for gdalFormatName
-	poDstDS = poDriver->Create( filename, size[0], size[1], size[2], dd.datatype, NULL);
+	poDstDS = poDriver->Create( filename, lcrs.size[0], lcrs.size[1], lcrs.size[2], dd.datatype, NULL);
 
 	//set the affine transformation coefficients for pixel <-> world conversion and create the spatial reference and
 	double adfGeoTransform[6]{ lcrs.origin[0], lcrs.scale[0], 0, lcrs.origin[1], 0, lcrs.scale[1] };
-	std::string srs = GDAL::SRSFromEPSG(epsg);
+	std::string srs = GDAL::SRSFromEPSG(lcrs.epsg);
 	//set dataset parameters
 	poDstDS->SetGeoTransform(adfGeoTransform);
 	poDstDS->SetProjection(srs.c_str());
 	//get the dataset -> TODO: we only have one band at the moment
+	void * data = const_cast<void *>(this->getData());
 	poBand = poDstDS->GetRasterBand(1);
-	poBand->RasterIO( GF_Write, 0, 0, size[0], size[1], getData(), size[0], size[1], dd.datatype, 0, 0 );
+	poBand->RasterIO( GF_Write, 0, 0, lcrs.size[0], lcrs.size[1], data, lcrs.size[0], lcrs.size[1], dd.datatype, 0, 0 );
+
 	//add the metadata to the dataset
 	poDstDS->SetMetadataItem("test1","test2","UMR_MAPPING");
 	//close all GDAL

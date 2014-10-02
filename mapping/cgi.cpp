@@ -222,6 +222,33 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 	}
 }
 
+auto processWCS(std::map<std::string, std::string> params, epsg_t query_epsg, time_t timestamp) -> int {
+
+	/*http://www.myserver.org:port/path?
+	 * service=WCS &version=2.0
+	 * &request=GetCoverage
+	 * &coverageId=C0002
+	 * &subset=lon,http://www.opengis.net/def/crs/EPSG/0/4326(-71,47)
+	 * &subset=lat,http://www.opengis.net/def/crs/EPSG/0/4326(-66,51)
+	 * &subset=t,http://www.opengis.net/def/trs/ISO-8601/0/Gregorian+UTC("2009-11-06T23:20:52Z")
+	 */
+
+	std::string version = params["version"];
+	if (version != "2.0.0")
+		abort("Invalid version");
+
+	if(params["request"] == "GetCoverage") {
+		//for now we will handle the OpGraph as the coverageId
+		auto graph = GenericOperator::fromJSON(params["coverageId"]);
+		//now we will build the QueryRectangle
+
+
+	}
+
+
+	return 0;
+}
+
 int main() {
 	//printf("Content-type: text/plain\r\n\r\nDebugging:\n");
 	try {
@@ -308,6 +335,11 @@ int main() {
 
 		if(params.count("service") > 0 && params["service"] == "WFS") {
 			return processWFS(params, query_epsg, timestamp);
+		}
+
+		// WCS-Requests
+		if (params.count("service") > 0 && params["service"] == "WCS") {
+			return processWCS(params, query_epsg, timestamp);
 		}
 
 
@@ -467,6 +499,7 @@ int main() {
 						}
 
 						outputImage(result_raster.get(), flipx, flipy, colorizer, overlay.get());
+						result_raster->toGDAL("/tmp/gdalexporttest12345678.tif","GTiff");
 					}
 				}
 				catch (const std::exception &e) {

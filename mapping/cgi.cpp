@@ -231,7 +231,49 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 	}
 }
 
-auto processWCS(std::map<std::string, std::string> params, epsg_t query_epsg, time_t timestamp) -> int {
+
+std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string openGisUri){
+	unsigned int beforeAutorityId = openGisUri.find("crs")+3;
+	unsigned int behindAutorityId = openGisUri.find_first_of("/",beforeAutorityId+1);
+	std::string authorityId = openGisUri.substr(beforeAutorityId+1, behindAutorityId-beforeAutorityId-1);
+	std::cerr<<"getCrsInformationFromOGCUri openGisUri: "<<openGisUri<<" beforeAutorityId: "<<beforeAutorityId<<" behindAutorityId: "<<behindAutorityId<<" authorityId: "<<authorityId<<std::endl;
+
+	//get the crsID
+	unsigned int beforeCrsCode = openGisUri.find_last_of("/");
+	unsigned int behindCrsCode = openGisUri.find_first_of("(", beforeCrsCode);
+	std::string crsCode = openGisUri.substr(beforeCrsCode+1, behindCrsCode-beforeCrsCode-1);
+	std::cerr<<"getCrsInformationFromOGCUri openGisUri: "<<openGisUri<<" beforeCrsCode: "<<beforeCrsCode<<" behindCrsCode: "<<behindCrsCode<<" crsCode: "<<crsCode<<std::endl;
+
+	//
+	return (std::pair<std::string, std::string>{"EPSG",crsCode});
+}
+
+std::pair<double, double> getParameterRangeFromOGCUri(std::string openGisUri){
+	std::pair<double, double> resultPair;
+
+	unsigned int rangeStart = openGisUri.find_first_of("(");
+	unsigned int rangeEnd = openGisUri.find_last_of(")");
+	unsigned int rangeSeperator = openGisUri.find_first_of(",", rangeStart);
+	unsigned int firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
+
+	resultPair.first = std::stod(openGisUri.substr(rangeStart+1, firstEnd-rangeStart -1));
+
+	if(rangeSeperator == std::string::npos){
+		resultPair.second = resultPair.first;
+	}else{
+		resultPair.second = std::stod(openGisUri.substr(firstEnd+1, rangeEnd-firstEnd -1));
+	}
+	std::cerr<<"getParameterRangeFromOGCUri openGisUri: "<<openGisUri<<" resultPair.first: "<<resultPair.first<<" resultPair.second: "<<resultPair.second<<std::endl;
+	return resultPair;
+}
+
+//std::pair<double, double> getTimeInformationFromOGCUri(std::string openGisUri){
+//
+//
+//}
+
+
+auto processWCS(std::map<std::string, std::string> params) -> int {
 
 	/*http://www.myserver.org:port/path?
 	 * service=WCS &version=2.0
@@ -246,12 +288,32 @@ auto processWCS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 	if (version != "2.0.0")
 		abort("Invalid version");
 
-	if(params["request"] == "GetCoverage") {
+	if(params["request"] == "getcoverage") {
 		//for now we will handle the OpGraph as the coverageId
-		auto graph = GenericOperator::fromJSON(params["coverageId"]);
-		//now we will build the QueryRectangle
+		std::cerr<<"coverageId:"<<params["coverageid"]<<std::endl;
+		auto graph = GenericOperator::fromJSON(params["coverageid"]);
 
+		//now we will identify the parameters for the QueryRectangle
+		std::pair<std::string, std::string> crsInformationLon = getCrsInformationFromOGCUri(params["subset_lon"]);
+		std::pair<std::string, std::string> crsInformationLat = getCrsInformationFromOGCUri(params["subset_lat"]);
 
+		if(crsInformationLat.first != crsInformationLon.first || crsInformationLat.second != crsInformationLon.second){
+			std::cerr<<"plz no mixed CRSs! lon:"<<crsInformationLon.second<<"lat: "<<crsInformationLat.second<<std::endl;
+			return 1;
+		}
+
+		epsg_t query_crsId = std::stoi(crsInformationLat.second);
+
+		std::pair<double, double> crsRangeLon = getParameterRangeFromOGCUri(params["subset_lon"]);
+		std::pair<double, double> crsRangeLat = getParameterRangeFromOGCUri(params["subset_lat"]);
+
+		//TODO: parse datetime!
+
+		//build the queryRectangle and get the data
+		QueryRectangle query_rect{42, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, 1024, 1024, query_crsId};
+		auto result_raster = graph->getCachedRaster(query_rect);
+
+		outputImage(result_raster.get(), false, false, "hsv");
 	}
 
 
@@ -347,7 +409,7 @@ int main() {
 
 		// WCS-Requests
 		if (params.count("service") > 0 && params["service"] == "WCS") {
-			return processWCS(params, query_epsg, timestamp);
+			return processWCS(params);
 		}
 
 

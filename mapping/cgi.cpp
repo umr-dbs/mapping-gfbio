@@ -111,8 +111,17 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 	while (item) {
 		std::string key(item->key);
 		std::transform(key.begin(), key.end(), key.begin(), ::tolower);
+
+		std::string value = urldecode(item->value);
+		if (key == "subset") {
+			auto pos = value.find(',');
+			if (pos != std::string::npos) {
+				key = key + '_' + value.substr(0, pos);
+				value = value.substr(pos+1);
+			}
+		}
 		//std::string value(item->value);
-		query_params[key] = urldecode(item->value);
+		query_params[key] = value;
 		//query_params.insert( std::make_pair( std::string(item->key), std::string(item->value) ) );
 		item = item->next;
 	}
@@ -231,7 +240,6 @@ int main() {
 			abort("No query string given");
 		}
 
-		//printInfo();return 0;
 		std::map<std::string, std::string> params = parseQueryString(query_string);
 
 		epsg_t query_epsg = EPSG_WEBMERCATOR;

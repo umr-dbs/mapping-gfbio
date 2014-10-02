@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <stdio.h>
 #include <string.h> // memset()
+#include <map>
 
 #include <time.h>
 
@@ -22,7 +23,10 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <poll.h>
+#include <signal.h>
 
+
+const int TIMEOUT_SECONDS = 60;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter" // silence the myriad of warnings in ***REMOVED*** headers
@@ -53,6 +57,17 @@ void log(const char *str, Args&&... args) {
 	fprintf(stderr, "\n");
 }
 
+int cmpTimespec(const struct timespec &t1, const struct timespec &t2) {
+	if (t1.tv_sec < t2.tv_sec)
+		return -1;
+	if (t1.tv_sec > t2.tv_sec)
+		return 1;
+	if (t1.tv_nsec < t2.tv_nsec)
+		return -1;
+	if (t1.tv_nsec > t2.tv_nsec)
+		return 1;
+	return 0;
+}
 
 std::unique_ptr<GenericRaster> query_raster_source(Socket &socket, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
@@ -165,20 +180,44 @@ int main()
 	chmod(rserver_socket_address, 0777);
 
 
+	std::map<pid_t, timespec> running_clients;
+
 	printf("Socket started, listening..\n");
 	// Start listening and fork()
 	listen(listen_fd, 5);
 	while (true) {
 		// try to reap our children
 		int status;
-		while (waitpid(-1, &status, WNOHANG) > 0) {
-			// a child exited somehow
+		pid_t exited_pid;
+		while ((exited_pid = waitpid(-1, &status, WNOHANG)) > 0) {
+			running_clients.erase(exited_pid);
+		}
+		// Kill all overdue children
+		struct timespec current_t;
+		clock_gettime(CLOCK_MONOTONIC, &current_t);
+
+		for (auto it = running_clients.begin(); it != running_clients.end(); ) {
+			auto timeout_t = it->second;
+			if (cmpTimespec(timeout_t, current_t) < 0) {
+				auto timeouted_pid = it->first;
+				log("Client %d gets killed due to timeout", (int) timeouted_pid);
+
+				if (kill(timeouted_pid, SIGHUP) < 0) { // TODO: SIGKILL?
+					perror("kill() failed");
+				}
+				// the postincrement of the iterator is important to avoid using an invalid iterator
+				running_clients.erase(it++);
+			}
+			else {
+				++it;
+			}
+
 		}
 
+		// Wait for new connections. Do not wait longer than 5 seconds.
 		struct pollfd pollfds[1];
 		pollfds[0].fd = listen_fd;
 		pollfds[0].events = POLLIN;
-		//int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 
 		int poll_res = poll(pollfds, /* count = */ 1, /* timeout in ms = */ 5000);
 		if (poll_res < 0) {
@@ -238,7 +277,11 @@ int main()
 		else {
 			// This is the server
 			close(client_fd);
-			// nothing more to do.
+
+			struct timespec timeout_t;
+			clock_gettime(CLOCK_MONOTONIC, &timeout_t);
+			timeout_t.tv_sec += TIMEOUT_SECONDS;
+			running_clients[pid] = timeout_t;
 		}
 	}
 }

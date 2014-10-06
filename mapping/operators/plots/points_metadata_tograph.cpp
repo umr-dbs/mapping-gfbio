@@ -44,16 +44,17 @@ auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::uniqu
 	std::vector<double> noDataValue;
 
 	for (std::string& name : names) {
-		hasNoData.push_back(points.getGlobalMDValue(name + "_has_no_data"));
-		noDataValue.push_back(points.getGlobalMDValue(name + "_no_data"));
+		hasNoData.push_back(points.global_md_value.get(name + "_has_no_data"));
+		noDataValue.push_back(points.global_md_value.get(name + "_no_data"));
 	}
 
-	for (Point &point : points.collection) {
+	size_t count = points.collection.size();
+	for (size_t point_idx=0;point_idx<count;point_idx++) {
 		std::array<double, size> value;
 		bool hasData = true;
 
-		for (std::size_t index = 0; index < size; ++index) {
-			value[index] = points.getLocalMDValue(point, names[index]);
+		for (size_t index = 0; index < size; ++index) {
+			value[index] = points.local_md_value.get(point_idx, names[index]);
 
 			if((hasNoData[index] && (std::fabs(value[index] - noDataValue[index]) < std::numeric_limits<double>::epsilon())) // no data
 					|| std::isnan(value[index])) /* is NaN */ {

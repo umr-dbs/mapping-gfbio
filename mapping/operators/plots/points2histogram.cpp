@@ -33,15 +33,17 @@ REGISTER_OPERATOR(Points2HistogramOperator, "points2histogram");
 std::unique_ptr<GenericPlot> Points2HistogramOperator::getPlot(const QueryRectangle &rect) {
 	auto points = getPointsFromSource(0, rect);
 
-	double raster_max = points->getGlobalMDValue(name + "_max");
-	double raster_min = points->getGlobalMDValue(name + "_min");
-	double raster_no_data = points->getGlobalMDValue(name + "_no_data");
-	bool raster_has_no_data = points->getGlobalMDValue(name + "_has_no_data");
+	double raster_max = points->global_md_value.get(name + "_max");
+	double raster_min = points->global_md_value.get(name + "_min");
+	double raster_no_data = points->global_md_value.get(name + "_no_data");
+	bool raster_has_no_data = points->global_md_value.get(name + "_has_no_data");
 
 	auto histogram = std::make_unique<Histogram>(numberOfBuckets, raster_min, raster_max);
 
-	for (Point &point : points->collection) {
-		double value = points->getLocalMDValue(point, name);
+	size_t count = points->collection.size();
+	auto &vec = points->local_md_value.getVector(name);
+	for (size_t idx=0;idx<count;idx++) {
+		double value = vec[idx];
 		if ((raster_has_no_data && value == raster_no_data) // no data
 				|| std::isnan(value) /* is NaN */)
 			histogram->incNoData();

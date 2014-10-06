@@ -33,45 +33,32 @@ REGISTER_OPERATOR(RasterMetaDataToPoints, "raster_metadata_to_points");
 
 template<typename T>
 struct PointDataEnhancement {
-	static std::unique_ptr<PointCollection> execute(Raster2D<T>* raster, PointCollection* pointsOld, std::string name) {
+	static void execute(Raster2D<T>* raster, PointCollection *points, std::string name) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
-
-		auto pointsNew = std::make_unique<PointCollection>(pointsOld->epsg);
-
-		PointCollectionMetadataCopier metadataCopier(*pointsOld, *pointsNew);
-		metadataCopier.copyGlobalMetadata();
 
 		T max = (T) raster->dd.max;
 		T min = (T) raster->dd.min;
 
 		// add global metadata
 		// TODO: resolve what to do on key-collision
-		pointsNew->setGlobalMDValue(name + "_max", max);
-		pointsNew->setGlobalMDValue(name + "_min", min);
-		pointsNew->setGlobalMDValue(name + "_no_data", raster->dd.no_data);
-		pointsNew->setGlobalMDValue(name + "_has_no_data", raster->dd.has_no_data); // bool -> 0/1
+		points->setGlobalMDValue(name + "_max", max);
+		points->setGlobalMDValue(name + "_min", min);
+		points->setGlobalMDValue(name + "_no_data", raster->dd.no_data);
+		points->setGlobalMDValue(name + "_has_no_data", raster->dd.has_no_data); // bool -> 0/1
 
 		// init local metadata
-		metadataCopier.initLocalMetadataFields();
-		pointsNew->addLocalMDValue(name);
+		auto &md_vec = points->local_md_value.addVector(name);
 
-		for (Point &pointOld : pointsOld->collection) {
-			int rasterCoordinateX = floor(raster->lcrs.WorldToPixelX(pointOld.x));
-			int rasterCoordinateY = floor(raster->lcrs.WorldToPixelY(pointOld.y));
+		for (auto &point : points->collection) {
+			size_t rasterCoordinateX = floor(raster->lcrs.WorldToPixelX(point.x));
+			size_t rasterCoordinateY = floor(raster->lcrs.WorldToPixelY(point.y));
 
-			if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	(size_t) rasterCoordinateX < raster->lcrs.size[0] && (size_t) rasterCoordinateY < raster->lcrs.size[1]) {
-				Point& pointNew = pointsNew->addPoint(pointOld.x, pointOld.y);
-
-				metadataCopier.copyLocalMetadata(pointOld, pointNew);
-
-				// add new meta data
-				// TODO: resolve what to do on key-collision
-				T value = raster->get(rasterCoordinateX, rasterCoordinateY);
-				pointsNew->setLocalMDValue(pointNew, name, value);
+			double md = raster->dd.no_data;
+			if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->lcrs.size[0] && rasterCoordinateY < raster->lcrs.size[1]) {
+				md = (double) raster->get(rasterCoordinateX, rasterCoordinateY);
 			}
+			md_vec.push_back(md);
 		}
-
-		return pointsNew;
 	}
 };
 
@@ -80,5 +67,6 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRe
 	auto raster = getRasterFromSource(0, rect);
 
 	Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
-	return callUnaryOperatorFunc<PointDataEnhancement>(raster.get(), points.get(), name);
+	callUnaryOperatorFunc<PointDataEnhancement>(raster.get(), points.get(), name);
+	return points;
 }

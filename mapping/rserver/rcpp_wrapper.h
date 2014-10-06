@@ -194,12 +194,11 @@ namespace ***REMOVED*** {
 		auto size = points.collection.size();
 
 		***REMOVED***::DataFrame data;
-		auto keys = points.getLocalMDValueKeys();
+		auto keys = points.local_md_value.getKeys();
 		for(auto key : keys) {
 			***REMOVED***::NumericVector vec(size);
 			for (decltype(size) i=0;i<size;i++) {
-				const Point &p = points.collection[i];
-				double value = points.getLocalMDValue(p, key);
+				double value = points.local_md_value.get(i, key);
 				vec[i] = value;
 			}
 			data[key] = vec;

@@ -90,9 +90,10 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const Query
 	auto header = parseCSVLine(line);
 	//TODO: distinguish between double and string properties
 	for(int i=2; i < header.size(); i++){
-		points_out->addLocalMDString(header[i]);
+		points_out->local_md_string.addVector(header[i]);
 	}
 
+	size_t idx = 0;
 	while(std::getline(data,line)){
 			auto csv = parseCSVLine(line);
 
@@ -100,8 +101,9 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const Query
 			//double year = std::atof(csv[3].c_str());
 
 			for(int i=2; i < csv.size(); i++){
-				points_out->setLocalMDString(point, header[i], csv[i]);
+				points_out->local_md_string.set(idx, header[i], csv[i]);
 			}
+			idx++;
 	}
 	//fprintf(stderr, data.str().c_str());
 	return points_out;

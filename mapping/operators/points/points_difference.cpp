@@ -50,7 +50,7 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 		Point &p_m = pointsMinuend->collection[idx_m];
 
 		for (size_t idx_s=0;idx_s<count_s;idx_s++) {
-			if (point_distance(p_m, pointsSubtrahend->collection[idx_s]) < epsilonDistance) {
+			if (point_distance(p_m, pointsSubtrahend->collection[idx_s]) <= epsilonDistance) {
 				keep[idx_m] = false;
 				break;
 			}

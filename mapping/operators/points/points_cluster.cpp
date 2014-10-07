@@ -38,10 +38,11 @@ std::unique_ptr<PointCollection> PointsClusterOperator::getPoints(const QueryRec
 		clusterer.insert(std::make_shared<pv::Circle>(pv::Coordinate(pointOld.x / rect.xres, pointOld.y / rect.yres), 5, 1));
 	}
 
-	pointsNew->local_md_value.addVector("radius");
-	pointsNew->local_md_value.addVector("numberOfPoints");
+	auto circles = clusterer.getCircles();
+	pointsNew->local_md_value.addVector("radius", circles.size());
+	pointsNew->local_md_value.addVector("numberOfPoints", circles.size());
 	size_t idx = 0;
-	for (auto& circle : clusterer.getCircles()) {
+	for (auto& circle : circles) {
 		Point& pointNew = pointsNew->addPoint(circle->getX() * rect.xres, circle->getY() * rect.yres);
 		pointsNew->local_md_value.set(idx, "radius", circle->getRadius());
 		pointsNew->local_md_value.set(idx, "numberOfPoints", circle->getNumberOfPoints());

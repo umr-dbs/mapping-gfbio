@@ -32,67 +32,30 @@ PointsDifferenceOperator::PointsDifferenceOperator(int sourcecounts[], GenericOp
 PointsDifferenceOperator::~PointsDifferenceOperator() {}
 REGISTER_OPERATOR(PointsDifferenceOperator, "points_difference");
 
+static double point_distance(const Point &p1, const Point &p2) {
+	double dx = p1.x - p2.x, dy = p1.y - p2.y;
+	return sqrt(dx*dx + dy*dy);
+}
+
 std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const QueryRectangle &rect) {
 	auto pointsMinuend = getPointsFromSource(0, rect);
 	auto pointsSubtrahend = getPointsFromSource(1, rect);
 
-	auto pointsOut = std::make_unique<PointCollection>(pointsMinuend->epsg);
+	size_t count_m = pointsMinuend->collection.size();
+	std::vector<bool> keep(count_m, true);
 
-	PointCollectionMetadataCopier metadataCopier(*pointsMinuend, *pointsOut);
-	metadataCopier.copyGlobalMetadata();
-	metadataCopier.initLocalMetadataFields();
+	size_t count_s = pointsSubtrahend->collection.size();
 
-	pointsOut->lock();
+	for (size_t idx_m=0;idx_m<count_m;idx_m++) {
+		Point &p_m = pointsMinuend->collection[idx_m];
 
-	if(std::fabs(epsilonDistance) < std::numeric_limits<double>::epsilon()) {
-		// use faster method for equality
-
-		// comparator that compares first to x1 < x2 and then to y1 < y2
-		auto compareFunction = [](const Point& p1, const Point& p2) -> bool {
-			return (p1.x < p2.x) || ((std::fabs(p1.x - p2.x) < std::numeric_limits<double>::epsilon()) && (p1.y < p2.y));
-		};
-
-		std::sort(pointsMinuend->collection.begin(), pointsMinuend->collection.end(), compareFunction);
-		std::sort(pointsSubtrahend->collection.begin(), pointsSubtrahend->collection.end(), compareFunction);
-
-		std::set_difference(pointsMinuend->collection.begin(), pointsMinuend->collection.end(),
-							pointsSubtrahend->collection.begin(), pointsSubtrahend->collection.end(),
-							std::inserter(pointsOut->collection, pointsOut->collection.begin()),
-							compareFunction);
-
-	} else {
-		// use geoms
-
-		// create factory for geos points
-		const geos::geom::PrecisionModel pm;
-		geos::geom::GeometryFactory geometryFactory = geos::geom::GeometryFactory(&pm, pointsMinuend->epsg);
-		auto geomDeleter = [&](geos::geom::Point* pointGeom) {
-			geometryFactory.destroyGeometry(pointGeom);
-		};
-
-		for (Point& pointMinuend : pointsMinuend->collection) {
-			std::unique_ptr<geos::geom::Point, decltype(geomDeleter)> pointGeomMinuend(
-					geometryFactory.createPoint(geos::geom::Coordinate(pointMinuend.x, pointMinuend.y)),
-					geomDeleter);
-
-			bool isSubtracted = false;
-			for (Point& pointSubtrahend : pointsSubtrahend->collection) {
-				std::unique_ptr<geos::geom::Point, decltype(geomDeleter)> pointGeomSubtrahend(
-						geometryFactory.createPoint(geos::geom::Coordinate(pointSubtrahend.x, pointSubtrahend.y)),
-						geomDeleter);
-
-				if(pointGeomMinuend->isWithinDistance(pointGeomSubtrahend.get(), epsilonDistance)) {
-					isSubtracted = true;
-					break;
-				}
-			}
-
-			if(!isSubtracted) {
-				pointsOut->addPoint(pointMinuend.x, pointMinuend.y);
+		for (size_t idx_s=0;idx_s<count_s;idx_s++) {
+			if (point_distance(p_m, pointsSubtrahend->collection[idx_s]) <= epsilonDistance) {
+				keep[idx_m] = false;
+				break;
 			}
 		}
-
 	}
 
-	return pointsOut;
+	return pointsMinuend->filter(keep);
 }

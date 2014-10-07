@@ -7,17 +7,17 @@
 #include <string>
 #include <sys/types.h>
 
-class Socket;
+class BinaryStream;
 
 template<typename T>
 class DirectMetadata {
 	public:
 		DirectMetadata();
-		DirectMetadata(Socket &socket);
+		DirectMetadata(BinaryStream &stream);
 		~DirectMetadata();
 
-		void fromSocket(Socket &socket);
-		void toSocket(Socket &socket) const;
+		void fromStream(BinaryStream &stream);
+		void toStream(BinaryStream &stream) const;
 
 		void set(const std::string &key, const T &value);
 		const T &get(const std::string &key) const;
@@ -32,57 +32,35 @@ class DirectMetadata {
 		std::map<std::string, T> data;
 };
 
-template<typename T>
-class IndexedMetadata;
 
 template<typename T>
-class MetadataIndex {
+class MetadataArrays {
 	public:
-		typedef uint8_t metadata_index_t;
-		MetadataIndex();
-		MetadataIndex(Socket &socket);
-		~MetadataIndex();
+		MetadataArrays();
+		MetadataArrays(BinaryStream &stream);
+		~MetadataArrays();
 
-		void fromSocket(Socket &socket);
-		void toSocket(Socket &socket) const;
+		void fromStream(BinaryStream &stream);
+		void toStream(BinaryStream &stream) const;
 
-		void addKey(const std::string &key);
-		void lock();
-		void setValue(IndexedMetadata<T> &object, const std::string &key, const T &value);
-		const T &getValue(const IndexedMetadata<T> &object, const std::string &key) const;
-		metadata_index_t size() { return index.size(); }
+		void set(size_t idx, const std::string &key, const T &value);
+		const T &get(size_t idx, const std::string &key) const;
+		const T &get(size_t idx, const std::string &key, const T &defaultvalue) const;
 
-		typename std::map<std::string, metadata_index_t>::const_iterator begin() const { return index.begin(); }
-		typename std::map<std::string, metadata_index_t>::const_iterator end() const { return index.end(); }
+		std::vector<T> &addVector(const std::string &key, size_t capacity = 0);
+		std::vector<T> &getVector(const std::string &key);
+
+		//typename std::map<std::string, std::vector<T>>::iterator begin() { return data.begin(); }
+		typename std::map<std::string, std::vector<T>>::const_iterator begin() const { return data.begin(); }
+
+	    //typename std::map<std::string, std::vector<T>>::iterator end() { return data.end(); }
+		typename std::map<std::string, std::vector<T>>::const_iterator end() const { return data.end(); }
+
+		size_t size() const { return data.size(); }
+
+		std::vector<std::string> getKeys() const;
 	private:
-		std::map<std::string, metadata_index_t> index;
-		bool index_is_locked;
-};
-
-
-template<typename T>
-class IndexedMetadata {
-	public:
-		typedef typename MetadataIndex<T>::metadata_index_t metadata_index_t;
-		IndexedMetadata(metadata_index_t count);
-		IndexedMetadata(Socket &socket);
-		//IndexedMetadata(const MetadataIndex &index);
-		~IndexedMetadata();
-
-		void fromSocket(Socket &socket);
-		void toSocket(Socket &socket) const;
-
-		// Copy
-		IndexedMetadata(const IndexedMetadata<T> &imd);
-		IndexedMetadata<T> &operator=(const IndexedMetadata<T> &imd);
-		// Move
-		IndexedMetadata(IndexedMetadata<T> &&imd);
-		IndexedMetadata<T> &operator=(IndexedMetadata<T> &&imd);
-	private:
-		metadata_index_t size;
-		T *data;
-
-		friend class MetadataIndex<T>;
+		std::map<std::string, std::vector<T> > data;
 };
 
 

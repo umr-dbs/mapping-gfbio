@@ -49,32 +49,24 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRe
 	auto geometry = generic_geometry->getGeometry();
 	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 
-	auto points_out = std::make_unique<PointCollection>(rect.epsg);
+	size_t points_count = points->collection.size();
+	std::vector<bool> keep(points_count, false);
 
 	auto prep = geos::geom::prep::PreparedGeometryFactory();
-
-	PointCollectionMetadataCopier metadataCopier(*points, *points_out);
-	metadataCopier.copyGlobalMetadata();
-	metadataCopier.initLocalMetadataFields();
 
 	size_t numgeom = geometry->getNumGeometries();
 	for (size_t i=0; i< numgeom; i++){
 
 		auto preparedGeometry = prep.prepare(geometry->getGeometryN(i));
-		for (Point &p : points->collection) {
+		for (size_t idx=0;idx<points_count;idx++) {
+			Point &p = points->collection[idx];
 			double x = p.x, y = p.y;
 
 			const geos::geom::Coordinate coordinate(x, y);
 			geos::geom::Point* pointGeom = geometryFactory->createPoint(coordinate);
 
-			if(preparedGeometry->contains(pointGeom)){
-				//TODO copy metadata
-				Point& p_new = points_out->addPoint(x, y);
-				metadataCopier.copyLocalMetadata(p, p_new);
-				geometryFactory->destroyGeometry(pointGeom);
-				continue;
-				//TODO: dont check this point again
-			}
+			if (preparedGeometry->contains(pointGeom))
+				keep[idx] = true;
 
 			geometryFactory->destroyGeometry(pointGeom);
 		}
@@ -82,5 +74,5 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRe
 		prep.destroy(preparedGeometry);
 	}
 
-	return points_out;
+	return points->filter(keep);
 }

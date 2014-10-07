@@ -30,10 +30,6 @@ std::unique_ptr<PointCollection> PointsClusterOperator::getPoints(const QueryRec
 	auto pointsOld = getPointsFromSource(0, rect);
 	auto pointsNew = std::make_unique<PointCollection>(rect.epsg);
 
-	//PointCollectionMetadataCopier metadataCopier(*pointsOld, *pointsNew);
-	//metadataCopier.copyGlobalMetadata();
-	//metadataCopier.initLocalMetadataFields();
-
 	pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(
 													pv::Coordinate((rect.x2 + rect.x1) / (2 * rect.xres), (rect.y2 + rect.y2) / (2 * rect.yres)),
 													pv::Dimension((rect.x2 - rect.x1) / (2 * rect.xres), (rect.y2 - rect.y2) / (2 * rect.yres)),
@@ -42,13 +38,15 @@ std::unique_ptr<PointCollection> PointsClusterOperator::getPoints(const QueryRec
 		clusterer.insert(std::make_shared<pv::Circle>(pv::Coordinate(pointOld.x / rect.xres, pointOld.y / rect.yres), 5, 1));
 	}
 
-	pointsNew->addLocalMDValue("radius");
-	pointsNew->addLocalMDValue("numberOfPoints");
-	for (auto& circle : clusterer.getCircles()) {
+	auto circles = clusterer.getCircles();
+	pointsNew->local_md_value.addVector("radius", circles.size());
+	pointsNew->local_md_value.addVector("numberOfPoints", circles.size());
+	size_t idx = 0;
+	for (auto& circle : circles) {
 		Point& pointNew = pointsNew->addPoint(circle->getX() * rect.xres, circle->getY() * rect.yres);
-		//metadataCopier.copyLocalMetadata(pointOld, pointNew);
-		pointsNew->setLocalMDValue(pointNew, "radius", circle->getRadius());
-		pointsNew->setLocalMDValue(pointNew, "numberOfPoints", circle->getNumberOfPoints());
+		pointsNew->local_md_value.set(idx, "radius", circle->getRadius());
+		pointsNew->local_md_value.set(idx, "numberOfPoints", circle->getNumberOfPoints());
+		idx++;
 	}
 
 	return pointsNew;

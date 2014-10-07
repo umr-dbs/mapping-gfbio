@@ -3,7 +3,7 @@
 #include "raster/typejuggling.h"
 #include "raster/opencl.h"
 #include "util/hash.h"
-#include "util/socket.h"
+#include "util/binarystream.h"
 #include "operators/operator.h" // for QueryRectangle
 
 #include <memory>
@@ -65,27 +65,27 @@ std::ostream& operator<< (std::ostream &out, const LocalCRS &rm) {
 	return out;
 }
 
-void LocalCRS::toSocket(Socket &socket) const {
-	socket.write(epsg);
-	socket.write(dimensions);
+void LocalCRS::toStream(BinaryStream &stream) const {
+	stream.write(epsg);
+	stream.write(dimensions);
 	for (int i=0;i<dimensions;i++) {
-		socket.write(size[i]);
-		socket.write(origin[i]);
-		socket.write(scale[i]);
+		stream.write(size[i]);
+		stream.write(origin[i]);
+		stream.write(scale[i]);
 	}
 }
-LocalCRS::LocalCRS(Socket &socket) {
+LocalCRS::LocalCRS(BinaryStream &stream) {
 	for (int i=0;i<3;i++) {
 		size[i] = 0;
 		origin[i] = 0;
 		scale[i] = 0;
 	}
-	socket.read(&epsg);
-	socket.read(&dimensions);
+	stream.read(&epsg);
+	stream.read(&dimensions);
 	for (int i=0;i<dimensions;i++) {
-		socket.read(&size[i]);
-		socket.read(&origin[i]);
-		socket.read(&scale[i]);
+		stream.read(&size[i]);
+		stream.read(&origin[i]);
+		stream.read(&scale[i]);
 	}
 }
 
@@ -226,21 +226,21 @@ void DataDescription::addNoData() {
 	has_no_data = true;
 }
 
-void DataDescription::toSocket(Socket &socket) const {
-	socket.write(datatype);
-	socket.write(min);
-	socket.write(max);
-	socket.write(has_no_data);
+void DataDescription::toStream(BinaryStream &stream) const {
+	stream.write(datatype);
+	stream.write(min);
+	stream.write(max);
+	stream.write(has_no_data);
 	if (has_no_data)
-		socket.write(no_data);
+		stream.write(no_data);
 }
-DataDescription::DataDescription(Socket &socket) {
-	socket.read(&datatype);
-	socket.read(&min);
-	socket.read(&max);
-	socket.read(&has_no_data);
+DataDescription::DataDescription(BinaryStream &stream) {
+	stream.read(&datatype);
+	stream.read(&min);
+	stream.read(&max);
+	stream.read(&has_no_data);
 	if (has_no_data)
-		socket.read(&no_data);
+		stream.read(&no_data);
 	else
 		no_data = 0.0;
 }
@@ -300,26 +300,26 @@ GenericRaster::GenericRaster(const LocalCRS &localcrs, const DataDescription &da
 GenericRaster::~GenericRaster() {
 }
 
-void GenericRaster::toSocket(Socket &socket) {
+void GenericRaster::toStream(BinaryStream &stream) {
 	const char *data = (const char *) getData();
 	size_t len = getDataSize();
-	socket.write(lcrs);
-	socket.write(dd);
-	socket.write(data, len);
-	socket.write(md_string);
-	socket.write(md_value);
+	stream.write(lcrs);
+	stream.write(dd);
+	stream.write(data, len);
+	stream.write(md_string);
+	stream.write(md_value);
 }
 
-std::unique_ptr<GenericRaster> GenericRaster::fromSocket(Socket &socket) {
-	LocalCRS lcrs(socket);
-	DataDescription dd(socket);
+std::unique_ptr<GenericRaster> GenericRaster::fromStream(BinaryStream &stream) {
+	LocalCRS lcrs(stream);
+	DataDescription dd(stream);
 
 	auto raster = GenericRaster::create(lcrs, dd);
 	char *data = (char *) raster->getDataForWriting();
 	size_t len = raster->getDataSize();
-	socket.read(data, len);
-	raster->md_string.fromSocket(socket);
-	raster->md_value.fromSocket(socket);
+	stream.read(data, len);
+	raster->md_string.fromStream(stream);
+	raster->md_value.fromStream(stream);
 
 	return raster;
 }

@@ -56,9 +56,10 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRec
 
 	auto column_count = points.columns();
 	for (pqxx::result::size_type c = 2;c<column_count;c++) {
-		points_out->addLocalMDValue(points.column_name(c));
+		points_out->local_md_value.addVector(points.column_name(c));
 	}
 
+	size_t idx = 0;
 	for (pqxx::result::tuple::size_type i=0; i < points.size();i++) {
 		auto row = points[i];
 		double x = row[0].as<double>(),
@@ -67,8 +68,9 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRec
 
 		Point &point = points_out->addPoint(x, y);
 		for (pqxx::result::tuple::size_type c = 2;c<column_count;c++) {
-			points_out->setLocalMDValue(point, points.column_name(c), row[c].as<double>());
+			points_out->local_md_value.set(idx, points.column_name(c), row[c].as<double>());
 		}
+		idx++;
 	}
 
 	return points_out;

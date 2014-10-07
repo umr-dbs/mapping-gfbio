@@ -5,7 +5,7 @@
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
-#include "util/socket.h"
+#include "util/binarystream.h"
 #include "rserver/rserver.h"
 
 #include <limits>
@@ -28,7 +28,7 @@ class ROperator : public GenericOperator {
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
 
-		void runScript(Socket &socket, const QueryRectangle &rect, char requested_type);
+		void runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type);
 	private:
 		friend std::unique_ptr<GenericRaster> query_raster_source(ROperator *op, int childidx, const QueryRectangle &rect);
 		friend std::unique_ptr<PointCollection> query_points_source(ROperator *op, int childidx, const QueryRectangle &rect);
@@ -46,30 +46,30 @@ ROperator::~ROperator() {
 REGISTER_OPERATOR(ROperator, "r");
 
 
-void ROperator::runScript(Socket &socket, const QueryRectangle &rect, char requested_type) {
+void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type) {
 	Profiler::Profiler p("R_OPERATOR");
 
-	socket.write(RSERVER_MAGIC_NUMBER);
-	socket.write(requested_type);
-	socket.write(source);
-	socket.write((int) getRasterSourceCount());
-	socket.write((int) getPointsSourceCount());
-	socket.write(rect);
+	stream.write(RSERVER_MAGIC_NUMBER);
+	stream.write(requested_type);
+	stream.write(source);
+	stream.write((int) getRasterSourceCount());
+	stream.write((int) getPointsSourceCount());
+	stream.write(rect);
 
 	char type;
-	while (socket.read(&type) != 0) {
+	while (stream.read(&type) != 0) {
 		//fprintf(stderr, "Server got command %d\n", (int) type);
 		if (type > 0) {
 			int childidx;
-			socket.read(&childidx);
-			QueryRectangle qrect(socket);
+			stream.read(&childidx);
+			QueryRectangle qrect(stream);
 			if (type == RSERVER_TYPE_RASTER) {
 				auto raster = getRasterFromSource(childidx, qrect);
-				socket.write(*raster);
+				stream.write(*raster);
 			}
 			else if (type == RSERVER_TYPE_POINTS) {
 				auto points = getPointsFromSource(childidx, qrect);
-				socket.write(*points);
+				stream.write(*points);
 			}
 			else {
 				throw OperatorException("R: invalid data type requested by server");
@@ -78,7 +78,7 @@ void ROperator::runScript(Socket &socket, const QueryRectangle &rect, char reque
 		else {
 			if (type != -requested_type)
 				throw OperatorException("R: wrong data type returned by server");
-			return; // the caller will read the result object from the socket
+			return; // the caller will read the result object from the stream
 		}
 	}
 	throw OperatorException("R: something went horribly wrong");
@@ -89,10 +89,10 @@ std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect) 
 	if (result_type != "raster")
 		throw OperatorException("This R script does not return rasters");
 
-	Socket socket(rserver_socket_address);
+	UnixSocket socket(rserver_socket_address);
 	runScript(socket, rect, RSERVER_TYPE_RASTER);
 
-	auto raster = GenericRaster::fromSocket(socket);
+	auto raster = GenericRaster::fromStream(socket);
 	return raster;
 }
 
@@ -108,11 +108,11 @@ std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect) {
 	if (result_type != "text")
 		throw OperatorException("This R script does not return a plot");
 
-	Socket socket(rserver_socket_address);
+	UnixSocket socket(rserver_socket_address);
 	runScript(socket, rect, RSERVER_TYPE_STRING);
 
 	std::string result;
-	socket.read(&result);
+	((BinaryStream &) socket).read(&result);
 	return std::unique_ptr<GenericPlot>(new TextPlot(result));
 }
 

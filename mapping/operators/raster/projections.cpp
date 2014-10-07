@@ -261,27 +261,28 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 		throw OperatorException(msg.str());
 	}
 
-	auto points_out = std::make_unique<PointCollection>(dest_epsg);
-
-	PointCollectionMetadataCopier copier(*points_in, *points_out);
-	copier.copyGlobalMetadata();
-	copier.initLocalMetadataFields();
+	std::vector<bool> keep(points_in->collection.size(), true);
+	bool has_filter = false;
 
 	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
-	for (Point &point : points_in->collection) {
+	size_t size = points_in->collection.size();
+	for (size_t idx = 0; idx < size; idx++) {
+		Point &point = points_in->collection[idx];
 		double x = point.x, y = point.y;
-		if (!transformer.transform(x, y)) {
-			continue;
+		if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
+			keep[idx] = false;
+			has_filter = true;
 		}
-		if (x < minx || x > maxx || y < miny || y > maxy) {
-			continue;
+		else {
+			point.x = x;
+			point.y = y;
 		}
-
-		Point &p = points_out->addPoint(x, y);
-		copier.copyLocalMetadata(point,p);
 	}
 
-	return points_out;
+	if (!has_filter)
+		return points_in;
+	else
+		return points_in->filter(keep);
 }
 
 

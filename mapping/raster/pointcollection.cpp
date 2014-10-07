@@ -1,65 +1,28 @@
 #include "raster/pointcollection.h"
-#include "util/socket.h"
+#include "util/binarystream.h"
+#include "util/make_unique.h"
 
 #include <sstream>
 #include <iomanip>
 #include <iostream>
 
 
-Point::Point(double x, double y, uint16_t size_md_string, uint16_t size_md_value) : x(x), y(y), md_string(size_md_string), md_value(size_md_value) {
+Point::Point(double x, double y) : x(x), y(y) {
 }
 
 Point::~Point() {
 }
 
-Point::Point(Socket &socket) : md_string(0), md_value(0) {
-	socket.read(&x);
-	socket.read(&y);
-	md_string.fromSocket(socket);
-	md_value.fromSocket(socket);
+Point::Point(BinaryStream &stream) {
+	stream.read(&x);
+	stream.read(&y);
 }
-void Point::toSocket(Socket &socket) {
-	socket.write(x);
-	socket.write(y);
-	socket.write(md_string);
-	socket.write(md_value);
+void Point::toStream(BinaryStream &stream) {
+	stream.write(x);
+	stream.write(y);
 }
 
 
-#if 0 // Default implementations should be equal
-// Copy constructors
-Point::Point(const Point &p) : x(p.x), y(p.y), md_string(p.md_string), md_value(p.md_value) {
-}
-Point &Point::operator=(const Point &p) {
-	x = p.x;
-	y = p.y;
-
-	md_string = p.md_string;
-	md_value = p.md_value;
-
-	return *this;
-}
-
-// Move constructors
-Point::Point(Point &&p) : x(p.x), y(p.y), md_string( std::move(p.md_string) ), md_value( std::move(p.md_value) ) {
-}
-Point &Point::operator=(Point &&p) {
-	x = p.x;
-	y = p.y;
-
-	md_string = std::move(p.md_string);
-	md_value = std::move(p.md_value);
-
-	return *this;
-}
-#endif
-
-
-/*
-Point PointCollection::makePoint(double x, double y) {
-	return Point(x, y, local_string_md.size(), local_double_md.size());
-}
-*/
 
 PointCollection::PointCollection(epsg_t epsg) : epsg(epsg) {
 
@@ -68,43 +31,90 @@ PointCollection::~PointCollection() {
 
 }
 
-PointCollection::PointCollection(Socket &socket) : epsg(EPSG_UNKNOWN) {
-	socket.read(&epsg);
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) {
+	size_t count = collection.size();
+	if (keep.size() != count) {
+		std::ostringstream msg;
+		msg << "PointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
+		throw ArgumentException(msg.str());
+	}
+
+	size_t kept_count = 0;
+	for (size_t idx=0;idx<count;idx++) {
+		if (keep[idx])
+			kept_count++;
+	}
+
+	auto out = std::make_unique<PointCollection>(epsg);
+	out->collection.reserve(kept_count);
+	// copy global metadata
+	out->global_md_string = global_md_string;
+	out->global_md_value = global_md_value;
+
+	// copy points
+	for (size_t idx=0;idx<count;idx++) {
+		if (keep[idx]) {
+			Point &p = collection[idx];
+			out->addPoint(p.x, p.y);
+		}
+	}
+
+	// copy local MD
+	for (auto &keyValue : local_md_string) {
+		const auto &vec_in = local_md_string.getVector(keyValue.first);
+		auto &vec_out = out->local_md_string.addVector(keyValue.first, kept_count);
+		for (size_t idx=0;idx<count;idx++) {
+			if (keep[idx])
+				vec_out.push_back(vec_in[idx]);
+		}
+	}
+
+	for (auto &keyValue : local_md_value) {
+		const auto &vec_in = local_md_value.getVector(keyValue.first);
+		auto &vec_out = out->local_md_value.addVector(keyValue.first, kept_count);
+		for (size_t idx=0;idx<count;idx++) {
+			if (keep[idx])
+				vec_out.push_back(vec_in[idx]);
+		}
+	}
+
+	return out;
+}
+
+PointCollection::PointCollection(BinaryStream &stream) : epsg(EPSG_UNKNOWN) {
+	stream.read(&epsg);
 	size_t count;
-	socket.read(&count);
+	stream.read(&count);
 	collection.reserve(count);
 
-	global_md_string.fromSocket(socket);
-	global_md_value.fromSocket(socket);
-	local_md_string.fromSocket(socket);
-	local_md_value.fromSocket(socket);
+	global_md_string.fromStream(stream);
+	global_md_value.fromStream(stream);
+	local_md_string.fromStream(stream);
+	local_md_value.fromStream(stream);
 
 	for (size_t i=0;i<count;i++) {
-		collection.push_back( Point(socket) );
+		collection.push_back( Point(stream) );
 	}
 }
 
-void PointCollection::toSocket(Socket &socket) {
-	socket.write(epsg);
+void PointCollection::toStream(BinaryStream &stream) {
+	stream.write(epsg);
 	size_t count = collection.size();
-	socket.write(count);
+	stream.write(count);
 
-	socket.write(global_md_string);
-	socket.write(global_md_value);
-	socket.write(local_md_string);
-	socket.write(local_md_value);
+	stream.write(global_md_string);
+	stream.write(global_md_value);
+	stream.write(local_md_string);
+	stream.write(local_md_value);
 
 	for (size_t i=0;i<count;i++) {
-		collection[i].toSocket(socket);
+		collection[i].toStream(stream);
 	}
 }
 
 
 Point &PointCollection::addPoint(double x, double y) {
-	local_md_string.lock();
-	local_md_value.lock();
-	//collection.emplace_back(x, y, local_md_string.size(), local_md_value.size());
-	collection.push_back(Point(x, y, local_md_string.size(), local_md_value.size()));
+	collection.push_back(Point(x, y));
 	return collection[ collection.size() - 1 ];
 }
 
@@ -153,67 +163,6 @@ void PointCollection::setGlobalMDValue(const std::string &key, double value) {
 }
 
 
-/**
- * Local meta-metadata
- */
-void PointCollection::addLocalMDString(const std::string &key) {
-	try{
-		local_md_string.addKey(key);
-	}
-	catch(MetadataException& e){
-		std::cerr << "Exception in PointCollection::addLocalMDString. Key: >"<< key << "< Msg: "<< e.what() << std::endl;
-	}
-}
-
-void PointCollection::addLocalMDValue(const std::string &key) {
-	try{
-		local_md_value.addKey(key);
-	}
-	catch(MetadataException& e){
-		std::cerr << "Exception in PointCollection::addLocalMDValue. Key: >"<< key << "< Msg: "<< e.what() << std::endl;
-	}
-}
-
-auto PointCollection::lock() -> void {
-	local_md_string.lock();
-	local_md_value.lock();
-}
-
-
-/**
- * Local Metadata on points
- */
-const std::string &PointCollection::getLocalMDString(const Point &point, const std::string &key) const {
-	return local_md_string.getValue(point.md_string, key);
-}
-
-double PointCollection::getLocalMDValue(const Point &point, const std::string &key) const {
-	return local_md_value.getValue(point.md_value, key);
-}
-
-std::vector<std::string> PointCollection::getLocalMDStringKeys() const {
-	std::vector<std::string> keys;
-	for(auto keyValue : local_md_string) {
-		keys.push_back(keyValue.first);
-	}
-	return keys;
-}
-
-std::vector<std::string> PointCollection::getLocalMDValueKeys() const {
-	std::vector<std::string> keys;
-	for (auto keyValue : local_md_value) {
-		keys.push_back(keyValue.first);
-	}
-	return keys;
-}
-
-void PointCollection::setLocalMDString(Point &point, const std::string &key, const std::string &value) {
-	local_md_string.setValue(point.md_string, key, value);
-}
-
-void PointCollection::setLocalMDValue(Point &point, const std::string &key, double value) {
-	local_md_value.setValue(point.md_value, key, value);
-}
 
 /**
  * Export
@@ -281,21 +230,23 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) {
 
 		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << epsg <<"\"}},\"features\":[";
 
+		size_t idx = 0;
 		for (const Point &p : collection) {
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]},\"properties\":{";
 
-			for (auto key : getLocalMDStringKeys()) {
-				json << "\"" << key << "\":\"" << getLocalMDString(p, key) << "\",";
+			for (auto key : local_md_string.getKeys()) {
+				json << "\"" << key << "\":\"" << local_md_string.get(idx, key) << "\",";
 			}
 
 			//p.dump_md_values();
-			for (auto key : getLocalMDValueKeys()) {
-				double value = getLocalMDValue(p, key);
+			for (auto key : local_md_value.getKeys()) {
+				double value = local_md_value.get(idx, key);
 				json << "\"" << key << "\":" << value << ",";
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
 			json << "}},";
+			idx++;
 		}
 
 		json.seekp(((long) json.tellp()) - 1); // delete last ,
@@ -330,53 +281,23 @@ std::string PointCollection::toCSV() {
 
 	//header
 	csv << "lon" << "," << "lat";
-	for(std::string key : getLocalMDStringKeys()){
+	for(std::string key : local_md_string.getKeys()) {
 		csv << "," << key;
 	}
 	csv << std::endl;
 
-	for (const Point &p : collection) {
+	size_t idx = 0;
+	for (const auto &p : collection) {
 		csv << p.x << "," << p.y;
 
-		for(std::string key : getLocalMDStringKeys()){
-				csv << "," << getLocalMDString(p, key);
+		for(std::string key : local_md_string.getKeys()) {
+				csv << "," << local_md_string.get(idx, key);
 		}
 
 		csv << std::endl;
+		idx++;
 	}
 
 	return csv.str();
 }
 
-PointCollectionMetadataCopier::PointCollectionMetadataCopier(PointCollection& pointsOld, PointCollection& pointsNew) : pointsOld(pointsOld), pointsNew(pointsNew) {
-}
-
-void PointCollectionMetadataCopier::copyGlobalMetadata() {
-	for (auto pair : *(pointsOld.getGlobalMDValueIterator())) {
-		pointsNew.setGlobalMDValue(pair.first, pair.second);
-	}
-	for (auto pair : *(pointsOld.getGlobalMDStringIterator())) {
-		pointsNew.setGlobalMDString(pair.first, pair.second);
-	}
-}
-
-void PointCollectionMetadataCopier::initLocalMetadataFields() {
-	localMDStringKeys = pointsOld.getLocalMDStringKeys();
-	for (auto key : localMDStringKeys) {
-		pointsNew.addLocalMDString(key);
-	}
-
-	localMDValueKeys = pointsOld.getLocalMDValueKeys();
-	for (auto key : localMDValueKeys) {
-		pointsNew.addLocalMDValue(key);
-	}
-}
-
-void PointCollectionMetadataCopier::copyLocalMetadata(const Point& pointOld, Point& pointNew) {
-	for (auto key : localMDStringKeys) {
-		pointsNew.setLocalMDString(pointNew, key, pointsOld.getLocalMDString(pointOld, key));
-	}
-	for (auto key : localMDValueKeys) {
-		pointsNew.setLocalMDValue(pointNew, key, pointsOld.getLocalMDValue(pointOld, key));
-	}
-}

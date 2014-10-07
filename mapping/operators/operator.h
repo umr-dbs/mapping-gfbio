@@ -14,15 +14,15 @@ class GenericRaster;
 class PointCollection;
 class GenericGeometry;
 class GenericPlot;
-class Socket;
+class BinaryStream;
 
 class QueryRectangle {
 	public:
 		QueryRectangle();
 		QueryRectangle(time_t timestamp, double x1, double y1, double x2, double y2, uint32_t xres, uint32_t yres, uint16_t epsg) : timestamp(timestamp), x1(x1), y1(y1), x2(x2), y2(y2), xres(xres), yres(yres), epsg(epsg) {};
-		QueryRectangle(Socket &socket);
+		QueryRectangle(BinaryStream &stream);
 
-		void toSocket(Socket &socket) const;
+		void toStream(BinaryStream &stream) const;
 
 		double minx() const;
 		double maxx() const;

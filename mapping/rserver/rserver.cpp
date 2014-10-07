@@ -1,5 +1,5 @@
 #include "raster/exceptions.h"
-#include "util/socket.h"
+#include "util/binarystream.h"
 #include "rserver/rserver.h"
 
 #include "raster/raster.h"
@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <stdio.h>
 #include <string.h> // memset()
+#include <map>
 
 #include <time.h>
 
@@ -22,7 +23,10 @@
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <poll.h>
+#include <signal.h>
 
+
+const int TIMEOUT_SECONDS = 60;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter" // silence the myriad of warnings in ***REMOVED*** headers
@@ -53,57 +57,69 @@ void log(const char *str, Args&&... args) {
 	fprintf(stderr, "\n");
 }
 
+int cmpTimespec(const struct timespec &t1, const struct timespec &t2) {
+	if (t1.tv_sec < t2.tv_sec)
+		return -1;
+	if (t1.tv_sec > t2.tv_sec)
+		return 1;
+	if (t1.tv_nsec < t2.tv_nsec)
+		return -1;
+	if (t1.tv_nsec > t2.tv_nsec)
+		return 1;
+	return 0;
+}
 
-std::unique_ptr<GenericRaster> query_raster_source(Socket &socket, int childidx, const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
 	log("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
-	socket.write((char) RSERVER_TYPE_RASTER);
-	socket.write(childidx);
-	socket.write(rect);
+	stream.write((char) RSERVER_TYPE_RASTER);
+	stream.write(childidx);
+	stream.write(rect);
 
-	auto raster = GenericRaster::fromSocket(socket);
+	auto raster = GenericRaster::fromStream(stream);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 	return raster;
 }
 
-std::unique_ptr<PointCollection> query_points_source(Socket &socket, int childidx, const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Points");
 	log("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
-	socket.write((char) RSERVER_TYPE_POINTS);
-	socket.write(childidx);
-	socket.write(rect);
+	stream.write((char) RSERVER_TYPE_POINTS);
+	stream.write(childidx);
+	stream.write(rect);
 
-	auto points = std::make_unique<PointCollection>(socket);
+	auto points = std::make_unique<PointCollection>(stream);
 	return points;
 }
 
 
 
 void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
-	Socket socket(sock_fd, sock_fd);
+	UnixSocket socket(sock_fd, sock_fd);
+	BinaryStream &stream = socket;
 
 	int magic;
-	socket.read(&magic);
+	stream.read(&magic);
 	if (magic != RSERVER_MAGIC_NUMBER)
 		throw PlatformException("Client sent the wrong magic number");
 	char type;
-	socket.read(&type);
+	stream.read(&type);
 	log("Requested type: %d", type);
 	std::string source;
-	socket.read(&source);
+	stream.read(&source);
 	//printf("Requested source: %s\n", source.c_str());
 	int rastersourcecount, pointssourcecount;
-	socket.read(&rastersourcecount);
-	socket.read(&pointssourcecount);
+	stream.read(&rastersourcecount);
+	stream.read(&pointssourcecount);
 	log("Requested counts: %d %d", rastersourcecount, pointssourcecount);
-	QueryRectangle qrect(socket);
+	QueryRectangle qrect(stream);
 	log("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
 
-	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(socket), std::placeholders::_1, std::placeholders::_2);
+	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.rastercount"] = rastersourcecount;
 	R["mapping.loadRaster"] = ***REMOVED***::InternalFunction( bound_raster_source );
 
-	std::function<std::unique_ptr<PointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, std::ref(socket), std::placeholders::_1, std::placeholders::_2);
+	std::function<std::unique_ptr<PointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.pointscount"] = pointssourcecount;
 	R["mapping.loadPoints"] = ***REMOVED***::InternalFunction( bound_points_source );
 
@@ -115,13 +131,13 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 
 	if (type == RSERVER_TYPE_RASTER) {
 		auto raster = ***REMOVED***::as<std::unique_ptr<GenericRaster>>(result);
-		socket.write((char) -RSERVER_TYPE_RASTER);
-		socket.write(*raster);
+		stream.write((char) -RSERVER_TYPE_RASTER);
+		stream.write(*raster);
 	}
 	else if (type == RSERVER_TYPE_STRING) {
 		std::string output = Rcallbacks.getConsoleOutput();
-		socket.write((char) -RSERVER_TYPE_STRING);
-		socket.write(output);
+		stream.write((char) -RSERVER_TYPE_STRING);
+		stream.write(output);
 	}
 	else
 		throw PlatformException("Unknown result type requested");
@@ -165,20 +181,44 @@ int main()
 	chmod(rserver_socket_address, 0777);
 
 
+	std::map<pid_t, timespec> running_clients;
+
 	printf("Socket started, listening..\n");
 	// Start listening and fork()
 	listen(listen_fd, 5);
 	while (true) {
 		// try to reap our children
 		int status;
-		while (waitpid(-1, &status, WNOHANG) > 0) {
-			// a child exited somehow
+		pid_t exited_pid;
+		while ((exited_pid = waitpid(-1, &status, WNOHANG)) > 0) {
+			running_clients.erase(exited_pid);
+		}
+		// Kill all overdue children
+		struct timespec current_t;
+		clock_gettime(CLOCK_MONOTONIC, &current_t);
+
+		for (auto it = running_clients.begin(); it != running_clients.end(); ) {
+			auto timeout_t = it->second;
+			if (cmpTimespec(timeout_t, current_t) < 0) {
+				auto timeouted_pid = it->first;
+				log("Client %d gets killed due to timeout", (int) timeouted_pid);
+
+				if (kill(timeouted_pid, SIGHUP) < 0) { // TODO: SIGKILL?
+					perror("kill() failed");
+				}
+				// the postincrement of the iterator is important to avoid using an invalid iterator
+				running_clients.erase(it++);
+			}
+			else {
+				++it;
+			}
+
 		}
 
+		// Wait for new connections. Do not wait longer than 5 seconds.
 		struct pollfd pollfds[1];
 		pollfds[0].fd = listen_fd;
 		pollfds[0].events = POLLIN;
-		//int poll(struct pollfd *fds, nfds_t nfds, int timeout);
 
 		int poll_res = poll(pollfds, /* count = */ 1, /* timeout in ms = */ 5000);
 		if (poll_res < 0) {
@@ -238,7 +278,11 @@ int main()
 		else {
 			// This is the server
 			close(client_fd);
-			// nothing more to do.
+
+			struct timespec timeout_t;
+			clock_gettime(CLOCK_MONOTONIC, &timeout_t);
+			timeout_t.tv_sec += TIMEOUT_SECONDS;
+			running_clients[pid] = timeout_t;
 		}
 	}
 }

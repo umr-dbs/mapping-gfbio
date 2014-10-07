@@ -32,31 +32,27 @@ PointsFilterByRangeOperator::~PointsFilterByRangeOperator() {
 REGISTER_OPERATOR(PointsFilterByRangeOperator, "points_filter_by_range");
 
 std::unique_ptr<PointCollection> PointsFilterByRangeOperator::getPoints(const QueryRectangle &rect) {
-	auto pointsOld = getPointsFromSource(0, rect);
-	auto pointsNew = std::make_unique<PointCollection>(pointsOld->epsg);
+	auto points = getPointsFromSource(0, rect);
 
-	PointCollectionMetadataCopier metadataCopier(*pointsOld, *pointsNew);
-	metadataCopier.copyGlobalMetadata();
+	size_t count = points->collection.size();
+	std::vector<bool> keep(count, false);
 
-	double raster_no_data = pointsOld->getGlobalMDValue(name + "_no_data");
-	bool raster_has_no_data = pointsOld->getGlobalMDValue(name + "_has_no_data");
+	double raster_no_data = points->global_md_value.get(name + "_no_data");
+	bool raster_has_no_data = points->global_md_value.get(name + "_has_no_data");
 
-	metadataCopier.initLocalMetadataFields();
-	for (Point &pointOld : pointsOld->collection) {
-		double value = pointsOld->getLocalMDValue(pointOld, name);
+	for (size_t idx=0;idx<count;idx++) {
+		double value = points->local_md_value.get(idx, name);
 		bool copy = false;
 
-		if (raster_has_no_data && value == raster_no_data) {
+		if ((raster_has_no_data && value == raster_no_data) || std::isnan(value)) {
 			copy = includeNoData;
-		} else {
+		}
+		else {
 			copy = (value >= rangeMin && value <= rangeMax);
 		}
 
-		if(copy) {
-			auto pointNew = pointsNew->addPoint(pointOld.x, pointOld.y);
-			metadataCopier.copyLocalMetadata(pointOld, pointNew);
-		}
+		keep[idx] = copy;
 	}
 
-	return pointsNew;
+	return points->filter(keep);
 }

@@ -8,13 +8,13 @@
 #include <string>
 #include <sys/types.h>
 
-class Socket;
+class BinaryStream;
 
 class Point {
 	private:
-		Point(double x, double y, uint16_t size_md_string = 0, uint16_t size_md_value = 0);
-		Point(Socket &socket);
-		void toSocket(Socket &socket);
+		Point(double x, double y);
+		Point(BinaryStream &stream);
+		void toStream(BinaryStream &stream);
 	public:
 		Point() = delete;
 		~Point();
@@ -27,9 +27,7 @@ class Point {
 		Point &operator=(Point &&p) = default;
 
 		double x, y;
-	private:
-		IndexedMetadata<std::string> md_string;
-		IndexedMetadata<double> md_value;
+
 		friend class PointCollection;
 };
 
@@ -37,10 +35,12 @@ class Point {
 class PointCollection {
 	public:
 		PointCollection(epsg_t epsg = EPSG_UNKNOWN);
-		PointCollection(Socket &socket);
+		PointCollection(BinaryStream &stream);
 		~PointCollection();
 
-		void toSocket(Socket &socket);
+		std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep);
+
+		void toStream(BinaryStream &stream);
 
 		epsg_t epsg;
 		std::vector<Point> collection;
@@ -48,7 +48,7 @@ class PointCollection {
 		// add a new point
 		Point &addPoint(double x, double y);
 
-		// global MetaData (stored on the PointCollection)
+		// global MetaData (one value per PointCollection)
 		const std::string &getGlobalMDString(const std::string &key) const;
 		double getGlobalMDValue(const std::string &key) const;
 		DirectMetadata<double>* getGlobalMDValueIterator();
@@ -58,41 +58,17 @@ class PointCollection {
 		void setGlobalMDString(const std::string &key, const std::string &value);
 		void setGlobalMDValue(const std::string &key, double value);
 
-
-		// local MetaData (metadata stored on the Points themselves)
-		// The collection just keeps a list of the allowed keys and their index.
-		void addLocalMDString(const std::string &key);
-		void addLocalMDValue(const std::string &key);
-		auto lock() -> void;
-
-
-		// local MetaData (stored on the Points)
-		const std::string &getLocalMDString(const Point &point, const std::string &key) const;
-		double getLocalMDValue(const Point &point, const std::string &key) const;
-		std::vector<std::string> getLocalMDValueKeys() const;
-		std::vector<std::string> getLocalMDStringKeys() const;
-		void setLocalMDString(Point &point, const std::string &key, const std::string &value);
-		void setLocalMDValue(Point &point, const std::string &key, double value);
-
 		// Export
 		std::string toGeoJSON(bool displayMetadata = false);
 		std::string toCSV();
-	private:
+
+		// global MetaData (one value per PointCollection)
 		DirectMetadata<std::string> global_md_string;
 		DirectMetadata<double> global_md_value;
-		MetadataIndex<std::string> local_md_string;
-		MetadataIndex<double> local_md_value;
-};
 
-class PointCollectionMetadataCopier {
-	public:
-		PointCollectionMetadataCopier(PointCollection& pointsOld, PointCollection& pointsNew);
-		void copyGlobalMetadata();
-		void initLocalMetadataFields();
-		void copyLocalMetadata(const Point& pointOld, Point& pointNew);
-	private:
-		PointCollection &pointsOld, &pointsNew;
-		std::vector<std::string> localMDStringKeys, localMDValueKeys;
+		// local MetaData (one value per Point)
+		MetadataArrays<std::string> local_md_string;
+		MetadataArrays<double> local_md_value;
 };
 
 #endif

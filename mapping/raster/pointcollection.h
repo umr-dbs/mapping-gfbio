@@ -8,13 +8,13 @@
 #include <string>
 #include <sys/types.h>
 
-class Socket;
+class BinaryStream;
 
 class Point {
 	private:
 		Point(double x, double y);
-		Point(Socket &socket);
-		void toSocket(Socket &socket);
+		Point(BinaryStream &stream);
+		void toStream(BinaryStream &stream);
 	public:
 		Point() = delete;
 		~Point();
@@ -35,12 +35,12 @@ class Point {
 class PointCollection {
 	public:
 		PointCollection(epsg_t epsg = EPSG_UNKNOWN);
-		PointCollection(Socket &socket);
+		PointCollection(BinaryStream &stream);
 		~PointCollection();
 
 		std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep);
 
-		void toSocket(Socket &socket);
+		void toStream(BinaryStream &stream);
 
 		epsg_t epsg;
 		std::vector<Point> collection;

@@ -36,7 +36,7 @@ OperatorRegistration::OperatorRegistration(const char *name, OPConstructor const
 
 
 
-QueryRectangle::QueryRectangle(Socket &socket) {
+QueryRectangle::QueryRectangle(BinaryStream &socket) {
 	socket.read(&timestamp);
 	socket.read(&x1);
 	socket.read(&y1);
@@ -47,15 +47,15 @@ QueryRectangle::QueryRectangle(Socket &socket) {
 	socket.read(&epsg);
 }
 
-void QueryRectangle::toSocket(Socket &socket) const {
-	socket.write(timestamp);
-	socket.write(x1);
-	socket.write(y1);
-	socket.write(x2);
-	socket.write(y2);
-	socket.write(xres);
-	socket.write(yres);
-	socket.write(epsg);
+void QueryRectangle::toStream(BinaryStream &stream) const {
+	stream.write(timestamp);
+	stream.write(x1);
+	stream.write(y1);
+	stream.write(x2);
+	stream.write(y2);
+	stream.write(xres);
+	stream.write(yres);
+	stream.write(epsg);
 }
 
 

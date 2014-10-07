@@ -69,56 +69,57 @@ int cmpTimespec(const struct timespec &t1, const struct timespec &t2) {
 	return 0;
 }
 
-std::unique_ptr<GenericRaster> query_raster_source(Socket &socket, int childidx, const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
 	log("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
-	socket.write((char) RSERVER_TYPE_RASTER);
-	socket.write(childidx);
-	socket.write(rect);
+	stream.write((char) RSERVER_TYPE_RASTER);
+	stream.write(childidx);
+	stream.write(rect);
 
-	auto raster = GenericRaster::fromSocket(socket);
+	auto raster = GenericRaster::fromStream(stream);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 	return raster;
 }
 
-std::unique_ptr<PointCollection> query_points_source(Socket &socket, int childidx, const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Points");
 	log("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
-	socket.write((char) RSERVER_TYPE_POINTS);
-	socket.write(childidx);
-	socket.write(rect);
+	stream.write((char) RSERVER_TYPE_POINTS);
+	stream.write(childidx);
+	stream.write(rect);
 
-	auto points = std::make_unique<PointCollection>(socket);
+	auto points = std::make_unique<PointCollection>(stream);
 	return points;
 }
 
 
 
 void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
-	Socket socket(sock_fd, sock_fd);
+	UnixSocket socket(sock_fd, sock_fd);
+	BinaryStream &stream = socket;
 
 	int magic;
-	socket.read(&magic);
+	stream.read(&magic);
 	if (magic != RSERVER_MAGIC_NUMBER)
 		throw PlatformException("Client sent the wrong magic number");
 	char type;
-	socket.read(&type);
+	stream.read(&type);
 	log("Requested type: %d", type);
 	std::string source;
-	socket.read(&source);
+	stream.read(&source);
 	//printf("Requested source: %s\n", source.c_str());
 	int rastersourcecount, pointssourcecount;
-	socket.read(&rastersourcecount);
-	socket.read(&pointssourcecount);
+	stream.read(&rastersourcecount);
+	stream.read(&pointssourcecount);
 	log("Requested counts: %d %d", rastersourcecount, pointssourcecount);
-	QueryRectangle qrect(socket);
+	QueryRectangle qrect(stream);
 	log("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
 
-	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(socket), std::placeholders::_1, std::placeholders::_2);
+	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.rastercount"] = rastersourcecount;
 	R["mapping.loadRaster"] = ***REMOVED***::InternalFunction( bound_raster_source );
 
-	std::function<std::unique_ptr<PointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, std::ref(socket), std::placeholders::_1, std::placeholders::_2);
+	std::function<std::unique_ptr<PointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.pointscount"] = pointssourcecount;
 	R["mapping.loadPoints"] = ***REMOVED***::InternalFunction( bound_points_source );
 
@@ -130,13 +131,13 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 
 	if (type == RSERVER_TYPE_RASTER) {
 		auto raster = ***REMOVED***::as<std::unique_ptr<GenericRaster>>(result);
-		socket.write((char) -RSERVER_TYPE_RASTER);
-		socket.write(*raster);
+		stream.write((char) -RSERVER_TYPE_RASTER);
+		stream.write(*raster);
 	}
 	else if (type == RSERVER_TYPE_STRING) {
 		std::string output = Rcallbacks.getConsoleOutput();
-		socket.write((char) -RSERVER_TYPE_STRING);
-		socket.write(output);
+		stream.write((char) -RSERVER_TYPE_STRING);
+		stream.write(output);
 	}
 	else
 		throw PlatformException("Unknown result type requested");

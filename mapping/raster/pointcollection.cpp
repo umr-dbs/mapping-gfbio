@@ -13,13 +13,13 @@ Point::Point(double x, double y) : x(x), y(y) {
 Point::~Point() {
 }
 
-Point::Point(Socket &socket) {
-	socket.read(&x);
-	socket.read(&y);
+Point::Point(BinaryStream &stream) {
+	stream.read(&x);
+	stream.read(&y);
 }
-void Point::toSocket(Socket &socket) {
-	socket.write(x);
-	socket.write(y);
+void Point::toStream(BinaryStream &stream) {
+	stream.write(x);
+	stream.write(y);
 }
 
 
@@ -81,34 +81,34 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool>
 	return out;
 }
 
-PointCollection::PointCollection(Socket &socket) : epsg(EPSG_UNKNOWN) {
-	socket.read(&epsg);
+PointCollection::PointCollection(BinaryStream &stream) : epsg(EPSG_UNKNOWN) {
+	stream.read(&epsg);
 	size_t count;
-	socket.read(&count);
+	stream.read(&count);
 	collection.reserve(count);
 
-	global_md_string.fromSocket(socket);
-	global_md_value.fromSocket(socket);
-	local_md_string.fromSocket(socket);
-	local_md_value.fromSocket(socket);
+	global_md_string.fromStream(stream);
+	global_md_value.fromStream(stream);
+	local_md_string.fromStream(stream);
+	local_md_value.fromStream(stream);
 
 	for (size_t i=0;i<count;i++) {
-		collection.push_back( Point(socket) );
+		collection.push_back( Point(stream) );
 	}
 }
 
-void PointCollection::toSocket(Socket &socket) {
-	socket.write(epsg);
+void PointCollection::toStream(BinaryStream &stream) {
+	stream.write(epsg);
 	size_t count = collection.size();
-	socket.write(count);
+	stream.write(count);
 
-	socket.write(global_md_string);
-	socket.write(global_md_value);
-	socket.write(local_md_string);
-	socket.write(local_md_value);
+	stream.write(global_md_string);
+	stream.write(global_md_value);
+	stream.write(local_md_string);
+	stream.write(local_md_value);
 
 	for (size_t i=0;i<count;i++) {
-		collection[i].toSocket(socket);
+		collection[i].toStream(stream);
 	}
 }
 

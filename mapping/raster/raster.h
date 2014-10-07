@@ -13,14 +13,14 @@
 
 #define EPSG_UNKNOWN 0
 #define EPSG_METEOSAT2 0xF592  // 62866  // 0xFE1E05A1
-#define EPSG_GEOSMSG 0x9E05    // 40453  // GEOS -> this is only valid for origin 0° 0° and satellite_height 35785831 (Proj4) [
+#define EPSG_GEOSMSG 0x9E05    // 40453  // GEOS -> this is only valid for origin 0ï¿½ 0ï¿½ and satellite_height 35785831 (Proj4) [
 #define EPSG_WEBMERCATOR 3857 // 3785 is deprecated
 #define EPSG_LATLON 4326 // http://spatialreference.org/ref/epsg/wgs-84/
 
 typedef uint16_t epsg_t;
 
 class QueryRectangle;
-class Socket;
+class BinaryStream;
 
 
 // LocalCoordinateSystem - lcs
@@ -39,7 +39,7 @@ class LocalCRS {
 			: epsg(epsg), dimensions(dimensions), size{w, h, d}, origin{origin_x, origin_y, origin_z}, scale{scale_x, scale_y, scale_z} {};
 
 		LocalCRS(const QueryRectangle &rect);
-		LocalCRS(Socket &pipe);
+		LocalCRS(BinaryStream &stream);
 
 		LocalCRS() = delete;
 		~LocalCRS() = default;
@@ -55,7 +55,7 @@ class LocalCRS {
 		size_t getPixelCount() const;
 		void verify() const;
 
-		void toSocket(Socket &socket) const;
+		void toStream(BinaryStream &stream) const;
 
 		double PixelToWorldX(int px) const { return origin[0] + px * scale[0]; }
 		double PixelToWorldY(int py) const { return origin[1] + py * scale[1]; }
@@ -88,7 +88,7 @@ class DataDescription {
 		DataDescription(GDALDataType datatype, double min, double max, bool has_no_data, double no_data)
 			: datatype(datatype), min(min), max(max), has_no_data(has_no_data), no_data(has_no_data ? no_data : 0.0) {};
 
-		DataDescription(Socket &socket);
+		DataDescription(BinaryStream &stream);
 
 		DataDescription() = delete;
 		~DataDescription() = default;
@@ -104,7 +104,7 @@ class DataDescription {
 		bool operator==(const DataDescription &b) const;
 		void verify() const;
 
-		void toSocket(Socket &socket) const;
+		void toStream(BinaryStream &stream) const;
 
 		int getBPP() const; // Bytes per Pixel
 		double getMinByDatatype() const;
@@ -168,8 +168,8 @@ class GenericRaster {
 		GenericRaster(const GenericRaster &) = delete;
 		GenericRaster &operator=(const GenericRaster &) = delete;
 
-		void toSocket(Socket &socket);
-		static std::unique_ptr<GenericRaster> fromSocket(Socket &socket);
+		void toStream(BinaryStream &stream);
+		static std::unique_ptr<GenericRaster> fromStream(BinaryStream &stream);
 
 		virtual void toPGM(const char *filename, bool avg = false) = 0;
 		virtual void toYUV(const char *filename) = 0;

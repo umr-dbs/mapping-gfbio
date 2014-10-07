@@ -38,30 +38,30 @@ const T &DirectMetadata<T>::get(const std::string &key, const T &defaultvalue) c
 }
 
 template<typename T>
-DirectMetadata<T>::DirectMetadata(Socket &socket) {
-	fromSocket(socket);
+DirectMetadata<T>::DirectMetadata(BinaryStream &stream) {
+	fromStream(stream);
 }
 
 template<typename T>
-void DirectMetadata<T>::fromSocket(Socket &socket) {
+void DirectMetadata<T>::fromStream(BinaryStream &stream) {
 	size_t count;
-	socket.read(&count);
+	stream.read(&count);
 	for (size_t i=0;i<count;i++) {
 		std::string key;
-		socket.read(&key);
+		stream.read(&key);
 		T value;
-		socket.read(&value);
+		stream.read(&value);
 		data[key] = value;
 	}
 }
 
 template<typename T>
-void DirectMetadata<T>::toSocket(Socket &socket) const {
+void DirectMetadata<T>::toStream(BinaryStream &stream) const {
 	size_t count = data.size();
-	socket.write(count);
+	stream.write(count);
 	for (auto &e : data) {
-		socket.write(e.first);
-		socket.write(e.second);
+		stream.write(e.first);
+		stream.write(e.second);
 	}
 }
 
@@ -122,23 +122,23 @@ std::vector<T> &MetadataArrays<T>::getVector(const std::string &key) {
 }
 
 template<typename T>
-MetadataArrays<T>::MetadataArrays(Socket &socket) {
-	fromSocket(socket);
+MetadataArrays<T>::MetadataArrays(BinaryStream &stream) {
+	fromStream(stream);
 }
 
 template<typename T>
-void MetadataArrays<T>::fromSocket(Socket &socket) {
+void MetadataArrays<T>::fromStream(BinaryStream &stream) {
 	size_t keycount;
-	socket.read(&keycount);
+	stream.read(&keycount);
 	for (size_t k=0;k<keycount;k++) {
 		std::string key;
-		socket.read(&key);
+		stream.read(&key);
 		size_t vecsize;
-		socket.read(&vecsize);
+		stream.read(&vecsize);
 		std::vector<T> vec(vecsize);
 		for (size_t i=0;i<vecsize;i++) {
 			T value;
-			socket.read(&value);
+			stream.read(&value);
 			vec.push_back(value);
 		}
 		data[key] = std::move(vec);
@@ -146,17 +146,17 @@ void MetadataArrays<T>::fromSocket(Socket &socket) {
 }
 
 template<typename T>
-void MetadataArrays<T>::toSocket(Socket &socket) const {
+void MetadataArrays<T>::toStream(BinaryStream &stream) const {
 	size_t keycount = data.size();
-	socket.write(keycount);
+	stream.write(keycount);
 	for (auto &e : data) {
 		auto &key = e.first;
-		socket.write(key);
+		stream.write(key);
 		auto &vec = e.second;
 		auto vecsize = vec.size();
-		socket.write(vecsize);
+		stream.write(vecsize);
 		for (size_t i=0;i<vecsize;i++)
-			socket.write(vec[i]);
+			stream.write(vec[i]);
 	}
 }
 

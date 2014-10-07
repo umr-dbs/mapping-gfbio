@@ -7,17 +7,17 @@
 #include <string>
 #include <sys/types.h>
 
-class Socket;
+class BinaryStream;
 
 template<typename T>
 class DirectMetadata {
 	public:
 		DirectMetadata();
-		DirectMetadata(Socket &socket);
+		DirectMetadata(BinaryStream &stream);
 		~DirectMetadata();
 
-		void fromSocket(Socket &socket);
-		void toSocket(Socket &socket) const;
+		void fromStream(BinaryStream &stream);
+		void toStream(BinaryStream &stream) const;
 
 		void set(const std::string &key, const T &value);
 		const T &get(const std::string &key) const;
@@ -37,11 +37,11 @@ template<typename T>
 class MetadataArrays {
 	public:
 		MetadataArrays();
-		MetadataArrays(Socket &socket);
+		MetadataArrays(BinaryStream &stream);
 		~MetadataArrays();
 
-		void fromSocket(Socket &socket);
-		void toSocket(Socket &socket) const;
+		void fromStream(BinaryStream &stream);
+		void toStream(BinaryStream &stream) const;
 
 		void set(size_t idx, const std::string &key, const T &value);
 		const T &get(size_t idx, const std::string &key) const;

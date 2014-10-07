@@ -1,5 +1,5 @@
 #include "raster/exceptions.h"
-#include "util/socket.h"
+#include "util/binarystream.h"
 #include "rserver/rserver.h"
 
 #include "raster/raster.h"

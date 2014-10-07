@@ -5,7 +5,7 @@
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
-#include "util/socket.h"
+#include "util/binarystream.h"
 #include "rserver/rserver.h"
 
 #include <limits>

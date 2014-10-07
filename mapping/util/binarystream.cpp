@@ -1,4 +1,4 @@
-#include "util/socket.h"
+#include "util/binarystream.h"
 #include "raster/exceptions.h"
 
 #include <sstream>

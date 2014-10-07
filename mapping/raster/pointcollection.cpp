@@ -1,5 +1,5 @@
 #include "raster/pointcollection.h"
-#include "util/socket.h"
+#include "util/binarystream.h"
 #include "util/make_unique.h"
 
 #include <sstream>

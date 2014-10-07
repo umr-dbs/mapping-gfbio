@@ -3,7 +3,7 @@
 #include "raster/typejuggling.h"
 #include "raster/opencl.h"
 #include "util/hash.h"
-#include "util/socket.h"
+#include "util/binarystream.h"
 #include "operators/operator.h" // for QueryRectangle
 
 #include <memory>

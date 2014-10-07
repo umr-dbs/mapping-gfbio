@@ -1,7 +1,7 @@
 
 #include "raster/exceptions.h"
 #include "raster/metadata.h"
-#include "util/socket.h"
+#include "util/binarystream.h"
 
 
 /*

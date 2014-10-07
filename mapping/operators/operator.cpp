@@ -3,7 +3,7 @@
 #include "raster/pointcollection.h"
 #include "raster/geometry.h"
 #include "plot/plot.h"
-#include "util/socket.h"
+#include "util/binarystream.h"
 
 #include "operators/operator.h"
 

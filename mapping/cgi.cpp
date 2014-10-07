@@ -233,14 +233,14 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 
 
 std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string openGisUri){
-	unsigned int beforeAutorityId = openGisUri.find("crs")+3;
-	unsigned int behindAutorityId = openGisUri.find_first_of("/",beforeAutorityId+1);
+	size_t beforeAutorityId = openGisUri.find("crs")+3;
+	size_t behindAutorityId = openGisUri.find_first_of("/",beforeAutorityId+1);
 	std::string authorityId = openGisUri.substr(beforeAutorityId+1, behindAutorityId-beforeAutorityId-1);
 	std::cerr<<"getCrsInformationFromOGCUri openGisUri: "<<openGisUri<<" beforeAutorityId: "<<beforeAutorityId<<" behindAutorityId: "<<behindAutorityId<<" authorityId: "<<authorityId<<std::endl;
 
 	//get the crsID
-	unsigned int beforeCrsCode = openGisUri.find_last_of("/");
-	unsigned int behindCrsCode = openGisUri.find_first_of("(", beforeCrsCode);
+	size_t beforeCrsCode = openGisUri.find_last_of("/");
+	size_t behindCrsCode = openGisUri.find_first_of("(", beforeCrsCode);
 	std::string crsCode = openGisUri.substr(beforeCrsCode+1, behindCrsCode-beforeCrsCode-1);
 	std::cerr<<"getCrsInformationFromOGCUri openGisUri: "<<openGisUri<<" beforeCrsCode: "<<beforeCrsCode<<" behindCrsCode: "<<behindCrsCode<<" crsCode: "<<crsCode<<std::endl;
 
@@ -251,10 +251,10 @@ std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string open
 std::pair<double, double> getParameterRangeFromOGCUri(std::string openGisUri){
 	std::pair<double, double> resultPair;
 
-	unsigned int rangeStart = openGisUri.find_first_of("(");
-	unsigned int rangeEnd = openGisUri.find_last_of(")");
-	unsigned int rangeSeperator = openGisUri.find_first_of(",", rangeStart);
-	unsigned int firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
+	size_t rangeStart = openGisUri.find_first_of("(");
+	size_t rangeEnd = openGisUri.find_last_of(")");
+	size_t rangeSeperator = openGisUri.find_first_of(",", rangeStart);
+	size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
 
 	resultPair.first = std::stod(openGisUri.substr(rangeStart+1, firstEnd-rangeStart -1));
 
@@ -290,7 +290,6 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 
 	if(params["request"] == "getcoverage") {
 		//for now we will handle the OpGraph as the coverageId
-		std::cerr<<"coverageId:"<<params["coverageid"]<<std::endl;
 		auto graph = GenericOperator::fromJSON(params["coverageid"]);
 
 		//now we will identify the parameters for the QueryRectangle
@@ -313,11 +312,34 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 		QueryRectangle query_rect{42, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, 1024, 1024, query_crsId};
 		auto result_raster = graph->getCachedRaster(query_rect);
 
-		outputImage(result_raster.get(), false, false, "hsv");
+		//setup the output parameters
+		std::string gdalDriver = "GTiff";
+		std::string gdalPrefix = "/vsimem/";
+		std::string gdalFileName = "test.tif";
+		std::string gdalOutFileName = gdalPrefix+gdalFileName;
+
+		//write the raster into a GDAL file
+		result_raster.get()->toGDAL(gdalOutFileName.c_str(), gdalDriver.c_str());
+
+		//get the bytearray (buffer) and its size
+		vsi_l_offset length;
+		GByte* outDataBuffer = VSIGetMemFileBuffer(gdalOutFileName.c_str(), &length, true);
+
+		//put the HTML headers for download
+		std::cout<<"Content-Disposition: attachment; filename=\""<<gdalFileName<<"\""<<std::endl;
+		std::cout<<"Content-Length: "<< static_cast<unsigned long long>(length)<<std::endl;
+		std::cout<<std::endl; //end of headers
+
+		//write the data into the output stream
+		std::cout.write(reinterpret_cast<char*>(outDataBuffer), static_cast<unsigned long long>(length));
+
+		//clean the GDAL resources
+		VSIFree(outDataBuffer);
+
+		return 0;
 	}
 
-
-	return 0;
+	return 1;
 }
 
 int main() {

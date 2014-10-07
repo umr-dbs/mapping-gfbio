@@ -84,7 +84,12 @@ void MetadataArrays<T>::set(size_t idx, const std::string &key, const T &value) 
 		data[key] = std::vector<T>();
 
 	auto &vec = data[key];
-	vec.reserve(idx);
+	if (idx == vec.size()) {
+		vec.push_back(value);
+		return;
+	}
+	if (vec.size() < idx+1)
+		vec.resize(idx+1);
 	vec[idx] = value;
 }
 

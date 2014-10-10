@@ -326,9 +326,9 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 		GByte* outDataBuffer = VSIGetMemFileBuffer(gdalOutFileName.c_str(), &length, true);
 
 		//put the HTML headers for download
-		std::cout<<"Content-Disposition: attachment; filename=\""<<gdalFileName<<"\""<<std::endl;
-		std::cout<<"Content-Length: "<< static_cast<unsigned long long>(length)<<std::endl;
-		std::cout<<std::endl; //end of headers
+		std::cout<<"Content-Disposition: attachment; filename=\""<<gdalFileName<<"\""<<"\r\n";
+		std::cout<<"Content-Length: "<< static_cast<unsigned long long>(length)<<"\r\n";
+		std::cout<<"\r\n"; //end of headers
 
 		//write the data into the output stream
 		std::cout.write(reinterpret_cast<char*>(outDataBuffer), static_cast<unsigned long long>(length));

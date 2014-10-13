@@ -77,7 +77,7 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRec
 
 		double x = coords->x, y = coords->y;
 
-		points_out->collection.push_back(Point(x, y));
+		points_out->addPoint(x, y);
 
 		gf->destroyGeometry(point);
 	}

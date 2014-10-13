@@ -93,17 +93,15 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const Query
 		points_out->local_md_string.addVector(header[i]);
 	}
 
-	size_t idx = 0;
 	while(std::getline(data,line)){
 			auto csv = parseCSVLine(line);
 
-			Point& point = points_out->addPoint(std::stod(csv[0]),std::stod(csv[1]));
+			size_t idx = points_out->addPoint(std::stod(csv[0]),std::stod(csv[1]));
 			//double year = std::atof(csv[3].c_str());
 
 			for(int i=2; i < csv.size(); i++){
 				points_out->local_md_string.set(idx, header[i], csv[i]);
 			}
-			idx++;
 	}
 	//fprintf(stderr, data.str().c_str());
 	return points_out;

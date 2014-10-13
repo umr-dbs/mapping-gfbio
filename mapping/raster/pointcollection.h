@@ -45,8 +45,8 @@ class PointCollection {
 		epsg_t epsg;
 		std::vector<Point> collection;
 
-		// add a new point
-		Point &addPoint(double x, double y);
+		// add a new point, returns index of the new point
+		size_t addPoint(double x, double y);
 
 		// global MetaData (one value per PointCollection)
 		const std::string &getGlobalMDString(const std::string &key) const;

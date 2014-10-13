@@ -41,12 +41,10 @@ std::unique_ptr<PointCollection> PointsClusterOperator::getPoints(const QueryRec
 	auto circles = clusterer.getCircles();
 	pointsNew->local_md_value.addVector("radius", circles.size());
 	pointsNew->local_md_value.addVector("numberOfPoints", circles.size());
-	size_t idx = 0;
 	for (auto& circle : circles) {
-		Point& pointNew = pointsNew->addPoint(circle->getX() * rect.xres, circle->getY() * rect.yres);
+		size_t idx = pointsNew->addPoint(circle->getX() * rect.xres, circle->getY() * rect.yres);
 		pointsNew->local_md_value.set(idx, "radius", circle->getRadius());
 		pointsNew->local_md_value.set(idx, "numberOfPoints", circle->getNumberOfPoints());
-		idx++;
 	}
 
 	return pointsNew;

@@ -113,9 +113,9 @@ void PointCollection::toStream(BinaryStream &stream) {
 }
 
 
-Point &PointCollection::addPoint(double x, double y) {
+size_t PointCollection::addPoint(double x, double y) {
 	collection.push_back(Point(x, y));
-	return collection[ collection.size() - 1 ];
+	return collection.size() - 1;
 }
 
 

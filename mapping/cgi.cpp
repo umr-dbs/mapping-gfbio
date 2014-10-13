@@ -113,7 +113,7 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 		std::transform(key.begin(), key.end(), key.begin(), ::tolower);
 
 		std::string value = urldecode(item->value);
-		if (key == "subset") {
+		if (key == "subset" || key == "size") {
 			auto pos = value.find(',');
 			if (pos != std::string::npos) {
 				key = key + '_' + value.substr(0, pos);
@@ -241,6 +241,9 @@ std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string open
 	//get the crsID
 	size_t beforeCrsCode = openGisUri.find_last_of("/");
 	size_t behindCrsCode = openGisUri.find_first_of("(", beforeCrsCode);
+	if(behindCrsCode = std::string::npos)
+		behindCrsCode = openGisUri.length();
+
 	std::string crsCode = openGisUri.substr(beforeCrsCode+1, behindCrsCode-beforeCrsCode-1);
 	std::cerr<<"getCrsInformationFromOGCUri openGisUri: "<<openGisUri<<" beforeCrsCode: "<<beforeCrsCode<<" behindCrsCode: "<<behindCrsCode<<" crsCode: "<<crsCode<<std::endl;
 
@@ -248,26 +251,40 @@ std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string open
 	return (std::pair<std::string, std::string>{"EPSG",crsCode});
 }
 
-std::pair<double, double> getParameterRangeFromOGCUri(std::string openGisUri){
+std::pair<double, double> getWfsParameterRangeDouble(std::string wfsParameterString){
 	std::pair<double, double> resultPair;
 
-	size_t rangeStart = openGisUri.find_first_of("(");
-	size_t rangeEnd = openGisUri.find_last_of(")");
-	size_t rangeSeperator = openGisUri.find_first_of(",", rangeStart);
+	size_t rangeStart = wfsParameterString.find_first_of("(");
+	size_t rangeEnd = wfsParameterString.find_last_of(")");
+	size_t rangeSeperator = wfsParameterString.find_first_of(",", rangeStart);
 	size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
 
-	resultPair.first = std::stod(openGisUri.substr(rangeStart+1, firstEnd-rangeStart -1));
+	resultPair.first = std::stod(wfsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
 
 	if(rangeSeperator == std::string::npos){
 		resultPair.second = resultPair.first;
 	}else{
-		resultPair.second = std::stod(openGisUri.substr(firstEnd+1, rangeEnd-firstEnd -1));
+		resultPair.second = std::stod(wfsParameterString.substr(firstEnd+1, rangeEnd-firstEnd -1));
 	}
-	std::cerr<<"getParameterRangeFromOGCUri openGisUri: "<<openGisUri<<" resultPair.first: "<<resultPair.first<<" resultPair.second: "<<resultPair.second<<std::endl;
+	std::cerr<<"getParameterRangeFromOGCUri openGisUri: "<<wfsParameterString<<" resultPair.first: "<<resultPair.first<<" resultPair.second: "<<resultPair.second<<std::endl;
 	return resultPair;
 }
 
-//std::pair<double, double> getTimeInformationFromOGCUri(std::string openGisUri){
+int getWfsParameterInteger(std::string wfsParameterString){
+
+	size_t rangeStart = wfsParameterString.find_first_of("(");
+	size_t rangeEnd = wfsParameterString.find_last_of(")");
+	size_t rangeSeperator = wfsParameterString.find_first_of(",", rangeStart);
+	size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
+
+	if(rangeSeperator != std::string::npos)
+		std::cerr<<"[getWFSIntegerParameter] "<<wfsParameterString<<" contains a range!"<<std::endl;
+
+	int parameterValue = std::stoi(wfsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
+	return parameterValue;
+}
+
+//std::pair<double, double> getTimeInformationFromOGCUri(std::string wfsParameterString){
 //
 //
 //}
@@ -285,7 +302,7 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 	 */
 
 	std::string version = params["version"];
-	if (version != "2.0.0")
+	if (version != "2.0.1")
 		abort("Invalid version");
 
 	if(params["request"] == "getcoverage") {
@@ -293,23 +310,30 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 		auto graph = GenericOperator::fromJSON(params["coverageid"]);
 
 		//now we will identify the parameters for the QueryRectangle
-		std::pair<std::string, std::string> crsInformationLon = getCrsInformationFromOGCUri(params["subset_lon"]);
-		std::pair<std::string, std::string> crsInformationLat = getCrsInformationFromOGCUri(params["subset_lat"]);
+		std::pair<std::string, std::string> crsInformation = getCrsInformationFromOGCUri(params["outputcrs"]);
+		epsg_t query_crsId = std::stoi(crsInformation.second);
 
-		if(crsInformationLat.first != crsInformationLon.first || crsInformationLat.second != crsInformationLon.second){
-			std::cerr<<"plz no mixed CRSs! lon:"<<crsInformationLon.second<<"lat: "<<crsInformationLat.second<<std::endl;
-			return 1;
-		}
+		/*
+		 *
+		 * std::pair<std::string, std::string> crsInformationLon = getCrsInformationFromOGCUri(params["subset_lon"]);
+		 * std::pair<std::string, std::string> crsInformationLat = getCrsInformationFromOGCUri(params["subset_lat"]);
+		 *
+		 * if(crsInformationLat.first != crsInformationLon.first || crsInformationLat.second != crsInformationLon.second){
+		 *	std::cerr<<"plz no mixed CRSs! lon:"<<crsInformationLon.second<<"lat: "<<crsInformationLat.second<<std::endl;
+		 *	return 1;
+		 *}
+		 */
 
-		epsg_t query_crsId = std::stoi(crsInformationLat.second);
+		std::pair<double, double> crsRangeLon = getWfsParameterRangeDouble(params["subset_lon"]);
+		std::pair<double, double> crsRangeLat = getWfsParameterRangeDouble(params["subset_lat"]);
 
-		std::pair<double, double> crsRangeLon = getParameterRangeFromOGCUri(params["subset_lon"]);
-		std::pair<double, double> crsRangeLat = getParameterRangeFromOGCUri(params["subset_lat"]);
+		unsigned int sizeX = getWfsParameterInteger(params["size_x"]);
+		unsigned int sizeY = getWfsParameterInteger(params["size_y"]);
 
 		//TODO: parse datetime!
 
 		//build the queryRectangle and get the data
-		QueryRectangle query_rect{42, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, 1024, 1024, query_crsId};
+		QueryRectangle query_rect{42, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, sizeX, sizeY, query_crsId};
 		auto result_raster = graph->getCachedRaster(query_rect);
 
 		//setup the output parameters

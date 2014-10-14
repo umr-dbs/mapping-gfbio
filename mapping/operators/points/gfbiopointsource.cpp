@@ -3,6 +3,7 @@
 
 #include "operators/operator.h"
 #include "util/curl.h"
+#include "util/csvparser.h"
 #include "util/make_unique.h"
 
 #include <string>
@@ -26,7 +27,6 @@ class GFBioPointSourceOperator : public GenericOperator {
 		std::string datasource;
 		std::string query;
 		cURL curl;
-		std::vector<std::string> parseCSVLine(std::string line);
 		std::string includeMetadata;
 };
 
@@ -51,31 +51,7 @@ class GFBioGeometrySourceOperator : public GFBioPointSourceOperator {
 };
 REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
-std::vector<std::string> GFBioPointSourceOperator::parseCSVLine(std::string line){
-	//TODO: use array
-	std::vector<std::string> csv;
 
-	//parse csv line, can't handle embedded quotes
-	int start = 0;
-	bool inQuote = false;
-	char separator = ',';
-	char quote = '\"';
-	size_t linelen = line.length();
-	for (size_t i = 0; i <= linelen; i++) {
-		if (line[i] == separator || i == linelen) {
-			if(!inQuote){
-				//token goes from start to i
-				csv.push_back(line.substr(start, i-start));
-
-				start = i+1;
-			}
-		} else if(line[i] == quote){
-			inQuote = !inQuote;
-		}
-	}
-
-	return csv;
-}
 
 std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect) {
 	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
@@ -83,25 +59,24 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const Query
 	std::stringstream data;
 	getStringFromServer(rect, data, "CSV");
 
-	std::string line;
+	CSVParser parser(data, ',', '\n');
 
-	//header
-	std::getline(data,line);
-	auto header = parseCSVLine(line);
+	auto header = parser.readHeaders();
 	//TODO: distinguish between double and string properties
 	for(int i=2; i < header.size(); i++){
 		points_out->local_md_string.addVector(header[i]);
 	}
 
-	while(std::getline(data,line)){
-			auto csv = parseCSVLine(line);
+	while(true){
+		auto tuple = parser.readTuple();
+		if (tuple.size() < 1)
+			break;
 
-			size_t idx = points_out->addPoint(std::stod(csv[0]),std::stod(csv[1]));
-			//double year = std::atof(csv[3].c_str());
+		size_t idx = points_out->addPoint(std::stod(tuple[0]),std::stod(tuple[1]));
+		//double year = std::atof(csv[3].c_str());
 
-			for(int i=2; i < csv.size(); i++){
-				points_out->local_md_string.set(idx, header[i], csv[i]);
-			}
+		for(int i=2; i < tuple.size(); i++)
+			points_out->local_md_string.set(idx, header[i], tuple[i]);
 	}
 	//fprintf(stderr, data.str().c_str());
 	return points_out;

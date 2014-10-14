@@ -341,14 +341,21 @@ Raster<T, dimensions>::Raster(const LocalCRS &localcrs, const DataDescription &d
 
 template<typename T, int dimensions>
 Raster<T, dimensions>::~Raster() {
-	if (data[lcrs.getPixelCount()] != 42) {
-		printf("Error in Raster: guard value was overwritten. Memory corruption!\n");
-		exit(6);
+	if (data) {
+		if (data[lcrs.getPixelCount()] != 42) {
+			printf("Error in Raster: guard value was overwritten. Memory corruption!\n");
+			exit(6);
+		}
+
+		delete [] data;
+		data = nullptr;
 	}
-
-	delete [] data;
-	data = nullptr;
-
+	if (clbuffer) {
+		delete clbuffer;
+		clbuffer = nullptr;
+		delete clbuffer_info;
+		clbuffer_info = nullptr;
+	}
 }
 
 

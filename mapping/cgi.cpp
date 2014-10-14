@@ -241,7 +241,7 @@ std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string open
 	//get the crsID
 	size_t beforeCrsCode = openGisUri.find_last_of("/");
 	size_t behindCrsCode = openGisUri.find_first_of("(", beforeCrsCode);
-	if(behindCrsCode = std::string::npos)
+	if(behindCrsCode == std::string::npos)
 		behindCrsCode = openGisUri.length();
 
 	std::string crsCode = openGisUri.substr(beforeCrsCode+1, behindCrsCode-beforeCrsCode-1);

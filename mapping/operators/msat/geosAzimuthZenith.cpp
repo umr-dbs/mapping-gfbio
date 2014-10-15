@@ -27,6 +27,7 @@ class GeosAzimuthZenith : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
+		std::string azimuthOrZenith;
 };
 
 
@@ -86,11 +87,14 @@ std::unique_ptr<GenericRaster> GeosAzimuthZenith::getRaster(const QueryRectangle
 	std::cerr<<std::endl;
 	*/
 
+	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590×10^-6. The difference is: 1.93384285×10^-9
+	double toViewAngleFac = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874×10^-6
+
 	Profiler::Profiler p("CL_GEOS_AZIMUTHZENITH_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
 
 	//
-	DataDescription out_dd(GDT_Float32, -90, 90); // no no_data //raster->dd.has_no_data, output_no_data);
+	DataDescription out_dd(GDT_Float32, 0.0, 360.0); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
@@ -100,6 +104,7 @@ std::unique_ptr<GenericRaster> GeosAzimuthZenith::getRaster(const QueryRectangle
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_msat_geosAzimuthZenith, "azimuthKernel");
+	prog.addArg(toViewAngleFac);
 	prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
 	prog.addArg(psaIntermediateValues.dRightAscension);
 	prog.addArg(psaIntermediateValues.dDeclination);

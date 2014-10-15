@@ -32,7 +32,7 @@ class MSATSolarAngleOperator : public GenericOperator {
 };
 
 
-#include "operators/msat/solarAngle.cl.h"
+#include "operators/msat/solarangle.cl.h"
 
 
 MSATSolarAngleOperator::MSATSolarAngleOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -45,7 +45,7 @@ MSATSolarAngleOperator::MSATSolarAngleOperator(int sourcecounts[], GenericOperat
 		solarAngle = SolarAngles::ZENITH;
 		else {
 			solarAngle = SolarAngles::AZIMUTH;
-			throw OperatorException(std::string("GeosAzimuthZenith:: Invalid SolarAngle specified: ") + specifiedAngle);
+			throw OperatorException(std::string("MSATSolarAngleOperator:: Invalid SolarAngle specified: ") + specifiedAngle);
 	}
 }
 MSATSolarAngleOperator::~MSATSolarAngleOperator() {
@@ -116,12 +116,12 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	else if(solarAngle == SolarAngles::ZENITH)
 		kernelName = "zenithKernel";
 	else
-		throw OperatorException(std::string("MsatSolarAngle:: Trying to initiate OpenCL kernel for an invalid SolarAngle!"));
+		throw OperatorException(std::string("MSATSolarAngleOperator:: Trying to initiate OpenCL kernel for an invalid SolarAngle!"));
 
 	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
-	prog.compile(operators_msat_solarAngle, kernelName.c_str());
+	prog.compile(operators_msat_solarangle, kernelName.c_str());
 	prog.addArg(toViewAngleFac);
 	prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
 	prog.addArg(psaIntermediateValues.dRightAscension);

@@ -19,6 +19,7 @@
 #include <json/json.h>
 #include <gdal_priv.h>
 
+enum class SolarAngle {AZIMUTH, ZENITH};
 
 class GeosAzimuthZenith : public GenericOperator {
 	public:
@@ -27,16 +28,25 @@ class GeosAzimuthZenith : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
-		std::string azimuthOrZenith;
+		SolarAngle solarAngle;
 };
 
 
 #include "operators/msat/geosAzimuthZenith.cl.h"
 
 
-
 GeosAzimuthZenith::GeosAzimuthZenith(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
+
+	std::string specifiedAngle = params.get("solarangle", "none").asString();
+	if (specifiedAngle == "azimuth")
+		solarAngle = SolarAngle::AZIMUTH;
+	else if (specifiedAngle == "zenith")
+		solarAngle = SolarAngle::ZENITH;
+		else {
+			solarAngle = SolarAngle::AZIMUTH;
+			throw OperatorException(std::string("GeosAzimuthZenith:: Invalid SolarAngle specified: ") + specifiedAngle);
+	}
 }
 GeosAzimuthZenith::~GeosAzimuthZenith() {
 }
@@ -100,10 +110,18 @@ std::unique_ptr<GenericRaster> GeosAzimuthZenith::getRaster(const QueryRectangle
 
 	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
+	std::string kernelName;
+	if(solarAngle == SolarAngle::AZIMUTH)
+		kernelName = "azimuthKernel";
+	else if(solarAngle == SolarAngle::ZENITH)
+		kernelName = "zenithKernel";
+	else
+		throw OperatorException(std::string("GeosAzimuthZenith:: Trying to initiate OpenCL kernel for an invalid SolarAngle!"));
+
 	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
-	prog.compile(operators_msat_geosAzimuthZenith, "azimuthKernel");
+	prog.compile(operators_msat_geosAzimuthZenith, kernelName.c_str());
 	prog.addArg(toViewAngleFac);
 	prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
 	prog.addArg(psaIntermediateValues.dRightAscension);

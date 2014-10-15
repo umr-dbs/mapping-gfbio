@@ -197,7 +197,9 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "expression",
 				"params": {
-					"expression": "value < 300 ? 1 : 0"
+					"expression": "A < 300 ? 1 : 0",
+					"min": 0,
+					"max": 1
 				},
 				"sources": {
 					"raster": [{
@@ -252,7 +254,9 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "expression",
 				"params": {
-					"expression": "1024-value"
+					"expression": "1024-A",
+					"min": 0,
+					"max": 1024
 				},
 				"sources": {
 					"raster": [{
@@ -399,7 +403,9 @@ if ($action == 'examplequerylist.get') {
 					"raster": [{
 						"type": "expression",
 						"params": {
-							"expression": "value < 300 ? 1 : 0"
+							"expression": "A < 300 ? 1 : 0"
+							"min": 0,
+							"max": 1
 						},
 						"sources": {
 							"raster": [{

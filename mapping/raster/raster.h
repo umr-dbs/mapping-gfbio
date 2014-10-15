@@ -52,6 +52,7 @@ class LocalCRS {
 
 
 		bool operator==(const LocalCRS &b) const;
+		bool operator!=(const LocalCRS &b) const { return !(*this == b); }
 		size_t getPixelCount() const;
 		void verify() const;
 
@@ -102,6 +103,7 @@ class DataDescription {
 		void addNoData();
 
 		bool operator==(const DataDescription &b) const;
+		bool operator!=(const DataDescription &b) const { return !(*this == b); }
 		void verify() const;
 
 		void toStream(BinaryStream &stream) const;

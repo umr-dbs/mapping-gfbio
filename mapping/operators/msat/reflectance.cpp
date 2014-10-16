@@ -27,6 +27,7 @@ class MSATReflectanceOperator : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
+		bool solarCorrection{true};
 };
 
 
@@ -123,13 +124,15 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	double dESD = calculateESD(timeDate.tm_yday+1);
 	//std::cerr<<"channel:"<<channel<<"|dETSRconst"<<dETSRconst<<"|dESD:"<<dESD<<std::endl;
 
+	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590×10^-6. The difference is: 1.93384285×10^-9
+	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874×10^-6
 
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
 
 	//
-	DataDescription out_dd(GDT_Float32, -0.1, 4.0); // no no_data //raster->dd.has_no_data, output_no_data);
+	DataDescription out_dd(GDT_Float32, -0.1, 1.2); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
@@ -138,10 +141,16 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
-	prog.compile(operators_msat_reflectance, "reflectancekernel");
-	prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
-	prog.addArg(psaIntermediateValues.dRightAscension);
-	prog.addArg(psaIntermediateValues.dDeclination);
+	if(solarCorrection){
+		prog.compile(operators_msat_reflectance, "reflectanceWithSolarCorrectionKernel");
+		prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
+		prog.addArg(psaIntermediateValues.dRightAscension);
+		prog.addArg(psaIntermediateValues.dDeclination);
+		prog.addArg(projectionCooridnateToViewAngleFactor);
+	}
+	else{
+		prog.compile(operators_msat_reflectance, "reflectanceWithoutSolarCorrectionKernel");
+	}
 	prog.addArg(dETSRconst);
 	prog.addArg(dESD);
 	prog.run();

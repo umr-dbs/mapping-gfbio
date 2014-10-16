@@ -1,18 +1,9 @@
-#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define dEarthMeanRadius     6371.01	// In km
 #define dAstronomicalUnit    149597890	// In km
-#define sub_lon 0.0						// sub satellite point!
 
 
-double2 zeroBasedXritPositionToLatLon(int2 zeroBasedXritPosition){
-	const int clfac = 13642337; //we know this for channel 1-11, TODO: rework for channel 12...
-	const int cloff = 1856;
-	
-	//xrit zerobased to real xrit
-	double2 position = (convert_double2(zeroBasedXritPosition) - cloff) / (pown(2.0, -16) * clfac);
-	
-	//now do msg projection
-	double2 xy = radians(position);
+double2 satelliteViewAngleToLatLon(double2 satelliteViewAngle, double sub_lon){
+	double2 xy = radians(satelliteViewAngle);
 	
 	double2 sinxy = sin(xy);
 	double2 cosxy = cos(xy);
@@ -70,7 +61,7 @@ double2 solarAzimuthZenith(double dGreenwichMeanSiderealTime, double dRightAscen
 	return degrees(azimuthZenith);
 }
 
-__kernel void reflectancekernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double dGreenwichMeanSiderealTime, const double dRightAscension, const double dDeclination, const double dETSRconst, const double dESD) {
+__kernel void reflectanceWithSolarCorrectionKernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double dGreenwichMeanSiderealTime, const double dRightAscension, const double dDeclination, const double projectionCooridnateToViewAngleFactor, const double dETSRconst, const double dESD) {
 	int gid = get_global_id(0);
 	if (gid >= in_info->size[0]*in_info->size[1]*in_info->size[2])
 		return;
@@ -80,19 +71,20 @@ __kernel void reflectancekernel(__global const IN_TYPE0 *in_data, __global const
 		return;
 	}
 	
-	//the position if the origin is the top left pixel -> TODO: at the moment the origin is down right!
-	int2 zeroBasedXritPosition;
-	zeroBasedXritPosition.x = 3711 - ((gid % in_info->size[0]) * in_info->scale[0] + in_info->origin[0]);
-	zeroBasedXritPosition.y = ((gid / in_info->size[0]) * in_info->scale[1] + in_info->origin[1]); 
+	//RasterInfo should provide GEOS coordinates
+	double2 geosPosition;
+	geosPosition.x = ((gid % in_info->size[0]) * in_info->scale[0] + in_info->origin[0]);
+	geosPosition.y = ((gid / in_info->size[0]) * in_info->scale[1] + in_info->origin[1]); 
 	
-	double2 latLonPosition = zeroBasedXritPositionToLatLon(zeroBasedXritPosition);
+	double2 satelliteViewAngle = geosPosition * projectionCooridnateToViewAngleFactor;	
+	double2 latLonPosition = satelliteViewAngleToLatLon(satelliteViewAngle, 0.0);
 	double2 azimuthZenith = solarAzimuthZenith(dGreenwichMeanSiderealTime, dRightAscension, dDeclination, latLonPosition);
 			
 	OUT_TYPE0 result = value * (dESD * dESD) / (dETSRconst * cos(radians(min(azimuthZenith.y, 80.0))));
 	out_data[gid] = result;
 }
 
-__kernel void reflectancekernel2(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double dGreenwichMeanSiderealTime, const double dRightAscension, const double dDeclination, const double dETSRconst, const double dESD) {
+__kernel void reflectanceWithoutSolarCorrectionKernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double dETSRconst, const double dESD) {
 	int gid = get_global_id(0);
 	if (gid >= in_info->size[0]*in_info->size[1]*in_info->size[2])
 		return;

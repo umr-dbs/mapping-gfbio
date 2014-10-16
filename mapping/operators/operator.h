@@ -40,7 +40,7 @@ class QueryRectangle {
 class GenericOperator {
 	public:
 		static const int MAX_INPUT_TYPES = 3;
-		static const int MAX_SOURCES = 5;
+		static const int MAX_SOURCES = 20;
 		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json);
 		static std::unique_ptr<GenericOperator> fromJSON(Json::Value &json);
 

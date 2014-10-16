@@ -572,7 +572,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	Profiler::start("RasterSource::load: sqlite");
 	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM rasters"
-		" WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ?");
+		" WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ? ORDER BY filenr ASC, fileoffset ASC");
 
 	stmt.bind(1, channelid);
 	stmt.bind(2, zoom);

@@ -9,3 +9,4 @@ datasources
 htdocs/cgi-bin/*
 mapping/mapping_manager
 
+/mapping/r_server

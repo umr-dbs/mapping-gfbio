@@ -98,7 +98,7 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	*/
 
 	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590×10^-6. The difference is: 1.93384285×10^-9
-	double toViewAngleFac = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874×10^-6
+	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874×10^-6
 
 	Profiler::Profiler p("CL_MSAT_SOLARANGLE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
@@ -122,7 +122,7 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_msat_solarangle, kernelName.c_str());
-	prog.addArg(toViewAngleFac);
+	prog.addArg(projectionCooridnateToViewAngleFactor);
 	prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
 	prog.addArg(psaIntermediateValues.dRightAscension);
 	prog.addArg(psaIntermediateValues.dDeclination);

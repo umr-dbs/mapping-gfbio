@@ -1,11 +1,10 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 #define dEarthMeanRadius     6371.01	// In km
 #define dAstronomicalUnit    149597890	// In km
-#define sub_lon 0.0						// sub satellite point!
 
 
-double2 transformGeosToLatLon(double2 geosPosition){
-	double2 xy = radians(geosPosition);
+double2 satelliteViewAngleToLatLon(double2 satelliteViewAngle, double sub_lon){
+	double2 xy = radians(satelliteViewAngle);
 	
 	double2 sinxy = sin(xy);
 	double2 cosxy = cos(xy);
@@ -63,7 +62,7 @@ double2 solarAzimuthZenith(double dGreenwichMeanSiderealTime, double dRightAscen
 	return degrees(azimuthZenith);
 }
 
-__kernel void azimuthKernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double dGreenwichMeanSiderealTime, const double dRightAscension, const double dDeclination) {
+__kernel void azimuthKernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double toViewAngleFac, const double dGreenwichMeanSiderealTime, const double dRightAscension, const double dDeclination) {
 	int gid = get_global_id(0);
 	if (gid >= in_info->size[0]*in_info->size[1]*in_info->size[2])
 		return;
@@ -78,14 +77,15 @@ __kernel void azimuthKernel(__global const IN_TYPE0 *in_data, __global const Ras
 	geosPosition.x = ((gid % in_info->size[0]) * in_info->scale[0] + in_info->origin[0]);
 	geosPosition.y = ((gid / in_info->size[0]) * in_info->scale[1] + in_info->origin[1]); 
 	
-	double2 latLonPosition = transformGeosToLatLon(geosPosition);
+	double2 satelliteViewAngle = geosPosition * toViewAngleFac;	
+	double2 latLonPosition = satelliteViewAngleToLatLon(satelliteViewAngle, 0.0);
 	double2 azimuthZenith = solarAzimuthZenith(dGreenwichMeanSiderealTime, dRightAscension, dDeclination, latLonPosition);
 			
-	OUT_TYPE0 result = latLonPosition.x;
+	OUT_TYPE0 result = azimuthZenith.x;
 	out_data[gid] = result;
 }
 
-__kernel void zenithKernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double dGreenwichMeanSiderealTime, const double dRightAscension, const double dDeclination) {
+__kernel void zenithKernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double toViewAngleFac, const double dGreenwichMeanSiderealTime, const double dRightAscension, const double dDeclination) {
 	int gid = get_global_id(0);
 	if (gid >= in_info->size[0]*in_info->size[1]*in_info->size[2])
 		return;
@@ -100,7 +100,8 @@ __kernel void zenithKernel(__global const IN_TYPE0 *in_data, __global const Rast
 	geosPosition.x = ((gid % in_info->size[0]) * in_info->scale[0] + in_info->origin[0]);
 	geosPosition.y = ((gid / in_info->size[0]) * in_info->scale[1] + in_info->origin[1]); 
 	
-	double2 latLonPosition = transformGeosToLatLon(geosPosition);
+	double2 satelliteViewAngle = geosPosition * toViewAngleFac;	
+	double2 latLonPosition = satelliteViewAngleToLatLon(satelliteViewAngle, 0.0);
 	double2 azimuthZenith = solarAzimuthZenith(dGreenwichMeanSiderealTime, dRightAscension, dDeclination, latLonPosition);
 			
 	OUT_TYPE0 result = azimuthZenith.y;

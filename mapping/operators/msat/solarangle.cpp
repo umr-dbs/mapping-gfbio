@@ -19,29 +19,40 @@
 #include <json/json.h>
 #include <gdal_priv.h>
 
+enum class SolarAngles {AZIMUTH, ZENITH};
 
-class GeosAzimuthZenith : public GenericOperator {
+class MSATSolarAngleOperator : public GenericOperator {
 	public:
-		GeosAzimuthZenith(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
-		virtual ~GeosAzimuthZenith();
+		MSATSolarAngleOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
+		virtual ~MSATSolarAngleOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
 	private:
+		SolarAngles solarAngle;
 };
 
 
-#include "operators/msat/geosAzimuthZenith.cl.h"
+#include "operators/msat/solarangle.cl.h"
 
 
-
-GeosAzimuthZenith::GeosAzimuthZenith(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
+MSATSolarAngleOperator::MSATSolarAngleOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
-}
-GeosAzimuthZenith::~GeosAzimuthZenith() {
-}
-REGISTER_OPERATOR(GeosAzimuthZenith, "geosazimuthzenith");
 
-std::unique_ptr<GenericRaster> GeosAzimuthZenith::getRaster(const QueryRectangle &rect) {
+	std::string specifiedAngle = params.get("solarangle", "none").asString();
+	if (specifiedAngle == "azimuth")
+		solarAngle = SolarAngles::AZIMUTH;
+	else if (specifiedAngle == "zenith")
+		solarAngle = SolarAngles::ZENITH;
+		else {
+			solarAngle = SolarAngles::AZIMUTH;
+			throw OperatorException(std::string("MSATSolarAngleOperator:: Invalid SolarAngle specified: ") + specifiedAngle);
+	}
+}
+MSATSolarAngleOperator::~MSATSolarAngleOperator() {
+}
+REGISTER_OPERATOR(MSATSolarAngleOperator, "msatsolarangle");
+
+std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRectangle &rect) {
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect);
 
@@ -86,20 +97,32 @@ std::unique_ptr<GenericRaster> GeosAzimuthZenith::getRaster(const QueryRectangle
 	std::cerr<<std::endl;
 	*/
 
-	Profiler::Profiler p("CL_GEOS_AZIMUTHZENITH_OPERATOR");
+	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590×10^-6. The difference is: 1.93384285×10^-9
+	double toViewAngleFac = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874×10^-6
+
+	Profiler::Profiler p("CL_MSAT_SOLARANGLE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
 
 	//
-	DataDescription out_dd(GDT_Float32, -90, 90); // no no_data //raster->dd.has_no_data, output_no_data);
+	DataDescription out_dd(GDT_Float32, 0.0, 360.0); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
 	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
+	std::string kernelName;
+	if(solarAngle == SolarAngles::AZIMUTH)
+		kernelName = "azimuthKernel";
+	else if(solarAngle == SolarAngles::ZENITH)
+		kernelName = "zenithKernel";
+	else
+		throw OperatorException(std::string("MSATSolarAngleOperator:: Trying to initiate OpenCL kernel for an invalid SolarAngle!"));
+
 	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
-	prog.compile(operators_msat_geosAzimuthZenith, "azimuthKernel");
+	prog.compile(operators_msat_solarangle, kernelName.c_str());
+	prog.addArg(toViewAngleFac);
 	prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
 	prog.addArg(psaIntermediateValues.dRightAscension);
 	prog.addArg(psaIntermediateValues.dDeclination);

@@ -257,6 +257,7 @@ int main()
 		int status;
 		pid_t exited_pid;
 		while ((exited_pid = waitpid(-1, &status, WNOHANG)) > 0) {
+			log("Client %d no longer exists", (int) exited_pid);
 			running_clients.erase(exited_pid);
 		}
 		// Kill all overdue children

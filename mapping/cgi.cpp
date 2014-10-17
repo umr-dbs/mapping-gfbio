@@ -615,7 +615,6 @@ int main() {
 						}
 
 						outputImage(result_raster.get(), flipx, flipy, colorizer, overlay.get());
-						result_raster->toGDAL("/tmp/gdalexporttest12345678.tif","GTiff");
 					}
 				}
 				catch (const std::exception &e) {

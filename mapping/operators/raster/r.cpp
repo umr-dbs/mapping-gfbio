@@ -37,8 +37,18 @@ class ROperator : public GenericOperator {
 		std::string result_type;
 };
 
+
+static void replace_all(std::string &str, const std::string &search, const std::string &replace) {
+    size_t start_pos = 0;
+    while ((start_pos = str.find(search, start_pos)) != std::string::npos) {
+        str.replace(start_pos, search.length(), replace);
+        start_pos += replace.length();
+    }
+};
+
 ROperator::ROperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	source = params["source"].asString();
+	replace_all(source, "\r\n", "\n");
 	result_type = params["result"].asString();
 }
 ROperator::~ROperator() {

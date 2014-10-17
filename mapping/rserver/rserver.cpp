@@ -10,7 +10,6 @@
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
-
 #include <cstdlib>
 #include <stdio.h>
 #include <string.h> // memset()
@@ -26,7 +25,7 @@
 #include <signal.h>
 
 
-const int TIMEOUT_SECONDS = 60;
+const int TIMEOUT_SECONDS = 600;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter" // silence the myriad of warnings in ***REMOVED*** headers
@@ -81,6 +80,31 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 	return raster;
 }
 
+***REMOVED***::NumericVector query_raster_source_as_array(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
+	Profiler::Profiler("requesting Raster");
+	log("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	stream.write((char) RSERVER_TYPE_RASTER);
+	stream.write(childidx);
+	stream.write(rect);
+
+	auto raster = GenericRaster::fromStream(stream);
+	raster->setRepresentation(GenericRaster::Representation::CPU);
+	int width = raster->lcrs.size[0];
+	int height = raster->lcrs.size[1];
+	***REMOVED***::NumericVector pixels(raster->lcrs.getPixelCount());
+	int pos = 0;
+	for (int y=0;y<height;y++) {
+		for (int x=0;x<width;x++) {
+			double val = raster->getAsDouble(x, y);
+			if (raster->dd.is_no_data(val))
+				pixels[pos++] = NAN;
+			else
+				pixels[pos++] = val;
+		}
+	}
+	return pixels;
+}
+
 std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Points");
 	log("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
@@ -115,9 +139,11 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 	QueryRectangle qrect(stream);
 	log("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
 
-	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.rastercount"] = rastersourcecount;
+	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.loadRaster"] = ***REMOVED***::InternalFunction( bound_raster_source );
+	std::function<***REMOVED***::NumericVector(int, const QueryRectangle &)> bound_raster_source_as_array = std::bind(query_raster_source_as_array, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
+	R["mapping.loadRasterAsVector"] = ***REMOVED***::InternalFunction( bound_raster_source_as_array );
 
 	std::function<std::unique_ptr<PointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.pointscount"] = pointssourcecount;
@@ -126,7 +152,22 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 	R["mapping.qrect"] = qrect;
 
 	Profiler::start("running R script");
-	auto result = R.parseEval(source);
+
+	std::string delimiter = "\n\n";
+	size_t start = 0;
+	size_t end = 0;
+	while (true) {
+		end = source.find(delimiter, start);
+		if (end == std::string::npos)
+			break;
+	    std::string line = source.substr(start, end-start);
+	    start = end+delimiter.length();
+	    log("src: %s", line.c_str());
+	    R.parseEval(line);
+	}
+	std::string lastline = source.substr(start);
+	log("src: %s", lastline.c_str());
+	auto result = R.parseEval(lastline);
 	Profiler::stop("running R script");
 
 	if (type == RSERVER_TYPE_RASTER) {
@@ -144,16 +185,41 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 }
 
 
+void signal_handler(int signum) {
+	log("Caught signal %d, exiting", signum);
+	exit(signum);
+}
+
+
 int main()
 {
+	// Signal handlers
+	int signals[] = {SIGHUP, SIGINT, 0};
+	for (int i=0;signals[i];i++) {
+		if (signal(signals[i], signal_handler) == SIG_ERR) {
+			perror("Cannot install signal handler");
+			exit(1);
+		}
+		else
+			printf("Signal handler for %d installed\n", signals[i]);
+	}
+	signal(SIGPIPE, SIG_IGN);
+
 	// Initialize R environment
 	***REMOVED***Callbacks *Rcallbacks = new ***REMOVED***Callbacks();
+	printf("...loading R\n");
 	***REMOVED*** R;
+	R.setVerbose(true);
 	R.set_callbacks( Rcallbacks );
+
+	printf("...loading packages\n");
+
 	R.parseEvalQ("library(\"raster\")");
+	R.parseEvalQ("library(\"caret\")");
+	R.parseEvalQ("library(\"randomForest\")");
 	Rcallbacks->resetConsoleOutput();
 
-	printf("R is initialized and ready\n");
+	printf("R is ready\n");
 
 
 	// get rid of leftover sockets

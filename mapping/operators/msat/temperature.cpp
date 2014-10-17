@@ -62,23 +62,25 @@ float RadianceTable::getRadianceFromTemp(float temp) {
 #include "operators/msat/temperature_tables.h"
 
 static RadianceTable *getRadianceTable(int channel) {
-	if (channel == 4)
+	if (channel == 3)
 		return &radiancetable_4;
-	if (channel == 5)
+	if (channel == 4)
 		return &radiancetable_5;
-	if (channel == 6)
+	if (channel == 5)
 		return &radiancetable_6;
-	if (channel == 7)
+	if (channel == 6)
 		return &radiancetable_7;
-	if (channel == 8)
+	if (channel == 7)
 		return &radiancetable_8;
-	if (channel == 9)
+	if (channel == 8)
 		return &radiancetable_9;
-	if (channel == 10)
+	if (channel == 9)
 		return &radiancetable_10;
-	if (channel == 11)
+	if (channel == 10)
 		return &radiancetable_11;
-	throw ArgumentException("getRadianceTable: invalid channel number");
+	std::stringstream msg;
+	msg << "getRadianceTable: invalid channel number "<<channel<<" (only 3 - 10 are allowed)";
+	throw ArgumentException(msg.str());
 }
 
 /*

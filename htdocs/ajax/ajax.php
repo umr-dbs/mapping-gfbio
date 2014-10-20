@@ -148,7 +148,7 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "source",
 				"params": {
-					"sourcepath": "datasources/msat2.json",
+					"sourcename": "msat2",
 					"channel": 6,
 					"transform": false
 				}
@@ -171,7 +171,7 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "source",
 				"params": {
-					"sourcepath": "datasources/msat2.json",
+					"sourcename": "msat2",
 					"channel": 6,
 					"transform": false
 				}
@@ -205,7 +205,7 @@ if ($action == 'examplequerylist.get') {
 					"raster": [{
 						"type": "source",
 						"params": {
-							"sourcepath": "datasources/msat2.json",
+							"sourcename": "msat2",
 							"channel": 6
 						}
 					}]
@@ -262,7 +262,7 @@ if ($action == 'examplequerylist.get') {
 					"raster": [{
 						"type": "source",
 						"params": {
-							"sourcepath": "datasources/msat2.json",
+							"sourcename": "msat2",
 							"channel": 0
 						}
 					}]
@@ -295,7 +295,7 @@ if ($action == 'examplequerylist.get') {
 					"raster": [{
 						"type": "source",
 						"params": {
-							"sourcepath": "datasources/msat2.json",
+							"sourcename": "msat2",
 							"channel": 0
 						}
 					}]
@@ -328,7 +328,7 @@ if ($action == 'examplequerylist.get') {
 					"raster": [{
 						"type": "source",
 						"params": {
-							"sourcepath": "datasources/msat2.json",
+							"sourcename": "msat2",
 							"channel": 0
 						}
 					}]
@@ -403,7 +403,7 @@ if ($action == 'examplequerylist.get') {
 					"raster": [{
 						"type": "expression",
 						"params": {
-							"expression": "A < 300 ? 1 : 0"
+							"expression": "A < 300 ? 1 : 0",
 							"min": 0,
 							"max": 1
 						},
@@ -411,7 +411,7 @@ if ($action == 'examplequerylist.get') {
 							"raster": [{
 								"type": "source",
 								"params": {
-									"sourcepath": "datasources/msat2.json",
+									"sourcename": "msat2",
 									"channel": 6
 								}
 							}]
@@ -479,7 +479,7 @@ if ($action == 'examplequerylist.get') {
 			                        {
 			                            "type": "source",
 			                            "params": {
-			                                "sourcepath": "datasources/worldclim.json",
+			                                "sourcename": "worldclim",
 			                                "channel": 2
 			                            }
 			                        }
@@ -491,7 +491,7 @@ if ($action == 'examplequerylist.get') {
 			            {
 			                "type": "source",
 			                "params": {
-			                    "sourcepath": "datasources/worldclim.json",
+			                    "sourcename": "worldclim",
 			                    "channel": 4
 			                }
 			            }

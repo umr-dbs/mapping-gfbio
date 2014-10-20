@@ -28,7 +28,7 @@ class SourceOperator : public GenericOperator {
 // RasterSource Operator
 SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rastersource(nullptr) {
 	assumeSources(0);
-	std::string filename = params.get("sourcepath", "").asString();
+	std::string filename = std::string("datasources/") + params.get("sourcename", "").asString() + std::string(".json");
 	rastersource = RasterSourceManager::open(filename.c_str());
 	channel = params.get("channel", 0).asInt();
 	transform = params.get("transform", true).asBool();

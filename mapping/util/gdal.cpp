@@ -7,7 +7,6 @@
 #include <cstdlib>
 #include <mutex>
 #include <sstream>
-//#include <cmath>
 
 #include <gdal_priv.h>
 #include <gdal_alg.h>
@@ -19,18 +18,13 @@
 namespace GDAL {
 
 
-static std::mutex gdal_init_mutex;
-static bool gdal_is_initialized = false;
+static std::once_flag gdal_init_once;
 
 void init() {
-	if (gdal_is_initialized)
-		return;
-	std::lock_guard<std::mutex> guard(gdal_init_mutex);
-	if (gdal_is_initialized)
-		return;
-	gdal_is_initialized = true;
-	GDALAllRegister();
-	//GetGDALDriverManager()->AutoLoadDrivers();
+	std::call_once(gdal_init_once, []{
+		GDALAllRegister();
+		//GetGDALDriverManager()->AutoLoadDrivers();
+	});
 }
 
 
@@ -47,7 +41,7 @@ std::string SRSFromEPSG(epsg_t epsg) {
 		hSRS = OSRNewSpatialReference( NULL );
 		bool success = false;
 
-		if((epsg == EPSG_GEOSMSG)){
+		if(epsg == EPSG_GEOSMSG) {
 			//MSG handling
 			success = (OSRSetGEOS(hSRS, 0, 35785831, 0, 0) == OGRERR_NONE); //this is valid for meteosat: lon, height, easting, northing (gdal notation)!
 			success = (OSRSetWellKnownGeogCS(hSRS, "WGS84" ) == OGRERR_NONE);

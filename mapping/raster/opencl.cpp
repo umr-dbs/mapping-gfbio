@@ -12,13 +12,13 @@
 #include <sstream>
 //#include <memory>
 #include <mutex>
+#include <atomic>
 //#include <string>
 
 namespace RasterOpenCL {
 
-
 static std::mutex opencl_mutex;
-static int initialization_status = 0; // 0: not initialized, 1: success, 2: failure
+static std::atomic<int> initialization_status(0); // 0: not initialized, 1: success, 2: failure
 
 
 static cl::Platform platform;
@@ -36,7 +36,8 @@ void init() {
 		Profiler::Profiler p("CL_INIT");
 		std::lock_guard<std::mutex> guard(opencl_mutex);
 		if (initialization_status == 0) {
-			// ok, let's initialize everything
+			// ok, let's initialize everything. Default to "failure".
+			initialization_status = 2;
 
 			// Platform
 			std::vector<cl::Platform> platformList;
@@ -62,7 +63,7 @@ void init() {
 					cprops
 				);
 			}
-			catch (cl::Error e) {
+			catch (const cl::Error &e) {
 				printf("Error %d: %s\n", e.err(), e.what());
 
 				throw;

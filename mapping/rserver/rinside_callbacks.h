@@ -7,7 +7,7 @@ class ***REMOVED***Callbacks : public Callbacks {
 		};
 
 		virtual void WriteConsole( const std::string& line, int /*type*/ ) {
-			output_buffer << line << std::endl;
+			output_buffer << line;
 		};
 
 		virtual void FlushConsole() {

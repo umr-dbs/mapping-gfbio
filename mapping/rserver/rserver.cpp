@@ -209,14 +209,19 @@ int main()
 	***REMOVED***Callbacks *Rcallbacks = new ***REMOVED***Callbacks();
 	printf("...loading R\n");
 	***REMOVED*** R;
-	R.setVerbose(true);
 	R.set_callbacks( Rcallbacks );
 
 	printf("...loading packages\n");
 
-	R.parseEvalQ("library(\"raster\")");
-	R.parseEvalQ("library(\"caret\")");
-	R.parseEvalQ("library(\"randomForest\")");
+	try {
+		R.parseEvalQ("library(\"raster\")");
+		R.parseEvalQ("library(\"caret\")");
+		R.parseEvalQ("library(\"randomForest\")");
+	}
+	catch (const std::exception &e) {
+		printf("error loading packages: %s\nR's output:\n%s", e.what(), Rcallbacks->getConsoleOutput().c_str());
+		exit(5);
+	}
 	Rcallbacks->resetConsoleOutput();
 
 	printf("R is ready\n");

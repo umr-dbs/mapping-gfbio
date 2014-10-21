@@ -7,6 +7,7 @@ namespace cloudclass{
 /* The following constants are used by the SOFOS cloud classification.
  * Re-implementation is based on the available articles (e.g. http://www.sciencedirect.com/science/article/pii/S0098300408000691#),
  * the source code of FMET (http://sourceforge.net/projects/fmet/) and personal communication with Jörg Bendix, Thomas Nauß and Boris Thies.
+ * TODO: use enum class with type in AMP++?
  */
 static const uint16_t rangeSurface			= 3;	//0000 0000 0000 0011 - this is the range of bits indicating surface of cloud
 static const uint16_t isSurface				= 0;	//0000 0000 0000 0000 - no cloud

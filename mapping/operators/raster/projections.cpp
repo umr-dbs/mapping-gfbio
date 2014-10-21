@@ -94,19 +94,23 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 	double src_x1, src_y1, src_x2, src_y2;
 	int src_xres = rect.xres, src_yres = rect.yres;
 
-	if (dest_epsg == EPSG_METEOSAT2) {
+	const double MSG_MAX_LAT = 79.0;  // north/south
+	const double MSG_MAX_LONG = 76.0; // east/west
+
+	if (dest_epsg == EPSG_METEOSAT2 || dest_epsg == EPSG_GEOSMSG) {
 		// We're loading some points and would like to display them in the msg projection. Why? Well, why not?
 		if (src_epsg == EPSG_WEBMERCATOR) {
+			// TODO: this is the whole world. A smaller rectangle would do, we just need to figure out the coordinates.
 			src_x1 = -20037508.34;
 			src_y1 = -20037508.34;
 			src_x2 = 20037508.34;
 			src_y2 = 20037508.34;
 		}
 		else if (src_epsg == EPSG_LATLON) {
-			src_x1 = -180;
-			src_y1 = -90;
-			src_x2 = 180;
-			src_y2 = 90;
+			src_x1 = -MSG_MAX_LONG;
+			src_y1 = -MSG_MAX_LAT;
+			src_x2 = MSG_MAX_LONG;
+			src_y2 = MSG_MAX_LAT;
 		}
 		else
 			throw OperatorException("Cannot transform to METEOSAT2 projection from this projection");
@@ -126,9 +130,6 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 		 * We're loading a msg raster. Since a rectangle in latlon or mercator does not map to
 		 * an exact rectangle in MSG, we need to use some heuristics
 		 */
-		const double MSG_MAX_LAT = 79.0;  // north/south
-		const double MSG_MAX_LONG = 76.0; // east/west
-
 		double tlx = rect.x1, tly = rect.y1, brx = rect.x2, bry = rect.y2;
 
 		if (dest_epsg != EPSG_LATLON) {

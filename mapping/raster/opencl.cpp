@@ -370,6 +370,18 @@ void CLProgram::compileFromFile(const char *filename, const char *kernelname) {
 }
 
 void CLProgram::run() {
+	try {
+		cl::Event event = CLProgram::run(nullptr);
+		event.wait();
+	}
+	catch (cl::Error &e) {
+		std::stringstream ss;
+		ss << "CL Error: " << e.err() << ": " << e.what();
+		throw OpenCLException(ss.str());
+	}
+}
+
+cl::Event CLProgram::run(std::vector<cl::Event>* events_to_wait_for) {
 	if (!kernel)
 		throw OpenCLException("Cannot run() before compile()");
 
@@ -380,16 +392,17 @@ void CLProgram::run() {
 		throw OpenCLException("Cannot run() a CLProgram twice (TODO: lift this restriction? Use case?)");
 
 	finished = true;
+	cl::Event event;
+
 	try {
-		cl::Event event;
 		RasterOpenCL::getQueue()->enqueueNDRangeKernel(*kernel,
 			cl::NullRange, // Offset
 			cl::NDRange(out_rasters[0]->lcrs.getPixelCount()), // Global
 			cl::NullRange, // local
-			nullptr, //events to wait for
+			events_to_wait_for, //events to wait for
 			&event //event to create
 		);
-		event.wait();
+		return event;
 	}
 	catch (cl::Error &e) {
 		std::stringstream ss;

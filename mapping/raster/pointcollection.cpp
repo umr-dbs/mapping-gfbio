@@ -24,7 +24,7 @@ void Point::toStream(BinaryStream &stream) {
 
 
 
-PointCollection::PointCollection(epsg_t epsg) : epsg(epsg) {
+PointCollection::PointCollection(epsg_t epsg) : epsg(epsg), has_time(false) {
 
 }
 PointCollection::~PointCollection() {
@@ -77,11 +77,22 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool>
 				vec_out.push_back(vec_in[idx]);
 		}
 	}
+	// copy time array
+	out->has_time = false;
+	out->timestamps.clear();
+	if (has_time) {
+		out->has_time = true;
+		out->timestamps.reserve(kept_count);
+		for (size_t idx=0;idx<count;idx++) {
+			if (keep[idx])
+				out->timestamps.push_back(timestamps[idx]);
+		}
+	}
 
 	return out;
 }
 
-PointCollection::PointCollection(BinaryStream &stream) : epsg(EPSG_UNKNOWN) {
+PointCollection::PointCollection(BinaryStream &stream) : epsg(EPSG_UNKNOWN), has_time(false) {
 	stream.read(&epsg);
 	size_t count;
 	stream.read(&count);
@@ -95,6 +106,7 @@ PointCollection::PointCollection(BinaryStream &stream) : epsg(EPSG_UNKNOWN) {
 	for (size_t i=0;i<count;i++) {
 		collection.push_back( Point(stream) );
 	}
+	// TODO: serialize/unserialize time array
 }
 
 void PointCollection::toStream(BinaryStream &stream) {
@@ -110,6 +122,7 @@ void PointCollection::toStream(BinaryStream &stream) {
 	for (size_t i=0;i<count;i++) {
 		collection[i].toStream(stream);
 	}
+	// TODO: serialize/unserialize time array
 }
 
 
@@ -226,22 +239,27 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) {
 	std::ostringstream json;
 	json << std::fixed; // std::setprecision(4);
 
-	if(displayMetadata && (local_md_value.size() > 0 || local_md_string.size() > 0)) {
+	if(displayMetadata && (local_md_value.size() > 0 || local_md_string.size() > 0 || has_time)) {
 
 		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << epsg <<"\"}},\"features\":[";
 
 		size_t idx = 0;
+		auto value_keys = local_md_value.getKeys();
+		auto string_keys = local_md_string.getKeys();
 		for (const Point &p : collection) {
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]},\"properties\":{";
 
-			for (auto key : local_md_string.getKeys()) {
+			for (auto &key : string_keys) {
 				json << "\"" << key << "\":\"" << local_md_string.get(idx, key) << "\",";
 			}
 
-			//p.dump_md_values();
-			for (auto key : local_md_value.getKeys()) {
+			for (auto &key : value_keys) {
 				double value = local_md_value.get(idx, key);
 				json << "\"" << key << "\":" << value << ",";
+			}
+
+			if (has_time) {
+				json << "\"time\":" << timestamps[idx] << ",";
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
@@ -278,22 +296,36 @@ std::string PointCollection::toCSV() {
 	std::ostringstream csv;
 	csv << std::fixed; // std::setprecision(4);
 
+	auto string_keys = local_md_string.getKeys();
+	auto value_keys = local_md_value.getKeys();
 
 	//header
 	csv << "lon" << "," << "lat";
-	for(std::string key : local_md_string.getKeys()) {
-		csv << "," << key;
+	if (has_time)
+		csv << ",\"time\"";
+	for(auto &key : string_keys) {
+		csv << ",\"" << key << "\"";
+	}
+	for(auto &key : value_keys) {
+		csv << ",\"" << key << "\"";
 	}
 	csv << std::endl;
 
 	size_t idx = 0;
 	for (const auto &p : collection) {
+		fprintf(stderr, "points\n");
 		csv << p.x << "," << p.y;
 
-		for(std::string key : local_md_string.getKeys()) {
-				csv << "," << local_md_string.get(idx, key);
-		}
+		if (has_time)
+			csv << "," << timestamps[idx];
 
+
+		for(auto &key : string_keys) {
+			csv << ",\"" << local_md_string.get(idx, key) << "\"";
+		}
+		for(auto &key : value_keys) {
+			csv << "," << local_md_value.get(idx, key);
+		}
 		csv << std::endl;
 		idx++;
 	}

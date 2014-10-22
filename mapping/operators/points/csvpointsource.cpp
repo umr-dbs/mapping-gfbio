@@ -56,7 +56,7 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 
 	// Try to find the headers with geo-coordinates
 	size_t no_pos = std::numeric_limits<size_t>::max();
-	size_t pos_x = no_pos, pos_y = no_pos;
+	size_t pos_x = no_pos, pos_y = no_pos, pos_t = no_pos;
 	for (size_t i=0; i < headers.size(); i++) {
 		std::string lc = headers[i];
 		std::transform(lc.begin(), lc.end(), lc.begin(), ::tolower);
@@ -65,17 +65,28 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 			pos_x = i;
 		if (lc == "y" || lc == "lat" || lc == "latitude")
 			pos_y = i;
+		if (lc == "time" || lc == "date" || lc == "datet")
+			pos_t = i;
 	}
 
 	if (pos_x == no_pos || pos_y == no_pos)
 		throw OperatorException("No georeferenced columns found in CSV. Name them \"x\" and \"y\", \"lat\" and \"lon\" or \"latitude\" and \"longitude\"");
 
+	if (pos_t != no_pos) {
+		points_out->has_time = true;
+	}
+
 	//TODO: distinguish between double and string properties
 	for (size_t i=0; i < headers.size(); i++) {
-		if (i == pos_x || i == pos_y)
+		if (i == pos_x || i == pos_y || i == pos_t)
 			continue;
 		points_out->local_md_string.addVector(headers[i]);
 	}
+
+	auto minx = rect.minx();
+	auto maxx = rect.maxx();
+	auto miny = rect.miny();
+	auto maxy = rect.maxy();
 
 	while (true) {
 		auto tuple = parser.readTuple();
@@ -90,13 +101,25 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 		catch (const std::exception &e) {
 			throw OperatorException("Coordinate value in CSV is not a number");
 		}
+		if (x < minx || x > maxx || y < miny || y > maxy)
+			continue;
 
 		size_t idx = points_out->addPoint(x, y);
 
 		for (size_t i=0; i < tuple.size(); i++) {
-			if (i == pos_x || i == pos_y)
+			if (i == pos_x || i == pos_y || i == pos_t)
 				continue;
 			points_out->local_md_string.set(idx, headers[i], tuple[i]);
+		}
+		if (pos_t != no_pos) {
+			const auto &str = tuple[pos_t];
+			std::tm tm;
+			// 13-Jul-2010  17:35
+			time_t t = 0;
+			if (strptime(str.c_str(), "%d-%B-%Y  %H:%M", &tm)) {
+				t = mktime(&tm);
+			}
+			points_out->timestamps.push_back(t);
 		}
 	}
 	//fprintf(stderr, data.str().c_str());

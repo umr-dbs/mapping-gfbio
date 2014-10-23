@@ -77,7 +77,7 @@ __kernel void azimuthKernel(__global const IN_TYPE0 *in_data, __global const Ras
 	geosPosition.x = ((gid % in_info->size[0]) * in_info->scale[0] + in_info->origin[0]);
 	geosPosition.y = ((gid / in_info->size[0]) * in_info->scale[1] + in_info->origin[1]); 
 	
-	double2 satelliteViewAngle = geosPosition * toViewAngleFac;	
+	double2 satelliteViewAngle = geosPosition * toViewAngleFac * (double2)(-1,1);	
 	double2 latLonPosition = satelliteViewAngleToLatLon(satelliteViewAngle, 0.0);
 	double2 azimuthZenith = solarAzimuthZenith(dGreenwichMeanSiderealTime, dRightAscension, dDeclination, latLonPosition);
 			
@@ -100,7 +100,7 @@ __kernel void zenithKernel(__global const IN_TYPE0 *in_data, __global const Rast
 	geosPosition.x = ((gid % in_info->size[0]) * in_info->scale[0] + in_info->origin[0]);
 	geosPosition.y = ((gid / in_info->size[0]) * in_info->scale[1] + in_info->origin[1]); 
 	
-	double2 satelliteViewAngle = geosPosition * toViewAngleFac;	
+	double2 satelliteViewAngle = geosPosition * toViewAngleFac * (double2)(-1,1);	
 	double2 latLonPosition = satelliteViewAngleToLatLon(satelliteViewAngle, 0.0);
 	double2 azimuthZenith = solarAzimuthZenith(dGreenwichMeanSiderealTime, dRightAscension, dDeclination, latLonPosition);
 			

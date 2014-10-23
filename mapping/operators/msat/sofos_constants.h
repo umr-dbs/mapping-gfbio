@@ -11,13 +11,13 @@ namespace cloudclass{
  */
 static const uint16_t is_no_data			= 0;
 
-static const uint16_t is_surface			= 1 << 0;						//0000 0000 0000 0001 - no cloud
+static const uint16_t is_surface			= 1;						//0000 0000 0000 0001 - no cloud
 static const uint16_t is_snow 				= 1 << 1;						//0000 0000 0000 0010 - snow covered surface -> no cloud
 static const uint16_t is_cloud 				= 1 << 2;						//0000 0000 0000 0100 - cloud
 static const uint16_t range_surface			= is_surface | is_cloud | is_snow;	//0000 0000 0000 0111 - this is the range of bits indicating surface of cloud
 
-static const uint16_t is_day 				= 1 << 3;						//0000 0000 0000 1000 - day -> no day = night
-static const uint16_t is_twilight 			= 1 << 4;						//0000 0000 0001 0000 - twilight TODO: define what is twilight... (IIRC the threshold for SZEN is 60°)
+static const uint16_t is_day 				= 1 << 4;						//0000 0000 0000 1000 - day -> no day = night
+static const uint16_t is_twilight 			= 1 << 3;						//0000 0000 0001 0000 - twilight TODO: define what is twilight... (IIRC the threshold for SZEN is 60°)
 static const uint16_t range_illumination	= is_day | is_twilight;			//0000 0000 0001 1000 - this is the range indicating the illumination condition
 
 static const uint16_t is_cirrus				= 1 << 5;						//0000 0000 0010 0000 - Cirrcus cloud

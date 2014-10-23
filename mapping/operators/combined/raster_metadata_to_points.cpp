@@ -64,6 +64,12 @@ struct PointDataEnhancement {
 
 std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRectangle &rect) {
 	auto points = getPointsFromSource(0, rect);
+
+	if (points->has_time) {
+		// TODO: sort by time, iterate over all timestamps, fetch the correct raster, then add metadata
+		throw OperatorException("raster_metadata_to_points: Cannot yet handle PointCollections with timestamps");
+	}
+
 	auto raster = getRasterFromSource(0, rect);
 
 	Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");

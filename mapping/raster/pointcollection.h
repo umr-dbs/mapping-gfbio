@@ -62,6 +62,9 @@ class PointCollection {
 		std::string toGeoJSON(bool displayMetadata = false);
 		std::string toCSV();
 
+		std::vector<time_t> timestamps;
+		bool has_time;
+
 		// global MetaData (one value per PointCollection)
 		DirectMetadata<std::string> global_md_string;
 		DirectMetadata<double> global_md_value;

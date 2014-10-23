@@ -424,12 +424,17 @@ int main() {
 			Profiler::print();
 			printf("\r\n");
 #endif
-			if(params.count("format") > 0){
-				if(params["format"] == "csv"){
-					outputPointCollectionCSV(points.get());
-				}
-			} else {
-				outputPointCollection(points.get());
+			std::string format("geojson");
+			if(params.count("format") > 0)
+				format = params["format"];
+			if (format == "csv") {
+				outputPointCollectionCSV(points.get());
+			}
+			else if (format == "geojsonfull") {
+				outputPointCollection(points.get(), true);
+			}
+			else {
+				outputPointCollection(points.get(), false);
 			}
 			return 0;
 		}

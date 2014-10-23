@@ -371,7 +371,7 @@ void CLProgram::compileFromFile(const char *filename, const char *kernelname) {
 
 void CLProgram::run() {
 	try {
-		cl::Event event = CLProgram::run(nullptr);
+		cl::Event event = run(nullptr);
 		event.wait();
 	}
 	catch (cl::Error &e) {

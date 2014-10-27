@@ -49,6 +49,19 @@ DATASET_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061200
 DATASET_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061200-C_
 DATASET_HRV=data/xrit2/H-000-MSG2__-MSG2________-HRV______-000001___-201006061200-C_
 
+DATASET2_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061800-C_
+DATASET2_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061800-C_
+DATASET2_C2=data/xrit2/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061800-C_
+DATASET2_C3=data/xrit2/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061800-C_
+DATASET2_C4=data/xrit2/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061800-C_
+DATASET2_C5=data/xrit2/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061800-C_
+DATASET2_C6=data/xrit2/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061800-C_
+DATASET2_C7=data/xrit2/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061800-C_
+DATASET2_C8=data/xrit2/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061800-C_
+DATASET2_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061800-C_
+DATASET2_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061800-C_
+DATASET2_HRV=data/xrit2/H-000-MSG2__-MSG2________-HRV______-000001___-201006061800-C_
+
 .SECONDARY: $(CL_HEADERS)
 
 .DELETE_ON_ERROR:
@@ -112,22 +125,8 @@ ${EXECGI}:	${OBJ_EXECGI}
 ${EXERSERVER}:	${OBJ_RSERVER}
 	${CPP} ${LDFLAGS} ${LDFLAGS_R} $+ -o $@
 
-msat2datasource:	${EXE}
-	rm -f datasources/msat2.dat datasources/msat2.db
-	#./${EXE} createsource 62866 ${DATASET_C0} ${DATASET_C1} ${DATASET_C2} ${DATASET_C3} ${DATASET_C4} ${DATASET_C5} ${DATASET_C6} ${DATASET_C7} ${DATASET_C8} ${DATASET_C9} ${DATASET_C10} >datasources/msat2.json
-	./${EXE} import datasources/msat2.json ${DATASET_C0} 1 0 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C1} 1 1 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C2} 1 2 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C3} 1 3 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C4} 1 4 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C5} 1 5 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C6} 1 6 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C7} 1 7 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C8} 1 8 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C9} 1 9 42 RAW
-	./${EXE} import datasources/msat2.json ${DATASET_C10} 1 10 42 RAW
 	
-msg9_geosdatasource:	${EXE}
+msg9_datasource:	${EXE}
 	rm -f datasources/msg9_geos.dat datasources/msg9_geos.db
 	#./${EXE} createsource 62866 ${DATASET_C0} ${DATASET_C1} ${DATASET_C2} ${DATASET_C3} ${DATASET_C4} ${DATASET_C5} ${DATASET_C6} ${DATASET_C7} ${DATASET_C8} ${DATASET_C9} ${DATASET_C10} >datasources/msat2.json
 	./${EXE} import datasources/msg9_geos.json ${DATASET_C0} 1 0 42 RAW
@@ -141,10 +140,22 @@ msg9_geosdatasource:	${EXE}
 	./${EXE} import datasources/msg9_geos.json ${DATASET_C8} 1 8 42 RAW
 	./${EXE} import datasources/msg9_geos.json ${DATASET_C9} 1 9 42 RAW
 	./${EXE} import datasources/msg9_geos.json ${DATASET_C10} 1 10 42 RAW
-	
-msg9_geos_hrvdatasource:	${EXE}
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C0} 1 0 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C1} 1 1 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C2} 1 2 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C3} 1 3 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C4} 1 4 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C5} 1 5 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C6} 1 6 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C7} 1 7 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C8} 1 8 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C9} 1 9 43 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C10} 1 10 43 RAW
+
+msg9_hrvdatasource:	${EXE}
 	rm -f datasources/msg9_geos_hrv.dat datasources/msg9_geos_hrv.db
 	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET_HRV} 1 0 42 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET2_HRV} 1 0 43 RAW
 
 worldclimdatasource:	${EXE}
 	rm -f datasources/worldclim*.dat datasources/worldclim*.db

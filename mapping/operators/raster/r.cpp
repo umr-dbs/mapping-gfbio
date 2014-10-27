@@ -86,6 +86,13 @@ void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char
 			}
 		}
 		else {
+			if (type == -RSERVER_TYPE_ERROR) {
+				std::string err;
+				stream.read(&err);
+				std::stringstream msg;
+				msg << "R exception: " << err;
+				throw OperatorException(msg.str());
+			}
 			if (type != -requested_type)
 				throw OperatorException("R: wrong data type returned by server");
 			return; // the caller will read the result object from the stream

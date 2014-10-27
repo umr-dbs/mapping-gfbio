@@ -8,6 +8,8 @@ const char RSERVER_TYPE_RASTER = 1;
 const char RSERVER_TYPE_POINTS = 2;
 const char RSERVER_TYPE_STRING = 3;
 const char RSERVER_TYPE_PLOT = 4;
+const char RSERVER_TYPE_ERROR = 99;
+
 
 /*
  * The Socket protocol is as follows:

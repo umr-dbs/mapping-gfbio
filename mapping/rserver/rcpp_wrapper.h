@@ -130,7 +130,7 @@ namespace ***REMOVED*** {
 		Profiler::Profiler p("***REMOVED***: unwrapping raster");
 		***REMOVED***::S4 rasterlayer(sexp);
 		if (!rasterlayer.is("RasterLayer"))
-			throw OperatorException("R: Result is not a RasterLayer");
+			throw OperatorException("Result is not a RasterLayer");
 
 		int width = rasterlayer.slot("ncols");
 		int height = rasterlayer.slot("nrows");
@@ -141,7 +141,7 @@ namespace ***REMOVED*** {
 		if (epsg_string.compare(0,5,"EPSG:") == 0)
 			epsg = std::stoi(epsg_string.substr(5, std::string::npos));
 		if (epsg == EPSG_UNKNOWN)
-			throw OperatorException("R: result raster has no projection of form EPSG:1234 set");
+			throw OperatorException("Result raster has no projection of form EPSG:1234 set");
 
 		***REMOVED***::S4 extent = rasterlayer.slot("extent");
 		double xmin = extent.slot("xmin"), ymin = extent.slot("ymin"), xmax = extent.slot("xmax"), ymax = extent.slot("ymax");
@@ -150,9 +150,9 @@ namespace ***REMOVED*** {
 
 		***REMOVED***::S4 data = rasterlayer.slot("data");
 		if ((bool) data.slot("inmemory") != true)
-			throw OperatorException("R: result raster not inmemory");
+			throw OperatorException("Result raster not inmemory");
 		if ((bool) data.slot("haveminmax") != true)
-			throw OperatorException("R: result raster does not have min/max");
+			throw OperatorException("Result raster does not have min/max");
 
 		double min = data.slot("min");
 		double max = data.slot("max");
@@ -247,17 +247,17 @@ namespace ***REMOVED*** {
 		Profiler::Profiler p("***REMOVED***: unwrapping pointcollection");
 		***REMOVED***::S4 SPDF(sexp);
 		if (!SPDF.is("SpatialPointsDataFrame"))
-			throw OperatorException("R: Result is not a SpatialPointsDataFrame");
+			throw OperatorException("Result is not a SpatialPointsDataFrame");
 
 		bool nrs = ***REMOVED***::as<bool>(SPDF.slot("coords.nrs"));
 		if (nrs != true)
-			throw OperatorException("R: Result has nrs = false, cannot convert");
+			throw OperatorException("Result has nrs = false, cannot convert");
 
 		***REMOVED***::S4 crs = SPDF.slot("proj4string");
 		std::string epsg_s = crs.slot("projargs");
 
 		if (epsg_s.compare(0,5,"EPSG:") != 0)
-			throw OperatorException("R: Result has an unknown epsg");
+			throw OperatorException("Result has an unknown epsg");
 		epsg_t epsg = std::stoi(epsg_s.substr(5, std::string::npos));
 
 		auto points = std::make_unique<PointCollection>(epsg);

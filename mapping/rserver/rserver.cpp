@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <string.h> // memset()
 #include <map>
+#include <atomic>
 
 #include <time.h>
 
@@ -68,13 +69,18 @@ int cmpTimespec(const struct timespec &t1, const struct timespec &t2) {
 }
 
 
+// Set to true while you're sending. If an exception happens when not sending, an error message can be returned
+std::atomic<bool> is_sending(false);
+
 
 std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
 	LOG("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	is_sending = true;
 	stream.write((char) RSERVER_TYPE_RASTER);
 	stream.write(childidx);
 	stream.write(rect);
+	is_sending = false;
 
 	auto raster = GenericRaster::fromStream(stream);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
@@ -84,9 +90,11 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 ***REMOVED***::NumericVector query_raster_source_as_array(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
 	LOG("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	is_sending = true;
 	stream.write((char) RSERVER_TYPE_RASTER);
 	stream.write(childidx);
 	stream.write(rect);
+	is_sending = false;
 
 	auto raster = GenericRaster::fromStream(stream);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
@@ -109,9 +117,11 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Points");
 	LOG("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	is_sending = true;
 	stream.write((char) RSERVER_TYPE_POINTS);
 	stream.write(childidx);
 	stream.write(rect);
+	is_sending = false;
 
 	auto points = std::make_unique<PointCollection>(stream);
 	return points;
@@ -153,41 +163,62 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 	R["mapping.qrect"] = qrect;
 
 	Profiler::start("running R script");
+	try {
+		std::string delimiter = "\n\n";
+		size_t start = 0;
+		size_t end = 0;
+		while (true) {
+			end = source.find(delimiter, start);
+			if (end == std::string::npos)
+				break;
+			std::string line = source.substr(start, end-start);
+			start = end+delimiter.length();
+			LOG("src: %s", line.c_str());
+			R.parseEval(line);
+		}
+		std::string lastline = source.substr(start);
+		LOG("src: %s", lastline.c_str());
+		auto result = R.parseEval(lastline);
+		Profiler::stop("running R script");
 
-	std::string delimiter = "\n\n";
-	size_t start = 0;
-	size_t end = 0;
-	while (true) {
-		end = source.find(delimiter, start);
-		if (end == std::string::npos)
-			break;
-	    std::string line = source.substr(start, end-start);
-	    start = end+delimiter.length();
-	    LOG("src: %s", line.c_str());
-	    R.parseEval(line);
+		if (type == RSERVER_TYPE_RASTER) {
+			auto raster = ***REMOVED***::as<std::unique_ptr<GenericRaster>>(result);
+			is_sending = true;
+			stream.write((char) -RSERVER_TYPE_RASTER);
+			stream.write(*raster);
+		}
+		else if (type == RSERVER_TYPE_POINTS) {
+			auto points = ***REMOVED***::as<std::unique_ptr<PointCollection>>(result);
+			is_sending = true;
+			stream.write((char) -RSERVER_TYPE_POINTS);
+			stream.write(*points);
+		}
+		else if (type == RSERVER_TYPE_STRING) {
+			std::string output = Rcallbacks.getConsoleOutput();
+			is_sending = true;
+			stream.write((char) -RSERVER_TYPE_STRING);
+			stream.write(output);
+		}
+		else
+			throw PlatformException("Unknown result type requested");
 	}
-	std::string lastline = source.substr(start);
-	LOG("src: %s", lastline.c_str());
-	auto result = R.parseEval(lastline);
-	Profiler::stop("running R script");
+	catch (const NetworkException &e) {
+		// don't do anything
+		throw;
+	}
+	catch (const std::exception &e) {
+		// We're already in the middle of sending something to the client. We cannot send more data in the middle of a packet.
+		if (is_sending)
+			throw;
 
-	if (type == RSERVER_TYPE_RASTER) {
-		auto raster = ***REMOVED***::as<std::unique_ptr<GenericRaster>>(result);
-		stream.write((char) -RSERVER_TYPE_RASTER);
-		stream.write(*raster);
+		auto what = e.what();
+		LOG("Exception: %s", what);
+		std::string msg(what);
+		stream.write((char) -RSERVER_TYPE_ERROR);
+		stream.write(msg);
+		return;
 	}
-	else if (type == RSERVER_TYPE_POINTS) {
-		auto points = ***REMOVED***::as<std::unique_ptr<PointCollection>>(result);
-		stream.write((char) -RSERVER_TYPE_POINTS);
-		stream.write(*points);
-	}
-	else if (type == RSERVER_TYPE_STRING) {
-		std::string output = Rcallbacks.getConsoleOutput();
-		stream.write((char) -RSERVER_TYPE_STRING);
-		stream.write(output);
-	}
-	else
-		throw PlatformException("Unknown result type requested");
+
 }
 
 

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <json/json.h>
 #include <algorithm>
+#include <vector>
 
 class RasterMetaDataToPoints: public GenericOperator {
 	public:
@@ -18,13 +19,22 @@ class RasterMetaDataToPoints: public GenericOperator {
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
 
 	private:
-		std::string name;
+		std::vector<std::string> names;
 };
 
 RasterMetaDataToPoints::RasterMetaDataToPoints(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
-	assumeSources(2);
+//	assumeSources(2);
 
-	name = params.get("name", "raster").asString();
+	names.clear();
+	auto arr = params["names"];
+	if (!arr.isArray())
+		throw OperatorException("raster_metadata_to_points: names parameter invalid");
+
+	int len = (int) arr.size();
+	names.reserve(len);
+	for (int i=0;i<len;i++) {
+		names.push_back( arr[i].asString() );
+	}
 }
 
 RasterMetaDataToPoints::~RasterMetaDataToPoints() {
@@ -33,18 +43,16 @@ REGISTER_OPERATOR(RasterMetaDataToPoints, "raster_metadata_to_points");
 
 template<typename T>
 struct PointDataEnhancement {
-	static void execute(Raster2D<T>* raster, PointCollection *points, std::string name) {
+	static void execute(Raster2D<T>* raster, PointCollection *points, const std::string &name) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
-		T max = (T) raster->dd.max;
-		T min = (T) raster->dd.min;
+		//T max = (T) raster->dd.max;
+		//T min = (T) raster->dd.min;
 
 		// add global metadata
 		// TODO: resolve what to do on key-collision
-		points->setGlobalMDValue(name + "_max", max);
-		points->setGlobalMDValue(name + "_min", min);
-		points->setGlobalMDValue(name + "_no_data", raster->dd.no_data);
-		points->setGlobalMDValue(name + "_has_no_data", raster->dd.has_no_data); // bool -> 0/1
+		//points->setGlobalMDValue(name + "_max", max);
+		//points->setGlobalMDValue(name + "_min", min);
 
 		// init local metadata
 		auto &md_vec = points->local_md_value.addVector(name);
@@ -53,9 +61,11 @@ struct PointDataEnhancement {
 			size_t rasterCoordinateX = floor(raster->lcrs.WorldToPixelX(point.x));
 			size_t rasterCoordinateY = floor(raster->lcrs.WorldToPixelY(point.y));
 
-			double md = raster->dd.no_data;
+			double md = std::numeric_limits<double>::quiet_NaN();
 			if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->lcrs.size[0] && rasterCoordinateY < raster->lcrs.size[1]) {
-				md = (double) raster->get(rasterCoordinateX, rasterCoordinateY);
+				T value = raster->get(rasterCoordinateX, rasterCoordinateY);
+				if (!raster->dd.is_no_data(value))
+					md = (double) value;
 			}
 			md_vec.push_back(md);
 		}
@@ -63,6 +73,8 @@ struct PointDataEnhancement {
 };
 
 std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRectangle &rect) {
+	Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
+
 	auto points = getPointsFromSource(0, rect);
 
 	if (points->has_time) {
@@ -70,9 +82,10 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRe
 		throw OperatorException("raster_metadata_to_points: Cannot yet handle PointCollections with timestamps");
 	}
 
-	auto raster = getRasterFromSource(0, rect);
-
-	Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
-	callUnaryOperatorFunc<PointDataEnhancement>(raster.get(), points.get(), name);
+	auto rasters = getRasterSourceCount();
+	for (int r=0;r<rasters;r++) {
+		auto raster = getRasterFromSource(r, rect);
+		callUnaryOperatorFunc<PointDataEnhancement>(raster.get(), points.get(), names.at(r));
+	}
 	return points;
 }

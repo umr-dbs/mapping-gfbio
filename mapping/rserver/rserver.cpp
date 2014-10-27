@@ -25,6 +25,9 @@
 #include <signal.h>
 
 
+#define LOG(...) {fprintf(stderr, "%d: ", getpid());fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");}
+
+
 const int TIMEOUT_SECONDS = 600;
 
 #pragma clang diagnostic push
@@ -44,17 +47,13 @@ const int TIMEOUT_SECONDS = 600;
 
 #pragma clang diagnostic pop // ignored "-Wunused-parameter"
 
+
+***REMOVED***::Function *attributes = nullptr;
 #include "rserver/***REMOVED***_wrapper.h" // definitions
 
 
 #include "rserver/***REMOVED***_callbacks.h"
 
-template<typename... Args>
-void log(const char *str, Args&&... args) {
-	fprintf(stderr, "%d: ", getpid());
-	fprintf(stderr, str, args...);
-	fprintf(stderr, "\n");
-}
 
 int cmpTimespec(const struct timespec &t1, const struct timespec &t2) {
 	if (t1.tv_sec < t2.tv_sec)
@@ -68,9 +67,11 @@ int cmpTimespec(const struct timespec &t1, const struct timespec &t2) {
 	return 0;
 }
 
+
+
 std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
-	log("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	LOG("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	stream.write((char) RSERVER_TYPE_RASTER);
 	stream.write(childidx);
 	stream.write(rect);
@@ -82,7 +83,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 
 ***REMOVED***::NumericVector query_raster_source_as_array(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
-	log("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	LOG("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	stream.write((char) RSERVER_TYPE_RASTER);
 	stream.write(childidx);
 	stream.write(rect);
@@ -107,7 +108,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 
 std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Points");
-	log("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	LOG("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	stream.write((char) RSERVER_TYPE_POINTS);
 	stream.write(childidx);
 	stream.write(rect);
@@ -128,16 +129,16 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 		throw PlatformException("Client sent the wrong magic number");
 	char type;
 	stream.read(&type);
-	log("Requested type: %d", type);
+	LOG("Requested type: %d", type);
 	std::string source;
 	stream.read(&source);
 	//printf("Requested source: %s\n", source.c_str());
 	int rastersourcecount, pointssourcecount;
 	stream.read(&rastersourcecount);
 	stream.read(&pointssourcecount);
-	log("Requested counts: %d %d", rastersourcecount, pointssourcecount);
+	LOG("Requested counts: %d %d", rastersourcecount, pointssourcecount);
 	QueryRectangle qrect(stream);
-	log("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
+	LOG("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
 
 	R["mapping.rastercount"] = rastersourcecount;
 	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
@@ -162,11 +163,11 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			break;
 	    std::string line = source.substr(start, end-start);
 	    start = end+delimiter.length();
-	    log("src: %s", line.c_str());
+	    LOG("src: %s", line.c_str());
 	    R.parseEval(line);
 	}
 	std::string lastline = source.substr(start);
-	log("src: %s", lastline.c_str());
+	LOG("src: %s", lastline.c_str());
 	auto result = R.parseEval(lastline);
 	Profiler::stop("running R script");
 
@@ -174,6 +175,11 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 		auto raster = ***REMOVED***::as<std::unique_ptr<GenericRaster>>(result);
 		stream.write((char) -RSERVER_TYPE_RASTER);
 		stream.write(*raster);
+	}
+	else if (type == RSERVER_TYPE_POINTS) {
+		auto points = ***REMOVED***::as<std::unique_ptr<PointCollection>>(result);
+		stream.write((char) -RSERVER_TYPE_POINTS);
+		stream.write(*points);
 	}
 	else if (type == RSERVER_TYPE_STRING) {
 		std::string output = Rcallbacks.getConsoleOutput();
@@ -186,7 +192,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 
 
 void signal_handler(int signum) {
-	log("Caught signal %d, exiting", signum);
+	LOG("Caught signal %d, exiting", signum);
 	exit(signum);
 }
 
@@ -224,8 +230,11 @@ int main()
 	}
 	Rcallbacks->resetConsoleOutput();
 
-	printf("R is ready\n");
+	printf("Capturing functions..\n");
+	***REMOVED***::Function _attributes("attributes");
+	attributes = &_attributes;
 
+	printf("R is ready\n");
 
 	// get rid of leftover sockets
 	unlink(rserver_socket_address);
@@ -262,7 +271,7 @@ int main()
 		int status;
 		pid_t exited_pid;
 		while ((exited_pid = waitpid(-1, &status, WNOHANG)) > 0) {
-			log("Client %d no longer exists", (int) exited_pid);
+			LOG("Client %d no longer exists", (int) exited_pid);
 			running_clients.erase(exited_pid);
 		}
 		// Kill all overdue children
@@ -273,7 +282,7 @@ int main()
 			auto timeout_t = it->second;
 			if (cmpTimespec(timeout_t, current_t) < 0) {
 				auto timeouted_pid = it->first;
-				log("Client %d gets killed due to timeout", (int) timeouted_pid);
+				LOG("Client %d gets killed due to timeout", (int) timeouted_pid);
 
 				if (kill(timeouted_pid, SIGHUP) < 0) { // TODO: SIGKILL?
 					perror("kill() failed");
@@ -322,7 +331,7 @@ int main()
 			// This is the client
 			// TODO: drop privileges!
 			close(listen_fd);
-			log("Client starting");
+			LOG("Client starting");
 			auto start_c = clock();
 			struct timespec start_t;
 			clock_gettime(CLOCK_MONOTONIC, &start_t);
@@ -330,7 +339,7 @@ int main()
 				client(client_fd, R, *Rcallbacks);
 			}
 			catch (const std::exception &e) {
-				log("Exception: %s", e.what());
+				LOG("Exception: %s", e.what());
 			}
 			auto end_c = clock();
 			struct timespec end_t;
@@ -339,10 +348,10 @@ int main()
 			double c = (double) (end_c - start_c) / CLOCKS_PER_SEC;
 			double t = (double) (end_t.tv_sec - start_t.tv_sec) + (double) (end_t.tv_nsec - start_t.tv_nsec) / 1000000000;
 
-			log("Client finished, %.3fs real, %.3fs CPU", t, c);
+			LOG("Client finished, %.3fs real, %.3fs CPU", t, c);
 			auto p = Profiler::get();
 			for (auto &s : p) {
-				log("%s", s.c_str());
+				LOG("%s", s.c_str());
 			}
 
 			exit(0);

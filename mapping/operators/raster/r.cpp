@@ -110,8 +110,11 @@ std::unique_ptr<PointCollection> ROperator::getPoints(const QueryRectangle &rect
 	if (result_type != "points")
 		throw OperatorException("This R script does not return a point collection");
 
-	throw OperatorException("TODO");
-	//return runScript(rect);
+	UnixSocket socket(rserver_socket_address);
+	runScript(socket, rect, RSERVER_TYPE_POINTS);
+
+	auto points = std::make_unique<PointCollection>(socket);
+	return points;
 }
 
 std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect) {

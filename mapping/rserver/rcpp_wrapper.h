@@ -15,7 +15,7 @@ namespace ***REMOVED*** {
 	// PointCollection
 	template<> SEXP wrap(const PointCollection &points);
 	template<> SEXP wrap(const std::unique_ptr<PointCollection> &points);
-	//template<> std::unique_ptr<PointCollection> as(SEXP sexp); // TODO
+	template<> std::unique_ptr<PointCollection> as(SEXP sexp);
 
 }
 
@@ -194,8 +194,8 @@ namespace ***REMOVED*** {
 		auto size = points.collection.size();
 
 		***REMOVED***::DataFrame data;
-		auto keys = points.local_md_value.getKeys();
-		for(auto key : keys) {
+		auto numeric_keys = points.local_md_value.getKeys();
+		for(auto key : numeric_keys) {
 			***REMOVED***::NumericVector vec(size);
 			for (decltype(size) i=0;i<size;i++) {
 				double value = points.local_md_value.get(i, key);
@@ -204,12 +204,25 @@ namespace ***REMOVED*** {
 			data[key] = vec;
 		}
 
+		auto string_keys = points.local_md_string.getKeys();
+		for(auto key : string_keys) {
+			***REMOVED***::StringVector vec(size);
+			for (decltype(size) i=0;i<size;i++) {
+				auto &value = points.local_md_string.get(i, key);
+				vec[i] = value;
+			}
+			data[key] = vec;
+		}
+
+
 		***REMOVED***::NumericMatrix coords(size, 2);
 		for (decltype(size) i=0;i<size;i++) {
 			const Point &p = points.collection[i];
 			coords(i, 0) = p.x;
 			coords(i, 1) = p.y;
 		}
+
+		// TODO: convert time vector
 
 		***REMOVED***::NumericMatrix bbox(2,2); // TODO ?
 
@@ -230,8 +243,61 @@ namespace ***REMOVED*** {
 	template<> SEXP wrap(const std::unique_ptr<PointCollection> &points) {
 		return ***REMOVED***::wrap(*points);
 	}
-	//template<> std::unique_ptr<PointCollection> as(SEXP sexp) {
-	//}
+	template<> std::unique_ptr<PointCollection> as(SEXP sexp) {
+		Profiler::Profiler p("***REMOVED***: unwrapping pointcollection");
+		***REMOVED***::S4 SPDF(sexp);
+		if (!SPDF.is("SpatialPointsDataFrame"))
+			throw OperatorException("R: Result is not a SpatialPointsDataFrame");
+
+		bool nrs = ***REMOVED***::as<bool>(SPDF.slot("coords.nrs"));
+		if (nrs != true)
+			throw OperatorException("R: Result has nrs = false, cannot convert");
+
+		***REMOVED***::S4 crs = SPDF.slot("proj4string");
+		std::string epsg_s = crs.slot("projargs");
+
+		if (epsg_s.compare(0,5,"EPSG:") != 0)
+			throw OperatorException("R: Result has an unknown epsg");
+		epsg_t epsg = std::stoi(epsg_s.substr(5, std::string::npos));
+
+		auto points = std::make_unique<PointCollection>(epsg);
+
+		***REMOVED***::NumericMatrix coords = ***REMOVED***::as<***REMOVED***::NumericMatrix>(SPDF.slot("coords"));
+
+		size_t size = coords.nrow();
+		points->collection.reserve(size);
+		for (size_t i=0;i<size;i++) {
+			double x = coords(i, 0);
+			double y = coords(i, 1);
+			points->addPoint(x, y);
+		}
+
+		***REMOVED***::DataFrame data = ***REMOVED***::as<***REMOVED***::DataFrame>(SPDF.slot("data"));
+		***REMOVED***::List attrs = (*attributes)(data);
+		***REMOVED***::StringVector a = attrs["names"];
+		auto len = a.length();
+		for (int i=0;i<len;i++) {
+			std::string attr = ***REMOVED***::as<std::string>(a[i]);
+			try {
+				***REMOVED***::NumericVector rvec = data[attr];
+				auto vec = points->local_md_value.addVector(attr, size);
+				for (size_t i=0;i<size;i++)
+					vec[i] = rvec[i];
+			}
+			catch (const ***REMOVED***::not_compatible &e) {
+				***REMOVED***::StringVector rvec = data[attr];
+				auto vec = points->local_md_string.addVector(attr, size);
+				for (size_t i=0;i<size;i++)
+					vec[i] = rvec[i];
+			}
+
+			LOG("Attribute %d: %s", i, attr.c_str());
+		}
+
+		// TODO: convert time vector
+
+		return points;
+	}
 
 }
 

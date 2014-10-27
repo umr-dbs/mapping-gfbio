@@ -57,6 +57,7 @@ namespace RasterOpenCL {
 				kernel->setArg(argpos++, buffer);
 			}
 			void run();
+			cl::Event run(std::vector<cl::Event>* events_to_wait_for);
 			void reset();
 		private:
 			cl::Kernel *kernel;

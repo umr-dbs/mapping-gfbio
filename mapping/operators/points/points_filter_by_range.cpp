@@ -37,14 +37,11 @@ std::unique_ptr<PointCollection> PointsFilterByRangeOperator::getPoints(const Qu
 	size_t count = points->collection.size();
 	std::vector<bool> keep(count, false);
 
-	double raster_no_data = points->global_md_value.get(name + "_no_data");
-	bool raster_has_no_data = points->global_md_value.get(name + "_has_no_data");
-
 	for (size_t idx=0;idx<count;idx++) {
 		double value = points->local_md_value.get(idx, name);
 		bool copy = false;
 
-		if ((raster_has_no_data && value == raster_no_data) || std::isnan(value)) {
+		if (std::isnan(value)) {
 			copy = includeNoData;
 		}
 		else {

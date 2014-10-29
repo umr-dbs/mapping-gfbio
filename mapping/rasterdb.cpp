@@ -195,39 +195,56 @@ static int testquery(int argc, char *argv[]) {
 	}
 	char *in_filename = argv[2];
 
-	/*
-	 * Step #1: open the query.json file and parse it
-	 */
-	std::ifstream file(in_filename);
-	if (!file.is_open()) {
-		printf("unable to open query file %s\n", in_filename);
-		return 5;
+	try {
+		/*
+		 * Step #1: open the query.json file and parse it
+		 */
+		std::ifstream file(in_filename);
+		if (!file.is_open()) {
+			printf("unable to open query file %s\n", in_filename);
+			return 5;
+		}
+
+		Json::Reader reader(Json::Features::strictMode());
+		Json::Value root;
+		if (!reader.parse(file, root)) {
+			printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
+			return 5;
+		}
+
+		double x1 = root.get("query_x1", -20037508).asDouble();
+		double y1 = root.get("query_y1", -20037508).asDouble();
+		double x2 = root.get("query_x2", 20037508).asDouble();
+		double y2 = root.get("query_y2", 20037508).asDouble();
+		int xres = root.get("query_xres", 1000).asInt();
+		int yres = root.get("query_yres", 1000).asInt();
+
+		auto graph = GenericOperator::fromJSON(root["query"]);
+		int timestamp = root.get("starttime", 0).asInt();
+		auto raster = graph->getCachedRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, EPSG_WEBMERCATOR));
+
+		std::string real_hash = raster->hash();
+
+		if (root.isMember("query_expected_hash")) {
+			std::string expected_hash = root.get("query_expected_hash", "#").asString();
+			printf("Expected: %s\nResult  : %s\n", expected_hash.c_str(), real_hash.c_str());
+
+			if (expected_hash != real_hash) {
+				printf("MISMATCH!!!\n");
+				return 5;
+			}
+		}
+		else {
+			root["query_expected_hash"] = real_hash;
+			std::ofstream file(in_filename);
+			file << root;
+			file.close();
+			printf("No hash in query file, added %s\n", real_hash.c_str());
+			return 5;
+		}
 	}
-
-	Json::Reader reader(Json::Features::strictMode());
-	Json::Value root;
-	if (!reader.parse(file, root)) {
-		printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
-		return 5;
-	}
-
-	std::string expected_hash = root.get("query_expected_hash", "(no hash given)").asString();
-	double x1 = root.get("query_x1", -20037508).asDouble();
-	double y1 = root.get("query_y1", -20037508).asDouble();
-	double x2 = root.get("query_x2", 20037508).asDouble();
-	double y2 = root.get("query_y2", 20037508).asDouble();
-	int xres = root.get("query_xres", 1000).asInt();
-	int yres = root.get("query_yres", 1000).asInt();
-
-	auto graph = GenericOperator::fromJSON(root["query"]);
-	int timestamp = root.get("starttime", 0).asInt();
-	auto raster = graph->getCachedRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, EPSG_WEBMERCATOR));
-
-	std::string real_hash = raster->hash();
-	printf("Expected: %s\nResult  : %s\n", expected_hash.c_str(), real_hash.c_str());
-
-	if (expected_hash != real_hash) {
-		printf("MISMATCH!!!\n");
+	catch (const std::exception &e) {
+		printf("Exception: %s\n", e.what());
 		return 5;
 	}
 	return 0;

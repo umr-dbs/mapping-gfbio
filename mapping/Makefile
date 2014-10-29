@@ -62,7 +62,17 @@ DATASET2_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-20100606180
 DATASET2_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061800-C_
 DATASET2_HRV=data/xrit2/H-000-MSG2__-MSG2________-HRV______-000001___-201006061800-C_
 
+
+VALGRIND=valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --suppressions=test/valgrind_suppression.supp --error-exitcode=2
+TEST_MODE=run
+
+TEST_QUERIES:=$(wildcard test/queries/*.json)
+TEST_LOGS:=$(TEST_QUERIES:.json=.log)
+
+
 .SECONDARY: $(CL_HEADERS)
+
+.PHONY: test clean testenvironment testcases
 
 .DELETE_ON_ERROR:
 
@@ -188,8 +198,26 @@ srtmdatasource:	${EXE}
 	rm -f datasources/srtm.dat datasources/srtm.db
 	./${EXE} import datasources/srtm.json data/srtm/srtm_all_index.out 1 0 42 GZIP
 
-test: ${EXE}
-	valgrind --error-exitcode=4 ./${EXE} testquery queries/msat0.json
+
+test:
+	${MAKE} testenvironment
+	${MAKE} testcases
+	php test/parse_logs.php >test/logs/tests_$$(date '+%Y-%m-%d_%H-%m').log
+	echo "Testcases done";
+	
+testcases: ${EXE} ${TEST_LOGS}
+	echo "All logs written"
+
+testenvironment: ${EXE}
+	rm -f test/data/world1.dat test/data/world1.db
+	#./${EXE} createsource 4326 test/data/world1.tif  >test/data/test_world1.json
+	./${EXE} import test/data/world1.json test/data/world1.tif 1 0 42 RAW
+
+test/queries/%.log: test/queries/%.json ${EXE} test/data/world1.dat 
+	echo -n >$@
+	if EXELOG=$$(./${EXE} testquery $< 2>&1) ; then echo "hash_passed: yes" >>$@ ; else echo "hash_passed: no\n$$EXELOG" >>$@ ; fi
+	if VGLOG=$$(${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
+
 
 webinstall:
 	php htdocs/get_css.php > htdocs/compiled/compiled.release.css

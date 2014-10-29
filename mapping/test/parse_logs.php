@@ -12,7 +12,7 @@ echo <<<EOS
 	function toggle(id) {
 		var e = document.getElementsByClassName('collapse_'+id);
 		for (var i=0;i<e.length;i++)
-			e[i].style.display = e[i].style.display == 'none' ? 'block' : 'none';
+			e[i].style.display = e[i].style.display == 'none' ? '' : 'none';
 	}
 	</script>
 	<body>
@@ -59,7 +59,11 @@ foreach ($logs as $file) {
 	}
 
 	$all_passed = true;
-	echo '<tr onclick="toggle('.$collapse_id.');"><td>'.$file.'</td>';
+	foreach($expected_results as $name) {
+		if (!$passed[$name])
+			$all_passed = false;
+	}
+	echo '<tr'.($all_passed ? '' : ' onclick="toggle('.$collapse_id.');" style="cursor: pointer;"').'><td>'.$file.'</td>';
 	foreach($expected_results as $name) {
 		echo '<td style="background-color: ' . ($passed[$name] ? 'green' : 'red') . '">'.$name.'</td>';
 	}

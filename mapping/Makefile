@@ -203,6 +203,7 @@ test:
 	${MAKE} testenvironment
 	${MAKE} testcases
 	php test/parse_logs.php >test/logs/tests_$$(date '+%Y-%m-%d_%H-%m').log
+	rm -f ${TEST_LOGS}
 	echo "Testcases done";
 	
 testcases: ${EXE} ${TEST_LOGS}

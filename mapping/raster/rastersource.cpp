@@ -730,8 +730,11 @@ RasterSource *RasterSourceManager::open(const char *filename, bool writeable)
 
 	// To make sure each source is only accessed by a single path, resolve all symlinks
 	char filename_clean[PATH_MAX];
-	if (realpath(filename, filename_clean) == nullptr)
-		throw new SourceException("realpath() failed");
+	if (realpath(filename, filename_clean) == nullptr) {
+		std::stringstream msg;
+		msg << "realpath(\"" << filename << "\") failed";
+		throw SourceException(msg.str());
+	}
 
 	std::string path(filename_clean);
 

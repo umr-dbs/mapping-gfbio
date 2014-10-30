@@ -1,0 +1,4 @@
+# Just print whatever you like and it will be returned
+print("Hello world");
+a <- 1:5;
+print(a);

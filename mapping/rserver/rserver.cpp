@@ -11,10 +11,12 @@
 #include "util/make_unique.h"
 
 #include <cstdlib>
-#include <stdio.h>
+#include <cstdio>
 #include <string.h> // memset()
 #include <map>
 #include <atomic>
+#include <iostream>
+#include <fstream>
 
 #include <time.h>
 
@@ -128,6 +130,20 @@ std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int c
 }
 
 
+static std::string read_file_as_string(const std::string &filename) {
+	std::ifstream in(filename, std::ios::in | std::ios::binary);
+	if (in) {
+		std::string contents;
+		in.seekg(0, std::ios::end);
+		contents.resize(in.tellg());
+		in.seekg(0, std::ios::beg);
+		in.read(&contents[0], contents.size());
+		in.close();
+		return contents;
+	}
+	throw PlatformException("Could not read plot file");
+}
+
 
 void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 	UnixSocket socket(sock_fd, sock_fd);
@@ -149,6 +165,11 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 	LOG("Requested counts: %d %d", rastersourcecount, pointssourcecount);
 	QueryRectangle qrect(stream);
 	LOG("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
+
+	if (type == RSERVER_TYPE_PLOT) {
+		R.parseEval("rserver_plot_tempfile = tempfile(\"rs_plot\", fileext=\".png\")");
+		R.parseEval("png(rserver_plot_tempfile)");
+	}
 
 	R["mapping.rastercount"] = rastersourcecount;
 	std::function<std::unique_ptr<GenericRaster>(int, const QueryRectangle &)> bound_raster_source = std::bind(query_raster_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
@@ -197,6 +218,15 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			std::string output = Rcallbacks.getConsoleOutput();
 			is_sending = true;
 			stream.write((char) -RSERVER_TYPE_STRING);
+			stream.write(output);
+		}
+		else if (type == RSERVER_TYPE_PLOT) {
+			R.parseEval("dev.off()");
+			std::string filename = ***REMOVED***::as<std::string>(R["rserver_plot_tempfile"]);
+			std::string output = read_file_as_string(filename);
+			std::remove(filename.c_str());
+			is_sending = true;
+			stream.write((char) -RSERVER_TYPE_PLOT);
 			stream.write(output);
 		}
 		else

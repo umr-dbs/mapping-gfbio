@@ -1,6 +1,7 @@
 #include "raster/raster.h"
 #include "raster/pointcollection.h"
 #include "plot/text.h"
+#include "plot/png.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
@@ -125,15 +126,20 @@ std::unique_ptr<PointCollection> ROperator::getPoints(const QueryRectangle &rect
 }
 
 std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect) {
-	if (result_type != "text")
+	bool wants_text = (result_type == "text");
+	bool wants_plot = (result_type == "plot");
+	if (!wants_text && !wants_plot)
 		throw OperatorException("This R script does not return a plot");
 
 	UnixSocket socket(rserver_socket_address);
-	runScript(socket, rect, RSERVER_TYPE_STRING);
+	runScript(socket, rect, wants_text ? RSERVER_TYPE_STRING : RSERVER_TYPE_PLOT);
 
 	std::string result;
 	((BinaryStream &) socket).read(&result);
-	return std::unique_ptr<GenericPlot>(new TextPlot(result));
+	if (wants_text)
+		return std::unique_ptr<GenericPlot>(new TextPlot(result));
+	else
+		return std::unique_ptr<GenericPlot>(new PNGPlot(result));
 }
 
 

@@ -6,8 +6,9 @@ class ***REMOVED***Callbacks : public Callbacks {
 			return "";
 		};
 
-		virtual void WriteConsole( const std::string& line, int /*type*/ ) {
+		virtual void WriteConsole( const std::string& line, int type ) {
 			output_buffer << line;
+			printf("Got buffer of type %d: '%s'\n", type, line.c_str());
 		};
 
 		virtual void FlushConsole() {
@@ -22,8 +23,8 @@ class ***REMOVED***Callbacks : public Callbacks {
 		virtual void Busy( bool /*is_busy*/ ) {
 		};
 
-		virtual void ShowMessage(const char* /*message*/) {
-
+		virtual void ShowMessage(const char* message) {
+			printf("Got Message: '%s'\n", message);
 		};
 
 		virtual void Suicide(const char* message) {

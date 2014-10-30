@@ -168,7 +168,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 
 	if (type == RSERVER_TYPE_PLOT) {
 		R.parseEval("rserver_plot_tempfile = tempfile(\"rs_plot\", fileext=\".png\")");
-		R.parseEval("png(rserver_plot_tempfile)");
+		R.parseEval("png(rserver_plot_tempfile, width=1000, height=1000, bg=\"transparent\")");
 	}
 
 	R["mapping.rastercount"] = rastersourcecount;

@@ -255,7 +255,15 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) {
 
 			for (auto &key : value_keys) {
 				double value = local_md_value.get(idx, key);
-				json << "\"" << key << "\":" << value << ",";
+				json << "\"" << key << "\":";
+				if (std::isfinite(value)) {
+					json << value;
+				}
+				else {
+					json << "null";
+				}
+
+				json << ",";
 			}
 
 			if (has_time) {

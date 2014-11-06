@@ -11,7 +11,7 @@ class DB {
 
 		// dbname = 'idessa' user = 'idessa' password = 'idessa'
 		// pgsql:host=localhost;port=5432;dbname=testdb;user=bruce;password=mypass
-		self::$db = new PDO('pgsql:host=localhost;dbname=webusers', 'webusers', 'idessa');
+		self::$db = new PDO('pgsql:host=***REMOVED***;dbname=webusers', 'webusers', 'idessa');
 		self::$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 		self::$db->setAttribute(PDO::ATTR_EMULATE_PREPARES, true);
 		self::$db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_OBJ); // TODO: check FETCH_CLASS!

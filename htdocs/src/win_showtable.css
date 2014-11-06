@@ -1,0 +1,18 @@
+.showtable_table {
+	border-collapse: collapse;
+	width:80%;
+	margin-left:10%;
+	margin-top: 5%;
+}
+
+.showtable_table table,th,td {
+	border: 1px solid #e6e6e6;
+}
+
+.showtable_table tr:first-child{
+	background-color : #C6C6C6;
+}
+
+.showtable_table tr:nth-child(even) {
+    background-color: #e6e6e6;
+}

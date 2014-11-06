@@ -54,7 +54,7 @@ std::vector<std::string> CSVParser::parseLine() {
 				}
 				break;
 			case State::FIELD_INSIDE_QUOTED:
-				if (c == field_separator)
+				if (c == line_separator)
 					throw OperatorException("CSV invalid: quoted field not terminated by quote"); // TODO: is that correct, or do we keep the separator as a literal?
 				if (c == quote) {
 					fields.push_back(line.substr(field_start, i-field_start));

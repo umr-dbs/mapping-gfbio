@@ -19,6 +19,26 @@ class Histogram : public GenericPlot {
 
 		static const int DEFAULT_NUMBER_OF_BUCKETS = 10000;
 
+		int getCountForBucket(int bucket){
+			return counts.at(bucket);
+		}
+		int getNoDataCount(){
+			return nodata_count;
+		}
+		double getMin(){
+			return min;
+		}
+		double getMax(){
+			return max;
+		}
+		int getNumberOfBuckets(){
+			return counts.size();
+		}
+		/**
+		 * calculates the bucket where a value would be inserted
+		 */
+		int calculateBucketForValue(double value);
+
 	private:
 		std::vector<int> counts;
 		int nodata_count;

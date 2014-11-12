@@ -38,39 +38,29 @@ REGISTER_OPERATOR(PointsMetadataToGraph, "points_metadata_to_graph");
 
 template<std::size_t size>
 auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::unique_ptr<GenericPlot> {
-	auto xygraph = std::make_unique<XYGraph<size>>();
+	auto xyGraph = std::make_unique<XYGraph<size>>();
 
-	std::vector<bool> hasNoData;
-	std::vector<double> noDataValue;
-
-	for (std::string& name : names) {
-		hasNoData.push_back(points.global_md_value.get(name + "_has_no_data"));
-		noDataValue.push_back(points.global_md_value.get(name + "_no_data"));
-	}
-
-	size_t count = points.collection.size();
-	for (size_t point_idx=0;point_idx<count;point_idx++) {
+	for (size_t pointIndex = 0; pointIndex < points.collection.size(); ++pointIndex) {
 		std::array<double, size> value;
 		bool hasData = true;
 
-		for (size_t index = 0; index < size; ++index) {
-			value[index] = points.local_md_value.get(point_idx, names[index]);
+		for (size_t valueIndex = 0; valueIndex < size; ++valueIndex) {
+			value[valueIndex] = points.local_md_value.get(pointIndex, names[valueIndex]);
 
-			if((hasNoData[index] && (std::fabs(value[index] - noDataValue[index]) < std::numeric_limits<double>::epsilon())) // no data
-					|| std::isnan(value[index])) /* is NaN */ {
+			if(std::isnan(value[valueIndex])) {
 				hasData = false;
 				break;
 			}
 		}
 
 		if(hasData) {
-			xygraph->addPoint(value);
+			xyGraph->addPoint(value);
 		} else {
-			xygraph->incNoData();
+			xyGraph->incNoData();
 		}
 	}
 
-	return std::move(xygraph);
+	return std::move(xyGraph);
 }
 
 std::unique_ptr<GenericPlot> PointsMetadataToGraph::getPlot(const QueryRectangle &rect) {

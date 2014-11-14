@@ -34,7 +34,7 @@ class XYGraph : public GenericPlot {
 		}
 		auto incNoData() -> void { nodata_count++; }
 
-		auto sort() -> void { std::sort(points.begin(), points.end(), sortFunction); sorted = true;	}
+		auto sort() -> void { std::sort(points.begin(), points.end()); sorted = true; }
 
 		auto toJSON() -> std::string {
 			if(!sorted)
@@ -70,20 +70,6 @@ class XYGraph : public GenericPlot {
 		std::array<double, dimensions> rangeMax;
 
 		bool sorted{false};
-		static auto sortFunction(const std::array<double, dimensions>& e1,	const std::array<double, dimensions>& e2) -> bool {
-			for (std::size_t dimension = 0; dimension < dimensions; ++dimension) {
-				double difference = e1[dimension] - e2[dimension];
-
-				if (std::fabs(difference) < std::numeric_limits<double>::epsilon())
-					continue;
-				else if (difference < 0)
-					return true;
-				else
-					return false;
-			}
-
-			return true;
-		}
 };
 
 #endif

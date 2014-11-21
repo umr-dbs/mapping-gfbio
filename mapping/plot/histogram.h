@@ -34,6 +34,10 @@ class Histogram : public GenericPlot {
 		int getNumberOfBuckets(){
 			return counts.size();
 		}
+		/*
+		 * returns the count of all inserted elements (without NoData)
+		 */
+		int getValidDataCount();
 		/**
 		 * calculates the bucket where a value would be inserted
 		 */

@@ -45,6 +45,16 @@ void Histogram::incNoData() {
 	nodata_count++;
 }
 
+int Histogram::getValidDataCount(){
+	//return std::accumulate(counts.begin(), counts.end(), 0);
+	int sum = 0;
+	for (int &i: counts)
+	  {
+	    sum += i;
+	  }
+	return sum;
+}
+
 std::string Histogram::toJSON() {
 	std::stringstream buffer;
 	buffer << "{\"type\": \"histogram\", ";

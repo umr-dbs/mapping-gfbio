@@ -133,29 +133,6 @@ if ($action == 'examplequerylist.get') {
 		}
 	}
 },
-"reflectance": {
-	"starttime": 42,
-	"endtime": 42,
-	"timeinterval": 1,
-
-	"name": "_MSat2 #6 Radiance",
-
-	"query": {
-		"type": "msatradiance",
-		"params": {
-		},
-		"sources": {
-			"raster": [{
-				"type": "source",
-				"params": {
-					"sourcename": "msat2",
-					"channel": 6,
-					"transform": false
-				}
-			}]
-		}
-	}
-},
 "temperature": {
 	"starttime": 42,
 	"endtime": 42,
@@ -171,7 +148,7 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "source",
 				"params": {
-					"sourcename": "msat2",
+					"sourcename": "msg9_geos",
 					"channel": 6,
 					"transform": false
 				}
@@ -188,27 +165,18 @@ if ($action == 'examplequerylist.get') {
 	"name": "Fake cloud-detection algorithm",
 
 	"query": {
-		"type": "projection",
+		"type": "expression",
 		"params": {
-			"src_epsg": 62866,
-			"dest_epsg": 3857
+			"expression": "A < 300 ? 1 : 0",
+			"min": 0,
+			"max": 1
 		},
 		"sources": {
 			"raster": [{
-				"type": "expression",
+				"type": "source",
 				"params": {
-					"expression": "A < 300 ? 1 : 0",
-					"min": 0,
-					"max": 1
-				},
-				"sources": {
-					"raster": [{
-						"type": "source",
-						"params": {
-							"sourcename": "msat2",
-							"channel": 6
-						}
-					}]
+					"sourcename": "msg9_geos",
+					"channel": 6
 				}
 			}]
 		}
@@ -245,30 +213,22 @@ if ($action == 'examplequerylist.get') {
 	"name": "A test-expression inverting a meteosat-layer",
 
 	"query": {
-		"type": "projection",
+		"type": "expression",
 		"params": {
-			"src_epsg": 62866,
-			"dest_epsg": 3857
+			"expression": "1024-A",
+			"min": 0,
+			"max": 1024
 		},
 		"sources": {
 			"raster": [{
-				"type": "expression",
+				"type": "source",
 				"params": {
-					"expression": "1024-A",
-					"min": 0,
-					"max": 1024
-				},
-				"sources": {
-					"raster": [{
-						"type": "source",
-						"params": {
-							"sourcename": "msat2",
-							"channel": 0
-						}
-					}]
+					"sourcename": "msg9_geos",
+					"channel": 0
 				}
 			}]
 		}
+			
 	}
 },
 "msat0_edge": {
@@ -288,14 +248,14 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "projection",
 				"params": {
-					"src_epsg": 62866,
+					"src_epsg": 40453,
 					"dest_epsg": 3857
 				},
 				"sources": {
 					"raster": [{
 						"type": "source",
 						"params": {
-							"sourcename": "msat2",
+							"sourcename": "msg9_geos",
 							"channel": 0
 						}
 					}]
@@ -314,7 +274,7 @@ if ($action == 'examplequerylist.get') {
 	"query": {
 		"type": "projection",
 		"params": {
-			"src_epsg": 62866,
+			"src_epsg": 40453,
 			"dest_epsg": 3857
 		},
 		"sources": {
@@ -328,7 +288,7 @@ if ($action == 'examplequerylist.get') {
 					"raster": [{
 						"type": "source",
 						"params": {
-							"sourcename": "msat2",
+							"sourcename": "msg9_geos",
 							"channel": 0
 						}
 					}]
@@ -396,7 +356,7 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "projection",
 				"params": {
-					"src_epsg": 62866,
+					"src_epsg": 40453,
 					"dest_epsg": 3857
 				},
 				"sources": {
@@ -411,7 +371,7 @@ if ($action == 'examplequerylist.get') {
 							"raster": [{
 								"type": "source",
 								"params": {
-									"sourcename": "msat2",
+									"sourcename": "msg9_geos",
 									"channel": 6
 								}
 							}]

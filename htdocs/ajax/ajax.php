@@ -544,6 +544,32 @@ if ($action == 'examplequerylist.get') {
 	                      {"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"traits\":[{\"datasource\":\"TRY\", \"trait\":\"epiphyte\", \"value\":\"epiphyte\"}],\"localAttributes\":{}}"},"sources":[]}
 	                     ]}]
 	         }
+},
+"msat_cloudclass": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Preprocessing for Meteosat Cloudclassification",
+
+	"query": {
+		
+				"type": "expression",
+				"params": {
+					"expression": "A-B",
+					"min": -100,
+					"max": 100
+				},
+				"sources": {
+					"raster": [{
+						"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":8,"transform":false}}]}
+					},
+					{
+						"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":3,"transform":false}}]}
+					}]
+				}
+		
+	}
 }
 }
 EOS

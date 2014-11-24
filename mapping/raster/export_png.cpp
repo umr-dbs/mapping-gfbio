@@ -98,7 +98,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 
 	if (overlay) {
 		std::ostringstream msg;
-		msg << GDALGetDataTypeName(dd.datatype) << " (" << actual_min << " - " << actual_max << ")";
+		msg << GDALGetDataTypeName(dd.datatype) << " (" << (double) actual_min << " - " << (double) actual_max << ")";
 		overlay->print(4, 16, 1, msg.str().c_str());
 	}
 

@@ -28,9 +28,16 @@ void Histogram::inc(double value) {
 		return;
 	}
 
+	//int bucket = std::floor(((value - min) / (max - min)) * counts.size());
+	//bucket = std::min((int) counts.size()-1, std::max(0, bucket));
+	//counts[bucket]++;
+	counts[calculateBucketForValue(value)]++;
+}
+
+int Histogram::calculateBucketForValue(double value){
 	int bucket = std::floor(((value - min) / (max - min)) * counts.size());
 	bucket = std::min((int) counts.size()-1, std::max(0, bucket));
-	counts[bucket]++;
+	return bucket;
 }
 
 

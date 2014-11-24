@@ -197,6 +197,10 @@ worldclimdatasource:	${EXE}
 srtmdatasource:	${EXE}
 	rm -f datasources/srtm.dat datasources/srtm.db
 	./${EXE} import datasources/srtm.json data/srtm/srtm_all_index.out 1 0 42 GZIP
+	
+glc2000_global_datasource:	${EXE}
+	rm -f datasources/glc2000_global.dat datasources/glc2000_global.db
+	./${EXE} import datasources/glc2000_global.json datasources/raw_data/glc2000_global/glc2000_v1_1.bil 1 0 42 GZIP
 
 
 test:

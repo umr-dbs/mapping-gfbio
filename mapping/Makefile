@@ -201,8 +201,20 @@ srtmdatasource:	${EXE}
 glc2000_global_datasource:	${EXE}
 	rm -f datasources/glc2000_global.dat datasources/glc2000_global.db
 	./${EXE} import datasources/glc2000_global.json datasources/raw_data/glc2000_global/glc2000_v1_1.bil 1 0 42 GZIP
-
-
+	
+modis_wcf:
+	rm -f datasources/modis_vcf*.dat datasources/modis_vcf*.db
+	./${EXE} import datasources/modis_vcf.json datasources/raw_data/modis_vcf/MOD44B_V5_TRE.2006.all.tif 1 0 42 GZIP
+	
+btw2015_paper_demo_datasource:	${EXE}
+	rm -f datasources/btw2015_paper_demo*.dat datasources/btw2015_paper_demo*.db
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_12_cut.tif 1 0 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_1_cut.tif 1 1 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_12_cut.tif 1 2 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_1_cut.tif 1 3 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/alt_cut.tif 1 4 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/glc2000_cut.tif 1 5 42 GZIP
+	
 test:
 	${MAKE} testenvironment
 	${MAKE} testcases

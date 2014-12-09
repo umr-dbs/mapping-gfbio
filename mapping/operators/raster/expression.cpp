@@ -62,8 +62,21 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	std::vector<std::unique_ptr<GenericRaster> > in_rasters;
 	in_rasters.reserve(rastercount);
 
-	// Load the first raster because it determines the data type and sizes
-	in_rasters.push_back(getRasterFromSource(0, rect));
+	// Load all sources *before* starting the profiling of this operator
+	for (int i=0;i<rastercount;i++) {
+		in_rasters.push_back(getRasterFromSource(i, rect));
+	}
+
+	Profiler::Profiler p("CL_EXPRESSION_OPERATOR");
+	{
+		// now migrate to CL, this is part of the profiling costs
+		//Profiler::Profiler p("CL_EXPRESSION_OPERATOR_MIGRATION");
+		for (int i=0;i<rastercount;i++) {
+			in_rasters[i]->setRepresentation(GenericRaster::OPENCL);
+		}
+	}
+
+	// The first raster determines the data type and sizes
 	GenericRaster *raster_in = in_rasters[0].get();
 
 	GDALDataType output_type = this->output_type;
@@ -72,11 +85,8 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 
 	DataDescription output_dd(output_type, raster_in->dd.min, raster_in->dd.max);
 
-	Profiler::Profiler p("CL_EXPRESSION_OPERATOR");
-	raster_in->setRepresentation(GenericRaster::OPENCL);
-
 	/*
-	 * So, first things first: let's assemble our code
+	 * Let's assemble our code
 	 */
 	std::stringstream ss_sourcecode;
 	ss_sourcecode << "__kernel void expressionkernel(";
@@ -115,15 +125,16 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	RasterOpenCL::CLProgram prog;
 	for (int i=0;i<rastercount;i++) {
 		if (i > 0) {
-			in_rasters.push_back(getRasterFromSource(i, rect));
-			auto r = in_rasters[i].get();
-			if (r->lcrs != raster_in->lcrs)
+			if (in_rasters[i]->lcrs != raster_in->lcrs)
 				throw OperatorException("ExpressionOperator: not all input rasters have the same lcrs");
 		}
 		prog.addInRaster(in_rasters[i].get());
 	}
 	prog.addOutRaster(raster_out.get());
-	prog.compile(sourcecode, "expressionkernel");
+	{
+		//Profiler::Profiler p("CL_EXPRESSION_OPERATOR_COMPILATION");
+		prog.compile(sourcecode, "expressionkernel");
+	}
 	prog.run();
 
 	return raster_out;

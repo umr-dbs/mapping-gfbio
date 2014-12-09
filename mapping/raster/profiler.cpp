@@ -57,9 +57,9 @@ namespace Profiler {
 		return result;
 	}
 
-	void print() {
+	void print(const char *separator) {
 		for (auto it = finished_timers.begin() ; it != finished_timers.end(); ++it) {
-			printf("%s: %f, ", it->first.c_str(), it->second);
+			printf("%s: %f%s", it->first.c_str(), it->second, separator);
 		}
 	}
 }

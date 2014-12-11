@@ -49,4 +49,11 @@ class HeightColorizer : public Colorizer {
 		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max)  const;
 };
 
+class GlobalLandCoverColorizer : public Colorizer {
+	public:
+		GlobalLandCoverColorizer();
+		virtual ~GlobalLandCoverColorizer();
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max)  const;
+};
+
 #endif

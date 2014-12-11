@@ -7,6 +7,7 @@
 #include "operators/operator.h"
 
 #include <memory>
+#include <sstream>
 #include <cmath>
 #include <json/json.h>
 
@@ -58,8 +59,11 @@ std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &r
 
 	const LocalCRS *lcrs = rastersource->getLocalCRS();
 
-	if (lcrs->epsg != rect.epsg)
-		throw OperatorException("SourceOperator: wrong epsg requested");
+	if (lcrs->epsg != rect.epsg) {
+		std::stringstream msg;
+		msg << "SourceOperator: wrong epsg requested. Source is " << lcrs->epsg << ", requested " << rect.epsg;
+		throw OperatorException(msg.str());
+	}
 
 	// world to pixel coordinates
 	double px1 = lcrs->WorldToPixelX(rect.x1);

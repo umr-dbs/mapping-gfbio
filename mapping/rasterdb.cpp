@@ -3,6 +3,7 @@
 #include "raster/colors.h"
 #include "operators/operator.h"
 #include "converters/converter.h"
+#include "raster/profiler.h"
 
 
 #include <stdio.h>
@@ -180,13 +181,31 @@ static void runquery(int argc, char *argv[]) {
 		exit(5);
 	}
 
+	epsg_t epsg = root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
+	double x1 = root.get("query_x1", -20037508).asDouble();
+	double y1 = root.get("query_y1", -20037508).asDouble();
+	double x2 = root.get("query_x2", 20037508).asDouble();
+	double y2 = root.get("query_y2", 20037508).asDouble();
+	int xres = root.get("query_xres", 1000).asInt();
+	int yres = root.get("query_yres", 1000).asInt();
+
 	auto graph = GenericOperator::fromJSON(root["query"]);
-
 	int timestamp = root.get("starttime", 0).asInt();
-	auto raster = graph->getCachedRaster(QueryRectangle(timestamp, -20037508, -20037508, 20037508, 20037508, 1920, 1200, EPSG_WEBMERCATOR));
+	auto raster = graph->getCachedRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, epsg));
 
-	GreyscaleColorizer c;
-	raster->toPNG(out_filename, c);
+#if 0
+	{
+		Profiler::Profiler p("TO_PNG");
+		GreyscaleColorizer c;
+		raster->toPNG(out_filename, c);
+	}
+#else
+	{
+		Profiler::Profiler p("TO_GTIFF");
+		raster->toGDAL(out_filename, "GTiff");
+	}
+#endif
+	Profiler::print("\n");
 }
 
 static int testquery(int argc, char *argv[]) {
@@ -212,6 +231,7 @@ static int testquery(int argc, char *argv[]) {
 			return 5;
 		}
 
+		epsg_t epsg = root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
 		double x1 = root.get("query_x1", -20037508).asDouble();
 		double y1 = root.get("query_y1", -20037508).asDouble();
 		double x2 = root.get("query_x2", 20037508).asDouble();
@@ -221,7 +241,7 @@ static int testquery(int argc, char *argv[]) {
 
 		auto graph = GenericOperator::fromJSON(root["query"]);
 		int timestamp = root.get("starttime", 0).asInt();
-		auto raster = graph->getCachedRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, EPSG_WEBMERCATOR));
+		auto raster = graph->getCachedRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, epsg));
 
 		std::string real_hash = raster->hash();
 

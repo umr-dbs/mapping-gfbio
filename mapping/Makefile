@@ -24,7 +24,7 @@ OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl
 OBJ_OPERATORS_POINTS=o/operators_points_pgpointsource.o o/operators_points_gfbiopointsource.o o/operators_points_points_filter_by_range.o o/operators_points_points_difference.o o/operators_points_points_cluster.o o/operators_points_csvpointsource.o
 OBJ_OPERATORS_GEOMETRY=o/operators_geometry_testgeometrysource.o o/operators_geometry_osmgeometrysource.o
 OBJ_OPERATORS_COMBINED=o/operators_combined_points2raster.o o/operators_combined_raster_metadata_to_points.o o/operators_combined_points2cluster_raster.o o/operators_combined_filterpointsbygeometry.o
-OBJ_OPERATORS_MSAT=o/operators_msat_temperature.o o/operators_msat_reflectance.o o/operators_msat_solarangle.o o/operators_msat_sofos_cloud_classification.o o/operators_msat_co2correction.o o/operators_msat_gccthermthresholddetection.o
+OBJ_OPERATORS_MSAT=o/operators_msat_temperature.o o/operators_msat_reflectance.o o/operators_msat_solarangle.o
 OBJ_OPERATORS_PLOTS=o/operators_plots_histogram.o o/operators_plots_points2histogram.o o/operators_plots_points_metadata_tograph.o
 OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS)
 OBJ_COMMON=${OBJ_RASTER} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL}
@@ -197,8 +197,24 @@ worldclimdatasource:	${EXE}
 srtmdatasource:	${EXE}
 	rm -f datasources/srtm.dat datasources/srtm.db
 	./${EXE} import datasources/srtm.json data/srtm/srtm_all_index.out 1 0 42 GZIP
-
-
+	
+glc2000_global_datasource:	${EXE}
+	rm -f datasources/glc2000_global.dat datasources/glc2000_global.db
+	./${EXE} import datasources/glc2000_global.json datasources/raw_data/glc2000_global/glc2000_v1_1.bil 1 0 42 GZIP
+	
+modis_wcf:
+	rm -f datasources/modis_vcf*.dat datasources/modis_vcf*.db
+	./${EXE} import datasources/modis_vcf.json datasources/raw_data/modis_vcf/MOD44B_V5_TRE.2006.all.tif 1 0 42 GZIP
+	
+btw2015_paper_demo_datasource:	${EXE}
+	rm -f datasources/btw2015_paper_demo*.dat datasources/btw2015_paper_demo*.db
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_12_cut.tif 1 0 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_1_cut.tif 1 1 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_12_cut.tif 1 2 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_1_cut.tif 1 3 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/alt_cut.tif 1 4 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/glc2000_cut.tif 1 5 42 GZIP
+	
 test:
 	${MAKE} testenvironment
 	${MAKE} testcases

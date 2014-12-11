@@ -15,7 +15,7 @@ namespace Profiler {
 	void start(const char *msg);
 	void stop(const char *msg);
 	std::vector<std::string> get();
-	void print();
+	void print(const char *separator = ", ");
 	class Profiler {
 		public:
 			Profiler(const char *msg) : msg(msg) { start(msg); };
@@ -25,7 +25,7 @@ namespace Profiler {
 #else
 	inline void start(const char *) {};
 	inline void stop(const char *) {};
-	inline void print() {};
+	inline void print(const char *separator = ", ") {};
 	class Profiler {
 		public:
 			Profiler(const char *msg) {};

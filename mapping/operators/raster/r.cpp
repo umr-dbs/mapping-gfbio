@@ -45,7 +45,7 @@ static void replace_all(std::string &str, const std::string &search, const std::
         str.replace(start_pos, search.length(), replace);
         start_pos += replace.length();
     }
-};
+}
 
 ROperator::ROperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	source = params["source"].asString();

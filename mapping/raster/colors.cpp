@@ -68,6 +68,8 @@ std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
 		return std::make_unique<TemperatureColorizer>();
 	if (name == "height")
 		return std::make_unique<HeightColorizer>();
+	if (name == "glc")
+		return std::make_unique<GlobalLandCoverColorizer>();
 	return std::make_unique<GreyscaleColorizer>();
 }
 
@@ -128,7 +130,7 @@ HeightColorizer::~HeightColorizer() {
 }
 
 void HeightColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-	double step = (max - min) / (num_colors-1);
+	double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
 	for (int c = 0; c < num_colors; c++) {
 		double value = min + c*step;
 		uint32_t color;
@@ -166,6 +168,71 @@ void HeightColorizer::fillPalette(uint32_t *colors, int num_colors, double min, 
 		else {
 			color = color_from_rgba(0, 0, 255);
 		}
+
+		colors[c] = color;
+	}
+}
+
+
+GlobalLandCoverColorizer::GlobalLandCoverColorizer() : Colorizer(true) {
+}
+
+GlobalLandCoverColorizer::~GlobalLandCoverColorizer() {
+}
+
+void GlobalLandCoverColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+	double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
+	for (int c = 0; c < num_colors; c++) {
+		int value = std::round(min + c*step);
+		uint32_t color;
+		if (value == 1)
+			color = color_from_rgba(0, 100, 0);
+		else if (value == 2)
+			color = color_from_rgba(0, 150, 0);
+		else if (value == 3)
+			color = color_from_rgba(175, 255, 98);
+		else if (value == 4)
+			color = color_from_rgba(139, 68, 18);
+		else if (value == 5)
+			color = color_from_rgba(205, 126, 95);
+		else if (value == 6)
+			color = color_from_rgba(140, 190, 0);
+		else if (value == 7)
+			color = color_from_rgba(119, 150, 255);
+		else if (value == 8)
+			color = color_from_rgba(0, 70, 200);
+		else if (value == 9)
+			color = color_from_rgba(0, 230, 0);
+		else if (value == 10)
+			color = color_from_rgba(0, 0, 0);
+		else if (value == 11)
+			color = color_from_rgba(255, 118, 0);
+		else if (value == 12)
+			color = color_from_rgba(255, 179, 0);
+		else if (value == 13)
+			color = color_from_rgba(255, 234, 158);
+		else if (value == 14)
+			color = color_from_rgba(222, 202, 161);
+		else if (value == 15)
+			color = color_from_rgba(0, 150, 150);
+		else if (value == 16)
+			color = color_from_rgba(255, 224, 229);
+		else if (value == 17)
+			color = color_from_rgba(255, 116, 232);
+		else if (value == 18)
+			color = color_from_rgba(202, 138, 255);
+		else if (value == 19)
+			color = color_from_rgba(180, 180, 180);
+		else if (value == 20)
+			color = color_from_rgba(138, 227, 255);
+		else if (value == 21)
+			color = color_from_rgba(240, 240, 240);
+		else if (value == 22)
+			color = color_from_rgba(255, 0, 0);
+		else if (value == 23)
+			color = color_from_rgba(255, 255, 255);
+		else
+			color = color_from_rgba(0, 0, 255);
 
 		colors[c] = color;
 	}

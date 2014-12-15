@@ -3,6 +3,7 @@
 #include "raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/pointcollection.h"
+#include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
@@ -46,16 +47,7 @@ struct PointDataEnhancement {
 	static void execute(Raster2D<T>* raster, PointCollection *points, const std::string &name) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
-		//T max = (T) raster->dd.max;
-		//T min = (T) raster->dd.min;
-
-		// add global metadata
-		// TODO: resolve what to do on key-collision
-		//points->setGlobalMDValue(name + "_max", max);
-		//points->setGlobalMDValue(name + "_min", min);
-
-		// init local metadata
-		auto &md_vec = points->local_md_value.addVector(name);
+		auto &md_vec = points->local_md_value.getVector(name);
 
 		for (auto &point : points->collection) {
 			size_t rasterCoordinateX = floor(raster->lcrs.WorldToPixelX(point.x));
@@ -72,6 +64,32 @@ struct PointDataEnhancement {
 	}
 };
 
+#include "operators/combined/raster_metadata_to_points.cl.h"
+
+static void enhance(PointCollection &points, GenericRaster &raster, const std::string name) {
+#ifdef MAPPING_NO_OPENCL
+	points.local_md_value.addVector(name);
+	callUnaryOperatorFunc<PointDataEnhancement>(&raster, &points, name);
+#else
+	RasterOpenCL::init();
+
+	points.local_md_value.addVector(name, points.collection.size());
+	try {
+		RasterOpenCL::CLProgram prog;
+		prog.addPointCollection(&points);
+		prog.addInRaster(&raster);
+		prog.compile(operators_combined_raster_metadata_to_points, "add_attribute");
+		prog.addPointCollectionPositions(0);
+		prog.addPointCollectionAttribute(0, name);
+		prog.run();
+	}
+	catch (cl::Error &e) {
+		printf("cl::Error %d: %s\n", e.err(), e.what());
+		throw;
+	}
+#endif
+}
+
 std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRectangle &rect) {
 	Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
 
@@ -85,7 +103,7 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRe
 	auto rasters = getRasterSourceCount();
 	for (int r=0;r<rasters;r++) {
 		auto raster = getRasterFromSource(r, rect);
-		callUnaryOperatorFunc<PointDataEnhancement>(raster.get(), points.get(), names.at(r));
+		enhance(*points, *raster, names.at(r));
 	}
 	return points;
 }

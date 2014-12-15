@@ -287,16 +287,75 @@ const std::string &getRasterInfoStructSource() {
 
 
 
-CLProgram::CLProgram() : kernel(nullptr), argpos(0), finished(false), in_rasters(), out_rasters() {
+CLProgram::CLProgram() : kernel(nullptr), argpos(0), finished(false), iteration_type(0), in_rasters(), out_rasters(), pointcollections() {
 }
 CLProgram::~CLProgram() {
 	reset();
 }
 void CLProgram::addInRaster(GenericRaster *raster) {
+	if (kernel)
+		throw OpenCLException("addInRaster() must be called before compile()");
 	in_rasters.push_back(raster);
 }
 void CLProgram::addOutRaster(GenericRaster *raster) {
+	if (kernel)
+		throw OpenCLException("addOutRaster() must be called before compile()");
+	if (iteration_type == 0)
+		iteration_type = 1;
 	out_rasters.push_back(raster);
+}
+
+size_t CLProgram::addPointCollection(PointCollection *pc) {
+	if (kernel)
+		throw OpenCLException("addPointCollection() must be called before compile()");
+	if (iteration_type == 0)
+		iteration_type = 2;
+	pointcollections.push_back(pc);
+	return pointcollections.size() - 1;
+}
+
+void CLProgram::addPointCollectionPositions(size_t idx) {
+	if (!kernel || finished)
+		throw OpenCLException("addPointCollectionPositions() should only be called between compile() and run()");
+
+	if (sizeof(cl_double2) != sizeof(Point))
+		throw OpenCLException("sizeof(cl_double2) != sizeof(Point), cannot use opencl on PointCollections");
+
+	PointCollection *pc = pointcollections.at(idx);
+	size_t size = sizeof(Point) * pc->collection.size();
+
+	auto clbuffer = new cl::Buffer(
+		*RasterOpenCL::getContext(),
+		CL_MEM_USE_HOST_PTR,
+		size,
+		pc->collection.data()
+	);
+	scratch_buffers.push_back(clbuffer);
+	auto clhostptr = RasterOpenCL::getQueue()->enqueueMapBuffer(*clbuffer, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, size);
+	scratch_maps.push_back(clhostptr);
+
+	kernel->setArg(argpos++, *clbuffer);
+}
+
+void CLProgram::addPointCollectionAttribute(size_t idx, const std::string &name) {
+	if (!kernel || finished)
+		throw OpenCLException("addPointCollectionAttribute() should only be called between compile() and run()");
+
+	PointCollection *pc = pointcollections.at(idx);
+	auto &vec = pc->local_md_value.getVector(name);
+	size_t size = sizeof(double) * vec.size();
+
+	auto clbuffer = new cl::Buffer(
+		*RasterOpenCL::getContext(),
+		CL_MEM_USE_HOST_PTR,
+		size,
+		vec.data()
+	);
+	scratch_buffers.push_back(clbuffer);
+	auto clhostptr = RasterOpenCL::getQueue()->enqueueMapBuffer(*clbuffer, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, size);
+	scratch_maps.push_back(clhostptr);
+
+	kernel->setArg(argpos++, *clbuffer);
 }
 
 template<typename T>
@@ -309,6 +368,9 @@ struct getCLTypeName {
 void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 	// TODO: here, we could add everything into our cache.
 	// key: hash(source) . (in-types) . (out-types) . kernelname
+
+	if (iteration_type == 0)
+		throw OpenCLException("No raster or pointcollection added, cannot iterate");
 
 	std::stringstream assembled_source;
 	assembled_source << RasterOpenCL::getRasterInfoStructSource();
@@ -330,15 +392,27 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 
 	std::string final_source = assembled_source.str();
 
-	cl::Program::Sources sources(1, std::make_pair(final_source.c_str(), final_source.length()));
-	cl::Program program(context, sources);
+	cl::Program program;
 	try {
+		fprintf(stderr, "sources\n");
+		cl::Program::Sources sources(1, std::make_pair(final_source.c_str(), final_source.length()));
+		fprintf(stderr, "program\n");
+		program = cl::Program(context, sources);
+		fprintf(stderr, "build\n");
 		program.build(deviceList,"");
 	}
-	catch (cl::Error &e) {
-		throw OpenCLException(std::string("Error building cl::Program: ")+kernelname+": "+program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0]));
+	catch (const cl::Error &e) {
+		std::stringstream msg;
+		msg << "Error building cl::Program: " << kernelname << ": " << e.what() << " " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0]);
+		fprintf(stderr, "OpenCL failed: %s", msg.str().c_str());
+		throw OpenCLException(msg.str());
+	}
+	catch (...) {
+		fprintf(stderr, "unknown exception caught\n");
+		exit(5);
 	}
 
+	fprintf(stderr, "compiled, adding args\n");
 	try {
 		kernel = new cl::Kernel(program, kernelname);
 
@@ -354,13 +428,18 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 			kernel->setArg(argpos++, *raster->getCLBuffer());
 			kernel->setArg(argpos++, *raster->getCLInfoBuffer());
 		}
+		for (decltype(pointcollections.size()) idx = 0; idx < pointcollections.size(); idx++) {
+			PointCollection *points = pointcollections[idx];
+			int size = points->collection.size();
+			kernel->setArg<cl_int>(argpos++, (cl_int) size);
+		}
 	}
-	catch (cl::Error &e) {
+	catch (const cl::Error &e) {
 		delete kernel;
 		kernel = nullptr;
-		std::stringstream ss;
-		ss << "CL Error in compile(): " << e.err() << ": " << e.what();
-		throw OpenCLException(ss.str());
+		std::stringstream msg;
+		msg << "CL Error in compile(): " << e.err() << ": " << e.what();
+		throw OpenCLException(msg.str());
 	}
 
 }
@@ -385,19 +464,24 @@ cl::Event CLProgram::run(std::vector<cl::Event>* events_to_wait_for) {
 	if (!kernel)
 		throw OpenCLException("Cannot run() before compile()");
 
-	if (out_rasters.size() < 1)
-		throw OpenCLException("Cannot run() without an output raster (TODO: manually specify global range?)");
-
 	if (finished)
 		throw OpenCLException("Cannot run() a CLProgram twice (TODO: lift this restriction? Use case?)");
 
 	finished = true;
 	cl::Event event;
 
+	cl::NDRange range;
+	if (iteration_type == 1)
+		range = cl::NDRange(out_rasters[0]->lcrs.size[0], out_rasters[0]->lcrs.size[1]);
+	else if (iteration_type == 2)
+		range = cl::NDRange(pointcollections[0]->collection.size());
+	else
+		throw OpenCLException("Unknown iteration_type, cannot create range");
+
 	try {
 		RasterOpenCL::getQueue()->enqueueNDRangeKernel(*kernel,
 			cl::NullRange, // Offset
-			cl::NDRange(out_rasters[0]->lcrs.getPixelCount()), // Global
+			range, // Global
 			cl::NullRange, // local
 			events_to_wait_for, //events to wait for
 			&event //event to create
@@ -409,6 +493,25 @@ cl::Event CLProgram::run(std::vector<cl::Event>* events_to_wait_for) {
 		ss << "CL Error: " << e.err() << ": " << e.what();
 		throw OpenCLException(ss.str());
 	}
+	cleanScratch();
+}
+
+
+void CLProgram::cleanScratch() {
+	size_t buffers = scratch_buffers.size();
+	for (size_t i=0;i<buffers;i++) {
+		auto clbuffer = scratch_buffers[i];
+		if (!clbuffer)
+			continue;
+		if (i < scratch_maps.size()) {
+			auto clhostptr = scratch_maps[i];
+			RasterOpenCL::getQueue()->enqueueUnmapMemObject(*clbuffer, clhostptr);
+		}
+		scratch_buffers[i] = nullptr;
+		delete clbuffer;
+	}
+	scratch_buffers.clear();
+	scratch_maps.clear();
 }
 
 void CLProgram::reset() {
@@ -416,10 +519,13 @@ void CLProgram::reset() {
 		delete kernel;
 		kernel = nullptr;
 	}
+	cleanScratch();
 	argpos = 0;
 	finished = false;
+	iteration_type = 0;
 	in_rasters.clear();
 	out_rasters.clear();
+	pointcollections.clear();
 }
 
 

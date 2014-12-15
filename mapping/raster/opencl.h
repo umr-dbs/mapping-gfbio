@@ -15,6 +15,9 @@
 #include <string>
 #include <gdal_priv.h>
 
+#include "raster/raster_priv.h"
+#include "raster/pointcollection.h"
+
 namespace RasterOpenCL {
 	void init();
 	void free();
@@ -26,13 +29,7 @@ namespace RasterOpenCL {
 	cl::Kernel addProgramFromFile(const char *filename, const char *kernelname);
 	cl::Kernel addProgram(const std::string &sourcecode, const char *kernelname);
 
-	//void setKernelArgByGDALType(cl::Kernel &kernel, cl_uint arg, GDALDataType datatype, double value);
-	//void setKernelArgAsRasterinfo(cl::Kernel &kernel, cl_uint arg, GenericRaster *raster);
 	cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster);
-	//const std::string &getRasterInfoStructSource();
-
-	//void runGenericTwoRasterKernel(cl::Kernel &kernel, GenericRaster *in, GenericRaster *out);
-
 
 
 	class CLProgram {
@@ -41,6 +38,11 @@ namespace RasterOpenCL {
 			~CLProgram();
 			void addInRaster(GenericRaster *input_raster);
 			void addOutRaster(GenericRaster *output_raster);
+
+			size_t addPointCollection(PointCollection *pc);
+			void addPointCollectionPositions(size_t idx);
+			void addPointCollectionAttribute(size_t idx, const std::string &name);
+
 			void compile(const std::string &source, const char *kernelname);
 			void compileFromFile(const char *filename, const char *kernelname);
 			template<typename T> void addArg(T arg) {
@@ -54,17 +56,24 @@ namespace RasterOpenCL {
 				kernel->setArg(argpos++, size, argPtr);
 			}
 			void addArg(cl::Buffer &buffer) {
+				if (!kernel || finished)
+					throw OpenCLException("addArg() should only be called between compile() and run()");
 				kernel->setArg(argpos++, buffer);
 			}
 			void run();
 			cl::Event run(std::vector<cl::Event>* events_to_wait_for);
 			void reset();
 		private:
+			void cleanScratch();
 			cl::Kernel *kernel;
 			cl_uint argpos;
 			bool finished;
+			int iteration_type; // 0 = unknown, 1 = first in_raster, 2 = first pointcollection
 			std::vector<GenericRaster *> in_rasters;
 			std::vector<GenericRaster *> out_rasters;
+			std::vector<PointCollection *> pointcollections;
+			std::vector<cl::Buffer *> scratch_buffers;
+			std::vector<void *> scratch_maps;
 	};
 }
 

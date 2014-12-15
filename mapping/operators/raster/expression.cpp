@@ -94,7 +94,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 		ss_sourcecode << "__global const IN_TYPE" << i << " *in_data" << i << ", __global const RasterInfo *in_info" << i << ",";
 	}
 	ss_sourcecode << "__global OUT_TYPE0 *out_data, __global const RasterInfo *out_info) {"
-		"int gid = get_global_id(0);"
+		"int gid = get_global_id(0) + get_global_id(1) * in_info0->size[0];"
 		"if (gid >= in_info0->size[0]*in_info0->size[1]*in_info0->size[2])"
 		"	return;";
 	for (int i=0;i<rastercount;i++) {

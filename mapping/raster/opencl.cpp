@@ -394,25 +394,16 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 
 	cl::Program program;
 	try {
-		fprintf(stderr, "sources\n");
 		cl::Program::Sources sources(1, std::make_pair(final_source.c_str(), final_source.length()));
-		fprintf(stderr, "program\n");
 		program = cl::Program(context, sources);
-		fprintf(stderr, "build\n");
 		program.build(deviceList,"");
 	}
 	catch (const cl::Error &e) {
 		std::stringstream msg;
 		msg << "Error building cl::Program: " << kernelname << ": " << e.what() << " " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0]);
-		fprintf(stderr, "OpenCL failed: %s", msg.str().c_str());
 		throw OpenCLException(msg.str());
 	}
-	catch (...) {
-		fprintf(stderr, "unknown exception caught\n");
-		exit(5);
-	}
 
-	fprintf(stderr, "compiled, adding args\n");
 	try {
 		kernel = new cl::Kernel(program, kernelname);
 

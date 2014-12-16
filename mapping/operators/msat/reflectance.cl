@@ -4,10 +4,10 @@
 
 double2 satelliteViewAngleToLatLon(double2 satelliteViewAngle, double sub_lon){
 	double2 xy = radians(satelliteViewAngle);
-	
+
 	double2 sinxy = sin(xy);
 	double2 cosxy = cos(xy);
-	
+
 	double cos2y = pown(cosxy.y, 2);
 	double sin2y = pown(sinxy.y, 2);
 	double cosxcosy = cosxy.x * cosxy.y;
@@ -29,12 +29,12 @@ double2 satelliteViewAngleToLatLon(double2 satelliteViewAngle, double sub_lon){
 	latLonRad.y = atan(lonRad_part) + radians(sub_lon);
 	double latRad_part = 1.006804 * s3 / sxy;
 	latLonRad.x = atan(latRad_part);
-	
+
 	return degrees(latLonRad);
 }
 
 double2 solarAzimuthZenith(double dGreenwichMeanSiderealTime, double dRightAscension, double dDeclination, double2 dLatLon){
-		
+
 		double2 azimuthZenith;
 
 		double dLocalMeanSiderealTime = radians(dGreenwichMeanSiderealTime*15 + dLatLon.y);;
@@ -43,51 +43,59 @@ double2 solarAzimuthZenith(double dGreenwichMeanSiderealTime, double dRightAscen
 		double dCos_Latitude = cos( dLatitudeInRadians );
 		double dSin_Latitude = sin( dLatitudeInRadians );
 		double dCos_HourAngle= cos( dHourAngle );
-		
+
 		azimuthZenith.y = (acos( dCos_Latitude*dCos_HourAngle*cos(dDeclination) + sin( dDeclination )*dSin_Latitude));
-		
-		
+
+
 		double dY = -sin( dHourAngle );
 		double dX = tan( dDeclination )*dCos_Latitude - dSin_Latitude*dCos_HourAngle;
 		azimuthZenith.x = atan2( dY, dX );
-		
-		if ( azimuthZenith.x < 0.0 ) 
+
+		if ( azimuthZenith.x < 0.0 )
 			azimuthZenith.x = azimuthZenith.x + M_PI*2;
 		//udtSunCoordinates->dAzimuth = udtSunCoordinates->dAzimuth/rad;
 		// Parallax Correction
 		double dParallax=(dEarthMeanRadius/dAstronomicalUnit)*sin(azimuthZenith.y);
 		azimuthZenith.y=(azimuthZenith.y + dParallax);///rad;
-			
+
 	return degrees(azimuthZenith);
 }
 
 __kernel void reflectanceWithSolarCorrectionKernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double dGreenwichMeanSiderealTime, const double dRightAscension, const double dDeclination, const double projectionCooridnateToViewAngleFactor, const double dETSRconst, const double dESD) {
-	int gid = get_global_id(0);
-	if (gid >= in_info->size[0]*in_info->size[1]*in_info->size[2])
+	const int posx = get_global_id(0);
+	const int posy = get_global_id(1);
+	const int gid = posy * out_info->size[0] + posx;
+
+	if (posx >= out_info->size[0] || posy >= out_info->size[1])
 		return;
+
 	IN_TYPE0 value = in_data[gid];
 	if (ISNODATA0(value, in_info)) {
 		out_data[gid] = out_info->no_data;
 		return;
 	}
-	
+
 	//RasterInfo should provide GEOS coordinates
 	double2 geosPosition;
-	geosPosition.x = ((gid % in_info->size[0]) * in_info->scale[0] + in_info->origin[0]);
-	geosPosition.y = ((gid / in_info->size[0]) * in_info->scale[1] + in_info->origin[1]); 
-	
-	double2 satelliteViewAngle = geosPosition * projectionCooridnateToViewAngleFactor;	
+	geosPosition.x = ((posx) * in_info->scale[0] + in_info->origin[0]);
+	geosPosition.y = ((posy) * in_info->scale[1] + in_info->origin[1]);
+
+	double2 satelliteViewAngle = geosPosition * projectionCooridnateToViewAngleFactor;
 	double2 latLonPosition = satelliteViewAngleToLatLon(satelliteViewAngle, 0.0);
 	double2 azimuthZenith = solarAzimuthZenith(dGreenwichMeanSiderealTime, dRightAscension, dDeclination, latLonPosition);
-			
+
 	OUT_TYPE0 result = value * (dESD * dESD) / (dETSRconst * cos(radians(min(azimuthZenith.y, 80.0))));
 	out_data[gid] = result;
 }
 
 __kernel void reflectanceWithoutSolarCorrectionKernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const double dETSRconst, const double dESD) {
-	int gid = get_global_id(0);
-	if (gid >= in_info->size[0]*in_info->size[1]*in_info->size[2])
+	const int posx = get_global_id(0);
+	const int posy = get_global_id(1);
+	const int gid = posy * out_info->size[0] + posx;
+
+	if (posx >= out_info->size[0] || posy >= out_info->size[1])
 		return;
+
 	IN_TYPE0 value = in_data[gid];
 	if (ISNODATA0(value, in_info)) {
 		out_data[gid] = out_info->no_data;

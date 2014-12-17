@@ -91,8 +91,6 @@ static void enhance(PointCollection &points, GenericRaster &raster, const std::s
 }
 
 std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRectangle &rect) {
-	Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
-
 	auto points = getPointsFromSource(0, rect);
 
 	if (points->has_time) {
@@ -103,6 +101,7 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRe
 	auto rasters = getRasterSourceCount();
 	for (int r=0;r<rasters;r++) {
 		auto raster = getRasterFromSource(r, rect);
+		Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
 		enhance(*points, *raster, names.at(r));
 	}
 	return points;

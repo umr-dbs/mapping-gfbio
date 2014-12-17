@@ -42,11 +42,23 @@ class Histogram : public GenericPlot {
 		 * calculates the bucket where a value would be inserted
 		 */
 		int calculateBucketForValue(double value);
+		/**
+		 * calculates the bucket minimum
+		 */
+		double calculateBucketLowerBorder(int bucket);
+		/**
+		 * add a marker
+		 */
+		void addMarker(double bucket, std::string label){
+			markers.emplace_back(bucket, label);
+		}
 
 	private:
 		std::vector<int> counts;
 		int nodata_count;
 		double min, max;
+
+		std::vector<std::pair<double, std::string>> markers;
 };
 
 #endif

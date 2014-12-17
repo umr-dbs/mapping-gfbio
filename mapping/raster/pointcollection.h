@@ -39,6 +39,7 @@ class PointCollection {
 		~PointCollection();
 
 		std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep);
+		std::unique_ptr<PointCollection> filter(const std::vector<char> &keep);
 
 		void toStream(BinaryStream &stream);
 

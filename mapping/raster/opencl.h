@@ -40,8 +40,8 @@ namespace RasterOpenCL {
 			void addOutRaster(GenericRaster *output_raster);
 
 			size_t addPointCollection(PointCollection *pc);
-			void addPointCollectionPositions(size_t idx);
-			void addPointCollectionAttribute(size_t idx, const std::string &name);
+			void addPointCollectionPositions(size_t idx, bool readonly = false);
+			void addPointCollectionAttribute(size_t idx, const std::string &name, bool readonly = false);
 
 			void compile(const std::string &source, const char *kernelname);
 			void compileFromFile(const char *filename, const char *kernelname);
@@ -49,6 +49,24 @@ namespace RasterOpenCL {
 				if (!kernel || finished)
 					throw OpenCLException("addArg() should only be called between compile() and run()");
 				kernel->setArg<T>(argpos++, arg);
+			}
+			template<typename T> void addArg(std::vector<T> &vec, bool readonly = false) {
+				if (!kernel || finished)
+					throw OpenCLException("addArg(std::vector) should only be called between compile() and run()");
+
+				size_t size = sizeof(T) * vec.size();
+
+				auto clbuffer = new cl::Buffer(
+					*RasterOpenCL::getContext(),
+					CL_MEM_USE_HOST_PTR,
+					size,
+					vec.data()
+				);
+				scratch_buffers.push_back(clbuffer);
+				auto clhostptr = RasterOpenCL::getQueue()->enqueueMapBuffer(*clbuffer, CL_TRUE, CL_MAP_READ | (readonly ? 0 : CL_MAP_WRITE), 0, size);
+				scratch_maps.push_back(clhostptr);
+
+				kernel->setArg(argpos++, *clbuffer);
 			}
 			void addArg(size_t size, void *argPtr) {
 				if (!kernel || finished)

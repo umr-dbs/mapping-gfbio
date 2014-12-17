@@ -314,49 +314,20 @@ size_t CLProgram::addPointCollection(PointCollection *pc) {
 	return pointcollections.size() - 1;
 }
 
-void CLProgram::addPointCollectionPositions(size_t idx) {
-	if (!kernel || finished)
-		throw OpenCLException("addPointCollectionPositions() should only be called between compile() and run()");
-
+void CLProgram::addPointCollectionPositions(size_t idx, bool readonly) {
 	if (sizeof(cl_double2) != sizeof(Point))
 		throw OpenCLException("sizeof(cl_double2) != sizeof(Point), cannot use opencl on PointCollections");
 
 	PointCollection *pc = pointcollections.at(idx);
-	size_t size = sizeof(Point) * pc->collection.size();
-
-	auto clbuffer = new cl::Buffer(
-		*RasterOpenCL::getContext(),
-		CL_MEM_USE_HOST_PTR,
-		size,
-		pc->collection.data()
-	);
-	scratch_buffers.push_back(clbuffer);
-	auto clhostptr = RasterOpenCL::getQueue()->enqueueMapBuffer(*clbuffer, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, size);
-	scratch_maps.push_back(clhostptr);
-
-	kernel->setArg(argpos++, *clbuffer);
+	addArg(pc->collection, readonly);
 }
 
-void CLProgram::addPointCollectionAttribute(size_t idx, const std::string &name) {
-	if (!kernel || finished)
-		throw OpenCLException("addPointCollectionAttribute() should only be called between compile() and run()");
-
+void CLProgram::addPointCollectionAttribute(size_t idx, const std::string &name, bool readonly) {
 	PointCollection *pc = pointcollections.at(idx);
 	auto &vec = pc->local_md_value.getVector(name);
-	size_t size = sizeof(double) * vec.size();
-
-	auto clbuffer = new cl::Buffer(
-		*RasterOpenCL::getContext(),
-		CL_MEM_USE_HOST_PTR,
-		size,
-		vec.data()
-	);
-	scratch_buffers.push_back(clbuffer);
-	auto clhostptr = RasterOpenCL::getQueue()->enqueueMapBuffer(*clbuffer, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, size);
-	scratch_maps.push_back(clhostptr);
-
-	kernel->setArg(argpos++, *clbuffer);
+	addArg(vec, readonly);
 }
+
 
 template<typename T>
 struct getCLTypeName {

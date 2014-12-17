@@ -118,51 +118,57 @@ struct CreateConditionalHistogramFunction{
 
 
 int findGccThermThreshold(Histogram &histogram, float min, float max){
-	const float minimum_land_peak_temperature = std::numeric_limits<float>::min();
-	const int minimum_decreasing_bins_before_cloud_threshold = 10;
+	const double minimum_land_peak_temperature = 1.0;
+	const int minimum_increasing_bins_for_rising_trend = 4;
 
-	/**first we need to find the land peak**/
-	int land_peak_bucket = 0;
-	//the landpeak is not allowed to be lower than minimum_land_peak_temperature
-	if(histogram.getMax() < minimum_land_peak_temperature){
-	   land_peak_bucket = histogram.getNumberOfBuckets();
-	}
-	else {
-	   //now we are sure that there is a bucket inside the histogram, witch contains minimum_land_peak_temperature
-	   land_peak_bucket = histogram.calculateBucketForValue(minimum_land_peak_temperature);
-	   int land_peak_count = histogram.getCountForBucket(land_peak_bucket);
-	   //now we will find the absolute maximum (with #bucket >= land_peak_bucket) in the histogram which is the real land peak (TODO: literature)
-	   for(int i = land_peak_bucket+1; i < histogram.getNumberOfBuckets(); i++){
-		   const int tempCount = histogram.getCountForBucket(i);
-		   if(tempCount > land_peak_count){
-			   land_peak_count = tempCount;
-			   land_peak_bucket = i;
-		   }
-	   }
-	}
+	/**start: find the land peak**/
 
-	/**second we need to identify the minimum with (with #bucket < land_peak_bucket)**/
+	//start with the minimum
+	double land_peak_temperature = minimum_land_peak_temperature;
+	int land_peak_bucket = -1;
+
+	//if there are buckets above the minimum_land_peak_temperature search the max -> real land peak
+	if(histogram.getMax() > minimum_land_peak_temperature){
+		land_peak_bucket = histogram.calculateBucketForValue(minimum_land_peak_temperature);
+		int land_peak_count = histogram.getCountForBucket(land_peak_bucket);
+
+		for(int i = land_peak_bucket; i < histogram.getNumberOfBuckets(); i++){
+			int tempCount = histogram.getCountForBucket(i);
+			if(tempCount > land_peak_count){
+				land_peak_count = tempCount;
+				land_peak_bucket = i;
+			}
+		}
+		land_peak_temperature = histogram.calculateBucketLowerBorder(land_peak_bucket);
+	}
+	histogram.addMarker(land_peak_temperature, "landpeak: "+std::to_string(land_peak_temperature)+" bucket: "+std::to_string(land_peak_bucket));
+	/**end: find the land peak*/
+
+
+	/**second we need to find a rising trend (indicated by **/
 	int minimum_between_land_and_cloud_peak_bucket = land_peak_bucket;
 	//int minimum_between_land_and_cloud_peak_bucket_count = 0;
-	int decreasing_buckets = 0;
+	int increasing_buckets = 0;
 
 	for(int i = land_peak_bucket-1; i >= 0; i--){
-	   int bucket_count = histogram.getCountForBucket(i);
+		int bucket_count = histogram.getCountForBucket(i);
 
-	   if(bucket_count < histogram.getCountForBucket(i+1)){
-		   decreasing_buckets += 1;
-		   //if(bucket_count < minimum_between_land_and_cloud_peak_bucket_count){
-			   minimum_between_land_and_cloud_peak_bucket = i;
-			   //minimum_between_land_and_cloud_peak_bucket_count = bucket_count;
-		   //}
-	   }
-	   else if(decreasing_buckets >= minimum_decreasing_bins_before_cloud_threshold){
-		   break;
+	   if(bucket_count > histogram.getCountForBucket(i+1)){
+		   increasing_buckets += 1;
+
+		  if(increasing_buckets >= minimum_increasing_bins_for_rising_trend)
+			   break;
 	   }
 	   else{
-		   decreasing_buckets = 0;
-		   }
+		   increasing_buckets = std::max(increasing_buckets-1, 0);
+
+		   if(bucket_count < histogram.getCountForBucket(minimum_between_land_and_cloud_peak_bucket))
+			   minimum_between_land_and_cloud_peak_bucket = i;
 	   }
+	}
+	double minimum_between_land_and_cloud_peak_value = histogram.calculateBucketLowerBorder(minimum_between_land_and_cloud_peak_bucket);
+	histogram.addMarker(minimum_between_land_and_cloud_peak_value, "minimum: "+std::to_string(minimum_between_land_and_cloud_peak_value)+" bucket: "+std::to_string(minimum_between_land_and_cloud_peak_bucket));
+
 
 	/**now we know the bucket of the cloud threshold :) **/
 
@@ -192,8 +198,8 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 		out_dd.addNoData();
 	auto raster_out = GenericRaster::create(bt108_minus_bt039_raster->lcrs, out_dd);
 
-	auto histogram_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), 3, cloudclass::day_solar_zenith_angle_min, cloudclass::day_solar_zenith_angle_max);
-	
+	auto histogram_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), 2, cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
+	int temp = findGccThermThreshold(*histogram_ptr.get(), 0.0, 0.0);
 	
 	return std::unique_ptr<GenericPlot>(std::move(histogram_ptr));
 }

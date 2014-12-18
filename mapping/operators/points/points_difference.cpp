@@ -48,7 +48,14 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 
 	Profiler::Profiler p("POINTS_DIFFERENCE_OPERATOR");
 
+	//fprintf(stderr, "Minuend: %lu, Subtrahend: %lu\n", pointsMinuend->collection.size(), pointsSubtrahend->collection.size());
+
 	size_t count_m = pointsMinuend->collection.size();
+
+	if (count_m > 100000)
+		throw OperatorException("Too many points for points_difference, aborting");
+
+
 #ifdef MAPPING_NO_OPENCL
 	std::vector<bool> keep(count_m, true);
 
@@ -74,8 +81,8 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 		prog.addPointCollection(pointsMinuend.get());
 		prog.addPointCollection(pointsSubtrahend.get());
 		prog.compile(operators_points_points_difference, "difference");
-		prog.addPointCollectionPositions(0);
-		prog.addPointCollectionPositions(1);
+		prog.addPointCollectionPositions(0, true);
+		prog.addPointCollectionPositions(1, true);
 		prog.addArg(keep);
 		prog.addArg(epsilonDistance);
 		prog.run();

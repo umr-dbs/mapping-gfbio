@@ -1,6 +1,7 @@
 #include "raster/raster.h"
 #include "raster/rastersource.h"
 #include "raster/colors.h"
+#include "raster/pointcollection.h"
 #include "operators/operator.h"
 #include "converters/converter.h"
 #include "raster/profiler.h"
@@ -158,6 +159,18 @@ static void import(int argc, char *argv[]) {
 	RasterSourceManager::close(source);
 }
 
+static QueryRectangle qrect_from_json(Json::Value &root) {
+	epsg_t epsg = root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
+	double x1 = root.get("query_x1", -20037508).asDouble();
+	double y1 = root.get("query_y1", -20037508).asDouble();
+	double x2 = root.get("query_x2", 20037508).asDouble();
+	double y2 = root.get("query_y2", 20037508).asDouble();
+	int xres = root.get("query_xres", 1000).asInt();
+	int yres = root.get("query_yres", 1000).asInt();
+	int timestamp = root.get("starttime", 0).asInt();
+	return QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, epsg);
+}
+
 static void runquery(int argc, char *argv[]) {
 	if (argc < 4) {
 		usage();
@@ -181,30 +194,30 @@ static void runquery(int argc, char *argv[]) {
 		exit(5);
 	}
 
-	epsg_t epsg = root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
-	double x1 = root.get("query_x1", -20037508).asDouble();
-	double y1 = root.get("query_y1", -20037508).asDouble();
-	double x2 = root.get("query_x2", 20037508).asDouble();
-	double y2 = root.get("query_y2", 20037508).asDouble();
-	int xres = root.get("query_xres", 1000).asInt();
-	int yres = root.get("query_yres", 1000).asInt();
-
 	auto graph = GenericOperator::fromJSON(root["query"]);
-	int timestamp = root.get("starttime", 0).asInt();
-	auto raster = graph->getCachedRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, epsg));
+	std::string result = root.get("query_result", "raster").asString();
 
-#if 0
-	{
-		Profiler::Profiler p("TO_PNG");
-		GreyscaleColorizer c;
-		raster->toPNG(out_filename, c);
+	if (result == "raster") {
+		auto raster = graph->getCachedRaster(qrect_from_json(root));
+		{
+			Profiler::Profiler p("TO_GTIFF");
+			raster->toGDAL(out_filename, "GTiff");
+		}
 	}
-#else
-	{
-		Profiler::Profiler p("TO_GTIFF");
-		raster->toGDAL(out_filename, "GTiff");
+	else if (result == "points") {
+		auto points = graph->getCachedPoints(qrect_from_json(root));
+		auto csv = points->toCSV();
+		FILE *f = fopen(out_filename, "w");
+		if (f) {
+			fwrite(csv.c_str(), csv.length(), 1, f);
+			fclose(f);
+		}
 	}
-#endif
+	else {
+		printf("Unknown result type: %s\n", result.c_str());
+		exit(5);
+	}
+
 	Profiler::print("\n");
 }
 
@@ -213,6 +226,9 @@ static int testquery(int argc, char *argv[]) {
 		usage();
 	}
 	char *in_filename = argv[2];
+	bool set_hash = false;
+	if (argc >= 4 && argv[3][0] == 'S')
+		set_hash = true;
 
 	try {
 		/*
@@ -231,19 +247,23 @@ static int testquery(int argc, char *argv[]) {
 			return 5;
 		}
 
-		epsg_t epsg = root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
-		double x1 = root.get("query_x1", -20037508).asDouble();
-		double y1 = root.get("query_y1", -20037508).asDouble();
-		double x2 = root.get("query_x2", 20037508).asDouble();
-		double y2 = root.get("query_y2", 20037508).asDouble();
-		int xres = root.get("query_xres", 1000).asInt();
-		int yres = root.get("query_yres", 1000).asInt();
-
 		auto graph = GenericOperator::fromJSON(root["query"]);
-		int timestamp = root.get("starttime", 0).asInt();
-		auto raster = graph->getCachedRaster(QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, epsg));
+		std::string result = root.get("query_result", "raster").asString();
 
-		std::string real_hash = raster->hash();
+		std::string real_hash;
+
+		if (result == "raster") {
+			auto raster = graph->getCachedRaster(qrect_from_json(root));
+			real_hash = raster->hash();
+		}
+		else if (result == "points") {
+			auto points = graph->getCachedPoints(qrect_from_json(root));
+			real_hash = points->hash();
+		}
+		else {
+			printf("Unknown result type: %s\n", result.c_str());
+			return 5;
+		}
 
 		if (root.isMember("query_expected_hash")) {
 			std::string expected_hash = root.get("query_expected_hash", "#").asString();
@@ -254,12 +274,16 @@ static int testquery(int argc, char *argv[]) {
 				return 5;
 			}
 		}
-		else {
+		else if (set_hash) {
 			root["query_expected_hash"] = real_hash;
 			std::ofstream file(in_filename);
 			file << root;
 			file.close();
 			printf("No hash in query file, added %s\n", real_hash.c_str());
+			return 5;
+		}
+		else {
+			printf("No hash in query file\n");
 			return 5;
 		}
 	}

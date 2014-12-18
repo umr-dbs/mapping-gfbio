@@ -1,0 +1,24 @@
+
+{
+	"endtime" : 42,
+	"name" : "Load points",
+	"query" : 
+	{
+		"params" : 
+		{
+			"filename" : "test/data/places_dump/places_dump_DE.csv"
+		},
+		"sources" : null,
+		"type" : "csvpointsource"
+	},
+	"query_expected_hash" : "8c879f74b7bacd5e824c0496929d7a76",
+	"query_result" : "points",
+	"query_x1" : -180,
+	"query_x2" : 180,
+	"query_xres" : 1000,
+	"query_y1" : -90,
+	"query_y2" : 90,
+	"query_yres" : 1000,
+	"starttime" : 42,
+	"timeinterval" : 1
+}

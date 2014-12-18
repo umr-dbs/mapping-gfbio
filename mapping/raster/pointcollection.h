@@ -63,6 +63,9 @@ class PointCollection {
 		std::string toGeoJSON(bool displayMetadata = false);
 		std::string toCSV();
 
+		std::string hash();
+
+		// Attributes
 		std::vector<time_t> timestamps;
 		bool has_time;
 

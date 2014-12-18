@@ -1,5 +1,6 @@
 #include "raster/pointcollection.h"
 #include "util/binarystream.h"
+#include "util/hash.h"
 #include "util/make_unique.h"
 
 #include <sstream>
@@ -330,7 +331,6 @@ std::string PointCollection::toCSV() {
 
 	size_t idx = 0;
 	for (const auto &p : collection) {
-		fprintf(stderr, "points\n");
 		csv << p.x << "," << p.y;
 
 		if (has_time)
@@ -350,3 +350,9 @@ std::string PointCollection::toCSV() {
 	return csv.str();
 }
 
+std::string PointCollection::hash() {
+	// certainly not the most stable solution, but it has few lines of code..
+	std::string csv = toCSV();
+
+	return calculateHash((const unsigned char *) csv.c_str(), (int) csv.length()).asHex();
+}

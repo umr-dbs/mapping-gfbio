@@ -10,14 +10,14 @@ CPATH := /usr/local/include/:$(CPATH)
 CPP=clang++
 CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
-LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl -L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
+LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-luriparser
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 OBJ_RASTER=o/raster_raster.o o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o o/raster_metadata.o o/raster_import_gdal.o o/raster_export_pgm.o o/raster_export_yuv.o o/raster_export_png.o o/raster_export_jpeg.o o/raster_pointcollection.o o/raster_geometry.o
 OBJ_PLOT=o/plot_histogram.o o/plot_text.o o/plot_png.o
-OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o
+OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o o/util_debug.o
 OBJ_POINTVISUALIZATION=o/pointvisualization_BoundingBox.o o/pointvisualization_Circle.o o/pointvisualization_Coordinate.o o/pointvisualization_Dimension.o o/pointvisualization_FindResult.o o/pointvisualization_QuadTreeNode.o o/pointvisualization_CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters_converter.o o/converters_raw.o
 OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_r.o
@@ -218,7 +218,7 @@ btw2015_paper_demo_datasource:	${EXE}
 test:
 	${MAKE} testenvironment
 	${MAKE} testcases
-	php test/parse_logs.php >test/logs/tests_$$(date '+%Y-%m-%d_%H-%m').log
+	php test/parse_logs.php >test/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log
 	rm -f ${TEST_LOGS}
 	echo "Testcases done";
 	
@@ -233,7 +233,7 @@ testenvironment: ${EXE}
 test/queries/%.log: test/queries/%.json ${EXE} test/data/world1.dat 
 	echo -n >$@
 	if EXELOG=$$(./${EXE} testquery $< 2>&1) ; then echo "hash_passed: yes" >>$@ ; else echo "hash_passed: no\n$$EXELOG" >>$@ ; fi
-	if VGLOG=$$(${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
+	if VGLOG=$$(timeout 180 ${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
 
 
 webinstall:

@@ -6,6 +6,7 @@
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
+#include "util/debug.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -134,7 +135,7 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
 	auto colorizer = Colorizer::make(colors);
-
+	print_debug_header();
 #if 1
 	printf("Content-type: image/png\r\n\r\n");
 
@@ -148,14 +149,17 @@ void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, 
 
 
 void outputPointCollection(PointCollection *points, bool displayMetadata = false) {
+	print_debug_header();
 	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON(displayMetadata).c_str());
 }
 
 void outputPointCollectionCSV(PointCollection *points) {
+	print_debug_header();
 	printf("Content-type: text/csv\r\nContent-Disposition: attachment; filename=\"export.csv\"\r\n\r\n%s", points->toCSV().c_str());
 }
 
 void outputGeometry(GenericGeometry *geometry) {
+	print_debug_header();
 	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
 }
 
@@ -217,13 +221,8 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 
 		auto graph = GenericOperator::fromJSON(params["layers"]);
 
-		auto points = graph->getCachedPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg));
-
-		#if RASTER_DO_PROFILE
-					printf("Profiling-header: ");
-					Profiler::print();
-					printf("\r\n");
-		#endif
+		QueryProfiler profiler;
+		auto points = graph->getCachedPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg), profiler);
 
 		outputPointCollection(points.get(), true);
 
@@ -334,7 +333,8 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 
 		//build the queryRectangle and get the data
 		QueryRectangle query_rect{42, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, sizeX, sizeY, query_crsId};
-		auto result_raster = graph->getCachedRaster(query_rect);
+		QueryProfiler profiler;
+		auto result_raster = graph->getCachedRaster(query_rect, profiler);
 
 		//setup the output parameters
 		std::string gdalDriver = "GTiff";
@@ -402,13 +402,9 @@ int main() {
 			if (params.count("colors") > 0)
 				colorizer = params["colors"];
 
-			auto raster = graph->getCachedRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			QueryProfiler profiler;
+			auto raster = graph->getCachedRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
-#if RASTER_DO_PROFILE
-			printf("Profiling-header: ");
-			Profiler::print();
-			printf("\r\n");
-#endif
 			outputImage(raster.get(), false, false, colorizer);
 			return 0;
 		}
@@ -417,13 +413,9 @@ int main() {
 		if (params.count("pointquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 
-			auto points = graph->getCachedPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			QueryProfiler profiler;
+			auto points = graph->getCachedPoints(QueryRectangle(timestamp, /*-180, -90, 180, 90*/-20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
-#if RASTER_DO_PROFILE
-			printf("Profiling-header: ");
-			Profiler::print();
-			printf("\r\n");
-#endif
 			std::string format("geojson");
 			if(params.count("format") > 0)
 				format = params["format"];
@@ -443,13 +435,9 @@ int main() {
 		if (params.count("geometryquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
 
-			auto geometry = graph->getCachedGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			QueryProfiler profiler;
+			auto geometry = graph->getCachedGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
-#if RASTER_DO_PROFILE
-			printf("Profiling-header: ");
-			Profiler::print();
-			printf("\r\n");
-#endif
 			outputGeometry(geometry.get());
 			return 0;
 		}
@@ -568,13 +556,15 @@ int main() {
 					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
 
 					if (format == "application/json") {
-						std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect);
+						QueryProfiler profiler;
+						std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect, profiler);
 
 						printf("content-type: application/json\r\n\r\n");
 						printf(dataVector->toJSON().c_str());
 					}
 					else {
-						auto result_raster = graph->getCachedRaster(qrect);
+						QueryProfiler profiler;
+						auto result_raster = graph->getCachedRaster(qrect, profiler);
 
 						if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
 							result_raster = result_raster->scale(output_width, output_height);
@@ -582,12 +572,6 @@ int main() {
 
 						bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
 						bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
-
-#if RASTER_DO_PROFILE
-						printf("Profiling-header: ");
-						Profiler::print();
-						printf("\r\n");
-#endif
 
 						std::unique_ptr<Raster2D<uint8_t>> overlay;
 						if (debug) {
@@ -607,16 +591,14 @@ int main() {
 							std::string msg_brs = msg_br.str();
 							overlay->print(overlay->lcrs.size[1]-4-8*msg_brs.length(), overlay->lcrs.size[1]-12, overlay->dd.max, msg_brs.c_str());
 
-#if RASTER_DO_PROFILE
 							if (result_raster->lcrs.size[1] >= 512) {
-								auto profile = Profiler::get();
+								auto messages = get_debug_messages();
 								int ypos = 36;
-								for (auto &msg : profile) {
+								for (auto &msg : messages) {
 									overlay->print(4, ypos, overlay->dd.max, msg.c_str());
 									ypos += 10;
 								}
 							}
-#endif
 						}
 
 						outputImage(result_raster.get(), flipx, flipy, colorizer, overlay.get());

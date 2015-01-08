@@ -18,6 +18,8 @@
 #include "raster/raster_priv.h"
 #include "raster/pointcollection.h"
 
+class QueryProfiler;
+
 namespace RasterOpenCL {
 	void init();
 	void free();
@@ -36,6 +38,9 @@ namespace RasterOpenCL {
 		public:
 			CLProgram();
 			~CLProgram();
+			void setProfiler(QueryProfiler &_profiler) {
+				profiler = &_profiler;
+			}
 			void addInRaster(GenericRaster *input_raster);
 			void addOutRaster(GenericRaster *output_raster);
 
@@ -83,6 +88,7 @@ namespace RasterOpenCL {
 			void reset();
 		private:
 			void cleanScratch();
+			QueryProfiler *profiler;
 			cl::Kernel *kernel;
 			cl_uint argpos;
 			bool finished;

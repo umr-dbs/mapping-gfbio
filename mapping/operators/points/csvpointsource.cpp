@@ -18,7 +18,7 @@ class CSVPointSource : public GenericOperator {
 		CSVPointSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~CSVPointSource();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		std::string filename;
 };
@@ -41,7 +41,7 @@ static bool endsWith(const std::string &str, const std::string &suffix) {
 	return (str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0);
 }
 
-std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
 
 	std::ifstream data(filename);
@@ -133,5 +133,7 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 		}
 	}
 	//fprintf(stderr, data.str().c_str());
+
+	profiler.addIOCost( data.tellg() );
 	return points_out;
 }

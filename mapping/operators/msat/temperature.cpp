@@ -98,7 +98,7 @@ class MSATTemperatureOperator : public GenericOperator {
 		MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATTemperatureOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 };
 
@@ -115,9 +115,9 @@ MSATTemperatureOperator::~MSATTemperatureOperator() {
 REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
 
 
-std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
-	auto raster = getRasterFromSource(0, rect);
+	auto raster = getRasterFromSource(0, rect, profiler);
 
 	if (raster->dd.min != 0 && raster->dd.max != 1024)
 		throw OperatorException("Input raster does not appear to be a meteosat raster");
@@ -155,6 +155,7 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
+	prog.setProfiler(profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_msat_temperature, "temperaturekernel");

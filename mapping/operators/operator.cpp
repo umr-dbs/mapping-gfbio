@@ -4,6 +4,7 @@
 #include "raster/geometry.h"
 #include "plot/plot.h"
 #include "util/binarystream.h"
+#include "util/debug.h"
 
 #include "operators/operator.h"
 
@@ -11,6 +12,9 @@
 #include <memory>
 #include <unordered_map>
 #include <sstream>
+#include <unistd.h>
+#include <time.h>
+
 
 #include <json/json.h>
 
@@ -35,7 +39,9 @@ OperatorRegistration::OperatorRegistration(const char *name, OPConstructor const
 }
 
 
-
+/*
+ * QueryRectangle class
+ */
 QueryRectangle::QueryRectangle(BinaryStream &socket) {
 	socket.read(&timestamp);
 	socket.read(&x1);
@@ -81,8 +87,70 @@ void QueryRectangle::enlarge(int pixels) {
 
 
 
-// GenericOperator default implementation
-GenericOperator::GenericOperator(int _sourcecounts[], GenericOperator *_sources[]) {
+/*
+ * QueryProfiler class
+ */
+QueryProfiler::QueryProfiler() : self_cpu(0), all_cpu(0), self_gpu(0), all_gpu(0), self_io(0), all_io(0), t_start(0) {
+
+}
+
+double QueryProfiler::getTimestamp() {
+#if defined(_POSIX_TIMERS) && defined(_POSIX_CPUTIME)
+	struct timespec t;
+	if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t) != 0)
+		throw OperatorException("QueryProfiler: clock_gettime() failed");
+	return (double) t.tv_sec + t.tv_nsec/1000000000.0;
+#else
+	#warning "QueryProfiler: Cannot query CPU time on this OS, using wall time instead"
+
+	struct timeval t;
+	if (gettimeofday(&t, nullptr) != 0)
+		throw OperatorException("QueryProfiler: gettimeofday() failed");
+	return (double) t.tv_sec + t.tv_usec/1000000.0;
+#endif
+}
+
+void QueryProfiler::startTimer() {
+	if (t_start != 0)
+		throw OperatorException("QueryProfiler: Timer started twice");
+	t_start = getTimestamp();
+}
+
+void QueryProfiler::stopTimer() {
+	if (t_start == 0)
+		throw OperatorException("QueryProfiler: Timer not started");
+	double cost = getTimestamp() - t_start;
+	t_start = 0;
+	if (cost < 0)
+		throw OperatorException("QueryProfiler: Timer stopped a negative time");
+	self_cpu += cost;
+	all_cpu += cost;
+}
+
+void QueryProfiler::addGPUCost(double seconds) {
+	self_gpu += seconds;
+	all_gpu += seconds;
+}
+
+void QueryProfiler::addIOCost(size_t bytes) {
+	self_io += bytes;
+	all_io += bytes;
+}
+
+QueryProfiler & QueryProfiler::operator+=(QueryProfiler &other) {
+	if (other.t_start != 0)
+		throw OperatorException("QueryProfiler: tried adding a timer that had not been stopped");
+	all_cpu += other.all_cpu;
+	all_gpu += other.all_gpu;
+	all_io += other.all_io;
+	return *this;
+}
+
+
+/*
+ * GenericOperator class
+ */
+GenericOperator::GenericOperator(int _sourcecounts[], GenericOperator *_sources[]) : type(), depth(0) {
 	for (int i=0;i<MAX_INPUT_TYPES;i++)
 		sourcecounts[i] = _sourcecounts[i];
 
@@ -112,54 +180,99 @@ void GenericOperator::assumeSources(int rasters, int pointcollections, int geome
 		throw OperatorException("Wrong amount of geometry sources");
 }
 
-std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &) {
+std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &, QueryProfiler &profiler) {
 	throw OperatorException("getRaster() called on an operator that doesn't return rasters");
 }
-std::unique_ptr<PointCollection> GenericOperator::getPoints(const QueryRectangle &) {
+std::unique_ptr<PointCollection> GenericOperator::getPoints(const QueryRectangle &, QueryProfiler &profiler) {
 	throw OperatorException("getPoints() called on an operator that doesn't return points");
 }
-std::unique_ptr<GenericGeometry> GenericOperator::getGeometry(const QueryRectangle &) {
+std::unique_ptr<GenericGeometry> GenericOperator::getGeometry(const QueryRectangle &, QueryProfiler &profiler) {
 	throw OperatorException("getGeometry() called on an operator that doesn't return geometries");
 }
-std::unique_ptr<GenericPlot> GenericOperator::getPlot(const QueryRectangle &) {
+std::unique_ptr<GenericPlot> GenericOperator::getPlot(const QueryRectangle &, QueryProfiler &profiler) {
 	throw OperatorException("getPlot() called on an operator that doesn't return data vectors");
 }
 
-std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect) {
-	return getRaster(rect);
+static void d_profile(int depth, const std::string &type, const char *result, QueryProfiler &profiler) {
+	std::ostringstream msg;
+	msg.precision(4);
+	for (int i=0;i<depth;i++)
+		msg << " ";
+	msg << std::fixed << "OP " << type << " " << result
+		<< " CPU: " << profiler.self_cpu << "/" << profiler.all_cpu
+		<< " GPU: " << profiler.self_gpu << "/" << profiler.all_gpu
+		<< " I/O: " << profiler.self_io << "/" << profiler.all_io;
+	d(msg.str());
 }
-std::unique_ptr<PointCollection> GenericOperator::getCachedPoints(const QueryRectangle &rect) {
-	return getPoints(rect);
+
+std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+	QueryProfiler profiler;
+	profiler.startTimer();
+	auto result = getRaster(rect, profiler);
+	profiler.stopTimer();
+	d_profile(depth, type, "raster", profiler);
+	parent_profiler += profiler;
+	return result;
 }
-std::unique_ptr<GenericGeometry> GenericOperator::getCachedGeometry(const QueryRectangle &rect) {
-	return getGeometry(rect);
+std::unique_ptr<PointCollection> GenericOperator::getCachedPoints(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+	QueryProfiler profiler;
+	profiler.startTimer();
+	auto result = getPoints(rect, profiler);
+	profiler.stopTimer();
+	d_profile(depth, type, "points", profiler);
+	parent_profiler += profiler;
+	return result;
 }
-std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle &rect) {
-	return getPlot(rect);
+std::unique_ptr<GenericGeometry> GenericOperator::getCachedGeometry(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+	QueryProfiler profiler;
+	profiler.startTimer();
+	auto result = getGeometry(rect, profiler);
+	profiler.stopTimer();
+	d_profile(depth, type, "geom", profiler);
+	parent_profiler += profiler;
+	return result;
+}
+std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+	QueryProfiler profiler;
+	profiler.startTimer();
+	auto result = getPlot(rect, profiler);
+	profiler.stopTimer();
+	d_profile(depth, type, "plot", profiler);
+	parent_profiler += profiler;
+	return result;
 }
 
 
-std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (idx < 0 || idx >= sourcecounts[0])
 		throw OperatorException("getChildRaster() called on invalid index");
-	return std::move(sources[idx]->getCachedRaster(rect));
+	profiler.stopTimer();
+	auto result = sources[idx]->getCachedRaster(rect, profiler);
+	profiler.startTimer();
+	return result;
 }
-std::unique_ptr<PointCollection> GenericOperator::getPointsFromSource(int idx, const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> GenericOperator::getPointsFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (idx < 0 || idx >= sourcecounts[1])
 		throw OperatorException("getChildPoints() called on invalid index");
+	profiler.stopTimer();
 	int offset = sourcecounts[0] + idx;
-	return std::move(sources[offset]->getCachedPoints(rect));
+	auto result = sources[offset]->getCachedPoints(rect, profiler);
+	profiler.startTimer();
+	return result;
 }
-std::unique_ptr<GenericGeometry> GenericOperator::getGeometryFromSource(int idx, const QueryRectangle &rect) {
+std::unique_ptr<GenericGeometry> GenericOperator::getGeometryFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (idx < 0 || idx >= sourcecounts[2])
 		throw OperatorException("getChildGeometry() called on invalid index");
+	profiler.stopTimer();
 	int offset = sourcecounts[0] + sourcecounts[1] + idx;
-	return std::move(sources[offset]->getCachedGeometry(rect));
+	auto result = sources[offset]->getCachedGeometry(rect, profiler);
+	profiler.startTimer();
+	return result;
 }
 
 
 // JSON constructor
-static int parseSourcesFromJSON(Json::Value &sourcelist, GenericOperator *sources[GenericOperator::MAX_SOURCES], int &sourcecount) {
+static int parseSourcesFromJSON(Json::Value &sourcelist, GenericOperator *sources[GenericOperator::MAX_SOURCES], int &sourcecount, int depth) {
 	if (!sourcelist.isArray() || sourcelist.size() <= 0)
 		return sourcecount;
 
@@ -169,14 +282,14 @@ static int parseSourcesFromJSON(Json::Value &sourcelist, GenericOperator *source
 		throw OperatorException("Operator with more than MAX_SOURCES found; increase the constant and recompile");
 
 	for (int i=0;i<newsources;i++) {
-		sources[sourcecount+i] = GenericOperator::fromJSON(sourcelist[(Json::Value::ArrayIndex) i]).release();
+		sources[sourcecount+i] = GenericOperator::fromJSON(sourcelist[(Json::Value::ArrayIndex) i], depth).release();
 	}
 
 	sourcecount += newsources;
 	return newsources;
 }
 
-std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json) {
+std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json, int depth) {
 	// recursively create all sources
 	Json::Value sourcelist = json["sources"];
 	Json::Value params = json["params"];
@@ -189,9 +302,9 @@ std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json) {
 	GenericOperator *sources[MAX_SOURCES] = {nullptr};
 	try {
 		if (sourcelist.isObject()) {
-			sourcecounts[0] = parseSourcesFromJSON(sourcelist["raster"], sources, sourcecount);
-			sourcecounts[1] = parseSourcesFromJSON(sourcelist["points"], sources, sourcecount);
-			sourcecounts[2] = parseSourcesFromJSON(sourcelist["geometry"], sources, sourcecount);
+			sourcecounts[0] = parseSourcesFromJSON(sourcelist["raster"], sources, sourcecount, depth+1);
+			sourcecounts[1] = parseSourcesFromJSON(sourcelist["points"], sources, sourcecount, depth+1);
+			sourcecounts[2] = parseSourcesFromJSON(sourcelist["geometry"], sources, sourcecount, depth+1);
 		}
 
 		// now check the operator name and instantiate the correct class
@@ -199,11 +312,14 @@ std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json) {
 
 		auto map = getRegisteredConstructorsMap();
 		if (map->count(type) != 1) {
-			throw OperatorException(std::string("Unknown operator type: ")+type);
+			throw OperatorException(std::string("Unknown operator type: '")+type+"'");
 		}
 
 		auto constructor = map->at(type);
-		return constructor(sourcecounts, sources, params);
+		auto op = constructor(sourcecounts, sources, params);
+		op->type = type;
+		op->depth = depth;
+		return op;
 	}
 	catch (const std::exception &e) {
 		for (int i=0;i<MAX_SOURCES;i++) {
@@ -217,12 +333,12 @@ std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json) {
 }
 
 
-std::unique_ptr<GenericOperator> GenericOperator::fromJSON(const std::string &json) {
+std::unique_ptr<GenericOperator> GenericOperator::fromJSON(const std::string &json, int depth) {
 	std::istringstream iss(json);
 	Json::Reader reader(Json::Features::strictMode());
 	Json::Value root;
 	if (!reader.parse(iss, root))
 		throw OperatorException("unable to parse json");
 
-	return GenericOperator::fromJSON(root);
+	return GenericOperator::fromJSON(root, depth);
 }

@@ -25,7 +25,7 @@ class MSATReflectanceOperator : public GenericOperator {
 		MSATReflectanceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATReflectanceOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		bool solarCorrection{true};
 };
@@ -73,9 +73,9 @@ double calculateESD(int dayOfYear){
 	return 1.0 - 0.0167 * cos(2.0 * acos(-1.0) * ((dayOfYear - 3.0) / 365.0));
 }
 
-std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
-	auto raster = getRasterFromSource(0, rect);
+	auto raster = getRasterFromSource(0, rect, profiler);
 
 	// get the timestamp of the MSG scene from the raster metadata
 	std::string timestamp = raster->md_string.get("TimeStamp");
@@ -124,8 +124,8 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	double dESD = calculateESD(timeDate.tm_yday+1);
 	//std::cerr<<"channel:"<<channel<<"|dETSRconst"<<dETSRconst<<"|dESD:"<<dESD<<std::endl;
 
-	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590×10^-6. The difference is: 1.93384285×10^-9
-	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874×10^-6
+	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590ï¿½10^-6. The difference is: 1.93384285ï¿½10^-9
+	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874ï¿½10^-6
 
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
@@ -139,6 +139,7 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
+	prog.setProfiler(profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	if(solarCorrection){

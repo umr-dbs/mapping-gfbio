@@ -6,6 +6,7 @@
 #include "raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/opencl.h"
+#include "operators/operator.h" // For QueryProfiler
 
 //#include <iostream>
 #include <fstream>
@@ -78,7 +79,7 @@ void init() {
 
 			// Command Queue
 			// CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE is not set
-			queue = cl::CommandQueue(context, device);
+			queue = cl::CommandQueue(context, device, CL_QUEUE_PROFILING_ENABLE);
 
 			initialization_status = 1;
 		}
@@ -287,7 +288,7 @@ const std::string &getRasterInfoStructSource() {
 
 
 
-CLProgram::CLProgram() : kernel(nullptr), argpos(0), finished(false), iteration_type(0), in_rasters(), out_rasters(), pointcollections() {
+CLProgram::CLProgram() : profiler(nullptr), kernel(nullptr), argpos(0), finished(false), iteration_type(0), in_rasters(), out_rasters(), pointcollections() {
 }
 CLProgram::~CLProgram() {
 	reset();
@@ -414,6 +415,13 @@ void CLProgram::run() {
 	try {
 		cl::Event event = run(nullptr);
 		event.wait();
+		if (profiler) {
+			cl_ulong start = 0, end = 0;
+			event.getProfilingInfo(CL_PROFILING_COMMAND_START, &start);
+			event.getProfilingInfo(CL_PROFILING_COMMAND_END, &end);
+			double seconds = (end - start) / 1000000000.0;
+			profiler->addGPUCost(seconds);
+		}
 	}
 	catch (cl::Error &e) {
 		std::stringstream ss;

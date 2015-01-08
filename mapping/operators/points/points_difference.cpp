@@ -1,6 +1,5 @@
 #include "raster/pointcollection.h"
 #include "raster/opencl.h"
-#include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
@@ -20,7 +19,7 @@ public:
 	PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 	virtual ~PointsDifferenceOperator();
 
-	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 private:
 	double epsilonDistance;
 };
@@ -42,11 +41,9 @@ static double point_distance(const Point &p1, const Point &p2) {
 	return sqrt(dx*dx + dy*dy);
 }
 
-std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const QueryRectangle &rect) {
-	auto pointsMinuend = getPointsFromSource(0, rect);
-	auto pointsSubtrahend = getPointsFromSource(1, rect);
-
-	Profiler::Profiler p("POINTS_DIFFERENCE_OPERATOR");
+std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto pointsMinuend = getPointsFromSource(0, rect, profiler);
+	auto pointsSubtrahend = getPointsFromSource(1, rect, profiler);
 
 	//fprintf(stderr, "Minuend: %lu, Subtrahend: %lu\n", pointsMinuend->collection.size(), pointsSubtrahend->collection.size());
 
@@ -78,6 +75,7 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 
 	try {
 		RasterOpenCL::CLProgram prog;
+		prog.setProfiler(profiler);
 		prog.addPointCollection(pointsMinuend.get());
 		prog.addPointCollection(pointsSubtrahend.get());
 		prog.compile(operators_points_points_difference, "difference");

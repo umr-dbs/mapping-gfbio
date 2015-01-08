@@ -2,7 +2,6 @@
 #include "raster/pointcollection.h"
 #include "plot/text.h"
 #include "plot/png.h"
-#include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
@@ -25,11 +24,11 @@ class ROperator : public GenericOperator {
 		ROperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ROperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
-		void runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type);
+		void runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type, QueryProfiler &profiler);
 	private:
 		friend std::unique_ptr<GenericRaster> query_raster_source(ROperator *op, int childidx, const QueryRectangle &rect);
 		friend std::unique_ptr<PointCollection> query_points_source(ROperator *op, int childidx, const QueryRectangle &rect);
@@ -57,9 +56,7 @@ ROperator::~ROperator() {
 REGISTER_OPERATOR(ROperator, "r");
 
 
-void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type) {
-	Profiler::Profiler p("R_OPERATOR");
-
+void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type, QueryProfiler &profiler) {
 	stream.write(RSERVER_MAGIC_NUMBER);
 	stream.write(requested_type);
 	stream.write(source);
@@ -75,11 +72,11 @@ void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char
 			stream.read(&childidx);
 			QueryRectangle qrect(stream);
 			if (type == RSERVER_TYPE_RASTER) {
-				auto raster = getRasterFromSource(childidx, qrect);
+				auto raster = getRasterFromSource(childidx, qrect, profiler);
 				stream.write(*raster);
 			}
 			else if (type == RSERVER_TYPE_POINTS) {
-				auto points = getPointsFromSource(childidx, qrect);
+				auto points = getPointsFromSource(childidx, qrect, profiler);
 				stream.write(*points);
 			}
 			else {
@@ -103,36 +100,36 @@ void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char
 }
 
 
-std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (result_type != "raster")
 		throw OperatorException("This R script does not return rasters");
 
 	UnixSocket socket(rserver_socket_address);
-	runScript(socket, rect, RSERVER_TYPE_RASTER);
+	runScript(socket, rect, RSERVER_TYPE_RASTER, profiler);
 
 	auto raster = GenericRaster::fromStream(socket);
 	return raster;
 }
 
-std::unique_ptr<PointCollection> ROperator::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> ROperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (result_type != "points")
 		throw OperatorException("This R script does not return a point collection");
 
 	UnixSocket socket(rserver_socket_address);
-	runScript(socket, rect, RSERVER_TYPE_POINTS);
+	runScript(socket, rect, RSERVER_TYPE_POINTS, profiler);
 
 	auto points = std::make_unique<PointCollection>(socket);
 	return points;
 }
 
-std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect) {
+std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
 	bool wants_text = (result_type == "text");
 	bool wants_plot = (result_type == "plot");
 	if (!wants_text && !wants_plot)
 		throw OperatorException("This R script does not return a plot");
 
 	UnixSocket socket(rserver_socket_address);
-	runScript(socket, rect, wants_text ? RSERVER_TYPE_STRING : RSERVER_TYPE_PLOT);
+	runScript(socket, rect, wants_text ? RSERVER_TYPE_STRING : RSERVER_TYPE_PLOT, profiler);
 
 	std::string result;
 	((BinaryStream &) socket).read(&result);

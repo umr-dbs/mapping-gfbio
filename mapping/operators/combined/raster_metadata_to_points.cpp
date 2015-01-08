@@ -17,7 +17,7 @@ class RasterMetaDataToPoints: public GenericOperator {
 		RasterMetaDataToPoints(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~RasterMetaDataToPoints();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	private:
 		std::vector<std::string> names;
@@ -66,7 +66,7 @@ struct PointDataEnhancement {
 
 #include "operators/combined/raster_metadata_to_points.cl.h"
 
-static void enhance(PointCollection &points, GenericRaster &raster, const std::string name) {
+static void enhance(PointCollection &points, GenericRaster &raster, const std::string name, QueryProfiler &profiler) {
 #ifdef MAPPING_NO_OPENCL
 	points.local_md_value.addVector(name);
 	callUnaryOperatorFunc<PointDataEnhancement>(&raster, &points, name);
@@ -76,6 +76,7 @@ static void enhance(PointCollection &points, GenericRaster &raster, const std::s
 	points.local_md_value.addVector(name, points.collection.size());
 	try {
 		RasterOpenCL::CLProgram prog;
+		prog.setProfiler(profiler);
 		prog.addPointCollection(&points);
 		prog.addInRaster(&raster);
 		prog.compile(operators_combined_raster_metadata_to_points, "add_attribute");
@@ -90,8 +91,8 @@ static void enhance(PointCollection &points, GenericRaster &raster, const std::s
 #endif
 }
 
-std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRectangle &rect) {
-	auto points = getPointsFromSource(0, rect);
+std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points = getPointsFromSource(0, rect, profiler);
 
 	if (points->has_time) {
 		// TODO: sort by time, iterate over all timestamps, fetch the correct raster, then add metadata
@@ -100,9 +101,9 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRe
 
 	auto rasters = getRasterSourceCount();
 	for (int r=0;r<rasters;r++) {
-		auto raster = getRasterFromSource(r, rect);
+		auto raster = getRasterFromSource(r, rect, profiler);
 		Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
-		enhance(*points, *raster, names.at(r));
+		enhance(*points, *raster, names.at(r), profiler);
 	}
 	return points;
 }

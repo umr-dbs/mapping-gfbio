@@ -16,7 +16,7 @@ class HistogramOperator : public GenericOperator {
 		HistogramOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~HistogramOperator();
 
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 
@@ -54,8 +54,8 @@ struct histogram{
 };
 
 
-std::unique_ptr<GenericPlot> HistogramOperator::getPlot(const QueryRectangle &rect) {
-	auto raster = getRasterFromSource(0, rect);
+std::unique_ptr<GenericPlot> HistogramOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto raster = getRasterFromSource(0, rect, profiler);
 
 	Profiler::Profiler p("HISTOGRAM_OPERATOR");
 	return callUnaryOperatorFunc<histogram>(raster.get());

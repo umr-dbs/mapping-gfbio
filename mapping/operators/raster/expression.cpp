@@ -2,7 +2,6 @@
 
 #include "raster/raster.h"
 #include "raster/typejuggling.h"
-#include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 
@@ -19,7 +18,7 @@ class ExpressionOperator : public GenericOperator {
 		ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ExpressionOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		std::string expression;
 		GDALDataType output_type;
@@ -52,7 +51,7 @@ REGISTER_OPERATOR(ExpressionOperator, "expression");
 
 
 
-std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	int rastercount = getRasterSourceCount();
 	if (rastercount > 26)
 		throw OperatorException("ExpressionOperator: cannot have more than 26 input rasters");
@@ -62,18 +61,10 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	std::vector<std::unique_ptr<GenericRaster> > in_rasters;
 	in_rasters.reserve(rastercount);
 
-	// Load all sources *before* starting the profiling of this operator
+	// Load all sources and migrate to opencl
 	for (int i=0;i<rastercount;i++) {
-		in_rasters.push_back(getRasterFromSource(i, rect));
-	}
-
-	Profiler::Profiler p("CL_EXPRESSION_OPERATOR");
-	{
-		// now migrate to CL, this is part of the profiling costs
-		//Profiler::Profiler p("CL_EXPRESSION_OPERATOR_MIGRATION");
-		for (int i=0;i<rastercount;i++) {
-			in_rasters[i]->setRepresentation(GenericRaster::OPENCL);
-		}
+		in_rasters.push_back(getRasterFromSource(i, rect, profiler));
+		in_rasters[i]->setRepresentation(GenericRaster::OPENCL);
 	}
 
 	// The first raster determines the data type and sizes
@@ -123,6 +114,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	auto raster_out = GenericRaster::create(raster_in->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
+	prog.setProfiler(profiler);
 	for (int i=0;i<rastercount;i++) {
 		if (i > 0) {
 			if (in_rasters[i]->lcrs != raster_in->lcrs)
@@ -131,10 +123,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 		prog.addInRaster(in_rasters[i].get());
 	}
 	prog.addOutRaster(raster_out.get());
-	{
-		//Profiler::Profiler p("CL_EXPRESSION_OPERATOR_COMPILATION");
-		prog.compile(sourcecode, "expressionkernel");
-	}
+	prog.compile(sourcecode, "expressionkernel");
 	prog.run();
 
 	return raster_out;

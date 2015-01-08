@@ -198,14 +198,16 @@ static void runquery(int argc, char *argv[]) {
 	std::string result = root.get("query_result", "raster").asString();
 
 	if (result == "raster") {
-		auto raster = graph->getCachedRaster(qrect_from_json(root));
+		QueryProfiler profiler;
+		auto raster = graph->getCachedRaster(qrect_from_json(root), profiler);
 		{
 			Profiler::Profiler p("TO_GTIFF");
 			raster->toGDAL(out_filename, "GTiff");
 		}
 	}
 	else if (result == "points") {
-		auto points = graph->getCachedPoints(qrect_from_json(root));
+		QueryProfiler profiler;
+		auto points = graph->getCachedPoints(qrect_from_json(root), profiler);
 		auto csv = points->toCSV();
 		FILE *f = fopen(out_filename, "w");
 		if (f) {
@@ -253,11 +255,13 @@ static int testquery(int argc, char *argv[]) {
 		std::string real_hash;
 
 		if (result == "raster") {
-			auto raster = graph->getCachedRaster(qrect_from_json(root));
+			QueryProfiler profiler;
+			auto raster = graph->getCachedRaster(qrect_from_json(root), profiler);
 			real_hash = raster->hash();
 		}
 		else if (result == "points") {
-			auto points = graph->getCachedPoints(qrect_from_json(root));
+			QueryProfiler profiler;
+			auto points = graph->getCachedPoints(qrect_from_json(root), profiler);
 			real_hash = points->hash();
 		}
 		else {

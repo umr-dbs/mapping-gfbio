@@ -19,8 +19,13 @@
 #include <memory>
 #include <string>
 
+#include <iomanip>
+#include <cctype>
+
 #include <uriparser/Uri.h>
 #include <json/json.h>
+
+#include "pointvisualization/CircleClusteringQuadTree.h"
 
 /*
 A few benchmarks:
@@ -163,6 +168,14 @@ void outputGeometry(GenericGeometry *geometry) {
 	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
 }
 
+bool to_bool(std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+    std::istringstream is(str);
+    bool b;
+    is >> std::boolalpha >> b;
+    return b;
+}
+
 auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, time_t timestamp) -> int {
 	if(params["request"] == "GetFeature") {
 		std::string version = params["version"];
@@ -223,6 +236,35 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 
 		QueryProfiler profiler;
 		auto points = graph->getCachedPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg), profiler);
+
+		if(to_bool(params["clustered"]) == true) {
+			auto clusteredPoints = std::make_unique<PointCollection>(query_epsg);
+
+			auto x1 = bbox[0];
+			auto x2 = bbox[2];
+			auto y1 = bbox[1];
+			auto y2 = bbox[3];
+			auto xres = output_width;
+			auto yres = output_height;
+			pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(
+															pv::Coordinate((x2 + x1) / (2 * xres), (y2 + y1) / (2 * yres)),
+															pv::Dimension((x2 - x1) / (2 * xres), (y2 - y1) / (2 * yres)),
+														1), 1);
+			for (Point& pointOld : points->collection) {
+				clusterer.insert(std::make_shared<pv::Circle>(pv::Coordinate(pointOld.x / xres, pointOld.y / yres), 5, 1));
+			}
+
+			auto circles = clusterer.getCircles();
+			clusteredPoints->local_md_value.addVector("radius", circles.size());
+			clusteredPoints->local_md_value.addVector("numberOfPoints", circles.size());
+			for (auto& circle : circles) {
+				size_t idx = clusteredPoints->addPoint(circle->getX() * xres, circle->getY() * yres);
+				clusteredPoints->local_md_value.set(idx, "radius", circle->getRadius());
+				clusteredPoints->local_md_value.set(idx, "numberOfPoints", circle->getNumberOfPoints());
+			}
+
+			points.swap(clusteredPoints);
+		}
 
 		outputPointCollection(points.get(), true);
 

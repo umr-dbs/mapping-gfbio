@@ -176,7 +176,101 @@ bool to_bool(std::string str) {
     return b;
 }
 
-auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, time_t timestamp) -> int {
+void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg = EPSG_WEBMERCATOR, bool allow_infinite = false) {
+	// &BBOX=0,0,10018754.171394622,10018754.171394622
+	for(int i=0;i<4;i++)
+		bbox[i] = NAN;
+
+	// Figure out if we know the extent of the CRS
+	// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
+	//                               minx          miny         maxx         maxy
+	double extent_webmercator[4] {-20037508.34 , -20037508.34 , 20037508.34 , 20037508.34};
+	double extent_latlon[4]      {     -180    ,       -90    ,      180    ,       90   };
+	double extent_msg[4]         { -5568748.276,  -5568748.276, 5568748.276,  5568748.276};
+
+	double *extent = nullptr;
+	if (epsg == EPSG_WEBMERCATOR)
+		extent = extent_webmercator;
+	else if (epsg == EPSG_LATLON)
+		extent = extent_latlon;
+	else if (epsg == EPSG_GEOSMSG)
+		extent = extent_msg;
+
+
+	std::string delimiters = " ,";
+	size_t current, next = -1;
+	int element = 0;
+	do {
+		current = next + 1;
+		next = bbox_str.find_first_of(delimiters, current);
+		std::string stringValue = bbox_str.substr(current, next - current);
+		double value = 0;
+
+		if (stringValue == "Infinity") {
+			if (!allow_infinite)
+				throw ArgumentException("cannot process BBOX with Infinity");
+			if (!extent)
+				throw ArgumentException("cannot process BBOX with Infinity and unknown CRS");
+			value = std::max(extent[element], extent[(element+2)%4]);
+		}
+		else if (stringValue == "-Infinity") {
+			if (!allow_infinite)
+				throw ArgumentException("cannot process BBOX with Infinity");
+			if (!extent)
+				throw ArgumentException("cannot process BBOX with Infinity and unknown CRS");
+			value = std::min(extent[element], extent[(element+2)%4]);
+		}
+		else {
+			value = std::stod(stringValue);
+			if (!std::isfinite(value))
+				throw ArgumentException("BBOX contains entry that is not a finite number");
+		}
+
+		bbox[element++] = value;
+	} while (element < 4 && next != std::string::npos);
+
+	if (element != 4)
+		throw ArgumentException("Could not parse BBOX parameter");
+
+	/*
+	 * OpenLayers insists on sending latitude in x and longitude in y.
+	 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
+	 * The simple solution is to swap the x and y coordinates.
+	 */
+	if (epsg == EPSG_LATLON) {
+		std::swap(bbox[0], bbox[1]);
+		std::swap(bbox[2], bbox[3]);
+	}
+
+	// If no extent is known, just trust the client.
+	if (extent) {
+		double bbox_normalized[4];
+		for (int i=0;i<4;i+=2) {
+			bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
+			bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
+		}
+
+		// Koordinaten können leicht ausserhalb liegen, z.B.
+		// 20037508.342789, 20037508.342789
+		for (int i=0;i<4;i++) {
+			if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
+				bbox_normalized[i] = 0.0;
+			else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
+				bbox_normalized[i] = 1.0;
+		}
+
+		for (int i=0;i<4;i++) {
+			if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0)
+				throw ArgumentException("BBOX exceeds extent");
+		}
+	}
+
+	//bbox_normalized[1] = 1.0 - bbox_normalized[1];
+	//bbox_normalized[3] = 1.0 - bbox_normalized[3];
+}
+
+
+void processWFS(std::map<std::string, std::string> &params, epsg_t query_epsg, time_t timestamp) {
 	if(params["request"] == "GetFeature") {
 		std::string version = params["version"];
 		if (version != "2.0.0")
@@ -188,49 +282,9 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 			abort("output_width not valid");
 		}
 
-		std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
 		double bbox[4];
+		parseBBOX(bbox, params.at("bbox"), query_epsg, true);
 
-		{
-			std::string delimiters = " ,";
-			size_t current, next = -1;
-			int element = 0;
-			do {
-			  current = next + 1;
-			  next = bbox_str.find_first_of(delimiters, current);
-			  std::string stringValue = bbox_str.substr(current, next - current);
-			  double value = 0;
-
-			  if(stringValue == "Infinity") {
-				  if (query_epsg == EPSG_WEBMERCATOR) {
-					  value = 20037508.34;
-				  }
-			  } else if(stringValue == "-Infinity") {
-				  if (query_epsg == EPSG_WEBMERCATOR) {
-					  value = -20037508.34;
-				  }
-			  } else {
-				  value = std::stod(stringValue);
-				  if (isnan(value))
-				  	abort("BBOX value is NaN");
-			  }
-
-			  bbox[element++] = value;
-			} while (element < 4 && next != std::string::npos);
-
-			if (element != 4)
-				abort("BBOX does not contain 4 doubles");
-		}
-
-		/*
-		 * OpenLayers insists on sending latitude in x and longitude in y.
-		 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
-		 * The simple solution is to swap the x and y coordinates.
-		 */
-		if (query_epsg == EPSG_LATLON) {
-			std::swap(bbox[0], bbox[1]);
-			std::swap(bbox[2], bbox[3]);
-		}
 
 		auto graph = GenericOperator::fromJSON(params["layers"]);
 
@@ -267,8 +321,6 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 		}
 
 		outputPointCollection(points.get(), true);
-
-		return 0;
 	}
 }
 
@@ -311,7 +363,7 @@ std::pair<double, double> getWfsParameterRangeDouble(std::string wfsParameterStr
 	return resultPair;
 }
 
-int getWfsParameterInteger(std::string wfsParameterString){
+int getWfsParameterInteger(const std::string &wfsParameterString){
 
 	size_t rangeStart = wfsParameterString.find_first_of("(");
 	size_t rangeEnd = wfsParameterString.find_last_of(")");
@@ -331,7 +383,7 @@ int getWfsParameterInteger(std::string wfsParameterString){
 //}
 
 
-auto processWCS(std::map<std::string, std::string> params) -> int {
+int processWCS(std::map<std::string, std::string> &params) {
 
 	/*http://www.myserver.org:port/path?
 	 * service=WCS &version=2.0
@@ -408,6 +460,21 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 	return 1;
 }
 
+epsg_t epsg_from_param(const std::string &crs, epsg_t def = EPSG_WEBMERCATOR) {
+	if (crs == "")
+		return def;
+	if (crs.compare(0,5,"EPSG:") == 0)
+		return std::stoi(crs.substr(5, std::string::npos));
+	throw ArgumentException("Unknown CRS specified");
+}
+
+epsg_t epsg_from_param(const std::map<std::string, std::string> &params, const std::string &key, epsg_t def = EPSG_WEBMERCATOR) {
+	if (params.count(key) < 1)
+		return def;
+	return epsg_from_param(params.at(key), def);
+}
+
+
 int main() {
 	//printf("Content-type: text/plain\r\n\r\nDebugging:\n");
 	try {
@@ -419,13 +486,8 @@ int main() {
 
 		std::map<std::string, std::string> params = parseQueryString(query_string);
 
-		epsg_t query_epsg = EPSG_WEBMERCATOR;
-		if (params.count("crs") > 0) {
-			std::string crs = params["crs"];
-			if (crs.compare(0,5,"EPSG:") == 0) {
-				query_epsg = std::stoi(crs.substr(5, std::string::npos));
-			}
-		}
+		epsg_t query_epsg = epsg_from_param(params, "crs", EPSG_WEBMERCATOR);
+
 		time_t timestamp = 42;
 		if (params.count("timestamp") > 0) {
 			timestamp = std::stol(params["timestamp"]);
@@ -485,7 +547,9 @@ int main() {
 		}
 
 		if(params.count("service") > 0 && params["service"] == "WFS") {
-			return processWFS(params, query_epsg, timestamp);
+			query_epsg = epsg_from_param(params, "srsname", query_epsg);
+			processWFS(params, query_epsg, timestamp);
+			return 0;
 		}
 
 		// WCS-Requests
@@ -524,56 +588,8 @@ int main() {
 					//if (params["tiled"] != "true")
 					//	abort("only tiled for now");
 
-					std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
 					double bbox[4];
-
-					{
-						std::string delimiters = " ,";
-						size_t current, next = -1;
-						int element = 0;
-						do {
-						  current = next + 1;
-						  next = bbox_str.find_first_of(delimiters, current);
-						  double value = std::stod( bbox_str.substr(current, next - current) );
-						  if (isnan(value))
-							  abort("BBOX value is NaN");
-						  bbox[element++] = value;
-						} while (element < 4 && next != std::string::npos);
-
-						if (element != 4)
-							abort("BBOX does not contain 4 doubles");
-					}
-
-					// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
-									//    minx          miny         maxx         maxy
-					double extent[4] {-20037508.34, -20037508.34, 20037508.34, 20037508.34};
-					double bbox_normalized[4];
-					for (int i=0;i<4;i+=2) {
-						bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
-						bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
-					}
-
-					// Koordinaten können leicht ausserhalb liegen, z.B.
-					// 20037508.342789, 20037508.342789
-					for (int i=0;i<4;i++) {
-						if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
-							bbox_normalized[i] = 0.0;
-						else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
-							bbox_normalized[i] = 1.0;
-					}
-
-					for (int i=0;i<4;i++) {
-						if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0) {
-							printf("Content-type: text/plain\r\n\r\n");
-							printf("extent: (%f, %f) -> (%f, %f)\n", extent[0], extent[1], extent[2], extent[3]);
-							printf("   raw: (%f, %f) -> (%f, %f)\n", bbox[0], bbox[1], bbox[2], bbox[3]);
-							printf("normal: (%10f, %10f) -> (%10f, %10f)\n", bbox_normalized[0], bbox_normalized[1], bbox_normalized[2], bbox_normalized[3]);
-							abort("bbox outside of extent");
-						}
-					}
-
-					//bbox_normalized[1] = 1.0 - bbox_normalized[1];
-					//bbox_normalized[3] = 1.0 - bbox_normalized[3];
+					parseBBOX(bbox, params.at("bbox"), query_epsg, false);
 
 					auto graph = GenericOperator::fromJSON(params["layers"]);
 					std::string colorizer;
@@ -583,16 +599,6 @@ int main() {
 					std::string format("image/png");
 					if (params.count("format") > 0) {
 						format = params["format"];
-					}
-
-					/*
-					 * OpenLayers insists on sending latitude in x and longitude in y.
-					 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
-					 * The simple solution is to swap the x and y coordinates.
-					 */
-					if (query_epsg == EPSG_LATLON) {
-						std::swap(bbox[0], bbox[1]);
-						std::swap(bbox[2], bbox[3]);
 					}
 
 					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);

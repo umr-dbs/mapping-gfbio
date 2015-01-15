@@ -22,6 +22,8 @@ class ProjectionOperator : public GenericOperator {
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream &stream);
 	private:
 		QueryRectangle projectQueryRectangle(const QueryRectangle &rect, const GDAL::CRSTransformer &transformer);
 		epsg_t src_epsg, dest_epsg;
@@ -51,6 +53,10 @@ ProjectionOperator::ProjectionOperator(int sourcecounts[], GenericOperator *sour
 ProjectionOperator::~ProjectionOperator() {
 }
 REGISTER_OPERATOR(ProjectionOperator, "projection");
+
+void ProjectionOperator::writeSemanticParameters(std::ostringstream &stream) {
+	stream << "\"src_epsg\": " << src_epsg << ", \"dest_epsg\": " << dest_epsg;
+}
 
 template<typename T>
 struct raster_projection {

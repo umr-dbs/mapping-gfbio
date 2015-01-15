@@ -3,6 +3,7 @@
 
 #include <ctime>
 #include <string>
+#include <sstream>
 #include <memory>
 #include "util/make_unique.h"
 
@@ -78,8 +79,11 @@ class GenericOperator {
 		std::unique_ptr<GenericGeometry> getCachedGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
 		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
+		const std::string &getSemanticId() { return semantic_id; }
+
 	protected:
 		GenericOperator(int sourcecounts[], GenericOperator *sources[]);
+		virtual void writeSemanticParameters(std::ostringstream &stream);
 		void assumeSources(int rasters, int pointcollections=0, int geometries=0);
 
 		int getRasterSourceCount() { return sourcecounts[0]; }
@@ -101,6 +105,7 @@ class GenericOperator {
 		GenericOperator *sources[MAX_SOURCES];
 
 		std::string type;
+		std::string semantic_id;
 		int depth;
 
 		void operator=(GenericOperator &) = delete;

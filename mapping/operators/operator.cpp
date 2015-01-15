@@ -150,7 +150,7 @@ QueryProfiler & QueryProfiler::operator+=(QueryProfiler &other) {
 /*
  * GenericOperator class
  */
-GenericOperator::GenericOperator(int _sourcecounts[], GenericOperator *_sources[]) : type(), depth(0) {
+GenericOperator::GenericOperator(int _sourcecounts[], GenericOperator *_sources[]) : type(), semantic_id(), depth(0) {
 	for (int i=0;i<MAX_INPUT_TYPES;i++)
 		sourcecounts[i] = _sourcecounts[i];
 
@@ -169,6 +169,8 @@ GenericOperator::~GenericOperator() {
 	}
 }
 
+void GenericOperator::writeSemanticParameters(std::ostringstream &) {
+}
 
 void GenericOperator::assumeSources(int rasters, int pointcollections, int geometries) {
 	return;
@@ -180,20 +182,20 @@ void GenericOperator::assumeSources(int rasters, int pointcollections, int geome
 		throw OperatorException("Wrong amount of geometry sources");
 }
 
-std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &, QueryProfiler &) {
 	throw OperatorException("getRaster() called on an operator that doesn't return rasters");
 }
-std::unique_ptr<PointCollection> GenericOperator::getPoints(const QueryRectangle &, QueryProfiler &profiler) {
+std::unique_ptr<PointCollection> GenericOperator::getPoints(const QueryRectangle &, QueryProfiler &) {
 	throw OperatorException("getPoints() called on an operator that doesn't return points");
 }
-std::unique_ptr<GenericGeometry> GenericOperator::getGeometry(const QueryRectangle &, QueryProfiler &profiler) {
+std::unique_ptr<GenericGeometry> GenericOperator::getGeometry(const QueryRectangle &, QueryProfiler &) {
 	throw OperatorException("getGeometry() called on an operator that doesn't return geometries");
 }
-std::unique_ptr<GenericPlot> GenericOperator::getPlot(const QueryRectangle &, QueryProfiler &profiler) {
+std::unique_ptr<GenericPlot> GenericOperator::getPlot(const QueryRectangle &, QueryProfiler &) {
 	throw OperatorException("getPlot() called on an operator that doesn't return data vectors");
 }
 
-static void d_profile(int depth, const std::string &type, const char *result, QueryProfiler &profiler) {
+static void d_profile(int depth, const std::string &type, const char *result, QueryProfiler &profiler, size_t bytes = 0) {
 	std::ostringstream msg;
 	msg.precision(4);
 	for (int i=0;i<depth;i++)
@@ -202,6 +204,14 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 		<< " CPU: " << profiler.self_cpu << "/" << profiler.all_cpu
 		<< " GPU: " << profiler.self_gpu << "/" << profiler.all_gpu
 		<< " I/O: " << profiler.self_io << "/" << profiler.all_io;
+	if (bytes > 0) {
+		// Estimate the costs to cache this item
+		double cache_cpu = 0.000000005 * bytes;
+		size_t cache_io = bytes;
+		msg << "  Caching CPU: " << cache_cpu << " I/O: " << cache_io;
+		if (2 * cache_cpu < (profiler.all_cpu + profiler.all_gpu) || 2 * cache_io < profiler.all_io)
+			msg << " CACHE CANDIDATE";
+	}
 	d(msg.str());
 }
 
@@ -210,7 +220,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	profiler.startTimer();
 	auto result = getRaster(rect, profiler);
 	profiler.stopTimer();
-	d_profile(depth, type, "raster", profiler);
+	d_profile(depth, type, "raster", profiler, result->getDataSize());
 	parent_profiler += profiler;
 	return result;
 }
@@ -274,7 +284,7 @@ std::unique_ptr<GenericGeometry> GenericOperator::getGeometryFromSource(int idx,
 // JSON constructor
 static int parseSourcesFromJSON(Json::Value &sourcelist, GenericOperator *sources[GenericOperator::MAX_SOURCES], int &sourcecount, int depth) {
 	if (!sourcelist.isArray() || sourcelist.size() <= 0)
-		return sourcecount;
+		return 0;
 
 	int newsources = sourcelist.size();
 
@@ -290,6 +300,8 @@ static int parseSourcesFromJSON(Json::Value &sourcelist, GenericOperator *source
 }
 
 std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json, int depth) {
+	std::string sourcetypes[] = { "raster", "points", "geometry" };
+
 	// recursively create all sources
 	Json::Value sourcelist = json["sources"];
 	Json::Value params = json["params"];
@@ -301,24 +313,48 @@ std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json, in
 	int sourcecounts[MAX_INPUT_TYPES] = {0};
 	GenericOperator *sources[MAX_SOURCES] = {nullptr};
 	try {
+		// Instantiate all the sources
 		if (sourcelist.isObject()) {
-			sourcecounts[0] = parseSourcesFromJSON(sourcelist["raster"], sources, sourcecount, depth+1);
-			sourcecounts[1] = parseSourcesFromJSON(sourcelist["points"], sources, sourcecount, depth+1);
-			sourcecounts[2] = parseSourcesFromJSON(sourcelist["geometry"], sources, sourcecount, depth+1);
+			for (int i=0;i<MAX_INPUT_TYPES;i++)
+				sourcecounts[i] = parseSourcesFromJSON(sourcelist[sourcetypes[i]], sources, sourcecount, depth+1);
 		}
 
 		// now check the operator name and instantiate the correct class
 		std::string type = json["type"].asString();
 
 		auto map = getRegisteredConstructorsMap();
-		if (map->count(type) != 1) {
+		if (map->count(type) != 1)
 			throw OperatorException(std::string("Unknown operator type: '")+type+"'");
-		}
 
 		auto constructor = map->at(type);
 		auto op = constructor(sourcecounts, sources, params);
 		op->type = type;
 		op->depth = depth;
+
+		// Finally construct the semantic id
+		std::ostringstream semantic_id;
+		semantic_id << "{ \"type\": \"" << type << "\", \"params\": {";
+		op->writeSemanticParameters(semantic_id);
+		semantic_id << "}, \"sources\":{";
+		int sourceidx = 0;
+		bool first_sourcetype = true;
+		for (int i=0;i<MAX_INPUT_TYPES;i++) {
+			int sourcecount = op->sourcecounts[i];
+			if (sourcecount > 0) {
+				if (!first_sourcetype)
+					semantic_id << ",";
+				first_sourcetype = false;
+				semantic_id << "\"" << sourcetypes[i] << "\": [";
+				for (int j=0;j<sourcecount;j++) {
+					if (j > 0)
+						semantic_id << ",";
+					semantic_id << op->sources[sourceidx++]->semantic_id;
+				}
+				semantic_id << "]";
+			}
+		}
+		semantic_id << "}}";
+		op->semantic_id = semantic_id.str();
 		return op;
 	}
 	catch (const std::exception &e) {

@@ -6,7 +6,7 @@
 	margin-bottom: 20px;
 }
 
-.showtable_table table,th,td {
+.showtable_table table,th,tr {
 	border: 1px solid #e6e6e6;
 }
 

@@ -1,5 +1,5 @@
 .loginform_container.gfbio {
-    width: 400px;
+    width: 435px;
 }
 
 .gfbio h1 {
@@ -18,7 +18,8 @@
 
 .gfbio_logo {
     width: 200px;
-    margin-left: 100px;
+    display: block;
+    margin: 0 auto;
 }
 
 .gfbio_funded {

@@ -1,5 +1,7 @@
 .loginform_container.gfbio {
-    width: 436px;
+    width: 670px;
+    top: 160px;
+    
 }
 
 .gfbio h1 {
@@ -28,4 +30,9 @@
 
 .dfg_logo {
     width: 100px;
+}
+
+.gfbio_google_video_iframe {
+	float: left;
+	margin: 5px;
 }

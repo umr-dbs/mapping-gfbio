@@ -1,5 +1,5 @@
 
-#include "plot/text.h"
+#include "datatypes/plots/text.h"
 
 #include <json/json.h>
 

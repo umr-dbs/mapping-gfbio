@@ -1,6 +1,6 @@
 
-#include "raster/raster_priv.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster/raster_priv.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/colors.h"
 
 #include <png.h>

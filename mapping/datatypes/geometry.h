@@ -1,7 +1,7 @@
 #ifndef RASTER_GEOMETRY_H
 #define RASTER_GEOMETRY_H
 
-#include "raster/raster.h" // epsg_t
+#include "datatypes/raster.h" // epsg_t
 
 #include <geos/geom/Geometry.h>
 #include <geos/geom/Coordinate.h>

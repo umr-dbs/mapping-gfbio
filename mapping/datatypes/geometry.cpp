@@ -1,6 +1,6 @@
 
 
-#include "raster/geometry.h"
+#include "datatypes/geometry.h"
 
 #include <geos/geom/GeometryFactory.h>
 #include <geos/geom/CoordinateSequence.h>

@@ -9,7 +9,7 @@
 #include <memory>
 
 #include "raster/exceptions.h"
-#include "raster/metadata.h"
+#include "datatypes/attributes.h"
 
 #define EPSG_UNKNOWN 0
 #define EPSG_METEOSAT2 0xF592  // 62866  // 0xFE1E05A1

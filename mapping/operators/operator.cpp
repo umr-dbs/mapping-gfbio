@@ -1,8 +1,8 @@
 
-#include "raster/raster.h"
-#include "raster/pointcollection.h"
-#include "raster/geometry.h"
-#include "plot/plot.h"
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/geometry.h"
+#include "datatypes/plot.h"
 #include "util/binarystream.h"
 #include "util/debug.h"
 

@@ -1,8 +1,8 @@
 #ifndef RASTER_POINTCOLLECTION_H
 #define RASTER_POINTCOLLECTION_H
 
-#include "raster/raster.h"
-#include "raster/metadata.h"
+#include "datatypes/raster.h"
+#include "datatypes/attributes.h"
 #include <vector>
 #include <map>
 #include <string>

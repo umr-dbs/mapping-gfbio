@@ -8,7 +8,7 @@
 #include <algorithm>
 #include <limits>
 
-#include "plot.h"
+#include "datatypes/plot.h"
 
 template<std::size_t dimensions>
 class XYGraph : public GenericPlot {

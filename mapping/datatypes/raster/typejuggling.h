@@ -1,7 +1,7 @@
 #ifndef RASTER_TYPEJUGGLING_H
 #define RASTER_TYPEJUGGLING_H 1
 
-#include "raster/raster_priv.h"
+#include "datatypes/raster/raster_priv.h"
 
 
 template< template<typename T> class func, typename... V>

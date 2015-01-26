@@ -1,6 +1,6 @@
 
 
-#include "raster/raster.h"
+#include "datatypes/raster.h"
 #include "util/gdal.h"
 
 #include <stdint.h>

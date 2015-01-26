@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "plot/plot.h"
+#include "datatypes/plot.h"
 
 class PNGPlot : public GenericPlot {
 	public:

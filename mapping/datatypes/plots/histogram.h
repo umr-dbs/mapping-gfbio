@@ -5,7 +5,7 @@
 #include <sstream>
 #include <string>
 
-#include "plot/plot.h"
+#include "datatypes/plot.h"
 
 class Histogram : public GenericPlot {
 	public:

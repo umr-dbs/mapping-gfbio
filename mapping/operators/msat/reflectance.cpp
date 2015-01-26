@@ -1,6 +1,6 @@
 
-#include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"

@@ -1,7 +1,7 @@
 #ifndef RASTER_RASTER_PRIV_H
 #define RASTER_RASTER_PRIV_H 1
 
-#include "raster/raster.h"
+#include "datatypes/raster.h"
 
 template<typename T, int dimensions> class Raster : public GenericRaster {
 	public:

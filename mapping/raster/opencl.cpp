@@ -1,9 +1,9 @@
 
 #ifndef MAPPING_NO_OPENCL
 
-#include "raster/raster.h"
-#include "raster/raster_priv.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/raster_priv.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h" // For QueryProfiler

@@ -1,8 +1,8 @@
 
-#include "raster/raster.h"
-#include "raster/pointcollection.h"
-#include "raster/geometry.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/geometry.h"
+#include "datatypes/raster/typejuggling.h"
 #include "operators/operator.h"
 #include "util/gdal.h"
 #include "util/make_unique.h"

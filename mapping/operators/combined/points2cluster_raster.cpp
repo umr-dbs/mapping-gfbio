@@ -1,8 +1,8 @@
 
-#include "raster/raster.h"
-#include "raster/raster_priv.h"
-#include "raster/pointcollection.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/raster_priv.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/raster/typejuggling.h"
 #include "operators/operator.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
 

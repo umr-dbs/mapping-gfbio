@@ -1,7 +1,7 @@
 #ifndef CONVERTERS_CONVERTER_H
 #define CONVERTERS_CONVERTER_H
 
-#include "raster/raster.h"
+#include "datatypes/raster.h"
 
 class ByteBuffer {
 	public:

@@ -1,7 +1,7 @@
 
-#include "raster/raster.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/rastersource.h"
-#include "raster/typejuggling.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
 

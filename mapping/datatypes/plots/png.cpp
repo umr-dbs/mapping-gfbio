@@ -1,5 +1,5 @@
 
-#include "plot/png.h"
+#include "datatypes/plots/png.h"
 
 #include <util/base64.h>
 #include <json/json.h>

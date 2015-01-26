@@ -1,4 +1,4 @@
-#include "raster/pointcollection.h"
+#include "datatypes/pointcollection.h"
 #include "util/binarystream.h"
 #include "util/hash.h"
 #include "util/make_unique.h"

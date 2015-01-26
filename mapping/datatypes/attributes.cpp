@@ -1,6 +1,6 @@
 
 #include "raster/exceptions.h"
-#include "raster/metadata.h"
+#include "datatypes/attributes.h"
 #include "util/binarystream.h"
 
 

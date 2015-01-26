@@ -1,6 +1,6 @@
 
-#include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
@@ -21,7 +21,7 @@ class MSATRadianceOperator : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
-		bool convert; // indicates if radiance will be converted to W/ µm m² sr
+		bool convert; // indicates if radiance will be converted to W/ ï¿½m mï¿½ sr
 };
 
 

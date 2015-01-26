@@ -15,8 +15,8 @@
 #include <string>
 #include <gdal_priv.h>
 
-#include "raster/raster_priv.h"
-#include "raster/pointcollection.h"
+#include "datatypes/raster/raster_priv.h"
+#include "datatypes/pointcollection.h"
 
 class QueryProfiler;
 

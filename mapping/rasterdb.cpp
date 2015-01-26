@@ -1,7 +1,8 @@
-#include "raster/raster.h"
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
 #include "raster/rastersource.h"
 #include "raster/colors.h"
-#include "raster/pointcollection.h"
+
 #include "operators/operator.h"
 #include "converters/converter.h"
 #include "raster/profiler.h"

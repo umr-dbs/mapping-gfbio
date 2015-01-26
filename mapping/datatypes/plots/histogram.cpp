@@ -1,6 +1,6 @@
 
 #include "raster/exceptions.h"
-#include "plot/histogram.h"
+#include "datatypes/plots/histogram.h"
 
 #include <cstdio>
 #include <cmath>

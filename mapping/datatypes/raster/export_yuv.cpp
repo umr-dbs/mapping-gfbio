@@ -1,5 +1,5 @@
 
-#include "raster/raster_priv.h"
+#include "datatypes/raster/raster_priv.h"
 
 #include <stdio.h>
 

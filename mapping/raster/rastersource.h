@@ -6,7 +6,7 @@
 #include <unordered_map>
 #include <mutex>
 
-#include "raster/raster.h"
+#include "datatypes/raster.h"
 #include "util/sqlite.h"
 
 class RasterSourceChannel;

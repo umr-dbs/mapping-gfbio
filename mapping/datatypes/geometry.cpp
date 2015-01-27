@@ -1,5 +1,5 @@
 
-
+#include "raster/exceptions.h"
 #include "datatypes/geometry.h"
 
 #include <geos/geom/GeometryFactory.h>
@@ -11,7 +11,7 @@
 #include <sstream>
 
 
-GenericGeometry::GenericGeometry(epsg_t epsg) : epsg(epsg), geom(nullptr) {
+GenericGeometry::GenericGeometry(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref), geom(nullptr) {
 
 }
 GenericGeometry::~GenericGeometry() {
@@ -137,7 +137,7 @@ static void geomToGeoJSONGeometry(const geos::geom::Geometry *geom, std::ostring
 std::string GenericGeometry::toGeoJSON() {
 	std::ostringstream json;
 	json << std::fixed; // std::setprecision(4);
-	json << "{\"type\":\"Feature\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << epsg <<"\"}},\"properties\":{},\"geometry\":";
+	json << "{\"type\":\"Feature\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"properties\":{},\"geometry\":";
 	geomToGeoJSONGeometry(geom, json);
 	json << "}";
 

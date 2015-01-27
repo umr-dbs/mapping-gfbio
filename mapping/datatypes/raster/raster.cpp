@@ -61,7 +61,7 @@ size_t LocalCRS::getPixelCount() const {
 
 
 std::ostream& operator<< (std::ostream &out, const LocalCRS &rm) {
-	out << "LocalCRS(epsg=" << rm.epsg << " dim=" << rm.dimensions << " size=["<<rm.size[0]<<","<<rm.size[1]<<"] origin=["<<rm.origin[0]<<","<<rm.origin[1]<<"] scale=["<<rm.scale[0]<<","<<rm.scale[1]<<"])";
+	out << "LocalCRS(epsg=" << (int) rm.epsg << " dim=" << rm.dimensions << " size=["<<rm.size[0]<<","<<rm.size[1]<<"] origin=["<<rm.origin[0]<<","<<rm.origin[1]<<"] scale=["<<rm.scale[0]<<","<<rm.scale[1]<<"])";
 	return out;
 }
 

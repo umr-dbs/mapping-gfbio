@@ -9,19 +9,12 @@
 #include <memory>
 
 #include "raster/exceptions.h"
+#include "datatypes/spatiotemporal.h"
 #include "datatypes/attributes.h"
 
-#define EPSG_UNKNOWN 0
-#define EPSG_METEOSAT2 0xF592  // 62866  // 0xFE1E05A1
-#define EPSG_GEOSMSG 0x9E05    // 40453  // GEOS -> this is only valid for origin 0� 0� and satellite_height 35785831 (Proj4) [
-#define EPSG_WEBMERCATOR 3857 // 3785 is deprecated
-#define EPSG_LATLON 4326 // http://spatialreference.org/ref/epsg/wgs-84/
-
-typedef uint16_t epsg_t;
 
 class QueryRectangle;
 class BinaryStream;
-
 
 // LocalCoordinateSystem - lcs
 class LocalCRS {

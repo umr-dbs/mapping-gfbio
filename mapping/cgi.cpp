@@ -404,7 +404,7 @@ int processWCS(std::map<std::string, std::string> &params) {
 
 		//now we will identify the parameters for the QueryRectangle
 		std::pair<std::string, std::string> crsInformation = getCrsInformationFromOGCUri(params["outputcrs"]);
-		epsg_t query_crsId = std::stoi(crsInformation.second);
+		epsg_t query_crsId = (epsg_t) std::stoi(crsInformation.second);
 
 		/*
 		 *
@@ -464,7 +464,7 @@ epsg_t epsg_from_param(const std::string &crs, epsg_t def = EPSG_WEBMERCATOR) {
 	if (crs == "")
 		return def;
 	if (crs.compare(0,5,"EPSG:") == 0)
-		return std::stoi(crs.substr(5, std::string::npos));
+		return (epsg_t) std::stoi(crs.substr(5, std::string::npos));
 	throw ArgumentException("Unknown CRS specified");
 }
 

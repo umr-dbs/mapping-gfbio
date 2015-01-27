@@ -61,7 +61,7 @@ static void createsource(int argc, char *argv[]) {
 
 	std::unique_ptr<LocalCRS> lcrs;
 
-	epsg_t epsg = atoi(argv[2]);
+	epsg_t epsg = (epsg_t) atoi(argv[2]);
 
 	for (int i=0;i<argc-3;i++) {
 		try {
@@ -161,7 +161,7 @@ static void import(int argc, char *argv[]) {
 }
 
 static QueryRectangle qrect_from_json(Json::Value &root) {
-	epsg_t epsg = root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
+	epsg_t epsg = (epsg_t) root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
 	double x1 = root.get("query_x1", -20037508).asDouble();
 	double y1 = root.get("query_y1", -20037508).asDouble();
 	double x2 = root.get("query_x2", 20037508).asDouble();

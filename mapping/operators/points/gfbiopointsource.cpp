@@ -94,7 +94,7 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const Query
 std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (rect.epsg != EPSG_LATLON) {
 		std::ostringstream msg;
-		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << rect.epsg << ", expected " << EPSG_LATLON << ")";
+		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << (int) rect.epsg << ", expected " << (int) EPSG_LATLON << ")";
 		throw OperatorException(msg.str());
 	}
 
@@ -108,7 +108,7 @@ std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const Que
 	data.seekg(0);
 	geos::geom::Geometry *geom = wkbreader.read(data);
 
-	auto geom_out = std::make_unique<GenericGeometry>(EPSG_LATLON);
+	auto geom_out = std::make_unique<GenericGeometry>(rect);
 	geom_out->setGeom(geom);
 
 	return geom_out;

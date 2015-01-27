@@ -43,8 +43,8 @@ class MeteosatLatLongOperator : public GenericOperator {
 
 
 ProjectionOperator::ProjectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
-	src_epsg = params.get("src_epsg", EPSG_UNKNOWN).asInt();
-	dest_epsg = params.get("dest_epsg", EPSG_UNKNOWN).asInt();
+	src_epsg = (epsg_t) params.get("src_epsg", EPSG_UNKNOWN).asInt();
+	dest_epsg = (epsg_t) params.get("dest_epsg", EPSG_UNKNOWN).asInt();
 	if (src_epsg == EPSG_UNKNOWN || dest_epsg == EPSG_UNKNOWN)
 		throw OperatorException("Unknown EPSG");
 	assumeSources(1);
@@ -55,7 +55,7 @@ ProjectionOperator::~ProjectionOperator() {
 REGISTER_OPERATOR(ProjectionOperator, "projection");
 
 void ProjectionOperator::writeSemanticParameters(std::ostringstream &stream) {
-	stream << "\"src_epsg\": " << src_epsg << ", \"dest_epsg\": " << dest_epsg;
+	stream << "\"src_epsg\": " << (int) src_epsg << ", \"dest_epsg\": " << (int) dest_epsg;
 }
 
 template<typename T>
@@ -102,7 +102,7 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 	const double MSG_MAX_LAT = 79.0;  // north/south
 	const double MSG_MAX_LONG = 76.0; // east/west
 
-	if (dest_epsg == EPSG_METEOSAT2 || dest_epsg == EPSG_GEOSMSG) {
+	if (dest_epsg == EPSG_GEOSMSG) {
 		// We're loading some points and would like to display them in the msg projection. Why? Well, why not?
 		if (src_epsg == EPSG_WEBMERCATOR) {
 			// TODO: this is the whole world. A smaller rectangle would do, we just need to figure out the coordinates.
@@ -119,16 +119,6 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 		}
 		else
 			throw OperatorException("Cannot transform to METEOSAT2 projection from this projection");
-	}
-	else if (src_epsg == EPSG_METEOSAT2) {
-		// We're loading a msg raster. ALWAYS load the full raster.
-		// TODO: optimize
-		src_x1 = 0;
-		src_y1 = 0;
-		src_x2 = 3711;
-		src_y2 = 3711;
-		src_xres = 3712;
-		src_yres = 3712;
 	}
 	else if (src_epsg == EPSG_GEOSMSG) {
 		/*
@@ -222,9 +212,6 @@ std::unique_ptr<GenericRaster> ProjectionOperator::getRaster(const QueryRectangl
 		return getRasterFromSource(0, rect, profiler);
 	}
 
-	if (dest_epsg == EPSG_METEOSAT2)
-		throw OperatorException("Cannot transform raster to Meteosat Projection. Why would you want that?");
-
 	GDAL::CRSTransformer transformer(dest_epsg, src_epsg);
 
 	QueryRectangle src_rect = projectQueryRectangle(rect, transformer);
@@ -246,9 +233,6 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 	if (src_epsg == dest_epsg)
 		return getPointsFromSource(0, rect, profiler);
 
-	//if (src_epsg == EPSG_METEOSAT2 || dest_epsg == EPSG_METEOSAT2)
-	//	throw OperatorException("Cannot transform Points from or to Meteosat Projection. Why would you want that?");
-
 
 	// Need to transform "backwards" to project the query rectangle..
 	GDAL::CRSTransformer qrect_transformer(dest_epsg, src_epsg);
@@ -262,7 +246,7 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 
 	if (src_epsg != points_in->epsg) {
 		std::ostringstream msg;
-		msg << "ProjectionOperator: Source Points not in expected projection, expected " << src_epsg << " got " << points_in->epsg;
+		msg << "ProjectionOperator: Source Points not in expected projection, expected " << (int) src_epsg << " got " << (int) points_in->epsg;
 		throw OperatorException(msg.str());
 	}
 
@@ -347,7 +331,7 @@ class ProjectionTransformer: public geos::geom::util::GeometryTransformer {
 
 
 std::unique_ptr<GenericGeometry> ProjectionOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
-	if (src_epsg == EPSG_METEOSAT2 || dest_epsg == EPSG_METEOSAT2)
+	if (src_epsg == EPSG_GEOSMSG || dest_epsg == EPSG_GEOSMSG)
 		throw OperatorException("Projection: cannot transform Geometries to or from MSAT2 projection");
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
@@ -356,9 +340,9 @@ std::unique_ptr<GenericGeometry> ProjectionOperator::getGeometry(const QueryRect
 	QueryRectangle src_rect = projectQueryRectangle(rect, qrect_transformer);
 
 	auto geom_in = getGeometryFromSource(0, src_rect, profiler);
-	if (src_epsg != geom_in->epsg) {
+	if (src_epsg != geom_in->stref.epsg) {
 		std::ostringstream msg;
-		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << src_epsg << " got " << geom_in->epsg;
+		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << (int) src_epsg << " got " << (int) geom_in->stref.epsg;
 		throw OperatorException(msg.str());
 	}
 
@@ -366,7 +350,7 @@ std::unique_ptr<GenericGeometry> ProjectionOperator::getGeometry(const QueryRect
 	ProjectionTransformer pt(geom_transformer);
 	auto geom_out = pt.transform(geom_in->getGeometry());
 
-	auto out = std::make_unique<GenericGeometry>(dest_epsg);
+	auto out = std::make_unique<GenericGeometry>(SpatioTemporalReference(rect));
 	out->setGeom(geom_out.release());
 
 	return out;

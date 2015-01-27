@@ -58,7 +58,7 @@ std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &r
 
 	if (lcrs->epsg != rect.epsg) {
 		std::stringstream msg;
-		msg << "SourceOperator: wrong epsg requested. Source is " << lcrs->epsg << ", requested " << rect.epsg;
+		msg << "SourceOperator: wrong epsg requested. Source is " << (int) lcrs->epsg << ", requested " << (int) rect.epsg;
 		throw OperatorException(msg.str());
 	}
 

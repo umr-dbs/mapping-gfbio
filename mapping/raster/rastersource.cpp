@@ -150,7 +150,7 @@ void RasterSource::init() {
 	if (dimensions != (int) origins.size() || dimensions != (int) scales.size())
 		throw SourceException("json invalid, different dimensions in data");
 
-	epsg_t epsg = jrm.get("epsg", EPSG_UNKNOWN).asInt();
+	epsg_t epsg = (epsg_t) jrm.get("epsg", EPSG_UNKNOWN).asInt();
 	if (dimensions == 1) {
 		lcrs = new LocalCRS(
 			epsg,

@@ -1,6 +1,8 @@
 #ifndef OPERATORS_OPERATOR_H
 #define OPERATORS_OPERATOR_H
 
+#include "datatypes/spatiotemporal.h"
+
 #include <ctime>
 #include <string>
 #include <sstream>
@@ -20,7 +22,7 @@ class BinaryStream;
 class QueryRectangle {
 	public:
 		QueryRectangle();
-		QueryRectangle(time_t timestamp, double x1, double y1, double x2, double y2, uint32_t xres, uint32_t yres, uint16_t epsg) : timestamp(timestamp), x1(x1), y1(y1), x2(x2), y2(y2), xres(xres), yres(yres), epsg(epsg) {};
+		QueryRectangle(time_t timestamp, double x1, double y1, double x2, double y2, uint32_t xres, uint32_t yres, epsg_t epsg) : timestamp(timestamp), x1(x1), y1(y1), x2(x2), y2(y2), xres(xres), yres(yres), epsg(epsg) {};
 		QueryRectangle(BinaryStream &stream);
 
 		void toStream(BinaryStream &stream) const;
@@ -35,7 +37,7 @@ class QueryRectangle {
 		time_t timestamp;
 		double x1, y1, x2, y2;
 		uint32_t xres, yres;
-		uint16_t epsg;
+		epsg_t epsg;
 };
 
 class QueryProfiler {

@@ -1,7 +1,7 @@
 #ifndef RASTER_GEOMETRY_H
 #define RASTER_GEOMETRY_H
 
-#include "datatypes/raster.h" // epsg_t
+#include "datatypes/spatiotemporal.h"
 
 #include <geos/geom/Geometry.h>
 #include <geos/geom/Coordinate.h>
@@ -9,9 +9,9 @@
 #include <functional>
 
 
-class GenericGeometry {
+class GenericGeometry : public SpatioTemporalResult {
 	public:
-		GenericGeometry(epsg_t epsg);
+		GenericGeometry(const SpatioTemporalReference &stref);
 		~GenericGeometry();
 
 		GenericGeometry() = delete;
@@ -27,8 +27,6 @@ class GenericGeometry {
 		void setGeom(geos::geom::Geometry *new_geom);
 		std::string toWKT();
 		std::string toGeoJSON();
-
-		const epsg_t epsg;
 	private:
 		geos::geom::Geometry *geom;
 };

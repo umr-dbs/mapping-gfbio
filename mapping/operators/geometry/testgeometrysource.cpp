@@ -51,7 +51,7 @@ std::unique_ptr<GenericGeometry> TestGeometrySourceOperator::getGeometry(const Q
 
 	geos::geom::Geometry *geom = wktreader.read(data);
 
-	auto geom_out = std::make_unique<GenericGeometry>(EPSG_LATLON);
+	auto geom_out = std::make_unique<GenericGeometry>(rect);
 	geom_out->setGeom(geom);
 
 	return geom_out;

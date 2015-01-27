@@ -34,7 +34,7 @@ namespace ***REMOVED*** {
 		list["y2"] = rect.y2;
 		list["xres"] = rect.xres;
 		list["yres"] = rect.xres;
-		list["epsg"] = rect.epsg;
+		list["epsg"] = (int) rect.epsg;
 
 		return ***REMOVED***::wrap(list);
 	}
@@ -50,7 +50,7 @@ namespace ***REMOVED*** {
 			list["y2"],
 			list["xres"],
 			list["yres"],
-			list["epsg"]
+			(epsg_t) (int) list["epsg"]
 		);
 	}
 
@@ -111,7 +111,7 @@ namespace ***REMOVED*** {
 
 		***REMOVED***::S4 crs("CRS");
 		std::ostringstream epsg;
-		epsg << "EPSG:" << raster.lcrs.epsg;
+		epsg << "EPSG:" << (int) raster.lcrs.epsg;
 		crs.slot("projargs") = epsg.str();
 
 		***REMOVED***::S4 rasterlayer("RasterLayer");
@@ -139,7 +139,7 @@ namespace ***REMOVED*** {
 		std::string epsg_string = crs.slot("projargs");
 		epsg_t epsg = EPSG_UNKNOWN;
 		if (epsg_string.compare(0,5,"EPSG:") == 0)
-			epsg = std::stoi(epsg_string.substr(5, std::string::npos));
+			epsg = (epsg_t) std::stoi(epsg_string.substr(5, std::string::npos));
 		if (epsg == EPSG_UNKNOWN)
 			throw OperatorException("Result raster has no projection of form EPSG:1234 set");
 
@@ -228,7 +228,7 @@ namespace ***REMOVED*** {
 
 		***REMOVED***::S4 crs("CRS");
 		std::ostringstream epsg;
-		epsg << "EPSG:" << points.epsg;
+		epsg << "EPSG:" << (int) points.epsg;
 		crs.slot("projargs") = epsg.str();
 
 
@@ -258,7 +258,7 @@ namespace ***REMOVED*** {
 
 		if (epsg_s.compare(0,5,"EPSG:") != 0)
 			throw OperatorException("Result has an unknown epsg");
-		epsg_t epsg = std::stoi(epsg_s.substr(5, std::string::npos));
+		epsg_t epsg = (epsg_t) std::stoi(epsg_s.substr(5, std::string::npos));
 
 		auto points = std::make_unique<PointCollection>(epsg);
 

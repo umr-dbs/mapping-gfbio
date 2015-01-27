@@ -251,7 +251,7 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) {
 
 	if(displayMetadata && (local_md_value.size() > 0 || local_md_string.size() > 0 || has_time)) {
 
-		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << epsg <<"\"}},\"features\":[";
+		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) epsg <<"\"}},\"features\":[";
 
 		size_t idx = 0;
 		auto value_keys = local_md_value.getKeys();
@@ -291,7 +291,7 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) {
 	} else {
 
 		//json << "{ \"type\": \"MultiPoint\", \"coordinates\": [ ";
-		json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
+		json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
 
 		bool first = true;
 		for (const Point &p : collection) {

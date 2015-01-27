@@ -1,12 +1,13 @@
 #ifndef RASTER_POINTCOLLECTION_H
 #define RASTER_POINTCOLLECTION_H
 
-#include "datatypes/raster.h"
+#include "datatypes/spatiotemporal.h"
 #include "datatypes/attributes.h"
 #include <vector>
 #include <map>
 #include <string>
 #include <sys/types.h>
+#include <memory>
 
 class BinaryStream;
 
@@ -32,9 +33,9 @@ class Point {
 };
 
 
-class PointCollection {
+class PointCollection : public SpatioTemporalResult {
 	public:
-		PointCollection(epsg_t epsg = EPSG_UNKNOWN);
+		PointCollection(const SpatioTemporalReference &stref);
 		PointCollection(BinaryStream &stream);
 		~PointCollection();
 
@@ -43,7 +44,6 @@ class PointCollection {
 
 		void toStream(BinaryStream &stream);
 
-		epsg_t epsg;
 		std::vector<Point> collection;
 
 		// add a new point, returns index of the new point

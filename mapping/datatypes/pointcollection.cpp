@@ -1,4 +1,5 @@
 #include "datatypes/pointcollection.h"
+#include "raster/exceptions.h"
 #include "util/binarystream.h"
 #include "util/hash.h"
 #include "util/make_unique.h"
@@ -6,6 +7,7 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
+#include <cmath>
 
 
 Point::Point(double x, double y) : x(x), y(y) {
@@ -25,7 +27,7 @@ void Point::toStream(BinaryStream &stream) {
 
 
 
-PointCollection::PointCollection(epsg_t epsg) : epsg(epsg), has_time(false) {
+PointCollection::PointCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref), has_time(false) {
 
 }
 PointCollection::~PointCollection() {
@@ -47,7 +49,7 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 			kept_count++;
 	}
 
-	auto out = std::make_unique<PointCollection>(in->epsg);
+	auto out = std::make_unique<PointCollection>(in->stref);
 	out->collection.reserve(kept_count);
 	// copy global metadata
 	out->global_md_string = in->global_md_string;
@@ -102,8 +104,7 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char>
 	return ::filter<char>(this, keep);
 }
 
-PointCollection::PointCollection(BinaryStream &stream) : epsg(EPSG_UNKNOWN), has_time(false) {
-	stream.read(&epsg);
+PointCollection::PointCollection(BinaryStream &stream) : SpatioTemporalResult(stream), has_time(false) {
 	size_t count;
 	stream.read(&count);
 	collection.reserve(count);
@@ -120,7 +121,7 @@ PointCollection::PointCollection(BinaryStream &stream) : epsg(EPSG_UNKNOWN), has
 }
 
 void PointCollection::toStream(BinaryStream &stream) {
-	stream.write(epsg);
+	stream.write(stref);
 	size_t count = collection.size();
 	stream.write(count);
 
@@ -251,7 +252,7 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) {
 
 	if(displayMetadata && (local_md_value.size() > 0 || local_md_string.size() > 0 || has_time)) {
 
-		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) epsg <<"\"}},\"features\":[";
+		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
 		size_t idx = 0;
 		auto value_keys = local_md_value.getKeys();
@@ -291,7 +292,7 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) {
 	} else {
 
 		//json << "{ \"type\": \"MultiPoint\", \"coordinates\": [ ";
-		json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
+		json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
 
 		bool first = true;
 		for (const Point &p : collection) {

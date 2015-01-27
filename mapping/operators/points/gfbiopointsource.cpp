@@ -2,6 +2,7 @@
 #include "datatypes/geometry.h"
 
 #include "operators/operator.h"
+#include "raster/exceptions.h"
 #include "util/curl.h"
 #include "util/csvparser.h"
 #include "util/make_unique.h"
@@ -52,7 +53,7 @@ REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
 
 std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
+	auto points_out = std::make_unique<PointCollection>(rect);
 
 	std::stringstream data;
 	getStringFromServer(rect, data, "CSV");

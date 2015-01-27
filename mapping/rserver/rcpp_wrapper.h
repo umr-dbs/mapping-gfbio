@@ -228,7 +228,7 @@ namespace ***REMOVED*** {
 
 		***REMOVED***::S4 crs("CRS");
 		std::ostringstream epsg;
-		epsg << "EPSG:" << (int) points.epsg;
+		epsg << "EPSG:" << (int) points.stref.epsg;
 		crs.slot("projargs") = epsg.str();
 
 
@@ -260,7 +260,7 @@ namespace ***REMOVED*** {
 			throw OperatorException("Result has an unknown epsg");
 		epsg_t epsg = (epsg_t) std::stoi(epsg_s.substr(5, std::string::npos));
 
-		auto points = std::make_unique<PointCollection>(epsg);
+		auto points = std::make_unique<PointCollection>(SpatioTemporalReference(epsg, TIMETYPE_UNIX));
 
 		***REMOVED***::NumericMatrix coords = ***REMOVED***::as<***REMOVED***::NumericMatrix>(SPDF.slot("coords"));
 

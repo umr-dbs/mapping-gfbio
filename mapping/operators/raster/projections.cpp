@@ -244,9 +244,9 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 
 	auto points_in = getPointsFromSource(0, src_rect, profiler);
 
-	if (src_epsg != points_in->epsg) {
+	if (src_epsg != points_in->stref.epsg) {
 		std::ostringstream msg;
-		msg << "ProjectionOperator: Source Points not in expected projection, expected " << (int) src_epsg << " got " << (int) points_in->epsg;
+		msg << "ProjectionOperator: Source Points not in expected projection, expected " << (int) src_epsg << " got " << (int) points_in->stref.epsg;
 		throw OperatorException(msg.str());
 	}
 
@@ -267,6 +267,8 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 			point.y = y;
 		}
 	}
+
+	points_in->replaceSTRef(rect);
 
 	if (!has_filter)
 		return points_in;

@@ -2,6 +2,7 @@
 #include "datatypes/geometry.h"
 
 #include "operators/operator.h"
+#include "raster/exceptions.h"
 #include "util/make_unique.h"
 #include "util/csvparser.h"
 
@@ -42,7 +43,7 @@ static bool endsWith(const std::string &str, const std::string &suffix) {
 }
 
 std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
+	auto points_out = std::make_unique<PointCollection>(rect);
 
 	std::ifstream data(filename);
 

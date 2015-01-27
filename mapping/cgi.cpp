@@ -292,7 +292,7 @@ void processWFS(std::map<std::string, std::string> &params, epsg_t query_epsg, t
 		auto points = graph->getCachedPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg), profiler);
 
 		if(to_bool(params["clustered"]) == true) {
-			auto clusteredPoints = std::make_unique<PointCollection>(query_epsg);
+			auto clusteredPoints = std::make_unique<PointCollection>(points->stref);
 
 			auto x1 = bbox[0];
 			auto x2 = bbox[2];

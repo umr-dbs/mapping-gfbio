@@ -5,6 +5,7 @@
 #include <string>
 #include <json/json.h>
 #include <limits>
+#include <cmath>
 
 class PointsFilterByRangeOperator: public GenericOperator {
 private:

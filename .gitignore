@@ -13,3 +13,5 @@ mapping/mapping_manager
 
 /docs/waveDoc/*
 /htdocs/doc/wave/*
+/docs/mappingDoc/*
+/htdocs/doc/mapping/*

@@ -2,3 +2,7 @@
 
 # create WAVE documentation:q
 jsdoc -c jsdoc.conf
+
+# MAPPING documentation
+doxygen doxygen.conf
+

@@ -2,7 +2,6 @@
 
 #include "raster/raster.h"
 #include "raster/typejuggling.h"
-#include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 
@@ -19,7 +18,7 @@ class ExpressionOperator : public GenericOperator {
 		ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ExpressionOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		std::string expression;
 		GDALDataType output_type;
@@ -52,7 +51,7 @@ REGISTER_OPERATOR(ExpressionOperator, "expression");
 
 
 
-std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	int rastercount = getRasterSourceCount();
 	if (rastercount > 26)
 		throw OperatorException("ExpressionOperator: cannot have more than 26 input rasters");
@@ -62,8 +61,13 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	std::vector<std::unique_ptr<GenericRaster> > in_rasters;
 	in_rasters.reserve(rastercount);
 
-	// Load the first raster because it determines the data type and sizes
-	in_rasters.push_back(getRasterFromSource(0, rect));
+	// Load all sources and migrate to opencl
+	for (int i=0;i<rastercount;i++) {
+		in_rasters.push_back(getRasterFromSource(i, rect, profiler));
+		in_rasters[i]->setRepresentation(GenericRaster::OPENCL);
+	}
+
+	// The first raster determines the data type and sizes
 	GenericRaster *raster_in = in_rasters[0].get();
 
 	GDALDataType output_type = this->output_type;
@@ -72,11 +76,8 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 
 	DataDescription output_dd(output_type, raster_in->dd.min, raster_in->dd.max);
 
-	Profiler::Profiler p("CL_EXPRESSION_OPERATOR");
-	raster_in->setRepresentation(GenericRaster::OPENCL);
-
 	/*
-	 * So, first things first: let's assemble our code
+	 * Let's assemble our code
 	 */
 	std::stringstream ss_sourcecode;
 	ss_sourcecode << "__kernel void expressionkernel(";
@@ -84,7 +85,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 		ss_sourcecode << "__global const IN_TYPE" << i << " *in_data" << i << ", __global const RasterInfo *in_info" << i << ",";
 	}
 	ss_sourcecode << "__global OUT_TYPE0 *out_data, __global const RasterInfo *out_info) {"
-		"int gid = get_global_id(0);"
+		"int gid = get_global_id(0) + get_global_id(1) * in_info0->size[0];"
 		"if (gid >= in_info0->size[0]*in_info0->size[1]*in_info0->size[2])"
 		"	return;";
 	for (int i=0;i<rastercount;i++) {
@@ -113,11 +114,10 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	auto raster_out = GenericRaster::create(raster_in->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
+	prog.setProfiler(profiler);
 	for (int i=0;i<rastercount;i++) {
 		if (i > 0) {
-			in_rasters.push_back(getRasterFromSource(i, rect));
-			auto r = in_rasters[i].get();
-			if (r->lcrs != raster_in->lcrs)
+			if (in_rasters[i]->lcrs != raster_in->lcrs)
 				throw OperatorException("ExpressionOperator: not all input rasters have the same lcrs");
 		}
 		prog.addInRaster(in_rasters[i].get());

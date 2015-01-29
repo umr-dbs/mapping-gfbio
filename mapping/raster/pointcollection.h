@@ -39,6 +39,7 @@ class PointCollection {
 		~PointCollection();
 
 		std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep);
+		std::unique_ptr<PointCollection> filter(const std::vector<char> &keep);
 
 		void toStream(BinaryStream &stream);
 
@@ -62,6 +63,9 @@ class PointCollection {
 		std::string toGeoJSON(bool displayMetadata = false);
 		std::string toCSV();
 
+		std::string hash();
+
+		// Attributes
 		std::vector<time_t> timestamps;
 		bool has_time;
 

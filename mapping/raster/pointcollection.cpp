@@ -1,5 +1,6 @@
 #include "raster/pointcollection.h"
 #include "util/binarystream.h"
+#include "util/hash.h"
 #include "util/make_unique.h"
 
 #include <sstream>
@@ -31,8 +32,9 @@ PointCollection::~PointCollection() {
 
 }
 
-std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) {
-	size_t count = collection.size();
+template<typename T>
+std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T> &keep) {
+	size_t count = in->collection.size();
 	if (keep.size() != count) {
 		std::ostringstream msg;
 		msg << "PointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
@@ -45,23 +47,23 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool>
 			kept_count++;
 	}
 
-	auto out = std::make_unique<PointCollection>(epsg);
+	auto out = std::make_unique<PointCollection>(in->epsg);
 	out->collection.reserve(kept_count);
 	// copy global metadata
-	out->global_md_string = global_md_string;
-	out->global_md_value = global_md_value;
+	out->global_md_string = in->global_md_string;
+	out->global_md_value = in->global_md_value;
 
 	// copy points
 	for (size_t idx=0;idx<count;idx++) {
 		if (keep[idx]) {
-			Point &p = collection[idx];
+			Point &p = in->collection[idx];
 			out->addPoint(p.x, p.y);
 		}
 	}
 
 	// copy local MD
-	for (auto &keyValue : local_md_string) {
-		const auto &vec_in = local_md_string.getVector(keyValue.first);
+	for (auto &keyValue : in->local_md_string) {
+		const auto &vec_in = in->local_md_string.getVector(keyValue.first);
 		auto &vec_out = out->local_md_string.addVector(keyValue.first, kept_count);
 		for (size_t idx=0;idx<count;idx++) {
 			if (keep[idx])
@@ -69,8 +71,8 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool>
 		}
 	}
 
-	for (auto &keyValue : local_md_value) {
-		const auto &vec_in = local_md_value.getVector(keyValue.first);
+	for (auto &keyValue : in->local_md_value) {
+		const auto &vec_in = in->local_md_value.getVector(keyValue.first);
 		auto &vec_out = out->local_md_value.addVector(keyValue.first, kept_count);
 		for (size_t idx=0;idx<count;idx++) {
 			if (keep[idx])
@@ -80,16 +82,24 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool>
 	// copy time array
 	out->has_time = false;
 	out->timestamps.clear();
-	if (has_time) {
+	if (in->has_time) {
 		out->has_time = true;
 		out->timestamps.reserve(kept_count);
 		for (size_t idx=0;idx<count;idx++) {
 			if (keep[idx])
-				out->timestamps.push_back(timestamps[idx]);
+				out->timestamps.push_back(in->timestamps[idx]);
 		}
 	}
 
 	return out;
+}
+
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) {
+	return ::filter<bool>(this, keep);
+}
+
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) {
+	return ::filter<char>(this, keep);
 }
 
 PointCollection::PointCollection(BinaryStream &stream) : epsg(EPSG_UNKNOWN), has_time(false) {
@@ -321,7 +331,6 @@ std::string PointCollection::toCSV() {
 
 	size_t idx = 0;
 	for (const auto &p : collection) {
-		fprintf(stderr, "points\n");
 		csv << p.x << "," << p.y;
 
 		if (has_time)
@@ -341,3 +350,9 @@ std::string PointCollection::toCSV() {
 	return csv.str();
 }
 
+std::string PointCollection::hash() {
+	// certainly not the most stable solution, but it has few lines of code..
+	std::string csv = toCSV();
+
+	return calculateHash((const unsigned char *) csv.c_str(), (int) csv.length()).asHex();
+}

@@ -1,6 +1,5 @@
 #include "raster/raster.h"
 #include "raster/typejuggling.h"
-#include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 
@@ -14,7 +13,7 @@ class MatrixKernelOperator : public GenericOperator {
 		MatrixKernelOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MatrixKernelOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		int matrixsize, *matrix;
 };
@@ -88,12 +87,11 @@ struct matrixkernel{
 
 #include "operators/raster/matrixkernel.cl.h"
 
-std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectangle &rect) {
-	auto raster_in = getRasterFromSource(0, rect);
+std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto raster_in = getRasterFromSource(0, rect, profiler);
 
 #ifndef MAPPING_NO_OPENCL
 	RasterOpenCL::init();
-	Profiler::Profiler p("MATRIXKERNEL_CL_OPERATOR");
 	raster_in->setRepresentation(GenericRaster::Representation::OPENCL);
 
 	auto raster_out = GenericRaster::create(raster_in->lcrs, raster_in->dd, GenericRaster::Representation::OPENCL);
@@ -103,6 +101,7 @@ std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectan
 
 	try {
 		RasterOpenCL::CLProgram prog;
+		prog.setProfiler(profiler);
 		prog.addInRaster(raster_in.get());
 		prog.addOutRaster(raster_out.get());
 		prog.compile(operators_raster_matrixkernel, "matrixkernel");
@@ -120,13 +119,12 @@ std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectan
 
 	}
 	catch (cl::Error &e) {
-		printf("cl::Error %d: %s\n", e.err(), e.what());
+		fprintf(stderr, "cl::Error %d: %s\n", e.err(), e.what());
 		throw;
 	}
 
 	return raster_out;
 #else
-	Profiler::Profiler p("MATRIXKERNEL_OPERATOR");
 	return callUnaryOperatorFunc<matrixkernel>(raster_in.get(), matrixsize, matrix);
 #endif
 }

@@ -21,7 +21,7 @@ public:
 	PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 	virtual ~PointsMetadataToGraph();
 
-	virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
+	virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 PointsMetadataToGraph::PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -63,8 +63,8 @@ auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::uniqu
 	return std::move(xyGraph);
 }
 
-std::unique_ptr<GenericPlot> PointsMetadataToGraph::getPlot(const QueryRectangle &rect) {
-	auto points = getPointsFromSource(0, rect);
+std::unique_ptr<GenericPlot> PointsMetadataToGraph::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points = getPointsFromSource(0, rect, profiler);
 
 	// TODO: GENERALIZE
 	if(names.size() == 3) {

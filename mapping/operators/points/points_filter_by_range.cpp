@@ -15,7 +15,7 @@ public:
 	PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 	virtual ~PointsFilterByRangeOperator();
 
-	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 PointsFilterByRangeOperator::PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -31,8 +31,8 @@ PointsFilterByRangeOperator::~PointsFilterByRangeOperator() {
 }
 REGISTER_OPERATOR(PointsFilterByRangeOperator, "points_filter_by_range");
 
-std::unique_ptr<PointCollection> PointsFilterByRangeOperator::getPoints(const QueryRectangle &rect) {
-	auto points = getPointsFromSource(0, rect);
+std::unique_ptr<PointCollection> PointsFilterByRangeOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points = getPointsFromSource(0, rect, profiler);
 
 	size_t count = points->collection.size();
 	std::vector<bool> keep(count, false);

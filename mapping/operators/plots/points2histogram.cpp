@@ -21,7 +21,7 @@ public:
 	Points2HistogramOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 	virtual ~Points2HistogramOperator();
 
-	virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
+	virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 /**
@@ -54,8 +54,8 @@ REGISTER_OPERATOR(Points2HistogramOperator, "points2histogram");
 /**
  * Calculates the histogram and returns it.
  */
-std::unique_ptr<GenericPlot> Points2HistogramOperator::getPlot(const QueryRectangle &rect) {
-	auto points = getPointsFromSource(0, rect);
+std::unique_ptr<GenericPlot> Points2HistogramOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points = getPointsFromSource(0, rect, profiler);
 
 	//double raster_max = points->global_md_value.get(name + "_max");
 	//double raster_min = points->global_md_value.get(name + "_min");

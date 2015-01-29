@@ -19,10 +19,9 @@ class GFBioPointSourceOperator : public GenericOperator {
 		GFBioPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~GFBioPointSourceOperator();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
-		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
-		std::unique_ptr<geos::geom::Geometry> loadGeometryFromServer(const QueryRectangle &qrect);
 		void getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format);
 		std::string datasource;
 		std::string query;
@@ -38,7 +37,6 @@ GFBioPointSourceOperator::GFBioPointSourceOperator(int sourcecounts[], GenericOp
 	query = params.get("query", "").asString();
 	params.get("includeMetadata", "false");
 	includeMetadata = params.get("includeMetadata", "false").asString();
-	//fprintf(stderr, params.get("includeMetadata", "hahahaha").asCString());
 }
 
 GFBioPointSourceOperator::~GFBioPointSourceOperator() {
@@ -53,42 +51,65 @@ REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
 
 
-std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
 
 	std::stringstream data;
 	getStringFromServer(rect, data, "CSV");
+	profiler.addIOCost( data.tellp() );
 
-	CSVParser parser(data, ',', '\n');
+	try {
+		CSVParser parser(data, ',', '\n');
 
-	auto header = parser.readHeaders();
-	//TODO: distinguish between double and string properties
-	for(int i=2; i < header.size(); i++){
-		points_out->local_md_string.addVector(header[i]);
+		auto header = parser.readHeaders();
+		//TODO: distinguish between double and string properties
+		for(int i=2; i < header.size(); i++){
+			points_out->local_md_string.addVector(header[i]);
+		}
+
+		while(true){
+			auto tuple = parser.readTuple();
+			if (tuple.size() < 1)
+				break;
+
+			size_t idx = points_out->addPoint(std::stod(tuple[0]),std::stod(tuple[1]));
+			//double year = std::atof(csv[3].c_str());
+
+			for(int i=2; i < tuple.size(); i++)
+				points_out->local_md_string.set(idx, header[i], tuple[i]);
+		}
+		//fprintf(stderr, data.str().c_str());
+		return points_out;
+	}
+	catch (const OperatorException &e) {
+		data.seekg(0, std::ios_base::beg);
+		fprintf(stderr, "CSV:\n%s\n", data.str().c_str());
+		throw;
 	}
 
-	while(true){
-		auto tuple = parser.readTuple();
-		if (tuple.size() < 1)
-			break;
-
-		size_t idx = points_out->addPoint(std::stod(tuple[0]),std::stod(tuple[1]));
-		//double year = std::atof(csv[3].c_str());
-
-		for(int i=2; i < tuple.size(); i++)
-			points_out->local_md_string.set(idx, header[i], tuple[i]);
-	}
-	//fprintf(stderr, data.str().c_str());
-	return points_out;
 }
 
 
 // pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/WKB?datasource=IUCN&query={"globalAttributes":{"speciesName":"Puma concolor"}}
-std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const QueryRectangle &rect) {
-	auto geom = loadGeometryFromServer(rect);
+std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
+	if (rect.epsg != EPSG_LATLON) {
+		std::ostringstream msg;
+		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << rect.epsg << ", expected " << EPSG_LATLON << ")";
+		throw OperatorException(msg.str());
+	}
+
+	std::stringstream data;
+	getStringFromServer(rect, data, "WKB");
+	profiler.addIOCost( data.tellp() );
+
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+	geos::io::WKBReader wkbreader(*gf);
+
+	data.seekg(0);
+	geos::geom::Geometry *geom = wkbreader.read(data);
 
 	auto geom_out = std::make_unique<GenericGeometry>(EPSG_LATLON);
-	geom_out->setGeom(geom.release());
+	geom_out->setGeom(geom);
 
 	return geom_out;
 }
@@ -101,38 +122,11 @@ void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, s
 			<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
 			<< rect.x2 << "," << rect.y2 << "&includeMetadata=" << includeMetadata;
 
-	fprintf(stderr, query.c_str());
+	//fprintf(stderr, "query: %s\nurl: %s\n", query.c_str(), url.str().c_str());
+	//curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
 	curl.setOpt(CURLOPT_URL, url.str().c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
 
 	curl.perform();
-}
-
-std::unique_ptr<geos::geom::Geometry> GFBioPointSourceOperator::loadGeometryFromServer(const QueryRectangle &rect) {
-	if (rect.epsg != EPSG_LATLON) {
-		std::ostringstream msg;
-		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << rect.epsg << ", expected " << EPSG_LATLON << ")";
-		throw OperatorException(msg.str());
-	}
-
-
-	//url << "http://dbsvm.mathematik.uni-marburg.de:9833/gfbio-prototype/rest/Wizzard/fetchDataSource?datasource" << datasource << "&query=" << query;
-	std::stringstream data;
-
-	getStringFromServer(rect, data, "WKB");
-	//curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
-
-	// result should now be in our stringstream
-
-//	printf("Content-type: text/plain\r\n\r\nURL: %s\nResult (%u bytes): '%s'\n", url.str().c_str(), data.str().length(), data.str().c_str());
-//	exit(5);
-
-	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
-	geos::io::WKBReader wkbreader(*gf);
-
-	data.seekg(0);
-	geos::geom::Geometry *geom = wkbreader.read(data);
-
-	return std::unique_ptr<geos::geom::Geometry>(geom);
 }

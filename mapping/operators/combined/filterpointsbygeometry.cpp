@@ -22,7 +22,7 @@ class FilterPointsByGeometry : public GenericOperator {
 		FilterPointsByGeometry(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~FilterPointsByGeometry();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 
@@ -37,15 +37,15 @@ FilterPointsByGeometry::~FilterPointsByGeometry() {
 REGISTER_OPERATOR(FilterPointsByGeometry, "filterpointsbygeometry");
 
 
-std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	//TODO: check projection
 	const geos::geom::PrecisionModel pm;
 	geos::geom::GeometryFactory gf = geos::geom::GeometryFactory(&pm, 4326);
 	geos::geom::GeometryFactory* geometryFactory = &gf;
 
-	auto points = getPointsFromSource(0, rect);
+	auto points = getPointsFromSource(0, rect, profiler);
 
-	auto generic_geometry = getGeometryFromSource(0, rect);
+	auto generic_geometry = getGeometryFromSource(0, rect, profiler);
 	auto geometry = generic_geometry->getGeometry();
 	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 

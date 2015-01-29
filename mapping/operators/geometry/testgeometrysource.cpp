@@ -13,7 +13,7 @@ class TestGeometrySourceOperator : public GenericOperator {
 		TestGeometrySourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~TestGeometrySourceOperator();
 
-		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 
@@ -28,7 +28,7 @@ TestGeometrySourceOperator::~TestGeometrySourceOperator() {
 REGISTER_OPERATOR(TestGeometrySourceOperator, "testgeometrysource");
 
 
-std::unique_ptr<GenericGeometry> TestGeometrySourceOperator::getGeometry(const QueryRectangle &rect) {
+std::unique_ptr<GenericGeometry> TestGeometrySourceOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
 
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);

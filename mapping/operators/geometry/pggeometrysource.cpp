@@ -16,7 +16,7 @@ class PGPointSourceOperator : public GenericOperator {
 		PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PGPointSourceOperator();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		pqxx::connection *connection;
 };
@@ -39,7 +39,7 @@ PGPointSourceOperator::~PGPointSourceOperator() {
 REGISTER_OPERATOR(PGPointSourceOperator, "pggeometrysource");
 
 
-std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 
 #define EPSG_AS_STRING2(e) #e
 #define EPSG_AS_STRING(e) EPSG_AS_STRING2(e)
@@ -82,5 +82,6 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRec
 		gf->destroyGeometry(point);
 	}
 
+	// TODO: capture I/O costs somehow
 	return points_out;
 }

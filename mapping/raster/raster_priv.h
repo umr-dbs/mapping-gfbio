@@ -21,6 +21,7 @@ template<typename T, int dimensions> class Raster : public GenericRaster {
 
 	protected:
 		T *data;
+		void *clhostptr;
 		cl::Buffer *clbuffer;
 		cl::Buffer *clbuffer_info;
 };

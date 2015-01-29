@@ -1,4 +1,5 @@
 #include "raster/pointcollection.h"
+#include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
@@ -18,7 +19,7 @@ public:
 	PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 	virtual ~PointsDifferenceOperator();
 
-	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 private:
 	double epsilonDistance;
 };
@@ -32,16 +33,27 @@ PointsDifferenceOperator::PointsDifferenceOperator(int sourcecounts[], GenericOp
 PointsDifferenceOperator::~PointsDifferenceOperator() {}
 REGISTER_OPERATOR(PointsDifferenceOperator, "points_difference");
 
+
+#include "operators/points/points_difference.cl.h"
+
 static double point_distance(const Point &p1, const Point &p2) {
 	double dx = p1.x - p2.x, dy = p1.y - p2.y;
 	return sqrt(dx*dx + dy*dy);
 }
 
-std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const QueryRectangle &rect) {
-	auto pointsMinuend = getPointsFromSource(0, rect);
-	auto pointsSubtrahend = getPointsFromSource(1, rect);
+std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto pointsMinuend = getPointsFromSource(0, rect, profiler);
+	auto pointsSubtrahend = getPointsFromSource(1, rect, profiler);
+
+	//fprintf(stderr, "Minuend: %lu, Subtrahend: %lu\n", pointsMinuend->collection.size(), pointsSubtrahend->collection.size());
 
 	size_t count_m = pointsMinuend->collection.size();
+
+	if (count_m > 100000)
+		throw OperatorException("Too many points for points_difference, aborting");
+
+
+#ifdef MAPPING_NO_OPENCL
 	std::vector<bool> keep(count_m, true);
 
 	size_t count_s = pointsSubtrahend->collection.size();
@@ -56,6 +68,28 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 			}
 		}
 	}
+#else
+	RasterOpenCL::init();
 
+	std::vector<char> keep(count_m, true);
+
+	try {
+		RasterOpenCL::CLProgram prog;
+		prog.setProfiler(profiler);
+		prog.addPointCollection(pointsMinuend.get());
+		prog.addPointCollection(pointsSubtrahend.get());
+		prog.compile(operators_points_points_difference, "difference");
+		prog.addPointCollectionPositions(0, true);
+		prog.addPointCollectionPositions(1, true);
+		prog.addArg(keep);
+		prog.addArg(epsilonDistance);
+		prog.run();
+	}
+	catch (cl::Error &e) {
+		printf("cl::Error %d: %s\n", e.err(), e.what());
+		throw;
+	}
+
+#endif
 	return pointsMinuend->filter(keep);
 }

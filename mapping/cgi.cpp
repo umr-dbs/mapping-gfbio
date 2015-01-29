@@ -6,6 +6,7 @@
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
+#include "util/debug.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -18,8 +19,13 @@
 #include <memory>
 #include <string>
 
+#include <iomanip>
+#include <cctype>
+
 #include <uriparser/Uri.h>
 #include <json/json.h>
+
+#include "pointvisualization/CircleClusteringQuadTree.h"
 
 /*
 A few benchmarks:
@@ -134,7 +140,7 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
 	auto colorizer = Colorizer::make(colors);
-
+	print_debug_header();
 #if 1
 	printf("Content-type: image/png\r\n\r\n");
 
@@ -148,18 +154,123 @@ void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, 
 
 
 void outputPointCollection(PointCollection *points, bool displayMetadata = false) {
+	print_debug_header();
 	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON(displayMetadata).c_str());
 }
 
 void outputPointCollectionCSV(PointCollection *points) {
+	print_debug_header();
 	printf("Content-type: text/csv\r\nContent-Disposition: attachment; filename=\"export.csv\"\r\n\r\n%s", points->toCSV().c_str());
 }
 
 void outputGeometry(GenericGeometry *geometry) {
+	print_debug_header();
 	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
 }
 
-auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, time_t timestamp) -> int {
+bool to_bool(std::string str) {
+    std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+    std::istringstream is(str);
+    bool b;
+    is >> std::boolalpha >> b;
+    return b;
+}
+
+void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg = EPSG_WEBMERCATOR, bool allow_infinite = false) {
+	// &BBOX=0,0,10018754.171394622,10018754.171394622
+	for(int i=0;i<4;i++)
+		bbox[i] = NAN;
+
+	// Figure out if we know the extent of the CRS
+	// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
+	//                               minx          miny         maxx         maxy
+	double extent_webmercator[4] {-20037508.34 , -20037508.34 , 20037508.34 , 20037508.34};
+	double extent_latlon[4]      {     -180    ,       -90    ,      180    ,       90   };
+	double extent_msg[4]         { -5568748.276,  -5568748.276, 5568748.276,  5568748.276};
+
+	double *extent = nullptr;
+	if (epsg == EPSG_WEBMERCATOR)
+		extent = extent_webmercator;
+	else if (epsg == EPSG_LATLON)
+		extent = extent_latlon;
+	else if (epsg == EPSG_GEOSMSG)
+		extent = extent_msg;
+
+
+	std::string delimiters = " ,";
+	size_t current, next = -1;
+	int element = 0;
+	do {
+		current = next + 1;
+		next = bbox_str.find_first_of(delimiters, current);
+		std::string stringValue = bbox_str.substr(current, next - current);
+		double value = 0;
+
+		if (stringValue == "Infinity") {
+			if (!allow_infinite)
+				throw ArgumentException("cannot process BBOX with Infinity");
+			if (!extent)
+				throw ArgumentException("cannot process BBOX with Infinity and unknown CRS");
+			value = std::max(extent[element], extent[(element+2)%4]);
+		}
+		else if (stringValue == "-Infinity") {
+			if (!allow_infinite)
+				throw ArgumentException("cannot process BBOX with Infinity");
+			if (!extent)
+				throw ArgumentException("cannot process BBOX with Infinity and unknown CRS");
+			value = std::min(extent[element], extent[(element+2)%4]);
+		}
+		else {
+			value = std::stod(stringValue);
+			if (!std::isfinite(value))
+				throw ArgumentException("BBOX contains entry that is not a finite number");
+		}
+
+		bbox[element++] = value;
+	} while (element < 4 && next != std::string::npos);
+
+	if (element != 4)
+		throw ArgumentException("Could not parse BBOX parameter");
+
+	/*
+	 * OpenLayers insists on sending latitude in x and longitude in y.
+	 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
+	 * The simple solution is to swap the x and y coordinates.
+	 */
+	if (epsg == EPSG_LATLON) {
+		std::swap(bbox[0], bbox[1]);
+		std::swap(bbox[2], bbox[3]);
+	}
+
+	// If no extent is known, just trust the client.
+	if (extent) {
+		double bbox_normalized[4];
+		for (int i=0;i<4;i+=2) {
+			bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
+			bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
+		}
+
+		// Koordinaten können leicht ausserhalb liegen, z.B.
+		// 20037508.342789, 20037508.342789
+		for (int i=0;i<4;i++) {
+			if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
+				bbox_normalized[i] = 0.0;
+			else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
+				bbox_normalized[i] = 1.0;
+		}
+
+		for (int i=0;i<4;i++) {
+			if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0)
+				throw ArgumentException("BBOX exceeds extent");
+		}
+	}
+
+	//bbox_normalized[1] = 1.0 - bbox_normalized[1];
+	//bbox_normalized[3] = 1.0 - bbox_normalized[3];
+}
+
+
+void processWFS(std::map<std::string, std::string> &params, epsg_t query_epsg, time_t timestamp) {
 	if(params["request"] == "GetFeature") {
 		std::string version = params["version"];
 		if (version != "2.0.0")
@@ -171,63 +282,45 @@ auto processWFS(std::map<std::string, std::string> params, epsg_t query_epsg, ti
 			abort("output_width not valid");
 		}
 
-		std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
 		double bbox[4];
+		parseBBOX(bbox, params.at("bbox"), query_epsg, true);
 
-		{
-			std::string delimiters = " ,";
-			size_t current, next = -1;
-			int element = 0;
-			do {
-			  current = next + 1;
-			  next = bbox_str.find_first_of(delimiters, current);
-			  std::string stringValue = bbox_str.substr(current, next - current);
-			  double value = 0;
-
-			  if(stringValue == "Infinity") {
-				  if (query_epsg == EPSG_WEBMERCATOR) {
-					  value = 20037508.34;
-				  }
-			  } else if(stringValue == "-Infinity") {
-				  if (query_epsg == EPSG_WEBMERCATOR) {
-					  value = -20037508.34;
-				  }
-			  } else {
-				  value = std::stod(stringValue);
-				  if (isnan(value))
-				  	abort("BBOX value is NaN");
-			  }
-
-			  bbox[element++] = value;
-			} while (element < 4 && next != std::string::npos);
-
-			if (element != 4)
-				abort("BBOX does not contain 4 doubles");
-		}
-
-		/*
-		 * OpenLayers insists on sending latitude in x and longitude in y.
-		 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
-		 * The simple solution is to swap the x and y coordinates.
-		 */
-		if (query_epsg == EPSG_LATLON) {
-			std::swap(bbox[0], bbox[1]);
-			std::swap(bbox[2], bbox[3]);
-		}
 
 		auto graph = GenericOperator::fromJSON(params["layers"]);
 
-		auto points = graph->getCachedPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg));
+		QueryProfiler profiler;
+		auto points = graph->getCachedPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg), profiler);
 
-		#if RASTER_DO_PROFILE
-					printf("Profiling-header: ");
-					Profiler::print();
-					printf("\r\n");
-		#endif
+		if(to_bool(params["clustered"]) == true) {
+			auto clusteredPoints = std::make_unique<PointCollection>(query_epsg);
+
+			auto x1 = bbox[0];
+			auto x2 = bbox[2];
+			auto y1 = bbox[1];
+			auto y2 = bbox[3];
+			auto xres = output_width;
+			auto yres = output_height;
+			pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(
+															pv::Coordinate((x2 + x1) / (2 * xres), (y2 + y1) / (2 * yres)),
+															pv::Dimension((x2 - x1) / (2 * xres), (y2 - y1) / (2 * yres)),
+														1), 1);
+			for (Point& pointOld : points->collection) {
+				clusterer.insert(std::make_shared<pv::Circle>(pv::Coordinate(pointOld.x / xres, pointOld.y / yres), 5, 1));
+			}
+
+			auto circles = clusterer.getCircles();
+			clusteredPoints->local_md_value.addVector("radius", circles.size());
+			clusteredPoints->local_md_value.addVector("numberOfPoints", circles.size());
+			for (auto& circle : circles) {
+				size_t idx = clusteredPoints->addPoint(circle->getX() * xres, circle->getY() * yres);
+				clusteredPoints->local_md_value.set(idx, "radius", circle->getRadius());
+				clusteredPoints->local_md_value.set(idx, "numberOfPoints", circle->getNumberOfPoints());
+			}
+
+			points.swap(clusteredPoints);
+		}
 
 		outputPointCollection(points.get(), true);
-
-		return 0;
 	}
 }
 
@@ -270,7 +363,7 @@ std::pair<double, double> getWfsParameterRangeDouble(std::string wfsParameterStr
 	return resultPair;
 }
 
-int getWfsParameterInteger(std::string wfsParameterString){
+int getWfsParameterInteger(const std::string &wfsParameterString){
 
 	size_t rangeStart = wfsParameterString.find_first_of("(");
 	size_t rangeEnd = wfsParameterString.find_last_of(")");
@@ -290,7 +383,7 @@ int getWfsParameterInteger(std::string wfsParameterString){
 //}
 
 
-auto processWCS(std::map<std::string, std::string> params) -> int {
+int processWCS(std::map<std::string, std::string> &params) {
 
 	/*http://www.myserver.org:port/path?
 	 * service=WCS &version=2.0
@@ -334,7 +427,8 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 
 		//build the queryRectangle and get the data
 		QueryRectangle query_rect{42, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, sizeX, sizeY, query_crsId};
-		auto result_raster = graph->getCachedRaster(query_rect);
+		QueryProfiler profiler;
+		auto result_raster = graph->getCachedRaster(query_rect, profiler);
 
 		//setup the output parameters
 		std::string gdalDriver = "GTiff";
@@ -366,6 +460,21 @@ auto processWCS(std::map<std::string, std::string> params) -> int {
 	return 1;
 }
 
+epsg_t epsg_from_param(const std::string &crs, epsg_t def = EPSG_WEBMERCATOR) {
+	if (crs == "")
+		return def;
+	if (crs.compare(0,5,"EPSG:") == 0)
+		return std::stoi(crs.substr(5, std::string::npos));
+	throw ArgumentException("Unknown CRS specified");
+}
+
+epsg_t epsg_from_param(const std::map<std::string, std::string> &params, const std::string &key, epsg_t def = EPSG_WEBMERCATOR) {
+	if (params.count(key) < 1)
+		return def;
+	return epsg_from_param(params.at(key), def);
+}
+
+
 int main() {
 	//printf("Content-type: text/plain\r\n\r\nDebugging:\n");
 	try {
@@ -377,19 +486,14 @@ int main() {
 
 		std::map<std::string, std::string> params = parseQueryString(query_string);
 
-		epsg_t query_epsg = EPSG_WEBMERCATOR;
-		if (params.count("crs") > 0) {
-			std::string crs = params["crs"];
-			if (crs.compare(0,5,"EPSG:") == 0) {
-				query_epsg = std::stoi(crs.substr(5, std::string::npos));
-			}
-		}
+		epsg_t query_epsg = epsg_from_param(params, "crs", EPSG_WEBMERCATOR);
+
 		time_t timestamp = 42;
 		if (params.count("timestamp") > 0) {
 			timestamp = std::stol(params["timestamp"]);
 		}
 
-		bool debug = true;
+		bool debug = false;
 		if (params.count("debug") > 0) {
 			debug = params["debug"] == "1";
 		}
@@ -402,13 +506,9 @@ int main() {
 			if (params.count("colors") > 0)
 				colorizer = params["colors"];
 
-			auto raster = graph->getCachedRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			QueryProfiler profiler;
+			auto raster = graph->getCachedRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
-#if RASTER_DO_PROFILE
-			printf("Profiling-header: ");
-			Profiler::print();
-			printf("\r\n");
-#endif
 			outputImage(raster.get(), false, false, colorizer);
 			return 0;
 		}
@@ -417,13 +517,9 @@ int main() {
 		if (params.count("pointquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 
-			auto points = graph->getCachedPoints(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			QueryProfiler profiler;
+			auto points = graph->getCachedPoints(QueryRectangle(timestamp, /*-180, -90, 180, 90*/-20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
-#if RASTER_DO_PROFILE
-			printf("Profiling-header: ");
-			Profiler::print();
-			printf("\r\n");
-#endif
 			std::string format("geojson");
 			if(params.count("format") > 0)
 				format = params["format"];
@@ -443,19 +539,17 @@ int main() {
 		if (params.count("geometryquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
 
-			auto geometry = graph->getCachedGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg));
+			QueryProfiler profiler;
+			auto geometry = graph->getCachedGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
-#if RASTER_DO_PROFILE
-			printf("Profiling-header: ");
-			Profiler::print();
-			printf("\r\n");
-#endif
 			outputGeometry(geometry.get());
 			return 0;
 		}
 
 		if(params.count("service") > 0 && params["service"] == "WFS") {
-			return processWFS(params, query_epsg, timestamp);
+			query_epsg = epsg_from_param(params, "srsname", query_epsg);
+			processWFS(params, query_epsg, timestamp);
+			return 0;
 		}
 
 		// WCS-Requests
@@ -494,56 +588,8 @@ int main() {
 					//if (params["tiled"] != "true")
 					//	abort("only tiled for now");
 
-					std::string bbox_str = params["bbox"]; // &BBOX=0,0,10018754.171394622,10018754.171394622
 					double bbox[4];
-
-					{
-						std::string delimiters = " ,";
-						size_t current, next = -1;
-						int element = 0;
-						do {
-						  current = next + 1;
-						  next = bbox_str.find_first_of(delimiters, current);
-						  double value = std::stod( bbox_str.substr(current, next - current) );
-						  if (isnan(value))
-							  abort("BBOX value is NaN");
-						  bbox[element++] = value;
-						} while (element < 4 && next != std::string::npos);
-
-						if (element != 4)
-							abort("BBOX does not contain 4 doubles");
-					}
-
-					// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
-									//    minx          miny         maxx         maxy
-					double extent[4] {-20037508.34, -20037508.34, 20037508.34, 20037508.34};
-					double bbox_normalized[4];
-					for (int i=0;i<4;i+=2) {
-						bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
-						bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
-					}
-
-					// Koordinaten können leicht ausserhalb liegen, z.B.
-					// 20037508.342789, 20037508.342789
-					for (int i=0;i<4;i++) {
-						if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
-							bbox_normalized[i] = 0.0;
-						else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
-							bbox_normalized[i] = 1.0;
-					}
-
-					for (int i=0;i<4;i++) {
-						if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0) {
-							printf("Content-type: text/plain\r\n\r\n");
-							printf("extent: (%f, %f) -> (%f, %f)\n", extent[0], extent[1], extent[2], extent[3]);
-							printf("   raw: (%f, %f) -> (%f, %f)\n", bbox[0], bbox[1], bbox[2], bbox[3]);
-							printf("normal: (%10f, %10f) -> (%10f, %10f)\n", bbox_normalized[0], bbox_normalized[1], bbox_normalized[2], bbox_normalized[3]);
-							abort("bbox outside of extent");
-						}
-					}
-
-					//bbox_normalized[1] = 1.0 - bbox_normalized[1];
-					//bbox_normalized[3] = 1.0 - bbox_normalized[3];
+					parseBBOX(bbox, params.at("bbox"), query_epsg, false);
 
 					auto graph = GenericOperator::fromJSON(params["layers"]);
 					std::string colorizer;
@@ -555,26 +601,18 @@ int main() {
 						format = params["format"];
 					}
 
-					/*
-					 * OpenLayers insists on sending latitude in x and longitude in y.
-					 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
-					 * The simple solution is to swap the x and y coordinates.
-					 */
-					if (query_epsg == EPSG_LATLON) {
-						std::swap(bbox[0], bbox[1]);
-						std::swap(bbox[2], bbox[3]);
-					}
-
 					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
 
 					if (format == "application/json") {
-						std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect);
+						QueryProfiler profiler;
+						std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect, profiler);
 
 						printf("content-type: application/json\r\n\r\n");
 						printf(dataVector->toJSON().c_str());
 					}
 					else {
-						auto result_raster = graph->getCachedRaster(qrect);
+						QueryProfiler profiler;
+						auto result_raster = graph->getCachedRaster(qrect, profiler);
 
 						if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
 							result_raster = result_raster->scale(output_width, output_height);
@@ -582,12 +620,6 @@ int main() {
 
 						bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
 						bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
-
-#if RASTER_DO_PROFILE
-						printf("Profiling-header: ");
-						Profiler::print();
-						printf("\r\n");
-#endif
 
 						std::unique_ptr<Raster2D<uint8_t>> overlay;
 						if (debug) {
@@ -607,16 +639,14 @@ int main() {
 							std::string msg_brs = msg_br.str();
 							overlay->print(overlay->lcrs.size[1]-4-8*msg_brs.length(), overlay->lcrs.size[1]-12, overlay->dd.max, msg_brs.c_str());
 
-#if RASTER_DO_PROFILE
 							if (result_raster->lcrs.size[1] >= 512) {
-								auto profile = Profiler::get();
+								auto messages = get_debug_messages();
 								int ypos = 36;
-								for (auto &msg : profile) {
+								for (auto &msg : messages) {
 									overlay->print(4, ypos, overlay->dd.max, msg.c_str());
 									ypos += 10;
 								}
 							}
-#endif
 						}
 
 						outputImage(result_raster.get(), flipx, flipy, colorizer, overlay.get());

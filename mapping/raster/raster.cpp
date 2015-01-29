@@ -363,6 +363,7 @@ template<typename T>
 Raster2D<T>::~Raster2D() {
 }
 
+#define MAPPING_OPENCL_USE_HOST_PTR 1
 
 template<typename T, int dimensions>
 void Raster<T, dimensions>::setRepresentation(Representation r) {
@@ -372,9 +373,18 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 #ifdef MAPPING_NO_OPENCL
 		throw PlatformException("No OpenCL support");
 #else
-		//printf("Migrating raster to GPU\n");
+		//printf("Migrating %u x %u x %u raster to GPU\n", lcrs.size[0], lcrs.size[1], (uint32_t) sizeof(data[0]));
 		// https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/clCreateBuffer.html
 		try {
+#if MAPPING_OPENCL_USE_HOST_PTR
+			clbuffer = new cl::Buffer(
+				*RasterOpenCL::getContext(),
+				CL_MEM_USE_HOST_PTR,
+				getDataSize(),
+				data
+			);
+			clhostptr = RasterOpenCL::getQueue()->enqueueMapBuffer(*clbuffer, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, getDataSize());
+#else
 			clbuffer = new cl::Buffer(
 				*RasterOpenCL::getContext(),
 				CL_MEM_READ_WRITE, // | CL_MEM_USE_HOST_PTR, // CL_MEM_COPY_HOST_PTR
@@ -382,6 +392,9 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 				nullptr //data
 			);
 			RasterOpenCL::getQueue()->enqueueWriteBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
+			delete [] data;
+			data = nullptr;
+#endif
 		}
 		catch (cl::Error &e) {
 			std::stringstream ss;
@@ -390,8 +403,6 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 		}
 
 		clbuffer_info = RasterOpenCL::getBufferWithRasterinfo(this);
-
-		// TODO: data löschen?
 #endif
 	}
 	else if (r == Representation::CPU) {
@@ -399,7 +410,15 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 		throw PlatformException("No OpenCL support");
 #else
 		//printf("Migrating raster back to CPU\n");
+#if MAPPING_OPENCL_USE_HOST_PTR
+		RasterOpenCL::getQueue()->enqueueUnmapMemObject(*clbuffer, clhostptr);
+		clhostptr = nullptr;
+#else
+		auto count = lcrs.getPixelCount();
+		data = new T[count + 1];
+		data[count] = 42;
 		RasterOpenCL::getQueue()->enqueueReadBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
+#endif
 		delete clbuffer;
 		clbuffer = nullptr;
 		delete clbuffer_info;

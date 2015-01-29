@@ -1,7 +1,6 @@
 
 #include "raster/raster.h"
 #include "raster/rastersource.h"
-#include "raster/profiler.h"
 #include "raster/typejuggling.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
@@ -512,11 +511,12 @@ static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, 
 	callBinaryOperatorFunc<raster_transformed_blit>(dest, src, destx, desty, destz, offset, scale);
 }
 
-std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform) {
+std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
+	if (io_cost)
+		*io_cost = 0;
+
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
-
-	//Profiler::Profiler p_all("RasterSource::load");
 
 	// find the most recent raster at the requested timestamp
 	// TODO: maximal zulässige alter?
@@ -569,7 +569,6 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	}
 
 	// find all overlapping rasters in DB
-	//Profiler::start("RasterSource::load: sqlite");
 	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM rasters"
 		" WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ? ORDER BY filenr ASC, fileoffset ASC");
@@ -581,9 +580,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	stmt.bind(5, x1);
 	stmt.bind(6, y1);
 	stmt.bind(7, timestamp);
-	//Profiler::stop("RasterSource::load: sqlite");
 
-	//Profiler::start("RasterSource::load: metadata");
 	decltype(GenericRaster::md_value) result_md_value;
 	decltype(GenericRaster::md_string) result_md_string;
 	SQLiteStatement stmt_md(db);
@@ -602,8 +599,6 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 		else
 			result_md_string.set(key, std::string(value));
 	}
-	//Profiler::stop("RasterSource::load: metadata");
-	//Profiler::start("RasterSource::load: create");
 
 	// Create an empty raster of the desired size
 	LocalCRS resultmetadata(
@@ -619,7 +614,6 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	result->clear(transformed_dd.no_data);
 	result->md_value = std::move(result_md_value);
 	result->md_string = std::move(result_md_string);
-	//Profiler::stop("RasterSource::stop: create");
 
 	// Load all overlapping parts and blit them onto the empty raster
 	int tiles_found = 0;
@@ -645,7 +639,8 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 			lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
 		);
 		auto tile = loadTile(channelid, tilelcrs, fileid, fileoffset, filebytes, method);
-		//Profiler::start("RasterSource::load: blit");
+		if (io_cost)
+			*io_cost += filebytes;
 
 		if (transform && channels[channelid]->hasTransform()) {
 			transformedBlit(
@@ -655,7 +650,6 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 		}
 		else
 			result->blit(tile.get(), (r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
-		//Profiler::stop("RasterSource::load: blit");
 		tiles_found++;
 	}
 
@@ -675,7 +669,6 @@ std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, const Local
 
 	//printf("loading raster from file %d offset %ld length %ld\n", fileid, offset, size);
 
-	//Profiler::start("RasterSource::load: File IO");
 #define USE_POSIX_IO true
 #if USE_POSIX_IO
 	int f = open(filename_data.c_str(), O_RDONLY | O_CLOEXEC); // | O_NOATIME
@@ -710,10 +703,8 @@ std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, const Local
 	}
 	fclose(f);
 #endif
-	//Profiler::stop("RasterSource::load: File IO");
 
 	// decode / decompress
-	//Profiler::Profiler p("RasterSource::load: decompress");
 	return RasterConverter::direct_decode(tilecrs, channels[channelid]->dd, &buffer, method);
 }
 

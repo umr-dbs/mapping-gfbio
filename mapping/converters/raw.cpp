@@ -8,7 +8,6 @@
 #include <bzlib.h>
 #include <zlib.h>
 
-
 static void checkLittleEndian(void)
 {
 	union {
@@ -74,7 +73,7 @@ std::unique_ptr<ByteBuffer> BzipConverter::encode(GenericRaster *raster) {
 }
 
 std::unique_ptr<GenericRaster> BzipConverter::decode(ByteBuffer *buffer) {
-	Profiler::Profiler p("Bzip::decompress");
+	//Profiler::Profiler p("Bzip::decompress");
 	auto raster = GenericRaster::create(localcrs, datadescription);
 
 	char *data = (char *) raster->getDataForWriting();
@@ -103,10 +102,6 @@ GzipConverter::GzipConverter(const LocalCRS &rm, const DataDescription &vm) : Ra
 
 std::unique_ptr<ByteBuffer> GzipConverter::encode(GenericRaster *raster) {
 	Profiler::Profiler p("Gzip::compress");
-	size_t raw_size = raster->getDataSize();
-	// per documentation, this amount of space is guaranteed to fit the compressed stream
-	unsigned int compressed_size = (unsigned int) (1.1 * raw_size) + 601;
-	unsigned char *compressed = new unsigned char[compressed_size];
 
 	z_stream stream;
 	stream.zalloc = Z_NULL;
@@ -115,10 +110,15 @@ std::unique_ptr<ByteBuffer> GzipConverter::encode(GenericRaster *raster) {
 	if (deflateInit(&stream, /* compression_level = */ 9) != Z_OK)
 		throw ConverterException("Error on deflateInit()");
 
+	size_t raw_size = raster->getDataSize();
+	// per documentation, this amount of space is guaranteed to fit the compressed stream
+	unsigned int compressed_size = (unsigned int) (1.1 * raw_size) + 601;
+	std::unique_ptr<unsigned char []> compressed(new unsigned char[compressed_size]);
+
 	stream.avail_in = raw_size;
 	stream.next_in = (unsigned char *) raster->getData();
 	stream.avail_out = compressed_size;
-	stream.next_out = compressed;
+	stream.next_out = compressed.get();
 	if (deflate(&stream, /* flush = */ Z_FINISH) != Z_STREAM_END) {
 		deflateEnd(&stream);
 		throw ConverterException("Error on deflate()");
@@ -132,15 +132,21 @@ std::unique_ptr<ByteBuffer> GzipConverter::encode(GenericRaster *raster) {
 	unsigned int real_size = compressed_size - stream.avail_out;
 	deflateEnd(&stream);
 
-	return std::make_unique<ByteBuffer>(compressed, real_size);
+	return std::make_unique<ByteBuffer>(compressed.release(), real_size);
 }
 
 std::unique_ptr<GenericRaster> GzipConverter::decode(ByteBuffer *buffer) {
-	Profiler::Profiler p("Gzip::decompress");
+	//Profiler::Profiler p("Gzip::decompress");
 	auto raster = GenericRaster::create(localcrs, datadescription);
 
 	char *data = (char *) raster->getDataForWriting();
 	unsigned int result_size = raster->getDataSize();
+
+	/*
+	std::stringstream msg;
+	msg << "Gzip::decompress " << buffer->size << " to " << result_size << " Bytes";
+	Profiler::Profiler p(msg.str().c_str());
+	*/
 
 	z_stream stream;
 	memset(&stream, 0, sizeof(stream));

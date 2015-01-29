@@ -89,7 +89,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 			actual_max = 1;
 		}
 	}
-	auto actual_range = RasterTypeInfo<T>::getRange(actual_min, actual_max);
+	//auto actual_range = RasterTypeInfo<T>::getRange(actual_min, actual_max);
 
 	uint32_t colors[256];
 	colors[0] = color_from_rgba(0,0,0,0);
@@ -98,7 +98,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 
 	if (overlay) {
 		std::ostringstream msg;
-		msg << GDALGetDataTypeName(dd.datatype) << " (" << actual_min << " - " << actual_max << ")";
+		msg << GDALGetDataTypeName(dd.datatype) << " (" << (double) actual_min << " - " << (double) actual_max << ")";
 		overlay->print(4, 16, 1, msg.str().c_str());
 	}
 
@@ -146,7 +146,10 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 				row[x] = 1;
 			}
 			else {
-				row[x] = round(253.0 * ((float) v - actual_min) / actual_range) + 2;
+				if (actual_min == actual_max)
+					row[x] = 3;
+				else
+					row[x] = round(253.0 * ((float) v - actual_min) / (actual_max - actual_min)) + 2;
 			}
 			if (overlay && (x == 0 || y == 0 || x == width-1 || y == height-1))
 				row[x] = 1;

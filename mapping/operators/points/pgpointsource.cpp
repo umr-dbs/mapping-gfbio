@@ -13,7 +13,7 @@ class PGPointSourceOperator : public GenericOperator {
 		PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PGPointSourceOperator();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		std::string connectionstring;
 		std::string querystring;
@@ -41,7 +41,7 @@ PGPointSourceOperator::~PGPointSourceOperator() {
 REGISTER_OPERATOR(PGPointSourceOperator, "pgpointsource");
 
 
-std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 
 	if (rect.epsg != EPSG_WEBMERCATOR)
 		throw OperatorException("PGPointSourceOperator: Shouldn't load points in a projection other than webmercator");
@@ -70,6 +70,8 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRec
 			points_out->local_md_value.set(idx, points.column_name(c), row[c].as<double>());
 		}
 	}
+
+	// TODO: capture I/O cost somehow
 
 	return points_out;
 }

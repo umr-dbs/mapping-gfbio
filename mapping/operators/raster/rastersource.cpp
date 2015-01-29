@@ -2,11 +2,11 @@
 #include "raster/raster.h"
 #include "raster/typejuggling.h"
 #include "raster/rastersource.h"
-#include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 
 #include <memory>
+#include <sstream>
 #include <cmath>
 #include <json/json.h>
 
@@ -17,7 +17,7 @@ class SourceOperator : public GenericOperator {
 		SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~SourceOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		RasterSource *rastersource;
 		int channel;
@@ -53,13 +53,14 @@ SourceOperator::~SourceOperator() {
 REGISTER_OPERATOR(SourceOperator, "source");
 
 
-std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &rect) {
-	Profiler::Profiler p("SOURCE_OPERATOR");
-
+std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	const LocalCRS *lcrs = rastersource->getLocalCRS();
 
-	if (lcrs->epsg != rect.epsg)
-		throw OperatorException("SourceOperator: wrong epsg requested");
+	if (lcrs->epsg != rect.epsg) {
+		std::stringstream msg;
+		msg << "SourceOperator: wrong epsg requested. Source is " << lcrs->epsg << ", requested " << rect.epsg;
+		throw OperatorException(msg.str());
+	}
 
 	// world to pixel coordinates
 	double px1 = lcrs->WorldToPixelX(rect.x1);
@@ -85,6 +86,9 @@ std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &r
 		pixel_height >>= 1;
 	}
 
-	return rastersource->load(channel, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform);
+	size_t io_costs = 0;
+	auto result = rastersource->load(channel, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
+	profiler.addIOCost(io_costs);
+	return result;
 }
 

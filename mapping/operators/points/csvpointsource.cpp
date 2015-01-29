@@ -18,7 +18,7 @@ class CSVPointSource : public GenericOperator {
 		CSVPointSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~CSVPointSource();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		std::string filename;
 };
@@ -41,7 +41,7 @@ static bool endsWith(const std::string &str, const std::string &suffix) {
 	return (str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0);
 }
 
-std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
 
 	std::ifstream data(filename);
@@ -55,6 +55,8 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 	auto headers = parser.readHeaders();
 
 	// Try to find the headers with geo-coordinates
+	std::vector<bool> is_numeric(headers.size(), false);
+
 	size_t no_pos = std::numeric_limits<size_t>::max();
 	size_t pos_x = no_pos, pos_y = no_pos, pos_t = no_pos;
 	for (size_t i=0; i < headers.size(); i++) {
@@ -67,6 +69,8 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 			pos_y = i;
 		if (lc == "time" || lc == "date" || lc == "datet")
 			pos_t = i;
+		if (lc == "plz")
+			is_numeric[i] = true;
 	}
 
 	if (pos_x == no_pos || pos_y == no_pos)
@@ -80,7 +84,10 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 	for (size_t i=0; i < headers.size(); i++) {
 		if (i == pos_x || i == pos_y || i == pos_t)
 			continue;
-		points_out->local_md_string.addVector(headers[i]);
+		if (is_numeric[i])
+			points_out->local_md_value.addVector(headers[i]);
+		else
+			points_out->local_md_string.addVector(headers[i]);
 	}
 
 	auto minx = rect.minx();
@@ -109,7 +116,10 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 		for (size_t i=0; i < tuple.size(); i++) {
 			if (i == pos_x || i == pos_y || i == pos_t)
 				continue;
-			points_out->local_md_string.set(idx, headers[i], tuple[i]);
+			if (is_numeric[i])
+				points_out->local_md_value.set(idx, headers[i], std::strtod(tuple[i].c_str(), nullptr));
+			else
+				points_out->local_md_string.set(idx, headers[i], tuple[i]);
 		}
 		if (pos_t != no_pos) {
 			const auto &str = tuple[pos_t];
@@ -123,5 +133,7 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 		}
 	}
 	//fprintf(stderr, data.str().c_str());
+
+	profiler.addIOCost( data.tellg() );
 	return points_out;
 }

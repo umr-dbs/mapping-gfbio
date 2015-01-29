@@ -6,6 +6,7 @@
 #include "operators/operator.h"
 
 
+#include <vector>
 #include <limits>
 #include <algorithm>
 #include <memory>
@@ -97,7 +98,7 @@ class MSATTemperatureOperator : public GenericOperator {
 		MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATTemperatureOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 };
 
@@ -114,9 +115,9 @@ MSATTemperatureOperator::~MSATTemperatureOperator() {
 REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
 
 
-std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
-	auto raster = getRasterFromSource(0, rect);
+	auto raster = getRasterFromSource(0, rect, profiler);
 
 	if (raster->dd.min != 0 && raster->dd.max != 1024)
 		throw OperatorException("Input raster does not appear to be a meteosat raster");
@@ -129,22 +130,13 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 	RadianceTable *table = getRadianceTable(channel);
 
 	Profiler::Profiler p1("CL_MSATTEMPERATURE_LOOKUPTABLE");
-	float lut[1024];
+	std::vector<float> lut;
+	lut.reserve(1024);
 	for(int i = 0; i < 1024; i++) {
 		float radiance = offset + i * slope;
-		lut[i] = table->getTempFromRadiance(radiance);
+		lut.push_back(table->getTempFromRadiance(radiance));
 		printf("%d: %f\n", i, lut[i]);
 	}
-
-	// migrate the table to openCL
-	cl::Buffer lut_buffer(
-		*RasterOpenCL::getContext(),
-		CL_MEM_READ_ONLY,
-		sizeof(lut),
-		nullptr //data
-	);
-	RasterOpenCL::getQueue()->enqueueWriteBuffer(lut_buffer, CL_TRUE, 0, sizeof(lut), lut);
-
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
@@ -163,10 +155,11 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
 
 	RasterOpenCL::CLProgram prog;
+	prog.setProfiler(profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_msat_temperature, "temperaturekernel");
-	prog.addArg(lut_buffer);
+	prog.addArg(lut);
 	prog.run();
 
 	return raster_out;

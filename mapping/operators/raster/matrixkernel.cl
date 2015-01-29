@@ -1,12 +1,12 @@
 __kernel void matrixkernel(__global const IN_TYPE0 *in_data, __global const RasterInfo *in_info, __global OUT_TYPE0 *out_data, __global const RasterInfo *out_info, const int matrix_size, __global const int *matrix) {
-	int gid = get_global_id(0);
-	if (gid >= out_info->size[0]*out_info->size[1]*out_info->size[2])
+	const uint posx = get_global_id(0);
+	const uint posy = get_global_id(1);
+	const int gid = posy * in_info->size[0] + posx;
+
+	if (posx >= out_info->size[0] || posy >= out_info->size[1])
 		return;
 
 	int matrix_offset = matrix_size / 2;
-
-	uint posx = gid % in_info->size[0];
-	uint posy = gid / in_info->size[0];
 
 	OUT_TYPE0 value = 0;
 	for (int ky=0;ky<matrix_size;ky++) {
@@ -28,10 +28,10 @@ __kernel void matrixkernel(__global const IN_TYPE0 *in_data, __global const Rast
 	OUT_TYPE0 min = out_info->min;
 
 	// Clamp to [min, max] unless it is no_data
-	if (!(out_info->has_no_data && value == out_info->no_data)) {
+	if (!(ISNODATA0(value, in_info))) {
 		if (value > max) value = max;
 		if (value < min) value = min;
 	}
 
-	out_data[gid] = value;
+	R(out, posx, posy) = value;
 }

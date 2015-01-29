@@ -3,6 +3,7 @@
 
 #include <ctime>
 #include <string>
+#include <sstream>
 #include <memory>
 #include "util/make_unique.h"
 
@@ -37,41 +38,75 @@ class QueryRectangle {
 		uint16_t epsg;
 };
 
+class QueryProfiler {
+	public:
+		QueryProfiler();
+		QueryProfiler(const QueryProfiler& that) = delete;
+
+		static double getTimestamp();
+
+		double self_cpu;
+		double all_cpu;
+		double self_gpu;
+		double all_gpu;
+		size_t self_io;
+		size_t all_io;
+		// TODO: track GPU cost? Separately track things like Postgres queries?
+		// TODO: track cached costs separately?
+
+		void startTimer();
+		void stopTimer();
+		void addGPUCost(double seconds);
+		void addIOCost(size_t bytes);
+
+		QueryProfiler & operator+=(QueryProfiler &other);
+
+	private:
+		double t_start;
+};
+
 class GenericOperator {
 	public:
 		static const int MAX_INPUT_TYPES = 3;
 		static const int MAX_SOURCES = 20;
-		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json);
-		static std::unique_ptr<GenericOperator> fromJSON(Json::Value &json);
+		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json, int depth = 0);
+		static std::unique_ptr<GenericOperator> fromJSON(Json::Value &json, int depth = 0);
 
 		virtual ~GenericOperator();
 
-		virtual std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect);
-		virtual std::unique_ptr<PointCollection> getCachedPoints(const QueryRectangle &rect);
-		virtual std::unique_ptr<GenericGeometry> getCachedGeometry(const QueryRectangle &rect);
-		virtual std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect);
+		std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<PointCollection> getCachedPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<GenericGeometry> getCachedGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+
+		const std::string &getSemanticId() { return semantic_id; }
 
 	protected:
 		GenericOperator(int sourcecounts[], GenericOperator *sources[]);
+		virtual void writeSemanticParameters(std::ostringstream &stream);
 		void assumeSources(int rasters, int pointcollections=0, int geometries=0);
 
 		int getRasterSourceCount() { return sourcecounts[0]; }
 		int getPointsSourceCount() { return sourcecounts[1]; }
 		int getGeometrySourceCount() { return sourcecounts[2]; }
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect);
-		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
-		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect);
-		std::unique_ptr<PointCollection> getPointsFromSource(int idx, const QueryRectangle &rect);
-		std::unique_ptr<GenericGeometry> getGeometryFromSource(int idx, const QueryRectangle &rect);
+		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<PointCollection> getPointsFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<GenericGeometry> getGeometryFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
 		// there is no getPlotFromSource, because plots are by definition the final step of a chain
 
 	private:
 		int sourcecounts[MAX_INPUT_TYPES];
 		GenericOperator *sources[MAX_SOURCES];
+
+		std::string type;
+		std::string semantic_id;
+		int depth;
 
 		void operator=(GenericOperator &) = delete;
 };

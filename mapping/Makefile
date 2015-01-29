@@ -10,21 +10,21 @@ CPATH := /usr/local/include/:$(CPATH)
 CPP=clang++
 CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
-LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl -L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
+LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-luriparser
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 OBJ_RASTER=o/raster_raster.o o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o o/raster_metadata.o o/raster_import_gdal.o o/raster_export_pgm.o o/raster_export_yuv.o o/raster_export_png.o o/raster_export_jpeg.o o/raster_pointcollection.o o/raster_geometry.o
 OBJ_PLOT=o/plot_histogram.o o/plot_text.o o/plot_png.o
-OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o
+OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o o/util_debug.o
 OBJ_POINTVISUALIZATION=o/pointvisualization_BoundingBox.o o/pointvisualization_Circle.o o/pointvisualization_Coordinate.o o/pointvisualization_Dimension.o o/pointvisualization_FindResult.o o/pointvisualization_QuadTreeNode.o o/pointvisualization_CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters_converter.o o/converters_raw.o
 OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_r.o
 OBJ_OPERATORS_POINTS=o/operators_points_pgpointsource.o o/operators_points_gfbiopointsource.o o/operators_points_points_filter_by_range.o o/operators_points_points_difference.o o/operators_points_points_cluster.o o/operators_points_csvpointsource.o
 OBJ_OPERATORS_GEOMETRY=o/operators_geometry_testgeometrysource.o o/operators_geometry_osmgeometrysource.o
 OBJ_OPERATORS_COMBINED=o/operators_combined_points2raster.o o/operators_combined_raster_metadata_to_points.o o/operators_combined_points2cluster_raster.o o/operators_combined_filterpointsbygeometry.o
-OBJ_OPERATORS_MSAT=o/operators_msat_temperature.o o/operators_msat_reflectance.o o/operators_msat_solarangle.o o/operators_msat_sofos_cloud_classification.o o/operators_msat_co2correction.o o/operators_msat_gccthermthresholddetection.o
+OBJ_OPERATORS_MSAT=o/operators_msat_temperature.o o/operators_msat_reflectance.o o/operators_msat_solarangle.o o/operators_msat_radiance.o o/operators_msat_sofos_cloud_classification.o o/operators_msat_co2correction.o o/operators_msat_gccthermthresholddetection.o
 OBJ_OPERATORS_PLOTS=o/operators_plots_histogram.o o/operators_plots_points2histogram.o o/operators_plots_points_metadata_tograph.o
 OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS)
 OBJ_COMMON=${OBJ_RASTER} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL}
@@ -197,12 +197,28 @@ worldclimdatasource:	${EXE}
 srtmdatasource:	${EXE}
 	rm -f datasources/srtm.dat datasources/srtm.db
 	./${EXE} import datasources/srtm.json data/srtm/srtm_all_index.out 1 0 42 GZIP
-
-
+	
+glc2000_global_datasource:	${EXE}
+	rm -f datasources/glc2000_global.dat datasources/glc2000_global.db
+	./${EXE} import datasources/glc2000_global.json datasources/raw_data/glc2000_global/glc2000_v1_1.bil 1 0 42 GZIP
+	
+modis_wcf:
+	rm -f datasources/modis_vcf*.dat datasources/modis_vcf*.db
+	./${EXE} import datasources/modis_vcf.json datasources/raw_data/modis_vcf/MOD44B_V5_TRE.2006.all.tif 1 0 42 GZIP
+	
+btw2015_paper_demo_datasource:	${EXE}
+	rm -f datasources/btw2015_paper_demo*.dat datasources/btw2015_paper_demo*.db
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_12_cut.tif 1 0 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_1_cut.tif 1 1 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_12_cut.tif 1 2 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_1_cut.tif 1 3 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/alt_cut.tif 1 4 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/glc2000_cut.tif 1 5 42 GZIP
+	
 test:
 	${MAKE} testenvironment
 	${MAKE} testcases
-	php test/parse_logs.php >test/logs/tests_$$(date '+%Y-%m-%d_%H-%m').log
+	php test/parse_logs.php >test/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log
 	rm -f ${TEST_LOGS}
 	echo "Testcases done";
 	
@@ -217,7 +233,7 @@ testenvironment: ${EXE}
 test/queries/%.log: test/queries/%.json ${EXE} test/data/world1.dat 
 	echo -n >$@
 	if EXELOG=$$(./${EXE} testquery $< 2>&1) ; then echo "hash_passed: yes" >>$@ ; else echo "hash_passed: no\n$$EXELOG" >>$@ ; fi
-	if VGLOG=$$(${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
+	if VGLOG=$$(timeout 180 ${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
 
 
 webinstall:

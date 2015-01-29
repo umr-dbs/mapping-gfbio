@@ -14,7 +14,7 @@ class OSMGeometrySourceOperator : public GenericOperator {
 		OSMGeometrySourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~OSMGeometrySourceOperator();
 
-		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 		std::string connectionstring;
 		std::string querystring;
@@ -38,7 +38,7 @@ OSMGeometrySourceOperator::~OSMGeometrySourceOperator() {
 REGISTER_OPERATOR(OSMGeometrySourceOperator, "osmgeometrysource");
 
 
-std::unique_ptr<GenericGeometry> OSMGeometrySourceOperator::getGeometry(const QueryRectangle &rect) {
+std::unique_ptr<GenericGeometry> OSMGeometrySourceOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
 	fprintf(stderr,"MMStart");
 	std::string sql ="SELECT ST_AsEWKT(ST_Collect(geom)) FROM osm.roads;";
 	auto geom_out = std::make_unique<GenericGeometry>(EPSG_LATLON);
@@ -67,5 +67,6 @@ std::unique_ptr<GenericGeometry> OSMGeometrySourceOperator::getGeometry(const Qu
 	catch(const pqxx::pqxx_exception &e){
 		fprintf(stderr, e.base().what());
 	}
+	// TODO: capture I/O costs somehow
 	return geom_out;
 }

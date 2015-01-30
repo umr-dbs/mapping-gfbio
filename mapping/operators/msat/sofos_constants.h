@@ -44,6 +44,12 @@ static const float day_solar_zenith_angle_min = -93.0f;
 static const float day_solar_zenith_angle_max = 93.0f;
 
 
+/*other constants */
+static const double solar_zenith_angle_min_day	= 0.0;
+static const double solar_zenith_angle_max_day	= 93.0;
+static const double solar_zenith_angle_min_night	= 100.0;
+static const double solar_zenith_angle_max_night	= 360.0;
+
 }
 
 #endif // __CLOUDCLASS_H_INCLUDED__

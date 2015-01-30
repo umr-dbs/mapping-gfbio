@@ -40,6 +40,12 @@ int Histogram::calculateBucketForValue(double value){
 	return bucket;
 }
 
+double Histogram::calculateBucketLowerBorder(int bucket){
+	double value = (bucket * ((max - min) / counts.size())) + min;
+	return value;
+}
+
+
 
 void Histogram::incNoData() {
 	nodata_count++;
@@ -60,10 +66,24 @@ std::string Histogram::toJSON() {
 	buffer << "{\"type\": \"histogram\", ";
 	buffer << "\"metadata\": {\"min\": " << min << ", \"max\": " << max << ", \"nodata\": " << nodata_count << ", \"numberOfBuckets\": " << counts.size() << "}, ";
 	buffer << "\"data\": [";
-	for(int& bucket : counts) {
-		buffer << bucket << ",";
+	for(int i=0; i < counts.size(); i++){
+				if(i != 0)
+					buffer <<" ,";
+		buffer << counts.at(i);
 	}
-	buffer.seekp(((long) buffer.tellp()) - 1);
-	buffer << "]}";
+	buffer << "] ";
+	if(markers.size() > 0){
+		buffer << ", ";
+		buffer <<"\"lines\":[";
+
+		for(int i=0; i < markers.size(); i++){
+			if(i != 0)
+				buffer <<" ,";
+			auto marker = markers.at(i);
+			buffer <<"{\"name\":\"" << marker.second << "\" ,\"pos\":" << std::to_string(marker.first) << "}";
+		}
+		buffer << "]";
+	}
+	buffer << "} ";
 	return buffer.str();
 }

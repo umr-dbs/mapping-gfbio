@@ -20,7 +20,7 @@ class MSATGccThermThresholdDetectionOperator : public GenericOperator {
 		MSATGccThermThresholdDetectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATGccThermThresholdDetectionOperator();
 
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 
@@ -178,9 +178,9 @@ REGISTER_OPERATOR(MSATGccThermThresholdDetectionOperator, "msatgccthermthreshold
 
 
 
-std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect) {
-	auto solar_zenith_angle_raster = getRasterFromSource(0, rect);
-	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect);
+std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, profiler);
+	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, profiler);
 
 	Profiler::Profiler p("MSATGCCTHERMTHRESHOLDDETECTION_OPERATOR");
 	solar_zenith_angle_raster->setRepresentation(GenericRaster::CPU);

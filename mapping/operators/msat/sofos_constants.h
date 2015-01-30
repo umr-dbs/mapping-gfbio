@@ -40,6 +40,9 @@ static const uint16_t range_height			= is_low | is_low_medium | is_medium | is_m
 
 static const uint16_t range_classification  = range_surface | range_illumination | range_cloud_type | range_phase | range_height;
 
+static const float day_solar_zenith_angle_min = -93.0f;
+static const float day_solar_zenith_angle_max = 93.0f;
+
 
 }
 

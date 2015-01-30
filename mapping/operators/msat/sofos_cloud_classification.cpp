@@ -27,7 +27,7 @@ class MsatSofosCloudClassificationOperator : public GenericOperator {
 		MsatSofosCloudClassificationOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MsatSofosCloudClassificationOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
 };
 
@@ -72,8 +72,8 @@ struct RasterDifferenceHistogramFunction{
 };
 
 int findGccThermThreshold(Histogram &histogram, float min, float max){
-	static const float minimum_land_peak_temperature = std::numeric_limits<float>::min;
-	static const int minimum_decreasing_bins_before_cloud_threshold = 10;
+	float minimum_land_peak_temperature = std::numeric_limits<float>::min();
+	int minimum_decreasing_bins_before_cloud_threshold = 10;
 
 	/**first we need to find the land peak**/
 	int land_peak_bucket = 0;
@@ -133,13 +133,13 @@ MsatSofosCloudClassificationOperator::~MsatSofosCloudClassificationOperator() {
 REGISTER_OPERATOR(MsatSofosCloudClassificationOperator, "msatsofoscloudclassification");
 
 
-std::unique_ptr<GenericRaster> MsatSofosCloudClassificationOperator::getRaster(const QueryRectangle &rect) {
+std::unique_ptr<GenericRaster> MsatSofosCloudClassificationOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
 
 	Profiler::Profiler p("CL_MSAT_SOFOS_CLOUD_CLASSIFICATION_OPERATOR");
 
 	/*SOFOS STEP 1: Detect if day or night!*/
-	auto raster_solar_zenith_angle = getRasterFromSource(0, rect);
+	auto raster_solar_zenith_angle = getRasterFromSource(0, rect, profiler);
 
 	//create the output raster using the no_data value of the cloud classification
 	const DataDescription out_dd(GDT_UInt16, cloudclass::is_surface, cloudclass::range_illumination, true, 0.0);
@@ -171,10 +171,10 @@ std::unique_ptr<GenericRaster> MsatSofosCloudClassificationOperator::getRaster(c
 
 
 	/*SOFOS STEP 2: Find the "grosstherm" threshold for (day/night) cloud detection*/
-	auto raster_bt039 = getRasterFromSource(1, rect);
+	auto raster_bt039 = getRasterFromSource(1, rect, profiler);
 	raster_bt039->setRepresentation(GenericRaster::CPU);
 
-	auto raster_bt108 = getRasterFromSource(2, rect);
+	auto raster_bt108 = getRasterFromSource(2, rect, profiler);
 	raster_bt108->setRepresentation(GenericRaster::CPU);
 
 	Histogram histogram = callBinaryOperatorFunc<RasterDifferenceHistogramFunction>(raster_bt108.get(), raster_bt039.get(), 3);

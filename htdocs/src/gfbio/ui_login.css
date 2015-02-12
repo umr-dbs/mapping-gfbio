@@ -1,19 +1,25 @@
 .loginform_container.gfbio {
-    width: 436px;
+    width: 670px;
+    top: 160px;
+    
 }
 
 .gfbio h1 {
     font-size: 18px;
     font-weight: normal;
+    text-align: center;
+}
+
+.gfbio .loginform {
+	text-align: center;
 }
 
 .gfbio .loginform label {
-    width: 80px;
-    float: left;
+    margin-right: 10px;    
 }
 
 .gfbio .loginform .login {
-    margin-left: 80px;
+    width: 100px;
 }
 
 .gfbio_logo {
@@ -28,4 +34,13 @@
 
 .dfg_logo {
     width: 100px;
+}
+
+.gfbio_screencasts {
+	margin: 10px 0px;
+}
+
+.gfbio_google_video_iframe {
+	float: left;
+	margin: 5px;
 }

@@ -10,3 +10,8 @@ htdocs/cgi-bin/*
 mapping/mapping_manager
 
 /mapping/r_server
+
+/docs/waveDoc/*
+/htdocs/doc/wave/*
+/docs/mappingDoc/*
+/htdocs/doc/mapping/*

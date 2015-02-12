@@ -493,7 +493,7 @@ int main() {
 			timestamp = std::stol(params["timestamp"]);
 		}
 
-		bool debug = true;
+		bool debug = false;
 		if (params.count("debug") > 0) {
 			debug = params["debug"] == "1";
 		}

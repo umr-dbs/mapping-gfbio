@@ -10,7 +10,7 @@
 
 
 
-static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *dataset, int rasteridx, double origin_x, double origin_y, double scale_x, double scale_y, epsg_t default_epsg) {
+static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *dataset, int rasteridx, double origin_x, double origin_y, double scale_x, double scale_y, bool &flipx, bool &flipy, epsg_t default_epsg) {
 	GDALRasterBand  *poBand;
 	int             nBlockXSize, nBlockYSize;
 	int             bGotMin, bGotMax;
@@ -61,7 +61,6 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *datas
 
 	epsg_t epsg = default_epsg; //EPSG_UNKNOWN;
 
-	LocalCRS lcrs(epsg, nXSize, nYSize, origin_x, origin_y, scale_x, scale_y);
 	double minvalue = adfMinMax[0];
 	double maxvalue = adfMinMax[1];
 
@@ -72,11 +71,16 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *datas
 		type = GDT_Int16; // TODO: sollte GDT_UInt16 sein!
 	}
 
+	double x1 = origin_x - scale_x * 0.5;
+	double y1 = origin_y - scale_y * 0.5;
+	double x2 = x1 + scale_x * nXSize;
+	double y2 = y1 + scale_y * nYSize;
 
+	SpatioTemporalReference stref(epsg, x1, y1, x2, y2, flipx, flipy, TIMETYPE_UNREFERENCED, 0, 1);
 	DataDescription dd(type, minvalue, maxvalue, hasnodata, nodata);
 	//printf("loading raster with %g -> %g valuerange\n", adfMinMax[0], adfMinMax[1]);
 
-	auto raster = GenericRaster::create(lcrs, dd);
+	auto raster = GenericRaster::create(dd, stref, nXSize, nYSize);
 	void *buffer = raster->getDataForWriting();
 	//int bpp = raster->getBPP();
 
@@ -118,7 +122,7 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 	return raster;
 }
 
-std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_t epsg) {
+std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int rasterid, bool &flipx, bool &flipy, epsg_t epsg) {
 	GDAL::init();
 
 	GDALDataset *dataset = (GDALDataset *) GDALOpen(filename, GA_ReadOnly);
@@ -178,14 +182,27 @@ std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int
 			throw ImporterException("MSG driver can only import rasters in MSG projection");
 	}
 
-	auto raster = GDALImporter_loadRaster(dataset, rasterid, adfGeoTransform[0], adfGeoTransform[3], adfGeoTransform[1], adfGeoTransform[5], epsg);
+	auto raster = GDALImporter_loadRaster(dataset, rasterid, adfGeoTransform[0], adfGeoTransform[3], adfGeoTransform[1], adfGeoTransform[5], flipx, flipy, epsg);
 
 	GDALClose(dataset);
 
 	return raster;
 }
 
-template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *gdalDriverName) {
+
+std::unique_ptr<GenericRaster> GenericRaster::fromGDAL(const char *filename, int rasterid, epsg_t epsg) {
+	bool flipx, flipy;
+	auto result = fromGDAL(filename, rasterid, flipx, flipy, epsg);
+
+	if (flipx || flipy) {
+		result = result->flip(flipx, flipy);
+	}
+	return result;
+}
+
+
+
+template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *gdalDriverName, bool flipx, bool flipy) {
 	GDAL::init();
 
 	GDALDriver *poDriver;
@@ -224,11 +241,16 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 //		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
 
 	//now create a GDAL dataset using the driver for gdalFormatName
-	poDstDS = poDriver->Create( filename, lcrs.size[0], lcrs.size[1], 1, dd.datatype, NULL);
+	poDstDS = poDriver->Create( filename, width, height, 1, dd.datatype, NULL);
 
 	//set the affine transformation coefficients for pixel <-> world conversion and create the spatial reference and
-	double adfGeoTransform[6]{ lcrs.origin[0], lcrs.scale[0], 0, lcrs.origin[1], 0, lcrs.scale[1] };
-	std::string srs = GDAL::SRSFromEPSG(lcrs.epsg);
+	double scale_x = pixel_scale_x * (flipx ? -1 : 1);
+	double scale_y = pixel_scale_y * (flipy ? -1 : 1);
+	double origin_x = (flipx ? stref.x2 : stref.x1) + scale_x*0.5;
+	double origin_y = (flipy ? stref.y2 : stref.y1) + scale_y*0.5;
+
+	double adfGeoTransform[6]{ origin_x, scale_x, 0, origin_y, 0, scale_y };
+	std::string srs = GDAL::SRSFromEPSG(stref.epsg);
 	//set dataset parameters
 	poDstDS->SetGeoTransform(adfGeoTransform);
 	poDstDS->SetProjection(srs.c_str());
@@ -240,7 +262,7 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 			poBand->SetNoDataValue(dd.no_data);
 	}
 
-	poBand->RasterIO( GF_Write, 0, 0, lcrs.size[0], lcrs.size[1], data, lcrs.size[0], lcrs.size[1], dd.datatype, 0, 0 );
+	poBand->RasterIO( GF_Write, 0, 0, width, height, data, width, height, dd.datatype, 0, 0 );
 
 
 	//add the metadata to the dataset

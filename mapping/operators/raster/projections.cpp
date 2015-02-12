@@ -60,23 +60,21 @@ void ProjectionOperator::writeSemanticParameters(std::ostringstream &stream) {
 
 template<typename T>
 struct raster_projection {
-	static std::unique_ptr<GenericRaster> execute(Raster2D<T> *raster_src, const GDAL::CRSTransformer *transformer, LocalCRS &rm_dest ) {
+	static std::unique_ptr<GenericRaster> execute(Raster2D<T> *raster_src, const GDAL::CRSTransformer *transformer, const SpatioTemporalReference &stref_dest, uint32_t width, uint32_t height) {
 		raster_src->setRepresentation(GenericRaster::Representation::CPU);
 
 		DataDescription out_dd = raster_src->dd;
 		out_dd.addNoData();
 
-		auto raster_dest_guard = GenericRaster::create(rm_dest, out_dd);
+		auto raster_dest_guard = GenericRaster::create(raster_src->dd, stref_dest, width, height);
 		Raster2D<T> *raster_dest = (Raster2D<T> *) raster_dest_guard.get();
 
 		T nodata = (T) out_dd.no_data;
 
-		int width = raster_dest->lcrs.size[0];
-		int height = raster_dest->lcrs.size[1];
-		for (int y=0;y<height;y++) {
-			for (int x=0;x<width;x++) {
-				double px = raster_dest->lcrs.PixelToWorldX(x);
-				double py = raster_dest->lcrs.PixelToWorldY(y);
+		for (uint32_t y=0;y<raster_dest->height;y++) {
+			for (uint32_t x=0;x<raster_dest->width;x++) {
+				double px = raster_dest->PixelToWorldX(x);
+				double py = raster_dest->PixelToWorldY(y);
 				double pz = 0;
 
 				if (!transformer->transform(px, py, pz)) {
@@ -84,8 +82,8 @@ struct raster_projection {
 					continue;
 				}
 
-				int tx = round(raster_src->lcrs.WorldToPixelX(px));
-				int ty = round(raster_src->lcrs.WorldToPixelY(py));
+				auto tx = raster_src->WorldToPixelX(px);
+				auto ty = raster_src->WorldToPixelY(py);
 				raster_dest->set(x, y, raster_src->getSafe(tx, ty, nodata));
 			}
 		}
@@ -218,12 +216,10 @@ std::unique_ptr<GenericRaster> ProjectionOperator::getRaster(const QueryRectangl
 
 	auto raster_in = getRasterFromSource(0, src_rect, profiler);
 
-	if (src_epsg != raster_in->lcrs.epsg)
+	if (src_epsg != raster_in->stref.epsg)
 		throw OperatorException("ProjectionOperator: Source Raster not in expected projection");
 
-	LocalCRS rm_dest(rect);
-
-	return callUnaryOperatorFunc<raster_projection>(raster_in.get(), &transformer, rm_dest);
+	return callUnaryOperatorFunc<raster_projection>(raster_in.get(), &transformer, rect, rect.xres, rect.yres);
 }
 
 

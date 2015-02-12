@@ -614,32 +614,32 @@ int main() {
 						QueryProfiler profiler;
 						auto result_raster = graph->getCachedRaster(qrect, profiler);
 
-						if (result_raster->lcrs.size[0] != (uint32_t) output_width || result_raster->lcrs.size[1] != (uint32_t) output_height) {
+						if (result_raster->width != (uint32_t) output_width || result_raster->height != (uint32_t) output_height) {
 							result_raster = result_raster->scale(output_width, output_height);
 						}
 
-						bool flipx = (bbox[2] > bbox[0]) != (result_raster->lcrs.scale[0] > 0);
-						bool flipy = (bbox[3] > bbox[1]) == (result_raster->lcrs.scale[1] > 0);
+						bool flipx = (bbox[2] > bbox[0]) != (result_raster->pixel_scale_x > 0);
+						bool flipy = (bbox[3] > bbox[1]) == (result_raster->pixel_scale_y > 0);
 
 						std::unique_ptr<Raster2D<uint8_t>> overlay;
 						if (debug) {
 							DataDescription dd_overlay(GDT_Byte, 0, 1);
-							overlay.reset( (Raster2D<uint8_t> *) GenericRaster::create(result_raster->lcrs, dd_overlay).release());
+							overlay.reset( (Raster2D<uint8_t> *) GenericRaster::create(dd_overlay, SpatioTemporalReference::unreferenced(), output_width, output_height).release() );
 							overlay->clear(0);
 
 							// Write debug info
 							std::ostringstream msg_tl;
 							msg_tl.precision(2);
-							msg_tl << std::fixed << bbox[0] << ", " << bbox[1];
+							msg_tl << std::fixed << bbox[0] << ", " << bbox[1] << " [" << result_raster->stref.x1 << ", " << result_raster->stref.y1 << "]";
 							overlay->print(4, 4, 1, msg_tl.str().c_str());
 
 							std::ostringstream msg_br;
 							msg_br.precision(2);
-							msg_br << std::fixed << bbox[2] << ", " << bbox[3];
+							msg_br << std::fixed << bbox[2] << ", " << bbox[3] << " [" << result_raster->stref.x2 << ", " << result_raster->stref.y2 << "]";;
 							std::string msg_brs = msg_br.str();
-							overlay->print(overlay->lcrs.size[1]-4-8*msg_brs.length(), overlay->lcrs.size[1]-12, overlay->dd.max, msg_brs.c_str());
+							overlay->print(overlay->width-4-8*msg_brs.length(), overlay->height-12, overlay->dd.max, msg_brs.c_str());
 
-							if (result_raster->lcrs.size[1] >= 512) {
+							if (result_raster->height >= 512) {
 								auto messages = get_debug_messages();
 								int ypos = 36;
 								for (auto &msg : messages) {
@@ -657,13 +657,11 @@ int main() {
 					// We're still in a WMS request though, so do our best to output an image with a clear error message.
 
 					DataDescription dd(GDT_Byte, 0, 255, true, 0);
-					LocalCRS lcrs(EPSG_UNKNOWN, output_width, output_height, 0.0, 0.0, 1.0, 1.0);
-
-					auto errorraster = GenericRaster::create(lcrs, dd);
+					auto errorraster = GenericRaster::create(dd, SpatioTemporalReference::unreferenced(), output_width, output_height);
 					errorraster->clear(0);
 
 					auto msg = e.what();
-					errorraster->printCentered(1, msg);
+					errorraster->printCentered(254, msg);
 
 					outputImage(errorraster.get(), false, false, "hsv");
 				}

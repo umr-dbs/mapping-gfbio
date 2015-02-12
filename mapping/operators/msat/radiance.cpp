@@ -67,7 +67,7 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
-	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
+	auto raster_out = GenericRaster::create(out_dd, *raster, GenericRaster::Representation::OPENCL);
 
 	RasterOpenCL::CLProgram prog;
 	prog.setProfiler(profiler);

@@ -25,7 +25,7 @@ static void checkLittleEndian(void)
 /**
  * RawConverter: raw buffer, uncompressed
  */
-RawConverter::RawConverter(const LocalCRS &rm, const DataDescription &vm) : RasterConverter(rm, vm) {
+RawConverter::RawConverter() {
 	checkLittleEndian();
 }
 
@@ -37,9 +37,9 @@ std::unique_ptr<ByteBuffer> RawConverter::encode(GenericRaster *raster) {
 	return std::make_unique<ByteBuffer>(copy, size);
 }
 
-std::unique_ptr<GenericRaster> RawConverter::decode(ByteBuffer *buffer) {
-	auto raster = GenericRaster::create(localcrs, datadescription);
-	memcpy(raster->getDataForWriting(), buffer->data, buffer->size);
+std::unique_ptr<GenericRaster> RawConverter::decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth) {
+	auto raster = GenericRaster::create(datadescription, stref, width, height, depth);
+	memcpy(raster->getDataForWriting(), buffer.data, buffer.size);
 	return raster;
 }
 
@@ -48,7 +48,7 @@ std::unique_ptr<GenericRaster> RawConverter::decode(ByteBuffer *buffer) {
 /**
  * BzipConverter: raw buffer, compressed
  */
-BzipConverter::BzipConverter(const LocalCRS &rm, const DataDescription &vm) : RasterConverter(rm, vm) {
+BzipConverter::BzipConverter() {
 	checkLittleEndian();
 }
 
@@ -72,15 +72,15 @@ std::unique_ptr<ByteBuffer> BzipConverter::encode(GenericRaster *raster) {
 	return std::make_unique<ByteBuffer>(compressed, compressed_size);
 }
 
-std::unique_ptr<GenericRaster> BzipConverter::decode(ByteBuffer *buffer) {
+std::unique_ptr<GenericRaster> BzipConverter::decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth) {
 	//Profiler::Profiler p("Bzip::decompress");
-	auto raster = GenericRaster::create(localcrs, datadescription);
+	auto raster = GenericRaster::create(datadescription, stref, width, height, depth);
 
 	char *data = (char *) raster->getDataForWriting();
 	unsigned int result_size = raster->getDataSize();
 	int res = BZ2_bzBuffToBuffDecompress(
 		data, &result_size,
-		(char *) buffer->data, buffer->size,
+		(char *) buffer.data, buffer.size,
 		0, 0
 	);
 
@@ -96,7 +96,7 @@ std::unique_ptr<GenericRaster> BzipConverter::decode(ByteBuffer *buffer) {
 /**
  * GzipConverter: raw buffer, compressed
  */
-GzipConverter::GzipConverter(const LocalCRS &rm, const DataDescription &vm) : RasterConverter(rm, vm) {
+GzipConverter::GzipConverter() {
 	checkLittleEndian();
 }
 
@@ -135,9 +135,9 @@ std::unique_ptr<ByteBuffer> GzipConverter::encode(GenericRaster *raster) {
 	return std::make_unique<ByteBuffer>(compressed.release(), real_size);
 }
 
-std::unique_ptr<GenericRaster> GzipConverter::decode(ByteBuffer *buffer) {
+std::unique_ptr<GenericRaster> GzipConverter::decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth) {
 	//Profiler::Profiler p("Gzip::decompress");
-	auto raster = GenericRaster::create(localcrs, datadescription);
+	auto raster = GenericRaster::create(datadescription, stref, width, height, depth);
 
 	char *data = (char *) raster->getDataForWriting();
 	unsigned int result_size = raster->getDataSize();
@@ -158,8 +158,8 @@ std::unique_ptr<GenericRaster> GzipConverter::decode(ByteBuffer *buffer) {
 	if (inflateInit(&stream) != Z_OK)
 		throw SourceException("Error on inflateInit()");
 
-	stream.next_in = buffer->data;
-	stream.avail_in = buffer->size;
+	stream.next_in = buffer.data;
+	stream.avail_in = buffer.size;
 
 	stream.next_out = (unsigned char *) data;
 	stream.avail_out = result_size;

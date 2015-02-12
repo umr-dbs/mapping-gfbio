@@ -37,15 +37,15 @@ std::unique_ptr<GenericRaster> OpenCLOperator::getRaster(const QueryRectangle &r
 	Profiler::Profiler p("CL_OPERATOR");
 	raster_in->setRepresentation(GenericRaster::OPENCL);
 
-	auto raster_out = GenericRaster::create(raster_in->lcrs, raster_in->dd, GenericRaster::OPENCL);
+	auto raster_out = GenericRaster::create(raster_in->dd, *raster_in, GenericRaster::OPENCL);
 
 
 	cl::Kernel kernel = RasterOpenCL::addProgramFromFile("operators/cl/test.cl", "testKernel");
 	kernel.setArg(0, *raster_in->getCLBuffer());
 	kernel.setArg(1, *raster_out->getCLBuffer());
-	kernel.setArg(2, (int) raster_in->lcrs.size[0]);
-	kernel.setArg(3, (int) raster_in->lcrs.size[1]);
-	//kernel.setArg(2, (int) raster->lcrs.getPixelCount());
+	kernel.setArg(2, (int) raster_in->width);
+	kernel.setArg(3, (int) raster_in->height);
+	//kernel.setArg(2, (int) raster->getPixelCount());
 
 
 	cl::Event event;
@@ -53,7 +53,7 @@ std::unique_ptr<GenericRaster> OpenCLOperator::getRaster(const QueryRectangle &r
 		Profiler::Profiler p("CL_EXECUTE");
 		RasterOpenCL::getQueue()->enqueueNDRangeKernel(kernel,
 			cl::NullRange, // Offset
-			cl::NDRange(raster_in->lcrs.getPixelCount()), // Global
+			cl::NDRange(raster_in->getPixelCount()), // Global
 			cl::NullRange, // cl::NDRange(1, 1), // local
 			nullptr, //events
 			&event //event

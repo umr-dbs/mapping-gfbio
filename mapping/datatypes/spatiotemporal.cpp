@@ -2,14 +2,12 @@
 #include "raster/exceptions.h"
 #include "operators/operator.h"
 #include "util/binarystream.h"
+#include "util/debug.h"
 
 #include <math.h>
 #include <limits>
+#include <sstream>
 
-
-SpatioTemporalReference::SpatioTemporalReference() : epsg(EPSG_UNKNOWN), timetype(TIMETYPE_UNKNOWN), x1(NAN), y1(NAN), x2(NAN), y2(NAN), t1(NAN), t2(NAN) {
-	// TODO: throw an exception here?
-};
 
 SpatioTemporalReference::SpatioTemporalReference(epsg_t epsg, timetype_t timetype) : epsg(epsg), timetype(timetype) {
 	x1 = -std::numeric_limits<double>::infinity();
@@ -28,6 +26,20 @@ SpatioTemporalReference::SpatioTemporalReference(epsg_t epsg, double x1, double 
 	: epsg(epsg), timetype(timetype), x1(x1), y1(y1), x2(x2), y2(y2), t1(t1), t2(t2) {
 	validate();
 };
+
+SpatioTemporalReference::SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy, timetype_t time, double t1, double t2)
+	: epsg(epsg), timetype(timetype), x1(x1), y1(y1), x2(x2), y2(y2), t1(t1), t2(t2) {
+	flipx = flipy = false;
+	if (x1 > x2) {
+		flipx = true;
+		std::swap(this->x1, this->x2);
+	}
+	if (y1 > y2) {
+		flipy = true;
+		std::swap(this->y1, this->y2);
+	}
+	validate();
+}
 
 SpatioTemporalReference::SpatioTemporalReference(const QueryRectangle &rect) {
 	x1 = std::min(rect.x1, rect.x2);
@@ -75,12 +87,11 @@ void SpatioTemporalReference::toStream(BinaryStream &stream) const {
 
 
 void SpatioTemporalReference::validate() const {
-	if (x1 > x2)
-		throw ArgumentException("SpatioTemporalReference: x1 > x2");
-	if (y1 > y2)
-		throw ArgumentException("SpatioTemporalReference: y1 > y2");
-	if (t1 > t2)
-		throw ArgumentException("SpatioTemporalReference: t1 > t2");
+	if (x1 > x2 || y1 > y2 || t1 > t2) {
+		std::stringstream msg;
+		msg << "SpatioTemporalReference invalid, requires x1:" << x1 << " <= x2:" << x2 << ", y1:" << y1 << " <= y2:" << y2 << " and t1:" << t1 << " <= t2:" << t2;
+		throw ArgumentException(msg.str());
+	}
 }
 
 

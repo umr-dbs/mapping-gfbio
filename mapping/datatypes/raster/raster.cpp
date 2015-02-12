@@ -14,82 +14,6 @@
 #include <sstream>
 
 
-LocalCRS::LocalCRS(const QueryRectangle &rect) : epsg(rect.epsg), dimensions(2), size{rect.xres, rect.yres, 0}, origin{rect.x1, rect.y1, 0}, scale{(rect.x2-rect.x1)/rect.xres, (rect.y2-rect.y1)/rect.yres, 0} {
-
-}
-
-bool LocalCRS::operator==(const LocalCRS &b) const {
-	if (dimensions != b.dimensions)
-		return false;
-	for (int i=0;i<dimensions;i++) {
-		if (size[i] != b.size[i]) {
-			std::cerr << "size mismatch" << std::endl;
-			return false;
-		}
-		if (fabs(origin[i] - b.origin[i]) > 0.5) {
-			std::cerr << "origin mismatch: " << fabs(origin[i] - b.origin[i]) << std::endl;
-			return false;
-		}
-		if (fabs(scale[i] / b.scale[i] - 1.0) > 0.001) {
-			std::cerr << "scale mismatch" << std::endl;
-			return false;
-		}
-	}
-	return true;
-}
-
-void LocalCRS::verify() const {
-	if (dimensions < 1 || dimensions > 3)
-		throw MetadataException("Amount of dimensions not between 1 and 3");
-	for (int i=0;i<dimensions;i++) {
-		if (/*size[i] < 0 || */ size[i] > 1<<24)
-			throw MetadataException("Size out of limits");
-		if (scale[i] == 0)
-			throw MetadataException("Scale cannot be 0");
-	}
-}
-
-size_t LocalCRS::getPixelCount() const {
-	if (dimensions == 1)
-		return (size_t) size[0];
-	if (dimensions == 2)
-		return (size_t) size[0] * size[1];
-	if (dimensions == 3)
-		return (size_t) size[0] * size[1] * size[2];
-	throw MetadataException("Amount of dimensions not between 1 and 3");
-}
-
-
-std::ostream& operator<< (std::ostream &out, const LocalCRS &rm) {
-	out << "LocalCRS(epsg=" << (int) rm.epsg << " dim=" << rm.dimensions << " size=["<<rm.size[0]<<","<<rm.size[1]<<"] origin=["<<rm.origin[0]<<","<<rm.origin[1]<<"] scale=["<<rm.scale[0]<<","<<rm.scale[1]<<"])";
-	return out;
-}
-
-void LocalCRS::toStream(BinaryStream &stream) const {
-	stream.write(epsg);
-	stream.write(dimensions);
-	for (int i=0;i<dimensions;i++) {
-		stream.write(size[i]);
-		stream.write(origin[i]);
-		stream.write(scale[i]);
-	}
-}
-LocalCRS::LocalCRS(BinaryStream &stream) {
-	for (int i=0;i<3;i++) {
-		size[i] = 0;
-		origin[i] = 0;
-		scale[i] = 0;
-	}
-	stream.read(&epsg);
-	stream.read(&dimensions);
-	for (int i=0;i<dimensions;i++) {
-		stream.read(&size[i]);
-		stream.read(&origin[i]);
-		stream.read(&scale[i]);
-	}
-}
-
-
 bool DataDescription::operator==(const DataDescription &b) const {
 	return datatype == b.datatype
 		&& min == b.min && max == b.max
@@ -247,33 +171,27 @@ DataDescription::DataDescription(BinaryStream &stream) {
 
 
 
-std::unique_ptr<GenericRaster> GenericRaster::create(const LocalCRS &localcrs, const DataDescription &datadescription, Representation representation)
-{
-	if (localcrs.dimensions != 2)
-		throw MetadataException("Cannot instantiate raster with dimensions != 2 yet");
 
-	if (localcrs.getPixelCount() <= 0)
-		throw MetadataException("Cannot instantiate raster with 0 pixels");
-
+std::unique_ptr<GenericRaster> GenericRaster::create(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth, Representation representation) {
 	GenericRaster *result = nullptr;
 	switch(datadescription.datatype) {
 		case GDT_Byte:
-			result = new Raster2D<uint8_t>(localcrs, datadescription);
+			result = new Raster2D<uint8_t>(datadescription, stref, width, height);
 			break;
 		case GDT_Int16:
-			result = new Raster2D<int16_t>(localcrs, datadescription);
+			result = new Raster2D<int16_t>(datadescription, stref, width, height);
 			break;
 		case GDT_UInt16:
-			result = new Raster2D<uint16_t>(localcrs, datadescription);
+			result = new Raster2D<uint16_t>(datadescription, stref, width, height);
 			break;
 		case GDT_Int32:
-			result = new Raster2D<int32_t>(localcrs, datadescription);
+			result = new Raster2D<int32_t>(datadescription, stref, width, height);
 			break;
 		case GDT_UInt32:
-			result = new Raster2D<uint32_t>(localcrs, datadescription);
+			result = new Raster2D<uint32_t>(datadescription, stref, width, height);
 			break;
 		case GDT_Float32:
-			result = new Raster2D<float>(localcrs, datadescription);
+			result = new Raster2D<float>(datadescription, stref, width, height);
 			break;
 		case GDT_Float64:
 			throw MetadataException("Unsupported data type: Float64");
@@ -293,8 +211,16 @@ std::unique_ptr<GenericRaster> GenericRaster::create(const LocalCRS &localcrs, c
 	return std::unique_ptr<GenericRaster>(result);
 }
 
-GenericRaster::GenericRaster(const LocalCRS &localcrs, const DataDescription &datadescription)
-	: lcrs(localcrs), dd(datadescription), representation(Representation::CPU) {
+GenericRaster::GenericRaster(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth)
+	: GridSpatioTemporalResult(stref, width, height), dd(datadescription), representation(Representation::CPU) {
+
+	if (depth != 0 || width == 0 || height == 0)
+		throw MetadataException("Cannot instantiate raster with dimensions != 2 yet");
+
+	double stwidth = std::abs(stref.x2 - stref.x1);
+	double stheight = std::abs(stref.y2 - stref.y1);
+	if (!std::isfinite(stwidth) || !std::isfinite(stheight))
+		throw MetadataException("Cannot instantiate raster on SpatioTemporalReference with infinite size");
 }
 
 GenericRaster::~GenericRaster() {
@@ -303,18 +229,23 @@ GenericRaster::~GenericRaster() {
 void GenericRaster::toStream(BinaryStream &stream) {
 	const char *data = (const char *) getData();
 	size_t len = getDataSize();
-	stream.write(lcrs);
 	stream.write(dd);
+	stream.write(stref);
+	stream.write((uint32_t) width);
+	stream.write((uint32_t) height);
 	stream.write(data, len);
 	stream.write(md_string);
 	stream.write(md_value);
 }
 
 std::unique_ptr<GenericRaster> GenericRaster::fromStream(BinaryStream &stream) {
-	LocalCRS lcrs(stream);
 	DataDescription dd(stream);
+	SpatioTemporalReference stref(stream);
+	uint32_t width, height;
+	stream.read(&width);
+	stream.read(&height);
 
-	auto raster = GenericRaster::create(lcrs, dd);
+	auto raster = GenericRaster::create(dd, stref, width, height);
 	char *data = (char *) raster->getDataForWriting();
 	size_t len = raster->getDataSize();
 	stream.read(data, len);
@@ -329,11 +260,9 @@ std::unique_ptr<GenericRaster> GenericRaster::fromStream(BinaryStream &stream) {
 
 
 template<typename T, int dimensions>
-Raster<T, dimensions>::Raster(const LocalCRS &localcrs, const DataDescription &datadescription)
-	: GenericRaster(localcrs, datadescription), clbuffer(nullptr), clbuffer_info(nullptr) {
-	if (lcrs.dimensions != dimensions)
-		throw MetadataException("metadata dimensions do not match raster dimensions");
-	auto count = lcrs.getPixelCount();
+Raster<T, dimensions>::Raster(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth)
+	: GenericRaster(datadescription, stref, width, height, depth), clhostptr(nullptr),clbuffer(nullptr), clbuffer_info(nullptr) {
+	auto count = getPixelCount();
 	data = new T[count + 1];
 	data[count] = 42;
 }
@@ -342,7 +271,7 @@ Raster<T, dimensions>::Raster(const LocalCRS &localcrs, const DataDescription &d
 template<typename T, int dimensions>
 Raster<T, dimensions>::~Raster() {
 	if (data) {
-		if (data[lcrs.getPixelCount()] != 42) {
+		if (data[getPixelCount()] != 42) {
 			printf("Error in Raster: guard value was overwritten. Memory corruption!\n");
 			exit(6);
 		}
@@ -373,7 +302,6 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 #ifdef MAPPING_NO_OPENCL
 		throw PlatformException("No OpenCL support");
 #else
-		//printf("Migrating %u x %u x %u raster to GPU\n", lcrs.size[0], lcrs.size[1], (uint32_t) sizeof(data[0]));
 		// https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/clCreateBuffer.html
 		try {
 #if MAPPING_OPENCL_USE_HOST_PTR
@@ -414,7 +342,7 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 		RasterOpenCL::getQueue()->enqueueUnmapMemObject(*clbuffer, clhostptr);
 		clhostptr = nullptr;
 #else
-		auto count = lcrs.getPixelCount();
+		auto count = getPixelCount();
 		data = new T[count + 1];
 		data[count] = 42;
 		RasterOpenCL::getQueue()->enqueueReadBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
@@ -438,7 +366,7 @@ void Raster2D<T>::clear(double _value) {
 	T value = (T) _value;
 
 	setRepresentation(GenericRaster::Representation::CPU);
-	auto size = lcrs.getPixelCount();
+	auto size = getPixelCount();
 	for (decltype(size) i=0;i<size;i++) {
 		data[i] = value;
 	}
@@ -447,8 +375,11 @@ void Raster2D<T>::clear(double _value) {
 
 template<typename T>
 void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty, int) {
-	if (genericraster->lcrs.dimensions != 2 || genericraster->lcrs.epsg != lcrs.epsg || genericraster->dd.datatype != dd.datatype)
+	if (genericraster->dd.datatype != dd.datatype)
 		throw MetadataException("blit with incompatible raster");
+
+	if (genericraster->stref.epsg != stref.epsg && stref.epsg != EPSG_UNREFERENCED && genericraster->stref.epsg != EPSG_UNREFERENCED)
+		throw MetadataException("blit of raster with different coordinate system");
 
 	setRepresentation(GenericRaster::Representation::CPU);
 	if (genericraster->getRepresentation() != GenericRaster::Representation::CPU)
@@ -457,8 +388,8 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 	Raster2D<T> *raster = (Raster2D<T> *) genericraster;
 	int x1 = std::max(destx, 0);
 	int y1 = std::max(desty, 0);
-	int x2 = std::min(lcrs.size[0], destx+raster->lcrs.size[0]);
-	int y2 = std::min(lcrs.size[1], desty+raster->lcrs.size[1]);
+	int x2 = std::min(width, destx+raster->width);
+	int y2 = std::min(height, desty+raster->height);
 
 /*
 	fprintf(stderr, "this raster is %dx%d\n", lcrs.size[0], lcrs.size[1]);
@@ -477,15 +408,15 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 #elif BLIT_TYPE == 2 // 0.0246
 	int blitwidth = x2-x1;
 	for (int y=y1;y<y2;y++) {
-		int rowoffset_dest = y * this->lcrs.size[0] + x1;
-		int rowoffset_src = (y-desty) * raster->lcrs.size[0] + (x1-destx);
+		int rowoffset_dest = y * this->width + x1;
+		int rowoffset_src = (y-desty) * raster->width + (x1-destx);
 		memcpy(&data[rowoffset_dest], &raster->data[rowoffset_src], blitwidth * sizeof(T));
 	}
 #else // 0.031
 	int blitwidth = x2-x1;
 	for (int y=y1;y<y2;y++) {
-		int rowoffset_dest = y * this->lcrs.size[0] + x1;
-		int rowoffset_src = (y-desty) * raster->lcrs.size[0] + (x1-destx);
+		int rowoffset_dest = y * this->width + x1;
+		int rowoffset_src = (y-desty) * raster->width + (x1-destx);
 		for (int x=0;x<blitwidth;x++)
 			data[rowoffset_dest+x] = raster->data[rowoffset_src+x];
 	}
@@ -495,21 +426,19 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 
 template<typename T>
 std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int width, int height, int depth) {
-	if (lcrs.dimensions != 2)
-		throw MetadataException("cut() only works on 2d rasters");
 	if (z1 != 0 || depth != 0)
 		throw MetadataException("cut() should not specify 3d coordinates on a 2d raster");
 
-	if (x1 < 0 || x1 + width > (int) lcrs.size[0] || y1 < 0 || y1 + height > (int) lcrs.size[1])
+	if (x1 < 0 || x1 + width > (int) width || y1 < 0 || y1 + height > (int) height)
 		throw MetadataException("cut() not inside the raster");
 
-	// Der Origin in Weltkoordinaten ist jetzt woanders, skalierung bleibt
-	LocalCRS newrmd(lcrs.epsg, width, height,
-		lcrs.PixelToWorldX(x1), lcrs.PixelToWorldY(y1),
-		lcrs.scale[0], lcrs.scale[1]
-	);
+	double world_x1 = PixelToWorldX(x1) - pixel_scale_x * 0.5;
+	double world_y1 = PixelToWorldY(y1) - pixel_scale_y * 0.5;
+	double world_x2 = world_x1 + pixel_scale_x * width;
+	double world_y2 = world_y1 + pixel_scale_y * height;
+	SpatioTemporalReference newstref(stref.epsg, world_x1, world_y1, world_x2, world_y2, stref.timetype, stref.t1, stref.t2);
 
-	auto outputraster_guard = GenericRaster::create(newrmd, dd);
+	auto outputraster_guard = GenericRaster::create(dd, newstref, width, height);
 	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();
 
 #define CUT_TYPE 2
@@ -519,7 +448,7 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 			outputraster->set(x, y, getSafe(x+x1, y+y1));
 #elif CUT_TYPE == 2 // 0.0246
 	for (int y=0;y<height;y++) {
-		size_t rowoffset_src = (size_t) (y+y1) * lcrs.size[0] + x1;
+		size_t rowoffset_src = (size_t) (y+y1) * width + x1;
 		size_t rowoffset_dest = (size_t) y * width;
 		memcpy(&outputraster->data[rowoffset_dest], &data[rowoffset_src], width * sizeof(T));
 	}
@@ -527,8 +456,8 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 #else // 0.031
 	int blitwidth = x2-x1;
 	for (int y=y1;y<y2;y++) {
-		int rowoffset_dest = y * this->lcrs.size[0] + x1;
-		int rowoffset_src = y * raster->lcrs.size[0] + x1;
+		int rowoffset_dest = y * this->width + x1;
+		int rowoffset_src = y * raster->width + x1;
 		for (int x=0;x<blitwidth;x++)
 			data[rowoffset_dest+x] = raster->data[rowoffset_src+x];
 	}
@@ -539,8 +468,6 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 
 template<typename T>
 std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int depth) {
-	if (lcrs.dimensions != 2)
-		throw MetadataException("scale() only works on 2d rasters");
 	if (depth != 0)
 		throw MetadataException("scale() should not specify z depth on a 2d raster");
 
@@ -549,32 +476,28 @@ std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int dep
 
 	this->setRepresentation(GenericRaster::CPU);
 
-	LocalCRS newrmd(lcrs.epsg, width, height,
-		lcrs.PixelToWorldX(0), lcrs.PixelToWorldY(0),
-		lcrs.scale[0] * (double) width / lcrs.size[0], lcrs.scale[1] * (double) height / lcrs.size[0]
-	);
 
-	//printf("Scaling to %d x %d\n", width, height);
-	auto outputraster_guard = GenericRaster::create(newrmd, dd);
+	auto outputraster_guard = GenericRaster::create(dd, stref, width, height, depth);
 	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();
 	//outputraster->clear(dd.no_data);
-	//printf("allocated\n");
 
-	int64_t src_width = lcrs.size[0], src_height = lcrs.size[1];
+	int64_t src_width = this->width, src_height = this->height;
 
 	for (int y=0;y<height;y++) {
-		//printf("going for line %lu\n", y);
 		for (int x=0;x<width;x++) {
-			int px = ((int64_t) x * src_width / width);
-			int py = ((int64_t) y * src_height / height);
-/*
+			int px = (int) round( ((x+0.5) * src_width / width) - 0.5 );
+			int py = (int) round( ((y+0.5) * src_height / height) - 0.5 );
+
+			/*
 			if (px < 0 || py < 0 || px >= src_width || py >= src_height) {
 				fprintf(stderr, "point outside: size (%ld, %ld) -> (%d, %d), point (%d, %d) -> (%d, %d)\n",
 					src_width, src_height, width, height,
 					x, y, px, py
 				);
+				continue;
 			}
-*/
+			*/
+
 			outputraster->set(x, y, get(px, py));
 		}
 	}
@@ -584,21 +507,17 @@ std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int dep
 
 template<typename T>
 std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
-	if (lcrs.dimensions != 2)
-		throw MetadataException("flip() only works on 2d rasters");
-
-	auto flipped_raster = GenericRaster::create(lcrs, dd);
+	auto flipped_raster = GenericRaster::create(dd, *this);
 	Raster2D<T> *r = (Raster2D<T> *) flipped_raster.get();
 
-	int width = lcrs.size[0];
-	int height = lcrs.size[1];
-	for (int y=0;y<height;y++) {
-		int py = flipy ? height-y-1 : y;
-		for (int x=0;x<width;x++) {
-			int px = flipx ? width-x-1 : x;
+	for (uint32_t y=0;y<height;y++) {
+		uint32_t py = flipy ? height-y-1 : y;
+		for (uint32_t x=0;x<width;x++) {
+			uint32_t px = flipx ? width-x-1 : x;
 			r->set(x, y, get(px, py));
 		}
 	}
+	// TODO: copy metadata
 	return flipped_raster;
 }
 
@@ -622,9 +541,6 @@ std::string GenericRaster::hash() {
 #include "raster_font.h"
 template<typename T>
 void Raster2D<T>::print(int dest_x, int dest_y, double dvalue, const char *text, int maxlen) {
-	if (lcrs.dimensions != 2)
-		throw MetadataException("print() only works on 2d rasters");
-
 	if (maxlen < 0)
 		maxlen = strlen(text);
 
@@ -652,15 +568,12 @@ void Raster2D<T>::print(int dest_x, int dest_y, double dvalue, const char *text,
 
 
 void GenericRaster::printCentered(double dvalue, const char *text) {
-	if (lcrs.dimensions != 2)
-		throw MetadataException("print() only works on 2d rasters");
-
 	const int BORDER = 16;
 
 	int len = strlen(text);
 
-	int width = lcrs.size[0] - 2*BORDER;
-	int height = lcrs.size[1] - 2*BORDER;
+	int width = this->width - 2*BORDER;
+	int height = this->height - 2*BORDER;
 
 	int max_chars_x = width / 8;
 	int max_chars_y = height / 8;

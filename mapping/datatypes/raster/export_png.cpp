@@ -8,9 +8,6 @@
 #include <sstream>
 
 template<typename T> void Raster2D<T>::toPNG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy, Raster2D<uint8_t> *overlay) {
-	if (lcrs.dimensions != 2)
-		throw new MetadataException("toPNG can only handle rasters with 2 dimensions");
-
 	this->setRepresentation(GenericRaster::Representation::CPU);
 
 	FILE *file = nullptr;
@@ -22,7 +19,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 
 	if (overlay) {
 		// do not use the overlay if the size does not match
-		if (overlay->lcrs.dimensions != 2 || overlay->lcrs.size[0] != lcrs.size[0] || overlay->lcrs.size[1] != lcrs.size[1])
+		if (overlay->width != width || overlay->height != height)
 			overlay = nullptr;
 	}
 
@@ -30,7 +27,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 		// Write debug info
 		std::ostringstream msg_scale;
 		msg_scale.precision(2);
-		msg_scale << std::fixed << "scale: " << lcrs.scale[0] << ", " << lcrs.scale[1];
+		msg_scale << std::fixed << "scale: " << pixel_scale_x << ", " << pixel_scale_y;
 		overlay->print(4, 26, overlay->dd.max, msg_scale.str().c_str());
 	}
 
@@ -63,7 +60,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 	}
 
 	png_set_IHDR(png_ptr, info_ptr,
-		lcrs.size[0],  lcrs.size[1],
+		width, height,
 		8, PNG_COLOR_TYPE_PALETTE,
 		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
 	);
@@ -75,7 +72,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 		actual_min = (T) dd.getMaxByDatatype();
 		actual_max = (T) dd.getMinByDatatype();
 		bool found_pixel = false;
-		auto size = lcrs.getPixelCount();
+		auto size = getPixelCount();
 		for (size_t i=0;i<size;i++) {
 			T v = data[i];
 			if (dd.is_no_data(v))
@@ -128,13 +125,11 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 	png_write_info(png_ptr, info_ptr);
 	png_set_filter(png_ptr, PNG_FILTER_TYPE_BASE, PNG_FILTER_NONE | PNG_FILTER_PAETH);
 
-	int width = lcrs.size[0];
-	int height = lcrs.size[1];
 	uint8_t *row = new uint8_t[ width ];
-	for (int y=0;y<height;y++) {
-		int py = flipy ? height-y-1 : y;
-		for (int x=0;x<width;x++) {
-			int px = flipx ? width-x-1 : x;
+	for (uint32_t y=0;y<height;y++) {
+		uint32_t py = flipy ? height-y-1 : y;
+		for (uint32_t x=0;x<width;x++) {
+			uint32_t px = flipx ? width-x-1 : x;
 			T v = get(px, py);
 			if (overlay && overlay->get(x, y) == 1) {
 				row[x] = 1;

@@ -111,14 +111,14 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	if (raster_in->dd.has_no_data)
 		out_dd.addNoData();
 
-	auto raster_out = GenericRaster::create(raster_in->lcrs, out_dd);
+	auto raster_out = GenericRaster::create(out_dd, *raster_in);
 
 	RasterOpenCL::CLProgram prog;
 	prog.setProfiler(profiler);
 	for (int i=0;i<rastercount;i++) {
 		if (i > 0) {
-			if (in_rasters[i]->lcrs != raster_in->lcrs)
-				throw OperatorException("ExpressionOperator: not all input rasters have the same lcrs");
+			if (in_rasters[i]->width != raster_in->width || in_rasters[i]->height != raster_in->height)
+				throw OperatorException("ExpressionOperator: not all input rasters have the same dimensions");
 		}
 		prog.addInRaster(in_rasters[i].get());
 	}

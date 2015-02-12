@@ -37,21 +37,20 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 
 	std::unique_ptr<PointCollection> points = getPointsFromSource(0, rect, profiler);
 
-	LocalCRS rm(rect);
-	DataDescription vm(GDT_Byte, 0, MAX, true, 0);
+	DataDescription dd(GDT_Byte, 0, MAX, true, 0);
+
+	GridSpatioTemporalResult crs(rect, rect.xres, rect.yres);
 
 	pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(pv::Coordinate((rect.x2 + rect.x1) / 2, (rect.y2 + rect.y2) / 2), pv::Dimension((rect.x2 - rect.x1) / 2, (rect.y2 - rect.y2) / 2), 1), 1);
 	for (Point &p : points->collection) {
-		double x = p.x, y = p.y;
-
-		int px = floor(rm.WorldToPixelX(x));
-		int py = floor(rm.WorldToPixelY(y));
+		auto px = crs.WorldToPixelX(p.x);
+		auto py = crs.WorldToPixelY(p.y);
 
 		clusterer.insert(std::make_shared<pv::Circle>(pv::Coordinate(px, py), 5, 1));
 	}
 
 
-	std::unique_ptr<GenericRaster> raster_out_guard = GenericRaster::create(rm, vm, GenericRaster::Representation::CPU);
+	std::unique_ptr<GenericRaster> raster_out_guard = GenericRaster::create(dd, crs, GenericRaster::Representation::CPU);
 	Raster2D<T> *raster_out = (Raster2D<T> *) raster_out_guard.get();
 
 	raster_out->clear(0);

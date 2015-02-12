@@ -7,6 +7,8 @@
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h" // For QueryProfiler
+#include "util/debug.h"
+
 
 //#include <iostream>
 #include <fstream>
@@ -48,19 +50,19 @@ void init() {
 			//printf("Platform number is: %d\n", (int) platformList.size());
 			platform = platformList[platformList.size()-1];
 
-			/*
 			for (size_t i=0;i<platformList.size();i++) {
 				std::string platformVendor;
 				platformList[i].getInfo((cl_platform_info)CL_PLATFORM_VENDOR, &platformVendor);
-				printf("Platform vendor %d is: %s\n", (int) i, platformVendor.c_str());
+				std::ostringstream msg;
+				msg << "CL vendor " << i << ": " << platformVendor;
+				d(msg.str());
 			}
-			*/
 
 			// Context
 			cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
 			try {
 				context = cl::Context(
-					CL_DEVICE_TYPE_CPU, // _CPU
+					CL_DEVICE_TYPE_GPU, // _CPU
 					cprops
 				);
 			}
@@ -220,42 +222,21 @@ static const std::string rasterinfo_source(
 "#define R(t,x,y) (t ## _data[y * t ## _info->size[0] + x])\n"
 );
 
-void setKernelArgAsRasterinfo(cl::Kernel &kernel, cl_uint arg, GenericRaster *raster) {
-	RasterInfo ri;
-	for (int i=0;i<raster->lcrs.dimensions;i++) {
-		ri.size[i] = raster->lcrs.size[i];
-		ri.origin[i] = raster->lcrs.origin[i];
-		ri.scale[i] = raster->lcrs.scale[i];
-	}
-	for (int i=raster->lcrs.dimensions;i<3;i++) {
-		ri.size[i] = 1;
-		ri.origin[i] = 0.0;
-		ri.scale[i] = 1.0;
-	}
-	ri.epsg = raster->lcrs.epsg;
-
-	ri.min = raster->dd.min;
-	ri.max = raster->dd.max;
-	ri.no_data = raster->dd.has_no_data ? raster->dd.no_data : 0.0;
-	ri.has_no_data = raster->dd.has_no_data;
-
-	kernel.setArg(arg, sizeof(RasterInfo), &ri);
-}
 
 cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster) {
 	RasterInfo ri;
 	memset(&ri, 0, sizeof(RasterInfo));
-	for (int i=0;i<raster->lcrs.dimensions;i++) {
-		ri.size[i] = raster->lcrs.size[i];
-		ri.origin[i] = raster->lcrs.origin[i];
-		ri.scale[i] = raster->lcrs.scale[i];
-	}
-	for (int i=raster->lcrs.dimensions;i<3;i++) {
-		ri.size[i] = 1;
-		ri.origin[i] = 0.0;
-		ri.scale[i] = 1.0;
-	}
-	ri.epsg = raster->lcrs.epsg;
+	ri.size[0] = raster->width;
+	ri.size[1] = raster->height;
+	ri.size[2] = 1;
+	ri.origin[0] = raster->PixelToWorldX(0);
+	ri.origin[1] = raster->PixelToWorldY(0);
+	ri.origin[2] = 0.0;
+	ri.scale[0] = raster->pixel_scale_x;
+	ri.scale[1] = raster->pixel_scale_y;
+	ri.scale[2] = 1.0;
+
+	ri.epsg = raster->stref.epsg;
 
 	ri.min = raster->dd.min;
 	ri.max = raster->dd.max;
@@ -442,7 +423,7 @@ cl::Event CLProgram::run(std::vector<cl::Event>* events_to_wait_for) {
 
 	cl::NDRange range;
 	if (iteration_type == 1)
-		range = cl::NDRange(out_rasters[0]->lcrs.size[0], out_rasters[0]->lcrs.size[1]);
+		range = cl::NDRange(out_rasters[0]->width, out_rasters[0]->height);
 	else if (iteration_type == 2)
 		range = cl::NDRange(pointcollections[0]->collection.size());
 	else

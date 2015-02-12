@@ -152,7 +152,7 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 			lut[no_data] = out_dd.no_data;
 	}
 
-	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
+	auto raster_out = GenericRaster::create(out_dd, *raster, GenericRaster::Representation::OPENCL);
 
 	RasterOpenCL::CLProgram prog;
 	prog.setProfiler(profiler);

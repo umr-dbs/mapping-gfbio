@@ -5,10 +5,10 @@
 
 template<typename T, int dimensions> class Raster : public GenericRaster {
 	public:
-		Raster(const LocalCRS &localcrs, const DataDescription &datadescription);
+		Raster(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
 		virtual ~Raster();
 
-		virtual size_t getDataSize() { return sizeof(T)*lcrs.getPixelCount(); };
+		virtual size_t getDataSize() { return sizeof(T)*getPixelCount(); };
 		virtual int getBPP() { return sizeof(T); }
 
 		virtual void setRepresentation(Representation);
@@ -30,15 +30,15 @@ class RasterOperator;
 
 template<typename T> class Raster2D : public Raster<T, 2> {
 	public:
-		Raster2D(const LocalCRS &localcrs, const DataDescription &datadescription)
-			:Raster<T, 2>(localcrs, datadescription) {};
+		Raster2D(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth = 0)
+			:Raster<T, 2>(datadescription, stref, width, height, depth) {};
 		virtual ~Raster2D();
 
 		virtual void toPGM(const char *filename, bool avg);
 		virtual void toYUV(const char *filename);
 		virtual void toPNG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false, Raster2D<uint8_t> *overlay = nullptr);
 		virtual void toJPEG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false);
-		virtual void toGDAL(const char *filename, const char *driver);
+		virtual void toGDAL(const char *filename, const char *driver, bool flipx = false, bool flipy = false);
 
 		virtual void clear(double value);
 		virtual void blit(const GenericRaster *raster, int x, int y=0, int z=0);
@@ -50,29 +50,35 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 		virtual double getAsDouble(int x, int y=0, int z=0) const;
 
 		T get(int x, int y) const {
-			return data[(size_t) y*this->lcrs.size[0] + x];
+			return data[(size_t) y*width + x];
 		}
 		T getSafe(int x, int y, T def = 0) const {
-			if (x >= 0 && y >= 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
-				return data[(size_t) y*this->lcrs.size[0] + x];
-			//fprintf(stderr, "getSafe(%d, %d) outside of range (%u, %u)\n", x, y, lcrs.size[0], lcrs.size[1]);
+			if (x >= 0 && y >= 0 && (uint32_t) x < width && (uint32_t) y < height)
+				return data[(size_t) y*width + x];
 			return def;
 		}
 		void set(int x, int y, T value) {
-			data[(size_t) y*lcrs.size[0] + x] = value;
+			data[(size_t) y*width + x] = value;
 		}
 		void setSafe(int x, int y, T value) {
-			if (x >= 0 && y >= 0 && (uint32_t) x < lcrs.size[0] && (uint32_t) y < lcrs.size[1])
-				data[(size_t) y*lcrs.size[0] + x] = value;
+			if (x >= 0 && y >= 0 && (uint32_t) x < width && (uint32_t) y < height)
+				data[(size_t) y*width + x] = value;
 		}
 
 		// create aliases for parent classes members
 		// otherwise we'd need to write this->data every time
 		// see: two-phase lookup of dependant names
 	public:
+		using Raster<T, 2>::stref;
+		using Raster<T, 2>::width;
+		using Raster<T, 2>::height;
+		using Raster<T, 2>::pixel_scale_x;
+		using Raster<T, 2>::pixel_scale_y;
+		using Raster<T, 2>::PixelToWorldX;
+		using Raster<T, 2>::PixelToWorldY;
 		using Raster<T, 2>::data;
-		using Raster<T, 2>::lcrs;
 		using Raster<T, 2>::dd;
+		using Raster<T, 2>::getPixelCount;
 		using Raster<T, 2>::getDataSize;
 		using Raster<T, 2>::setRepresentation;
 };

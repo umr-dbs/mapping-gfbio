@@ -80,10 +80,10 @@ namespace ***REMOVED*** {
 
 		 */
 		Profiler::Profiler p("***REMOVED***: wrapping raster");
-		int width = raster.lcrs.size[0];
-		int height = raster.lcrs.size[1];
+		int width = raster.width;
+		int height = raster.height;
 
-		***REMOVED***::NumericVector pixels(raster.lcrs.getPixelCount());
+		***REMOVED***::NumericVector pixels(raster.getPixelCount());
 		int pos = 0;
 		for (int y=0;y<height;y++) {
 			for (int x=0;x<width;x++) {
@@ -103,23 +103,24 @@ namespace ***REMOVED*** {
 		data.slot("min") = raster.dd.min;
 		data.slot("max") = raster.dd.max;
 
+		// TODO: how exactly would R like the Extent to be?
 		***REMOVED***::S4 extent("Extent");
-		extent.slot("xmin") = raster.lcrs.origin[0];
-		extent.slot("ymin") = raster.lcrs.origin[1];
-		extent.slot("xmax") = raster.lcrs.PixelToWorldX(raster.lcrs.size[0]);
-		extent.slot("ymax") = raster.lcrs.PixelToWorldY(raster.lcrs.size[1]);
+		extent.slot("xmin") = raster.stref.x1;
+		extent.slot("ymin") = raster.stref.y1;
+		extent.slot("xmax") = raster.stref.x2;
+		extent.slot("ymax") = raster.stref.y2;
 
 		***REMOVED***::S4 crs("CRS");
 		std::ostringstream epsg;
-		epsg << "EPSG:" << (int) raster.lcrs.epsg;
+		epsg << "EPSG:" << (int) raster.stref.epsg;
 		crs.slot("projargs") = epsg.str();
 
 		***REMOVED***::S4 rasterlayer("RasterLayer");
 		rasterlayer.slot("data") = data;
 		rasterlayer.slot("extent") = extent;
 		rasterlayer.slot("crs") = crs;
-		rasterlayer.slot("ncols") = raster.lcrs.size[0];
-		rasterlayer.slot("nrows") = raster.lcrs.size[1];
+		rasterlayer.slot("ncols") = raster.width;
+		rasterlayer.slot("nrows") = raster.height;
 
 		return ***REMOVED***::wrap(rasterlayer);
 	}
@@ -146,7 +147,7 @@ namespace ***REMOVED*** {
 		***REMOVED***::S4 extent = rasterlayer.slot("extent");
 		double xmin = extent.slot("xmin"), ymin = extent.slot("ymin"), xmax = extent.slot("xmax"), ymax = extent.slot("ymax");
 
-		LocalCRS lcrs(epsg, width, height, xmin, ymin, (xmax-xmin)/width, (ymax-ymin)/height);
+		SpatioTemporalReference stref(epsg, xmin, ymin, xmax, ymax, TIMETYPE_UNREFERENCED, 0, 1);
 
 		***REMOVED***::S4 data = rasterlayer.slot("data");
 		if ((bool) data.slot("inmemory") != true)
@@ -158,10 +159,8 @@ namespace ***REMOVED*** {
 		double max = data.slot("max");
 
 		DataDescription dd(GDT_Float32, min, max, true, NAN);
-
-		lcrs.verify();
 		dd.verify();
-		auto raster_out = GenericRaster::create(lcrs, dd, GenericRaster::Representation::CPU);
+		auto raster_out = GenericRaster::create(dd, stref, width, height, GenericRaster::Representation::CPU);
 		Raster2D<float> *raster2d = (Raster2D<float> *) raster_out.get();
 
 		***REMOVED***::NumericVector pixels = data.slot("values");

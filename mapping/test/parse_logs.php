@@ -60,16 +60,22 @@ foreach ($logs as $file) {
 
 	$all_passed = true;
 	foreach($expected_results as $name) {
-		if (!$passed[$name])
+		if (isset($passed[$name]) && !$passed[$name])
 			$all_passed = false;
 	}
 	echo '<tr'.($all_passed ? '' : ' onclick="toggle('.$collapse_id.');" style="cursor: pointer;"').'><td>'.$file.'</td>';
 	foreach($expected_results as $name) {
-		echo '<td style="background-color: ' . ($passed[$name] ? 'green' : 'red') . '">'.$name.'</td>';
+		if (!isset($passed[$name]))
+			$col = 'blue';
+		else if ($passed[$name])
+			$col = 'green';
+		else
+			$col = 'red';
+		echo '<td style="background-color: ' . $col . '">'.$name.'</td>';
 	}
 	echo "</tr>\n";
 	foreach($expected_results as $name) {
-		if ($passed[$name])
+		if (!isset($passed[$name]) || $passed[$name])
 			continue;
 		echo '<tr class="collapse_'.$collapse_id.'" style="display: none"><td colspan="'.(count($expected_results)+1).'"><b>'.$name.'</b><br /><pre>'.$log[$name].'</pre></td></tr>'."\n";
 	}

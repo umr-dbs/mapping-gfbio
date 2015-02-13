@@ -521,6 +521,23 @@ std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
 	return flipped_raster;
 }
 
+template<typename T>
+std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRectangle &qrect) {
+	if (qrect.epsg != stref.epsg)
+		throw ArgumentException("Cannot fit a Raster to a QueryRectangle with a different epsg");
+
+	auto out = GenericRaster::create(dd, qrect, qrect.xres, qrect.yres);
+	Raster2D<T> *r = (Raster2D<T> *) out.get();
+
+	for (uint32_t y=0;y<r->height;y++) {
+		auto py = this->WorldToPixelY( r->PixelToWorldY(y) );
+		for (uint32_t x=0;x<r->width;x++) {
+			auto px = this->WorldToPixelX( r->PixelToWorldX(x) );
+			r->set(x, y, getSafe(px, py));
+		}
+	}
+	return out;
+}
 
 template<typename T>
 double Raster2D<T>::getAsDouble(int x, int y, int) const {

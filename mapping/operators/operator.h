@@ -23,6 +23,7 @@ class QueryRectangle {
 	public:
 		QueryRectangle();
 		QueryRectangle(time_t timestamp, double x1, double y1, double x2, double y2, uint32_t xres, uint32_t yres, epsg_t epsg) : timestamp(timestamp), x1(std::min(x1,x2)), y1(std::min(y1,y2)), x2(std::max(x1,x2)), y2(std::max(y1,y2)), xres(xres), yres(yres), epsg(epsg) {};
+		QueryRectangle(const GridSpatioTemporalResult &grid);
 		QueryRectangle(BinaryStream &stream);
 
 		void toStream(BinaryStream &stream) const;
@@ -69,6 +70,11 @@ class QueryProfiler {
 
 class GenericOperator {
 	public:
+		enum class RasterQM {
+			EXACT,
+			LOOSE
+		};
+
 		static const int MAX_INPUT_TYPES = 3;
 		static const int MAX_SOURCES = 20;
 		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json, int depth = 0);
@@ -76,7 +82,7 @@ class GenericOperator {
 
 		virtual ~GenericOperator();
 
-		std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
 		std::unique_ptr<PointCollection> getCachedPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 		std::unique_ptr<GenericGeometry> getCachedGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
 		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
@@ -97,7 +103,7 @@ class GenericOperator {
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
-		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
 		std::unique_ptr<PointCollection> getPointsFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
 		std::unique_ptr<GenericGeometry> getGeometryFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
 		// there is no getPlotFromSource, because plots are by definition the final step of a chain

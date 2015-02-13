@@ -42,6 +42,11 @@ OperatorRegistration::OperatorRegistration(const char *name, OPConstructor const
 /*
  * QueryRectangle class
  */
+QueryRectangle::QueryRectangle(const GridSpatioTemporalResult &grid)
+	: QueryRectangle(grid.stref.t1, grid.stref.x1, grid.stref.y1, grid.stref.x2, grid.stref.y2, grid.width, grid.height, grid.stref.epsg){
+}
+
+
 QueryRectangle::QueryRectangle(BinaryStream &socket) {
 	socket.read(&timestamp);
 	socket.read(&x1);
@@ -215,11 +220,15 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 	d(msg.str());
 }
 
-std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
 	QueryProfiler profiler;
 	profiler.startTimer();
 	auto result = getRaster(rect, profiler);
 	profiler.stopTimer();
+
+	// the costs of adjusting the result are assigned to the calling operator
+	if (query_mode == RasterQM::EXACT)
+		result = result->fitToQueryRectangle(rect);
 	d_profile(depth, type, "raster", profiler, result->getDataSize());
 	parent_profiler += profiler;
 	return result;
@@ -253,11 +262,11 @@ std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle
 }
 
 
-std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode) {
 	if (idx < 0 || idx >= sourcecounts[0])
 		throw OperatorException("getChildRaster() called on invalid index");
 	profiler.stopTimer();
-	auto result = sources[idx]->getCachedRaster(rect, profiler);
+	auto result = sources[idx]->getCachedRaster(rect, profiler, query_mode);
 	profiler.startTimer();
 	return result;
 }

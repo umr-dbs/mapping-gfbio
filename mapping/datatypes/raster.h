@@ -79,6 +79,7 @@ namespace cl {
 }
 
 class Colorizer;
+class QueryRectangle;
 
 template<typename T> class Raster2D;
 
@@ -133,6 +134,7 @@ class GenericRaster : public GridSpatioTemporalResult {
 		std::unique_ptr<GenericRaster> cut(int x, int y, int width, int height) { return cut(x,y,0,width,height,0); }
 		virtual std::unique_ptr<GenericRaster> scale(int width, int height=0, int depth=0) = 0;
 		virtual std::unique_ptr<GenericRaster> flip(bool flipx, bool flipy) = 0;
+		virtual std::unique_ptr<GenericRaster> fitToQueryRectangle(const QueryRectangle &qrect) = 0;
 
 		virtual void print(int x, int y, double value, const char *text, int maxlen = -1) = 0;
 		virtual void printCentered(double value, const char *text);

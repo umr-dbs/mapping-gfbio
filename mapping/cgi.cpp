@@ -612,11 +612,7 @@ int main() {
 					}
 					else {
 						QueryProfiler profiler;
-						auto result_raster = graph->getCachedRaster(qrect, profiler);
-
-						if (result_raster->width != (uint32_t) output_width || result_raster->height != (uint32_t) output_height) {
-							result_raster = result_raster->scale(output_width, output_height);
-						}
+						auto result_raster = graph->getCachedRaster(qrect, profiler, GenericOperator::RasterQM::EXACT);
 
 						bool flipx = (bbox[2] > bbox[0]) != (result_raster->pixel_scale_x > 0);
 						bool flipy = (bbox[3] > bbox[1]) == (result_raster->pixel_scale_y > 0);

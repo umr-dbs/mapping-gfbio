@@ -7,7 +7,7 @@ LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
 CPATH := /usr/local/include/:$(CPATH)
 
 #CPP=g++
-CPP=clang++
+CPP=clang++-3.5
 CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl

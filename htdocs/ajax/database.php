@@ -36,5 +36,17 @@ class DB {
 		$stmt->execute($params);
 		return $stmt->rowCount();
 	}
+	
+	static public function beginTransaction() {
+		self::$db->beginTransaction();
+	}
+	
+	static public function commit() {
+		self::$db->commit();
+	}
+	
+	static public function getLastInsertedId($sequenceName) {
+		return self::$db->lastInsertId($sequenceName);
+	}
 
 }

@@ -32,10 +32,11 @@ class Authentication extends \Slim\Middleware {
 		if ($this->authenticate ( $userId, $sessionToken )) {
 			$app->request->authentication = array (
 					"loggedIn" => true,
-					"userId" => 5 
+					"userId" => $userId 
 			);
-			
+			   
 			// Run inner middleware and application
+			
 			$this->next->call ();
 		} else {
 			// Send error code
@@ -103,36 +104,120 @@ $app->group ( '/workflows', function () use($app) {
 	 * Store a workflow group.
 	 */
 	$app->post ( '/:name', function ($name) use($app) {
+		$app->response ()->header ( 'Content-Type', 'application/json' );
+		
 		if (! $app->request->authentication ["loggedIn"]) {
 			return;
 		}
 		$userId = $app->request->authentication ["userId"];
 		
- 		$workflows = $app->request->params("workflows");
+		$workflows = $app->request->params ( "workflows" );
 		
-		DB::beginTransaction();
+		DB::beginTransaction ();
 		$exists = DB::query ( 'SELECT count(*) AS count, MAX(id) AS id FROM workflow_groups WHERE user_id = ? AND name LIKE ?', $userId, $name );
 		
 		$id = 0;
-		if($exists[0]->count <= 0) {
+		if ($exists [0]->count <= 0) {
 			// INSERT
-			DB::exec("INSERT INTO workflow_groups(user_id, name) VALUES (?, ?)", $userId, $name);
-			$id = DB::getLastInsertedId("workflow_groups_id_seq");
+			DB::exec ( "INSERT INTO workflow_groups(user_id, name) VALUES (?, ?)", $userId, $name );
+			$id = DB::getLastInsertedId ( "workflow_groups_id_seq" );
 		} else {
 			// UPDATE
-			$id = $exists[0]->id;
-			DB::exec("UPDATE workflow_groups SET changed = NOW() WHERE user_id = ? AND id = ?", $userId, $id);
+			$id = $exists [0]->id;
+			DB::exec ( "UPDATE workflow_groups SET changed = NOW() WHERE user_id = ? AND id = ?", $userId, $id );
 		}
 		
 		// DELETE OLD ENTRIES AND ADD NEW ONES
-		DB::exec("DELETE FROM workflows WHERE workflow_group_id = ?", $id);
+		DB::exec ( "DELETE FROM workflows WHERE workflow_group_id = ?", $id );
 		
-		foreach ($workflows as $workflow) {
-			echo var_dump($workflow);
-			DB::exec("INSERT INTO workflows(workflow_group_id, graph, name) VALUES (?, ?, ?)", $id, $workflow["query"], $workflow["name"]);
+		foreach ( $workflows as $workflow ) {
+			DB::exec ( "INSERT INTO workflows(workflow_group_id, graph, name) VALUES (?, ?, ?)", $id, $workflow ["query"], $workflow ["name"] );
 		}
 		
-		DB::commit();
+		DB::commit ();
+		
+		echo '{"status": "OK"}';
+	} );
+} );
+
+/**
+ * Storage and retrieval of user defined scripts.
+ */
+$app->group ( '/scripts', function () use($app) {
+	/**
+	 * Get a list of all scripts.
+	 */
+	$app->get ( '/', function () use($app) {
+		$app->response ()->header ( 'Content-Type', 'application/json' );
+		
+		if (! $app->request->authentication ["loggedIn"]) {
+			echo array ();
+		}
+		$userId = $app->request->authentication ["userId"];
+		
+		$scripts = DB::query ( 'SELECT id, name FROM scripts WHERE user_id = ? ORDER BY name ASC', $userId );
+		
+		$output = array ();
+		foreach ( $scripts as $script ) {
+			$output [] = array (
+					"id" => $script->id,
+					"name" => $script->name 
+			);
+		}
+		
+		echo json_encode ( $output );
+	} );
+	
+	/**
+	 * Get one scripts.
+	 */
+	$app->get ( '/:scriptId', function ($scriptId) use($app) {
+		$app->response ()->header ( 'Content-Type', 'application/json' );
+		
+		if (! $app->request->authentication ["loggedIn"]) {
+			echo new stdClass ();
+		}
+		$userId = $app->request->authentication ["userId"];
+		
+		$scripts = DB::query ( 'SELECT script, result_type FROM scripts WHERE user_id = ? AND id = ?', $userId, $scriptId );
+		
+		$output = new stdClass ();
+		foreach ( $scripts as $script ) {
+			$output->code = $script->script;
+			$output->resultType = $script->result_type;
+		}
+		
+		echo json_encode ( $output );
+	} );
+	
+	/**
+	 * Store a script.
+	 */
+	$app->post ( '/:name', function ($name) use($app) {
+		$app->response ()->header ( 'Content-Type', 'application/json' );
+		
+		if (! $app->request->authentication ["loggedIn"]) {
+			return;
+		}
+		$userId = $app->request->authentication ["userId"];
+		
+		$script = $app->request->params ( "script" );
+		
+		DB::beginTransaction ();
+		$exists = DB::query ( 'SELECT count(*) AS count, MAX(id) AS id FROM scripts WHERE user_id = ? AND name LIKE ?', $userId, $name );
+		
+		if ($exists [0]->count <= 0) {
+			// INSERT
+			DB::exec ( "INSERT INTO scripts(user_id, name, script, result_type) VALUES (?, ?, ?, ?)", $userId, $name, $script["code"], $script["resultType"] );
+		} else {
+			// UPDATE
+			$id = $exists [0]->id;
+			DB::exec ( "UPDATE scripts SET script = ?, result_type = ? WHERE user_id = ? AND id = ?", $script["code"], $script["resultType"], $userId, $id );
+		}
+		
+		DB::commit ();
+		
+		echo '{"status": "OK"}';
 	} );
 } );
 

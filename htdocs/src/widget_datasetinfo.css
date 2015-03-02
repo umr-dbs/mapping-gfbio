@@ -1,3 +1,14 @@
 .widget_datasetinfo {
+	padding:10px;
+}
 
+.dataset_key{
+	font-weight: bold;
+	vertical-align: text-top;
+	padding-bottom: 1em;
+}
+
+.dataset_value{
+	padding-left: 50px;
+	padding-bottom: 1em;
 }

@@ -34,7 +34,7 @@ class Authentication extends \Slim\Middleware {
 					"loggedIn" => true,
 					"userId" => $userId 
 			);
-			   
+			
 			// Run inner middleware and application
 			
 			$this->next->call ();
@@ -49,45 +49,47 @@ $app = new \Slim\Slim ();
 $app->add ( new \Authentication () );
 
 /**
- * Storage and retrieval of workflows.
+ * Storage and retrieval of projects.
  */
-$app->group ( '/workflows', function () use($app) {
+$app->group ( '/projects', function () use($app) {
 	/**
-	 * Get a list of all workflow group names.
+	 * Get a list of all projects.
 	 */
 	$app->get ( '/', function () use($app) {
 		$app->response ()->header ( 'Content-Type', 'application/json' );
 		
 		if (! $app->request->authentication ["loggedIn"]) {
-			echo new stdClass ();
+			$app->response->write ( new stdClass () );
+			return;
 		}
 		$userId = $app->request->authentication ["userId"];
 		
-		$groups = DB::query ( 'SELECT id, name, changed FROM workflow_groups WHERE user_id = ?', $userId );
+		$projects = DB::query ( "SELECT id, name, valid_from FROM projects WHERE user_id = ? AND valid_to = 'infinity'", $userId );
 		
 		$output = array ();
-		foreach ( $groups as $group ) {
-			$output [$group->id] = array (
-					"name" => $group->name,
-					"changed" => $group->changed 
+		foreach ( $projects as $project ) {
+			$output [$project->id] = array (
+					"name" => $project->name,
+					"changed" => $project->valid_from 
 			);
 		}
 		
-		echo json_encode ( ( object ) $output );
+		$app->response->write ( json_encode ( ( object ) $output ) );
 	} );
 	
 	/**
-	 * Get a specific workflow group.
+	 * Get a specific project.
 	 */
-	$app->get ( '/:workflowId', function ($workflowGroupId) use($app) {
+	$app->get ( '/:projectId', function ($projectId) use($app) {
 		$app->response ()->header ( 'Content-Type', 'application/json' );
 		
 		if (! $app->request->authentication ["loggedIn"]) {
-			echo new stdClass ();
+			$app->response->write ( new stdClass () );
+			return;
 		}
 		$userId = $app->request->authentication ["userId"];
 		
-		$workflows = DB::query ( 'SELECT w.name, w.graph FROM workflows w JOIN workflow_groups g ON(g.id = w.workflow_group_id) WHERE g.user_id = ? AND g.id = ?', $userId, $workflowGroupId );
+		$workflows = DB::query ( "SELECT w.name, w.graph FROM workflows w JOIN projects p ON(p.id = w.project_id) WHERE p.user_id = ? AND p.id = ? AND p.valid_to = 'infinity' AND w.valid_to = 'infinity'", $userId, $projectId );
 		
 		$output = array ();
 		foreach ( $workflows as $workflow ) {
@@ -97,46 +99,105 @@ $app->group ( '/workflows', function () use($app) {
 			);
 		}
 		
-		echo json_encode ( $output );
+		$app->response->write ( json_encode ( $output ) );
 	} );
 	
 	/**
 	 * Store a workflow group.
 	 */
 	$app->post ( '/:name', function ($name) use($app) {
-		$app->response ()->header ( 'Content-Type', 'application/json' );
-		
 		if (! $app->request->authentication ["loggedIn"]) {
-			return;
+			$app->halt ( 403 );
 		}
 		$userId = $app->request->authentication ["userId"];
 		
-		$workflows = $app->request->params ( "workflows" );
-		
 		DB::beginTransaction ();
-		$exists = DB::query ( 'SELECT count(*) AS count, MAX(id) AS id FROM workflow_groups WHERE user_id = ? AND name LIKE ?', $userId, $name );
 		
-		$id = 0;
-		if ($exists [0]->count <= 0) {
+		// GET A PROJECT ID
+		$projectId = null;
+		$exists = DB::query ( "SELECT id, valid_to FROM projects WHERE user_id = ? AND name LIKE ? AND valid_to >= ALL (SELECT valid_to FROM projects WHERE user_id = ? AND name LIKE ?)", $userId, $name, $userId, $name );
+		if (count ( $exists ) <= 0) {
 			// INSERT
-			DB::exec ( "INSERT INTO workflow_groups(user_id, name) VALUES (?, ?)", $userId, $name );
-			$id = DB::getLastInsertedId ( "workflow_groups_id_seq" );
+			DB::exec ( "INSERT INTO projects(user_id, name) VALUES (?, ?)", $userId, $name );
+			$projectId = DB::getLastInsertedId ( "project_id_seq" );
 		} else {
 			// UPDATE
-			$id = $exists [0]->id;
-			DB::exec ( "UPDATE workflow_groups SET changed = NOW() WHERE user_id = ? AND id = ?", $userId, $id );
+			$projectId = $exists [0]->id;
+			if ($exists [0]->valid_to == "infinity") {
+				// close the current group
+				DB::exec ( "UPDATE projects SET valid_to = NOW() WHERE user_id = ? AND id = ?", $userId, $projectId );
+			}
+			DB::exec ( "INSERT INTO projects(id, user_id, name) VALUES (?, ?, ?)", $projectId, $userId, $name );
 		}
 		
-		// DELETE OLD ENTRIES AND ADD NEW ONES
-		DB::exec ( "DELETE FROM workflows WHERE workflow_group_id = ?", $id );
+		// PROCESS WORKFLOWS
+		$workflows = $app->request->params ( "workflows" );
+		
+		// -- THESE WORKFLOWS CAN STAY UNCHANGED
+		$existingWorkflows = DB::query ( "SELECT id, name, graph FROM workflows WHERE project_id = ? AND valid_to = 'infinity'", $projectId );
+		foreach ( $existingWorkflows as $existingWorkflow ) {
+			$stillExists = false;
+			
+			foreach ( $workflows as $workflowKey => $workflow ) {
+				if ($existingWorkflow->name == $workflow ["name"] && $existingWorkflow->graph == $workflow ["query"]) {
+					$stillExists = true;
+					// remove unchanged workflows
+					unset ( $workflows [$workflowKey] );
+					break;
+				}
+			}
+			
+			if (! $stillExists) {
+				// close the old ones
+				DB::exec ( "UPDATE workflows SET valid_to = NOW() WHERE project_id = ? AND id = ? AND valid_to = 'infinity'", $projectId, $existingWorkflow->id );
+			}
+		}
+		
+		// INSERT NEW WORKFLOWS
+		$workflowNames = array ();
+		foreach ( $workflows as $workflow ) {
+			$workflowNames [] = $workflow ["name"];
+		}
+		$existingWorkflows = DB::query ( "SELECT id, name FROM workflows WHERE project_id = ? AND name = ANY(?)", $projectId, "{" . implode ( ",", $workflowNames ) . "}" );
+		
+		$updatables = array ();
+		foreach ( $existingWorkflows as $existingWorkflow ) {
+			$updatables [$existingWorkflow->name] = $existingWorkflow->id;
+		}
 		
 		foreach ( $workflows as $workflow ) {
-			DB::exec ( "INSERT INTO workflows(workflow_group_id, graph, name) VALUES (?, ?, ?)", $id, $workflow ["query"], $workflow ["name"] );
+			if (isset ( $updatables [$workflow ["name"]] )) {
+				// match to existing workflow (id + name)
+				$id = $updatables [$workflow ["name"]];
+				DB::exec ( "INSERT INTO workflows(id, project_id, graph, name) VALUES (?, ?, ?, ?)", $id, $projectId, $workflow ["query"], $workflow ["name"] );
+			} else {
+				DB::exec ( "INSERT INTO workflows(project_id, graph, name) VALUES (?, ?, ?)", $projectId, $workflow ["query"], $workflow ["name"] );
+			}
 		}
 		
 		DB::commit ();
 		
-		echo '{"status": "OK"}';
+		$app->response->setStatus ( 204 );
+	} );
+	
+	/**
+	 * Delete a project.
+	 */
+	$app->delete ( '/:projectId', function ($projectId) use($app) {
+		if (! $app->request->authentication ["loggedIn"]) {
+			$app->halt ( 403 );
+			return;
+		}
+		$userId = $app->request->authentication ["userId"];
+		
+		DB::beginTransaction ();
+		
+		DB::exec ( "UPDATE projects SET valid_to = NOW() WHERE user_id = ? AND id = ? AND valid_to = 'infinity'", $userId, $projectId );
+		DB::exec ( "UPDATE workflows SET valid_to = NOW() WHERE project_id = ? AND valid_to = 'infinity'", $projectId );
+		
+		DB::commit ();
+		
+		$app->response->setStatus ( 204 );
 	} );
 } );
 
@@ -208,11 +269,11 @@ $app->group ( '/scripts', function () use($app) {
 		
 		if ($exists [0]->count <= 0) {
 			// INSERT
-			DB::exec ( "INSERT INTO scripts(user_id, name, script, result_type) VALUES (?, ?, ?, ?)", $userId, $name, $script["code"], $script["resultType"] );
+			DB::exec ( "INSERT INTO scripts(user_id, name, script, result_type) VALUES (?, ?, ?, ?)", $userId, $name, $script ["code"], $script ["resultType"] );
 		} else {
 			// UPDATE
 			$id = $exists [0]->id;
-			DB::exec ( "UPDATE scripts SET script = ?, result_type = ? WHERE user_id = ? AND id = ?", $script["code"], $script["resultType"], $userId, $id );
+			DB::exec ( "UPDATE scripts SET script = ?, result_type = ? WHERE user_id = ? AND id = ?", $script ["code"], $script ["resultType"], $userId, $id );
 		}
 		
 		DB::commit ();

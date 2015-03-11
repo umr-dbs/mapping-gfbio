@@ -78,18 +78,48 @@ $app->group ( '/projects', function () use($app) {
 	} );
 	
 	/**
-	 * Get a specific project.
+	 * Get versions of a project.
 	 */
-	$app->get ( '/:projectId', function ($projectId) use($app) {
+	$app->get ( '/:projectId/versions', function ($projectId) use($app) {
 		$app->response ()->header ( 'Content-Type', 'application/json' );
 		
 		if (! $app->request->authentication ["loggedIn"]) {
-			$app->response->write ( new stdClass () );
+			$app->response->write ( array () );
 			return;
 		}
 		$userId = $app->request->authentication ["userId"];
 		
-		$workflows = DB::query ( "SELECT w.name, w.graph FROM workflows w JOIN projects p ON(p.id = w.project_id) WHERE p.user_id = ? AND p.id = ? AND p.valid_to = 'infinity' AND w.valid_to = 'infinity'", $userId, $projectId );
+		$projectVersions = DB::query ( "SELECT id, name, valid_from FROM projects WHERE user_id = ? AND id = ? ORDER BY valid_from DESC", $userId, $projectId );
+		
+		$output = array ();
+		foreach ( $projectVersions as $version ) {
+			$output [] = array (
+					"id" => $version->id,
+					"name" => $version->name,
+					"changed" => $version->valid_from 
+			);
+		}
+		
+		$app->response->write ( json_encode ( $output ) );
+	} );
+	
+	/**
+	 * Get a specific project.
+	 */
+	$app->get ( '/:projectId(/version/:timestamp)', function ($projectId, $timestamp = 'infinity') use($app) {
+		$app->response ()->header ( 'Content-Type', 'application/json' );
+		
+		if (! $app->request->authentication ["loggedIn"]) {
+			$app->response->write ( array () );
+			return;
+		}
+		$userId = $app->request->authentication ["userId"];
+		
+		if ($timestamp == "infinity") {
+			$workflows = DB::query ( "SELECT w.name, w.graph FROM workflows w JOIN projects p ON(p.id = w.project_id) WHERE p.user_id = ? AND p.id = ? AND p.valid_to = 'infinity' AND w.valid_to = 'infinity'", $userId, $projectId );
+		} else {
+			$workflows = DB::query ( "SELECT w.name, w.graph FROM workflows w JOIN projects p ON(p.id = w.project_id) WHERE p.user_id = ? AND p.id = ? AND (p.valid_from <= ? AND ? < p.valid_to) AND (w.valid_from <= ? AND ? < w.valid_to)", $userId, $projectId, $timestamp, $timestamp, $timestamp, $timestamp );
+		}
 		
 		$output = array ();
 		foreach ( $workflows as $workflow ) {
@@ -103,7 +133,7 @@ $app->group ( '/projects', function () use($app) {
 	} );
 	
 	/**
-	 * Store a workflow group.
+	 * Store a project.
 	 */
 	$app->post ( '/:name', function ($name) use($app) {
 		if (! $app->request->authentication ["loggedIn"]) {
@@ -125,7 +155,7 @@ $app->group ( '/projects', function () use($app) {
 			$projectId = $exists [0]->id;
 			if ($exists [0]->valid_to == "infinity") {
 				// close the current group
-				DB::exec ( "UPDATE projects SET valid_to = NOW() WHERE user_id = ? AND id = ?", $userId, $projectId );
+				DB::exec ( "UPDATE projects SET valid_to = NOW() WHERE user_id = ? AND id = ? AND valid_to = 'infinity'", $userId, $projectId );
 			}
 			DB::exec ( "INSERT INTO projects(id, user_id, name) VALUES (?, ?, ?)", $projectId, $userId, $name );
 		}

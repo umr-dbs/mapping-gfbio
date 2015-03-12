@@ -49,8 +49,7 @@ int DataDescription::getBPP() const {
 		case GDT_Int32: return sizeof(int32_t);
 		case GDT_UInt32: return sizeof(uint32_t);
 		case GDT_Float32: return sizeof(float);
-		case GDT_Float64:
-			throw MetadataException("Unsupported data type: Float64");
+		case GDT_Float64: return sizeof(double);
 		case GDT_CInt16:
 			throw MetadataException("Unsupported data type: CInt16");
 		case GDT_CInt32:
@@ -72,8 +71,7 @@ double DataDescription::getMinByDatatype() const {
 		case GDT_Int32: return std::numeric_limits<int32_t>::min();
 		case GDT_UInt32: return std::numeric_limits<uint32_t>::min();
 		case GDT_Float32: return std::numeric_limits<float>::lowest();
-		case GDT_Float64:
-			throw MetadataException("Unsupported data type: Float64");
+		case GDT_Float64: return std::numeric_limits<double>::lowest();
 		case GDT_CInt16:
 			throw MetadataException("Unsupported data type: CInt16");
 		case GDT_CInt32:
@@ -95,8 +93,7 @@ double DataDescription::getMaxByDatatype() const {
 		case GDT_Int32: return std::numeric_limits<int32_t>::max();
 		case GDT_UInt32: return std::numeric_limits<uint32_t>::max();
 		case GDT_Float32: return std::numeric_limits<float>::max();
-		case GDT_Float64:
-			throw MetadataException("Unsupported data type: Float64");
+		case GDT_Float64: return std::numeric_limits<double>::max();
 		case GDT_CInt16:
 			throw MetadataException("Unsupported data type: CInt16");
 		case GDT_CInt32:
@@ -194,7 +191,8 @@ std::unique_ptr<GenericRaster> GenericRaster::create(const DataDescription &data
 			result = new Raster2D<float>(datadescription, stref, width, height);
 			break;
 		case GDT_Float64:
-			throw MetadataException("Unsupported data type: Float64");
+			result = new Raster2D<double>(datadescription, stref, width, height);
+			break;
 		case GDT_CInt16:
 			throw MetadataException("Unsupported data type: CInt16");
 		case GDT_CInt32:

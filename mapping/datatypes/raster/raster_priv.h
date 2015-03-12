@@ -87,7 +87,7 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 };
 
 
-#define RASTER_PRIV_INSTANTIATE_ALL template class Raster2D<uint8_t>;template class Raster2D<uint16_t>;template class Raster2D<int16_t>;template class Raster2D<uint32_t>;template class Raster2D<int32_t>;template class Raster2D<float>;
+#define RASTER_PRIV_INSTANTIATE_ALL template class Raster2D<uint8_t>;template class Raster2D<uint16_t>;template class Raster2D<int16_t>;template class Raster2D<uint32_t>;template class Raster2D<int32_t>;template class Raster2D<float>;template class Raster2D<double>;
 
 
 

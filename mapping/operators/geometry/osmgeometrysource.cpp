@@ -1,4 +1,4 @@
-#include "raster/geometry.h"
+#include "datatypes/geometry.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
@@ -41,7 +41,7 @@ REGISTER_OPERATOR(OSMGeometrySourceOperator, "osmgeometrysource");
 std::unique_ptr<GenericGeometry> OSMGeometrySourceOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
 	fprintf(stderr,"MMStart");
 	std::string sql ="SELECT ST_AsEWKT(ST_Collect(geom)) FROM osm.roads;";
-	auto geom_out = std::make_unique<GenericGeometry>(EPSG_LATLON);
+	auto geom_out = std::make_unique<GenericGeometry>(rect);
 
 	try {
 		pqxx::work transaction(*connection, "load_points");

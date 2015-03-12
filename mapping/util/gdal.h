@@ -3,8 +3,7 @@
 
 #include <string>
 #include <stdint.h>
-
-typedef uint16_t epsg_t;
+#include "datatypes/spatiotemporal.h"
 
 namespace GDAL {
 	void init();

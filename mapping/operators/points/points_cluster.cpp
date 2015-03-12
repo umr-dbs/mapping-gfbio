@@ -1,4 +1,4 @@
-#include "raster/pointcollection.h"
+#include "datatypes/pointcollection.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
@@ -28,7 +28,7 @@ std::unique_ptr<PointCollection> PointsClusterOperator::getPoints(const QueryRec
 	// TODO: EXPECT EPSG:3857
 
 	auto pointsOld = getPointsFromSource(0, rect, profiler);
-	auto pointsNew = std::make_unique<PointCollection>(rect.epsg);
+	auto pointsNew = std::make_unique<PointCollection>(pointsOld->stref);
 
 	pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(
 													pv::Coordinate((rect.x2 + rect.x1) / (2 * rect.xres), (rect.y2 + rect.y2) / (2 * rect.yres)),

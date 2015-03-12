@@ -1,8 +1,8 @@
 
-#include "raster/raster.h"
-#include "raster/raster_priv.h"
-#include "raster/pointcollection.h"
-#include "raster/geometry.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/raster_priv.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/geometry.h"
 #include "operators/operator.h"
 
 #include "util/make_unique.h"

@@ -2,10 +2,10 @@
 #include "util/binarystream.h"
 #include "rserver/rserver.h"
 
-#include "raster/raster.h"
-#include "raster/raster_priv.h"
-#include "raster/pointcollection.h"
-#include "plot/text.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/raster_priv.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/plots/text.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
@@ -100,9 +100,9 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 
 	auto raster = GenericRaster::fromStream(stream);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
-	int width = raster->lcrs.size[0];
-	int height = raster->lcrs.size[1];
-	***REMOVED***::NumericVector pixels(raster->lcrs.getPixelCount());
+	int width = raster->width;
+	int height = raster->height;
+	***REMOVED***::NumericVector pixels(raster->getPixelCount());
 	int pos = 0;
 	for (int y=0;y<height;y++) {
 		for (int x=0;x<width;x++) {

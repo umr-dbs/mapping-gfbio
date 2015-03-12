@@ -1,5 +1,5 @@
-#include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 
@@ -53,7 +53,7 @@ struct matrixkernel{
 	static std::unique_ptr<GenericRaster> execute(Raster2D<T> *raster_src, int matrix_size, int *matrix) {
 		raster_src->setRepresentation(GenericRaster::Representation::CPU);
 
-		auto raster_dest_guard = GenericRaster::create(raster_src->lcrs, raster_src->dd, GenericRaster::Representation::CPU);
+		auto raster_dest_guard = GenericRaster::create(raster_src->dd, *raster_src, GenericRaster::Representation::CPU);
 		Raster2D<T> *raster_dest = (Raster2D<T> *) raster_dest_guard.get();
 
 		T max = (T) raster_src->valuemeta.max;
@@ -94,7 +94,7 @@ std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectan
 	RasterOpenCL::init();
 	raster_in->setRepresentation(GenericRaster::Representation::OPENCL);
 
-	auto raster_out = GenericRaster::create(raster_in->lcrs, raster_in->dd, GenericRaster::Representation::OPENCL);
+	auto raster_out = GenericRaster::create(raster_in->dd, *raster_in, GenericRaster::Representation::OPENCL);
 
 	size_t matrix_count = (size_t) matrixsize*matrixsize;
 	size_t matrix_buffer_size = sizeof(matrix[0]) * matrix_count;

@@ -1,7 +1,7 @@
-#include "raster/raster.h"
-#include "raster/pointcollection.h"
-#include "plot/text.h"
-#include "plot/png.h"
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/plots/text.h"
+#include "datatypes/plots/png.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 

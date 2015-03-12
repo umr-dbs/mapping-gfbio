@@ -4,24 +4,24 @@
 
 class RawConverter : public RasterConverter {
 	public:
-		RawConverter(const LocalCRS &rm, const DataDescription &vm);
+		RawConverter();
 		virtual std::unique_ptr<ByteBuffer> encode(GenericRaster *raster);
-		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer *buffer);
+		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
 };
 
 
 class BzipConverter : public RasterConverter {
 	public:
-		BzipConverter(const LocalCRS &rm, const DataDescription &vm);
+		BzipConverter();
 		virtual std::unique_ptr<ByteBuffer> encode(GenericRaster *raster);
-		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer *buffer);
+		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
 };
 
 class GzipConverter : public RasterConverter {
 	public:
-		GzipConverter(const LocalCRS &rm, const DataDescription &vm);
+		GzipConverter();
 		virtual std::unique_ptr<ByteBuffer> encode(GenericRaster *raster);
-		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer *buffer);
+		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
 };
 
 #endif

@@ -1,7 +1,7 @@
 #ifndef MAPPING_NO_OPENCL
 
-#include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 
@@ -53,8 +53,8 @@ REGISTER_OPERATOR(ExpressionOperator, "expression");
 
 std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	int rastercount = getRasterSourceCount();
-	if (rastercount > 26)
-		throw OperatorException("ExpressionOperator: cannot have more than 26 input rasters");
+	if (rastercount < 1 || rastercount > 26)
+		throw OperatorException("ExpressionOperator: need between 1 and 26 input rasters");
 
 	RasterOpenCL::init();
 
@@ -62,19 +62,16 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	in_rasters.reserve(rastercount);
 
 	// Load all sources and migrate to opencl
-	for (int i=0;i<rastercount;i++) {
-		in_rasters.push_back(getRasterFromSource(i, rect, profiler));
-		in_rasters[i]->setRepresentation(GenericRaster::OPENCL);
-	}
-
+	in_rasters.push_back(getRasterFromSource(0, rect, profiler, RasterQM::LOOSE));
 	// The first raster determines the data type and sizes
 	GenericRaster *raster_in = in_rasters[0].get();
+	raster_in->setRepresentation(GenericRaster::OPENCL);
 
-	GDALDataType output_type = this->output_type;
-	if (output_type == GDT_Unknown)
-		output_type = raster_in->dd.datatype;
-
-	DataDescription output_dd(output_type, raster_in->dd.min, raster_in->dd.max);
+	QueryRectangle exact_rect(*raster_in);
+	for (int i=1;i<rastercount;i++) {
+		in_rasters.push_back(getRasterFromSource(i, exact_rect, profiler, RasterQM::EXACT));
+		in_rasters[i]->setRepresentation(GenericRaster::OPENCL);
+	}
 
 	/*
 	 * Let's assemble our code
@@ -105,20 +102,27 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	std::string sourcecode(ss_sourcecode.str());
 
 	/*
-	 * Now that we got our new min and max.. time to do this.
+	 * Figure out data type, min and max, and create our output raster
 	 */
+	GDALDataType output_type = this->output_type;
+	if (output_type == GDT_Unknown)
+		output_type = raster_in->dd.datatype;
+
 	DataDescription out_dd(output_type, output_min, output_max);
 	if (raster_in->dd.has_no_data)
 		out_dd.addNoData();
 
-	auto raster_out = GenericRaster::create(raster_in->lcrs, out_dd);
+	auto raster_out = GenericRaster::create(out_dd, *raster_in);
 
+	/*
+	 * Run the kernel
+	 */
 	RasterOpenCL::CLProgram prog;
 	prog.setProfiler(profiler);
 	for (int i=0;i<rastercount;i++) {
 		if (i > 0) {
-			if (in_rasters[i]->lcrs != raster_in->lcrs)
-				throw OperatorException("ExpressionOperator: not all input rasters have the same lcrs");
+			if (in_rasters[i]->width != raster_in->width || in_rasters[i]->height != raster_in->height)
+				throw OperatorException("ExpressionOperator: not all input rasters have the same dimensions");
 		}
 		prog.addInRaster(in_rasters[i].get());
 	}

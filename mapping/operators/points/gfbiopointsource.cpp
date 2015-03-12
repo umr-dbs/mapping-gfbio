@@ -1,7 +1,8 @@
-#include "raster/pointcollection.h"
-#include "raster/geometry.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/geometry.h"
 
 #include "operators/operator.h"
+#include "raster/exceptions.h"
 #include "util/curl.h"
 #include "util/csvparser.h"
 #include "util/make_unique.h"
@@ -52,7 +53,7 @@ REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
 
 std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<PointCollection>(EPSG_LATLON);
+	auto points_out = std::make_unique<PointCollection>(rect);
 
 	std::stringstream data;
 	getStringFromServer(rect, data, "CSV");
@@ -94,7 +95,7 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPoints(const Query
 std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (rect.epsg != EPSG_LATLON) {
 		std::ostringstream msg;
-		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << rect.epsg << ", expected " << EPSG_LATLON << ")";
+		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << (int) rect.epsg << ", expected " << (int) EPSG_LATLON << ")";
 		throw OperatorException(msg.str());
 	}
 
@@ -108,7 +109,7 @@ std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const Que
 	data.seekg(0);
 	geos::geom::Geometry *geom = wkbreader.read(data);
 
-	auto geom_out = std::make_unique<GenericGeometry>(EPSG_LATLON);
+	auto geom_out = std::make_unique<GenericGeometry>(rect);
 	geom_out->setGeom(geom);
 
 	return geom_out;

@@ -1,7 +1,8 @@
-#include "raster/raster.h"
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
 #include "raster/rastersource.h"
 #include "raster/colors.h"
-#include "raster/pointcollection.h"
+
 #include "operators/operator.h"
 #include "converters/converter.h"
 #include "raster/profiler.h"
@@ -58,9 +59,9 @@ static void createsource(int argc, char *argv[]) {
 
 	Json::Value channels(Json::arrayValue);
 
-	std::unique_ptr<LocalCRS> lcrs;
+	std::unique_ptr<GDALCRS> lcrs;
 
-	epsg_t epsg = atoi(argv[2]);
+	epsg_t epsg = (epsg_t) atoi(argv[2]);
 
 	for (int i=0;i<argc-3;i++) {
 		try {
@@ -72,7 +73,7 @@ static void createsource(int argc, char *argv[]) {
 		}
 
 		if (i == 0) {
-			lcrs.reset(new LocalCRS(raster->lcrs));
+			lcrs.reset(new GDALCRS(*raster));
 
 			Json::Value coords(Json::objectValue);
 			Json::Value sizes(Json::arrayValue);
@@ -91,7 +92,8 @@ static void createsource(int argc, char *argv[]) {
 			root["coords"] = coords;
 		}
 		else {
-			if (!(*lcrs == raster->lcrs)) {
+			GDALCRS compare_crs(*raster);
+			if (!(*lcrs == compare_crs)) {
 				printf("Channel %d has a different coordinate system than the first channel\n", i);
 				exit(5);
 			}
@@ -159,8 +161,8 @@ static void import(int argc, char *argv[]) {
 	RasterSourceManager::close(source);
 }
 
-static QueryRectangle qrect_from_json(Json::Value &root) {
-	epsg_t epsg = root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
+static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {
+	epsg_t epsg = (epsg_t) root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
 	double x1 = root.get("query_x1", -20037508).asDouble();
 	double y1 = root.get("query_y1", -20037508).asDouble();
 	double x2 = root.get("query_x2", 20037508).asDouble();
@@ -168,7 +170,16 @@ static QueryRectangle qrect_from_json(Json::Value &root) {
 	int xres = root.get("query_xres", 1000).asInt();
 	int yres = root.get("query_yres", 1000).asInt();
 	int timestamp = root.get("starttime", 0).asInt();
-	return QueryRectangle(timestamp, x1, y1, x2, y2, xres, yres, epsg);
+
+	QueryRectangle result(timestamp, x1, y1, x2, y2, xres, yres, epsg);
+	flipx = (result.x1 != x1);
+	flipy = (result.y1 != y1);
+	return result;
+}
+
+static QueryRectangle qrect_from_json(Json::Value &root) {
+	bool flipx, flipy;
+	return qrect_from_json(root, flipx, flipy);
 }
 
 static void runquery(int argc, char *argv[]) {
@@ -199,10 +210,22 @@ static void runquery(int argc, char *argv[]) {
 
 	if (result == "raster") {
 		QueryProfiler profiler;
-		auto raster = graph->getCachedRaster(qrect_from_json(root), profiler);
+		bool flipx, flipy;
+		auto qrect = qrect_from_json(root, flipx, flipy);
+		auto raster = graph->getCachedRaster(qrect, profiler);
+		printf("flip: %d %d\n", flipx, flipy);
+		printf("QRect(%f,%f -> %f,%f)\n", qrect.x1, qrect.y1, qrect.x2, qrect.y2);
+		if (flipx || flipy)
+			raster = raster->flip(flipx, flipy);
+
 		{
 			Profiler::Profiler p("TO_GTIFF");
-			raster->toGDAL(out_filename, "GTiff");
+			raster->toGDAL((std::string(out_filename) + ".tif").c_str(), "GTiff", flipx, flipy);
+		}
+		{
+			Profiler::Profiler p("TO_PNG");
+			auto colors = Colorizer::make("grey");
+			raster->toPNG((std::string(out_filename) + ".png").c_str(), *colors);
 		}
 	}
 	else if (result == "points") {
@@ -256,7 +279,11 @@ static int testquery(int argc, char *argv[]) {
 
 		if (result == "raster") {
 			QueryProfiler profiler;
-			auto raster = graph->getCachedRaster(qrect_from_json(root), profiler);
+			bool flipx, flipy;
+			auto qrect = qrect_from_json(root, flipx, flipy);
+			auto raster = graph->getCachedRaster(qrect, profiler);
+			if (flipx || flipy)
+				raster = raster->flip(flipx, flipy);
 			real_hash = raster->hash();
 		}
 		else if (result == "points") {

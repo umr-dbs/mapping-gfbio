@@ -1,6 +1,6 @@
 
-#include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
@@ -108,7 +108,7 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
-	auto raster_out = GenericRaster::create(raster->lcrs, out_dd);
+	auto raster_out = GenericRaster::create(out_dd, *raster, GenericRaster::Representation::OPENCL);
 
 	std::string kernelName;
 	if(solarAngle == SolarAngles::AZIMUTH)

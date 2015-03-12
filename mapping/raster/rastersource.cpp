@@ -1,9 +1,10 @@
 
-#include "raster/raster.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/rastersource.h"
-#include "raster/typejuggling.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
+#include "operators/operator.h"
 
 
 #include <limits.h>
@@ -26,6 +27,62 @@
 
 
 const int DEFAULT_TILE_SIZE = 2048;
+
+
+bool GDALCRS::operator==(const GDALCRS &b) const {
+	if (dimensions != b.dimensions)
+		return false;
+	for (int i=0;i<dimensions;i++) {
+		if (size[i] != b.size[i]) {
+			std::cerr << "size mismatch" << std::endl;
+			return false;
+		}
+		if (fabs(origin[i] - b.origin[i]) > 0.5) {
+			std::cerr << "origin mismatch: " << fabs(origin[i] - b.origin[i]) << std::endl;
+			return false;
+		}
+		if (fabs(scale[i] / b.scale[i] - 1.0) > 0.001) {
+			std::cerr << "scale mismatch" << std::endl;
+			return false;
+		}
+	}
+	return true;
+}
+
+void GDALCRS::verify() const {
+	if (dimensions < 1 || dimensions > 3)
+		throw MetadataException("Amount of dimensions not between 1 and 3");
+	for (int i=0;i<dimensions;i++) {
+		if (/*size[i] < 0 || */ size[i] > 1<<24)
+			throw MetadataException("Size out of limits");
+		if (scale[i] == 0)
+			throw MetadataException("Scale cannot be 0");
+	}
+}
+
+size_t GDALCRS::getPixelCount() const {
+	if (dimensions == 1)
+		return (size_t) size[0];
+	if (dimensions == 2)
+		return (size_t) size[0] * size[1];
+	if (dimensions == 3)
+		return (size_t) size[0] * size[1] * size[2];
+	throw MetadataException("Amount of dimensions not between 1 and 3");
+}
+
+SpatioTemporalReference GDALCRS::toSpatioTemporalReference(bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2) const {
+	double x1 = origin[0] - scale[0] * 0.5;
+	double y1 = origin[1] - scale[1] * 0.5;
+	double x2 = origin[0] + scale[0] * (size[0] - 0.5);
+	double y2 = origin[1] + scale[1] * (size[1] - 0.5);
+
+	return SpatioTemporalReference(epsg, x1, y1, x2, y2, flipx, flipy, timetype, t1, t2);
+}
+
+std::ostream& operator<< (std::ostream &out, const GDALCRS &rm) {
+	out << "GDALCRS(epsg=" << (int) rm.epsg << " dim=" << rm.dimensions << " size=["<<rm.size[0]<<","<<rm.size[1]<<"] origin=["<<rm.origin[0]<<","<<rm.origin[1]<<"] scale=["<<rm.scale[0]<<","<<rm.scale[1]<<"])";
+	return out;
+}
 
 
 
@@ -87,7 +144,7 @@ class RasterSourceChannel {
 
 
 RasterSource::RasterSource(const char *_filename, bool writeable)
-	: lockedfile(-1), writeable(writeable), filename_json(_filename), lcrs(nullptr), channelcount(0), channels(nullptr), refcount(0) {
+	: lockedfile(-1), writeable(writeable), filename_json(_filename), crs(nullptr), channelcount(0), channels(nullptr), refcount(0) {
 	try {
 		init();
 	}
@@ -149,36 +206,20 @@ void RasterSource::init() {
 	int dimensions = sizes.size();
 	if (dimensions != (int) origins.size() || dimensions != (int) scales.size())
 		throw SourceException("json invalid, different dimensions in data");
+	epsg_t epsg = (epsg_t) jrm.get("epsg", EPSG_UNKNOWN).asInt();
 
-	epsg_t epsg = jrm.get("epsg", EPSG_UNKNOWN).asInt();
-	if (dimensions == 1) {
-		lcrs = new LocalCRS(
-			epsg,
-			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(),
-			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(),
-			scales.get((Json::Value::ArrayIndex) 0, 0).asDouble()
-		);
-	}
-	else if (dimensions == 2) {
-		lcrs = new LocalCRS(
+	if (dimensions == 2) {
+		crs = new GDALCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 1, -1).asInt(),
 			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(), origins.get((Json::Value::ArrayIndex) 1, 0).asInt(),
 			scales.get((Json::Value::ArrayIndex) 0, 0).asDouble(), scales.get((Json::Value::ArrayIndex) 1, 0).asDouble()
 		);
 	}
-	else if (dimensions == 3) {
-		lcrs = new LocalCRS(
-			epsg,
-			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 1, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 2, -1).asInt(),
-			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(), origins.get((Json::Value::ArrayIndex) 1, 0).asInt(), origins.get((Json::Value::ArrayIndex) 2, 0).asInt(),
-			scales.get((Json::Value::ArrayIndex) 0, 0).asDouble(), scales.get((Json::Value::ArrayIndex) 1, 0).asDouble(), scales.get((Json::Value::ArrayIndex) 2, 0).asDouble()
-		);
-	}
 	else
-		throw SourceException("json invalid, dimensions not between 1 and 3");
+		throw SourceException("json invalid, can only process two-dimensional rasters");
 
-	lcrs->verify();
+	crs->verify();
 
 	Json::Value channelinfo = root["channels"];
 	if (!channelinfo.isArray() || channelinfo.size() < 1) {
@@ -267,9 +308,9 @@ void RasterSource::cleanup() {
 		close(lockedfile); // also removes the lock acquired by flock()
 		lockedfile = -1;
 	}
-	if (lcrs) {
-		delete lcrs;
-		lcrs = nullptr;
+	if (crs) {
+		delete crs;
+		crs = nullptr;
 	}
 	if (channelcount && channels) {
 		for (int i=0;i<channelcount;i++) {
@@ -284,7 +325,20 @@ void RasterSource::cleanup() {
 void RasterSource::import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
-	auto raster = GenericRaster::fromGDAL(filename, sourcechannel, lcrs->epsg);
+	bool raster_flipx, raster_flipy;
+	auto raster = GenericRaster::fromGDAL(filename, sourcechannel, raster_flipx, raster_flipy, crs->epsg);
+
+	bool crs_flipx, crs_flipy;
+	SpatioTemporalReference stref(crs->epsg, crs->origin[0], crs->origin[1], crs->origin[0]+crs->scale[0], crs->origin[1]+crs->scale[1], crs_flipx, crs_flipy, TIMETYPE_UNREFERENCED, 0, 1);
+
+	bool need_flipx = raster_flipx != crs_flipx;
+	bool need_flipy = raster_flipy != crs_flipy;
+
+	printf("GDAL: %d %d\nCRS:  %d %d\nflip: %d %d\n", raster_flipx, raster_flipy, crs_flipx, crs_flipy, need_flipx, need_flipy);
+
+	if (need_flipx || need_flipy) {
+		raster = raster->flip(need_flipx, need_flipy);
+	}
 
 	import(raster.get(), channelid, timestamp, compression);
 }
@@ -321,38 +375,34 @@ void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp
 	for (int zoom=0;;zoom++) {
 		int zoomfactor = 1 << zoom;
 
-		if (zoom > 0 && lcrs->size[0] / zoomfactor < tilesize && lcrs->size[1] / zoomfactor < tilesize && lcrs->size[2] / zoomfactor < tilesize)
+		if (zoom > 0 && crs->size[0] / zoomfactor < tilesize && crs->size[1] / zoomfactor < tilesize && crs->size[2] / zoomfactor < tilesize)
 			break;
 
 		GenericRaster *zoomedraster = raster;
 		std::unique_ptr<GenericRaster> zoomedraster_guard;
 		if (zoom > 0) {
-			printf("Scaling for zoom %d to %u x %u x %u pixels\n", zoom, lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
-			zoomedraster_guard = raster->scale(lcrs->size[0] / zoomfactor, lcrs->size[1] / zoomfactor, lcrs->size[2] / zoomfactor);
+			printf("Scaling for zoom %d to %u x %u x %u pixels\n", zoom, crs->size[0] / zoomfactor, crs->size[1] / zoomfactor, crs->size[2] / zoomfactor);
+			zoomedraster_guard = raster->scale(crs->size[0] / zoomfactor, crs->size[1] / zoomfactor, crs->size[2] / zoomfactor);
 			zoomedraster = zoomedraster_guard.get();
 			printf("done scaling\n");
 		}
 
-		for (uint32_t zoff = 0; zoff == 0 || zoff < zoomedraster->lcrs.size[2]; zoff += tilesize) {
-			uint32_t zsize = std::min(zoomedraster->lcrs.size[2] - zoff, tilesize);
-			for (uint32_t yoff = 0; yoff == 0 || yoff < zoomedraster->lcrs.size[1]; yoff += tilesize) {
-				uint32_t ysize = std::min(zoomedraster->lcrs.size[1] - yoff, tilesize);
-				for (uint32_t xoff = 0; xoff < zoomedraster->lcrs.size[0]; xoff += tilesize) {
-					uint32_t xsize = std::min(zoomedraster->lcrs.size[0] - xoff, tilesize);
-
-					LocalCRS tilelcrs(lcrs->epsg, lcrs->dimensions,
-						xsize, ysize, zsize,
-						zoomedraster->lcrs.PixelToWorldX(xoff), zoomedraster->lcrs.PixelToWorldY(yoff), zoomedraster->lcrs.PixelToWorldZ(zoff),
-						zoomedraster->lcrs.scale[0], zoomedraster->lcrs.scale[1], zoomedraster->lcrs.scale[2]
-					);
+		/*for (uint32_t zoff = 0; zoff == 0 || zoff < zoomedraster->lcrs.size[2]; zoff += tilesize)*/ {
+			uint32_t zoff = 0;
+			uint32_t zsize = 0; //std::min(zoomedraster->lcrs.size[2] - zoff, tilesize);
+			for (uint32_t yoff = 0; yoff == 0 || yoff < zoomedraster->height; yoff += tilesize) {
+				uint32_t ysize = std::min(zoomedraster->height - yoff, tilesize);
+				for (uint32_t xoff = 0; xoff < zoomedraster->width; xoff += tilesize) {
+					uint32_t xsize = std::min(zoomedraster->width - xoff, tilesize);
 
 					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
-					if (hasTile(tilelcrs, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp)) {
+					if (hasTile(xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp)) {
 						printf(" skipping..\n");
 						continue;
 					}
 
-					auto tile = GenericRaster::create(tilelcrs, channels[channelid]->dd);
+					//auto tile = GenericRaster::create(tilelcrs, channels[channelid]->dd);
+					auto tile = GenericRaster::create(channels[channelid]->dd, SpatioTemporalReference::unreferenced(), xsize, ysize, zsize);
 					tile->blit(zoomedraster, -xoff, -yoff, -zoff);
 					printf("done blitting\n");
 
@@ -392,10 +442,9 @@ void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp
 		stmt.exec();
 		printf("inserting value md: %s = %f\n", key.c_str(), value);
 	}
-	//importTile(raster, 0, 0, 0, 0, channelid, timestamp, compression);
 }
 
-bool RasterSource::hasTile(const LocalCRS &lcrs, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp) {
+bool RasterSource::hasTile(uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp) {
 	int zoomfactor = 1 << zoom;
 
 	SQLiteStatement stmt(db);
@@ -407,9 +456,9 @@ bool RasterSource::hasTile(const LocalCRS &lcrs, int offx, int offy, int offz, i
 	stmt.bind(3, offx); // x1
 	stmt.bind(4, offy); // y1
 	stmt.bind(5, offz); // z1
-	stmt.bind(6, (int32_t) (offx+lcrs.size[0]*zoomfactor)); // x2
-	stmt.bind(7, (int32_t) (offy+lcrs.size[1]*zoomfactor)); // y2
-	stmt.bind(8, (int32_t) (offz+lcrs.size[2]*zoomfactor)); // z2
+	stmt.bind(6, (int32_t) (offx+width*zoomfactor)); // x2
+	stmt.bind(7, (int32_t) (offy+height*zoomfactor)); // y2
+	stmt.bind(8, (int32_t) (offz+depth*zoomfactor)); // z2
 	stmt.bind(9, zoom);
 
 	bool result = false;
@@ -464,9 +513,9 @@ void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int off
 	stmt.bind(3, offx); // x1
 	stmt.bind(4, offy); // y1
 	stmt.bind(5, offz); // z1
-	stmt.bind(6, (int32_t) (offx+raster->lcrs.size[0]*zoomfactor)); // x2
-	stmt.bind(7, (int32_t) (offy+raster->lcrs.size[1]*zoomfactor)); // y2
-	stmt.bind(8, (int32_t) (offz+raster->lcrs.size[2]*zoomfactor)); // z2
+	stmt.bind(6, (int32_t) (offx+raster->width*zoomfactor)); // x2
+	stmt.bind(7, (int32_t) (offy+raster->height*zoomfactor)); // y2
+	stmt.bind(8, (int32_t) 0/*(offz+raster->depth*zoomfactor)*/); // z2
 	stmt.bind(9, zoom);
 	stmt.bind(10, (int32_t) filenr);
 	stmt.bind(11, (int64_t) fileoffset);
@@ -482,8 +531,8 @@ struct raster_transformed_blit {
 	static void execute(Raster2D<T1> *raster_dest, Raster2D<T2> *raster_src, int destx, int desty, int destz, double offset, double scale) {
 		int x1 = std::max(destx, 0);
 		int y1 = std::max(desty, 0);
-		int x2 = std::min(raster_dest->lcrs.size[0], destx+raster_src->lcrs.size[0]);
-		int y2 = std::min(raster_dest->lcrs.size[1], desty+raster_src->lcrs.size[1]);
+		int x2 = std::min(raster_dest->width, destx+raster_src->width);
+		int y2 = std::min(raster_dest->height, desty+raster_src->height);
 
 		if (x1 >= x2 || y1 >= y2)
 			throw MetadataException("transformedBlit without overlapping region");
@@ -502,9 +551,6 @@ struct raster_transformed_blit {
 
 
 static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, int desty, int destz, double offset, double scale) {
-	if (src->lcrs.dimensions != 2 || dest->lcrs.dimensions != 2 || src->lcrs.epsg != dest->lcrs.epsg)
-		throw MetadataException("transformedBlit with incompatible rasters");
-
 	if (src->getRepresentation() != GenericRaster::Representation::CPU || dest->getRepresentation() != GenericRaster::Representation::CPU)
 		throw MetadataException("transformedBlit from raster that's not in a CPU buffer");
 
@@ -548,19 +594,29 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	zoom = std::min(zoom, max_zoom);
 	int zoomfactor = 1 << zoom;
 
-/*
-	x1 = std::max(x1, 0);
-	y1 = std::max(y1, 0);
-	x2 = std::min(x2, (int) lcrs->size[0]);
-	y2 = std::min(y2, (int) lcrs->size[1]);
-*/
+
+	// Figure out the CRS after cutting and zooming
+	auto width = (x2-x1) >> zoom;
+	auto height = (y2-y1) >> zoom;
+	auto scale_x = crs->scale[0]*zoomfactor;
+	auto scale_y = crs->scale[1]*zoomfactor;
+	auto origin_x = crs->PixelToWorldX(x1);
+	auto origin_y = crs->PixelToWorldY(y1);
+	GDALCRS zoomed_and_cut_crs(crs->epsg, width, height, origin_x, origin_y, scale_x, scale_y);
+
+	bool flipx, flipy;
+	auto resultstref = zoomed_and_cut_crs.toSpatioTemporalReference(flipx, flipy, TIMETYPE_UNIX, timestamp, timestamp+1);
+
 	/*
-	if (x1 < 0 || y1 < 0 || (size_t) x2 > lcrs->size[0] || (size_t) y2 > lcrs->size[1]) {
+	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom)) {
 		std::stringstream ss;
-		ss << "RasterSource::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords out of bounds";
+		ss << "RasterSource::load, fractions of a pixel requested: (x: " << x2 << " <-> " << (x1 + (width<<zoom)) << " y: " << y2 << " <-> " << (y1 + (height<<zoom));
 		throw SourceException(ss.str());
 	}
 	*/
+	// Make sure no fractional pixels are requested
+	//x2 = x1 + (width << zoom);
+	//y2 = y1 + (height << zoom);
 
 	if (x1 > x2 || y1 > y2) {
 		std::stringstream ss;
@@ -600,20 +656,10 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 			result_md_string.set(key, std::string(value));
 	}
 
-	// Create an empty raster of the desired size
-	LocalCRS resultmetadata(
-		lcrs->epsg,
-		lcrs->dimensions,
-		(x2-x1) >> zoom, (y2-y1) >> zoom, 0 /* (z2-z1) >> zoom */,
-		lcrs->PixelToWorldX(x1), lcrs->PixelToWorldY(y1), lcrs->PixelToWorldZ(0 /* z1 */),
-		lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
-	);
 
 	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_md_value) : channels[channelid]->dd;
-	auto result = GenericRaster::create(resultmetadata, transformed_dd);
+	auto result = GenericRaster::create(transformed_dd, resultstref, width, height);
 	result->clear(transformed_dd.no_data);
-	result->md_value = std::move(result_md_value);
-	result->md_string = std::move(result_md_string);
 
 	// Load all overlapping parts and blit them onto the empty raster
 	int tiles_found = 0;
@@ -631,14 +677,10 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 		GenericRaster::Compression method = (GenericRaster::Compression) stmt.getInt(9);
 
 		//fprintf(stderr, "loading raster from %d,%d, blitting to %d, %d\n", r_x1, r_y1, x1, y1);
-		LocalCRS tilelcrs(
-			lcrs->epsg,
-			lcrs->dimensions,
-			(r_x2-r_x1) >> zoom, (r_y2-r_y1) >> zoom, 0 /* (r_z2-r_z1) >> zoom */,
-			lcrs->PixelToWorldX(r_x1), lcrs->PixelToWorldY(r_y1), lcrs->PixelToWorldZ(0 /* r_z1 */),
-			lcrs->scale[0]*zoomfactor, lcrs->scale[1]*zoomfactor, lcrs->scale[2]*zoomfactor
-		);
-		auto tile = loadTile(channelid, tilelcrs, fileid, fileoffset, filebytes, method);
+		uint32_t tile_width = (r_x2-r_x1) >> zoom;
+		uint32_t tile_height = (r_y2-r_y1) >> zoom;
+		uint32_t tile_depth = 0;
+		auto tile = loadTile(channelid, fileid, fileoffset, filebytes, tile_width, tile_height, tile_depth, method);
 		if (io_cost)
 			*io_cost += filebytes;
 
@@ -646,7 +688,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 			transformedBlit(
 				result.get(), tile.get(),
 				(r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
-				channels[channelid]->getOffset(result->md_value), channels[channelid]->getScale(result->md_value));
+				channels[channelid]->getOffset(result_md_value), channels[channelid]->getScale(result_md_value));
 		}
 		else
 			result->blit(tile.get(), (r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
@@ -658,12 +700,18 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	if (tiles_found == 0)
 		throw SourceException("RasterSource::load(): No matching tiles found in DB");
 
+	if (flipx || flipy) {
+		result = result->flip(flipx, flipy);
+	}
+
+	result->md_value = std::move(result_md_value);
+	result->md_string = std::move(result_md_string);
 	result->md_value.set("Channel", channelid);
 	return result;
 }
 
 
-std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, const LocalCRS &tilecrs, int fileid, size_t offset, size_t size, GenericRaster::Compression method) {
+std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, int fileid, size_t offset, size_t size, uint32_t width, uint32_t height, uint32_t depth, GenericRaster::Compression method) {
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterSource::load: unknown channel");
 
@@ -705,9 +753,44 @@ std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, const Local
 #endif
 
 	// decode / decompress
-	return RasterConverter::direct_decode(tilecrs, channels[channelid]->dd, &buffer, method);
+	return RasterConverter::direct_decode(buffer, channels[channelid]->dd, SpatioTemporalReference::unreferenced(), width, height, depth, method);
 }
 
+std::unique_ptr<GenericRaster> RasterSource::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
+	if (crs->epsg != rect.epsg) {
+		std::stringstream msg;
+		msg << "SourceOperator: wrong epsg requested. Source is " << (int) crs->epsg << ", requested " << (int) rect.epsg;
+		throw OperatorException(msg.str());
+	}
+
+	// world to pixel coordinates
+	double px1 = crs->WorldToPixelX(rect.x1);
+	double py1 = crs->WorldToPixelY(rect.y1);
+	double px2 = crs->WorldToPixelX(rect.x2);
+	double py2 = crs->WorldToPixelY(rect.y2);
+	// The endpoints of the query rectangle are inclusive.
+	// TODO: return all pixels partially inside the rectangle? Only pixel with the center in the rectangle?
+
+	// Figure out the desired zoom level
+	int pixel_x1 = std::floor(std::min(px1,px2));
+	int pixel_y1 = std::floor(std::min(py1,py2));
+	int pixel_x2 = std::ceil(std::max(px1,px2))+1;
+	int pixel_y2 = std::ceil(std::max(py1,py2))+1;
+
+	int zoom = 0;
+	uint32_t pixel_width = pixel_x2 - pixel_x1;
+	uint32_t pixel_height = pixel_y2 - pixel_y1;
+	while (pixel_width > 2*rect.xres && pixel_height > 2*rect.yres) {
+		zoom++;
+		pixel_width >>= 1;
+		pixel_height >>= 1;
+	}
+
+	size_t io_costs = 0;
+	auto result = load(channelid, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
+	profiler.addIOCost(io_costs);
+	return result;
+}
 
 
 

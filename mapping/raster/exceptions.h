@@ -3,38 +3,27 @@
 
 #include <string>
 #include <exception>
+#include <stdexcept>
 
 #include <iostream>
 
-class RasterDBException : public std::exception {
-	public:
-		RasterDBException(const char *_msg, const char *_classname) {
-			msg = std::string(_classname) + ": " + _msg;
-			std::cerr << msg << std::endl;
-		}
-		virtual const char *what() const throw() {
-			return msg.c_str();
-		}
-	private:
-		std::string msg;
-};
 
-#define RASTERDB_EXCEPTION_CLASS(C) class C : public RasterDBException { public: C(const char *msg) : RasterDBException(msg, #C) {} C(std::string msg) : RasterDBException(msg.c_str(), #C) {}}
+#define _CUSTOM_EXCEPTION_CLASS(C) class C : public std::runtime_error { public: C(const std::string &msg) : std::runtime_error(std::string(#C) + ": " + msg) {}}
 
-RASTERDB_EXCEPTION_CLASS(ArgumentException);
-RASTERDB_EXCEPTION_CLASS(ImporterException);
-RASTERDB_EXCEPTION_CLASS(ExporterException);
-RASTERDB_EXCEPTION_CLASS(SourceException);
-RASTERDB_EXCEPTION_CLASS(MetadataException);
-RASTERDB_EXCEPTION_CLASS(ConverterException);
-RASTERDB_EXCEPTION_CLASS(OperatorException);
-RASTERDB_EXCEPTION_CLASS(OpenCLException);
-RASTERDB_EXCEPTION_CLASS(PlatformException);
-RASTERDB_EXCEPTION_CLASS(cURLException);
-RASTERDB_EXCEPTION_CLASS(SQLiteException);
-RASTERDB_EXCEPTION_CLASS(GDALException);
-RASTERDB_EXCEPTION_CLASS(NetworkException);
+_CUSTOM_EXCEPTION_CLASS(ArgumentException);
+_CUSTOM_EXCEPTION_CLASS(ImporterException);
+_CUSTOM_EXCEPTION_CLASS(ExporterException);
+_CUSTOM_EXCEPTION_CLASS(SourceException);
+_CUSTOM_EXCEPTION_CLASS(MetadataException);
+_CUSTOM_EXCEPTION_CLASS(ConverterException);
+_CUSTOM_EXCEPTION_CLASS(OperatorException);
+_CUSTOM_EXCEPTION_CLASS(OpenCLException);
+_CUSTOM_EXCEPTION_CLASS(PlatformException);
+_CUSTOM_EXCEPTION_CLASS(cURLException);
+_CUSTOM_EXCEPTION_CLASS(SQLiteException);
+_CUSTOM_EXCEPTION_CLASS(GDALException);
+_CUSTOM_EXCEPTION_CLASS(NetworkException);
 
-#undef RASTERDB_EXCEPTION_CLASS
+#undef _CUSTOM_EXCEPTION_CLASS
 
 #endif

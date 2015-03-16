@@ -216,7 +216,6 @@ $app->group ( '/projects', function () use($app) {
 	$app->delete ( '/:projectId', function ($projectId) use($app) {
 		if (! $app->request->authentication ["loggedIn"]) {
 			$app->halt ( 403 );
-			return;
 		}
 		$userId = $app->request->authentication ["userId"];
 		
@@ -242,35 +241,68 @@ $app->group ( '/scripts', function () use($app) {
 		$app->response ()->header ( 'Content-Type', 'application/json' );
 		
 		if (! $app->request->authentication ["loggedIn"]) {
-			echo array ();
+			$app->response->write ( json_encode ( array () ) );
+			return;
 		}
 		$userId = $app->request->authentication ["userId"];
 		
-		$scripts = DB::query ( 'SELECT id, name FROM scripts WHERE user_id = ? ORDER BY name ASC', $userId );
+		$scripts = DB::query ( "SELECT id, name, valid_from FROM scripts WHERE user_id = ? AND valid_to = 'infinity' ORDER BY name ASC", $userId );
 		
 		$output = array ();
 		foreach ( $scripts as $script ) {
 			$output [] = array (
 					"id" => $script->id,
-					"name" => $script->name 
+					"name" => $script->name,
+					"changed" => $script->valid_from 
 			);
 		}
 		
-		echo json_encode ( $output );
+		$app->response->write ( json_encode ( $output ) );
 	} );
 	
 	/**
-	 * Get one scripts.
+	 * Get versions of a script.
 	 */
-	$app->get ( '/:scriptId', function ($scriptId) use($app) {
+	$app->get ( '/:scriptId/versions', function ($scriptId) use($app) {
 		$app->response ()->header ( 'Content-Type', 'application/json' );
 		
 		if (! $app->request->authentication ["loggedIn"]) {
-			echo new stdClass ();
+			$app->response->write ( array () );
+			return;
 		}
 		$userId = $app->request->authentication ["userId"];
 		
-		$scripts = DB::query ( 'SELECT script, result_type FROM scripts WHERE user_id = ? AND id = ?', $userId, $scriptId );
+		$scriptVersions = DB::query ( "SELECT id, name, valid_from FROM scripts WHERE user_id = ? AND id = ? ORDER BY valid_from DESC", $userId, $scriptId );
+		
+		$output = array ();
+		foreach ( $scriptVersions as $version ) {
+			$output [] = array (
+					"id" => $version->id,
+					"name" => $version->name,
+					"changed" => $version->valid_from 
+			);
+		}
+		
+		$app->response->write ( json_encode ( $output ) );
+	} );
+	
+	/**
+	 * Get one script.
+	 */
+	$app->get ( '/:scriptId(/version/:timestamp)', function ($scriptId, $timestamp = 'infinity') use($app) {
+		$app->response ()->header ( 'Content-Type', 'application/json' );
+		
+		if (! $app->request->authentication ["loggedIn"]) {
+			$app->response->write ( json_encode ( stdClass () ) );
+			return;
+		}
+		$userId = $app->request->authentication ["userId"];
+		
+		if ($timestamp == "infinity") {
+			$scripts = DB::query ( "SELECT script, result_type FROM scripts WHERE user_id = ? AND id = ? AND valid_to = 'infinity'", $userId, $scriptId );
+		} else {
+			$scripts = DB::query ( "SELECT script, result_type FROM scripts WHERE user_id = ? AND id = ? AND (valid_from <= ? AND ? < valid_to)", $userId, $scriptId, $timestamp, $timestamp );
+		}
 		
 		$output = new stdClass ();
 		foreach ( $scripts as $script ) {
@@ -278,37 +310,57 @@ $app->group ( '/scripts', function () use($app) {
 			$output->resultType = $script->result_type;
 		}
 		
-		echo json_encode ( $output );
+		$app->response->write ( json_encode ( $output ) );
 	} );
 	
 	/**
 	 * Store a script.
 	 */
 	$app->post ( '/:name', function ($name) use($app) {
-		$app->response ()->header ( 'Content-Type', 'application/json' );
-		
 		if (! $app->request->authentication ["loggedIn"]) {
-			return;
+			$app->halt ( 403 );
 		}
 		$userId = $app->request->authentication ["userId"];
 		
 		$script = $app->request->params ( "script" );
 		
 		DB::beginTransaction ();
-		$exists = DB::query ( 'SELECT count(*) AS count, MAX(id) AS id FROM scripts WHERE user_id = ? AND name LIKE ?', $userId, $name );
+		$exists = DB::query ( "SELECT id, valid_to FROM scripts WHERE user_id = ? AND name LIKE ? AND valid_to >= ALL(SELECT valid_to FROM scripts WHERE user_id = ? AND name LIKE ?)", $userId, $name, $userId, $name );
 		
-		if ($exists [0]->count <= 0) {
+		if (count($exists) <= 0) {
 			// INSERT
 			DB::exec ( "INSERT INTO scripts(user_id, name, script, result_type) VALUES (?, ?, ?, ?)", $userId, $name, $script ["code"], $script ["resultType"] );
 		} else {
 			// UPDATE
 			$id = $exists [0]->id;
-			DB::exec ( "UPDATE scripts SET script = ?, result_type = ? WHERE user_id = ? AND id = ?", $script ["code"], $script ["resultType"], $userId, $id );
+			if ($exists [0]->valid_to == 'infinity') {
+				// close old entry
+				DB::exec ( "UPDATE scripts SET valid_to = NOW() WHERE user_id = ? AND id = ? AND valid_to = 'infinity'", $userId, $id );
+			}
+			DB::exec ( "INSERT INTO scripts(id, user_id, name, script, result_type) VALUES (?, ?, ?, ?, ?)", $id, $userId, $name, $script ["code"], $script ["resultType"] );
 		}
 		
 		DB::commit ();
 		
-		echo '{"status": "OK"}';
+		$app->response->setStatus ( 204 );
+	} );
+	
+	/**
+	 * Delete a script.
+	 */
+	$app->delete ( '/:scriptId', function ($scriptId) use($app) {
+		if (! $app->request->authentication ["loggedIn"]) {
+			$app->halt ( 403 );
+		}
+		$userId = $app->request->authentication ["userId"];
+		
+		DB::beginTransaction ();
+		
+		DB::exec ( "UPDATE scripts SET valid_to = NOW() WHERE user_id = ? AND id = ? AND valid_to = 'infinity'", $userId, $scriptId );
+		
+		DB::commit ();
+		
+		$app->response->setStatus ( 204 );
 	} );
 } );
 

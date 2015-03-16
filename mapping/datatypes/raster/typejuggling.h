@@ -20,6 +20,8 @@ auto callUnaryOperatorFunc(GenericRaster *raster, V... v)
 			return func<uint32_t>::execute((Raster2D<uint32_t> *) raster, v...);
 		case GDT_Float32:
 			return func<float>::execute((Raster2D<float> *) raster, v...);
+		case GDT_Float64:
+			return func<double>::execute((Raster2D<double> *) raster, v...);
 		default:
 			throw MetadataException("Cannot call operator with this data type");
 	}
@@ -42,6 +44,8 @@ auto callBinaryOperatorFunc2(Raster2D<T> *raster1, GenericRaster *raster2, V... 
 			return func<T, uint32_t>::execute(raster1, (Raster2D<uint32_t> *) raster2, v...);
 		case GDT_Float32:
 			return func<T, float>::execute(raster1, (Raster2D<float> *) raster2, v...);
+		case GDT_Float64:
+			return func<T, double>::execute(raster1, (Raster2D<double> *) raster2, v...);
 		default:
 			throw MetadataException("Cannot call operator with this data type");
 	}
@@ -64,6 +68,8 @@ auto callBinaryOperatorFunc(GenericRaster *raster1, GenericRaster *raster2, V...
 			return callBinaryOperatorFunc2<func, uint32_t>((Raster2D<uint32_t> *) raster1, raster2, v...);
 		case GDT_Float32:
 			return callBinaryOperatorFunc2<func, float>((Raster2D<float> *) raster1, raster2, v...);
+		case GDT_Float64:
+			return callBinaryOperatorFunc2<func, double>((Raster2D<double> *) raster1, raster2, v...);
 		default:
 			throw MetadataException("Cannot call operator with this data type");
 	}
@@ -128,14 +134,16 @@ template<> struct RasterTypeInfo<float> {
 	typedef double signed_accumulator_type;
 	static double getRange(float min, float max) { return (double) max-min; }
 };
-/*
 template<> struct RasterTypeInfo<double> {
-	const GDALDataType type = GDT_Float64;
-	const bool isinteger = false;
-	const bool issigned = true;
+	static const GDALDataType type = GDT_Float64;
+	static constexpr const char *cltypename = "double";
+	static const bool isinteger = false;
+	static const bool issigned = true;
 	typedef double accumulator_type;
+	typedef double signed_accumulator_type;
+	static double getRange(double min, double max) { return (double) max-min; }
 };
-*/
+
 
 
 

@@ -6,7 +6,7 @@
 #include "operators/operator.h"
 #include "converters/converter.h"
 #include "raster/profiler.h"
-
+#include "util/configuration.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -332,6 +332,8 @@ int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		usage();
 	}
+
+	Configuration::loadFromDefaultPaths();
 
 	const char *command = argv[1];
 

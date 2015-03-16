@@ -508,6 +508,8 @@ std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
 	auto flipped_raster = GenericRaster::create(dd, *this);
 	Raster2D<T> *r = (Raster2D<T> *) flipped_raster.get();
 
+	setRepresentation(GenericRaster::Representation::CPU);
+
 	for (uint32_t y=0;y<height;y++) {
 		uint32_t py = flipy ? height-y-1 : y;
 		for (uint32_t x=0;x<width;x++) {
@@ -515,7 +517,7 @@ std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
 			r->set(x, y, get(px, py));
 		}
 	}
-	// TODO: copy metadata
+	// TODO: copy metadata?
 	return flipped_raster;
 }
 
@@ -523,6 +525,7 @@ template<typename T>
 std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRectangle &qrect) {
 	if (qrect.epsg != stref.epsg)
 		throw ArgumentException("Cannot fit a Raster to a QueryRectangle with a different epsg");
+	setRepresentation(GenericRaster::Representation::CPU);
 
 	auto out = GenericRaster::create(dd, qrect, qrect.xres, qrect.yres);
 	Raster2D<T> *r = (Raster2D<T> *) out.get();
@@ -534,6 +537,7 @@ std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRecta
 			r->set(x, y, getSafe(px, py));
 		}
 	}
+	// TODO: copy metadata?
 	return out;
 }
 

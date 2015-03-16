@@ -24,7 +24,7 @@ class GreyscaleColorizer : public Colorizer {
 	public:
 		GreyscaleColorizer();
 		virtual ~GreyscaleColorizer();
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max)  const;
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
 };
 
 
@@ -32,28 +32,42 @@ class HSVColorizer : public Colorizer {
 	public:
 		HSVColorizer();
 		virtual ~HSVColorizer();
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max)  const;
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
+};
+
+class HeatmapColorizer : public Colorizer {
+	public:
+		HeatmapColorizer();
+		virtual ~HeatmapColorizer();
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
 };
 
 class TemperatureColorizer : public Colorizer {
 	public:
 		TemperatureColorizer();
 		virtual ~TemperatureColorizer();
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max)  const;
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
 };
 
 class HeightColorizer : public Colorizer {
 	public:
 		HeightColorizer();
 		virtual ~HeightColorizer();
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max)  const;
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
+};
+
+class CPMColorizer : public Colorizer {
+	public:
+		CPMColorizer();
+		virtual ~CPMColorizer();
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
 };
 
 class GlobalLandCoverColorizer : public Colorizer {
 	public:
 		GlobalLandCoverColorizer();
 		virtual ~GlobalLandCoverColorizer();
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max)  const;
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
 };
 
 #endif

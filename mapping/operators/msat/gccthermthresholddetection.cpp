@@ -1,12 +1,12 @@
 
-#include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "msg_constants.h"
 #include "sofos_constants.h"
-#include "plot/histogram.h"
+#include "datatypes/plots/histogram.h"
 
 
 #include <memory>
@@ -42,8 +42,8 @@ struct CreateHistogramPairFunction{
 		Histogram day_histogram = Histogram{static_cast<int>(buckets), static_cast<double>(bt108_minus_bt039_min), static_cast<double>(bt108_minus_bt039_max)};
 		Histogram night_histogram = Histogram{static_cast<int>(buckets), static_cast<double>(bt108_minus_bt039_min), static_cast<double>(bt108_minus_bt039_max)};
 
-		int size_a = bt108_minus_bt039_raster->lcrs.getPixelCount();
-		int size_b = sza_raster->lcrs.getPixelCount();
+		int size_a = bt108_minus_bt039_raster->getPixelCount();
+		int size_b = sza_raster->getPixelCount();
 
 		if(size_a != size_b){
 			//do something here
@@ -91,8 +91,8 @@ struct CreateConditionalHistogramFunction{
 
 		auto histogram_ptr = std::make_unique<Histogram>(buckets, bt108_minus_bt039_min, bt108_minus_bt039_max);
 
-		int size_a = value_raster->lcrs.getPixelCount();
-		int size_b = condition_raster->lcrs.getPixelCount();
+		int size_a = value_raster->getPixelCount();
+		int size_b = condition_raster->getPixelCount();
 
 		if(size_a != size_b){
 			//do something here
@@ -196,7 +196,7 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 	DataDescription out_dd(GDT_Float32, bt108_minus_bt039_raster->dd.min, bt108_minus_bt039_raster->dd.max); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (bt108_minus_bt039_raster->dd.has_no_data)
 		out_dd.addNoData();
-	auto raster_out = GenericRaster::create(bt108_minus_bt039_raster->lcrs, out_dd);
+	auto raster_out = GenericRaster::create(out_dd, *bt108_minus_bt039_raster);
 
 	auto histogram_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), 2, cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
 	int temp = findGccThermThreshold(*histogram_ptr.get(), 0.0, 0.0);

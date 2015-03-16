@@ -1,13 +1,13 @@
 
-#include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "msg_constants.h"
 #include "util/sunpos.h"
 #include "sofos_constants.h"
-#include "plot/histogram.h"
+#include "datatypes/plots/histogram.h"
 
 
 
@@ -51,8 +51,8 @@ struct RasterDifferenceHistogramFunction{
 	   auto buckets = range*bucket_scale;
 	   Histogram histogram = Histogram{static_cast<int>(buckets), static_cast<double>(min), static_cast<double>(max)};
 
-	   int size_a = raster_a->lcrs.getPixelCount();
-	   int size_b = raster_b->lcrs.getPixelCount();
+	   int size_a = raster_a->getPixelCount();
+	   int size_b = raster_b->getPixelCount();
 
 	   if(size_a != size_b){
 		   //do something here
@@ -143,7 +143,7 @@ std::unique_ptr<GenericRaster> MsatSofosCloudClassificationOperator::getRaster(c
 
 	//create the output raster using the no_data value of the cloud classification
 	const DataDescription out_dd(GDT_UInt16, cloudclass::is_surface, cloudclass::range_illumination, true, 0.0);
-	auto raster_out = GenericRaster::create(raster_solar_zenith_angle->lcrs, out_dd);
+	auto raster_out = GenericRaster::create(out_dd, *raster_solar_zenith_angle, GenericRaster::Representation::OPENCL);
 
 	//define classification and move it to OpenCL
 	std::string kernelName = "multiThresholdKernel";

@@ -1,6 +1,6 @@
 
-#include "raster/raster.h"
-#include "raster/typejuggling.h"
+#include "datatypes/raster.h"
+#include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
@@ -56,7 +56,7 @@ std::unique_ptr<GenericRaster> MSATCo2CorrectionOperator::getRaster(const QueryR
 	DataDescription out_dd(GDT_Float32, raster_bt039->dd.min, raster_bt039->dd.max); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster_bt039->dd.has_no_data||raster_bt108->dd.has_no_data||raster_bt134->dd.has_no_data)
 		out_dd.addNoData();
-	auto raster_out = GenericRaster::create(raster_bt039->lcrs, out_dd);
+	auto raster_out = GenericRaster::create(out_dd, *raster_bt039, GenericRaster::Representation::OPENCL);
 
 	RasterOpenCL::CLProgram prog;
 	prog.addInRaster(raster_bt039.get());

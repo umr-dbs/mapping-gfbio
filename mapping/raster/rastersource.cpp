@@ -534,8 +534,11 @@ struct raster_transformed_blit {
 		int x2 = std::min(raster_dest->width, destx+raster_src->width);
 		int y2 = std::min(raster_dest->height, desty+raster_src->height);
 
-		if (x1 >= x2 || y1 >= y2)
-			throw MetadataException("transformedBlit without overlapping region");
+		if (x1 >= x2 || y1 >= y2) {
+			std::ostringstream msg;
+			msg << "transformedBlit without overlapping region: " << raster_src->width << "x" << raster_src->height << " blitted onto " << raster_dest->width << "x" << raster_dest->height << " at (" << destx << "," << desty << "), overlap (" << x1 << "," << y1 << ") -> (" << x2 << "," << y2 << ")";
+			throw ArgumentException(msg.str());
+		}
 
 		for (int y=y1;y<y2;y++) {
 			for (int x=x1;x<x2;x++) {
@@ -627,7 +630,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	// find all overlapping rasters in DB
 	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM rasters"
-		" WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ? ORDER BY filenr ASC, fileoffset ASC");
+		" WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 > ? AND y2 > ? AND timestamp = ? ORDER BY filenr ASC, fileoffset ASC");
 
 	stmt.bind(1, channelid);
 	stmt.bind(2, zoom);

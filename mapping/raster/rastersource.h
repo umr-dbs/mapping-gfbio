@@ -14,7 +14,13 @@ class QueryRectangle;
 class QueryProfiler;
 
 
-// A coordinate reference system as modeled by GDAL
+/*
+ * A coordinate reference system as modeled by GDAL.
+ * See http://www.gdal.org/gdal_datamodel.html for the formulas.
+ * Take note that the origin is not the center of pixel (0,0), but the outer corner!
+ * This is different from the CRS used e.g. in OpenCL kernels, where origin is set to the center of pixel (0,0).
+ *
+ */
 class GDALCRS {
 	public:
 		GDALCRS(epsg_t epsg, uint32_t w, uint32_t h, double origin_x, double origin_y, double scale_x, double scale_y)
@@ -44,25 +50,33 @@ class GDALCRS {
 
 		SpatioTemporalReference toSpatioTemporalReference(bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2) const;
 
+		epsg_t epsg;
+		uint8_t dimensions; // 1 .. 3
+		uint32_t size[3]; // size of the raster in pixels
+		double origin[3]; // world coordinates of the outer corner of pixel (0,0)
+		double scale[3]; // size of each pixel
+		/*
+		 * World coordinates of the center of the pixel at (x, y) are:
+		 * world_x = origin[0] + (x+0.5) * scale[0]
+		 * world_y = origin[1] + (y+0.5) * scale[1]
+		 */
+
+	private:
+		// These are only meant to be used in RasterSource, thus private
+
+		// These return the world coordinates of the top left corner of the pixel.
 		double PixelToWorldX(int px) const { return origin[0] + px * scale[0]; }
 		double PixelToWorldY(int py) const { return origin[1] + py * scale[1]; }
 		double PixelToWorldZ(int pz) const { return origin[2] + pz * scale[2]; }
 
+		// These do not return fixed pixel coordinates, but doubles. A return value of 0.5 is the center of the first pixel.
+		// floor() the results to get the exact pixel the world coordinate belongs in.
 		double WorldToPixelX(double wx) const { return (wx - origin[0]) / scale[0]; }
 		double WorldToPixelY(double wy) const { return (wy - origin[1]) / scale[1]; }
 		double WorldToPixelZ(double wz) const { return (wz - origin[2]) / scale[2]; }
 
-		epsg_t epsg;
-		uint8_t dimensions; // 1 .. 3
-		uint32_t size[3]; // size of the raster in pixels
-		double origin[3]; // world coordinates of the point at pixel coordinates (0,0)
-		double scale[3]; // size of each pixel
-		/*
-		 * World coordinates of the pixel at (x, y) are:
-		 * world_x = origin[0] + x * scale[0]
-		 * world_y = origin[1] + y * scale[1]
-		 */
 
+		friend class RasterSource;
 		friend std::ostream& operator<< (std::ostream &out, const GDALCRS &crs);
 };
 

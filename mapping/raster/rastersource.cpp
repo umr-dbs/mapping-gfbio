@@ -71,10 +71,10 @@ size_t GDALCRS::getPixelCount() const {
 }
 
 SpatioTemporalReference GDALCRS::toSpatioTemporalReference(bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2) const {
-	double x1 = origin[0] - scale[0] * 0.5;
-	double y1 = origin[1] - scale[1] * 0.5;
-	double x2 = origin[0] + scale[0] * (size[0] - 0.5);
-	double y2 = origin[1] + scale[1] * (size[1] - 0.5);
+	double x1 = origin[0];
+	double y1 = origin[1];
+	double x2 = origin[0] + scale[0] * size[0];
+	double y2 = origin[1] + scale[1] * size[1];
 
 	return SpatioTemporalReference(epsg, x1, y1, x2, y2, flipx, flipy, timetype, t1, t2);
 }
@@ -763,20 +763,19 @@ std::unique_ptr<GenericRaster> RasterSource::query(const QueryRectangle &rect, Q
 		throw OperatorException(msg.str());
 	}
 
-	// world to pixel coordinates
+	// Get all pixel coordinates that need to be returned. The endpoints of the QueryRectangle are inclusive.
 	double px1 = crs->WorldToPixelX(rect.x1);
 	double py1 = crs->WorldToPixelY(rect.y1);
 	double px2 = crs->WorldToPixelX(rect.x2);
 	double py2 = crs->WorldToPixelY(rect.y2);
-	// The endpoints of the query rectangle are inclusive.
-	// TODO: return all pixels partially inside the rectangle? Only pixel with the center in the rectangle?
 
-	// Figure out the desired zoom level
+	// All Pixels even partially inside the rectangle need to be returned.
 	int pixel_x1 = std::floor(std::min(px1,px2));
 	int pixel_y1 = std::floor(std::min(py1,py2));
-	int pixel_x2 = std::ceil(std::max(px1,px2))+1;
+	int pixel_x2 = std::ceil(std::max(px1,px2))+1; // +1 because x2/y2 are not inclusive
 	int pixel_y2 = std::ceil(std::max(py1,py2))+1;
 
+	// Figure out the desired zoom level
 	int zoom = 0;
 	uint32_t pixel_width = pixel_x2 - pixel_x1;
 	uint32_t pixel_height = pixel_y2 - pixel_y1;

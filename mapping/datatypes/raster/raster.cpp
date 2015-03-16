@@ -521,19 +521,53 @@ std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
 	return flipped_raster;
 }
 
+
+/*
+ * This class is a performance optimization to reproject between two rasters of the same CRS.
+ *
+ * The basic formula is this:
+ * source_x = source->WorldToPixelX( dest->PixelToWorldX( dest_x ) );
+ *
+ * But that involves several mathematical operations we can precalculate.
+ */
+class GridSpatioTemporalResultProjecter {
+public:
+	GridSpatioTemporalResultProjecter(const GridSpatioTemporalResult &source, const GridSpatioTemporalResult &dest) {
+		if (source.stref.epsg != dest.stref.epsg)
+			throw ArgumentException("Cannot do simple projections between rasters of a different epsg");
+		// source_x = WorldToPixelX( PixelToWorldX( dest_x ) );
+		// source_x = WorldToPixelY( dest.stref.x1 + (dest_x+0.5) * dest.pixel_scale_x )
+		// source_x = floor( ( (dest.stref.x1 + (dest_x+0.5) * dest.pixel_scale_x) - source.stref.x1) / source.pixel_scale_x )
+		// source_x = floor( ( (dest.stref.x1 + (dest_x+0.5) * dest.pixel_scale_x) - source.stref.x1) / source.pixel_scale_x )
+		// source_x = floor( dest_x * dest.pixel_scale_x/source.pixel_scale_x + (dest.stref.x1 + 0.5*dest.pixel_scale_x - source.stref.x1) / source.pixel_scale_x )
+		factor_x = dest.pixel_scale_x/source.pixel_scale_x;
+		add_x = (dest.stref.x1 + 0.5*dest.pixel_scale_x - source.stref.x1) / source.pixel_scale_x;
+
+		factor_y = dest.pixel_scale_y/source.pixel_scale_y;
+		add_y = (dest.stref.y1 + 0.5*dest.pixel_scale_y - source.stref.y1) / source.pixel_scale_y;
+	}
+	int64_t getX(int px) { return floor(px * factor_x + add_x); }
+	int64_t getY(int py) { return floor(py * factor_y + add_y); }
+private:
+	double factor_x, factor_y;
+	double add_x, add_y;
+};
+
+
 template<typename T>
 std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRectangle &qrect) {
-	if (qrect.epsg != stref.epsg)
-		throw ArgumentException("Cannot fit a Raster to a QueryRectangle with a different epsg");
 	setRepresentation(GenericRaster::Representation::CPU);
 
 	auto out = GenericRaster::create(dd, qrect, qrect.xres, qrect.yres);
 	Raster2D<T> *r = (Raster2D<T> *) out.get();
 
+	GridSpatioTemporalResultProjecter p(*this, *out);
 	for (uint32_t y=0;y<r->height;y++) {
-		auto py = this->WorldToPixelY( r->PixelToWorldY(y) );
+		//auto py = this->WorldToPixelY( r->PixelToWorldY(y) );
+		auto py = p.getY(y);
 		for (uint32_t x=0;x<r->width;x++) {
-			auto px = this->WorldToPixelX( r->PixelToWorldX(x) );
+			//auto px = this->WorldToPixelX( r->PixelToWorldX(x) );
+			auto px = p.getX(x);
 			r->set(x, y, getSafe(px, py));
 		}
 	}

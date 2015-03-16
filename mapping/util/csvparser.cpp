@@ -42,8 +42,10 @@ std::vector<std::string> CSVParser::parseLine() {
 		char c = line[i];
 		switch(state) {
 			case State::FIELD_START:
-				if (c == field_separator)
-					throw OperatorException("CSV invalid: empty field");
+				if (c == field_separator) {
+					fields.push_back(std::string(""));
+					continue;
+				}
 				if (c == quote) {
 					state = State::FIELD_INSIDE_QUOTED;
 					field_start = i + 1;
@@ -81,7 +83,8 @@ std::vector<std::string> CSVParser::parseLine() {
 	// end of line, see which state we're in
 	switch(state) {
 		case State::FIELD_START:
-			// this is ok.
+			// the line ends in an empty field. That's ok.
+			fields.push_back(std::string(""));
 			break;
 		case State::FIELD_INSIDE_QUOTED:
 			throw OperatorException("CSV invalid: end of line inside quoted field");

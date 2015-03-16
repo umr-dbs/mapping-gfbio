@@ -150,31 +150,6 @@ cl::Kernel addProgramFromFile(const char *filename, const char *kernelname) {
 	return addProgram(readFileAsString(filename), kernelname);
 }
 
-
-
-void setKernelArgByGDALType(cl::Kernel &kernel, cl_uint arg, GDALDataType datatype, double value) {
-	switch(datatype) {
-		case GDT_Byte: kernel.setArg<uint8_t>(arg, value);return;
-		case GDT_Int16: kernel.setArg<int16_t>(arg, value);return;
-		case GDT_UInt16: kernel.setArg<uint16_t>(arg, value);return;
-		case GDT_Int32: kernel.setArg<int32_t>(arg, value);return;
-		case GDT_UInt32: kernel.setArg<uint32_t>(arg, value);return;
-		case GDT_Float32: kernel.setArg<float>(arg, value);return;
-		case GDT_Float64:
-			throw MetadataException("Unsupported data type: Float64");
-		case GDT_CInt16:
-			throw MetadataException("Unsupported data type: CInt16");
-		case GDT_CInt32:
-			throw MetadataException("Unsupported data type: CInt32");
-		case GDT_CFloat32:
-			throw MetadataException("Unsupported data type: CFloat32");
-		case GDT_CFloat64:
-			throw MetadataException("Unsupported data type: CFloat64");
-		default:
-			throw MetadataException("Unknown data type");
-	}
-}
-
 /*
 struct RasterInfo {
 	cl_double origin[3];
@@ -219,7 +194,7 @@ static const std::string rasterinfo_source(
 "	ushort epsg;"
 "	ushort has_no_data;"
 "} RasterInfo;\n"
-"#define R(t,x,y) (t ## _data[y * t ## _info->size[0] + x])\n"
+"#define R(t,x,y) t ## _data[y * t ## _info->size[0] + x]\n"
 );
 
 

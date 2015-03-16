@@ -12,7 +12,7 @@
 #include <streambuf>
 #include <algorithm>
 #include <json/json.h>
-
+#include <sys/stat.h>
 
 class CSVPointSource : public GenericOperator {
 	public:
@@ -42,8 +42,21 @@ static bool endsWith(const std::string &str, const std::string &suffix) {
 	return (str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0);
 }
 
+static uint64_t getFilesize(const char *filename) {
+    struct stat st;
+    if (stat(filename, &st) == 0)
+        return st.st_size;
+    return -1;
+}
+
 std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points_out = std::make_unique<PointCollection>(rect);
+
+	auto filesize = getFilesize(filename.c_str());
+	if (filesize <= 0)
+		throw OperatorException("CSVPointSource: getFilesize() failed, unable to estimate I/O costs");
+	profiler.addIOCost(filesize);
+
 
 	std::ifstream data(filename);
 
@@ -70,7 +83,7 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 			pos_y = i;
 		if (lc == "time" || lc == "date" || lc == "datet")
 			pos_t = i;
-		if (lc == "plz")
+		if (lc == "plz" || lc == "value")
 			is_numeric[i] = true;
 	}
 
@@ -100,6 +113,10 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 		auto tuple = parser.readTuple();
 		if (tuple.size() == 0)
 			break;
+
+		// Workaround for safecast data: ignore entries without coordinates
+		if (tuple[pos_x] == "" || tuple[pos_y] == "")
+			continue;
 
 		double x, y;
 		try {
@@ -135,6 +152,5 @@ std::unique_ptr<PointCollection> CSVPointSource::getPoints(const QueryRectangle 
 	}
 	//fprintf(stderr, data.str().c_str());
 
-	profiler.addIOCost( data.tellg() );
 	return points_out;
 }

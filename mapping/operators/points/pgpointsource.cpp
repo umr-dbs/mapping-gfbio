@@ -16,6 +16,10 @@ class PGPointSourceOperator : public GenericOperator {
 		virtual ~PGPointSourceOperator();
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
+
 	private:
 		std::string connectionstring;
 		std::string querystring;
@@ -40,6 +44,9 @@ PGPointSourceOperator::~PGPointSourceOperator() {
 }
 REGISTER_OPERATOR(PGPointSourceOperator, "pgpointsource");
 
+void PGPointSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"querystring\":\"" << querystring << "\"";
+}
 
 std::unique_ptr<PointCollection> PGPointSourceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 

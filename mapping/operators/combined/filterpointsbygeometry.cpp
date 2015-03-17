@@ -23,6 +23,8 @@ class FilterPointsByGeometry : public GenericOperator {
 		virtual ~FilterPointsByGeometry();
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 };
 
 
@@ -36,6 +38,7 @@ FilterPointsByGeometry::~FilterPointsByGeometry() {
 }
 REGISTER_OPERATOR(FilterPointsByGeometry, "filterpointsbygeometry");
 
+void FilterPointsByGeometry::writeSemanticParameters(std::ostringstream& stream) {}
 
 std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	//TODO: check projection

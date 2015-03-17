@@ -15,13 +15,17 @@
 #include <geos/geom/prep/PreparedGeometryFactory.h>
 
 class PointsDifferenceOperator: public GenericOperator {
-public:
-	PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
-	virtual ~PointsDifferenceOperator();
+	public:
+		PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
+		virtual ~PointsDifferenceOperator();
 
-	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
-private:
-	double epsilonDistance;
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
+
+	private:
+		double epsilonDistance;
 };
 
 PointsDifferenceOperator::PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -33,6 +37,9 @@ PointsDifferenceOperator::PointsDifferenceOperator(int sourcecounts[], GenericOp
 PointsDifferenceOperator::~PointsDifferenceOperator() {}
 REGISTER_OPERATOR(PointsDifferenceOperator, "points_difference");
 
+void PointsDifferenceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"epsilonDistance\":" << epsilonDistance;
+}
 
 #include "operators/points/points_difference.cl.h"
 
@@ -49,6 +56,7 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 
 	size_t count_m = pointsMinuend->collection.size();
 
+	// TODO: why is there a limitation? remove or make more reasonable abort decisions.
 	if (count_m > 100000)
 		throw OperatorException("Too many points for points_difference, aborting");
 

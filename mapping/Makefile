@@ -16,7 +16,7 @@ LDFLAGS_CGI=-luriparser
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 OBJ_SERVICES=o/services_wfs_request.o
-OBJ_RASTER=o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
+OBJ_RASTER=o/rasterdb_rasterdb.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
 OBJ_DATATYPES=o/datatypes_attributes.o o/datatypes_spatiotemporal.o o/datatypes_raster_raster.o o/datatypes_raster_import_gdal.o o/datatypes_raster_export_pgm.o o/datatypes_raster_export_yuv.o o/datatypes_raster_export_png.o o/datatypes_raster_export_jpeg.o o/datatypes_pointcollection.o o/datatypes_geometry.o
 OBJ_PLOT=o/datatypes_plots_histogram.o o/datatypes_plots_text.o o/datatypes_plots_png.o
 OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o o/util_configuration.o o/util_debug.o
@@ -92,6 +92,9 @@ o/services_%.o: services/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
 o/raster_%.o: raster/%.cpp
+	${CPP} ${CPPFLAGS} -c $+ -o $@
+
+o/rasterdb_%.o: rasterdb/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
 o/converters_%.o: converters/%.cpp

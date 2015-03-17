@@ -1,7 +1,7 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/typejuggling.h"
-#include "raster/rastersource.h"
+#include "rasterdb/rasterdb.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/configuration.h"
@@ -20,14 +20,14 @@ class SourceOperator : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
-		RasterSource *rastersource;
+		RasterDB *rasterdb;
 		int channel;
 		bool transform;
 };
 
 
 // RasterSource Operator
-SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rastersource(nullptr) {
+SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rasterdb(nullptr) {
 	assumeSources(0);
 	std::string fullpath = params.get("sourcepath", "").asString();
 	std::string sourcename = params.get("sourcename", "").asString();
@@ -41,20 +41,20 @@ SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], J
 	else
 		filename = Configuration::get("operators.rastersource.path", "") + sourcename + std::string(".json");
 
-	rastersource = RasterSourceManager::open(filename.c_str());
+	rasterdb = RasterDBManager::open(filename.c_str());
 	channel = params.get("channel", 0).asInt();
 	transform = params.get("transform", true).asBool();
 }
 
 SourceOperator::~SourceOperator() {
-	RasterSourceManager::close(rastersource);
-	rastersource = nullptr;
+	RasterDBManager::close(rasterdb);
+	rasterdb = nullptr;
 }
 
 REGISTER_OPERATOR(SourceOperator, "source");
 
 
 std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
-	return rastersource->query(rect, profiler, channel, transform);
+	return rasterdb->query(rect, profiler, channel, transform);
 }
 

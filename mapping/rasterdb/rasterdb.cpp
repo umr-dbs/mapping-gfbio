@@ -1,7 +1,7 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/typejuggling.h"
-#include "raster/rastersource.h"
+#include "rasterdb/rasterdb.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
 #include "operators/operator.h"
@@ -86,12 +86,12 @@ std::ostream& operator<< (std::ostream &out, const GDALCRS &rm) {
 
 
 
-class RasterSourceChannel {
+class RasterDBChannel {
 	public:
-		//friend class RasterSource;
+		//friend class RasterDB;
 
-		RasterSourceChannel(const DataDescription &dd) : dd(dd), has_transform(false) {}
-		~RasterSourceChannel() {}
+		RasterDBChannel(const DataDescription &dd) : dd(dd), has_transform(false) {}
+		~RasterDBChannel() {}
 
 		void setTransform(GDALDataType datatype, double offset, double scale, const std::string &offset_metadata, const std::string &scale_metadata) {
 			has_transform = true;
@@ -143,7 +143,7 @@ class RasterSourceChannel {
 
 
 
-RasterSource::RasterSource(const char *_filename, bool writeable)
+RasterDB::RasterDB(const char *_filename, bool writeable)
 	: lockedfile(-1), writeable(writeable), filename_json(_filename), crs(nullptr), channelcount(0), channels(nullptr), refcount(0) {
 	try {
 		init();
@@ -154,12 +154,12 @@ RasterSource::RasterSource(const char *_filename, bool writeable)
 	}
 }
 
-RasterSource::~RasterSource() {
+RasterDB::~RasterDB() {
 	cleanup();
 }
 
 
-void RasterSource::init() {
+void RasterDB::init() {
 	size_t suffixpos = filename_json.rfind(".json");
 	if (suffixpos == std::string::npos || suffixpos != filename_json.length()-5) {
 		printf("Filename doesn't end with .json (%ld / %ld)\n", suffixpos, filename_json.length());
@@ -228,7 +228,7 @@ void RasterSource::init() {
 	}
 
 	channelcount = channelinfo.size();
-	channels = new RasterSourceChannel *[channelcount];
+	channels = new RasterDBChannel *[channelcount];
 	for (int i=0;i<channelcount;i++)
 		channels[i] = nullptr;
 
@@ -243,7 +243,7 @@ void RasterSource::init() {
 			no_data = channel.get("nodata", 0).asDouble();
 		}
 
-		channels[i] = new RasterSourceChannel(DataDescription(
+		channels[i] = new RasterDBChannel(DataDescription(
 			GDALGetDataTypeByName(datatype.c_str()),
 			channel.get("min", 0).asDouble(),
 			channel.get("max", -1).asDouble(),
@@ -303,7 +303,7 @@ void RasterSource::init() {
 }
 
 
-void RasterSource::cleanup() {
+void RasterDB::cleanup() {
 	if (lockedfile != -1) {
 		close(lockedfile); // also removes the lock acquired by flock()
 		lockedfile = -1;
@@ -322,7 +322,7 @@ void RasterSource::cleanup() {
 
 
 
-void RasterSource::import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression) {
+void RasterDB::import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	bool raster_flipx, raster_flipy;
@@ -344,16 +344,16 @@ void RasterSource::import(const char *filename, int sourcechannel, int channelid
 }
 
 
-void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp, GenericRaster::Compression compression) {
+void RasterDB::import(GenericRaster *raster, int channelid, time_t timestamp, GenericRaster::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	if (channelid < 0 || channelid >= channelcount)
-		throw SourceException("RasterSource::import: unknown channel");
+		throw SourceException("RasterDB::import: unknown channel");
 	/*
 	if (!(raster->lcrs == *lcrs)) {
 		std::cerr << "Imported CRS: " << raster->lcrs << std::endl;
 		std::cerr << "Expected CRS: " << *lcrs << std::endl;
-		throw SourceException("Local CRS does not match RasterSource");
+		throw SourceException("Local CRS does not match RasterDB");
 	}
 	*/
 
@@ -444,7 +444,7 @@ void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp
 	}
 }
 
-bool RasterSource::hasTile(uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp) {
+bool RasterDB::hasTile(uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp) {
 	int zoomfactor = 1 << zoom;
 
 	SQLiteStatement stmt(db);
@@ -469,7 +469,7 @@ bool RasterSource::hasTile(uint32_t width, uint32_t height, uint32_t depth, int 
 	return result;
 }
 
-void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp, GenericRaster::Compression compression) {
+void RasterDB::importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp, GenericRaster::Compression compression) {
 	auto buffer = RasterConverter::direct_encode(raster, compression);
 
 	int zoomfactor = 1 << zoom;
@@ -560,12 +560,12 @@ static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, 
 	callBinaryOperatorFunc<raster_transformed_blit>(dest, src, destx, desty, destz, offset, scale);
 }
 
-std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
+std::unique_ptr<GenericRaster> RasterDB::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
 	if (io_cost)
 		*io_cost = 0;
 
 	if (channelid < 0 || channelid >= channelcount)
-		throw SourceException("RasterSource::load: unknown channel");
+		throw SourceException("RasterDB::load: unknown channel");
 
 	// find the most recent raster at the requested timestamp
 	// TODO: maximal zulässige alter?
@@ -613,7 +613,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	/*
 	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom)) {
 		std::stringstream ss;
-		ss << "RasterSource::load, fractions of a pixel requested: (x: " << x2 << " <-> " << (x1 + (width<<zoom)) << " y: " << y2 << " <-> " << (y1 + (height<<zoom));
+		ss << "RasterDB::load, fractions of a pixel requested: (x: " << x2 << " <-> " << (x1 + (width<<zoom)) << " y: " << y2 << " <-> " << (y1 + (height<<zoom));
 		throw SourceException(ss.str());
 	}
 	*/
@@ -623,7 +623,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 
 	if (x1 > x2 || y1 > y2) {
 		std::stringstream ss;
-		ss << "RasterSource::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords swapped";
+		ss << "RasterDB::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords swapped";
 		throw SourceException(ss.str());
 	}
 
@@ -701,7 +701,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	stmt.finalize();
 
 	if (tiles_found == 0)
-		throw SourceException("RasterSource::load(): No matching tiles found in DB");
+		throw SourceException("RasterDB::load(): No matching tiles found in DB");
 
 	if (flipx || flipy) {
 		result = result->flip(flipx, flipy);
@@ -714,9 +714,9 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 }
 
 
-std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, int fileid, size_t offset, size_t size, uint32_t width, uint32_t height, uint32_t depth, GenericRaster::Compression method) {
+std::unique_ptr<GenericRaster> RasterDB::loadTile(int channelid, int fileid, size_t offset, size_t size, uint32_t width, uint32_t height, uint32_t depth, GenericRaster::Compression method) {
 	if (channelid < 0 || channelid >= channelcount)
-		throw SourceException("RasterSource::load: unknown channel");
+		throw SourceException("RasterDB::load: unknown channel");
 
 	//printf("loading raster from file %d offset %ld length %ld\n", fileid, offset, size);
 
@@ -759,7 +759,7 @@ std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, int fileid,
 	return RasterConverter::direct_decode(buffer, channels[channelid]->dd, SpatioTemporalReference::unreferenced(), width, height, depth, method);
 }
 
-std::unique_ptr<GenericRaster> RasterSource::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
+std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
 	if (crs->epsg != rect.epsg) {
 		std::stringstream msg;
 		msg << "SourceOperator: wrong epsg requested. Source is " << (int) crs->epsg << ", requested " << (int) rect.epsg;
@@ -797,10 +797,10 @@ std::unique_ptr<GenericRaster> RasterSource::query(const QueryRectangle &rect, Q
 
 
 
-std::unordered_map<std::string, RasterSource *> RasterSourceManager::map;
-std::mutex RasterSourceManager::mutex;
+std::unordered_map<std::string, RasterDB *> RasterDBManager::map;
+std::mutex RasterDBManager::mutex;
 
-RasterSource *RasterSourceManager::open(const char *filename, bool writeable)
+RasterDB *RasterDBManager::open(const char *filename, bool writeable)
 {
 	std::lock_guard<std::mutex> guard(mutex);
 
@@ -814,12 +814,12 @@ RasterSource *RasterSourceManager::open(const char *filename, bool writeable)
 
 	std::string path(filename_clean);
 
-	RasterSource *source = nullptr;
+	RasterDB *source = nullptr;
 	if (map.count(path) == 1) {
 		source = map.at(path);
 	}
 	else {
-		source = new RasterSource(path.c_str(), writeable);
+		source = new RasterDB(path.c_str(), writeable);
 		map[path] = source;
 	}
 
@@ -830,15 +830,14 @@ RasterSource *RasterSourceManager::open(const char *filename, bool writeable)
 	return source;
 }
 
-void RasterSourceManager::close(RasterSource *source)
+void RasterDBManager::close(RasterDB *db)
 {
-	if (!source)
+	if (!db)
 		return;
 	std::lock_guard<std::mutex> guard(mutex);
 
-	source->refcount--;
-	if (source->refcount <= 0)
-		delete source;
+	db->refcount--;
+	if (db->refcount <= 0)
+		delete db;
 }
-
 

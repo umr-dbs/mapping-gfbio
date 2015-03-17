@@ -1,6 +1,6 @@
 #include "datatypes/raster.h"
 #include "datatypes/pointcollection.h"
-#include "raster/rastersource.h"
+#include "rasterdb/rasterdb.h"
 #include "raster/colors.h"
 
 #include "operators/operator.h"
@@ -122,14 +122,14 @@ static void loadsource(int argc, char *argv[]) {
 	if (argc < 3) {
 		usage();
 	}
-	RasterSource *source = nullptr;
+	RasterDB *db = nullptr;
 	try {
-		source = RasterSourceManager::open(argv[2]);
+		db = RasterDBManager::open(argv[2]);
 	}
 	catch (std::exception &e) {
 		printf("Failure: %s\n", e.what());
 	}
-	RasterSourceManager::close(source);
+	RasterDBManager::close(db);
 }
 
 // import <sourcename> <filename> <filechannel> <sourcechannel> <timestamp>
@@ -137,9 +137,9 @@ static void import(int argc, char *argv[]) {
 	if (argc < 7) {
 		usage();
 	}
-	RasterSource *source = nullptr;
+	RasterDB *db = nullptr;
 	try {
-		source = RasterSourceManager::open(argv[2], RasterSource::READ_WRITE);
+		db = RasterDBManager::open(argv[2], RasterDB::READ_WRITE);
 		const char *filename = argv[3];
 		int sourcechannel = atoi(argv[4]);
 		int channelid = atoi(argv[5]);
@@ -153,12 +153,12 @@ static void import(int argc, char *argv[]) {
 			else if (argv[7][0] == 'R')
 				compression = GenericRaster::Compression::UNCOMPRESSED;
 		}
-		source->import(filename, sourcechannel, channelid, timestamp, compression);
+		db->import(filename, sourcechannel, channelid, timestamp, compression);
 	}
 	catch (std::exception &e) {
 		printf("Failure: %s\n", e.what());
 	}
-	RasterSourceManager::close(source);
+	RasterDBManager::close(db);
 }
 
 static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {

@@ -9,7 +9,7 @@
 #include "datatypes/raster.h"
 #include "util/sqlite.h"
 
-class RasterSourceChannel;
+class RasterDBChannel;
 class QueryRectangle;
 class QueryProfiler;
 
@@ -62,7 +62,7 @@ class GDALCRS {
 		 */
 
 	private:
-		// These are only meant to be used in RasterSource, thus private
+		// These are only meant to be used in RasterDB, thus private
 
 		// These return the world coordinates of the top left corner of the pixel.
 		double PixelToWorldX(int px) const { return origin[0] + px * scale[0]; }
@@ -76,19 +76,19 @@ class GDALCRS {
 		double WorldToPixelZ(double wz) const { return (wz - origin[2]) / scale[2]; }
 
 
-		friend class RasterSource;
+		friend class RasterDB;
 		friend std::ostream& operator<< (std::ostream &out, const GDALCRS &crs);
 };
 
 
-class RasterSource {
+class RasterDB {
 	public:
 		static const bool READ_ONLY = false;
 		static const bool READ_WRITE = true;
-	private: // Instantiation only by RasterSourceManager
-		RasterSource(const char *filename, bool writeable = RasterSource::READ_ONLY);
-		virtual ~RasterSource();
-		friend class RasterSourceManager;
+	private: // Instantiation only by RasterDBManager
+		RasterDB(const char *filename, bool writeable = RasterDB::READ_ONLY);
+		virtual ~RasterDB();
+		friend class RasterDBManager;
 
 	public:
 		void import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
@@ -115,25 +115,25 @@ class RasterSource {
 		std::string filename_db;
 		GDALCRS *crs;
 		int channelcount;
-		RasterSourceChannel **channels;
+		RasterDBChannel **channels;
 		SQLite db;
 		int refcount;
 };
 
 
 /*
- * Each RasterSource has a lock on its files, so no two open objects should refer to the same source.
- * Constructing and Destructing RasterSources through the manager solves this.
+ * Each RasterDB has a lock on its files, so no two open objects should refer to the same source.
+ * Constructing and Destructing RasterDBs through the manager solves this.
  */
-class RasterSourceManager {
+class RasterDBManager {
 	public:
-		static RasterSource *open(const char *filename, bool writeable = RasterSource::READ_ONLY);
-		static void close(RasterSource *source);
+		static RasterDB *open(const char *filename, bool writeable = RasterDB::READ_ONLY);
+		static void close(RasterDB *source);
 
 	private:
-		static std::unordered_map<std::string, RasterSource *> map;
+		static std::unordered_map<std::string, RasterDB *> map;
 		static std::mutex mutex;
-		RasterSourceManager();
+		RasterDBManager();
 };
 
 #endif

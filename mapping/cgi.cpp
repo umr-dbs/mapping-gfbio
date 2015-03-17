@@ -6,6 +6,7 @@
 #include "raster/colors.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
+#include "util/configuration.h"
 #include "util/debug.h"
 #include "services/wfs_request.h"
 
@@ -423,6 +424,8 @@ epsg_t epsg_from_param(const std::map<std::string, std::string> &params, const s
 int main() {
 	//printf("Content-type: text/plain\r\n\r\nDebugging:\n");
 	try {
+		Configuration::loadFromDefaultPaths();
+
 		const char *query_string = getenv("QUERY_STRING");
 		if (!query_string) {
 			//query_string = "SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image%2Fpng8&TRANSPARENT=true&LAYERS=load&TILED=true&STYLES=dem&CRS=EPSG%3A3857&WIDTH=2571&HEIGHT=1350&BBOX=-8412792.231579678%2C-5618420.447247234%2C16741716.532732407%2C7589898.040431223";

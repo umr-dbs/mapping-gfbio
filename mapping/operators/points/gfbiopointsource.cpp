@@ -5,6 +5,7 @@
 #include "raster/exceptions.h"
 #include "util/curl.h"
 #include "util/csvparser.h"
+#include "util/configuration.h"
 #include "util/make_unique.h"
 
 #include <string>
@@ -118,13 +119,13 @@ std::unique_ptr<GenericGeometry> GFBioPointSourceOperator::getGeometry(const Que
 void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format) {
 	std::ostringstream url;
 	url
-			<< "http://***REMOVED***:81/GFBioJavaWS/Wizzard/fetchDataSource/" << format << "?datasource="
-			<< curl.escape(datasource) << "&query=" << curl.escape(query)
-			<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
-			<< rect.x2 << "," << rect.y2 << "&includeMetadata=" << includeMetadata;
+		<< Configuration::get("operators.gfbiosource.webserviceurl")
+		<< format << "?datasource="
+		<< curl.escape(datasource) << "&query=" << curl.escape(query)
+		<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
+		<< rect.x2 << "," << rect.y2 << "&includeMetadata=" << includeMetadata;
 
-	//fprintf(stderr, "query: %s\nurl: %s\n", query.c_str(), url.str().c_str());
-	//curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
+	curl.setOpt(CURLOPT_PROXY, Configuration::get("operators.gfbiosource.proxy", "").c_str());
 	curl.setOpt(CURLOPT_URL, url.str().c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);

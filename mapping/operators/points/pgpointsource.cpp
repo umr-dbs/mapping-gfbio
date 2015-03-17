@@ -2,6 +2,7 @@
 #include "operators/operator.h"
 #include "raster/exceptions.h"
 #include "util/make_unique.h"
+#include "util/configuration.h"
 
 #include <pqxx/pqxx>
 #include <string>
@@ -27,10 +28,8 @@ class PGPointSourceOperator : public GenericOperator {
 PGPointSourceOperator::PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), connection(nullptr) {
 	assumeSources(0);
 
-	connectionstring = params.get("connection", "host = 'localhost' dbname = 'idessa' user = 'idessa' password = 'idessa' ").asString();
+	connectionstring = params.get("connection", Configuration::get("operators.pgpointsource.dbcredentials", "")).asString();
 	querystring = params.get("query", "x, y FROM locations").asString();
-
-	//const char *connectionstring = "host = 'localhost' dbname = 'idessa' user = 'idessa' password = 'idessa' "; // host = 'localhost'
 
 	connection = new pqxx::connection(connectionstring);
 }

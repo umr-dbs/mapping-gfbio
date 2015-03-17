@@ -19,7 +19,7 @@ OBJ_SERVICES=o/services_wfs_request.o
 OBJ_RASTER=o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
 OBJ_DATATYPES=o/datatypes_attributes.o o/datatypes_spatiotemporal.o o/datatypes_raster_raster.o o/datatypes_raster_import_gdal.o o/datatypes_raster_export_pgm.o o/datatypes_raster_export_yuv.o o/datatypes_raster_export_png.o o/datatypes_raster_export_jpeg.o o/datatypes_pointcollection.o o/datatypes_geometry.o
 OBJ_PLOT=o/datatypes_plots_histogram.o o/datatypes_plots_text.o o/datatypes_plots_png.o
-OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o o/util_debug.o
+OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o o/util_configuration.o o/util_debug.o
 OBJ_POINTVISUALIZATION=o/pointvisualization_BoundingBox.o o/pointvisualization_Circle.o o/pointvisualization_Coordinate.o o/pointvisualization_Dimension.o o/pointvisualization_FindResult.o o/pointvisualization_QuadTreeNode.o o/pointvisualization_CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters_converter.o o/converters_raw.o
 OBJ_OPERATORS_RASTER=o/operators_raster_matrixkernel.o o/operators_raster_opencl.o o/operators_raster_expression.o o/operators_raster_projections.o o/operators_raster_rastersource.o o/operators_raster_r.o
@@ -172,6 +172,35 @@ msg9_datasource:	${EXE}
 	./${EXE} import datasources/msg9_geos.json ${DATASET2_C8} 1 8 43 RAW
 	./${EXE} import datasources/msg9_geos.json ${DATASET2_C9} 1 9 43 RAW
 	./${EXE} import datasources/msg9_geos.json ${DATASET2_C10} 1 10 43 RAW
+	
+msg9_add_2008: ${EXE}
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-200811171200-C_ 1 0 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-200811171200-C_ 1 1 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-200811171200-C_ 1 2 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_039___-000001___-200811171200-C_ 1 3 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_062___-000001___-200811171200-C_ 1 4 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_073___-000001___-200811171200-C_ 1 5 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_087___-000001___-200811171200-C_ 1 6 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_097___-000001___-200811171200-C_ 1 7 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-200811171200-C_ 1 8 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-200811171200-C_ 1 9 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-200811171200-C_ 1 10 1226919600 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-200811171200-C_ 1 0 1226919600 RAW
+
+msg9_add_2011: ${EXE}
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-201101171215-C_ 1 0 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-201101171215-C_ 1 1 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-201101171215-C_ 1 2 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_039___-000001___-201101171215-C_ 1 3 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_062___-000001___-201101171215-C_ 1 4 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_073___-000001___-201101171215-C_ 1 5 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_087___-000001___-201101171215-C_ 1 6 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_097___-000001___-201101171215-C_ 1 7 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-201101171215-C_ 1 8 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-201101171215-C_ 1 9 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-201101171215-C_ 1 10 1295262900 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-201101171215-C_ 1 0 1295262900 RAW
+
 
 msg9_hrvdatasource:	${EXE}
 	rm -f datasources/msg9_geos_hrv.dat datasources/msg9_geos_hrv.db

@@ -4,6 +4,7 @@
 #include "raster/rastersource.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
+#include "util/configuration.h"
 
 #include <memory>
 #include <sstream>
@@ -38,7 +39,7 @@ SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], J
 	if (fullpath.length() > 0)
 		filename = fullpath;
 	else
-		filename = std::string("datasources/") + sourcename + std::string(".json");
+		filename = Configuration::get("operators.rastersource.path", "") + sourcename + std::string(".json");
 
 	rastersource = RasterSourceManager::open(filename.c_str());
 	channel = params.get("channel", 0).asInt();

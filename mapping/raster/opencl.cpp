@@ -7,6 +7,7 @@
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h" // For QueryProfiler
+#include "util/configuration.h"
 #include "util/debug.h"
 
 
@@ -48,21 +49,36 @@ void init() {
 			if (platformList.size() == 0)
 				throw PlatformException("No CL platforms found");
 			//printf("Platform number is: %d\n", (int) platformList.size());
-			platform = platformList[platformList.size()-1];
+
+			auto preferredPlatformName = Configuration::get("global.opencl.preferredplatform", "");
+			int64_t selectedPlatform = -1;
 
 			for (size_t i=0;i<platformList.size();i++) {
-				std::string platformVendor;
-				platformList[i].getInfo((cl_platform_info)CL_PLATFORM_VENDOR, &platformVendor);
+				std::string platformName;
+				platformList[i].getInfo((cl_platform_info)CL_PLATFORM_NAME, &platformName);
 				std::ostringstream msg;
-				msg << "CL vendor " << i << ": " << platformVendor;
+				msg << "CL vendor " << i << ": " << platformName;
 				d(msg.str());
+				if (platformName == preferredPlatformName)
+					selectedPlatform = i;
 			}
+
+			if (selectedPlatform < 0) {
+				if (preferredPlatformName != "" || platformList.size() > 0)
+					d("Configured openCL platform not found, using the first one offered");
+				selectedPlatform = 0;
+			}
+			platform = platformList[selectedPlatform];
 
 			// Context
 			cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
 			try {
+				int device_type = CL_DEVICE_TYPE_GPU;
+				if (Configuration::get("global.opencl.forcecpu", "0") == "1")
+					device_type = CL_DEVICE_TYPE_CPU;
+
 				context = cl::Context(
-					CL_DEVICE_TYPE_GPU, // _CPU
+						device_type, // _CPU
 					cprops
 				);
 			}
@@ -150,31 +166,6 @@ cl::Kernel addProgramFromFile(const char *filename, const char *kernelname) {
 	return addProgram(readFileAsString(filename), kernelname);
 }
 
-
-
-void setKernelArgByGDALType(cl::Kernel &kernel, cl_uint arg, GDALDataType datatype, double value) {
-	switch(datatype) {
-		case GDT_Byte: kernel.setArg<uint8_t>(arg, value);return;
-		case GDT_Int16: kernel.setArg<int16_t>(arg, value);return;
-		case GDT_UInt16: kernel.setArg<uint16_t>(arg, value);return;
-		case GDT_Int32: kernel.setArg<int32_t>(arg, value);return;
-		case GDT_UInt32: kernel.setArg<uint32_t>(arg, value);return;
-		case GDT_Float32: kernel.setArg<float>(arg, value);return;
-		case GDT_Float64:
-			throw MetadataException("Unsupported data type: Float64");
-		case GDT_CInt16:
-			throw MetadataException("Unsupported data type: CInt16");
-		case GDT_CInt32:
-			throw MetadataException("Unsupported data type: CInt32");
-		case GDT_CFloat32:
-			throw MetadataException("Unsupported data type: CFloat32");
-		case GDT_CFloat64:
-			throw MetadataException("Unsupported data type: CFloat64");
-		default:
-			throw MetadataException("Unknown data type");
-	}
-}
-
 /*
 struct RasterInfo {
 	cl_double origin[3];
@@ -219,7 +210,7 @@ static const std::string rasterinfo_source(
 "	ushort epsg;"
 "	ushort has_no_data;"
 "} RasterInfo;\n"
-"#define R(t,x,y) (t ## _data[y * t ## _info->size[0] + x])\n"
+"#define R(t,x,y) t ## _data[y * t ## _info->size[0] + x]\n"
 );
 
 

@@ -64,10 +64,14 @@ Colorizer::~Colorizer() {
 std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
 	if (name == "hsv")
 		return std::make_unique<HSVColorizer>();
+	if (name == "heatmap")
+		return std::make_unique<HeatmapColorizer>();
 	if (name == "temperature")
 		return std::make_unique<TemperatureColorizer>();
 	if (name == "height")
 		return std::make_unique<HeightColorizer>();
+	if (name == "cpm")
+		return std::make_unique<CPMColorizer>();
 	if (name == "glc")
 		return std::make_unique<GlobalLandCoverColorizer>();
 	return std::make_unique<GreyscaleColorizer>();
@@ -104,6 +108,30 @@ void HSVColorizer::fillPalette(uint32_t *colors, int num_colors, double, double)
 	}
 }
 
+
+
+HeatmapColorizer::HeatmapColorizer() : Colorizer(false) {
+}
+
+HeatmapColorizer::~HeatmapColorizer() {
+}
+
+void HeatmapColorizer::fillPalette(uint32_t *colors, int num_colors, double, double) const {
+	for (int c = 0; c < num_colors; c++) {
+		int f = floor((double) c / num_colors * 256);
+		uint8_t alpha = 255;
+		if (f < 100)
+			colors[c] = color_from_rgba(0, 0, 255, 50+f);
+		else if (f < 150)
+			colors[c] = color_from_rgba(0, 255-5*(149-f), 255, alpha);
+		else if (f < 200)
+			colors[c] = color_from_rgba(0, 255, 5*(199-f), alpha);
+		else if (f < 235)
+			colors[c] = color_from_rgba(255-8*(234-f), 255, 0, alpha);
+		else
+			colors[c] = color_from_rgba(f, 12*(255-f), 0, alpha);
+	}
+}
 
 
 TemperatureColorizer::TemperatureColorizer() : Colorizer(true) {
@@ -173,6 +201,34 @@ void HeightColorizer::fillPalette(uint32_t *colors, int num_colors, double min, 
 	}
 }
 
+
+CPMColorizer::CPMColorizer() : Colorizer(true) {
+}
+
+CPMColorizer::~CPMColorizer() {
+}
+
+void CPMColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+	double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
+	for (int c = 0; c < num_colors; c++) {
+		double value = min + c*step;
+		uint32_t color;
+		if (value <= 100)
+			color = color_from_rgba(2*value,255,0);
+		else if (value <= 1000) {
+			double d = (value-100)/900;
+			color = color_from_rgba(200+d*55,255-d*255,0);
+		}
+		else if (value <= 10000) {
+			double d = (value-1000)/9000;
+			color = color_from_rgba(255-d*255,0,0);
+		}
+		else
+			color = color_from_rgba(0,0,0);
+
+		colors[c] = color;
+	}
+}
 
 GlobalLandCoverColorizer::GlobalLandCoverColorizer() : Colorizer(true) {
 }

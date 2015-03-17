@@ -92,7 +92,7 @@ namespace RasterOpenCL {
 			cl::Kernel *kernel;
 			cl_uint argpos;
 			bool finished;
-			int iteration_type; // 0 = unknown, 1 = first in_raster, 2 = first pointcollection
+			int iteration_type; // 0 = unknown, 1 = first out_raster, 2 = first pointcollection
 			std::vector<GenericRaster *> in_rasters;
 			std::vector<GenericRaster *> out_rasters;
 			std::vector<PointCollection *> pointcollections;

@@ -7,6 +7,7 @@
 #include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/debug.h"
+#include "services/wfs_request.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -269,62 +270,6 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg = EPSG_WEBM
 	//bbox_normalized[3] = 1.0 - bbox_normalized[3];
 }
 
-
-void processWFS(std::map<std::string, std::string> &params, epsg_t query_epsg, time_t timestamp) {
-	if(params["request"] == "GetFeature") {
-		std::string version = params["version"];
-		if (version != "2.0.0")
-			abort("Invalid version");
-
-		int output_width = std::stoi(params["width"]);
-		int output_height = std::stoi(params["height"]);
-		if (output_width <= 0 || output_height <= 0) {
-			abort("output_width not valid");
-		}
-
-		double bbox[4];
-		parseBBOX(bbox, params.at("bbox"), query_epsg, true);
-
-
-		auto graph = GenericOperator::fromJSON(params["layers"]);
-
-		QueryProfiler profiler;
-		auto points = graph->getCachedPoints(QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg), profiler);
-
-		if(to_bool(params["clustered"]) == true) {
-			auto clusteredPoints = std::make_unique<PointCollection>(points->stref);
-
-			auto x1 = bbox[0];
-			auto x2 = bbox[2];
-			auto y1 = bbox[1];
-			auto y2 = bbox[3];
-			auto xres = output_width;
-			auto yres = output_height;
-			pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(
-															pv::Coordinate((x2 + x1) / (2 * xres), (y2 + y1) / (2 * yres)),
-															pv::Dimension((x2 - x1) / (2 * xres), (y2 - y1) / (2 * yres)),
-														1), 1);
-			for (Point& pointOld : points->collection) {
-				clusterer.insert(std::make_shared<pv::Circle>(pv::Coordinate(pointOld.x / xres, pointOld.y / yres), 5, 1));
-			}
-
-			auto circles = clusterer.getCircles();
-			clusteredPoints->local_md_value.addVector("radius", circles.size());
-			clusteredPoints->local_md_value.addVector("numberOfPoints", circles.size());
-			for (auto& circle : circles) {
-				size_t idx = clusteredPoints->addPoint(circle->getX() * xres, circle->getY() * yres);
-				clusteredPoints->local_md_value.set(idx, "radius", circle->getRadius());
-				clusteredPoints->local_md_value.set(idx, "numberOfPoints", circle->getNumberOfPoints());
-			}
-
-			points.swap(clusteredPoints);
-		}
-
-		outputPointCollection(points.get(), true);
-	}
-}
-
-
 std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string openGisUri){
 	size_t beforeAutorityId = openGisUri.find("crs")+3;
 	size_t behindAutorityId = openGisUri.find_first_of("/",beforeAutorityId+1);
@@ -547,8 +492,11 @@ int main() {
 		}
 
 		if(params.count("service") > 0 && params["service"] == "WFS") {
-			query_epsg = epsg_from_param(params, "srsname", query_epsg);
-			processWFS(params, query_epsg, timestamp);
+
+			print_debug_header();
+			std::cout << "Content-type: application/json" << std::endl << std::endl
+					<< WFSRequest(params).getResponse() << std::endl;
+
 			return 0;
 		}
 

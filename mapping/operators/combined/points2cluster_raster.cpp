@@ -16,6 +16,8 @@ class PointsToClusterRasterOperator : public GenericOperator {
 		virtual ~PointsToClusterRasterOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 };
 
 
@@ -29,6 +31,7 @@ PointsToClusterRasterOperator::~PointsToClusterRasterOperator() {
 }
 REGISTER_OPERATOR(PointsToClusterRasterOperator, "points2cluster_raster");
 
+void PointsToClusterRasterOperator::writeSemanticParameters(std::ostringstream& stream) {}
 
 std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 

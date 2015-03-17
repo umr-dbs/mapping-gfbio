@@ -7,13 +7,14 @@
 #include <json/json.h>
 
 class PointsClusterOperator: public GenericOperator {
-private:
+	public:
+		PointsClusterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
+		virtual ~PointsClusterOperator();
 
-public:
-	PointsClusterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
-	virtual ~PointsClusterOperator();
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 
-	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 };
 
 PointsClusterOperator::PointsClusterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -23,6 +24,8 @@ PointsClusterOperator::PointsClusterOperator(int sourcecounts[], GenericOperator
 PointsClusterOperator::~PointsClusterOperator() {
 }
 REGISTER_OPERATOR(PointsClusterOperator, "points_cluster");
+
+void PointsClusterOperator::writeSemanticParameters(std::ostringstream& stream) {}
 
 std::unique_ptr<PointCollection> PointsClusterOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	// TODO: EXPECT EPSG:3857

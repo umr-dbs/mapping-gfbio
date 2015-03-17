@@ -15,6 +15,7 @@ LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-luriparser
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
+OBJ_SERVICES=o/services_wfs_request.o
 OBJ_RASTER=o/raster_rastersource.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
 OBJ_DATATYPES=o/datatypes_attributes.o o/datatypes_spatiotemporal.o o/datatypes_raster_raster.o o/datatypes_raster_import_gdal.o o/datatypes_raster_export_pgm.o o/datatypes_raster_export_yuv.o o/datatypes_raster_export_png.o o/datatypes_raster_export_jpeg.o o/datatypes_pointcollection.o o/datatypes_geometry.o
 OBJ_PLOT=o/datatypes_plots_histogram.o o/datatypes_plots_text.o o/datatypes_plots_png.o
@@ -28,7 +29,7 @@ OBJ_OPERATORS_COMBINED=o/operators_combined_points2raster.o o/operators_combined
 OBJ_OPERATORS_MSAT=o/operators_msat_temperature.o o/operators_msat_reflectance.o o/operators_msat_solarangle.o o/operators_msat_radiance.o
 OBJ_OPERATORS_PLOTS=o/operators_plots_histogram.o o/operators_plots_points2histogram.o o/operators_plots_points_metadata_tograph.o
 OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS)
-OBJ_COMMON=${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL}
+OBJ_COMMON=${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
@@ -85,6 +86,9 @@ o/util_%.o: util/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
 o/pointvisualization_%.o: pointvisualization/%.cpp
+	${CPP} ${CPPFLAGS} -c $+ -o $@
+
+o/services_%.o: services/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
 o/raster_%.o: raster/%.cpp

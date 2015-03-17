@@ -27,6 +27,8 @@ class MSATSolarAngleOperator : public GenericOperator {
 		virtual ~MSATSolarAngleOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		SolarAngles solarAngle;
 };
@@ -51,6 +53,10 @@ MSATSolarAngleOperator::MSATSolarAngleOperator(int sourcecounts[], GenericOperat
 MSATSolarAngleOperator::~MSATSolarAngleOperator() {
 }
 REGISTER_OPERATOR(MSATSolarAngleOperator, "msatsolarangle");
+
+void MSATSolarAngleOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"solarAngle\":" << static_cast<int>(solarAngle);
+}
 
 std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();

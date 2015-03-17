@@ -26,6 +26,8 @@ class MSATReflectanceOperator : public GenericOperator {
 		virtual ~MSATReflectanceOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		bool solarCorrection{true};
 };
@@ -42,6 +44,9 @@ MSATReflectanceOperator::~MSATReflectanceOperator() {
 }
 REGISTER_OPERATOR(MSATReflectanceOperator, "msatreflectance");
 
+void MSATReflectanceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"solarCorrection\":" << solarCorrection;
+}
 
 double calculateDevisorFor(int channel, int dayOfYear) {
 	int index = 0;

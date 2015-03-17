@@ -14,6 +14,8 @@ class MatrixKernelOperator : public GenericOperator {
 		virtual ~MatrixKernelOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		int matrixsize, *matrix;
 };
@@ -43,6 +45,14 @@ MatrixKernelOperator::~MatrixKernelOperator() {
 	matrix = nullptr;
 }
 REGISTER_OPERATOR(MatrixKernelOperator, "matrix");
+
+void MatrixKernelOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"matrix\":[" << matrix[0];
+	for (int i = 1; i < matrixsize; ++i) {
+		stream << "," << matrix[i];
+	}
+	stream << "]";
+}
 
 template<typename T> T cap(T v, T min, T max) {
 	return std::min(max, std::max(v, min));

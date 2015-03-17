@@ -18,6 +18,8 @@ class PointsToRasterOperator : public GenericOperator {
 		virtual ~PointsToRasterOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		std::string renderattribute;
 		double radius;
@@ -36,6 +38,10 @@ PointsToRasterOperator::~PointsToRasterOperator() {
 }
 REGISTER_OPERATOR(PointsToRasterOperator, "points2raster");
 
+void PointsToRasterOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"renderattribute\":\"" << renderattribute << "\","
+			<< "\"radius\":" << radius;
+}
 
 #include "operators/combined/points2raster_frequency.cl.h"
 #include "operators/combined/points2raster_value.cl.h"

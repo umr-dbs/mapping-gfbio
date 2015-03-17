@@ -19,8 +19,11 @@ class SourceOperator : public GenericOperator {
 		virtual ~SourceOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		RasterSource *rastersource;
+		std::string filename; // for semantic parameters
 		int channel;
 		bool transform;
 };
@@ -35,7 +38,7 @@ SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], J
 		throw OperatorException("SourceOperator: specify sourcepath or sourcename, not both");
 	if (fullpath.length() == 0 && sourcename.length() == 0)
 		throw OperatorException("SourceOperator: missing sourcepath or sourcename");
-	std::string filename;
+
 	if (fullpath.length() > 0)
 		filename = fullpath;
 	else
@@ -53,6 +56,11 @@ SourceOperator::~SourceOperator() {
 
 REGISTER_OPERATOR(SourceOperator, "source");
 
+void SourceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"rastersource\":\"" << filename << "\","
+			<< "\"channel\":" << channel << ","
+			<< "\"transform\":" << transform;
+}
 
 std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	return rastersource->query(rect, profiler, channel, transform);

@@ -17,8 +17,6 @@ class HistogramOperator : public GenericOperator {
 		virtual ~HistogramOperator();
 
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
-	protected:
-		void writeSemanticParameters(std::ostringstream& stream);
 };
 
 
@@ -28,8 +26,6 @@ HistogramOperator::HistogramOperator(int sourcecounts[], GenericOperator *source
 HistogramOperator::~HistogramOperator() {
 }
 REGISTER_OPERATOR(HistogramOperator, "histogram");
-
-void HistogramOperator::writeSemanticParameters(std::ostringstream& stream) {}
 
 template<typename T>
 struct histogram{

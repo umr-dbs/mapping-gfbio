@@ -246,8 +246,8 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 	//set the affine transformation coefficients for pixel <-> world conversion and create the spatial reference and
 	double scale_x = pixel_scale_x * (flipx ? -1 : 1);
 	double scale_y = pixel_scale_y * (flipy ? -1 : 1);
-	double origin_x = (flipx ? stref.x2 : stref.x1) + scale_x*0.5;
-	double origin_y = (flipy ? stref.y2 : stref.y1) + scale_y*0.5;
+	double origin_x = flipx ? stref.x2 : stref.x1;
+	double origin_y = flipy ? stref.y2 : stref.y1;
 
 	double adfGeoTransform[6]{ origin_x, scale_x, 0, origin_y, 0, scale_y };
 	std::string srs = GDAL::SRSFromEPSG(stref.epsg);

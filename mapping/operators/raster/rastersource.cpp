@@ -20,7 +20,7 @@ class SourceOperator : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
-		RasterDB *rasterdb;
+		std::shared_ptr<RasterDB> rasterdb;
 		int channel;
 		bool transform;
 };
@@ -41,14 +41,12 @@ SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], J
 	else
 		filename = Configuration::get("operators.rastersource.path", "") + sourcename + std::string(".json");
 
-	rasterdb = RasterDBManager::open(filename.c_str());
+	rasterdb = RasterDB::open(filename.c_str());
 	channel = params.get("channel", 0).asInt();
 	transform = params.get("transform", true).asBool();
 }
 
 SourceOperator::~SourceOperator() {
-	RasterDBManager::close(rasterdb);
-	rasterdb = nullptr;
 }
 
 REGISTER_OPERATOR(SourceOperator, "source");

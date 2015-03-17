@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 #include <exception>
-#include <unordered_map>
-#include <mutex>
+#include <memory>
 
 #include "datatypes/raster.h"
 #include "util/sqlite.h"
@@ -85,10 +84,14 @@ class RasterDB {
 	public:
 		static const bool READ_ONLY = false;
 		static const bool READ_WRITE = true;
-	private: // Instantiation only by RasterDBManager
+
+		// Each RasterDB has a lock on its files, so no two open objects should refer to the same source.
+		static std::shared_ptr<RasterDB> open(const char *filename, bool writeable = RasterDB::READ_ONLY);
+
+		// Instantiation should only be done by ::open()
+		// These are public anyway, because they're instantiated by std::make_shared, which is difficult to friend.
 		RasterDB(const char *filename, bool writeable = RasterDB::READ_ONLY);
 		virtual ~RasterDB();
-		friend class RasterDBManager;
 
 	public:
 		void import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
@@ -117,23 +120,6 @@ class RasterDB {
 		int channelcount;
 		RasterDBChannel **channels;
 		SQLite db;
-		int refcount;
-};
-
-
-/*
- * Each RasterDB has a lock on its files, so no two open objects should refer to the same source.
- * Constructing and Destructing RasterDBs through the manager solves this.
- */
-class RasterDBManager {
-	public:
-		static RasterDB *open(const char *filename, bool writeable = RasterDB::READ_ONLY);
-		static void close(RasterDB *source);
-
-	private:
-		static std::unordered_map<std::string, RasterDB *> map;
-		static std::mutex mutex;
-		RasterDBManager();
 };
 
 #endif

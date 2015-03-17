@@ -7,6 +7,8 @@
 #include "operators/operator.h"
 
 
+#include <unordered_map>
+#include <mutex>
 #include <limits.h>
 #include <stdio.h>
 #include <cstdlib>
@@ -144,7 +146,7 @@ class RasterDBChannel {
 
 
 RasterDB::RasterDB(const char *_filename, bool writeable)
-	: lockedfile(-1), writeable(writeable), filename_json(_filename), crs(nullptr), channelcount(0), channels(nullptr), refcount(0) {
+	: lockedfile(-1), writeable(writeable), filename_json(_filename), crs(nullptr), channelcount(0), channels(nullptr) {
 	try {
 		init();
 	}
@@ -188,7 +190,7 @@ void RasterDB::init() {
 	file.close();
 
 	// Now reopen the file to acquire a lock
-	lockedfile = open(filename_json.c_str(), O_RDONLY | O_CLOEXEC); // | O_NOATIME | O_CLOEXEC);
+	lockedfile = ::open(filename_json.c_str(), O_RDONLY | O_CLOEXEC); // | O_NOATIME | O_CLOEXEC);
 	if (lockedfile < 0) {
 		printf("Unable to open() rastersource at %s\n", filename_json.c_str());
 		perror("error: ");
@@ -722,7 +724,7 @@ std::unique_ptr<GenericRaster> RasterDB::loadTile(int channelid, int fileid, siz
 
 #define USE_POSIX_IO true
 #if USE_POSIX_IO
-	int f = open(filename_data.c_str(), O_RDONLY | O_CLOEXEC); // | O_NOATIME
+	int f = ::open(filename_data.c_str(), O_RDONLY | O_CLOEXEC); // | O_NOATIME
 	if (f < 0)
 		throw SourceException("Could not open data file");
 
@@ -797,12 +799,11 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 
 
 
-std::unordered_map<std::string, RasterDB *> RasterDBManager::map;
-std::mutex RasterDBManager::mutex;
+static std::unordered_map<std::string, std::weak_ptr<RasterDB> > RasterDB_map;
+static std::mutex RasterDB_map_mutex;
 
-RasterDB *RasterDBManager::open(const char *filename, bool writeable)
-{
-	std::lock_guard<std::mutex> guard(mutex);
+std::shared_ptr<RasterDB> RasterDB::open(const char *filename, bool writeable) {
+	std::lock_guard<std::mutex> guard(RasterDB_map_mutex);
 
 	// To make sure each source is only accessed by a single path, resolve all symlinks
 	char filename_clean[PATH_MAX];
@@ -814,30 +815,22 @@ RasterDB *RasterDBManager::open(const char *filename, bool writeable)
 
 	std::string path(filename_clean);
 
-	RasterDB *source = nullptr;
-	if (map.count(path) == 1) {
-		source = map.at(path);
-	}
-	else {
-		source = new RasterDB(path.c_str(), writeable);
-		map[path] = source;
+	if (RasterDB_map.count(path) == 1) {
+		auto &weak_ptr = RasterDB_map.at(path);
+		auto shared_ptr = weak_ptr.lock();
+		if (shared_ptr) {
+			if (writeable && !shared_ptr->isWriteable())
+				throw new SourceException("Cannot re-open source as read/write (TODO?)");
+			return shared_ptr;
+		}
+		RasterDB_map.erase(path);
 	}
 
-	if (writeable && !source->isWriteable())
+	auto shared_ptr = std::make_shared<RasterDB>(path.c_str(), writeable);
+	RasterDB_map[path] = std::weak_ptr<RasterDB>(shared_ptr);
+
+	if (writeable && !shared_ptr->isWriteable())
 		throw new SourceException("Cannot re-open source as read/write (TODO?)");
-
-	source->refcount++;
-	return source;
-}
-
-void RasterDBManager::close(RasterDB *db)
-{
-	if (!db)
-		return;
-	std::lock_guard<std::mutex> guard(mutex);
-
-	db->refcount--;
-	if (db->refcount <= 0)
-		delete db;
+	return shared_ptr;
 }
 

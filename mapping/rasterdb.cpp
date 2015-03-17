@@ -122,14 +122,12 @@ static void loadsource(int argc, char *argv[]) {
 	if (argc < 3) {
 		usage();
 	}
-	RasterDB *db = nullptr;
 	try {
-		db = RasterDBManager::open(argv[2]);
+		auto db = RasterDB::open(argv[2]);
 	}
 	catch (std::exception &e) {
 		printf("Failure: %s\n", e.what());
 	}
-	RasterDBManager::close(db);
 }
 
 // import <sourcename> <filename> <filechannel> <sourcechannel> <timestamp>
@@ -137,9 +135,8 @@ static void import(int argc, char *argv[]) {
 	if (argc < 7) {
 		usage();
 	}
-	RasterDB *db = nullptr;
 	try {
-		db = RasterDBManager::open(argv[2], RasterDB::READ_WRITE);
+		auto db = RasterDB::open(argv[2], RasterDB::READ_WRITE);
 		const char *filename = argv[3];
 		int sourcechannel = atoi(argv[4]);
 		int channelid = atoi(argv[5]);
@@ -158,7 +155,6 @@ static void import(int argc, char *argv[]) {
 	catch (std::exception &e) {
 		printf("Failure: %s\n", e.what());
 	}
-	RasterDBManager::close(db);
 }
 
 static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {

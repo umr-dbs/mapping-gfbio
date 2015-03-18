@@ -212,7 +212,7 @@ void RasterSource::init() {
 		crs = new GDALCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 1, -1).asInt(),
-			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(), origins.get((Json::Value::ArrayIndex) 1, 0).asInt(),
+			origins.get((Json::Value::ArrayIndex) 0, 0).asDouble(), origins.get((Json::Value::ArrayIndex) 1, 0).asDouble(),
 			scales.get((Json::Value::ArrayIndex) 0, 0).asDouble(), scales.get((Json::Value::ArrayIndex) 1, 0).asDouble()
 		);
 	}

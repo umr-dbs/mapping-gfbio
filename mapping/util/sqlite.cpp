@@ -42,6 +42,10 @@ void SQLite::exec(const char *query) {
 	}
 }
 
+int64_t SQLite::getLastInsertId() {
+	return sqlite3_last_insert_rowid(db);
+}
+
 
 
 

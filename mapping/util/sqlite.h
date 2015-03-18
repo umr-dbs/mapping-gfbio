@@ -14,6 +14,7 @@ class SQLite {
 		~SQLite();
 		void open(const char *filename);
 		void exec(const char *query);
+		int64_t getLastInsertId();
 	private:
 		sqlite3 *db;
 

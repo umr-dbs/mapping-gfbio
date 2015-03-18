@@ -19,6 +19,8 @@ class ExpressionOperator : public GenericOperator {
 		virtual ~ExpressionOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		std::string expression;
 		GDALDataType output_type;
@@ -49,7 +51,12 @@ ExpressionOperator::~ExpressionOperator() {
 }
 REGISTER_OPERATOR(ExpressionOperator, "expression");
 
-
+void ExpressionOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"expression\":\"" << expression << "\","
+			<< "\"output_type\":" << static_cast<int>(output_type) << ","
+			<< "\"output_min\":" << output_min << ","
+			<< "\"output_max\":" << output_max;
+}
 
 std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	int rastercount = getRasterSourceCount();

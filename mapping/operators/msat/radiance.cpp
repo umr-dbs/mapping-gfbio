@@ -20,6 +20,8 @@ class MSATRadianceOperator : public GenericOperator {
 		virtual ~MSATRadianceOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		bool convert; // indicates if radiance will be converted to W/ �m m� sr
 };
@@ -41,6 +43,9 @@ MSATRadianceOperator::~MSATRadianceOperator() {
 // We do not need this operator any more, the raster source can scale automatically.
 REGISTER_OPERATOR(MSATRadianceOperator, "msatradiance");
 
+void MSATRadianceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"convert\":" << convert;
+}
 
 std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();

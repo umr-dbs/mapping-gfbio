@@ -30,6 +30,8 @@ class ROperator : public GenericOperator {
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		void runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		friend std::unique_ptr<GenericRaster> query_raster_source(ROperator *op, int childidx, const QueryRectangle &rect);
 		friend std::unique_ptr<PointCollection> query_points_source(ROperator *op, int childidx, const QueryRectangle &rect);
@@ -58,6 +60,10 @@ ROperator::~ROperator() {
 }
 REGISTER_OPERATOR(ROperator, "r");
 
+void ROperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"source\":\"" << source << "\","
+			<< "\"result_type\":\"" << result_type << "\"";
+}
 
 void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type, QueryProfiler &profiler) {
 	stream.write(RSERVER_MAGIC_NUMBER);

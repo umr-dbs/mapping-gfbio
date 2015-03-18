@@ -16,7 +16,7 @@ LDFLAGS_CGI=-luriparser
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 OBJ_SERVICES=o/services_wfs_request.o
-OBJ_RASTER=o/rasterdb_rasterdb.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
+OBJ_RASTER=o/rasterdb_rasterdb.o o/rasterdb_backend_local.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
 OBJ_DATATYPES=o/datatypes_attributes.o o/datatypes_spatiotemporal.o o/datatypes_raster_raster.o o/datatypes_raster_import_gdal.o o/datatypes_raster_export_pgm.o o/datatypes_raster_export_yuv.o o/datatypes_raster_export_png.o o/datatypes_raster_export_jpeg.o o/datatypes_pointcollection.o o/datatypes_geometry.o
 OBJ_PLOT=o/datatypes_plots_histogram.o o/datatypes_plots_text.o o/datatypes_plots_png.o
 OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o o/util_configuration.o o/util_debug.o
@@ -38,31 +38,31 @@ EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
 
-DATASET_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061200-C_
-DATASET_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061200-C_
-DATASET_C2=data/xrit2/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061200-C_
-DATASET_C3=data/xrit2/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061200-C_
-DATASET_C4=data/xrit2/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061200-C_
-DATASET_C5=data/xrit2/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061200-C_
-DATASET_C6=data/xrit2/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061200-C_
-DATASET_C7=data/xrit2/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061200-C_
-DATASET_C8=data/xrit2/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061200-C_
-DATASET_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061200-C_
-DATASET_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061200-C_
-DATASET_HRV=data/xrit2/H-000-MSG2__-MSG2________-HRV______-000001___-201006061200-C_
+DATASET_C0=datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061200-C_
+DATASET_C1=datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061200-C_
+DATASET_C2=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061200-C_
+DATASET_C3=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061200-C_
+DATASET_C4=datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061200-C_
+DATASET_C5=datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061200-C_
+DATASET_C6=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061200-C_
+DATASET_C7=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061200-C_
+DATASET_C8=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061200-C_
+DATASET_C9=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061200-C_
+DATASET_C10=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061200-C_
+DATASET_HRV=datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-201006061200-C_
 
-DATASET2_C0=data/xrit2/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061800-C_
-DATASET2_C1=data/xrit2/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061800-C_
-DATASET2_C2=data/xrit2/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061800-C_
-DATASET2_C3=data/xrit2/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061800-C_
-DATASET2_C4=data/xrit2/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061800-C_
-DATASET2_C5=data/xrit2/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061800-C_
-DATASET2_C6=data/xrit2/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061800-C_
-DATASET2_C7=data/xrit2/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061800-C_
-DATASET2_C8=data/xrit2/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061800-C_
-DATASET2_C9=data/xrit2/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061800-C_
-DATASET2_C10=data/xrit2/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061800-C_
-DATASET2_HRV=data/xrit2/H-000-MSG2__-MSG2________-HRV______-000001___-201006061800-C_
+DATASET2_C0=datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061800-C_
+DATASET2_C1=datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061800-C_
+DATASET2_C2=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-201006061800-C_
+DATASET2_C3=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_039___-000001___-201006061800-C_
+DATASET2_C4=datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_062___-000001___-201006061800-C_
+DATASET2_C5=datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_073___-000001___-201006061800-C_
+DATASET2_C6=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_087___-000001___-201006061800-C_
+DATASET2_C7=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_097___-000001___-201006061800-C_
+DATASET2_C8=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-201006061800-C_
+DATASET2_C9=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-201006061800-C_
+DATASET2_C10=datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-201006061800-C_
+DATASET2_HRV=datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-201006061800-C_
 
 
 VALGRIND=valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --suppressions=test/valgrind_suppression.supp --error-exitcode=2
@@ -153,30 +153,30 @@ ${EXERSERVER}:	${OBJ_RSERVER}
 msg9_datasource:	${EXE}
 	rm -f datasources/msg9_geos.dat datasources/msg9_geos.db
 	#./${EXE} createsource 62866 ${DATASET_C0} ${DATASET_C1} ${DATASET_C2} ${DATASET_C3} ${DATASET_C4} ${DATASET_C5} ${DATASET_C6} ${DATASET_C7} ${DATASET_C8} ${DATASET_C9} ${DATASET_C10} >datasources/msat2.json
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C0} 1 0 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C1} 1 1 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C2} 1 2 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C3} 1 3 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C4} 1 4 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C5} 1 5 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C6} 1 6 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C7} 1 7 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C8} 1 8 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C9} 1 9 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C10} 1 10 42 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C0} 1 0 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C1} 1 1 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C2} 1 2 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C3} 1 3 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C4} 1 4 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C5} 1 5 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C6} 1 6 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C7} 1 7 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C8} 1 8 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C9} 1 9 43 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C10} 1 10 43 RAW
-	
-msg9_add_2008: ${EXE}
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C0} 1 0 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C1} 1 1 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C2} 1 2 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C3} 1 3 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C4} 1 4 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C5} 1 5 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C6} 1 6 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C7} 1 7 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C8} 1 8 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C9} 1 9 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C10} 1 10 1275818400 RAW
+
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C0} 1 0 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C1} 1 1 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C2} 1 2 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C3} 1 3 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C4} 1 4 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C5} 1 5 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C6} 1 6 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C7} 1 7 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C8} 1 8 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C9} 1 9 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C10} 1 10 1275840000 RAW
+
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-200811171200-C_ 1 0 1226919600 RAW
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-200811171200-C_ 1 1 1226919600 RAW
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-200811171200-C_ 1 2 1226919600 RAW
@@ -188,9 +188,7 @@ msg9_add_2008: ${EXE}
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-200811171200-C_ 1 8 1226919600 RAW
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-200811171200-C_ 1 9 1226919600 RAW
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-200811171200-C_ 1 10 1226919600 RAW
-	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-200811171200-C_ 1 0 1226919600 RAW
 
-msg9_add_2011: ${EXE}
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-201101171215-C_ 1 0 1295262900 RAW
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-201101171215-C_ 1 1 1295262900 RAW
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-201101171215-C_ 1 2 1295262900 RAW
@@ -202,13 +200,14 @@ msg9_add_2011: ${EXE}
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-201101171215-C_ 1 8 1295262900 RAW
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-201101171215-C_ 1 9 1295262900 RAW
 	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-201101171215-C_ 1 10 1295262900 RAW
-	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-201101171215-C_ 1 0 1295262900 RAW
-
 
 msg9_hrvdatasource:	${EXE}
 	rm -f datasources/msg9_geos_hrv.dat datasources/msg9_geos_hrv.db
-	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET_HRV} 1 0 42 RAW
-	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET2_HRV} 1 0 43 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET_HRV} 1 0 1275818400 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET2_HRV} 1 0 1275840000 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-200811171200-C_ 1 0 1226919600 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-201101171215-C_ 1 0 1295262900 RAW
+
 
 worldclimdatasource:	${EXE}
 	rm -f datasources/worldclim*.dat datasources/worldclim*.db

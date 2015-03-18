@@ -6,8 +6,9 @@
 #include <memory>
 
 #include "datatypes/raster.h"
-#include "util/sqlite.h"
+#include "converters/converter.h"
 
+class RasterDBBackend;
 class RasterDBChannel;
 class QueryRectangle;
 class QueryProfiler;
@@ -94,32 +95,23 @@ class RasterDB {
 		virtual ~RasterDB();
 
 	public:
-		void import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
+		void import(const char *filename, int sourcechannel, int channelid, time_t timestamp, RasterConverter::Compression compression = RasterConverter::Compression::GZIP);
 		std::unique_ptr<GenericRaster> query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform = true);
 
 		bool isWriteable() const { return writeable; }
 
 	private:
-		void import(GenericRaster *raster, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
-		void importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::PREDICTED);
-
-		bool hasTile(uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp);
-
+		void import(GenericRaster *raster, int channelid, time_t timestamp, RasterConverter::Compression compression = RasterConverter::Compression::GZIP);
 		std::unique_ptr<GenericRaster> load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom = 0, bool transform = true, size_t *io_cost = nullptr);
-		std::unique_ptr<GenericRaster> loadTile(int channelid, int fileid, size_t offset, size_t size, uint32_t width, uint32_t height, uint32_t depth, GenericRaster::Compression method);
 
 		void init();
 		void cleanup();
 
-		int lockedfile;
 		bool writeable;
-		std::string filename_json;
-		std::string filename_data;
-		std::string filename_db;
+		std::unique_ptr<RasterDBBackend> backend;
 		GDALCRS *crs;
 		int channelcount;
 		RasterDBChannel **channels;
-		SQLite db;
 };
 
 #endif

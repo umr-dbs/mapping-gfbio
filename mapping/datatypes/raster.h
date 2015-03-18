@@ -90,13 +90,6 @@ class GenericRaster : public GridSpatioTemporalResult {
 			OPENCL = 2
 		};
 
-		enum Compression {
-			UNCOMPRESSED = 1,
-			BZIP = 2,
-			PREDICTED = 3,
-			GZIP = 4
-		};
-
 		virtual void setRepresentation(Representation r) = 0;
 		Representation getRepresentation() const { return representation; }
 

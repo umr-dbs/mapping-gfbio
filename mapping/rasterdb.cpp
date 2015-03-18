@@ -141,14 +141,14 @@ static void import(int argc, char *argv[]) {
 		int sourcechannel = atoi(argv[4]);
 		int channelid = atoi(argv[5]);
 		int timestamp = atoi(argv[6]);
-		GenericRaster::Compression compression = GenericRaster::Compression::BZIP;
+		RasterConverter::Compression compression = RasterConverter::Compression::BZIP;
 		if (argc > 7) {
 			if (argv[7][0] == 'P')
-				compression = GenericRaster::Compression::PREDICTED;
+				compression = RasterConverter::Compression::PREDICTED;
 			else if (argv[7][0] == 'G')
-				compression = GenericRaster::Compression::GZIP;
+				compression = RasterConverter::Compression::GZIP;
 			else if (argv[7][0] == 'R')
-				compression = GenericRaster::Compression::UNCOMPRESSED;
+				compression = RasterConverter::Compression::UNCOMPRESSED;
 		}
 		db->import(filename, sourcechannel, channelid, timestamp, compression);
 	}

@@ -138,6 +138,11 @@ int32_t SQLiteStatement::getInt(int column) {
 int64_t SQLiteStatement::getInt64(int column) {
 	return sqlite3_column_int64(stmt, column);
 }
+
+double SQLiteStatement::getDouble(int column) {
+	return sqlite3_column_double(stmt, column);
+}
+
 const char *SQLiteStatement::getString(int column) {
 	return (const char *) sqlite3_column_text(stmt, column);
 }

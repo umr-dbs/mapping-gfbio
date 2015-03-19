@@ -45,6 +45,7 @@ class SQLiteStatement {
 		bool next();
 		int32_t getInt(int column);
 		int64_t getInt64(int column);
+		double getDouble(int column);
 		const char *getString(int column);
 
 		// cleanup for re-use

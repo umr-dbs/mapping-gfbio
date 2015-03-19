@@ -19,11 +19,11 @@ SQLite::~SQLite() {
 	}
 }
 
-void SQLite::open(const char *filename) {
+void SQLite::open(const char *filename, bool readonly) {
 	if (db)
 		throw SQLiteException("DB already open");
 
-	int rc = sqlite3_open(filename, &db);
+	int rc = sqlite3_open_v2(filename, &db, readonly ? (SQLITE_OPEN_READONLY) : (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE), nullptr);
 	if (rc != SQLITE_OK) {
 		std::ostringstream msg;
 		msg << "Can't open database " << filename << ": " << sqlite3_errmsg(db);

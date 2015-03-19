@@ -36,7 +36,6 @@ FilterPointsByGeometry::~FilterPointsByGeometry() {
 }
 REGISTER_OPERATOR(FilterPointsByGeometry, "filterpointsbygeometry");
 
-
 std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	//TODO: check projection
 	const geos::geom::PrecisionModel pm;

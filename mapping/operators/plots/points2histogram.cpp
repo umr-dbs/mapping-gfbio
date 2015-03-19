@@ -12,16 +12,20 @@
  * This class generates a histogram out of a point set with attached meta data.
  */
 class Points2HistogramOperator : public GenericOperator {
-private:
-	std::string name;
-	unsigned int numberOfBuckets;
-	double rangeMin, rangeMax;
-	bool autoRange;
-public:
-	Points2HistogramOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
-	virtual ~Points2HistogramOperator();
+	public:
+		Points2HistogramOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
+		virtual ~Points2HistogramOperator();
 
-	virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
+
+	private:
+		std::string name;
+		unsigned int numberOfBuckets;
+		double rangeMin, rangeMax;
+		bool autoRange;
 };
 
 /**
@@ -50,6 +54,15 @@ Points2HistogramOperator::~Points2HistogramOperator() {
 }
 REGISTER_OPERATOR(Points2HistogramOperator, "points2histogram");
 
+void Points2HistogramOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"attributeName\":\"" << name << "\"," << stream
+			<< "\"numberOfBuckets\":" << numberOfBuckets << ",";
+	if(autoRange) {
+		stream << "\"autoRange\":true";
+	} else {
+		stream << "\"rangeMin\":" << rangeMin << ",\"rangeMax\":" << rangeMax;
+	}
+}
 
 /**
  * Calculates the histogram and returns it.

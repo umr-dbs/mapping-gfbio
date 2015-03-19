@@ -7,13 +7,11 @@
 #include <json/json.h>
 
 class PointsClusterOperator: public GenericOperator {
-private:
+	public:
+		PointsClusterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
+		virtual ~PointsClusterOperator();
 
-public:
-	PointsClusterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
-	virtual ~PointsClusterOperator();
-
-	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 PointsClusterOperator::PointsClusterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {

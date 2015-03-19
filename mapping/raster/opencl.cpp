@@ -7,6 +7,7 @@
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h" // For QueryProfiler
+#include "util/configuration.h"
 #include "util/debug.h"
 
 
@@ -48,21 +49,36 @@ void init() {
 			if (platformList.size() == 0)
 				throw PlatformException("No CL platforms found");
 			//printf("Platform number is: %d\n", (int) platformList.size());
-			platform = platformList[platformList.size()-1];
+
+			auto preferredPlatformName = Configuration::get("global.opencl.preferredplatform", "");
+			int64_t selectedPlatform = -1;
 
 			for (size_t i=0;i<platformList.size();i++) {
-				std::string platformVendor;
-				platformList[i].getInfo((cl_platform_info)CL_PLATFORM_VENDOR, &platformVendor);
+				std::string platformName;
+				platformList[i].getInfo((cl_platform_info)CL_PLATFORM_NAME, &platformName);
 				std::ostringstream msg;
-				msg << "CL vendor " << i << ": " << platformVendor;
+				msg << "CL vendor " << i << ": " << platformName;
 				d(msg.str());
+				if (platformName == preferredPlatformName)
+					selectedPlatform = i;
 			}
+
+			if (selectedPlatform < 0) {
+				if (preferredPlatformName != "" || platformList.size() > 0)
+					d("Configured openCL platform not found, using the first one offered");
+				selectedPlatform = 0;
+			}
+			platform = platformList[selectedPlatform];
 
 			// Context
 			cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
 			try {
+				int device_type = CL_DEVICE_TYPE_GPU;
+				if (Configuration::get("global.opencl.forcecpu", "0") == "1")
+					device_type = CL_DEVICE_TYPE_CPU;
+
 				context = cl::Context(
-					CL_DEVICE_TYPE_GPU, // _CPU
+						device_type, // _CPU
 					cprops
 				);
 			}

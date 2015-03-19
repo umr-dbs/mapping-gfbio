@@ -20,6 +20,10 @@ class CSVPointSource : public GenericOperator {
 		virtual ~CSVPointSource();
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
+
 	private:
 		std::string filename;
 };
@@ -34,6 +38,10 @@ CSVPointSource::CSVPointSource(int sourcecounts[], GenericOperator *sources[], J
 CSVPointSource::~CSVPointSource() {
 }
 REGISTER_OPERATOR(CSVPointSource, "csvpointsource");
+
+void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"filename\":\"" << filename << "\"";
+}
 
 static bool endsWith(const std::string &str, const std::string &suffix) {
 	if (str.length() < suffix.length())

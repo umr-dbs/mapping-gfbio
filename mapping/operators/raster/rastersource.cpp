@@ -1,9 +1,10 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/typejuggling.h"
-#include "raster/rastersource.h"
+#include "rasterdb/rasterdb.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
+#include "util/configuration.h"
 
 #include <memory>
 #include <sstream>
@@ -19,14 +20,14 @@ class SourceOperator : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 	private:
-		RasterSource *rastersource;
+		std::shared_ptr<RasterDB> rasterdb;
 		int channel;
 		bool transform;
 };
 
 
 // RasterSource Operator
-SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rastersource(nullptr) {
+SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rasterdb(nullptr) {
 	assumeSources(0);
 	std::string fullpath = params.get("sourcepath", "").asString();
 	std::string sourcename = params.get("sourcename", "").asString();
@@ -38,22 +39,20 @@ SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], J
 	if (fullpath.length() > 0)
 		filename = fullpath;
 	else
-		filename = std::string("datasources/") + sourcename + std::string(".json");
+		filename = Configuration::get("operators.rastersource.path", "") + sourcename + std::string(".json");
 
-	rastersource = RasterSourceManager::open(filename.c_str());
+	rasterdb = RasterDB::open(filename.c_str());
 	channel = params.get("channel", 0).asInt();
 	transform = params.get("transform", true).asBool();
 }
 
 SourceOperator::~SourceOperator() {
-	RasterSourceManager::close(rastersource);
-	rastersource = nullptr;
 }
 
 REGISTER_OPERATOR(SourceOperator, "source");
 
 
 std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
-	return rastersource->query(rect, profiler, channel, transform);
+	return rasterdb->query(rect, profiler, channel, transform);
 }
 

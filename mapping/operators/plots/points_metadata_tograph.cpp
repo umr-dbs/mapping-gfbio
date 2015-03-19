@@ -11,17 +11,20 @@
 #include <cmath>
 
 class PointsMetadataToGraph: public GenericOperator {
-private:
-	std::vector<std::string> names;
+	public:
+		PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
+		virtual ~PointsMetadataToGraph();
 
-	template<std::size_t size>
-		std::unique_ptr<GenericPlot> createXYGraph(PointCollection& points);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
-public:
-	PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
-	virtual ~PointsMetadataToGraph();
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 
-	virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+	private:
+		std::vector<std::string> names;
+
+		template<std::size_t size>
+			std::unique_ptr<GenericPlot> createXYGraph(PointCollection& points);
 };
 
 PointsMetadataToGraph::PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -35,6 +38,15 @@ PointsMetadataToGraph::PointsMetadataToGraph(int sourcecounts[], GenericOperator
 
 PointsMetadataToGraph::~PointsMetadataToGraph() {}
 REGISTER_OPERATOR(PointsMetadataToGraph, "points_metadata_to_graph");
+
+void PointsMetadataToGraph::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"parameterNames\":[";
+	for(auto& name : names) {
+		stream << "\"" << name << "\",";
+	}
+	stream.seekp(((long) stream.tellp()) - 1); // remove last comma
+	stream << "]";
+}
 
 template<std::size_t size>
 auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::unique_ptr<GenericPlot> {

@@ -1,12 +1,12 @@
 #include "datatypes/raster.h"
 #include "datatypes/pointcollection.h"
-#include "raster/rastersource.h"
+#include "rasterdb/rasterdb.h"
 #include "raster/colors.h"
 
 #include "operators/operator.h"
 #include "converters/converter.h"
 #include "raster/profiler.h"
-
+#include "util/configuration.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,14 +122,12 @@ static void loadsource(int argc, char *argv[]) {
 	if (argc < 3) {
 		usage();
 	}
-	RasterSource *source = nullptr;
 	try {
-		source = RasterSourceManager::open(argv[2]);
+		auto db = RasterDB::open(argv[2]);
 	}
 	catch (std::exception &e) {
 		printf("Failure: %s\n", e.what());
 	}
-	RasterSourceManager::close(source);
 }
 
 // import <sourcename> <filename> <filechannel> <sourcechannel> <timestamp>
@@ -137,28 +135,26 @@ static void import(int argc, char *argv[]) {
 	if (argc < 7) {
 		usage();
 	}
-	RasterSource *source = nullptr;
 	try {
-		source = RasterSourceManager::open(argv[2], RasterSource::READ_WRITE);
+		auto db = RasterDB::open(argv[2], RasterDB::READ_WRITE);
 		const char *filename = argv[3];
 		int sourcechannel = atoi(argv[4]);
 		int channelid = atoi(argv[5]);
 		int timestamp = atoi(argv[6]);
-		GenericRaster::Compression compression = GenericRaster::Compression::BZIP;
+		RasterConverter::Compression compression = RasterConverter::Compression::BZIP;
 		if (argc > 7) {
 			if (argv[7][0] == 'P')
-				compression = GenericRaster::Compression::PREDICTED;
+				compression = RasterConverter::Compression::PREDICTED;
 			else if (argv[7][0] == 'G')
-				compression = GenericRaster::Compression::GZIP;
+				compression = RasterConverter::Compression::GZIP;
 			else if (argv[7][0] == 'R')
-				compression = GenericRaster::Compression::UNCOMPRESSED;
+				compression = RasterConverter::Compression::UNCOMPRESSED;
 		}
-		source->import(filename, sourcechannel, channelid, timestamp, compression);
+		db->import(filename, sourcechannel, channelid, timestamp, compression);
 	}
 	catch (std::exception &e) {
 		printf("Failure: %s\n", e.what());
 	}
-	RasterSourceManager::close(source);
 }
 
 static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {
@@ -332,6 +328,8 @@ int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		usage();
 	}
+
+	Configuration::loadFromDefaultPaths();
 
 	const char *command = argv[1];
 

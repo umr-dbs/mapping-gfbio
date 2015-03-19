@@ -1,12 +1,16 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/typejuggling.h"
-#include "raster/rastersource.h"
+#include "rasterdb/rasterdb.h"
+#include "rasterdb/backend.h"
+#include "rasterdb/backend_local.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
 #include "operators/operator.h"
 
 
+#include <unordered_map>
+#include <mutex>
 #include <limits.h>
 #include <stdio.h>
 #include <cstdlib>
@@ -86,12 +90,12 @@ std::ostream& operator<< (std::ostream &out, const GDALCRS &rm) {
 
 
 
-class RasterSourceChannel {
+class RasterDBChannel {
 	public:
-		//friend class RasterSource;
+		//friend class RasterDB;
 
-		RasterSourceChannel(const DataDescription &dd) : dd(dd), has_transform(false) {}
-		~RasterSourceChannel() {}
+		RasterDBChannel(const DataDescription &dd) : dd(dd), has_transform(false) {}
+		~RasterDBChannel() {}
 
 		void setTransform(GDALDataType datatype, double offset, double scale, const std::string &offset_metadata, const std::string &scale_metadata) {
 			has_transform = true;
@@ -143,9 +147,10 @@ class RasterSourceChannel {
 
 
 
-RasterSource::RasterSource(const char *_filename, bool writeable)
-	: lockedfile(-1), writeable(writeable), filename_json(_filename), crs(nullptr), channelcount(0), channels(nullptr), refcount(0) {
+RasterDB::RasterDB(const char *filename, bool writeable)
+	: writeable(writeable), crs(nullptr), channelcount(0), channels(nullptr) {
 	try {
+		backend.reset( new LocalRasterDBBackend(filename, writeable) );
 		init();
 	}
 	catch (const std::exception &e) {
@@ -154,49 +159,21 @@ RasterSource::RasterSource(const char *_filename, bool writeable)
 	}
 }
 
-RasterSource::~RasterSource() {
+RasterDB::~RasterDB() {
 	cleanup();
 }
 
 
-void RasterSource::init() {
-	size_t suffixpos = filename_json.rfind(".json");
-	if (suffixpos == std::string::npos || suffixpos != filename_json.length()-5) {
-		printf("Filename doesn't end with .json (%ld / %ld)\n", suffixpos, filename_json.length());
-		throw SourceException("filename must end with .json");
-	}
-	std::string basename = filename_json.substr(0, suffixpos);
-	filename_data = basename + ".dat";
-	filename_db = basename + ".db";
-
+void RasterDB::init() {
 	/*
-	 * Step #1: open the .json file and parse it
+	 * Step #1: parse the json
 	 */
-	std::ifstream file(filename_json.c_str());
-	if (!file.is_open()) {
-		printf("unable to open file %s\n", filename_json.c_str());
-		throw SourceException("unable to open file");
-	}
-
+	auto json = backend->readJSON();
 	Json::Reader reader(Json::Features::strictMode());
 	Json::Value root;
-	if (!reader.parse(file, root)) {
+	if (!reader.parse(json, root)) {
 		printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
 		throw SourceException("unable to parse json");
-	}
-
-	file.close();
-
-	// Now reopen the file to acquire a lock
-	lockedfile = open(filename_json.c_str(), O_RDONLY | O_CLOEXEC); // | O_NOATIME | O_CLOEXEC);
-	if (lockedfile < 0) {
-		printf("Unable to open() rastersource at %s\n", filename_json.c_str());
-		perror("error: ");
-		throw SourceException("open() before flock() failed");
-	}
-	if (flock(lockedfile, writeable ? LOCK_EX : LOCK_SH) != 0) {
-		printf("Unable to flock() rastersource\n");
-		throw SourceException("flock() failed");
 	}
 
 	Json::Value jrm = root["coords"];
@@ -212,7 +189,7 @@ void RasterSource::init() {
 		crs = new GDALCRS(
 			epsg,
 			sizes.get((Json::Value::ArrayIndex) 0, -1).asInt(), sizes.get((Json::Value::ArrayIndex) 1, -1).asInt(),
-			origins.get((Json::Value::ArrayIndex) 0, 0).asInt(), origins.get((Json::Value::ArrayIndex) 1, 0).asInt(),
+			origins.get((Json::Value::ArrayIndex) 0, 0).asDouble(), origins.get((Json::Value::ArrayIndex) 1, 0).asDouble(),
 			scales.get((Json::Value::ArrayIndex) 0, 0).asDouble(), scales.get((Json::Value::ArrayIndex) 1, 0).asDouble()
 		);
 	}
@@ -228,7 +205,7 @@ void RasterSource::init() {
 	}
 
 	channelcount = channelinfo.size();
-	channels = new RasterSourceChannel *[channelcount];
+	channels = new RasterDBChannel *[channelcount];
 	for (int i=0;i<channelcount;i++)
 		channels[i] = nullptr;
 
@@ -243,7 +220,7 @@ void RasterSource::init() {
 			no_data = channel.get("nodata", 0).asDouble();
 		}
 
-		channels[i] = new RasterSourceChannel(DataDescription(
+		channels[i] = new RasterDBChannel(DataDescription(
 			GDALGetDataTypeByName(datatype.c_str()),
 			channel.get("min", 0).asDouble(),
 			channel.get("max", -1).asDouble(),
@@ -264,50 +241,10 @@ void RasterSource::init() {
 		}
 		channels[i]->dd.verify();
 	}
-
-	/*
-	 * Step #2: open the .db file and initialize it if needed
-	 */
-	db.open(filename_db.c_str());
-
-	db.exec("CREATE TABLE IF NOT EXISTS rasters("
-		" id INTEGER PRIMARY KEY,"
-		" channel INTEGER NOT NULL,"
-		" timestamp INTEGER NOT NULL,"
-		" x1 INTEGER NOT NULL,"
-		" y1 INTEGER NOT NULL,"
-		" z1 INTERGET NOT NULL,"
-		" x2 INTEGER NOT NULL,"
-		" y2 INTEGER NOT NULL,"
-		" z2 INTEGER NOT NULL,"
-		" zoom INTEGER NOT NULL,"
-		" filenr INTEGER NOT NULL,"
-		" fileoffset INTEGER NOT NULL,"
-		" filebytes INTEGER NOT NULL,"
-		" compression INTEGER NOT NULL"
-		")"
-	);
-	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ctxyzz ON rasters (channel, timestamp, x1, y1, z1, zoom)");
-
-	db.exec("CREATE TABLE IF NOT EXISTS metadata("
-		" id INTEGER PRIMARY KEY,"
-		" channel INTEGER NOT NULL,"
-		" timestamp INTEGER NOT NULL,"
-		" isstring INTEGER NOT NULL,"
-		" key STRING NOT NULL,"
-		" value STRING NOT NULL"
-		")"
-	);
-
-	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS ctik ON metadata (channel, timestamp, isstring, key)");
 }
 
 
-void RasterSource::cleanup() {
-	if (lockedfile != -1) {
-		close(lockedfile); // also removes the lock acquired by flock()
-		lockedfile = -1;
-	}
+void RasterDB::cleanup() {
 	if (crs) {
 		delete crs;
 		crs = nullptr;
@@ -322,7 +259,7 @@ void RasterSource::cleanup() {
 
 
 
-void RasterSource::import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression) {
+void RasterDB::import(const char *filename, int sourcechannel, int channelid, time_t timestamp, RasterConverter::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	bool raster_flipx, raster_flipy;
@@ -344,16 +281,16 @@ void RasterSource::import(const char *filename, int sourcechannel, int channelid
 }
 
 
-void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp, GenericRaster::Compression compression) {
+void RasterDB::import(GenericRaster *raster, int channelid, time_t timestamp, RasterConverter::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	if (channelid < 0 || channelid >= channelcount)
-		throw SourceException("RasterSource::import: unknown channel");
+		throw SourceException("RasterDB::import: unknown channel");
 	/*
 	if (!(raster->lcrs == *lcrs)) {
 		std::cerr << "Imported CRS: " << raster->lcrs << std::endl;
 		std::cerr << "Expected CRS: " << *lcrs << std::endl;
-		throw SourceException("Local CRS does not match RasterSource");
+		throw SourceException("Local CRS does not match RasterDB");
 	}
 	*/
 
@@ -371,6 +308,8 @@ void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp
 	}
 */
 	uint32_t tilesize = DEFAULT_TILE_SIZE;
+
+	auto rasterid = backend->createRaster(channelid, timestamp, timestamp+1, raster->md_string, raster->md_value);
 
 	for (int zoom=0;;zoom++) {
 		int zoomfactor = 1 << zoom;
@@ -396,133 +335,24 @@ void RasterSource::import(GenericRaster *raster, int channelid, time_t timestamp
 					uint32_t xsize = std::min(zoomedraster->width - xoff, tilesize);
 
 					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
-					if (hasTile(xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp)) {
+					if (backend->hasTile(rasterid, xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom)) {
 						printf(" skipping..\n");
 						continue;
 					}
 
-					//auto tile = GenericRaster::create(tilelcrs, channels[channelid]->dd);
 					auto tile = GenericRaster::create(channels[channelid]->dd, SpatioTemporalReference::unreferenced(), xsize, ysize, zsize);
-					tile->blit(zoomedraster, -xoff, -yoff, -zoff);
+					tile->blit(zoomedraster, -(int)xoff, -(int)yoff, -(int)zoff);
 					printf("done blitting\n");
 
-					importTile(tile.get(), xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, channelid, timestamp, compression);
+					auto buffer = RasterConverter::direct_encode(tile.get(), compression);
+					printf("done compressing, method %d, size: %ld -> %ld (%f)\n", (int) compression, tile->getDataSize(), buffer->size, (double) buffer->size / tile->getDataSize());
+
+					backend->writeTile(rasterid, *buffer, xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, compression);
 					printf("done importing\n");
 				}
 			}
 		}
 	}
-
-	SQLiteStatement stmt(db);
-	stmt.prepare("INSERT INTO metadata (channel, timestamp, isstring, key, value) VALUES (?,?,?,?,?)");
-	stmt.bind(1, channelid);
-	stmt.bind(2, timestamp);
-	stmt.bind(3, 1); // isstring
-
-	// import metadata
-	for (auto md : raster->md_string) {
-		auto key = md.first;
-		auto value = md.second;
-
-		stmt.bind(4, key);
-		stmt.bind(5, value);
-
-		stmt.exec();
-		printf("inserting string md: %s = %s\n", key.c_str(), value.c_str());
-	}
-	stmt.bind(3, 0); // isstring
-
-	for (auto md : raster->md_value) {
-		auto key = md.first;
-		auto value = md.second;
-
-		stmt.bind(4, key);
-		stmt.bind(5, value);
-
-		stmt.exec();
-		printf("inserting value md: %s = %f\n", key.c_str(), value);
-	}
-}
-
-bool RasterSource::hasTile(uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp) {
-	int zoomfactor = 1 << zoom;
-
-	SQLiteStatement stmt(db);
-
-	stmt.prepare("SELECT 1 FROM rasters WHERE channel = ? AND timestamp = ? AND x1 = ? AND y1 = ? AND z1 = ? AND x2 = ? AND y2 = ? AND z2 = ? AND zoom = ?");
-
-	stmt.bind(1, channelid);
-	stmt.bind(2, timestamp);
-	stmt.bind(3, offx); // x1
-	stmt.bind(4, offy); // y1
-	stmt.bind(5, offz); // z1
-	stmt.bind(6, (int32_t) (offx+width*zoomfactor)); // x2
-	stmt.bind(7, (int32_t) (offy+height*zoomfactor)); // y2
-	stmt.bind(8, (int32_t) (offz+depth*zoomfactor)); // z2
-	stmt.bind(9, zoom);
-
-	bool result = false;
-	if (stmt.next())
-		result = true;
-	stmt.finalize();
-
-	return result;
-}
-
-void RasterSource::importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp, GenericRaster::Compression compression) {
-	auto buffer = RasterConverter::direct_encode(raster, compression);
-
-	int zoomfactor = 1 << zoom;
-
-	printf("Method %d, size of data: %ld -> %ld (%f)\n", (int) compression, raster->getDataSize(), buffer->size, (double) buffer->size / raster->getDataSize());
-
-	// Step 1: compress and write
-	size_t filenr = 0;
-
-	FILE *f = fopen(filename_data.c_str(), "a+b");
-	if (!f)
-		throw SourceException("Could not open data file");
-
-	if (fseek(f, 0, SEEK_END) != 0) {
-		fclose(f);
-		throw SourceException("tell failed");
-	}
-	long int fileoffset = ftell(f);
-	if (fileoffset < 0) {
-		fclose(f);
-		throw SourceException("tell failed");
-	}
-
-	//printf("writing to file starting at position %ld\n", fileoffset);
-	size_t written = fwrite(buffer->data, sizeof(unsigned char), buffer->size, f);
-
-	fclose(f);
-	if (written != buffer->size) {
-		throw SourceException("writing failed, disk full?");
-	}
-
-
-	// Step 2: insert into DB
-	SQLiteStatement stmt(db);
-
-	stmt.prepare("INSERT INTO rasters (channel, timestamp, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression)"
-		" VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
-
-	stmt.bind(1, channelid);
-	stmt.bind(2, timestamp);
-	stmt.bind(3, offx); // x1
-	stmt.bind(4, offy); // y1
-	stmt.bind(5, offz); // z1
-	stmt.bind(6, (int32_t) (offx+raster->width*zoomfactor)); // x2
-	stmt.bind(7, (int32_t) (offy+raster->height*zoomfactor)); // y2
-	stmt.bind(8, (int32_t) 0/*(offz+raster->depth*zoomfactor)*/); // z2
-	stmt.bind(9, zoom);
-	stmt.bind(10, (int32_t) filenr);
-	stmt.bind(11, (int64_t) fileoffset);
-	stmt.bind(12, (int64_t) buffer->size);
-	stmt.bind(13, compression);
-
-	stmt.exec();
 }
 
 
@@ -534,8 +364,11 @@ struct raster_transformed_blit {
 		int x2 = std::min(raster_dest->width, destx+raster_src->width);
 		int y2 = std::min(raster_dest->height, desty+raster_src->height);
 
-		if (x1 >= x2 || y1 >= y2)
-			throw MetadataException("transformedBlit without overlapping region");
+		if (x1 >= x2 || y1 >= y2) {
+			std::ostringstream msg;
+			msg << "transformedBlit without overlapping region: " << raster_src->width << "x" << raster_src->height << " blitted onto " << raster_dest->width << "x" << raster_dest->height << " at (" << destx << "," << desty << "), overlap (" << x1 << "," << y1 << ") -> (" << x2 << "," << y2 << ")";
+			throw ArgumentException(msg.str());
+		}
 
 		for (int y=y1;y<y2;y++) {
 			for (int x=x1;x<x2;x++) {
@@ -557,43 +390,16 @@ static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, 
 	callBinaryOperatorFunc<raster_transformed_blit>(dest, src, destx, desty, destz, offset, scale);
 }
 
-std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
+std::unique_ptr<GenericRaster> RasterDB::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
 	if (io_cost)
 		*io_cost = 0;
 
 	if (channelid < 0 || channelid >= channelcount)
-		throw SourceException("RasterSource::load: unknown channel");
+		throw SourceException("RasterDB::load: unknown channel");
 
-	// find the most recent raster at the requested timestamp
-	// TODO: maximal zulässige alter?
-	SQLiteStatement stmt_t(db);
-	stmt_t.prepare("SELECT timestamp FROM rasters WHERE channel = ? AND timestamp <= ? ORDER BY timestamp DESC limit 1");
-	stmt_t.bind(1, channelid);
-	stmt_t.bind(2, timestamp);
-	if (!stmt_t.next())
-		throw SourceException("No raster found for the given timestamp");
-
-	timestamp = stmt_t.getInt64(0);
-	stmt_t.finalize();
-
-	// find the best available zoom level
-	SQLiteStatement stmt_z(db);
-	stmt_z.prepare("SELECT MAX(zoom) FROM rasters WHERE channel = ? AND timestamp = ? AND zoom <= ?");
-	stmt_z.bind(1, channelid);
-	stmt_z.bind(2, timestamp);
-	stmt_z.bind(3, zoom);
-
-	int max_zoom = -1;
-	if (stmt_z.next())
-		max_zoom = stmt_z.getInt(0);
-	stmt_z.finalize();
-
-	if (max_zoom < 0)
-		throw SourceException("No zoom level found for the given channel and timestamp");
-
-	zoom = std::min(zoom, max_zoom);
+	auto rasterid = backend->getClosestRaster(channelid, timestamp);
+	zoom = backend->getBestZoom(rasterid, zoom);
 	int zoomfactor = 1 << zoom;
-
 
 	// Figure out the CRS after cutting and zooming
 	auto width = (x2-x1) >> zoom;
@@ -610,7 +416,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 	/*
 	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom)) {
 		std::stringstream ss;
-		ss << "RasterSource::load, fractions of a pixel requested: (x: " << x2 << " <-> " << (x1 + (width<<zoom)) << " y: " << y2 << " <-> " << (y1 + (height<<zoom));
+		ss << "RasterDB::load, fractions of a pixel requested: (x: " << x2 << " <-> " << (x1 + (width<<zoom)) << " y: " << y2 << " <-> " << (y1 + (height<<zoom));
 		throw SourceException(ss.str());
 	}
 	*/
@@ -620,25 +426,14 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 
 	if (x1 > x2 || y1 > y2) {
 		std::stringstream ss;
-		ss << "RasterSource::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords swapped";
+		ss << "RasterDB::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords swapped";
 		throw SourceException(ss.str());
 	}
 
-	// find all overlapping rasters in DB
-	SQLiteStatement stmt(db);
-	stmt.prepare("SELECT x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM rasters"
-		" WHERE channel = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 >= ? AND y2 >= ? AND timestamp = ? ORDER BY filenr ASC, fileoffset ASC");
-
-	stmt.bind(1, channelid);
-	stmt.bind(2, zoom);
-	stmt.bind(3, x2);
-	stmt.bind(4, y2);
-	stmt.bind(5, x1);
-	stmt.bind(6, y1);
-	stmt.bind(7, timestamp);
-
 	decltype(GenericRaster::md_value) result_md_value;
 	decltype(GenericRaster::md_string) result_md_string;
+	backend->readAttributes(rasterid, result_md_string, result_md_value);
+	/*
 	SQLiteStatement stmt_md(db);
 	stmt_md.prepare("SELECT isstring, key, value FROM metadata"
 		" WHERE channel = ? AND timestamp = ?");
@@ -655,50 +450,33 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 		else
 			result_md_string.set(key, std::string(value));
 	}
-
+	*/
 
 	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_md_value) : channels[channelid]->dd;
 	auto result = GenericRaster::create(transformed_dd, resultstref, width, height);
 	result->clear(transformed_dd.no_data);
 
 	// Load all overlapping parts and blit them onto the empty raster
-	int tiles_found = 0;
-	while (stmt.next()) {
-		int r_x1 = stmt.getInt(0);
-		int r_y1 = stmt.getInt(1);
-		//int r_z1 = stmt.getInt(2);
-		int r_x2 = stmt.getInt(3);
-		int r_y2 = stmt.getInt(4);
-		//int r_z2 = stmt.getInt(5);
+	auto tiles = backend->enumerateTiles(channelid, rasterid, x1, y1, x2, y2, zoom);
+	if (tiles.size() <= 0)
+		throw SourceException("RasterDB::load(): No matching tiles found in DB");
 
-		int fileid = stmt.getInt(6);
-		size_t fileoffset = stmt.getInt64(7);
-		size_t filebytes = stmt.getInt64(8);
-		GenericRaster::Compression method = (GenericRaster::Compression) stmt.getInt(9);
+	for (auto &tile : tiles) {
+		auto tile_buffer = backend->readTile(tile);
 
-		//fprintf(stderr, "loading raster from %d,%d, blitting to %d, %d\n", r_x1, r_y1, x1, y1);
-		uint32_t tile_width = (r_x2-r_x1) >> zoom;
-		uint32_t tile_height = (r_y2-r_y1) >> zoom;
-		uint32_t tile_depth = 0;
-		auto tile = loadTile(channelid, fileid, fileoffset, filebytes, tile_width, tile_height, tile_depth, method);
+		auto tile_raster = RasterConverter::direct_decode(*tile_buffer, channels[channelid]->dd, SpatioTemporalReference::unreferenced(), tile.width, tile.height, tile.depth, tile.compression);
 		if (io_cost)
-			*io_cost += filebytes;
+			*io_cost += tile.size;
 
 		if (transform && channels[channelid]->hasTransform()) {
 			transformedBlit(
-				result.get(), tile.get(),
-				(r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
+				result.get(), tile_raster.get(),
+				(tile.x1-x1) >> zoom, (tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
 				channels[channelid]->getOffset(result_md_value), channels[channelid]->getScale(result_md_value));
 		}
 		else
-			result->blit(tile.get(), (r_x1-x1) >> zoom, (r_y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
-		tiles_found++;
+			result->blit(tile_raster.get(), ((int) tile.x1-x1) >> zoom, ((int) tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
 	}
-
-	stmt.finalize();
-
-	if (tiles_found == 0)
-		throw SourceException("RasterSource::load(): No matching tiles found in DB");
 
 	if (flipx || flipy) {
 		result = result->flip(flipx, flipy);
@@ -711,52 +489,7 @@ std::unique_ptr<GenericRaster> RasterSource::load(int channelid, time_t timestam
 }
 
 
-std::unique_ptr<GenericRaster> RasterSource::loadTile(int channelid, int fileid, size_t offset, size_t size, uint32_t width, uint32_t height, uint32_t depth, GenericRaster::Compression method) {
-	if (channelid < 0 || channelid >= channelcount)
-		throw SourceException("RasterSource::load: unknown channel");
-
-	//printf("loading raster from file %d offset %ld length %ld\n", fileid, offset, size);
-
-#define USE_POSIX_IO true
-#if USE_POSIX_IO
-	int f = open(filename_data.c_str(), O_RDONLY | O_CLOEXEC); // | O_NOATIME
-	if (f < 0)
-		throw SourceException("Could not open data file");
-
-	ByteBuffer buffer(size);
-	if (lseek(f, (off_t) offset, SEEK_SET) != (off_t) offset) {
-		close(f);
-		throw SourceException("seek failed");
-	}
-
-	if (read(f, buffer.data, size) != (ssize_t) size) {
-		close(f);
-		throw SourceException("read failed");
-	}
-	close(f);
-#else
-	FILE *f = fopen(filename_data.c_str(), "rb");
-	if (!f)
-		throw SourceException("Could not open data file");
-
-	if (fseek(f, offset, SEEK_SET) != 0) {
-		fclose(f);
-		throw SourceException("seek failed");
-	}
-
-	ByteBuffer buffer(size);
-	if (fread(buffer.data, sizeof(unsigned char), size, f) != size) {
-		fclose(f);
-		throw SourceException("read failed");
-	}
-	fclose(f);
-#endif
-
-	// decode / decompress
-	return RasterConverter::direct_decode(buffer, channels[channelid]->dd, SpatioTemporalReference::unreferenced(), width, height, depth, method);
-}
-
-std::unique_ptr<GenericRaster> RasterSource::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
+std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
 	if (crs->epsg != rect.epsg) {
 		std::stringstream msg;
 		msg << "SourceOperator: wrong epsg requested. Source is " << (int) crs->epsg << ", requested " << (int) rect.epsg;
@@ -794,12 +527,11 @@ std::unique_ptr<GenericRaster> RasterSource::query(const QueryRectangle &rect, Q
 
 
 
-std::unordered_map<std::string, RasterSource *> RasterSourceManager::map;
-std::mutex RasterSourceManager::mutex;
+static std::unordered_map<std::string, std::weak_ptr<RasterDB> > RasterDB_map;
+static std::mutex RasterDB_map_mutex;
 
-RasterSource *RasterSourceManager::open(const char *filename, bool writeable)
-{
-	std::lock_guard<std::mutex> guard(mutex);
+std::shared_ptr<RasterDB> RasterDB::open(const char *filename, bool writeable) {
+	std::lock_guard<std::mutex> guard(RasterDB_map_mutex);
 
 	// To make sure each source is only accessed by a single path, resolve all symlinks
 	char filename_clean[PATH_MAX];
@@ -811,31 +543,22 @@ RasterSource *RasterSourceManager::open(const char *filename, bool writeable)
 
 	std::string path(filename_clean);
 
-	RasterSource *source = nullptr;
-	if (map.count(path) == 1) {
-		source = map.at(path);
-	}
-	else {
-		source = new RasterSource(path.c_str(), writeable);
-		map[path] = source;
+	if (RasterDB_map.count(path) == 1) {
+		auto &weak_ptr = RasterDB_map.at(path);
+		auto shared_ptr = weak_ptr.lock();
+		if (shared_ptr) {
+			if (writeable && !shared_ptr->isWriteable())
+				throw new SourceException("Cannot re-open source as read/write (TODO?)");
+			return shared_ptr;
+		}
+		RasterDB_map.erase(path);
 	}
 
-	if (writeable && !source->isWriteable())
+	auto shared_ptr = std::make_shared<RasterDB>(path.c_str(), writeable);
+	RasterDB_map[path] = std::weak_ptr<RasterDB>(shared_ptr);
+
+	if (writeable && !shared_ptr->isWriteable())
 		throw new SourceException("Cannot re-open source as read/write (TODO?)");
-
-	source->refcount++;
-	return source;
+	return shared_ptr;
 }
-
-void RasterSourceManager::close(RasterSource *source)
-{
-	if (!source)
-		return;
-	std::lock_guard<std::mutex> guard(mutex);
-
-	source->refcount--;
-	if (source->refcount <= 0)
-		delete source;
-}
-
 

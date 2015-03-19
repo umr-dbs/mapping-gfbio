@@ -19,6 +19,9 @@ class RasterMetaDataToPoints: public GenericOperator {
 
 		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
 
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
+
 	private:
 		std::vector<std::string> names;
 };
@@ -41,6 +44,15 @@ RasterMetaDataToPoints::RasterMetaDataToPoints(int sourcecounts[], GenericOperat
 RasterMetaDataToPoints::~RasterMetaDataToPoints() {
 }
 REGISTER_OPERATOR(RasterMetaDataToPoints, "raster_metadata_to_points");
+
+void RasterMetaDataToPoints::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"parameterNames\":[";
+	for(auto& name : names) {
+		stream << "\"" << name << "\",";
+	}
+	stream.seekp(((long) stream.tellp()) - 1); // remove last comma
+	stream << "]";
+}
 
 template<typename T>
 struct PointDataEnhancement {

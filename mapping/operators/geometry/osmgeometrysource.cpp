@@ -15,6 +15,8 @@ class OSMGeometrySourceOperator : public GenericOperator {
 		virtual ~OSMGeometrySourceOperator();
 
 		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		std::string connectionstring;
 		std::string querystring;
@@ -37,6 +39,9 @@ OSMGeometrySourceOperator::~OSMGeometrySourceOperator() {
 }
 REGISTER_OPERATOR(OSMGeometrySourceOperator, "osmgeometrysource");
 
+void OSMGeometrySourceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"querystring\":\"" << querystring << "\"";
+}
 
 std::unique_ptr<GenericGeometry> OSMGeometrySourceOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
 	fprintf(stderr,"MMStart");

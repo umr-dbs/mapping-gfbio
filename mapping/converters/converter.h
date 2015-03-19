@@ -22,10 +22,17 @@ class RasterConverter {
 	public:
 		virtual ~RasterConverter() { }
 
-		static std::unique_ptr<ByteBuffer> direct_encode(GenericRaster *raster, GenericRaster::Compression method);
-		static std::unique_ptr<GenericRaster> direct_decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth, GenericRaster::Compression method);
+		enum Compression {
+			UNCOMPRESSED = 1,
+			BZIP = 2,
+			PREDICTED = 3,
+			GZIP = 4
+		};
 
-		static std::unique_ptr<RasterConverter> getConverter(GenericRaster::Compression method);
+		static std::unique_ptr<ByteBuffer> direct_encode(GenericRaster *raster, RasterConverter::Compression method);
+		static std::unique_ptr<GenericRaster> direct_decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth, RasterConverter::Compression method);
+
+		static std::unique_ptr<RasterConverter> getConverter(RasterConverter::Compression method);
 
 		virtual std::unique_ptr<ByteBuffer> encode(GenericRaster *raster) = 0;
 		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth) = 0;

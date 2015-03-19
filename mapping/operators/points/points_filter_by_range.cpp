@@ -8,16 +8,20 @@
 #include <cmath>
 
 class PointsFilterByRangeOperator: public GenericOperator {
-private:
-	std::string name;
-	bool includeNoData;
-	double rangeMin, rangeMax;
-public:
-	PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
-	virtual ~PointsFilterByRangeOperator();
+	public:
+		PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
+		virtual ~PointsFilterByRangeOperator();
 
-	virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
-};
+		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
+
+	private:
+		std::string name;
+		bool includeNoData;
+		double rangeMin, rangeMax;
+	};
 
 PointsFilterByRangeOperator::PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
@@ -31,6 +35,13 @@ PointsFilterByRangeOperator::PointsFilterByRangeOperator(int sourcecounts[], Gen
 PointsFilterByRangeOperator::~PointsFilterByRangeOperator() {
 }
 REGISTER_OPERATOR(PointsFilterByRangeOperator, "points_filter_by_range");
+
+void PointsFilterByRangeOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"attributeName\":\"" << name << "\","
+			<< "\"includeNoData\":" << includeNoData
+			<< "\"rangeMin\"" << rangeMin
+			<< "\"rangeMax\"" << rangeMax;
+}
 
 std::unique_ptr<PointCollection> PointsFilterByRangeOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points = getPointsFromSource(0, rect, profiler);

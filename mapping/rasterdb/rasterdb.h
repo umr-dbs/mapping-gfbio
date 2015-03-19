@@ -3,13 +3,13 @@
 
 #include <stdint.h>
 #include <exception>
-#include <unordered_map>
-#include <mutex>
+#include <memory>
 
 #include "datatypes/raster.h"
-#include "util/sqlite.h"
+#include "converters/converter.h"
 
-class RasterSourceChannel;
+class RasterDBBackend;
+class RasterDBChannel;
 class QueryRectangle;
 class QueryProfiler;
 
@@ -62,7 +62,7 @@ class GDALCRS {
 		 */
 
 	private:
-		// These are only meant to be used in RasterSource, thus private
+		// These are only meant to be used in RasterDB, thus private
 
 		// These return the world coordinates of the top left corner of the pixel.
 		double PixelToWorldX(int px) const { return origin[0] + px * scale[0]; }
@@ -76,64 +76,42 @@ class GDALCRS {
 		double WorldToPixelZ(double wz) const { return (wz - origin[2]) / scale[2]; }
 
 
-		friend class RasterSource;
+		friend class RasterDB;
 		friend std::ostream& operator<< (std::ostream &out, const GDALCRS &crs);
 };
 
 
-class RasterSource {
+class RasterDB {
 	public:
 		static const bool READ_ONLY = false;
 		static const bool READ_WRITE = true;
-	private: // Instantiation only by RasterSourceManager
-		RasterSource(const char *filename, bool writeable = RasterSource::READ_ONLY);
-		virtual ~RasterSource();
-		friend class RasterSourceManager;
+
+		// Each RasterDB has a lock on its files, so no two open objects should refer to the same source.
+		static std::shared_ptr<RasterDB> open(const char *filename, bool writeable = RasterDB::READ_ONLY);
+
+		// Instantiation should only be done by ::open()
+		// These are public anyway, because they're instantiated by std::make_shared, which is difficult to friend.
+		RasterDB(const char *filename, bool writeable = RasterDB::READ_ONLY);
+		virtual ~RasterDB();
 
 	public:
-		void import(const char *filename, int sourcechannel, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
-
-		std::unique_ptr<GenericRaster> load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom = 0, bool transform = true, size_t *io_cost = nullptr);
+		void import(const char *filename, int sourcechannel, int channelid, time_t timestamp, RasterConverter::Compression compression = RasterConverter::Compression::GZIP);
 		std::unique_ptr<GenericRaster> query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform = true);
 
 		bool isWriteable() const { return writeable; }
 
 	private:
-		void import(GenericRaster *raster, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::GZIP);
-
-		bool hasTile(uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp);
-		void importTile(GenericRaster *raster, int offx, int offy, int offz, int zoom, int channelid, time_t timestamp, GenericRaster::Compression compression = GenericRaster::Compression::PREDICTED);
-		std::unique_ptr<GenericRaster> loadTile(int channelid, int fileid, size_t offset, size_t size, uint32_t width, uint32_t height, uint32_t depth, GenericRaster::Compression method);
+		void import(GenericRaster *raster, int channelid, time_t timestamp, RasterConverter::Compression compression = RasterConverter::Compression::GZIP);
+		std::unique_ptr<GenericRaster> load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom = 0, bool transform = true, size_t *io_cost = nullptr);
 
 		void init();
 		void cleanup();
 
-		int lockedfile;
 		bool writeable;
-		std::string filename_json;
-		std::string filename_data;
-		std::string filename_db;
+		std::unique_ptr<RasterDBBackend> backend;
 		GDALCRS *crs;
 		int channelcount;
-		RasterSourceChannel **channels;
-		SQLite db;
-		int refcount;
-};
-
-
-/*
- * Each RasterSource has a lock on its files, so no two open objects should refer to the same source.
- * Constructing and Destructing RasterSources through the manager solves this.
- */
-class RasterSourceManager {
-	public:
-		static RasterSource *open(const char *filename, bool writeable = RasterSource::READ_ONLY);
-		static void close(RasterSource *source);
-
-	private:
-		static std::unordered_map<std::string, RasterSource *> map;
-		static std::mutex mutex;
-		RasterSourceManager();
+		RasterDBChannel **channels;
 };
 
 #endif

@@ -29,7 +29,6 @@ PointsToClusterRasterOperator::~PointsToClusterRasterOperator() {
 }
 REGISTER_OPERATOR(PointsToClusterRasterOperator, "points2cluster_raster");
 
-
 std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 
 	const int MAX = 255;

@@ -27,7 +27,6 @@ HistogramOperator::~HistogramOperator() {
 }
 REGISTER_OPERATOR(HistogramOperator, "histogram");
 
-
 template<typename T>
 struct histogram{
 	static std::unique_ptr<GenericPlot> execute(Raster2D<T> *raster) {

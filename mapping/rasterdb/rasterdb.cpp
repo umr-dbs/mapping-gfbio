@@ -433,24 +433,6 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, time_t timestamp, i
 	decltype(GenericRaster::md_value) result_md_value;
 	decltype(GenericRaster::md_string) result_md_string;
 	backend->readAttributes(rasterid, result_md_string, result_md_value);
-	/*
-	SQLiteStatement stmt_md(db);
-	stmt_md.prepare("SELECT isstring, key, value FROM metadata"
-		" WHERE channel = ? AND timestamp = ?");
-	stmt_md.bind(1, channelid);
-	stmt_md.bind(2, timestamp);
-	while (stmt_md.next()) {
-		int isstring = stmt_md.getInt(0);
-		std::string key(stmt_md.getString(1));
-		const char *value = stmt_md.getString(2);
-		if (isstring == 0) {
-			double dvalue = std::strtod(value, nullptr);
-			result_md_value.set(key, dvalue);
-		}
-		else
-			result_md_string.set(key, std::string(value));
-	}
-	*/
 
 	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_md_value) : channels[channelid]->dd;
 	auto result = GenericRaster::create(transformed_dd, resultstref, width, height);

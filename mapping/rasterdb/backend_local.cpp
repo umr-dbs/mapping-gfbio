@@ -122,6 +122,15 @@ std::string LocalRasterDBBackend::readJSON() {
 
 RasterDBBackend::rasterid LocalRasterDBBackend::createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value) {
 	SQLiteStatement stmt(db);
+	stmt.prepare("SELECT id FROM rasters WHERE channel = ? AND ABS(time_start - ?) < 0.001 AND ABS(time_end - ?) < 0.001");
+	stmt.bind(1, channel);
+	stmt.bind(2, time_start);
+	stmt.bind(3, time_end);
+	if (stmt.next()) {
+		std::cerr << "createRaster: returning existing raster\n";
+		return stmt.getInt64(0);
+	}
+	stmt.finalize();
 
 	stmt.prepare("INSERT INTO rasters (channel, time_start, time_end) VALUES (?,?,?)");
 	stmt.bind(1, channel);
@@ -147,7 +156,7 @@ RasterDBBackend::rasterid LocalRasterDBBackend::createRaster(int channel, double
 		stmt_attr.exec();
 		printf("inserting string attribute: %s = %s\n", key.c_str(), value.c_str());
 	}
-	stmt_attr.bind(3, 0); // isstring
+	stmt_attr.bind(2, 0); // isstring
 
 	for (auto attr : md_value) {
 		auto key = attr.first;

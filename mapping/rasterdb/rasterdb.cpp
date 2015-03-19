@@ -259,7 +259,7 @@ void RasterDB::cleanup() {
 
 
 
-void RasterDB::import(const char *filename, int sourcechannel, int channelid, time_t timestamp, RasterConverter::Compression compression) {
+void RasterDB::import(const char *filename, int sourcechannel, int channelid, double time_start, double time_end, RasterConverter::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	bool raster_flipx, raster_flipy;
@@ -277,11 +277,11 @@ void RasterDB::import(const char *filename, int sourcechannel, int channelid, ti
 		raster = raster->flip(need_flipx, need_flipy);
 	}
 
-	import(raster.get(), channelid, timestamp, compression);
+	import(raster.get(), channelid, time_start, time_end, compression);
 }
 
 
-void RasterDB::import(GenericRaster *raster, int channelid, time_t timestamp, RasterConverter::Compression compression) {
+void RasterDB::import(GenericRaster *raster, int channelid, double time_start, double time_end, RasterConverter::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	if (channelid < 0 || channelid >= channelcount)
@@ -309,7 +309,7 @@ void RasterDB::import(GenericRaster *raster, int channelid, time_t timestamp, Ra
 */
 	uint32_t tilesize = DEFAULT_TILE_SIZE;
 
-	auto rasterid = backend->createRaster(channelid, timestamp, timestamp+1, raster->md_string, raster->md_value);
+	auto rasterid = backend->createRaster(channelid, time_start, time_end, raster->md_string, raster->md_value);
 
 	for (int zoom=0;;zoom++) {
 		int zoomfactor = 1 << zoom;
@@ -390,14 +390,15 @@ static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, 
 	callBinaryOperatorFunc<raster_transformed_blit>(dest, src, destx, desty, destz, offset, scale);
 }
 
-std::unique_ptr<GenericRaster> RasterDB::load(int channelid, time_t timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
+std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
 	if (io_cost)
 		*io_cost = 0;
 
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterDB::load: unknown channel");
 
-	auto rasterid = backend->getClosestRaster(channelid, timestamp);
+	auto rasterdescription = backend->getClosestRaster(channelid, timestamp);
+	auto rasterid = rasterdescription.rasterid;
 	zoom = backend->getBestZoom(rasterid, zoom);
 	int zoomfactor = 1 << zoom;
 
@@ -411,7 +412,7 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, time_t timestamp, i
 	GDALCRS zoomed_and_cut_crs(crs->epsg, width, height, origin_x, origin_y, scale_x, scale_y);
 
 	bool flipx, flipy;
-	auto resultstref = zoomed_and_cut_crs.toSpatioTemporalReference(flipx, flipy, TIMETYPE_UNIX, timestamp, timestamp+1);
+	auto resultstref = zoomed_and_cut_crs.toSpatioTemporalReference(flipx, flipy, TIMETYPE_UNIX, rasterdescription.time_start, rasterdescription.time_end);
 
 	/*
 	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom)) {

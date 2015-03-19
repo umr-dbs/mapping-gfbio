@@ -130,9 +130,9 @@ static void loadsource(int argc, char *argv[]) {
 	}
 }
 
-// import <sourcename> <filename> <filechannel> <sourcechannel> <timestamp>
+// import <sourcename> <filename> <filechannel> <sourcechannel> <time_start> <duration> [<compression>]
 static void import(int argc, char *argv[]) {
-	if (argc < 7) {
+	if (argc < 8) {
 		usage();
 	}
 	try {
@@ -140,17 +140,18 @@ static void import(int argc, char *argv[]) {
 		const char *filename = argv[3];
 		int sourcechannel = atoi(argv[4]);
 		int channelid = atoi(argv[5]);
-		int timestamp = atoi(argv[6]);
-		RasterConverter::Compression compression = RasterConverter::Compression::BZIP;
-		if (argc > 7) {
-			if (argv[7][0] == 'P')
+		double time_start = atof(argv[6]);
+		double duration = atof(argv[7]);
+		RasterConverter::Compression compression = RasterConverter::Compression::GZIP;
+		if (argc > 8) {
+			if (argv[8][0] == 'P')
 				compression = RasterConverter::Compression::PREDICTED;
-			else if (argv[7][0] == 'G')
+			else if (argv[8][0] == 'G')
 				compression = RasterConverter::Compression::GZIP;
-			else if (argv[7][0] == 'R')
+			else if (argv[8][0] == 'R')
 				compression = RasterConverter::Compression::UNCOMPRESSED;
 		}
-		db->import(filename, sourcechannel, channelid, timestamp, compression);
+		db->import(filename, sourcechannel, channelid, time_start, time_start+duration, compression);
 	}
 	catch (std::exception &e) {
 		printf("Failure: %s\n", e.what());

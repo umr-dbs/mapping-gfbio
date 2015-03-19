@@ -70,43 +70,45 @@ void LocalRasterDBBackend::init() {
 	/*
 	 * Step #2: open the .db file and initialize it if needed
 	 */
-	db.open(filename_db.c_str());
+	db.open(filename_db.c_str(), !writeable);
 
-	db.exec("CREATE TABLE IF NOT EXISTS rasters("
-		" id INTEGER PRIMARY KEY,"
-		" channel INTEGER NOT NULL,"
-		" time_start REAL NOT NULL,"
-		" time_end REAL NOT NULL"
-		")"
-	);
-	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_ct ON rasters (channel, time_start)");
+	if (writeable) {
+		db.exec("CREATE TABLE IF NOT EXISTS rasters("
+			" id INTEGER PRIMARY KEY,"
+			" channel INTEGER NOT NULL,"
+			" time_start REAL NOT NULL,"
+			" time_end REAL NOT NULL"
+			")"
+		);
+		db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_ct ON rasters (channel, time_start)");
 
-	db.exec("CREATE TABLE IF NOT EXISTS tiles("
-		" id INTEGER PRIMARY KEY,"
-		" rasterid INTEGER NOT NULL,"
-		" x1 INTEGER NOT NULL,"
-		" y1 INTEGER NOT NULL,"
-		" z1 INTERGET NOT NULL,"
-		" x2 INTEGER NOT NULL,"
-		" y2 INTEGER NOT NULL,"
-		" z2 INTEGER NOT NULL,"
-		" zoom INTEGER NOT NULL,"
-		" filenr INTEGER NOT NULL,"
-		" fileoffset INTEGER NOT NULL,"
-		" filebytes INTEGER NOT NULL,"
-		" compression INTEGER NOT NULL"
-		")"
-	);
-	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rxyzz ON tiles (rasterid, x1, y1, z1, zoom)");
+		db.exec("CREATE TABLE IF NOT EXISTS tiles("
+			" id INTEGER PRIMARY KEY,"
+			" rasterid INTEGER NOT NULL,"
+			" x1 INTEGER NOT NULL,"
+			" y1 INTEGER NOT NULL,"
+			" z1 INTERGET NOT NULL,"
+			" x2 INTEGER NOT NULL,"
+			" y2 INTEGER NOT NULL,"
+			" z2 INTEGER NOT NULL,"
+			" zoom INTEGER NOT NULL,"
+			" filenr INTEGER NOT NULL,"
+			" fileoffset INTEGER NOT NULL,"
+			" filebytes INTEGER NOT NULL,"
+			" compression INTEGER NOT NULL"
+			")"
+		);
+		db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rxyzz ON tiles (rasterid, x1, y1, z1, zoom)");
 
-	db.exec("CREATE TABLE IF NOT EXISTS attributes("
-		" rasterid INTEGER NOT NULL,"
-		" isstring INTEGER NOT NULL,"
-		" key STRING NOT NULL,"
-		" value STRING NOT NULL"
-		")"
-	);
-	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rik ON attributes (rasterid, isstring, key)");
+		db.exec("CREATE TABLE IF NOT EXISTS attributes("
+			" rasterid INTEGER NOT NULL,"
+			" isstring INTEGER NOT NULL,"
+			" key STRING NOT NULL,"
+			" value STRING NOT NULL"
+			")"
+		);
+		db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rik ON attributes (rasterid, isstring, key)");
+	}
 }
 
 void LocalRasterDBBackend::cleanup() {
@@ -220,7 +222,7 @@ void LocalRasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint
 	stmt.exec();
 }
 
-RasterDBBackend::rasterid LocalRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
+RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
 	// find a raster that's valid during the given timestamp
 	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT id FROM rasters WHERE channel = ? AND time_start <= ? AND time_end > ? ORDER BY time_start DESC limit 1");
@@ -231,8 +233,10 @@ RasterDBBackend::rasterid LocalRasterDBBackend::getClosestRaster(int channelid, 
 		throw SourceException("No raster found for the given timestamp");
 
 	auto rasterid = stmt.getInt64(0);
+	double time_start = stmt.getDouble(1);
+	double time_end = stmt.getDouble(2);
 	stmt.finalize();
-	return rasterid;
+	return RasterDescription{rasterid, time_start, time_end};
 }
 
 void LocalRasterDBBackend::readAttributes(rasterid rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value) {

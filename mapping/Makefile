@@ -153,109 +153,109 @@ ${EXERSERVER}:	${OBJ_RSERVER}
 msg9_datasource:	${EXE}
 	rm -f datasources/msg9_geos.dat datasources/msg9_geos.db
 	#./${EXE} createsource 62866 ${DATASET_C0} ${DATASET_C1} ${DATASET_C2} ${DATASET_C3} ${DATASET_C4} ${DATASET_C5} ${DATASET_C6} ${DATASET_C7} ${DATASET_C8} ${DATASET_C9} ${DATASET_C10} >datasources/msat2.json
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C0} 1 0 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C1} 1 1 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C2} 1 2 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C3} 1 3 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C4} 1 4 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C5} 1 5 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C6} 1 6 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C7} 1 7 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C8} 1 8 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C9} 1 9 1275818400 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET_C10} 1 10 1275818400 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C0} 1 0 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C1} 1 1 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C2} 1 2 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C3} 1 3 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C4} 1 4 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C5} 1 5 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C6} 1 6 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C7} 1 7 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C8} 1 8 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C9} 1 9 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET_C10} 1 10 1275818400 900 RAW
 
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C0} 1 0 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C1} 1 1 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C2} 1 2 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C3} 1 3 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C4} 1 4 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C5} 1 5 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C6} 1 6 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C7} 1 7 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C8} 1 8 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C9} 1 9 1275840000 RAW
-	./${EXE} import datasources/msg9_geos.json ${DATASET2_C10} 1 10 1275840000 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C0} 1 0 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C1} 1 1 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C2} 1 2 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C3} 1 3 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C4} 1 4 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C5} 1 5 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C6} 1 6 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C7} 1 7 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C8} 1 8 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C9} 1 9 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos.json ${DATASET2_C10} 1 10 1275840000 900 RAW
 
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-200811171200-C_ 1 0 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-200811171200-C_ 1 1 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-200811171200-C_ 1 2 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_039___-000001___-200811171200-C_ 1 3 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_062___-000001___-200811171200-C_ 1 4 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_073___-000001___-200811171200-C_ 1 5 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_087___-000001___-200811171200-C_ 1 6 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_097___-000001___-200811171200-C_ 1 7 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-200811171200-C_ 1 8 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-200811171200-C_ 1 9 1226919600 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-200811171200-C_ 1 10 1226919600 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-200811171200-C_ 1 0 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-200811171200-C_ 1 1 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-200811171200-C_ 1 2 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_039___-000001___-200811171200-C_ 1 3 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_062___-000001___-200811171200-C_ 1 4 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_073___-000001___-200811171200-C_ 1 5 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_087___-000001___-200811171200-C_ 1 6 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_097___-000001___-200811171200-C_ 1 7 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-200811171200-C_ 1 8 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-200811171200-C_ 1 9 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-200811171200-C_ 1 10 1226919600 900 RAW
 
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-201101171215-C_ 1 0 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-201101171215-C_ 1 1 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-201101171215-C_ 1 2 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_039___-000001___-201101171215-C_ 1 3 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_062___-000001___-201101171215-C_ 1 4 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_073___-000001___-201101171215-C_ 1 5 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_087___-000001___-201101171215-C_ 1 6 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_097___-000001___-201101171215-C_ 1 7 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-201101171215-C_ 1 8 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-201101171215-C_ 1 9 1295262900 RAW
-	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-201101171215-C_ 1 10 1295262900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-201101171215-C_ 1 0 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-201101171215-C_ 1 1 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_016___-000001___-201101171215-C_ 1 2 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_039___-000001___-201101171215-C_ 1 3 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_062___-000001___-201101171215-C_ 1 4 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-WV_073___-000001___-201101171215-C_ 1 5 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_087___-000001___-201101171215-C_ 1 6 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_097___-000001___-201101171215-C_ 1 7 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_108___-000001___-201101171215-C_ 1 8 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_120___-000001___-201101171215-C_ 1 9 1295262900 900 RAW
+	./${EXE} import datasources/msg9_geos.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-IR_134___-000001___-201101171215-C_ 1 10 1295262900 900 RAW
 
 msg9_hrvdatasource:	${EXE}
 	rm -f datasources/msg9_geos_hrv.dat datasources/msg9_geos_hrv.db
-	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET_HRV} 1 0 1275818400 RAW
-	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET2_HRV} 1 0 1275840000 RAW
-	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-200811171200-C_ 1 0 1226919600 RAW
-	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-201101171215-C_ 1 0 1295262900 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET_HRV} 1 0 1275818400 900 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json ${DATASET2_HRV} 1 0 1275840000 900 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-200811171200-C_ 1 0 1226919600 900 RAW
+	./${EXE} import datasources/msg9_geos_hrv.json datasources/raw_data/msat/H-000-MSG2__-MSG2________-HRV______-000001___-201101171215-C_ 1 0 1295262900 900 RAW
 
 
 worldclimdatasource:	${EXE}
 	rm -f datasources/worldclim*.dat datasources/worldclim*.db
-	./${EXE} import datasources/worldclim.json data/worldclim/tmin_1.bil 1 0 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/tmax_1.bil 1 1 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/tmean_1.bil 1 2 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/prec_1.bil 1 3 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/alt.bil 1 4 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_1.bil 1 5 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_2.bil 1 6 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_3.bil 1 7 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_4.bil 1 8 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_5.bil 1 9 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_6.bil 1 10 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_7.bil 1 11 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_8.bil 1 12 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_9.bil 1 13 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_10.bil 1 14 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_11.bil 1 15 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_12.bil 1 16 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_13.bil 1 17 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_14.bil 1 18 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_15.bil 1 19 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_16.bil 1 20 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_17.bil 1 21 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_18.bil 1 22 42 GZIP
-	./${EXE} import datasources/worldclim.json data/worldclim/bio_19.bil 1 23 42 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/tmin_1.bil 1 0 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/tmax_1.bil 1 1 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/tmean_1.bil 1 2 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/prec_1.bil 1 3 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/alt.bil 1 4 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_1.bil 1 5 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_2.bil 1 6 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_3.bil 1 7 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_4.bil 1 8 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_5.bil 1 9 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_6.bil 1 10 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_7.bil 1 11 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_8.bil 1 12 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_9.bil 1 13 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_10.bil 1 14 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_11.bil 1 15 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_12.bil 1 16 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_13.bil 1 17 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_14.bil 1 18 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_15.bil 1 19 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_16.bil 1 20 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_17.bil 1 21 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_18.bil 1 22 0 2000000000 GZIP
+	./${EXE} import datasources/worldclim.json data/worldclim/bio_19.bil 1 23 0 2000000000 GZIP
 
 srtmdatasource:	${EXE}
 	rm -f datasources/srtm.dat datasources/srtm.db
-	./${EXE} import datasources/srtm.json data/srtm/srtm_all_index.out 1 0 42 GZIP
+	./${EXE} import datasources/srtm.json data/srtm/srtm_all_index.out 1 0 0 2000000000 GZIP
 	
 glc2000_global_datasource:	${EXE}
 	rm -f datasources/glc2000_global.dat datasources/glc2000_global.db
-	./${EXE} import datasources/glc2000_global.json datasources/raw_data/glc2000_global/glc2000_v1_1.bil 1 0 42 GZIP
+	./${EXE} import datasources/glc2000_global.json datasources/raw_data/glc2000_global/glc2000_v1_1.bil 1 0 0 2000000000 GZIP
 	
 modis_wcf:
 	rm -f datasources/modis_vcf*.dat datasources/modis_vcf*.db
-	./${EXE} import datasources/modis_vcf.json datasources/raw_data/modis_vcf/MOD44B_V5_TRE.2006.all.tif 1 0 42 GZIP
+	./${EXE} import datasources/modis_vcf.json datasources/raw_data/modis_vcf/MOD44B_V5_TRE.2006.all.tif 1 0 0 2000000000 GZIP
 	
 btw2015_paper_demo_datasource:	${EXE}
 	rm -f datasources/btw2015_paper_demo*.dat datasources/btw2015_paper_demo*.db
-	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_12_cut.tif 1 0 42 GZIP
-	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_1_cut.tif 1 1 42 GZIP
-	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_12_cut.tif 1 2 42 GZIP
-	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_1_cut.tif 1 3 42 GZIP
-	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/alt_cut.tif 1 4 42 GZIP
-	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/glc2000_cut.tif 1 5 42 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_12_cut.tif 1 0 0 2000000000 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/prec_1_cut.tif 1 1 0 2000000000 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_12_cut.tif 1 2 0 2000000000 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/tmean_1_cut.tif 1 3 0 2000000000 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/alt_cut.tif 1 4 0 2000000000 GZIP
+	./${EXE} import datasources/btw2015_paper_demo.json datasources/raw_data/btw2015_paper_demo/glc2000_cut.tif 1 5 0 2000000000 GZIP
 	
 test:
 	${MAKE} testenvironment
@@ -270,7 +270,7 @@ testcases: ${EXE} ${TEST_LOGS}
 testenvironment: ${EXE}
 	rm -f test/data/world1.dat test/data/world1.db
 	#./${EXE} createsource 4326 test/data/world1.tif  >test/data/test_world1.json
-	./${EXE} import test/data/world1.json test/data/world1.tif 1 0 42 RAW
+	./${EXE} import test/data/world1.json test/data/world1.tif 1 0 0 2000000000 RAW
 
 test/queries/%.log: test/queries/%.json ${EXE} test/data/world1.dat 
 	echo -n >$@

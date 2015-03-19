@@ -19,7 +19,7 @@ class LocalRasterDBBackend : public RasterDBBackend {
 		virtual void writeTile(rasterid rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression);
 
 
-		virtual rasterid getClosestRaster(int channelid, double timestamp);
+		virtual RasterDescription getClosestRaster(int channelid, double timestamp);
 		virtual void readAttributes(rasterid rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value);
 		virtual int getBestZoom(rasterid rasterid, int desiredzoom);
 		virtual const std::vector<TileDescription> enumerateTiles(int channelid, rasterid rasterid, int x1, int y1, int x2, int y2, int zoom = 0);

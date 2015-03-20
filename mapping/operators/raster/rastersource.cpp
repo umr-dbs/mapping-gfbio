@@ -41,7 +41,7 @@ SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], J
 	else
 		filename = Configuration::get("operators.rastersource.path", "") + sourcename + std::string(".json");
 
-	rasterdb = RasterDB::open(filename.c_str());
+	rasterdb = RasterDB::open(filename.c_str(), RasterDB::READ_ONLY);
 	channel = params.get("channel", 0).asInt();
 	transform = params.get("transform", true).asBool();
 }

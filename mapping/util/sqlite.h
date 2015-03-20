@@ -12,7 +12,7 @@ class SQLite {
 	public:
 		SQLite();
 		~SQLite();
-		void open(const char *filename);
+		void open(const char *filename, bool readonly = false);
 		void exec(const char *query);
 		int64_t getLastInsertId();
 	private:
@@ -45,6 +45,7 @@ class SQLiteStatement {
 		bool next();
 		int32_t getInt(int column);
 		int64_t getInt64(int column);
+		double getDouble(int column);
 		const char *getString(int column);
 
 		// cleanup for re-use

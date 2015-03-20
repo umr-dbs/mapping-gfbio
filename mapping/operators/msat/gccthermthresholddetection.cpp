@@ -26,70 +26,70 @@ class MSATGccThermThresholdDetectionOperator : public GenericOperator {
 
 //#include "operators/msat/co2correction.cl.h"
 
-template<typename T1, typename T2>
-struct CreateHistogramPairFunction{
-	static std::pair<Histogram, Histogram> execute(Raster2D<T1> *bt108_minus_bt039_raster, Raster2D<T2> *sza_raster, int bucket_scale, double sza_day_min, double sza_day_max, double sza_night_min, double sza_night_max) {
-		bt108_minus_bt039_raster->setRepresentation(GenericRaster::Representation::CPU);
-		sza_raster->setRepresentation(GenericRaster::Representation::CPU);
-
-	   //get min and max
-		double bt108_minus_bt039_min = bt108_minus_bt039_raster->dd.min;
-		double bt108_minus_bt039_max = bt108_minus_bt039_raster->dd.max;
-
-		auto bt108_minus_bt039_raster_range = RasterTypeInfo<T1>::getRange(bt108_minus_bt039_min, bt108_minus_bt039_max);
-
-		auto buckets = bt108_minus_bt039_raster_range*bucket_scale;
-		Histogram day_histogram = Histogram{static_cast<int>(buckets), static_cast<double>(bt108_minus_bt039_min), static_cast<double>(bt108_minus_bt039_max)};
-		Histogram night_histogram = Histogram{static_cast<int>(buckets), static_cast<double>(bt108_minus_bt039_min), static_cast<double>(bt108_minus_bt039_max)};
-
-		int size_a = bt108_minus_bt039_raster->getPixelCount();
-		int size_b = sza_raster->getPixelCount();
-
-		if(size_a != size_b){
-			//do something here
-		}
-
-	   for (int i=0;i<size_a;i++) {
-		   T1 value = bt108_minus_bt039_raster->data[i];
-		   T2 condition = sza_raster->data[i];
-		   if (bt108_minus_bt039_raster->dd.is_no_data(value) || sza_raster->dd.is_no_data(condition)){
-			   day_histogram.incNoData();
-		   	   night_histogram.incNoData();
-		   }
-		   else if(condition >= sza_day_min && condition <= sza_day_max) {
-			   day_histogram.inc(value);
-		   	   night_histogram.incNoData();
-		   }
-		   else if(condition >= sza_night_min && condition <= sza_night_max){
-			   day_histogram.incNoData();
-			   night_histogram.inc(value);
-		   }
-		   else{ //solar zenith angle indicates twilight
-			   day_histogram.incNoData();
-			   night_histogram.incNoData();
-		   }
-	   }
-	   return std::pair<Histogram,Histogram>{day_histogram, night_histogram};
-	}
-};
+//template<typename T1, typename T2>
+//struct CreateHistogramPairFunction{
+//	static std::pair<Histogram, Histogram> execute(Raster2D<T1> *bt108_minus_bt039_raster, Raster2D<T2> *sza_raster, int bucket_scale, double sza_day_min, double sza_day_max, double sza_night_min, double sza_night_max) {
+//		bt108_minus_bt039_raster->setRepresentation(GenericRaster::Representation::CPU);
+//		sza_raster->setRepresentation(GenericRaster::Representation::CPU);
+//
+//	   //get min and max
+//		double bt108_minus_bt039_min = bt108_minus_bt039_raster->dd.min;
+//		double bt108_minus_bt039_max = bt108_minus_bt039_raster->dd.max;
+//
+//		auto bt108_minus_bt039_raster_range = RasterTypeInfo<T1>::getRange(bt108_minus_bt039_min, bt108_minus_bt039_max);
+//
+//		auto buckets = bt108_minus_bt039_raster_range*bucket_scale;
+//		Histogram day_histogram = Histogram{static_cast<int>(buckets), static_cast<double>(bt108_minus_bt039_min), static_cast<double>(bt108_minus_bt039_max)};
+//		Histogram night_histogram = Histogram{static_cast<int>(buckets), static_cast<double>(bt108_minus_bt039_min), static_cast<double>(bt108_minus_bt039_max)};
+//
+//		int size_a = bt108_minus_bt039_raster->getPixelCount();
+//		int size_b = sza_raster->getPixelCount();
+//
+//		if(size_a != size_b){
+//			//do something here
+//		}
+//
+//	   for (int i=0;i<size_a;i++) {
+//		   T1 value = bt108_minus_bt039_raster->data[i];
+//		   T2 condition = sza_raster->data[i];
+//		   if (bt108_minus_bt039_raster->dd.is_no_data(value) || sza_raster->dd.is_no_data(condition)){
+//			   day_histogram.incNoData();
+//		   	   night_histogram.incNoData();
+//		   }
+//		   else if(condition >= sza_day_min && condition <= sza_day_max) {
+//			   day_histogram.inc(value);
+//		   	   night_histogram.incNoData();
+//		   }
+//		   else if(condition >= sza_night_min && condition <= sza_night_max){
+//			   day_histogram.incNoData();
+//			   night_histogram.inc(value);
+//		   }
+//		   else{ //solar zenith angle indicates twilight
+//			   day_histogram.incNoData();
+//			   night_histogram.incNoData();
+//		   }
+//	   }
+//	   return std::pair<Histogram,Histogram>{day_histogram, night_histogram};
+//	}
+//};
 
 template<typename T1, typename T2>
 struct CreateConditionalHistogramFunction{
-	static std::unique_ptr<Histogram> execute(Raster2D<T1> *value_raster, Raster2D<T2> *condition_raster, int bucket_scale, double condition_min, double condition_max) {
+	static std::unique_ptr<Histogram> execute(Raster2D<T1> *value_raster, Raster2D<T2> *condition_raster, double bucket_size, double condition_min, double condition_max) {
 		value_raster->setRepresentation(GenericRaster::Representation::CPU);
 		condition_raster->setRepresentation(GenericRaster::Representation::CPU);
 
 	   //get min and max
-		T1 bt108_minus_bt039_min = (T1) value_raster->dd.min;
-		T1 bt108_minus_bt039_max = (T1) value_raster->dd.max;
+		T1 value_raster_min = (T1) value_raster->dd.min;
+		T1 value_raster_max = (T1) value_raster->dd.max;
 
-		auto bt108_minus_bt039_raster_range = RasterTypeInfo<T1>::getRange(bt108_minus_bt039_min, bt108_minus_bt039_max);
+		auto value_raster_range = RasterTypeInfo<T1>::getRange(value_raster_min, value_raster_max);
 
-		auto buckets = bt108_minus_bt039_raster_range*bucket_scale;
+		auto buckets = std::ceil(value_raster_range/bucket_size);
 
-		std::cerr<<"min: "<<bt108_minus_bt039_min<<" |max: "<<bt108_minus_bt039_max<<" |range: "<<bt108_minus_bt039_raster_range<<" |buckets:"<<buckets<<std::endl;
+		std::cerr<<"min: "<<value_raster_min<<" |max: "<<value_raster_max<<" |range: "<<value_raster_range<<" |buckets:"<<buckets<<std::endl;
 
-		auto histogram_ptr = std::make_unique<Histogram>(buckets, bt108_minus_bt039_min, bt108_minus_bt039_max);
+		auto histogram_ptr = std::make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
 
 		int size_a = value_raster->getPixelCount();
 		int size_b = condition_raster->getPixelCount();
@@ -117,9 +117,7 @@ struct CreateConditionalHistogramFunction{
 };
 
 
-int findGccThermThreshold(Histogram &histogram, float min, float max){
-	const double minimum_land_peak_temperature = 1.0;
-	const int minimum_increasing_bins_for_rising_trend = 4;
+int findGccThermThreshold(Histogram &histogram, const double minimum_land_peak_temperature, const int minimum_increasing_bins_for_rising_trend){
 
 	/**start: find the land peak**/
 
@@ -198,8 +196,8 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 		out_dd.addNoData();
 	auto raster_out = GenericRaster::create(out_dd, *bt108_minus_bt039_raster);
 
-	auto histogram_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), 2, cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
-	int temp = findGccThermThreshold(*histogram_ptr.get(), 0.0, 0.0);
+	auto histogram_day_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), 0.5, cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
+	int temp = findGccThermThreshold(*histogram_day_ptr.get(), -1, 4);
 	
-	return std::unique_ptr<GenericPlot>(std::move(histogram_ptr));
+	return std::unique_ptr<GenericPlot>(std::move(histogram_day_ptr));
 }

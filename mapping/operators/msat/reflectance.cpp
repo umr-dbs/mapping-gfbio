@@ -48,31 +48,32 @@ void MSATReflectanceOperator::writeSemanticParameters(std::ostringstream& stream
 	stream << "\"solarCorrection\":" << solarCorrection;
 }
 
-double calculateDevisorFor(int channel, int dayOfYear) {
-	int index = 0;
-	if(channel>=0 && channel <=2)
-		index = channel;
-	else if(channel == 12)
-		index = 3;
-	else
-		throw ArgumentException("MSG: radiance only valid for channels 1-3 and 12!");
-
-	//calculate ESD?
-	double dESD = 1.0 - 0.0167 * cos(2.0 * acos(-1.0) * ((dayOfYear - 3.0) / 365.0));
-	/*
-	//get the central wavelength
-	double cwl = msg::dCwl[channel - 1];
-	// calculate the ETSR?
-	double etsr = msg::dETSRconst[index] * 10 / (dESD*dESD) * (cwl*cwl);
-	//now we can precalculate the devisior we need to change radiance to reflectance
-	double div = (cwl*cwl) * etsr;
-	// reflectance is radiance * 10 / div
-	return 10/div;
-	*/
-
-	//y not zoidberg? //TODO check if 1/something produces a problem
-	return 1 / msg::dETSRconst[index] / (dESD*dESD);
-}
+//double calculateDevisorFor(int channel, int dayOfYear) {
+//	int index = 0;
+//	if(channel>=0 && channel <=2)
+//		index = channel;
+//	else if(channel == 12)
+//		index = 3;
+//	else
+//		throw ArgumentException("MSATReflectanceOperator is only valid for channels 1-3 and 12!");
+//
+//	//calculate ESD?
+//	double dESD = calculateESD(dayOfYear - 3.0);
+//	/*
+//	//get the central wavelength
+//	double cwl = msg::dCwl[channel - 1];
+//	// calculate the ETSR?
+//	double etsr = msg::dETSRconst[index] * 10 / (dESD*dESD) * (cwl*cwl);
+//	//now we can precalculate the devisior we need to change radiance to reflectance
+//	double div = (cwl*cwl) * etsr;
+//	// reflectance is radiance * 10 / div
+//	return 10/div;
+//	*/
+//
+//	//y not zoidberg? //TODO check if 1/something produces a problem
+//	//return 1 / msg::dETSRconst[index] / (dESD*dESD);
+//	return  (dESD*dESD) / msg::dETSRconst[index]; //srsly?
+//}
 
 double calculateESD(int dayOfYear){
 	return 1.0 - 0.0167 * cos(2.0 * acos(-1.0) * ((dayOfYear - 3.0) / 365.0));

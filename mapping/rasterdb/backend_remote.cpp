@@ -59,6 +59,11 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 	stream->write(channelid);
 	stream->write(timestamp);
 	RasterDescription res(*stream);
+	if (res.rasterid < 0) {
+		std::string error;
+		stream->read(&error);
+		throw SourceException(error);
+	}
 	return res;
 }
 

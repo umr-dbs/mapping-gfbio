@@ -138,9 +138,17 @@ int Connection::input() {
 			stream->read(&channelid);
 			double timestamp;
 			stream->read(&timestamp);
-			auto res = backend->getClosestRaster(channelid, timestamp);
-			printf("returning raster with id %ld, time %f->%f\n", res.rasterid, res.time_start, res.time_end);
-			stream->write(res);
+			try {
+				auto res = backend->getClosestRaster(channelid, timestamp);
+				printf("returning raster with id %ld, time %f->%f\n", res.rasterid, res.time_start, res.time_end);
+				stream->write(res);
+			}
+			catch (const SourceException &e) {
+				RasterDBBackend::RasterDescription r(-1, 0, 0);
+				stream->write(r);
+				std::string error(e.what());
+				stream->write(error);
+			}
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_READATTRIBUTES: {

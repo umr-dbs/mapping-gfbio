@@ -26,7 +26,7 @@
 #include <sys/wait.h>
 
 
-int getListeningSocket(int port, int backlog = 50) {
+int getListeningSocket(int port, int backlog = 10) {
 	int sock;
 	struct addrinfo hints, *servinfo, *p;
 	int yes = 1;
@@ -88,13 +88,17 @@ class Connection {
 		Connection(int fd);
 		int input();
 		int fd;
+		int id;
 	private:
 		std::unique_ptr<BinaryStream> stream;
 		std::shared_ptr<LocalRasterDBBackend> backend;
 };
 
+static int connection_id = 1;
 Connection::Connection(int fd) : fd(fd) {
+	id = connection_id++;
 	stream.reset( new UnixSocket(fd,fd) );
+	printf("%d: connected\n", id);
 }
 
 int Connection::input() {
@@ -102,11 +106,11 @@ int Connection::input() {
 
 	uint8_t c;
 	if (!stream->read(&c, true)) {
-		printf("fd %d disconnected\n", fd);
+		printf("%d: disconnected\n", id);
 		return -1;
 	}
 
-	printf("got command %d on fd %d.\n", c, fd);
+	printf("%d: got command %d\n", id, c);
 
 
 	if (backend.get() == nullptr && (c != RemoteRasterDBBackend::COMMAND_EXIT && c != RemoteRasterDBBackend::COMMAND_OPEN))
@@ -140,7 +144,7 @@ int Connection::input() {
 			stream->read(&timestamp);
 			try {
 				auto res = backend->getClosestRaster(channelid, timestamp);
-				printf("returning raster with id %ld, time %f->%f\n", res.rasterid, res.time_start, res.time_end);
+				printf("%d: found closest raster with id %ld, time %f->%f\n", id, res.rasterid, res.time_start, res.time_end);
 				stream->write(res);
 			}
 			catch (const SourceException &e) {
@@ -192,7 +196,7 @@ int Connection::input() {
 			stream->read(&zoom);
 			auto res = backend->enumerateTiles(channelid, rasterid, x1, y1, x2, y2, zoom);
 			size_t size = res.size();
-			printf("(%d,%d) -> (%d,%d), channel %d, raster %ld at zoom %d yielded %lu tiles\n", x1, y1, x2, y2, channelid, rasterid, zoom, size);
+			printf("%d: (%d,%d) -> (%d,%d), channel %d, raster %ld at zoom %d yielded %lu tiles\n", id, x1, y1, x2, y2, channelid, rasterid, zoom, size);
 			stream->write(size);
 			for (auto &td : res)
 				stream->write(td);
@@ -201,13 +205,11 @@ int Connection::input() {
 		//case RemoteRasterDBBackend::COMMAND_HASTILE:
 		case RemoteRasterDBBackend::COMMAND_READTILE: {
 			RasterDBBackend::TileDescription tile(*stream);
-			printf("reading tile, offset %lu, size %lu\n", tile.offset, tile.size);
+			printf("%d: returning tile, offset %lu, size %lu\n", id, tile.offset, tile.size);
 			auto buffer = backend->readTile(tile);
-			printf("buffer is %lu bytes\n", buffer->size);
 			stream->write(buffer->size);
-			printf("size sent\n");
 			stream->write((const char *) buffer->data, buffer->size);
-			printf("data sent\n");
+			printf("%d: data sent\n", id);
 			break;
 		}
 		default:
@@ -243,9 +245,7 @@ int main(void) {
     	maxfd = std::max(listensocket, maxfd);
     	FD_SET(listensocket, &readfds);
 
-    	printf("select.. ");
         select(maxfd+1, &readfds, nullptr, nullptr, &tv);
-        printf("finished\n");
 
         auto it = connections.begin();
         while (it != connections.end()) {
@@ -257,13 +257,14 @@ int main(void) {
         				needs_closing = true;
         		}
         		catch (const std::exception &e) {
-        			fprintf(stderr, "Exception in connection: %s\n", e.what());
+        			fprintf(stderr, "%d: Exception: %s\n", c.id, e.what());
         			needs_closing = true;
         		}
         	}
     		if (needs_closing) {
-    			printf("closing connection %d\n", c.fd);
+    			auto id = c.id;
     			it = connections.erase(it);
+    			printf("%d: closing, %lu clients remain\n", id, connections.size());
     		}
     		else
     			++it;

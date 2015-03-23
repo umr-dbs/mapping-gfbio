@@ -90,8 +90,9 @@ UnixSocket::UnixSocket(const char *hostname, int port) : is_eof(false), read_fd(
 	if (connect(new_fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
 		freeaddrinfo(servinfo);
 		::close(new_fd);
-		perror("connect()");
-		throw NetworkException("UnixSocket: unable to connect()");
+		std::ostringstream msg;
+		msg << "UnixSocket: unable to connect(" << hostname << ":" << port << "/" << portstr << "): " << strerror(errno);
+		throw NetworkException(msg.str());
 	}
 
 	read_fd = new_fd;

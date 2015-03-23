@@ -62,14 +62,17 @@ void SQLiteStatement::prepare(const char *query) {
 	if (stmt)
 		throw SQLiteException("Statement already prepared");
 
-	if (SQLITE_OK != sqlite3_prepare_v2(
-			db->db,
-			query,
-			-1, // read until '\0'
-			&stmt,
-			NULL
-		)) {
-		throw SourceException("Cannot prepare statement");
+	auto result = sqlite3_prepare_v2(
+		db->db,
+		query,
+		-1, // read until '\0'
+		&stmt,
+		NULL
+	);
+	if (result != SQLITE_OK) {
+		std::ostringstream msg;
+		msg << "Cannot prepare statement: " << result << ", error='" << sqlite3_errmsg(db->db) << "', query='" << query << "'";
+		throw SourceException(msg.str());
 	}
 }
 

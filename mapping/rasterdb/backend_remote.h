@@ -1,18 +1,32 @@
-#ifndef RASTERDB_BACKEND_LOCAL_H
-#define RASTERDB_BACKEND_LOCAL_H
+#ifndef RASTERDB_BACKEND_REMOTE_H
+#define RASTERDB_BACKEND_REMOTE_H
 
-//#include "rasterdb/rasterdb.h"
 #include "rasterdb/backend.h"
 #include "util/sqlite.h"
 
 #include <string>
+#include <memory>
 
+class BinaryStream;
 
-class LocalRasterDBBackend : public RasterDBBackend {
+class RemoteRasterDBBackend : public RasterDBBackend {
 	public:
-		LocalRasterDBBackend(const char *filename, bool writeable = false);
-		virtual ~LocalRasterDBBackend();
+		RemoteRasterDBBackend(const char *filename, bool writeable = false);
+		virtual ~RemoteRasterDBBackend();
 
+		static const uint8_t COMMAND_EXIT = 1;
+		static const uint8_t COMMAND_OPEN = 2;
+		static const uint8_t COMMAND_READJSON = 10;
+
+		static const uint8_t COMMAND_CREATERASTER = 11;
+		static const uint8_t COMMAND_WRITETILE = 12;
+
+		static const uint8_t COMMAND_GETCLOSESTRASTER = 13;
+		static const uint8_t COMMAND_READATTRIBUTES = 14;
+		static const uint8_t COMMAND_GETBESTZOOM = 15;
+		static const uint8_t COMMAND_ENUMERATETILES = 16;
+		static const uint8_t COMMAND_HASTILE = 17;
+		static const uint8_t COMMAND_READTILE = 18;
 
 		virtual std::string readJSON();
 		virtual rasterid createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value);
@@ -28,15 +42,11 @@ class LocalRasterDBBackend : public RasterDBBackend {
 
 	private:
 		void init();
-		void cleanup();
 
-		int lockedfile;
-		std::string sourcename;
-		std::string filename_json;
-		std::string filename_data;
-		std::string filename_db;
+		std::unique_ptr<BinaryStream> stream;
+		std::string remote_host;
+		std::string remote_port;
 		std::string json;
-		SQLite db;
 };
 
 #endif

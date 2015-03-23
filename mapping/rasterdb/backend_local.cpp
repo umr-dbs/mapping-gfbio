@@ -1,10 +1,8 @@
 
 #include "rasterdb/backend_local.h"
+#include "util/configuration.h"
 
-//#include <limits.h>
-//#include <stdio.h>
-//#include <cstdlib>
-//#include <string.h>
+
 #include <sys/file.h> // flock()
 #include <sys/types.h> // the next three are for posix open()
 #include <sys/stat.h>
@@ -16,7 +14,7 @@
 
 
 LocalRasterDBBackend::LocalRasterDBBackend(const char *filename, bool writeable)
-	: RasterDBBackend(writeable), lockedfile(-1), filename_json(filename) {
+	: RasterDBBackend(writeable), lockedfile(-1), sourcename(filename) {
 	try {
 		init();
 	}
@@ -31,13 +29,11 @@ LocalRasterDBBackend::~LocalRasterDBBackend() {
 }
 
 void LocalRasterDBBackend::init() {
-	size_t suffixpos = filename_json.rfind(".json");
-	if (suffixpos == std::string::npos || suffixpos != filename_json.length()-5)
-		throw SourceException("LocalRasterDBBackend: filename must end with .json");
+	std::string basepath = Configuration::get("rasterdb.local.path", "") + sourcename;
 
-	std::string basename = filename_json.substr(0, suffixpos);
-	filename_data = basename + ".dat";
-	filename_db = basename + ".db";
+	filename_json = basepath + ".json";
+	filename_data = basepath + ".dat";
+	filename_db = basepath + ".db";
 
 	/*
 	 * Step #1: open the .json file and store its contents
@@ -225,7 +221,7 @@ void LocalRasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint
 RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
 	// find a raster that's valid during the given timestamp
 	SQLiteStatement stmt(db);
-	stmt.prepare("SELECT id FROM rasters WHERE channel = ? AND time_start <= ? AND time_end > ? ORDER BY time_start DESC limit 1");
+	stmt.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end > ? ORDER BY time_start DESC limit 1");
 	stmt.bind(1, channelid);
 	stmt.bind(2, timestamp);
 	stmt.bind(3, timestamp);

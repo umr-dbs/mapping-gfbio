@@ -4,8 +4,10 @@
 #include "rasterdb/rasterdb.h"
 #include "rasterdb/backend.h"
 #include "rasterdb/backend_local.h"
+#include "rasterdb/backend_remote.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
+#include "util/configuration.h"
 #include "operators/operator.h"
 
 
@@ -147,10 +149,16 @@ class RasterDBChannel {
 
 
 
-RasterDB::RasterDB(const char *filename, bool writeable)
+RasterDB::RasterDB(const char *sourcename, bool writeable)
 	: writeable(writeable), crs(nullptr), channelcount(0), channels(nullptr) {
 	try {
-		backend.reset( new LocalRasterDBBackend(filename, writeable) );
+		auto backendtype = Configuration::get("rasterdb.backend", "local");
+
+		if (backendtype == "remote")
+			backend.reset( new RemoteRasterDBBackend(sourcename, writeable) );
+		else
+			backend.reset( new LocalRasterDBBackend(sourcename, writeable) );
+
 		init();
 	}
 	catch (const std::exception &e) {
@@ -172,7 +180,7 @@ void RasterDB::init() {
 	Json::Reader reader(Json::Features::strictMode());
 	Json::Value root;
 	if (!reader.parse(json, root)) {
-		printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
+		//printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
 		throw SourceException("unable to parse json");
 	}
 
@@ -200,7 +208,6 @@ void RasterDB::init() {
 
 	Json::Value channelinfo = root["channels"];
 	if (!channelinfo.isArray() || channelinfo.size() < 1) {
-		printf("No channel information in json\n");
 		throw SourceException("No channel information in json");
 	}
 
@@ -513,32 +520,24 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 static std::unordered_map<std::string, std::weak_ptr<RasterDB> > RasterDB_map;
 static std::mutex RasterDB_map_mutex;
 
-std::shared_ptr<RasterDB> RasterDB::open(const char *filename, bool writeable) {
+std::shared_ptr<RasterDB> RasterDB::open(const char *sourcename, bool writeable) {
 	std::lock_guard<std::mutex> guard(RasterDB_map_mutex);
 
-	// To make sure each source is only accessed by a single path, resolve all symlinks
-	char filename_clean[PATH_MAX];
-	if (realpath(filename, filename_clean) == nullptr) {
-		std::stringstream msg;
-		msg << "realpath(\"" << filename << "\") failed";
-		throw SourceException(msg.str());
-	}
+	std::string name(sourcename);
 
-	std::string path(filename_clean);
-
-	if (RasterDB_map.count(path) == 1) {
-		auto &weak_ptr = RasterDB_map.at(path);
+	if (RasterDB_map.count(name) == 1) {
+		auto &weak_ptr = RasterDB_map.at(name);
 		auto shared_ptr = weak_ptr.lock();
 		if (shared_ptr) {
 			if (writeable && !shared_ptr->isWriteable())
 				throw new SourceException("Cannot re-open source as read/write (TODO?)");
 			return shared_ptr;
 		}
-		RasterDB_map.erase(path);
+		RasterDB_map.erase(name);
 	}
 
-	auto shared_ptr = std::make_shared<RasterDB>(path.c_str(), writeable);
-	RasterDB_map[path] = std::weak_ptr<RasterDB>(shared_ptr);
+	auto shared_ptr = std::make_shared<RasterDB>(name.c_str(), writeable);
+	RasterDB_map[name] = std::weak_ptr<RasterDB>(shared_ptr);
 
 	if (writeable && !shared_ptr->isWriteable())
 		throw new SourceException("Cannot re-open source as read/write (TODO?)");

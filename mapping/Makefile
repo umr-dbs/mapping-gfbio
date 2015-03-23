@@ -16,7 +16,7 @@ LDFLAGS_CGI=-luriparser
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 OBJ_SERVICES=o/services_wfs_request.o
-OBJ_RASTER=o/rasterdb_rasterdb.o o/rasterdb_backend_local.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
+OBJ_RASTER=o/rasterdb_rasterdb.o o/rasterdb_backend.o o/rasterdb_backend_local.o o/rasterdb_backend_remote.o o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
 OBJ_DATATYPES=o/datatypes_attributes.o o/datatypes_spatiotemporal.o o/datatypes_raster_raster.o o/datatypes_raster_import_gdal.o o/datatypes_raster_export_pgm.o o/datatypes_raster_export_yuv.o o/datatypes_raster_export_png.o o/datatypes_raster_export_jpeg.o o/datatypes_pointcollection.o o/datatypes_geometry.o
 OBJ_PLOT=o/datatypes_plots_histogram.o o/datatypes_plots_text.o o/datatypes_plots_png.o
 OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o o/util_configuration.o o/util_debug.o
@@ -37,6 +37,7 @@ OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o ${OBJ_CONVERTERS} ${OBJ_R
 EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
+EXETILESERVER=tileserver
 
 DATASET_C0=datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS006___-000001___-201006061200-C_
 DATASET_C1=datasources/raw_data/msat/H-000-MSG2__-MSG2________-VIS008___-000001___-201006061200-C_
@@ -138,7 +139,7 @@ o/main_%.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
 
-all: ${EXE} ${EXECGI} ${EXERSERVER}
+all: ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER}
 
 ${EXE}:	${OBJ_EXE}
 	${CPP} $+ ${LDFLAGS} -o $@
@@ -149,7 +150,10 @@ ${EXECGI}:	${OBJ_EXECGI}
 ${EXERSERVER}:	${OBJ_RSERVER}
 	${CPP} ${LDFLAGS} ${LDFLAGS_R} $+ -o $@
 
-	
+${EXETILESERVER}: o/rasterdb_tileserver.o o/rasterdb_backend.o o/rasterdb_backend_local.o o/datatypes_attributes.o o/util_binarystream.o o/util_sqlite.o o/util_configuration.o
+	${CPP} ${LDFLAGS} $+ -o $@
+
+
 msg9_datasource:	${EXE}
 	rm -f datasources/msg9_geos.dat datasources/msg9_geos.db
 	#./${EXE} createsource 62866 ${DATASET_C0} ${DATASET_C1} ${DATASET_C2} ${DATASET_C3} ${DATASET_C4} ${DATASET_C5} ${DATASET_C6} ${DATASET_C7} ${DATASET_C8} ${DATASET_C9} ${DATASET_C10} >datasources/msat2.json

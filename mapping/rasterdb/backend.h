@@ -6,7 +6,7 @@
 #include <stdint.h>
 #include <vector>
 
-
+class BinaryStream;
 
 class RasterDBBackend {
 	public:
@@ -15,6 +15,11 @@ class RasterDBBackend {
 
 		class TileDescription {
 			public:
+				TileDescription(tileid tileid, int channelid, int fileid, size_t offset, size_t size, uint32_t x1, uint32_t y1, uint32_t z1, uint32_t width, uint32_t height, uint32_t depth, RasterConverter::Compression compression)
+					: tileid(tileid), channelid(channelid), fileid(fileid), offset(offset), size(size), x1(x1), y1(y1), z1(z1), width(width), height(height), depth(depth), compression(compression) {}
+				TileDescription(BinaryStream &stream);
+				void toStream(BinaryStream &stream) const;
+
 				tileid tileid;
 				int channelid;
 				int fileid;
@@ -27,6 +32,10 @@ class RasterDBBackend {
 
 		class RasterDescription {
 			public:
+				RasterDescription(rasterid rasterid, double time_start, double time_end) : rasterid(rasterid), time_start(time_start), time_end(time_end) {}
+				RasterDescription(BinaryStream &stream);
+				void toStream(BinaryStream &stream) const;
+
 				rasterid rasterid;
 				double time_start;
 				double time_end;

@@ -7,14 +7,17 @@
 
 #include <stdio.h>
 #include <cstdlib>
+#include <sstream>
+#include <fstream>
 
 RemoteRasterDBBackend::RemoteRasterDBBackend(const char *sourcename, bool writeable)
-	: RasterDBBackend(writeable) {
+	: RasterDBBackend(writeable), sourcename(sourcename) {
 	if (writeable)
 		throw ArgumentException("RemoteRasterDBBackend cannot be opened writeable");
 
 	auto servername = Configuration::get("rasterdb.remote.host");
 	auto serverport = Configuration::get("rasterdb.remote.port");
+	cache_directory = Configuration::get("rasterdb.remote.cache", "");
 
 	int portnr = atoi(serverport.c_str());
 
@@ -24,7 +27,7 @@ RemoteRasterDBBackend::RemoteRasterDBBackend(const char *sourcename, bool writea
 
 	auto c = COMMAND_OPEN;
 	stream->write(c);
-	stream->write(std::string(sourcename));
+	stream->write(this->sourcename);
 	uint8_t response;
 	stream->read(&response);
 	if (response != 48)
@@ -126,7 +129,29 @@ bool RemoteRasterDBBackend::hasTile(rasterid rasterid, uint32_t width, uint32_t 
 }
 
 std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescription &tiledesc) {
-	// TODO: implement a local cache
+	std::string cachepath;
+	if (cache_directory != "") {
+		std::ostringstream pathss;
+		pathss << cache_directory << sourcename << "_" << tiledesc.channelid << "_" << tiledesc.tileid << ".tile";
+		cachepath = pathss.str();
+
+		std::ifstream file(cachepath);
+		if (file.is_open()) {
+			file.seekg(0, std::ios::end);
+			auto filesize = file.tellg();
+			if (filesize == tiledesc.size) {
+				file.seekg(0, std::ios::beg);
+				auto bb = std::make_unique<ByteBuffer>(filesize);
+				file.read((char *) bb->data, bb->size);
+				return bb;
+			}
+			else {
+				fprintf(stderr, "RemoteRasterDBBackend::readTile(): size in cache %lu, expected %lu\n", filesize, tiledesc.size);
+				file.close();
+			}
+		}
+	}
+
 	auto c = COMMAND_READTILE;
 	stream->write(c);
 	stream->write(tiledesc);
@@ -135,5 +160,11 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 
 	auto bb = std::make_unique<ByteBuffer>(size);
 	stream->read((char *) bb->data, bb->size);
+
+	if (cache_directory != "") {
+		std::ofstream file(cachepath);
+		file.write((char *) bb->data, bb->size);
+		file.close();
+	}
 	return bb;
 }

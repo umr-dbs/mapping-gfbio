@@ -44,6 +44,8 @@ class RemoteRasterDBBackend : public RasterDBBackend {
 		void init();
 
 		std::unique_ptr<BinaryStream> stream;
+		std::string sourcename;
+		std::string cache_directory;
 		std::string remote_host;
 		std::string remote_port;
 		std::string json;

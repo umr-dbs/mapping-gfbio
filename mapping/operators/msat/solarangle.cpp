@@ -19,6 +19,9 @@
 #include <json/json.h>
 #include <gdal_priv.h>
 
+#include <iostream>
+#include <fstream>
+
 enum class SolarAngles {AZIMUTH, ZENITH};
 
 class MSATSolarAngleOperator : public GenericOperator {
@@ -72,11 +75,9 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	ss >> std::get_time(&time, "%Y%m%d%H%M%S");
 	*/
 	strptime(timestamp.c_str(),"%Y%m%d%H%M", &timeDate);
-	//std::cerr<<"timeDate.tm_mday:"<<timeDate.tm_mday<<"|timeDate.tm_mon:"<<timeDate.tm_mon<<"|timeDate.tm_year:"<<timeDate.tm_year<<"|timeDate.tm_hour:"<<timeDate.tm_hour<<"|timeDate.tm_min:"<<timeDate.tm_min<<"|ORIGINAL:"<<timestamp<<std::endl;
 
 	//now calculate the intermediate values using PSA algorithm
 	cIntermediateVariables psaIntermediateValues = sunposIntermediate(timeDate.tm_year+1900, timeDate.tm_mon+1,	timeDate.tm_mday, timeDate.tm_hour, timeDate.tm_min, 0.0);
-	//std::cerr<<"GMST: "<<psaIntermediateValues.dGreenwichMeanSiderealTime<<" dRightAscension: "<<psaIntermediateValues.dRightAscension<<" dDeclination: "<<psaIntermediateValues.dDeclination<<std::endl;
 
 	/* DEBUG infos
 	//get more information about the raster dimensions of the processed tile
@@ -103,8 +104,9 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	std::cerr<<std::endl;
 	*/
 
-	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590�10^-6. The difference is: 1.93384285�10^-9
-	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874�10^-6
+	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590�10^-6. -> should be identical...
+	//x = X * 65536 / (CFAC * ColumnDirGridStep)
+	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337 * 3000.403165817);
 
 	Profiler::Profiler p("CL_MSAT_SOLARANGLE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);

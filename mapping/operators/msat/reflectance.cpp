@@ -39,6 +39,8 @@ class MSATReflectanceOperator : public GenericOperator {
 
 MSATReflectanceOperator::MSATReflectanceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
+
+	solarCorrection = params.get("solarCorrection", true).asBool();
 }
 MSATReflectanceOperator::~MSATReflectanceOperator() {
 }
@@ -131,7 +133,7 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	//std::cerr<<"channel:"<<channel<<"|dETSRconst"<<dETSRconst<<"|dESD:"<<dESD<<std::endl;
 
 	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590�10^-6. The difference is: 1.93384285�10^-9
-	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337.0 * 3004.03165817); //= -1.59914060874�10^-6
+	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337.0 * 3000.403165817); //= -1.59914060874�10^-6
 
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");

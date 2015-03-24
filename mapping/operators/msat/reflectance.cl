@@ -80,7 +80,7 @@ __kernel void reflectanceWithSolarCorrectionKernel(__global const IN_TYPE0 *in_d
 	geosPosition.x = ((posx) * in_info->scale[0] + in_info->origin[0]);
 	geosPosition.y = ((posy) * in_info->scale[1] + in_info->origin[1]);
 
-	double2 satelliteViewAngle = geosPosition * projectionCooridnateToViewAngleFactor;
+	double2 satelliteViewAngle = geosPosition * projectionCooridnateToViewAngleFactor * (double2)(-1,1);
 	double2 latLonPosition = satelliteViewAngleToLatLon(satelliteViewAngle, 0.0);
 	double2 azimuthZenith = solarAzimuthZenith(dGreenwichMeanSiderealTime, dRightAscension, dDeclination, latLonPosition);
 

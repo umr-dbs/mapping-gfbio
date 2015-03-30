@@ -32,7 +32,7 @@
 #include <json/json.h>
 
 
-const int DEFAULT_TILE_SIZE = 2048;
+const int DEFAULT_TILE_SIZE = 1024;
 
 
 bool GDALCRS::operator==(const GDALCRS &b) const {
@@ -461,11 +461,11 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, i
 		if (transform && channels[channelid]->hasTransform()) {
 			transformedBlit(
 				result.get(), tile_raster.get(),
-				(tile.x1-x1) >> zoom, (tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
+				((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
 				channels[channelid]->getOffset(result_md_value), channels[channelid]->getScale(result_md_value));
 		}
 		else
-			result->blit(tile_raster.get(), ((int) tile.x1-x1) >> zoom, ((int) tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
+			result->blit(tile_raster.get(), ((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* ((int64_t) r_z1-z1) >> zoom*/);
 	}
 
 	if (flipx || flipy) {

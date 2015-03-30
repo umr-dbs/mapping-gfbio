@@ -29,8 +29,6 @@
 int getListeningSocket(int port, int backlog = 10) {
 	int sock;
 	struct addrinfo hints, *servinfo, *p;
-	int yes = 1;
-	int rv;
 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
@@ -39,6 +37,7 @@ int getListeningSocket(int port, int backlog = 10) {
 
 	char portstr[16];
 	snprintf(portstr, 16, "%d", port);
+	int rv;
 	if ((rv = getaddrinfo(nullptr, portstr, &hints, &servinfo)) != 0) {
 		//fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		throw NetworkException("getaddrinfo() failed");
@@ -46,23 +45,17 @@ int getListeningSocket(int port, int backlog = 10) {
 
 	// loop through all the results and bind to the first we can
 	for (p = servinfo; p != nullptr; p = p->ai_next) {
-		if ((sock = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK, p->ai_protocol)) == -1) {
-			//perror("server: socket");
+		if ((sock = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK, p->ai_protocol)) == -1)
 			continue;
-		}
 
-		// TODO: what does this do?
-		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))
-				== -1) {
-			//perror("setsockopt");
-			//exit(1);
+		int yes = 1;
+		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
 			freeaddrinfo(servinfo); // all done with this structure
 			throw NetworkException("setsockopt() failed");
 		}
 
 		if (bind(sock, p->ai_addr, p->ai_addrlen) == -1) {
 			close(sock);
-			//perror("server: bind");
 			continue;
 		}
 
@@ -74,10 +67,9 @@ int getListeningSocket(int port, int backlog = 10) {
 	if (p == nullptr)
 		throw NetworkException("failed to bind");
 
-	if (listen(sock, backlog) == -1) {
-		//perror("listen");
+	if (listen(sock, backlog) == -1)
 		throw NetworkException("listen() failed");
-	}
+
 	return sock;
 }
 

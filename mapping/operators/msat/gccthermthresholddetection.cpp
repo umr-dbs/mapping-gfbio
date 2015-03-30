@@ -8,6 +8,8 @@
 #include "sofos_constants.h"
 #include "datatypes/plots/histogram.h"
 
+#include <iostream>
+#include <fstream>
 
 #include <memory>
 #include <math.h>
@@ -17,14 +19,15 @@
 
 class MSATGccThermThresholdDetectionOperator : public GenericOperator {
 	public:
-		MSATGccThermThresholdDetectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
+		MSATGccThermThresholdDetectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &/*params*/);
 		virtual ~MSATGccThermThresholdDetectionOperator();
 
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 
-//#include "operators/msat/co2correction.cl.h"
+#include "operators/msat/classification_kernels.cl.h"
+
 
 //template<typename T1, typename T2>
 //struct CreateHistogramPairFunction{
@@ -100,11 +103,11 @@ struct CreateConditionalHistogramFunction{
 
 	   for (int i=0;i<size_a;i++) {
 		   T1 value = value_raster->data[i];
-		   T2 condition = condition_raster->data[i];
-		   if (value_raster->dd.is_no_data(value) || condition_raster->dd.is_no_data(condition)){
+		   T2 condition_value = condition_raster->data[i];
+		   if (value_raster->dd.is_no_data(value) || condition_raster->dd.is_no_data(condition_value)){
 			   histogram_ptr->incNoData();
 		   }
-		   else if(condition >= condition_min && condition <= condition_max) {
+		   else if(condition_value >= condition_min && condition_value < condition_max) {
 			   histogram_ptr->inc(value);
 		   }
 		   else{
@@ -117,7 +120,7 @@ struct CreateConditionalHistogramFunction{
 };
 
 
-int findGccThermThreshold(Histogram &histogram, const double minimum_land_peak_temperature, const int minimum_increasing_bins_for_rising_trend){
+double findGccThermThreshold(Histogram &histogram, const double minimum_land_peak_temperature, const int minimum_increasing_bins_for_rising_trend){
 
 	/**start: find the land peak**/
 
@@ -170,8 +173,41 @@ int findGccThermThreshold(Histogram &histogram, const double minimum_land_peak_t
 
 	/**now we know the bucket of the cloud threshold :) **/
 
-	return minimum_between_land_and_cloud_peak_bucket;
+	return minimum_between_land_and_cloud_peak_value;//minimum_between_land_and_cloud_peak_bucket;
 }
+
+template<typename T1, typename T2>
+struct PlsNoDontDoThis{
+	static void execute(Raster2D<T1> *sza_raster, Raster2D<T2> *out_raster, std::vector<float> classification_thresholds, std::vector<float> classification_classes, int number_of_classes) {
+
+		int width = out_raster->width;
+		int height = out_raster->height;
+
+		for(int i = 0; i < width; i++){
+			for (int j = 0; j < height; j++){
+		//start with NAN
+			T2 outputValue = out_raster->dd.no_data;
+			T1 inputValue = sza_raster->getSafe(i,j);
+
+				for(int k=0; k<number_of_classes; k++) {
+					float lowerThreshold = classification_thresholds[2*k];
+					float upperThreshold = classification_thresholds[2*k+1];
+
+					if( (inputValue >= lowerThreshold) && (inputValue <= upperThreshold) ){
+						outputValue = classification_classes[k];
+					}
+
+					//printf("OCL gid = %d, inputValue = %f, temp = %f, lowerThreshold = %f, upperThreshold = %f , outputValue= %f \n", gid, inputValue, outputValue, lowerThreshold, upperThreshold, outputValue);
+				}
+
+			out_raster->setSafe(i,j,outputValue);
+
+			}
+		}
+
+	}
+};
+
 
 MSATGccThermThresholdDetectionOperator::MSATGccThermThresholdDetectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
@@ -182,7 +218,10 @@ REGISTER_OPERATOR(MSATGccThermThresholdDetectionOperator, "msatgccthermthreshold
 
 
 
-std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster>  MSATGccThermThresholdDetectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	std::ofstream logfile( "/tmp/loggcctherm.txt" );
+
+
 	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, profiler);
 	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, profiler);
 
@@ -190,14 +229,52 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 	solar_zenith_angle_raster->setRepresentation(GenericRaster::CPU);
 	bt108_minus_bt039_raster->setRepresentation(GenericRaster::CPU);
 
-	//TODO: check if raster lcrs are equal
-	DataDescription out_dd(GDT_Float32, bt108_minus_bt039_raster->dd.min, bt108_minus_bt039_raster->dd.max); // no no_data //raster->dd.has_no_data, output_no_data);
-	if (bt108_minus_bt039_raster->dd.has_no_data)
-		out_dd.addNoData();
-	auto raster_out = GenericRaster::create(out_dd, *bt108_minus_bt039_raster);
+	double bucket_size = 1.0/3.0;
+	int increasing_buckets_for_rising_trend = 4;
+	int minimum_values_in_histogram = 500;
+	double minimum_land_peak_temperature = -1;
+	double temperature_threshold_night, temperature_threshold_day = -1;
 
-	auto histogram_day_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), 0.5, cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
-	int temp = findGccThermThreshold(*histogram_day_ptr.get(), -1, 4);
-	
-	return std::unique_ptr<GenericPlot>(std::move(histogram_day_ptr));
+	logfile<<"bucket_size: "<<bucket_size<<"|increasing_buckets_for_rising_trend: "<<increasing_buckets_for_rising_trend<<"|minimum_land_peak_temperature: "<<minimum_land_peak_temperature<<std::endl;
+
+	logfile<<"DAY"<<std::endl;
+	auto histogram_day_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), bucket_size, cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
+	logfile<<histogram_day_ptr->toJSON()<<std::endl;
+	if(histogram_day_ptr->getValidDataCount()>minimum_values_in_histogram)
+		temperature_threshold_day = findGccThermThreshold(*histogram_day_ptr.get(), minimum_land_peak_temperature, increasing_buckets_for_rising_trend);
+	logfile<<"temperature_threshold_day: "<<temperature_threshold_day<<std::endl;
+	auto histogram_night_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), bucket_size, cloudclass::solar_zenith_angle_min_night, cloudclass::solar_zenith_angle_max_night);
+
+	logfile<<"NIGHT"<<std::endl;
+	logfile<<histogram_night_ptr->toJSON()<<std::endl;
+	if(histogram_night_ptr->getValidDataCount()>minimum_values_in_histogram)
+		temperature_threshold_night = findGccThermThreshold(*histogram_night_ptr.get(), minimum_land_peak_temperature, increasing_buckets_for_rising_trend);
+	logfile<<"temperature_threshold_night: "<<temperature_threshold_night<<std::endl;
+
+	//build vectors
+	std::vector<float> thresholds{static_cast<float>(cloudclass::solar_zenith_angle_min_day), static_cast<float>(cloudclass::solar_zenith_angle_max_day), static_cast<float>(cloudclass::solar_zenith_angle_min_night), static_cast<float>(cloudclass::solar_zenith_angle_max_night)};
+	std::vector<float> classes{static_cast<float>(temperature_threshold_day), static_cast<float>(temperature_threshold_night)};
+
+	//return std::unique_ptr<GenericPlot>(std::move(histogram_night_ptr));
+	std::cerr<<"temperature_threshold_day: "<<temperature_threshold_day<<" |temperature_threshold_night: "<<temperature_threshold_night<<" |thresholds: "<<thresholds.at(3)<<" |classes:"<<classes.at(1)<<std::endl;
+
+	//solar_zenith_angle_raster->setRepresentation(GenericRaster::Representation::OPENCL);
+
+	DataDescription out_dd(GDT_Float32, std::min(temperature_threshold_day, temperature_threshold_night), std::max(temperature_threshold_day, temperature_threshold_night)); // no no_data //raster->dd.has_no_data, output_no_data);
+	out_dd.addNoData();
+	auto raster_out = GenericRaster::create(out_dd, *solar_zenith_angle_raster, GenericRaster::Representation::CPU);
+
+	//RasterOpenCL::CLProgram prog;
+	//	prog.setProfiler(profiler);
+	//	prog.addOutRaster(raster_out.get());
+	//	prog.addInRaster(solar_zenith_angle_raster.get());
+	//	prog.compile(operators_msat_classification_kernels, "valueClassificationKernel");
+	//	prog.addArg(thresholds);
+	//	prog.addArg(classes);
+	//	prog.addArg(2);
+	//	prog.run();
+
+
+	callBinaryOperatorFunc<PlsNoDontDoThis>(solar_zenith_angle_raster.get(), raster_out.get(), thresholds, classes, 2);
+	return raster_out;
 }

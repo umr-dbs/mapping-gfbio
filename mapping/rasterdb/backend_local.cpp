@@ -125,7 +125,7 @@ RasterDBBackend::rasterid LocalRasterDBBackend::createRaster(int channel, double
 	stmt.bind(2, time_start);
 	stmt.bind(3, time_end);
 	if (stmt.next()) {
-		std::cerr << "createRaster: returning existing raster\n";
+		std::cerr << "createRaster: returning existing raster for " << time_start << " -> " << time_end << "\n";
 		return stmt.getInt64(0);
 	}
 	stmt.finalize();

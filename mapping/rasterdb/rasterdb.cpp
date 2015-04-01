@@ -278,7 +278,7 @@ void RasterDB::import(const char *filename, int sourcechannel, int channelid, do
 	bool need_flipx = raster_flipx != crs_flipx;
 	bool need_flipy = raster_flipy != crs_flipy;
 
-	printf("GDAL: %d %d\nCRS:  %d %d\nflip: %d %d\n", raster_flipx, raster_flipy, crs_flipx, crs_flipy, need_flipx, need_flipy);
+	//printf("GDAL: %d %d\nCRS:  %d %d\nflip: %d %d\n", raster_flipx, raster_flipy, crs_flipx, crs_flipy, need_flipx, need_flipy);
 
 	if (need_flipx || need_flipy) {
 		raster = raster->flip(need_flipx, need_flipy);
@@ -316,6 +316,8 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 */
 	uint32_t tilesize = DEFAULT_TILE_SIZE;
 
+	printf("starting import for raster of size %d x %d, time %f -> %f\n", raster->width, raster->height, time_start, time_end);
+
 	auto rasterid = backend->createRaster(channelid, time_start, time_end, raster->md_string, raster->md_value);
 
 	for (int zoom=0;;zoom++) {
@@ -327,10 +329,10 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 		GenericRaster *zoomedraster = raster;
 		std::unique_ptr<GenericRaster> zoomedraster_guard;
 		if (zoom > 0) {
-			printf("Scaling for zoom %d to %u x %u x %u pixels\n", zoom, crs->size[0] / zoomfactor, crs->size[1] / zoomfactor, crs->size[2] / zoomfactor);
+			printf("  Scaling for zoom %d to %u x %u x %u pixels\n", zoom, crs->size[0] / zoomfactor, crs->size[1] / zoomfactor, crs->size[2] / zoomfactor);
 			zoomedraster_guard = raster->scale(crs->size[0] / zoomfactor, crs->size[1] / zoomfactor, crs->size[2] / zoomfactor);
 			zoomedraster = zoomedraster_guard.get();
-			printf("done scaling\n");
+			printf("  done scaling\n");
 		}
 
 		/*for (uint32_t zoff = 0; zoff == 0 || zoff < zoomedraster->lcrs.size[2]; zoff += tilesize)*/ {
@@ -341,21 +343,19 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 				for (uint32_t xoff = 0; xoff < zoomedraster->width; xoff += tilesize) {
 					uint32_t xsize = std::min(zoomedraster->width - xoff, tilesize);
 
-					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
+					printf("    importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
 					if (backend->hasTile(rasterid, xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom)) {
-						printf(" skipping..\n");
+						printf("      skipping..\n");
 						continue;
 					}
 
 					auto tile = GenericRaster::create(channels[channelid]->dd, SpatioTemporalReference::unreferenced(), xsize, ysize, zsize);
 					tile->blit(zoomedraster, -(int)xoff, -(int)yoff, -(int)zoff);
-					printf("done blitting\n");
 
 					auto buffer = RasterConverter::direct_encode(tile.get(), compression);
-					printf("done compressing, method %d, size: %ld -> %ld (%f)\n", (int) compression, tile->getDataSize(), buffer->size, (double) buffer->size / tile->getDataSize());
 
 					backend->writeTile(rasterid, *buffer, xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, compression);
-					printf("done importing\n");
+					printf("    tile saved, compression %d, size: %ld -> %ld (%f)\n", (int) compression, tile->getDataSize(), buffer->size, (double) buffer->size / tile->getDataSize());
 				}
 			}
 		}

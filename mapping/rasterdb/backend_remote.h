@@ -29,9 +29,6 @@ class RemoteRasterDBBackend : public RasterDBBackend {
 		static const uint8_t COMMAND_READTILE = 18;
 
 		virtual std::string readJSON();
-		virtual rasterid createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value);
-		virtual void writeTile(rasterid rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression);
-
 
 		virtual RasterDescription getClosestRaster(int channelid, double timestamp);
 		virtual void readAttributes(rasterid rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value);

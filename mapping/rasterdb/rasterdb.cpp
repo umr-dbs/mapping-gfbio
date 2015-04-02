@@ -363,6 +363,14 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 }
 
 
+void RasterDB::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
+	if (!isWriteable())
+		throw SourceException("Cannot link rasters in a source opened as read-only");
+
+	backend->linkRaster(channelid, time_of_reference, time_start, time_end);
+}
+
+
 template<typename T1, typename T2>
 struct raster_transformed_blit {
 	static void execute(Raster2D<T1> *raster_dest, Raster2D<T2> *raster_src, int destx, int desty, int destz, double offset, double scale) {

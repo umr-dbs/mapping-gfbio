@@ -156,6 +156,25 @@ static void import(int argc, char *argv[]) {
 	}
 }
 
+// link <sourcename> <channel> <reference_time> <new_time_start> <new_duration>
+static void link(int argc, char *argv[]) {
+	if (argc < 7) {
+		usage();
+	}
+	try {
+		auto db = RasterDB::open(argv[2], RasterDB::READ_WRITE);
+		int channelid = atoi(argv[3]);
+		double time_reference = atof(argv[4]);
+		double time_start = atof(argv[5]);
+		double duration = atof(argv[6]);
+		db->linkRaster(channelid, time_reference, time_start, time_start+duration);
+	}
+	catch (std::exception &e) {
+		printf("Failure: %s\n", e.what());
+	}
+}
+
+
 static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {
 	epsg_t epsg = (epsg_t) root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
 	double x1 = root.get("query_x1", -20037508).asDouble();
@@ -343,6 +362,9 @@ int main(int argc, char *argv[]) {
 	}
 	else if (strcmp(command, "import") == 0) {
 		import(argc, argv);
+	}
+	else if (strcmp(command, "link") == 0) {
+		link(argc, argv);
 	}
 	else if (strcmp(command, "query") == 0) {
 		runquery(argc, argv);

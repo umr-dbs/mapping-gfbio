@@ -44,3 +44,17 @@ void RasterDBBackend::RasterDescription::toStream(BinaryStream &stream) const {
 	stream.write(time_start);
 	stream.write(time_end);
 }
+
+
+
+RasterDBBackend::rasterid RasterDBBackend::createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value) {
+	throw std::runtime_error("RasterDBBackend::createRaster() not implemented in this backend");
+}
+
+void RasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression) {
+	throw std::runtime_error("RasterDBBackend::writeTile() not implemented in this backend");
+}
+
+void RasterDBBackend::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
+	throw std::runtime_error("RasterDBBackend::linkRaster() not implemented in this backend");
+}

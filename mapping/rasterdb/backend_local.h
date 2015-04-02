@@ -17,6 +17,7 @@ class LocalRasterDBBackend : public RasterDBBackend {
 		virtual std::string readJSON();
 		virtual rasterid createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value);
 		virtual void writeTile(rasterid rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression);
+		virtual void linkRaster(int channelid, double time_of_reference, double time_start, double time_end);
 
 
 		virtual RasterDescription getClosestRaster(int channelid, double timestamp);

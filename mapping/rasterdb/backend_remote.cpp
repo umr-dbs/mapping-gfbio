@@ -48,13 +48,6 @@ std::string RemoteRasterDBBackend::readJSON() {
 	return json;
 }
 
-RasterDBBackend::rasterid RemoteRasterDBBackend::createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value) {
-	throw std::runtime_error("RemoteRasterDBBackend::createRaster() not implemented");
-}
-
-void RemoteRasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression) {
-	throw std::runtime_error("RemoteRasterDBBackend::writeTile() not implemented");
-}
 
 RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
 	auto c = COMMAND_GETCLOSESTRASTER;

@@ -218,6 +218,40 @@ void LocalRasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint
 	stmt.exec();
 }
 
+void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
+	auto rd = getClosestRaster(channelid, time_of_reference);
+
+	if (time_end > rd.time_start && time_start < rd.time_end)
+		throw SourceException("Cannot link rasters with overlapping time intervals");
+
+	// Create the new raster
+	SQLiteStatement stmt(db);
+	stmt.prepare("INSERT INTO rasters (channel, time_start, time_end) VALUES (?,?,?)");
+	stmt.bind(1, channelid);
+	stmt.bind(2, time_start);
+	stmt.bind(3, time_end);
+	stmt.exec();
+	auto rasterid = db.getLastInsertId();
+	stmt.finalize();
+
+	// Copy all attributes
+	SQLiteStatement stmt_attr(db);
+	stmt_attr.prepare("INSERT INTO attributes (rasterid, isstring, key, value) SELECT ? AS rasterid, isstring, key, value FROM attributes WHERE rasterid = ?");
+	stmt_attr.bind(1, rasterid);
+	stmt_attr.bind(2, rd.rasterid);
+	stmt_attr.exec();
+
+	// Copy all tiles
+	// Note: this will assign new IDs to the copies, so they will be stored twice in the tileserver cache
+	SQLiteStatement stmt_tiles(db);
+	stmt_tiles.prepare("INSERT INTO tiles (rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression)"
+		" SELECT ? AS rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression FROM tiles WHERE rasterid = ?");
+	stmt_tiles.bind(1, rasterid);
+	stmt_tiles.bind(2, rd.rasterid);
+	stmt_tiles.exec();
+}
+
+
 RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
 	// find a raster that's valid during the given timestamp
 	SQLiteStatement stmt(db);

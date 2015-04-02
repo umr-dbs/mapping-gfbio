@@ -8,9 +8,6 @@
 #include "sofos_constants.h"
 #include "datatypes/plots/histogram.h"
 
-#include <iostream>
-#include <fstream>
-
 #include <memory>
 #include <math.h>
 //#include <time.h>
@@ -21,193 +18,23 @@ class MSATGccThermThresholdDetectionOperator : public GenericOperator {
 	public:
 		MSATGccThermThresholdDetectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &/*params*/);
 		virtual ~MSATGccThermThresholdDetectionOperator();
-
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+
+	private:
+		double findGccThermThreshold(Histogram *histogram);
+		const double bucket_size{1.0/2.0}; //this is the bucket size used for the histogram(s)
+		const int minimum_increasing_buckets_for_rising_trend{3}; //threshold detection phase 1 uses this to determine the minimum between cloud and land peak
+		const int minimum_soft_falling_buckets{2}; //threshold detection phase 2 uses this to detect a cloud peak merged into the land peak
+		const double minimum_land_peak_temperature{-1}; //this is the minimum land peak temperature
+		const double minimum_cloud_threshold_temperature{-12}; //this is the minimum valid cloud threshold temperature
+		const double cloud_minimum_and_peak_ratio{0.85}; //ratio to determine if the minimum between land and cloud peak is ?distinct?
+		const double merged_peaks_bucket_ratio_bound_lower{0.95}; //default is 0.8
+		const double merged_peaks_bucket_ratio_bound_higher{1.05}; //default is 1
 };
 
 
 #include "operators/msat/classification_kernels.cl.h"
-
-
-//template<typename T1, typename T2>
-//struct CreateHistogramPairFunction{
-//	static std::pair<Histogram, Histogram> execute(Raster2D<T1> *bt108_minus_bt039_raster, Raster2D<T2> *sza_raster, int bucket_scale, double sza_day_min, double sza_day_max, double sza_night_min, double sza_night_max) {
-//		bt108_minus_bt039_raster->setRepresentation(GenericRaster::Representation::CPU);
-//		sza_raster->setRepresentation(GenericRaster::Representation::CPU);
-//
-//	   //get min and max
-//		double bt108_minus_bt039_min = bt108_minus_bt039_raster->dd.min;
-//		double bt108_minus_bt039_max = bt108_minus_bt039_raster->dd.max;
-//
-//		auto bt108_minus_bt039_raster_range = RasterTypeInfo<T1>::getRange(bt108_minus_bt039_min, bt108_minus_bt039_max);
-//
-//		auto buckets = bt108_minus_bt039_raster_range*bucket_scale;
-//		Histogram day_histogram = Histogram{static_cast<int>(buckets), static_cast<double>(bt108_minus_bt039_min), static_cast<double>(bt108_minus_bt039_max)};
-//		Histogram night_histogram = Histogram{static_cast<int>(buckets), static_cast<double>(bt108_minus_bt039_min), static_cast<double>(bt108_minus_bt039_max)};
-//
-//		int size_a = bt108_minus_bt039_raster->getPixelCount();
-//		int size_b = sza_raster->getPixelCount();
-//
-//		if(size_a != size_b){
-//			//do something here
-//		}
-//
-//	   for (int i=0;i<size_a;i++) {
-//		   T1 value = bt108_minus_bt039_raster->data[i];
-//		   T2 condition = sza_raster->data[i];
-//		   if (bt108_minus_bt039_raster->dd.is_no_data(value) || sza_raster->dd.is_no_data(condition)){
-//			   day_histogram.incNoData();
-//		   	   night_histogram.incNoData();
-//		   }
-//		   else if(condition >= sza_day_min && condition <= sza_day_max) {
-//			   day_histogram.inc(value);
-//		   	   night_histogram.incNoData();
-//		   }
-//		   else if(condition >= sza_night_min && condition <= sza_night_max){
-//			   day_histogram.incNoData();
-//			   night_histogram.inc(value);
-//		   }
-//		   else{ //solar zenith angle indicates twilight
-//			   day_histogram.incNoData();
-//			   night_histogram.incNoData();
-//		   }
-//	   }
-//	   return std::pair<Histogram,Histogram>{day_histogram, night_histogram};
-//	}
-//};
-
-template<typename T1, typename T2>
-struct CreateConditionalHistogramFunction{
-	static std::unique_ptr<Histogram> execute(Raster2D<T1> *value_raster, Raster2D<T2> *condition_raster, double bucket_size, double condition_min, double condition_max) {
-		value_raster->setRepresentation(GenericRaster::Representation::CPU);
-		condition_raster->setRepresentation(GenericRaster::Representation::CPU);
-
-	   //get min and max
-		T1 value_raster_min = (T1) value_raster->dd.min;
-		T1 value_raster_max = (T1) value_raster->dd.max;
-
-		auto value_raster_range = RasterTypeInfo<T1>::getRange(value_raster_min, value_raster_max);
-
-		auto buckets = std::ceil(value_raster_range/bucket_size);
-
-		std::cerr<<"min: "<<value_raster_min<<" |max: "<<value_raster_max<<" |range: "<<value_raster_range<<" |buckets:"<<buckets<<std::endl;
-
-		auto histogram_ptr = std::make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
-
-		int size_a = value_raster->getPixelCount();
-		int size_b = condition_raster->getPixelCount();
-
-		if(size_a != size_b){
-			//do something here
-		}
-
-	   for (int i=0;i<size_a;i++) {
-		   T1 value = value_raster->data[i];
-		   T2 condition_value = condition_raster->data[i];
-		   if (value_raster->dd.is_no_data(value) || condition_raster->dd.is_no_data(condition_value)){
-			   histogram_ptr->incNoData();
-		   }
-		   else if(condition_value >= condition_min && condition_value < condition_max) {
-			   histogram_ptr->inc(value);
-		   }
-		   else{
-			   histogram_ptr->incNoData();
-		   }
-	   }
-
-	   return histogram_ptr;
-	}
-};
-
-
-double findGccThermThreshold(Histogram &histogram, const double minimum_land_peak_temperature, const int minimum_increasing_bins_for_rising_trend){
-
-	/**start: find the land peak**/
-
-	//start with the minimum
-	double land_peak_temperature = minimum_land_peak_temperature;
-	int land_peak_bucket = -1;
-
-	//if there are buckets above the minimum_land_peak_temperature search the max -> real land peak
-	if(histogram.getMax() > minimum_land_peak_temperature){
-		land_peak_bucket = histogram.calculateBucketForValue(minimum_land_peak_temperature);
-		int land_peak_count = histogram.getCountForBucket(land_peak_bucket);
-
-		for(int i = land_peak_bucket; i < histogram.getNumberOfBuckets(); i++){
-			int tempCount = histogram.getCountForBucket(i);
-			if(tempCount > land_peak_count){
-				land_peak_count = tempCount;
-				land_peak_bucket = i;
-			}
-		}
-		land_peak_temperature = histogram.calculateBucketLowerBorder(land_peak_bucket);
-	}
-	histogram.addMarker(land_peak_temperature, "landpeak: "+std::to_string(land_peak_temperature)+" bucket: "+std::to_string(land_peak_bucket));
-	/**end: find the land peak*/
-
-
-	/**second we need to find a rising trend (indicated by **/
-	int minimum_between_land_and_cloud_peak_bucket = land_peak_bucket;
-	//int minimum_between_land_and_cloud_peak_bucket_count = 0;
-	int increasing_buckets = 0;
-
-	for(int i = land_peak_bucket-1; i >= 0; i--){
-		int bucket_count = histogram.getCountForBucket(i);
-
-	   if(bucket_count > histogram.getCountForBucket(i+1)){
-		   increasing_buckets += 1;
-
-		  if(increasing_buckets >= minimum_increasing_bins_for_rising_trend)
-			   break;
-	   }
-	   else{
-		   increasing_buckets = std::max(increasing_buckets-1, 0);
-
-		   if(bucket_count < histogram.getCountForBucket(minimum_between_land_and_cloud_peak_bucket))
-			   minimum_between_land_and_cloud_peak_bucket = i;
-	   }
-	}
-	double minimum_between_land_and_cloud_peak_value = histogram.calculateBucketLowerBorder(minimum_between_land_and_cloud_peak_bucket);
-	histogram.addMarker(minimum_between_land_and_cloud_peak_value, "minimum: "+std::to_string(minimum_between_land_and_cloud_peak_value)+" bucket: "+std::to_string(minimum_between_land_and_cloud_peak_bucket));
-
-
-	/**now we know the bucket of the cloud threshold :) **/
-
-	return minimum_between_land_and_cloud_peak_value;//minimum_between_land_and_cloud_peak_bucket;
-}
-
-template<typename T1, typename T2>
-struct PlsNoDontDoThis{
-	static void execute(Raster2D<T1> *sza_raster, Raster2D<T2> *out_raster, std::vector<float> classification_thresholds, std::vector<float> classification_classes, int number_of_classes) {
-
-		int width = out_raster->width;
-		int height = out_raster->height;
-
-		for(int i = 0; i < width; i++){
-			for (int j = 0; j < height; j++){
-		//start with NAN
-			T2 outputValue = out_raster->dd.no_data;
-			T1 inputValue = sza_raster->getSafe(i,j);
-
-				for(int k=0; k<number_of_classes; k++) {
-					float lowerThreshold = classification_thresholds[2*k];
-					float upperThreshold = classification_thresholds[2*k+1];
-
-					if( (inputValue >= lowerThreshold) && (inputValue <= upperThreshold) ){
-						outputValue = classification_classes[k];
-					}
-
-					//printf("OCL gid = %d, inputValue = %f, temp = %f, lowerThreshold = %f, upperThreshold = %f , outputValue= %f \n", gid, inputValue, outputValue, lowerThreshold, upperThreshold, outputValue);
-				}
-
-			out_raster->setSafe(i,j,outputValue);
-
-			}
-		}
-
-	}
-};
-
 
 MSATGccThermThresholdDetectionOperator::MSATGccThermThresholdDetectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
@@ -216,65 +43,293 @@ MSATGccThermThresholdDetectionOperator::~MSATGccThermThresholdDetectionOperator(
 }
 REGISTER_OPERATOR(MSATGccThermThresholdDetectionOperator, "msatgccthermthresholddetection");
 
+template<typename T1, typename T2>
+struct RasterClassification{
+	static void execute(Raster2D<T1> *sza_raster, Raster2D<T2> *out_raster, std::vector<float> classification_bounds_lower, std::vector<float> classification_bounds_upper, std::vector<float> classification_classes) {
+
+		int width = out_raster->width;
+		int height = out_raster->height;
+
+		for(int i = 0; i < width; i++){
+			for (int j = 0; j < height; j++){
+
+			T2 outputValue = out_raster->dd.no_data; //start with no data
+			T1 inputValue = sza_raster->getSafe(i,j);
+
+				for(size_t k=0; k<classification_classes.size(); k++) {
+					float lowerThreshold = classification_bounds_lower[k];
+					float upperThreshold = classification_bounds_upper[k];
+
+					if( (inputValue >= lowerThreshold) && (inputValue <= upperThreshold) ){
+						outputValue = classification_classes[k];
+					}
+				}
+			out_raster->setSafe(i,j,outputValue);
+			}
+		}
+	}
+};
 
 
-std::unique_ptr<GenericRaster>  MSATGccThermThresholdDetectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
-	std::ofstream logfile( "/tmp/loggcctherm.txt" );
+template<typename T1, typename T2>
+struct ConditionalFillHistogramFunction{
+	static void execute(Raster2D<T1> *value_raster, Raster2D<T2> *condition_raster, Histogram *histogram, double condition_min, double condition_max) {
+		value_raster->setRepresentation(GenericRaster::Representation::CPU);
+		condition_raster->setRepresentation(GenericRaster::Representation::CPU);
 
+		int size_a = value_raster->getPixelCount();
+		int size_b = condition_raster->getPixelCount();
+		if(size_a != size_b){
+			//do something here
+		}
 
+	   for (int i=0;i<size_a;i++) {
+		   T1 value = value_raster->data[i];
+		   T2 condition_value = condition_raster->data[i];
+		   if (value_raster->dd.is_no_data(value) || condition_raster->dd.is_no_data(condition_value)){
+			   histogram->incNoData();
+		   }
+		   else if(condition_value >= condition_min && condition_value < condition_max) {
+			   histogram->inc(value);
+		   }
+		   else{
+			   histogram->incNoData();
+		   }
+	   }
+
+	   return;
+	}
+};
+
+/**
+ * This function determines the bucket of the land_peak
+ */
+int phase1FindLandPeakBucket(Histogram *histogram, const double minimum_land_peak_temperature){
+
+	//set the land_peak_bucket to the bucket containing the minimum_land_peak_temperature
+	int land_peak_bucket = histogram->calculateBucketForValue(minimum_land_peak_temperature);
+
+	//if there are buckets above the land_peak_bucket calculated for the minimum_land_peak_temperature -> search the bucket with max. count. This is the real land peak.
+	if(histogram->getMax() > minimum_land_peak_temperature){
+		int land_peak_count = histogram->getCountForBucket(land_peak_bucket);
+		for(int i = land_peak_bucket; i < histogram->getNumberOfBuckets(); i++){
+			int tempCount = histogram->getCountForBucket(i);
+			if(tempCount > land_peak_count){
+				land_peak_count = tempCount;
+				land_peak_bucket = i;
+			}
+		}
+	}
+	return (land_peak_bucket);
+}
+
+/**
+ * This function determines the bucket of the minimum between a land and cloud peak (and the number of increasing buckets):
+ * The minimum is indicated by at least 'minimum_increasing_buckets_for_rising_trend' buckets with greater values on the cloud peak side.
+ */
+std::pair<int,int> phase1FindMinimumWithRisingTrendBetweenLandAndCloudPeak(Histogram *histogram, const double minimum_increasing_buckets_for_rising_trend, const int land_peak_bucket){
+
+	int minimum_between_land_and_cloud_peak_bucket = land_peak_bucket;
+	int increasing_buckets = 0;
+	/** starting from land peak bucket we are searching buckets at lower positions with rising counts.
+	 ** TODO: this approach is strange as it allows a pattern like 10 11 12 -10 9 8 7 with minimum_increasing_buckets_for_rising_trend = 4.
+	 ** 	One solution would be: if there is a new minimum -> increasing_buckets should be reset to 0....
+	 **/
+	for(int i = land_peak_bucket-1; i >= 0; i--){
+		int bucket_count = histogram->getCountForBucket(i);
+		   if(bucket_count > histogram->getCountForBucket(i+1)){
+		   increasing_buckets += 1;
+		  if(increasing_buckets >= minimum_increasing_buckets_for_rising_trend)
+			   break;
+	   }
+	   else{
+		   increasing_buckets = std::max(increasing_buckets-1, 0);
+		   if(bucket_count < histogram->getCountForBucket(minimum_between_land_and_cloud_peak_bucket))
+			   minimum_between_land_and_cloud_peak_bucket = i;
+	   }
+	}
+	return (std::pair<int,int>{minimum_between_land_and_cloud_peak_bucket, increasing_buckets});
+}
+
+/**
+ * This function determines the cloud peak at a position <(=) minimum_between_land_and_cloud_peak_bucket
+ */
+int phase1FindCloudPeakBucket(Histogram *histogram, const int minimum_between_land_and_cloud_peak_bucket){
+	//start at the minimum between bucket
+	int cloud_peak_bucket = minimum_between_land_and_cloud_peak_bucket;
+	//now simply find the maximum
+	for(int i = minimum_between_land_and_cloud_peak_bucket; i >= 0; i--){
+		if(histogram->getCountForBucket(i) > histogram->getCountForBucket(minimum_between_land_and_cloud_peak_bucket)){
+			cloud_peak_bucket = i;
+		}
+	}
+	return (cloud_peak_bucket);
+}
+
+/**
+ * This function detects a cloud peak merged into a land peak
+ */
+int phase2FindMergedPeaksBucket(Histogram *histogram, const int minimum_soft_falling_buckets, const int land_peak_bucket, const double bucket_ratio_bound_lower,  const double bucket_ratio_bound_higher){
+	int merged_peeks_soft_falling_bucket = 0;
+	int soft_falling_buckets = 0;
+	for(int i = land_peak_bucket-1; i >= 0; i--){
+		double bucket_ratio = static_cast<double>(histogram->getCountForBucket(i)) / static_cast<double>(histogram->getCountForBucket(i+1));
+			if((bucket_ratio > bucket_ratio_bound_lower) & (bucket_ratio <=bucket_ratio_bound_higher)){
+				soft_falling_buckets += 1;
+			if(soft_falling_buckets >= minimum_soft_falling_buckets){
+				merged_peeks_soft_falling_bucket = i + soft_falling_buckets; //go back to the start of the matching buckets
+				break;
+			}
+		}
+		else{
+			soft_falling_buckets = 0;
+		}
+	}
+	return (merged_peeks_soft_falling_bucket);
+}
+
+/**
+ * This function detects a dynamic threshold for seperating cloudy pixels from land (or sea) pixels based on IR10.8-IR03.9 and the solar zenith angle of a meteosat scene based on:
+ * Cermak, Jan. SOFOS - A New Satellite-based Operational Fog Observation Scheme. http://archiv.ub.uni-marburg.de/diss/z2006/0149. Philipps-Universität Marburg, 2006. [Page 45ff].
+ * Please note: The implementation is based on the original FORTRAN sources which includes numerous changes/adaptations not reflected in the publication.
+ * Additionally note: SOFOS was developed for a region that resembles the BBOX of Europe. Validation for other regions or region sizes other than 767px*510px is still needed!
+ */
+double MSATGccThermThresholdDetectionOperator::findGccThermThreshold(Histogram *histogram/*, const double minimum_land_peak_temperature, const double minimum_cloud_threshold_temperature, const int minimum_increasing_bins_for_rising_trend, const int minimum_soft_falling_buckets */){
+
+	/** PHASE 1 **/
+
+	/**phase 1: The first step is to find the bucket of the land peak in the histogram**/
+	int land_peak_bucket = phase1FindLandPeakBucket(histogram, this-> minimum_land_peak_temperature);
+
+	/**phase 1: If there is a clear minimum between the land peak and the (still to find) cloud peak this is the cloud threshold.
+	 **			The minimum is indicated by 'rising trend of minimum_increasing_buckets_for_rising_trend' buckets.
+	 **/
+	std::pair<int,int> minimum_between_and_increasing_buckets = phase1FindMinimumWithRisingTrendBetweenLandAndCloudPeak(histogram, this->minimum_increasing_buckets_for_rising_trend, land_peak_bucket);
+	int minimum_between_land_and_cloud_peak_bucket = minimum_between_and_increasing_buckets.first;
+	int increasing_buckets = minimum_between_and_increasing_buckets.second; //TODO remove this and change return value to int
+
+	/** new we need to find the cloud peek which should be the maximum bucket below the minimum_between_land_and_cloud_peak_bucket**/
+	int cloud_peak_bucket = phase1FindCloudPeakBucket(histogram, minimum_between_land_and_cloud_peak_bucket);
+
+	/** PHASE 2 **/
+
+	/** phase2: if there are no clear differentiated peeks we must use a different method to identify the cloud threshold.
+	 ** 		Find the point where the falling slope of the land peak decreases significantly
+	 **/
+	int merged_peeks_soft_falling_bucket = phase2FindMergedPeaksBucket(histogram, this->minimum_soft_falling_buckets, land_peak_bucket, this->merged_peaks_bucket_ratio_bound_lower, this->merged_peaks_bucket_ratio_bound_higher);
+
+	/** now we know the buckets of the peaks and the minimum and can get the values **/
+	double land_peak_value = histogram->calculateBucketLowerBorder(land_peak_bucket);
+	double minimum_between_land_and_cloud_peak_value = histogram->calculateBucketLowerBorder(minimum_between_land_and_cloud_peak_bucket);
+	double cloud_peak_value = histogram->calculateBucketLowerBorder(cloud_peak_bucket);
+	double merged_peeks_soft_falling_value = histogram->calculateBucketLowerBorder(merged_peeks_soft_falling_bucket);
+
+	/** check if the minimum is a valid cloud threshold **/
+	bool cant_use_minimum_as_cloud_threshold =	(increasing_buckets < minimum_increasing_buckets_for_rising_trend) | // rising trends was not met TODO: this is always covered by the next check and could be removed (if the histogram is not to small)
+											(minimum_between_land_and_cloud_peak_value < minimum_cloud_threshold_temperature) | // cloud_threshold is to cold
+											((cloud_peak_bucket != minimum_between_land_and_cloud_peak_bucket) & ((minimum_between_land_and_cloud_peak_value/cloud_peak_value)>cloud_minimum_and_peak_ratio)); //exp: cloud area is to flat
+
+	/**add annotations for peaks and minimum **/
+	histogram->addMarker(land_peak_value, "landpeak: "+std::to_string(land_peak_value)+" bucket: "+std::to_string(land_peak_bucket));
+	histogram->addMarker(minimum_between_land_and_cloud_peak_value, "minimum: "+std::to_string(minimum_between_land_and_cloud_peak_value)+" bucket: "+std::to_string(minimum_between_land_and_cloud_peak_bucket)+" cant use: "+std::to_string(cant_use_minimum_as_cloud_threshold));
+	histogram->addMarker(cloud_peak_value, "cloudpeak: "+std::to_string(cloud_peak_value)+" bucket: "+std::to_string(cloud_peak_bucket));
+	histogram->addMarker(merged_peeks_soft_falling_value, "mergedpeeks soft falling: "+std::to_string(merged_peeks_soft_falling_value)+" bucket: "+std::to_string(merged_peeks_soft_falling_bucket));
+
+	/** now decide if we shoud use the minimum between peeks or the merged peeks value**/
+	if(cant_use_minimum_as_cloud_threshold){
+		return (merged_peeks_soft_falling_value); //return merged peeks value
+	}else{
+		return (minimum_between_land_and_cloud_peak_value); //return minimum between peeks value
+	}
+}
+
+std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	//get the input rasters
 	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, profiler);
 	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, profiler);
 
+	//setup the profiler
 	Profiler::Profiler p("MSATGCCTHERMTHRESHOLDDETECTION_OPERATOR");
+
+	//move rasters to cpu if needed
 	solar_zenith_angle_raster->setRepresentation(GenericRaster::CPU);
 	bt108_minus_bt039_raster->setRepresentation(GenericRaster::CPU);
 
-	double bucket_size = 1.0/3.0;
-	int increasing_buckets_for_rising_trend = 4;
-	int minimum_values_in_histogram = 500;
-	double minimum_land_peak_temperature = -1;
-	double temperature_threshold_night, temperature_threshold_day = -1;
+	//get min and max values and calculate the needed buckets
+	double value_raster_min = bt108_minus_bt039_raster->dd.min;
+	double value_raster_max = bt108_minus_bt039_raster->dd.max;
+	int buckets = static_cast<int>(std::ceil((value_raster_max-value_raster_min)/bucket_size));
 
-	logfile<<"bucket_size: "<<bucket_size<<"|increasing_buckets_for_rising_trend: "<<increasing_buckets_for_rising_trend<<"|minimum_land_peak_temperature: "<<minimum_land_peak_temperature<<std::endl;
+	//create the histogram for day mode
+	std::unique_ptr<Histogram> histogram_day_ptr = std::make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
+	//fill the histogram
+	callBinaryOperatorFunc<ConditionalFillHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), histogram_day_ptr.get(), cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
+	//get the threshold
+	double temperature_threshold_day = findGccThermThreshold(histogram_day_ptr.get());
 
-	logfile<<"DAY"<<std::endl;
-	auto histogram_day_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), bucket_size, cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
-	logfile<<histogram_day_ptr->toJSON()<<std::endl;
-	if(histogram_day_ptr->getValidDataCount()>minimum_values_in_histogram)
-		temperature_threshold_day = findGccThermThreshold(*histogram_day_ptr.get(), minimum_land_peak_temperature, increasing_buckets_for_rising_trend);
-	logfile<<"temperature_threshold_day: "<<temperature_threshold_day<<std::endl;
-	auto histogram_night_ptr = callBinaryOperatorFunc<CreateConditionalHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), bucket_size, cloudclass::solar_zenith_angle_min_night, cloudclass::solar_zenith_angle_max_night);
+	//create the histogram for day mode
+	std::unique_ptr<Histogram> histogram_night_ptr = std::make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
+	//fill the histogram
+	callBinaryOperatorFunc<ConditionalFillHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), histogram_night_ptr.get(), cloudclass::solar_zenith_angle_min_night, cloudclass::solar_zenith_angle_max_night);
+	//get the threshold
+	double temperature_threshold_night = findGccThermThreshold(histogram_night_ptr.get());
 
-	logfile<<"NIGHT"<<std::endl;
-	logfile<<histogram_night_ptr->toJSON()<<std::endl;
-	if(histogram_night_ptr->getValidDataCount()>minimum_values_in_histogram)
-		temperature_threshold_night = findGccThermThreshold(*histogram_night_ptr.get(), minimum_land_peak_temperature, increasing_buckets_for_rising_trend);
-	logfile<<"temperature_threshold_night: "<<temperature_threshold_night<<std::endl;
+	//build vectors for classification ->
+	std::vector<float> classification_bounds_lower{static_cast<float>(cloudclass::solar_zenith_angle_min_day), static_cast<float>(cloudclass::solar_zenith_angle_min_night)};
+	std::vector<float> classification_bounds_upper{static_cast<float>(cloudclass::solar_zenith_angle_max_day), static_cast<float>(cloudclass::solar_zenith_angle_max_night)};
+	std::vector<float> classification_classes{static_cast<float>(temperature_threshold_day), static_cast<float>(temperature_threshold_night)};
 
-	//build vectors
-	std::vector<float> thresholds{static_cast<float>(cloudclass::solar_zenith_angle_min_day), static_cast<float>(cloudclass::solar_zenith_angle_max_day), static_cast<float>(cloudclass::solar_zenith_angle_min_night), static_cast<float>(cloudclass::solar_zenith_angle_max_night)};
-	std::vector<float> classes{static_cast<float>(temperature_threshold_day), static_cast<float>(temperature_threshold_night)};
+	//move the zenith_angle_raster to the device
+	solar_zenith_angle_raster->setRepresentation(GenericRaster::Representation::CPU); //TODO: do GPU
 
-	//return std::unique_ptr<GenericPlot>(std::move(histogram_night_ptr));
-	std::cerr<<"temperature_threshold_day: "<<temperature_threshold_day<<" |temperature_threshold_night: "<<temperature_threshold_night<<" |thresholds: "<<thresholds.at(3)<<" |classes:"<<classes.at(1)<<std::endl;
-
-	//solar_zenith_angle_raster->setRepresentation(GenericRaster::Representation::OPENCL);
-
-	DataDescription out_dd(GDT_Float32, std::min(temperature_threshold_day, temperature_threshold_night), std::max(temperature_threshold_day, temperature_threshold_night)); // no no_data //raster->dd.has_no_data, output_no_data);
+	//create the output raster
+	double min = -12;std::min(temperature_threshold_day, temperature_threshold_night);
+	double max = 12;std::max(temperature_threshold_day, temperature_threshold_night);
+	DataDescription out_dd(GDT_Float32, min, max); // no no_data //raster->dd.has_no_data, output_no_data);
 	out_dd.addNoData();
 	auto raster_out = GenericRaster::create(out_dd, *solar_zenith_angle_raster, GenericRaster::Representation::CPU);
 
+	//TODO: figure out why opencl kernel is not working :(
 	//RasterOpenCL::CLProgram prog;
 	//	prog.setProfiler(profiler);
 	//	prog.addOutRaster(raster_out.get());
 	//	prog.addInRaster(solar_zenith_angle_raster.get());
 	//	prog.compile(operators_msat_classification_kernels, "valueClassificationKernel");
-	//	prog.addArg(thresholds);
+	//	prog.addArg(classification_bounds_lower);
+	//	prog.addArg(classification_bounds_upper);
 	//	prog.addArg(classes);
 	//	prog.addArg(2);
 	//	prog.run();
 
 
-	callBinaryOperatorFunc<PlsNoDontDoThis>(solar_zenith_angle_raster.get(), raster_out.get(), thresholds, classes, 2);
-	return raster_out;
+	callBinaryOperatorFunc<RasterClassification>(solar_zenith_angle_raster.get(), raster_out.get(), classification_bounds_lower, classification_bounds_upper, classification_classes);
+	return (raster_out);
+}
+
+std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+	//get the input rasters
+	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, profiler);
+	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, profiler);
+
+	//setup the profiler
+	Profiler::Profiler p("MSATGCCTHERMTHRESHOLDDETECTION_OPERATOR");
+
+	//move rasters to cpu if needed
+	solar_zenith_angle_raster->setRepresentation(GenericRaster::CPU);
+	bt108_minus_bt039_raster->setRepresentation(GenericRaster::CPU);
+
+	//get min and max values and calculate the needed buckets
+	double value_raster_min = bt108_minus_bt039_raster->dd.min;
+	double value_raster_max = bt108_minus_bt039_raster->dd.max;
+	int buckets = static_cast<int>(std::ceil((value_raster_max-value_raster_min)/bucket_size));
+
+	//create the histogram
+	std::unique_ptr<Histogram> histogram_ptr = std::make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
+	//fill the histogram
+	callBinaryOperatorFunc<ConditionalFillHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), histogram_ptr.get(), cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
+	//find the GccThermalThreshold and annotate the histogram
+	findGccThermThreshold(histogram_ptr.get());
+
+	//return the histogram as plot
+	return (std::unique_ptr<GenericPlot>(std::move(histogram_ptr)));;
 }

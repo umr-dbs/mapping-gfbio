@@ -289,7 +289,7 @@ std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster
 	out_dd.addNoData();
 	auto raster_out = GenericRaster::create(out_dd, *solar_zenith_angle_raster, GenericRaster::Representation::CPU);
 
-	//TODO: figure out why opencl kernel is not working :(
+	//TODO: figure out why opencl kernel is not working. NOTE: kernel code does no longer match to the used data structures!
 	//RasterOpenCL::CLProgram prog;
 	//	prog.setProfiler(profiler);
 	//	prog.addOutRaster(raster_out.get());

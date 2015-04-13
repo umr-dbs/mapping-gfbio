@@ -436,7 +436,7 @@ int main() {
 
 		epsg_t query_epsg = epsg_from_param(params, "crs", EPSG_WEBMERCATOR);
 
-		time_t timestamp = 42;
+		time_t timestamp = 1295266500; // 2011-1-17 12:15
 		if (params.count("timestamp") > 0) {
 			timestamp = std::stol(params["timestamp"]);
 		}
@@ -593,6 +593,16 @@ int main() {
 									overlay->print(4, ypos, overlay->dd.max, msg.c_str());
 									ypos += 10;
 								}
+								ypos += 20;
+								overlay->print(4, ypos, overlay->dd.max, "Attributes:");
+								ypos += 10;
+								for (auto val : result_raster->md_value) {
+									std::ostringstream msg;
+									msg << "attribute " << val.first << "=" << val.second;
+									overlay->print(4, ypos, overlay->dd.max, msg.str().c_str());
+									ypos += 10;
+								}
+
 							}
 						}
 

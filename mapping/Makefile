@@ -129,31 +129,31 @@ ${EXETILESERVER}: o/rasterdb_tileserver.o o/rasterdb_backend.o o/rasterdb_backen
 
 
 btw2015_paper_demo_datasource:	${EXE}
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/btw2015_paper_demo.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/btw2015_paper_demo.sh $$(readlink -f ./${EXE})
 
 cruts_datasource:	${EXE}
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/cruts.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/cruts.sh $$(readlink -f ./${EXE})
 
 glc2000_global_datasource:	${EXE}
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/glc2000_global.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/glc2000_global.sh $$(readlink -f ./${EXE})
 
 isric_wise_datasource:	${EXE}
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/isric_wise.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/isric_wise.sh $$(readlink -f ./${EXE})
 
 modis_npp_datasource:
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/modis_npp.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/modis_npp.sh $$(readlink -f ./${EXE})
 
 modis_vcf_datasource:
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/modis_vcf.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/modis_vcf.sh $$(readlink -f ./${EXE})
 
 msat_datasource:	${EXE}
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/msat.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/msat.sh $$(readlink -f ./${EXE})
 
 srtm_datasource:	${EXE}
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/srtm.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/srtm.sh $$(readlink -f ./${EXE})
 
 worldclim_datasource:	${EXE}
-	MAPPING_RASTERDB_LOCAL_PATH=/home/rastersources/ /mnt/data/raster_import/worldclim.sh $$(readlink -f ./${EXE})
+	/mnt/data/raster_import/worldclim.sh $$(readlink -f ./${EXE})
 
 
 	

@@ -29,19 +29,11 @@ class SourceOperator : public GenericOperator {
 // RasterSource Operator
 SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rasterdb(nullptr) {
 	assumeSources(0);
-	std::string fullpath = params.get("sourcepath", "").asString();
 	std::string sourcename = params.get("sourcename", "").asString();
-	if (fullpath.length() > 0 && sourcename.length() > 0)
-		throw OperatorException("SourceOperator: specify sourcepath or sourcename, not both");
-	if (fullpath.length() == 0 && sourcename.length() == 0)
-		throw OperatorException("SourceOperator: missing sourcepath or sourcename");
-	std::string filename;
-	if (fullpath.length() > 0)
-		filename = fullpath;
-	else
-		filename = Configuration::get("operators.rastersource.path", "") + sourcename + std::string(".json");
+	if (sourcename.length() == 0)
+		throw OperatorException("SourceOperator: missing sourcename");
 
-	rasterdb = RasterDB::open(filename.c_str(), RasterDB::READ_ONLY);
+	rasterdb = RasterDB::open(sourcename.c_str(), RasterDB::READ_ONLY);
 	channel = params.get("channel", 0).asInt();
 	transform = params.get("transform", true).asBool();
 }
@@ -49,7 +41,15 @@ SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], J
 SourceOperator::~SourceOperator() {
 }
 
-REGISTER_OPERATOR(SourceOperator, "source");
+REGISTER_OPERATOR(SourceOperator, "rastersource");
+
+// obsolete, keep for backwards compatibility for a while
+class SourceOperator2 : public SourceOperator {
+	public:
+		SourceOperator2(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : SourceOperator(sourcecounts, sources, params) {}
+};
+REGISTER_OPERATOR(SourceOperator2, "source");
+
 
 
 std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {

@@ -1,10 +1,8 @@
 
 #include "rasterdb/backend_local.h"
+#include "util/configuration.h"
 
-//#include <limits.h>
-//#include <stdio.h>
-//#include <cstdlib>
-//#include <string.h>
+
 #include <sys/file.h> // flock()
 #include <sys/types.h> // the next three are for posix open()
 #include <sys/stat.h>
@@ -16,7 +14,7 @@
 
 
 LocalRasterDBBackend::LocalRasterDBBackend(const char *filename, bool writeable)
-	: RasterDBBackend(writeable), lockedfile(-1), filename_json(filename) {
+	: RasterDBBackend(writeable), lockedfile(-1), sourcename(filename) {
 	try {
 		init();
 	}
@@ -31,13 +29,11 @@ LocalRasterDBBackend::~LocalRasterDBBackend() {
 }
 
 void LocalRasterDBBackend::init() {
-	size_t suffixpos = filename_json.rfind(".json");
-	if (suffixpos == std::string::npos || suffixpos != filename_json.length()-5)
-		throw SourceException("LocalRasterDBBackend: filename must end with .json");
+	std::string basepath = Configuration::get("rasterdb.local.path", "") + sourcename;
 
-	std::string basename = filename_json.substr(0, suffixpos);
-	filename_data = basename + ".dat";
-	filename_db = basename + ".db";
+	filename_json = basepath + ".json";
+	filename_data = basepath + ".dat";
+	filename_db = basepath + ".db";
 
 	/*
 	 * Step #1: open the .json file and store its contents
@@ -129,7 +125,7 @@ RasterDBBackend::rasterid LocalRasterDBBackend::createRaster(int channel, double
 	stmt.bind(2, time_start);
 	stmt.bind(3, time_end);
 	if (stmt.next()) {
-		std::cerr << "createRaster: returning existing raster\n";
+		std::cerr << "createRaster: returning existing raster for " << time_start << " -> " << time_end << "\n";
 		return stmt.getInt64(0);
 	}
 	stmt.finalize();
@@ -222,10 +218,44 @@ void LocalRasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint
 	stmt.exec();
 }
 
+void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
+	auto rd = getClosestRaster(channelid, time_of_reference);
+
+	if (time_end > rd.time_start && time_start < rd.time_end)
+		throw SourceException("Cannot link rasters with overlapping time intervals");
+
+	// Create the new raster
+	SQLiteStatement stmt(db);
+	stmt.prepare("INSERT INTO rasters (channel, time_start, time_end) VALUES (?,?,?)");
+	stmt.bind(1, channelid);
+	stmt.bind(2, time_start);
+	stmt.bind(3, time_end);
+	stmt.exec();
+	auto rasterid = db.getLastInsertId();
+	stmt.finalize();
+
+	// Copy all attributes
+	SQLiteStatement stmt_attr(db);
+	stmt_attr.prepare("INSERT INTO attributes (rasterid, isstring, key, value) SELECT ? AS rasterid, isstring, key, value FROM attributes WHERE rasterid = ?");
+	stmt_attr.bind(1, rasterid);
+	stmt_attr.bind(2, rd.rasterid);
+	stmt_attr.exec();
+
+	// Copy all tiles
+	// Note: this will assign new IDs to the copies, so they will be stored twice in the tileserver cache
+	SQLiteStatement stmt_tiles(db);
+	stmt_tiles.prepare("INSERT INTO tiles (rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression)"
+		" SELECT ? AS rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression FROM tiles WHERE rasterid = ?");
+	stmt_tiles.bind(1, rasterid);
+	stmt_tiles.bind(2, rd.rasterid);
+	stmt_tiles.exec();
+}
+
+
 RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
 	// find a raster that's valid during the given timestamp
 	SQLiteStatement stmt(db);
-	stmt.prepare("SELECT id FROM rasters WHERE channel = ? AND time_start <= ? AND time_end > ? ORDER BY time_start DESC limit 1");
+	stmt.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end > ? ORDER BY time_start DESC limit 1");
 	stmt.bind(1, channelid);
 	stmt.bind(2, timestamp);
 	stmt.bind(3, timestamp);

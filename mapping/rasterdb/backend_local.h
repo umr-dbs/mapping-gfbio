@@ -1,7 +1,7 @@
 #ifndef RASTERDB_BACKEND_LOCAL_H
 #define RASTERDB_BACKEND_LOCAL_H
 
-#include "rasterdb/rasterdb.h"
+//#include "rasterdb/rasterdb.h"
 #include "rasterdb/backend.h"
 #include "util/sqlite.h"
 
@@ -10,13 +10,14 @@
 
 class LocalRasterDBBackend : public RasterDBBackend {
 	public:
-		LocalRasterDBBackend(const char *filename, bool writeable = RasterDB::READ_ONLY);
+		LocalRasterDBBackend(const char *filename, bool writeable = false);
 		virtual ~LocalRasterDBBackend();
 
 
 		virtual std::string readJSON();
 		virtual rasterid createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value);
 		virtual void writeTile(rasterid rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression);
+		virtual void linkRaster(int channelid, double time_of_reference, double time_start, double time_end);
 
 
 		virtual RasterDescription getClosestRaster(int channelid, double timestamp);
@@ -31,6 +32,7 @@ class LocalRasterDBBackend : public RasterDBBackend {
 		void cleanup();
 
 		int lockedfile;
+		std::string sourcename;
 		std::string filename_json;
 		std::string filename_data;
 		std::string filename_db;

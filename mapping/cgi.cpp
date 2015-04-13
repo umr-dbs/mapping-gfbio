@@ -432,15 +432,15 @@ int main() {
 		if (!query_string) {
 			//query_string = "geometryquery={\"type\":\"projection\",\"params\":{\"src_epsg\":4326,\"dest_epsg\":3857},\"sources\":{\"geometry\":[{\"type\":\"gfbiogeometrysource\",\"params\":{\"datasource\":\"IUCN\",\"query\":\"{\\\"globalAttributes\\\":{\\\"speciesName\\\":\\\"Puma concolor\\\"},\\\"localAttributes\\\":{}}\"}}]}}&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
 			//query_string = "pointquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22points%22%3A%5B%7B%22type%22%3A%22filterpointsbygeometry%22%2C%22sources%22%3A%7B%22points%22%3A%5B%7B%22type%22%3A%22gfbiopointsource%22%2C%22params%22%3A%7B%22datasource%22%3A%22GBIF%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%2C%22geometry%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
-			query_string = "geometryquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22multipolygons%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
-			//abort("No query string given");
+			//query_string = "geometryquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22multipolygons%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
+			abort("No query string given");
 		}
 
 		std::map<std::string, std::string> params = parseQueryString(query_string);
 
 		epsg_t query_epsg = epsg_from_param(params, "crs", EPSG_WEBMERCATOR);
 
-		time_t timestamp = 42;
+		time_t timestamp = 1295266500; // 2011-1-17 12:15
 		if (params.count("timestamp") > 0) {
 			timestamp = std::stol(params["timestamp"]);
 		}
@@ -602,6 +602,16 @@ int main() {
 									overlay->print(4, ypos, overlay->dd.max, msg.c_str());
 									ypos += 10;
 								}
+								ypos += 20;
+								overlay->print(4, ypos, overlay->dd.max, "Attributes:");
+								ypos += 10;
+								for (auto val : result_raster->md_value) {
+									std::ostringstream msg;
+									msg << "attribute " << val.first << "=" << val.second;
+									overlay->print(4, ypos, overlay->dd.max, msg.str().c_str());
+									ypos += 10;
+								}
+
 							}
 						}
 

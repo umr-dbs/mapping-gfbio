@@ -1,4 +1,4 @@
-#include "datatypes/pointcollection.h"
+#include "datatypes/multipointcollection.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
@@ -11,7 +11,7 @@ class PointsClusterOperator: public GenericOperator {
 		PointsClusterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 		virtual ~PointsClusterOperator();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 PointsClusterOperator::PointsClusterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -22,17 +22,17 @@ PointsClusterOperator::~PointsClusterOperator() {
 }
 REGISTER_OPERATOR(PointsClusterOperator, "points_cluster");
 
-std::unique_ptr<PointCollection> PointsClusterOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<MultiPointCollection> PointsClusterOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	// TODO: EXPECT EPSG:3857
 
-	auto pointsOld = getPointsFromSource(0, rect, profiler);
-	auto pointsNew = std::make_unique<PointCollection>(pointsOld->stref);
+	auto pointsOld = getMultiPointCollectionFromSource(0, rect, profiler);
+	auto pointsNew = std::make_unique<MultiPointCollection>(pointsOld->stref);
 
 	pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(
 													pv::Coordinate((rect.x2 + rect.x1) / (2 * rect.xres), (rect.y2 + rect.y2) / (2 * rect.yres)),
 													pv::Dimension((rect.x2 - rect.x1) / (2 * rect.xres), (rect.y2 - rect.y2) / (2 * rect.yres)),
 												1), 1);
-	for (Point &pointOld : pointsOld->collection) {
+	for (Point &pointOld : pointsOld->points) {
 		clusterer.insert(std::make_shared<pv::Circle>(pv::Coordinate(pointOld.x / rect.xres, pointOld.y / rect.yres), 5, 1));
 	}
 

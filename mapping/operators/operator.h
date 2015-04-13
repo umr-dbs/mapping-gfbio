@@ -14,8 +14,9 @@ namespace Json {
 }
 
 class GenericRaster;
-class PointCollection;
-class GenericGeometry;
+class MultiPointCollection;
+class MultiLineCollection;
+class MultiPolygonCollection;
 class GenericPlot;
 class BinaryStream;
 
@@ -75,7 +76,7 @@ class GenericOperator {
 			LOOSE
 		};
 
-		static const int MAX_INPUT_TYPES = 3;
+		static const int MAX_INPUT_TYPES = 4;
 		static const int MAX_SOURCES = 20;
 		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json, int depth = 0);
 		static std::unique_ptr<GenericOperator> fromJSON(Json::Value &json, int depth = 0);
@@ -83,8 +84,9 @@ class GenericOperator {
 		virtual ~GenericOperator();
 
 		std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
-		std::unique_ptr<PointCollection> getCachedPoints(const QueryRectangle &rect, QueryProfiler &profiler);
-		std::unique_ptr<GenericGeometry> getCachedGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<MultiPointCollection> getCachedMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<MultiLineCollection> getCachedMultiLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<MultiPolygonCollection> getCachedMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		const std::string &getSemanticId() { return semantic_id; }
@@ -92,20 +94,23 @@ class GenericOperator {
 	protected:
 		GenericOperator(int sourcecounts[], GenericOperator *sources[]);
 		virtual void writeSemanticParameters(std::ostringstream &stream);
-		void assumeSources(int rasters, int pointcollections=0, int geometries=0);
+		void assumeSources(int rasters, int multipointcollections=0, int multilinecollections=0, int multipolygoncollections=0);
 
 		int getRasterSourceCount() { return sourcecounts[0]; }
-		int getPointsSourceCount() { return sourcecounts[1]; }
-		int getGeometrySourceCount() { return sourcecounts[2]; }
+		int getMultiPointCollectionSourceCount() { return sourcecounts[1]; }
+		int getMultiLineCollectionSourceCount() { return sourcecounts[2]; }
+		int getMultiPolygonCollectionSourceCount() { return sourcecounts[3]; }
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiLineCollection> getMultiLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
-		std::unique_ptr<PointCollection> getPointsFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
-		std::unique_ptr<GenericGeometry> getGeometryFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<MultiPointCollection> getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<MultiLineCollection> getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
 		// there is no getPlotFromSource, because plots are by definition the final step of a chain
 
 	private:

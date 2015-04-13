@@ -1,4 +1,4 @@
-#include "datatypes/pointcollection.h"
+#include "datatypes/multipointcollection.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "datatypes/plots/histogram.h"
@@ -68,12 +68,12 @@ void Points2HistogramOperator::writeSemanticParameters(std::ostringstream& strea
  * Calculates the histogram and returns it.
  */
 std::unique_ptr<GenericPlot> Points2HistogramOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointsFromSource(0, rect, profiler);
+	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
 
 	//double raster_max = points->global_md_value.get(name + "_max");
 	//double raster_min = points->global_md_value.get(name + "_min");
 
-	size_t pointSize = points->collection.size();
+	size_t pointSize = points->points.size();
 	auto& valueVector = points->local_md_value.getVector(name);
 
 	// detect range automatically

@@ -69,7 +69,7 @@ auto WFSRequest::getFeature() -> std::string {
 	// namespace + points or polygons
 
 	QueryProfiler profiler;
-	auto points = graph->getCachedPoints(
+	auto points = graph->getCachedMultiPointCollection(
 			QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3],
 					output_width, output_height, queryEpsg), profiler);
 
@@ -87,7 +87,7 @@ auto WFSRequest::getFeature() -> std::string {
 	//		</Cluster>
 	// </Filter>
 	if (this->to_bool(parameters["clustered"]) == true) {
-		auto clusteredPoints = std::make_unique<PointCollection>(points->stref);
+		auto clusteredPoints = std::make_unique<MultiPointCollection>(points->stref);
 
 		auto x1 = bbox[0];
 		auto x2 = bbox[2];
@@ -101,7 +101,7 @@ auto WFSRequest::getFeature() -> std::string {
 								(y2 + y1) / (2 * yres)),
 						pv::Dimension((x2 - x1) / (2 * xres),
 								(y2 - y1) / (2 * yres)), 1), 1);
-		for (Point& pointOld : points->collection) {
+		for (Point& pointOld : points->points) {
 			clusterer.insert(
 					std::make_shared<pv::Circle>(
 							pv::Coordinate(pointOld.x / xres,

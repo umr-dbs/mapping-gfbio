@@ -1,7 +1,7 @@
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
-#include "datatypes/pointcollection.h"
-#include "datatypes/geometry.h"
+#include "datatypes/multipointcollection.h"
+#include "datatypes/multipolygoncollection.h"
 #include "datatypes/plot.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
@@ -155,20 +155,22 @@ void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, 
 }
 
 
-void outputPointCollection(PointCollection *points, bool displayMetadata = false) {
+void outputMultiPointCollection(MultiPointCollection *points, bool displayMetadata = false) {
 	print_debug_header();
 	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON(displayMetadata).c_str());
 }
 
-void outputPointCollectionCSV(PointCollection *points) {
+void outputMultiPointCollectionCSV(MultiPointCollection *points) {
 	print_debug_header();
 	printf("Content-type: text/csv\r\nContent-Disposition: attachment; filename=\"export.csv\"\r\n\r\n%s", points->toCSV().c_str());
 }
 
-void outputGeometry(GenericGeometry *geometry) {
+void outputMultiPolygonCollection(MultiPolygonCollection& multiPolygonCollection, bool displayMetadata = false){
 	print_debug_header();
-	printf("Content-type: application/json\r\n\r\n%s", geometry->toGeoJSON().c_str());
+	printf("Content-type: application/json\r\n\r\n%s", multiPolygonCollection.toGeoJSON(displayMetadata).c_str());
 }
+
+//TODO: output for other feature types
 
 bool to_bool(std::string str) {
     std::transform(str.begin(), str.end(), str.begin(), ::tolower);
@@ -428,8 +430,10 @@ int main() {
 
 		const char *query_string = getenv("QUERY_STRING");
 		if (!query_string) {
-			//query_string = "SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image%2Fpng8&TRANSPARENT=true&LAYERS=load&TILED=true&STYLES=dem&CRS=EPSG%3A3857&WIDTH=2571&HEIGHT=1350&BBOX=-8412792.231579678%2C-5618420.447247234%2C16741716.532732407%2C7589898.040431223";
-			abort("No query string given");
+			//query_string = "geometryquery={\"type\":\"projection\",\"params\":{\"src_epsg\":4326,\"dest_epsg\":3857},\"sources\":{\"geometry\":[{\"type\":\"gfbiogeometrysource\",\"params\":{\"datasource\":\"IUCN\",\"query\":\"{\\\"globalAttributes\\\":{\\\"speciesName\\\":\\\"Puma concolor\\\"},\\\"localAttributes\\\":{}}\"}}]}}&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
+			//query_string = "pointquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22points%22%3A%5B%7B%22type%22%3A%22filterpointsbygeometry%22%2C%22sources%22%3A%7B%22points%22%3A%5B%7B%22type%22%3A%22gfbiopointsource%22%2C%22params%22%3A%7B%22datasource%22%3A%22GBIF%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%2C%22geometry%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
+			query_string = "geometryquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22multipolygons%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
+			//abort("No query string given");
 		}
 
 		std::map<std::string, std::string> params = parseQueryString(query_string);
@@ -466,31 +470,36 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 
 			QueryProfiler profiler;
-			auto points = graph->getCachedPoints(QueryRectangle(timestamp, /*-180, -90, 180, 90*/-20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+			auto points = graph->getCachedMultiPointCollection(QueryRectangle(timestamp, /*-180, -90, 180, 90*/-20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
 				format = params["format"];
 			if (format == "csv") {
-				outputPointCollectionCSV(points.get());
+				outputMultiPointCollectionCSV(points.get());
 			}
 			else if (format == "geojsonfull") {
-				outputPointCollection(points.get(), true);
+				outputMultiPointCollection(points.get(), true);
 			}
 			else {
-				outputPointCollection(points.get(), false);
+				outputMultiPointCollection(points.get(), false);
 			}
 			return 0;
 		}
 
 		// Geometry as GeoJSON
+		//TODO migrate to new simplefeaturecollections
 		if (params.count("geometryquery") > 0) {
+			std::string foo = params["geometryquery"];
+
+			std::cerr << foo;
+
 			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
 
 			QueryProfiler profiler;
-			auto geometry = graph->getCachedGeometry(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+			auto geometry = graph->getCachedMultiPolygonCollection(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
-			outputGeometry(geometry.get());
+			outputMultiPolygonCollection(*geometry.get(), false);
 			return 0;
 		}
 

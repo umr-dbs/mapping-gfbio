@@ -33,7 +33,7 @@
 								"params" : 
 								{
 									"channel" : 0,
-									"sourcepath" : "test/data/world1.json"
+									"sourcename" : "world1"
 								},
 								"sources" : 
 								{

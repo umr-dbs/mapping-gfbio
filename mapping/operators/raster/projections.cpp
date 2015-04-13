@@ -1,8 +1,9 @@
 
 #include "datatypes/raster.h"
-#include "datatypes/pointcollection.h"
-#include "datatypes/geometry.h"
+#include "datatypes/multipointcollection.h"
+#include "datatypes/multipolygoncollection.h"
 #include "datatypes/raster/typejuggling.h"
+#include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include "operators/operator.h"
 #include "util/gdal.h"
 #include "util/make_unique.h"
@@ -20,8 +21,8 @@ class ProjectionOperator : public GenericOperator {
 		virtual ~ProjectionOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<GenericGeometry> getGeometry(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 	protected:
 		void writeSemanticParameters(std::ostringstream &stream);
 	private:
@@ -223,11 +224,11 @@ std::unique_ptr<GenericRaster> ProjectionOperator::getRaster(const QueryRectangl
 }
 
 
-std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<MultiPointCollection> ProjectionOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 	if (src_epsg == dest_epsg)
-		return getPointsFromSource(0, rect, profiler);
+		return getMultiPointCollectionFromSource(0, rect, profiler);
 
 
 	// Need to transform "backwards" to project the query rectangle..
@@ -238,7 +239,7 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 	GDAL::CRSTransformer transformer(src_epsg, dest_epsg);
 
 
-	auto points_in = getPointsFromSource(0, src_rect, profiler);
+	auto points_in = getMultiPointCollectionFromSource(0, src_rect, profiler);
 
 	if (src_epsg != points_in->stref.epsg) {
 		std::ostringstream msg;
@@ -246,13 +247,13 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPoints(const QueryRectan
 		throw OperatorException(msg.str());
 	}
 
-	std::vector<bool> keep(points_in->collection.size(), true);
+	std::vector<bool> keep(points_in->points.size(), true);
 	bool has_filter = false;
 
 	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
-	size_t size = points_in->collection.size();
+	size_t size = points_in->points.size();
 	for (size_t idx = 0; idx < size; idx++) {
-		Point &point = points_in->collection[idx];
+		Point &point = points_in->points[idx];
 		double x = point.x, y = point.y;
 		if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
 			keep[idx] = false;
@@ -327,8 +328,8 @@ class ProjectionTransformer: public geos::geom::util::GeometryTransformer {
 		const GDAL::CRSTransformer &transformer;
 };
 
-
-std::unique_ptr<GenericGeometry> ProjectionOperator::getGeometry(const QueryRectangle &rect, QueryProfiler &profiler) {
+//TODO: why is this in raster folder?
+std::unique_ptr<MultiPolygonCollection> ProjectionOperator::getMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (src_epsg == EPSG_GEOSMSG || dest_epsg == EPSG_GEOSMSG)
 		throw OperatorException("Projection: cannot transform Geometries to or from MSAT2 projection");
 	if (dest_epsg != rect.epsg)
@@ -337,21 +338,24 @@ std::unique_ptr<GenericGeometry> ProjectionOperator::getGeometry(const QueryRect
 	GDAL::CRSTransformer qrect_transformer(dest_epsg, src_epsg);
 	QueryRectangle src_rect = projectQueryRectangle(rect, qrect_transformer);
 
-	auto geom_in = getGeometryFromSource(0, src_rect, profiler);
-	if (src_epsg != geom_in->stref.epsg) {
+	//TODO: reproject without GEOS workaround
+
+	auto multiPolygonCollection = getMultiPolygonCollectionFromSource(0, src_rect, profiler);
+
+	auto geom_in = GeosGeomUtil::createGeosGeometry(*multiPolygonCollection);
+
+	if (src_epsg != multiPolygonCollection->stref.epsg) {
 		std::ostringstream msg;
-		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << (int) src_epsg << " got " << (int) geom_in->stref.epsg;
+		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << (int) src_epsg << " got " << (int) multiPolygonCollection->stref.epsg;
 		throw OperatorException(msg.str());
 	}
 
 	GDAL::CRSTransformer geom_transformer(src_epsg, dest_epsg);
 	ProjectionTransformer pt(geom_transformer);
-	auto geom_out = pt.transform(geom_in->getGeometry());
+	auto geom_out = pt.transform(geom_in.get());
 
-	auto out = std::make_unique<GenericGeometry>(SpatioTemporalReference(rect));
-	out->setGeom(geom_out.release());
 
-	return out;
+	return 	GeosGeomUtil::createMultiPolygonCollection(*geom_out.get());
 }
 
 

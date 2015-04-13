@@ -96,6 +96,7 @@ class RasterDB {
 
 	public:
 		void import(const char *filename, int sourcechannel, int channelid, double time_start, double time_end, RasterConverter::Compression compression = RasterConverter::Compression::GZIP);
+		void linkRaster(int channelid, double time_of_reference, double time_start, double time_end);
 		std::unique_ptr<GenericRaster> query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform = true);
 
 		bool isWriteable() const { return writeable; }

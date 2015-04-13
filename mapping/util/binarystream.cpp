@@ -9,6 +9,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <netinet/in.h>
+#include <netdb.h>
 
 
 BinaryStream::BinaryStream() {
@@ -60,6 +62,45 @@ UnixSocket::UnixSocket(const char *server_path) : is_eof(false), read_fd(-1), wr
 	read_fd = new_fd;
 	write_fd = new_fd;
 }
+
+
+UnixSocket::UnixSocket(const char *hostname, int port) : is_eof(false), read_fd(-1), write_fd(-1) {
+	struct addrinfo hints;
+	memset(&hints, 0, sizeof(hints));
+	struct addrinfo *servinfo;
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+
+	char portstr[16];
+	snprintf(portstr, 16, "%d", port);
+	int status = getaddrinfo(hostname, portstr, &hints, &servinfo);
+	if (status != 0) {
+	    std::ostringstream msg;
+	    msg << "getaddrinfo() failed: " << gai_strerror(status);
+	    throw NetworkException(msg.str());
+	}
+
+	int new_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
+	if (new_fd < 0) {
+		freeaddrinfo(servinfo);
+		throw NetworkException("UnixSocket: unable to create socket()");
+	}
+
+	if (connect(new_fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
+		freeaddrinfo(servinfo);
+		::close(new_fd);
+		std::ostringstream msg;
+		msg << "UnixSocket: unable to connect(" << hostname << ":" << port << "/" << portstr << "): " << strerror(errno);
+		throw NetworkException(msg.str());
+	}
+
+	read_fd = new_fd;
+	write_fd = new_fd;
+	freeaddrinfo(servinfo);
+}
+
+
 UnixSocket::UnixSocket(int read_fd, int write_fd) : is_eof(false), read_fd(read_fd), write_fd(write_fd) {
 	if (write_fd == -2)
 		write_fd = read_fd;
@@ -89,13 +130,24 @@ void UnixSocket::write(const char *buffer, size_t len) {
 		throw NetworkException(msg.str());
 	}
 	//auto res = ::send(write_fd, buffer, len, MSG_NOSIGNAL);
-	auto res = ::write(write_fd, buffer, len);
-	if (res < 0 || (size_t) res != len) {
-		std::ostringstream msg;
-		msg << "UnixSocket: write() failed: " << strerror(errno);
-		throw NetworkException(msg.str());
+	size_t written = 0;
+	while (written < len) {
+		size_t remaining = len - written;
+		auto res = ::write(write_fd, &buffer[written], remaining);
+		if ((size_t) res == remaining)
+			return;
+		if (res <= 0) {
+			std::ostringstream msg;
+			msg << "UnixSocket: write() failed: " << strerror(errno) << "(" << remaining << " requested, " << res << " written)";
+			throw NetworkException(msg.str());
+		}
+		if ((size_t) res > remaining) {
+			std::ostringstream msg;
+			msg << "UnixSocket: write() wrote too much bytes: " << remaining << " requested, " << res << " written";
+			throw NetworkException(msg.str());
+		}
+		written += res;
 	}
-
 	//fprintf(stderr, "UnixSocket: written %lu bytes\n", len);
 }
 

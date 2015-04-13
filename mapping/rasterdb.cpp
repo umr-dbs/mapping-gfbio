@@ -1,5 +1,5 @@
 #include "datatypes/raster.h"
-#include "datatypes/pointcollection.h"
+#include "datatypes/multipointcollection.h"
 #include "rasterdb/rasterdb.h"
 #include "raster/colors.h"
 
@@ -25,7 +25,7 @@ static void usage() {
 		printf("%s convert <input_filename> <png_filename>\n", program_name);
 		printf("%s createsource <epsg> <channel1_example> <channel2_example> ...\n", program_name);
 		printf("%s loadsource <sourcename>\n", program_name);
-		printf("%s import <sourcename> <filename> <filechannel> <sourcechannel> <timestamp>\n", program_name);
+		printf("%s import <sourcename> <filename> <filechannel> <sourcechannel> <time_start> <duration> <compression>\n", program_name);
 		printf("%s query <queryname> <png_filename>\n", program_name);
 		printf("%s hash <queryname>\n", program_name);
 		exit(5);
@@ -130,9 +130,9 @@ static void loadsource(int argc, char *argv[]) {
 	}
 }
 
-// import <sourcename> <filename> <filechannel> <sourcechannel> <time_start> <duration> [<compression>]
+// import <sourcename> <filename> <filechannel> <sourcechannel> <time_start> <duration> <compression>
 static void import(int argc, char *argv[]) {
-	if (argc < 8) {
+	if (argc < 9) {
 		usage();
 	}
 	try {
@@ -143,20 +143,37 @@ static void import(int argc, char *argv[]) {
 		double time_start = atof(argv[6]);
 		double duration = atof(argv[7]);
 		RasterConverter::Compression compression = RasterConverter::Compression::GZIP;
-		if (argc > 8) {
-			if (argv[8][0] == 'P')
-				compression = RasterConverter::Compression::PREDICTED;
-			else if (argv[8][0] == 'G')
-				compression = RasterConverter::Compression::GZIP;
-			else if (argv[8][0] == 'R')
-				compression = RasterConverter::Compression::UNCOMPRESSED;
-		}
+		if (argv[8][0] == 'P')
+			compression = RasterConverter::Compression::PREDICTED;
+		else if (argv[8][0] == 'G')
+			compression = RasterConverter::Compression::GZIP;
+		else if (argv[8][0] == 'R')
+			compression = RasterConverter::Compression::UNCOMPRESSED;
 		db->import(filename, sourcechannel, channelid, time_start, time_start+duration, compression);
 	}
 	catch (std::exception &e) {
 		printf("Failure: %s\n", e.what());
 	}
 }
+
+// link <sourcename> <channel> <reference_time> <new_time_start> <new_duration>
+static void link(int argc, char *argv[]) {
+	if (argc < 7) {
+		usage();
+	}
+	try {
+		auto db = RasterDB::open(argv[2], RasterDB::READ_WRITE);
+		int channelid = atoi(argv[3]);
+		double time_reference = atof(argv[4]);
+		double time_start = atof(argv[5]);
+		double duration = atof(argv[6]);
+		db->linkRaster(channelid, time_reference, time_start, time_start+duration);
+	}
+	catch (std::exception &e) {
+		printf("Failure: %s\n", e.what());
+	}
+}
+
 
 static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {
 	epsg_t epsg = (epsg_t) root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
@@ -227,7 +244,7 @@ static void runquery(int argc, char *argv[]) {
 	}
 	else if (result == "points") {
 		QueryProfiler profiler;
-		auto points = graph->getCachedPoints(qrect_from_json(root), profiler);
+		auto points = graph->getCachedMultiPointCollection(qrect_from_json(root), profiler);
 		auto csv = points->toCSV();
 		FILE *f = fopen(out_filename, "w");
 		if (f) {
@@ -285,7 +302,7 @@ static int testquery(int argc, char *argv[]) {
 		}
 		else if (result == "points") {
 			QueryProfiler profiler;
-			auto points = graph->getCachedPoints(qrect_from_json(root), profiler);
+			auto points = graph->getCachedMultiPointCollection(qrect_from_json(root), profiler);
 			real_hash = points->hash();
 		}
 		else {
@@ -345,6 +362,9 @@ int main(int argc, char *argv[]) {
 	}
 	else if (strcmp(command, "import") == 0) {
 		import(argc, argv);
+	}
+	else if (strcmp(command, "link") == 0) {
+		link(argc, argv);
 	}
 	else if (strcmp(command, "query") == 0) {
 		runquery(argc, argv);

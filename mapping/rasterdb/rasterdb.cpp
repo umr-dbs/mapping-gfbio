@@ -4,8 +4,10 @@
 #include "rasterdb/rasterdb.h"
 #include "rasterdb/backend.h"
 #include "rasterdb/backend_local.h"
+#include "rasterdb/backend_remote.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
+#include "util/configuration.h"
 #include "operators/operator.h"
 
 
@@ -30,7 +32,7 @@
 #include <json/json.h>
 
 
-const int DEFAULT_TILE_SIZE = 2048;
+const int DEFAULT_TILE_SIZE = 1024;
 
 
 bool GDALCRS::operator==(const GDALCRS &b) const {
@@ -147,10 +149,16 @@ class RasterDBChannel {
 
 
 
-RasterDB::RasterDB(const char *filename, bool writeable)
+RasterDB::RasterDB(const char *sourcename, bool writeable)
 	: writeable(writeable), crs(nullptr), channelcount(0), channels(nullptr) {
 	try {
-		backend.reset( new LocalRasterDBBackend(filename, writeable) );
+		auto backendtype = Configuration::get("rasterdb.backend", "local");
+
+		if (backendtype == "remote")
+			backend.reset( new RemoteRasterDBBackend(sourcename, writeable) );
+		else
+			backend.reset( new LocalRasterDBBackend(sourcename, writeable) );
+
 		init();
 	}
 	catch (const std::exception &e) {
@@ -172,7 +180,7 @@ void RasterDB::init() {
 	Json::Reader reader(Json::Features::strictMode());
 	Json::Value root;
 	if (!reader.parse(json, root)) {
-		printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
+		//printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
 		throw SourceException("unable to parse json");
 	}
 
@@ -200,7 +208,6 @@ void RasterDB::init() {
 
 	Json::Value channelinfo = root["channels"];
 	if (!channelinfo.isArray() || channelinfo.size() < 1) {
-		printf("No channel information in json\n");
 		throw SourceException("No channel information in json");
 	}
 
@@ -271,7 +278,7 @@ void RasterDB::import(const char *filename, int sourcechannel, int channelid, do
 	bool need_flipx = raster_flipx != crs_flipx;
 	bool need_flipy = raster_flipy != crs_flipy;
 
-	printf("GDAL: %d %d\nCRS:  %d %d\nflip: %d %d\n", raster_flipx, raster_flipy, crs_flipx, crs_flipy, need_flipx, need_flipy);
+	//printf("GDAL: %d %d\nCRS:  %d %d\nflip: %d %d\n", raster_flipx, raster_flipy, crs_flipx, crs_flipy, need_flipx, need_flipy);
 
 	if (need_flipx || need_flipy) {
 		raster = raster->flip(need_flipx, need_flipy);
@@ -309,6 +316,8 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 */
 	uint32_t tilesize = DEFAULT_TILE_SIZE;
 
+	printf("starting import for raster of size %d x %d, time %f -> %f\n", raster->width, raster->height, time_start, time_end);
+
 	auto rasterid = backend->createRaster(channelid, time_start, time_end, raster->md_string, raster->md_value);
 
 	for (int zoom=0;;zoom++) {
@@ -320,10 +329,10 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 		GenericRaster *zoomedraster = raster;
 		std::unique_ptr<GenericRaster> zoomedraster_guard;
 		if (zoom > 0) {
-			printf("Scaling for zoom %d to %u x %u x %u pixels\n", zoom, crs->size[0] / zoomfactor, crs->size[1] / zoomfactor, crs->size[2] / zoomfactor);
+			printf("  Scaling for zoom %d to %u x %u x %u pixels\n", zoom, crs->size[0] / zoomfactor, crs->size[1] / zoomfactor, crs->size[2] / zoomfactor);
 			zoomedraster_guard = raster->scale(crs->size[0] / zoomfactor, crs->size[1] / zoomfactor, crs->size[2] / zoomfactor);
 			zoomedraster = zoomedraster_guard.get();
-			printf("done scaling\n");
+			printf("  done scaling\n");
 		}
 
 		/*for (uint32_t zoff = 0; zoff == 0 || zoff < zoomedraster->lcrs.size[2]; zoff += tilesize)*/ {
@@ -334,25 +343,31 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 				for (uint32_t xoff = 0; xoff < zoomedraster->width; xoff += tilesize) {
 					uint32_t xsize = std::min(zoomedraster->width - xoff, tilesize);
 
-					printf("importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
+					printf("    importing tile at zoom %d with size %u: (%u, %u, %u) at offset (%u, %u, %u)\n", zoom, tilesize, xsize, ysize, zsize, xoff, yoff, zoff);
 					if (backend->hasTile(rasterid, xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom)) {
-						printf(" skipping..\n");
+						printf("      skipping..\n");
 						continue;
 					}
 
 					auto tile = GenericRaster::create(channels[channelid]->dd, SpatioTemporalReference::unreferenced(), xsize, ysize, zsize);
 					tile->blit(zoomedraster, -(int)xoff, -(int)yoff, -(int)zoff);
-					printf("done blitting\n");
 
 					auto buffer = RasterConverter::direct_encode(tile.get(), compression);
-					printf("done compressing, method %d, size: %ld -> %ld (%f)\n", (int) compression, tile->getDataSize(), buffer->size, (double) buffer->size / tile->getDataSize());
 
 					backend->writeTile(rasterid, *buffer, xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, compression);
-					printf("done importing\n");
+					printf("    tile saved, compression %d, size: %ld -> %ld (%f)\n", (int) compression, tile->getDataSize(), buffer->size, (double) buffer->size / tile->getDataSize());
 				}
 			}
 		}
 	}
+}
+
+
+void RasterDB::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
+	if (!isWriteable())
+		throw SourceException("Cannot link rasters in a source opened as read-only");
+
+	backend->linkRaster(channelid, time_of_reference, time_start, time_end);
 }
 
 
@@ -454,11 +469,11 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, i
 		if (transform && channels[channelid]->hasTransform()) {
 			transformedBlit(
 				result.get(), tile_raster.get(),
-				(tile.x1-x1) >> zoom, (tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
+				((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
 				channels[channelid]->getOffset(result_md_value), channels[channelid]->getScale(result_md_value));
 		}
 		else
-			result->blit(tile_raster.get(), ((int) tile.x1-x1) >> zoom, ((int) tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/);
+			result->blit(tile_raster.get(), ((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* ((int64_t) r_z1-z1) >> zoom*/);
 	}
 
 	if (flipx || flipy) {
@@ -513,32 +528,24 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 static std::unordered_map<std::string, std::weak_ptr<RasterDB> > RasterDB_map;
 static std::mutex RasterDB_map_mutex;
 
-std::shared_ptr<RasterDB> RasterDB::open(const char *filename, bool writeable) {
+std::shared_ptr<RasterDB> RasterDB::open(const char *sourcename, bool writeable) {
 	std::lock_guard<std::mutex> guard(RasterDB_map_mutex);
 
-	// To make sure each source is only accessed by a single path, resolve all symlinks
-	char filename_clean[PATH_MAX];
-	if (realpath(filename, filename_clean) == nullptr) {
-		std::stringstream msg;
-		msg << "realpath(\"" << filename << "\") failed";
-		throw SourceException(msg.str());
-	}
+	std::string name(sourcename);
 
-	std::string path(filename_clean);
-
-	if (RasterDB_map.count(path) == 1) {
-		auto &weak_ptr = RasterDB_map.at(path);
+	if (RasterDB_map.count(name) == 1) {
+		auto &weak_ptr = RasterDB_map.at(name);
 		auto shared_ptr = weak_ptr.lock();
 		if (shared_ptr) {
 			if (writeable && !shared_ptr->isWriteable())
 				throw new SourceException("Cannot re-open source as read/write (TODO?)");
 			return shared_ptr;
 		}
-		RasterDB_map.erase(path);
+		RasterDB_map.erase(name);
 	}
 
-	auto shared_ptr = std::make_shared<RasterDB>(path.c_str(), writeable);
-	RasterDB_map[path] = std::weak_ptr<RasterDB>(shared_ptr);
+	auto shared_ptr = std::make_shared<RasterDB>(name.c_str(), writeable);
+	RasterDB_map[name] = std::weak_ptr<RasterDB>(shared_ptr);
 
 	if (writeable && !shared_ptr->isWriteable())
 		throw new SourceException("Cannot re-open source as read/write (TODO?)");

@@ -260,7 +260,7 @@ const std::string &getRasterInfoStructSource() {
 
 
 
-CLProgram::CLProgram() : profiler(nullptr), kernel(nullptr), argpos(0), finished(false), iteration_type(0), in_rasters(), out_rasters(), pointcollections() {
+CLProgram::CLProgram() : profiler(nullptr), kernel(nullptr), argpos(0), finished(false), iteration_type(0), in_rasters(), out_rasters(), multipointcollections() {
 }
 CLProgram::~CLProgram() {
 	reset();
@@ -278,25 +278,25 @@ void CLProgram::addOutRaster(GenericRaster *raster) {
 	out_rasters.push_back(raster);
 }
 
-size_t CLProgram::addPointCollection(PointCollection *pc) {
+size_t CLProgram::addMultiPointCollection(MultiPointCollection *pc) {
 	if (kernel)
 		throw OpenCLException("addPointCollection() must be called before compile()");
 	if (iteration_type == 0)
 		iteration_type = 2;
-	pointcollections.push_back(pc);
-	return pointcollections.size() - 1;
+	multipointcollections.push_back(pc);
+	return multipointcollections.size() - 1;
 }
 
 void CLProgram::addPointCollectionPositions(size_t idx, bool readonly) {
 	if (sizeof(cl_double2) != sizeof(Point))
-		throw OpenCLException("sizeof(cl_double2) != sizeof(Point), cannot use opencl on PointCollections");
+		throw OpenCLException("sizeof(cl_double2) != sizeof(Point), cannot use opencl on multipointcollections");
 
-	PointCollection *pc = pointcollections.at(idx);
-	addArg(pc->collection, readonly);
+	MultiPointCollection *pc = multipointcollections.at(idx);
+	addArg(pc->points, readonly);
 }
 
 void CLProgram::addPointCollectionAttribute(size_t idx, const std::string &name, bool readonly) {
-	PointCollection *pc = pointcollections.at(idx);
+	MultiPointCollection *pc = multipointcollections.at(idx);
 	auto &vec = pc->local_md_value.getVector(name);
 	addArg(vec, readonly);
 }
@@ -363,9 +363,9 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 			kernel->setArg(argpos++, *raster->getCLBuffer());
 			kernel->setArg(argpos++, *raster->getCLInfoBuffer());
 		}
-		for (decltype(pointcollections.size()) idx = 0; idx < pointcollections.size(); idx++) {
-			PointCollection *points = pointcollections[idx];
-			int size = points->collection.size();
+		for (decltype(multipointcollections.size()) idx = 0; idx < multipointcollections.size(); idx++) {
+			MultiPointCollection *points = multipointcollections[idx];
+			int size = points->points.size();
 			kernel->setArg<cl_int>(argpos++, (cl_int) size);
 		}
 	}
@@ -416,7 +416,7 @@ cl::Event CLProgram::run(std::vector<cl::Event>* events_to_wait_for) {
 	if (iteration_type == 1)
 		range = cl::NDRange(out_rasters[0]->width, out_rasters[0]->height);
 	else if (iteration_type == 2)
-		range = cl::NDRange(pointcollections[0]->collection.size());
+		range = cl::NDRange(multipointcollections[0]->points.size());
 	else
 		throw OpenCLException("Unknown iteration_type, cannot create range");
 
@@ -467,7 +467,7 @@ void CLProgram::reset() {
 	iteration_type = 0;
 	in_rasters.clear();
 	out_rasters.clear();
-	pointcollections.clear();
+	multipointcollections.clear();
 }
 
 

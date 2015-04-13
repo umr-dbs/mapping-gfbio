@@ -26,10 +26,10 @@
 class BinaryStream {
 	protected:
 		BinaryStream();
-		virtual ~BinaryStream();
 		BinaryStream(const BinaryStream &) = delete;
 		BinaryStream &operator=(const BinaryStream &) = delete;
 	public:
+		virtual ~BinaryStream();
 		virtual void write(const char *buffer, size_t len) = 0;
 
 		void write(const std::string &string);
@@ -79,6 +79,7 @@ template<typename T> void BinaryStream::write(T& t) {
 class UnixSocket : public BinaryStream {
 	public:
 		UnixSocket(const char *server_path);
+		UnixSocket(const char *hostname, int port);
 		UnixSocket(int read_fd, int write_fd = -2);
 		virtual ~UnixSocket();
 

@@ -13,9 +13,9 @@ namespace ***REMOVED*** {
 	template<> std::unique_ptr<GenericRaster> as(SEXP sexp);
 
 	// PointCollection
-	template<> SEXP wrap(const PointCollection &points);
-	template<> SEXP wrap(const std::unique_ptr<PointCollection> &points);
-	template<> std::unique_ptr<PointCollection> as(SEXP sexp);
+	template<> SEXP wrap(const MultiPointCollection &points);
+	template<> SEXP wrap(const std::unique_ptr<MultiPointCollection> &points);
+	template<> std::unique_ptr<MultiPointCollection> as(SEXP sexp);
 
 }
 
@@ -176,7 +176,7 @@ namespace ***REMOVED*** {
 
 
 	// PointCollection
-	template<> SEXP wrap(const PointCollection &points) {
+	template<> SEXP wrap(const MultiPointCollection &points) {
 		/*
 		new("SpatialPointsDataFrame"
 			, data = structure(list(), .Names = character(0), row.names = integer(0), class = "data.frame")
@@ -190,7 +190,7 @@ namespace ***REMOVED*** {
 		Profiler::Profiler p("***REMOVED***: wrapping pointcollection");
 		***REMOVED***::S4 SPDF("SpatialPointsDataFrame");
 
-		auto size = points.collection.size();
+		auto size = points.points.size();
 
 		***REMOVED***::DataFrame data;
 		auto numeric_keys = points.local_md_value.getKeys();
@@ -216,7 +216,7 @@ namespace ***REMOVED*** {
 
 		***REMOVED***::NumericMatrix coords(size, 2);
 		for (decltype(size) i=0;i<size;i++) {
-			const Point &p = points.collection[i];
+			const Point &p = points.points[i];
 			coords(i, 0) = p.x;
 			coords(i, 1) = p.y;
 		}
@@ -239,10 +239,10 @@ namespace ***REMOVED*** {
 
 		return SPDF;
 	}
-	template<> SEXP wrap(const std::unique_ptr<PointCollection> &points) {
+	template<> SEXP wrap(const std::unique_ptr<MultiPointCollection> &points) {
 		return ***REMOVED***::wrap(*points);
 	}
-	template<> std::unique_ptr<PointCollection> as(SEXP sexp) {
+	template<> std::unique_ptr<MultiPointCollection> as(SEXP sexp) {
 		Profiler::Profiler p("***REMOVED***: unwrapping pointcollection");
 		***REMOVED***::S4 SPDF(sexp);
 		if (!SPDF.is("SpatialPointsDataFrame"))
@@ -259,12 +259,12 @@ namespace ***REMOVED*** {
 			throw OperatorException("Result has an unknown epsg");
 		epsg_t epsg = (epsg_t) std::stoi(epsg_s.substr(5, std::string::npos));
 
-		auto points = std::make_unique<PointCollection>(SpatioTemporalReference(epsg, TIMETYPE_UNIX));
+		auto points = std::make_unique<MultiPointCollection>(SpatioTemporalReference(epsg, TIMETYPE_UNIX));
 
 		***REMOVED***::NumericMatrix coords = ***REMOVED***::as<***REMOVED***::NumericMatrix>(SPDF.slot("coords"));
 
 		size_t size = coords.nrow();
-		points->collection.reserve(size);
+		points->points.reserve(size);
 		for (size_t i=0;i<size;i++) {
 			double x = coords(i, 0);
 			double y = coords(i, 1);

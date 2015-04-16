@@ -20,6 +20,8 @@ public:
 	virtual std::string toGeoJSON(bool displayMetadata);
 	virtual std::string toCSV();
 
+	virtual bool isSimple();
+
 	virtual ~MultiLineCollection(){};
 };
 

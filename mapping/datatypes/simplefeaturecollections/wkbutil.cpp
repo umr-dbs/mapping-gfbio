@@ -9,10 +9,6 @@
 #include "raster/exceptions.h"
 
 
-WKBUtil::~WKBUtil() {
-
-}
-
 //read Multipolygon as we currently need it for GFBioWS
 //TODO: support Polygons, MultiPolygons, Collection of Polygons, Collection of MultiPolygon, Collection of mixed (Multi-)Polygons
 std::unique_ptr<MultiPolygonCollection> WKBUtil::readMultiPolygonCollection(std::stringstream& wkb){

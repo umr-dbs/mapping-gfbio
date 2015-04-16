@@ -12,7 +12,6 @@ public:
 
 	static std::unique_ptr<MultiPolygonCollection> readMultiPolygonCollection(std::stringstream& wkb);
 
-	virtual ~WKBUtil();
 };
 
 #endif

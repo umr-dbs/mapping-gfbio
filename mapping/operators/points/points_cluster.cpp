@@ -40,7 +40,7 @@ std::unique_ptr<MultiPointCollection> PointsClusterOperator::getMultiPointCollec
 	pointsNew->local_md_value.addVector("radius", circles.size());
 	pointsNew->local_md_value.addVector("numberOfPoints", circles.size());
 	for (auto& circle : circles) {
-		size_t idx = pointsNew->addPoint(circle->getX() * rect.xres, circle->getY() * rect.yres);
+		size_t idx = pointsNew->addFeature(Coordinate(circle->getX() * rect.xres, circle->getY() * rect.yres));
 		pointsNew->local_md_value.set(idx, "radius", circle->getRadius());
 		pointsNew->local_md_value.set(idx, "numberOfPoints", circle->getNumberOfPoints());
 	}

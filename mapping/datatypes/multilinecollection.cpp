@@ -10,3 +10,8 @@ std::string MultiLineCollection::toCSV() {
 	 //TODO: implement
 	return "";
 }
+
+bool MultiLineCollection::isSimple(){
+	//TODO: implement
+	return false;
+}

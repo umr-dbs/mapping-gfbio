@@ -18,6 +18,9 @@
 #include <string>
 #include <sstream>
 
+/**
+ * Filter simple multipointcollection by a simple multipolygoncollection
+ */
 class FilterPointsByGeometry : public GenericOperator {
 	public:
 		FilterPointsByGeometry(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
@@ -46,10 +49,15 @@ std::unique_ptr<MultiPointCollection> FilterPointsByGeometry::getMultiPointColle
 	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
 
 	auto multiPolygons = getMultiPolygonCollectionFromSource(0, rect, profiler);
+
+	if(!points->isSimple() || !multiPolygons->isSimple()){
+		throw OperatorException("Filterpointsbygeometry operator only supports simple point- and polygoncollections");
+	}
+
 	auto geometry = GeosGeomUtil::createGeosGeometry(*multiPolygons);
 	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 
-	size_t points_count = points->coordinates.size();
+	size_t points_count = points->startFeature.size();
 	std::vector<bool> keep(points_count, false);
 
 	auto prep = geos::geom::prep::PreparedGeometryFactory();

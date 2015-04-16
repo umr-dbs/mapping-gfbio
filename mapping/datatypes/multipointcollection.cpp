@@ -11,10 +11,10 @@
 
 template<typename T>
 std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std::vector<T> &keep) {
-	size_t count = in->coordinates.size();
+	size_t count = in->startFeature.size();
 	if (keep.size() != count) {
 		std::ostringstream msg;
-		msg << "PointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
+		msg << "MultiPointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
 		throw ArgumentException(msg.str());
 	}
 
@@ -25,16 +25,21 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 	}
 
 	auto out = std::make_unique<MultiPointCollection>(in->stref);
-	out->coordinates.reserve(kept_count);
+	out->startFeature.reserve(kept_count);
 	// copy global metadata
 	out->global_md_string = in->global_md_string;
 	out->global_md_value = in->global_md_value;
 
-	// copy points
-	for (size_t idx=0;idx<count;idx++) {
-		if (keep[idx]) {
-			Coordinate &p = in->coordinates[idx];
-			out->addPoint(p.x, p.y);
+	// copy features
+	for (size_t featureIndex=0;featureIndex<count;featureIndex++) {
+		if (keep[featureIndex]) {
+			out->startFeature.push_back(out->coordinates.size());
+
+			//copy coordinates
+			for(size_t coordinateIndex = in->startFeature[featureIndex]; coordinateIndex < in->stopFeature(featureIndex); ++coordinateIndex){
+				Coordinate &p = in->coordinates[coordinateIndex];
+				out->addCoordinate(p.x, p.y);
+			}
 		}
 	}
 
@@ -112,9 +117,21 @@ void MultiPointCollection::toStream(BinaryStream &stream) {
 }
 
 
-size_t MultiPointCollection::addPoint(double x, double y) {
+void MultiPointCollection::addCoordinate(double x, double y) {
 	coordinates.push_back(Coordinate(x, y));
-	return coordinates.size() - 1;
+}
+
+size_t MultiPointCollection::addFeature(std::vector<Coordinate> featureCoordinates){
+	startFeature.push_back(coordinates.size());
+	coordinates.insert(coordinates.end(), featureCoordinates.begin(), featureCoordinates.end());
+
+	return startFeature.size() - 1;
+}
+
+size_t MultiPointCollection::addFeature(Coordinate coordinate){
+	startFeature.push_back(coordinates.size());
+	coordinates.push_back(coordinate);
+	return startFeature.size() - 1;
 }
 
 
@@ -286,4 +303,8 @@ std::string MultiPointCollection::hash() {
 	std::string csv = toCSV();
 
 	return calculateHash((const unsigned char *) csv.c_str(), (int) csv.length()).asHex();
+}
+
+bool MultiPointCollection::isSimple(){
+	return coordinates.size() == startFeature.size();
 }

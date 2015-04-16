@@ -49,3 +49,7 @@ std::string MultiPolygonCollection::toCSV() {
 	 //TODO: implement
 	return "";
 }
+
+bool MultiPolygonCollection::isSimple(){
+	return startFeature.size() == startPolygon.size();
+}

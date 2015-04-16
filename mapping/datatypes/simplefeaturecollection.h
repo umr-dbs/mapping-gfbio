@@ -8,10 +8,10 @@
 
 class Coordinate {
 	private:
-		Coordinate(double x, double y);
 		Coordinate(BinaryStream &stream);
 		void toStream(BinaryStream &stream);
 	public:
+		Coordinate(double x, double y);
 		Coordinate() = delete;
 		~Coordinate();
 
@@ -65,6 +65,9 @@ public:
 	// Export
 	virtual std::string toGeoJSON(bool displayMetadata = false) = 0;
 	virtual std::string toCSV() = 0;
+
+	// return true if all features consist of a single element
+	virtual bool isSimple() = 0;
 
 };
 

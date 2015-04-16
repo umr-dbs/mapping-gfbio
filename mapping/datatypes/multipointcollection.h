@@ -17,8 +17,12 @@ public:
 
 	void toStream(BinaryStream &stream);
 
-	// add a new point, returns index of the new point
-	size_t addPoint(double x, double y);
+	// add a new coordinate, returns index of the new coordinate
+	void addCoordinate(double x, double y);
+	//add a new feature consisting of given coordinates
+	size_t addFeature(std::vector<Coordinate> coordinates);
+	//add a new feature consisting of a single coordinate
+	size_t addFeature(Coordinate coordinate);
 
 	std::unique_ptr<MultiPointCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<MultiPointCollection> filter(const std::vector<char> &keep);
@@ -27,6 +31,13 @@ public:
 
 	virtual std::string toGeoJSON(bool displayMetadata);
 	virtual std::string toCSV();
+
+	virtual bool isSimple();
+
+	//return the index of the next feature in the startPolygon array that is no longer part of the index-th feature
+	inline size_t stopFeature(size_t index) const {
+		return index + 1 >= startFeature.size() ? coordinates.size() : startFeature[index + 1];
+	}
 
 	virtual ~MultiPointCollection(){};
 };

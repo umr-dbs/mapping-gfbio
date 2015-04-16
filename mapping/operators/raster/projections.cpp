@@ -247,13 +247,13 @@ std::unique_ptr<MultiPointCollection> ProjectionOperator::getMultiPointCollectio
 		throw OperatorException(msg.str());
 	}
 
-	std::vector<bool> keep(points_in->points.size(), true);
+	std::vector<bool> keep(points_in->coordinates.size(), true);
 	bool has_filter = false;
 
 	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
-	size_t size = points_in->points.size();
+	size_t size = points_in->coordinates.size();
 	for (size_t idx = 0; idx < size; idx++) {
-		Point &point = points_in->points[idx];
+		Coordinate &point = points_in->coordinates[idx];
 		double x = point.x, y = point.y;
 		if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
 			keep[idx] = false;

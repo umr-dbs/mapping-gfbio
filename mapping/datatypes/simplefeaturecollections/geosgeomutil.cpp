@@ -64,7 +64,7 @@ void GeosGeomUtil::addPolygon(MultiPolygonCollection& multiPolygonCollection, co
 	auto& startRing = multiPolygonCollection.startRing;
 	auto& startPolygon = multiPolygonCollection.startPolygon;
 	auto& startFeature = multiPolygonCollection.startFeature;
-	auto& points = multiPolygonCollection.points;
+	auto& points = multiPolygonCollection.coordinates;
 
 	//add new polygon
 	if(newFeature) {
@@ -78,7 +78,7 @@ void GeosGeomUtil::addPolygon(MultiPolygonCollection& multiPolygonCollection, co
 	auto outerRing = polygon.getExteriorRing()->getCoordinates();
 	startRing.push_back(points.size());
 	for(size_t i = 0; i < outerRing->getSize(); ++i){
-		points.push_back(Point(outerRing->getX(i), outerRing->getY(i)));
+		points.push_back(Coordinate(outerRing->getX(i), outerRing->getY(i)));
 	}
 
 	//inner rings
@@ -87,7 +87,7 @@ void GeosGeomUtil::addPolygon(MultiPolygonCollection& multiPolygonCollection, co
 		startRing.push_back(points.size());
 
 		for(size_t i = 0; i < innerRing->getSize(); ++i){
-			points.push_back(Point(innerRing->getX(i), innerRing->getY(i)));
+			points.push_back(Coordinate(innerRing->getX(i), innerRing->getY(i)));
 		}
 	}
 }
@@ -142,7 +142,7 @@ std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosGeometry(const Mul
 
 			//outer ring
 			for(size_t pointsIndex = multiPolygonCollection.startRing[ringIndex]; pointsIndex < multiPolygonCollection.stopRing(ringIndex); ++pointsIndex){
-				const Point& point = multiPolygonCollection.points[pointsIndex];
+				const Coordinate& point = multiPolygonCollection.coordinates[pointsIndex];
 				coordinates->push_back(geos::geom::Coordinate(point.x, point.y));
 			}
 
@@ -161,7 +161,7 @@ std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosGeometry(const Mul
 				coordinates.reset(new std::vector<geos::geom::Coordinate>);
 
 				for(size_t pointsIndex = multiPolygonCollection.startRing[ringIndex]; pointsIndex < multiPolygonCollection.stopRing(ringIndex); ++pointsIndex){
-					const Point& point = multiPolygonCollection.points[pointsIndex];
+					const Coordinate& point = multiPolygonCollection.coordinates[pointsIndex];
 					coordinates->push_back(geos::geom::Coordinate(point.x, point.y));
 				}
 

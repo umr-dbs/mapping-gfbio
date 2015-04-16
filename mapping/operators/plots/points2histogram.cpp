@@ -73,7 +73,7 @@ std::unique_ptr<GenericPlot> Points2HistogramOperator::getPlot(const QueryRectan
 	//double raster_max = points->global_md_value.get(name + "_max");
 	//double raster_min = points->global_md_value.get(name + "_min");
 
-	size_t pointSize = points->points.size();
+	size_t pointSize = points->coordinates.size();
 	auto& valueVector = points->local_md_value.getVector(name);
 
 	// detect range automatically

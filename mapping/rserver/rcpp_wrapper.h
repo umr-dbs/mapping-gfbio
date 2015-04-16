@@ -190,7 +190,7 @@ namespace ***REMOVED*** {
 		Profiler::Profiler p("***REMOVED***: wrapping pointcollection");
 		***REMOVED***::S4 SPDF("SpatialPointsDataFrame");
 
-		auto size = points.points.size();
+		auto size = points.coordinates.size();
 
 		***REMOVED***::DataFrame data;
 		auto numeric_keys = points.local_md_value.getKeys();
@@ -216,7 +216,7 @@ namespace ***REMOVED*** {
 
 		***REMOVED***::NumericMatrix coords(size, 2);
 		for (decltype(size) i=0;i<size;i++) {
-			const Point &p = points.points[i];
+			const Coordinate &p = points.coordinates[i];
 			coords(i, 0) = p.x;
 			coords(i, 1) = p.y;
 		}
@@ -264,7 +264,7 @@ namespace ***REMOVED*** {
 		***REMOVED***::NumericMatrix coords = ***REMOVED***::as<***REMOVED***::NumericMatrix>(SPDF.slot("coords"));
 
 		size_t size = coords.nrow();
-		points->points.reserve(size);
+		points->coordinates.reserve(size);
 		for (size_t i=0;i<size;i++) {
 			double x = coords(i, 0);
 			double y = coords(i, 1);

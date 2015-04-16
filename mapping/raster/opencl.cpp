@@ -288,11 +288,11 @@ size_t CLProgram::addMultiPointCollection(MultiPointCollection *pc) {
 }
 
 void CLProgram::addPointCollectionPositions(size_t idx, bool readonly) {
-	if (sizeof(cl_double2) != sizeof(Point))
+	if (sizeof(cl_double2) != sizeof(Coordinate))
 		throw OpenCLException("sizeof(cl_double2) != sizeof(Point), cannot use opencl on multipointcollections");
 
 	MultiPointCollection *pc = multipointcollections.at(idx);
-	addArg(pc->points, readonly);
+	addArg(pc->coordinates, readonly);
 }
 
 void CLProgram::addPointCollectionAttribute(size_t idx, const std::string &name, bool readonly) {
@@ -365,7 +365,7 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 		}
 		for (decltype(multipointcollections.size()) idx = 0; idx < multipointcollections.size(); idx++) {
 			MultiPointCollection *points = multipointcollections[idx];
-			int size = points->points.size();
+			int size = points->coordinates.size();
 			kernel->setArg<cl_int>(argpos++, (cl_int) size);
 		}
 	}
@@ -416,7 +416,7 @@ cl::Event CLProgram::run(std::vector<cl::Event>* events_to_wait_for) {
 	if (iteration_type == 1)
 		range = cl::NDRange(out_rasters[0]->width, out_rasters[0]->height);
 	else if (iteration_type == 2)
-		range = cl::NDRange(multipointcollections[0]->points.size());
+		range = cl::NDRange(multipointcollections[0]->coordinates.size());
 	else
 		throw OpenCLException("Unknown iteration_type, cannot create range");
 

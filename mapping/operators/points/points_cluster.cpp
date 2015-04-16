@@ -32,7 +32,7 @@ std::unique_ptr<MultiPointCollection> PointsClusterOperator::getMultiPointCollec
 													pv::Coordinate((rect.x2 + rect.x1) / (2 * rect.xres), (rect.y2 + rect.y2) / (2 * rect.yres)),
 													pv::Dimension((rect.x2 - rect.x1) / (2 * rect.xres), (rect.y2 - rect.y2) / (2 * rect.yres)),
 												1), 1);
-	for (Point &pointOld : pointsOld->points) {
+	for (Coordinate &pointOld : pointsOld->coordinates) {
 		clusterer.insert(std::make_shared<pv::Circle>(pv::Coordinate(pointOld.x / rect.xres, pointOld.y / rect.yres), 5, 1));
 	}
 

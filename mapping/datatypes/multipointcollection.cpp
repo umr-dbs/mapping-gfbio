@@ -11,7 +11,7 @@
 
 template<typename T>
 std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std::vector<T> &keep) {
-	size_t count = in->points.size();
+	size_t count = in->coordinates.size();
 	if (keep.size() != count) {
 		std::ostringstream msg;
 		msg << "PointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
@@ -25,7 +25,7 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 	}
 
 	auto out = std::make_unique<MultiPointCollection>(in->stref);
-	out->points.reserve(kept_count);
+	out->coordinates.reserve(kept_count);
 	// copy global metadata
 	out->global_md_string = in->global_md_string;
 	out->global_md_value = in->global_md_value;
@@ -33,7 +33,7 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 	// copy points
 	for (size_t idx=0;idx<count;idx++) {
 		if (keep[idx]) {
-			Point &p = in->points[idx];
+			Coordinate &p = in->coordinates[idx];
 			out->addPoint(p.x, p.y);
 		}
 	}
@@ -82,7 +82,7 @@ std::unique_ptr<MultiPointCollection> MultiPointCollection::filter(const std::ve
 MultiPointCollection::MultiPointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
 	size_t count;
 	stream.read(&count);
-	points.reserve(count);
+	coordinates.reserve(count);
 
 	global_md_string.fromStream(stream);
 	global_md_value.fromStream(stream);
@@ -90,14 +90,14 @@ MultiPointCollection::MultiPointCollection(BinaryStream &stream) : SimpleFeature
 	local_md_value.fromStream(stream);
 
 	for (size_t i=0;i<count;i++) {
-		points.push_back( Point(stream) );
+		coordinates.push_back( Coordinate(stream) );
 	}
 	// TODO: serialize/unserialize time array
 }
 
 void MultiPointCollection::toStream(BinaryStream &stream) {
 	stream.write(stref);
-	size_t count = points.size();
+	size_t count = coordinates.size();
 	stream.write(count);
 
 	stream.write(global_md_string);
@@ -106,15 +106,15 @@ void MultiPointCollection::toStream(BinaryStream &stream) {
 	stream.write(local_md_value);
 
 	for (size_t i=0;i<count;i++) {
-		points[i].toStream(stream);
+		coordinates[i].toStream(stream);
 	}
 	// TODO: serialize/unserialize time array
 }
 
 
 size_t MultiPointCollection::addPoint(double x, double y) {
-	points.push_back(Point(x, y));
-	return points.size() - 1;
+	coordinates.push_back(Coordinate(x, y));
+	return coordinates.size() - 1;
 }
 
 
@@ -149,7 +149,7 @@ void MultiPointCollection::toOGR(const char *driver = "ESRI Shapefile") {
     // No attributes
 
     // Loop over all points
-	for (const Point &p : collection) {
+	for (const Coordinate &p : collection) {
 		double x = p.x, y = p.y;
 
 		OGRFeature *poFeature = OGRFeature::CreateFeature(poLayer->GetLayerDefn());
@@ -187,7 +187,7 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 		size_t idx = 0;
 		auto value_keys = local_md_value.getKeys();
 		auto string_keys = local_md_string.getKeys();
-		for (const Point &p : points) {
+		for (const Coordinate &p : coordinates) {
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]},\"properties\":{";
 
 			for (auto &key : string_keys) {
@@ -225,7 +225,7 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 		json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
 
 		bool first = true;
-		for (const Point &p : points) {
+		for (const Coordinate &p : coordinates) {
 			if (first)
 				first = false;
 			else
@@ -261,7 +261,7 @@ std::string MultiPointCollection::toCSV() {
 	csv << std::endl;
 
 	size_t idx = 0;
-	for (const auto &p : points) {
+	for (const auto &p : coordinates) {
 		csv << p.x << "," << p.y;
 
 		if (has_time)

@@ -52,7 +52,7 @@ template<std::size_t size>
 auto PointsMetadataToGraph::createXYGraph(MultiPointCollection& points) -> std::unique_ptr<GenericPlot> {
 	auto xyGraph = std::make_unique<XYGraph<size>>();
 
-	for (size_t pointIndex = 0; pointIndex < points.points.size(); ++pointIndex) {
+	for (size_t pointIndex = 0; pointIndex < points.coordinates.size(); ++pointIndex) {
 		std::array<double, size> value;
 		bool hasData = true;
 

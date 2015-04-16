@@ -43,7 +43,7 @@ void PointsDifferenceOperator::writeSemanticParameters(std::ostringstream& strea
 
 #include "operators/points/points_difference.cl.h"
 
-static double point_distance(const Point &p1, const Point &p2) {
+static double point_distance(const Coordinate &p1, const Coordinate &p2) {
 	double dx = p1.x - p2.x, dy = p1.y - p2.y;
 	return sqrt(dx*dx + dy*dy);
 }
@@ -54,7 +54,7 @@ std::unique_ptr<MultiPointCollection> PointsDifferenceOperator::getMultiPointCol
 
 	//fprintf(stderr, "Minuend: %lu, Subtrahend: %lu\n", pointsMinuend->collection.size(), pointsSubtrahend->collection.size());
 
-	size_t count_m = pointsMinuend->points.size();
+	size_t count_m = pointsMinuend->coordinates.size();
 
 	// TODO: why is there a limitation? remove or make more reasonable abort decisions.
 	if (count_m > 100000)
@@ -64,13 +64,13 @@ std::unique_ptr<MultiPointCollection> PointsDifferenceOperator::getMultiPointCol
 #ifdef MAPPING_NO_OPENCL
 	std::vector<bool> keep(count_m, true);
 
-	size_t count_s = pointsSubtrahend->points.size();
+	size_t count_s = pointsSubtrahend->coordinates.size();
 
 	for (size_t idx_m=0;idx_m<count_m;idx_m++) {
-		Point &p_m = pointsMinuend->points[idx_m];
+		Coordinate &p_m = pointsMinuend->coordinates[idx_m];
 
 		for (size_t idx_s=0;idx_s<count_s;idx_s++) {
-			if (point_distance(p_m, pointsSubtrahend->points[idx_s]) <= epsilonDistance) {
+			if (point_distance(p_m, pointsSubtrahend->coordinates[idx_s]) <= epsilonDistance) {
 				keep[idx_m] = false;
 				break;
 			}

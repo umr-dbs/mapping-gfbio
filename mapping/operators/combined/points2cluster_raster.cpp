@@ -42,7 +42,7 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 	GridSpatioTemporalResult crs(rect, rect.xres, rect.yres);
 
 	pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(pv::Coordinate((rect.x2 + rect.x1) / 2, (rect.y2 + rect.y2) / 2), pv::Dimension((rect.x2 - rect.x1) / 2, (rect.y2 - rect.y2) / 2), 1), 1);
-	for (Point &p : points->points) {
+	for (Coordinate &p : points->coordinates) {
 		auto px = crs.WorldToPixelX(p.x);
 		auto py = crs.WorldToPixelY(p.y);
 

@@ -61,7 +61,7 @@ struct PointDataEnhancement {
 
 		auto &md_vec = points->local_md_value.getVector(name);
 
-		for (auto &point : points->points) {
+		for (auto &point : points->coordinates) {
 			size_t rasterCoordinateX = floor(raster->lcrs.WorldToPixelX(point.x));
 			size_t rasterCoordinateY = floor(raster->lcrs.WorldToPixelY(point.y));
 
@@ -85,7 +85,7 @@ static void enhance(MultiPointCollection &points, GenericRaster &raster, const s
 #else
 	RasterOpenCL::init();
 
-	points.local_md_value.addVector(name, points.points.size());
+	points.local_md_value.addVector(name, points.coordinates.size());
 	try {
 		RasterOpenCL::CLProgram prog;
 		prog.setProfiler(profiler);

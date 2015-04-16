@@ -11,17 +11,17 @@
 #include <cmath>
 
 
-Point::Point(double x, double y) : x(x), y(y) {
+Coordinate::Coordinate(double x, double y) : x(x), y(y) {
 }
 
-Point::~Point() {
+Coordinate::~Coordinate() {
 }
 
-Point::Point(BinaryStream &stream) {
+Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
 	stream.read(&y);
 }
-void Point::toStream(BinaryStream &stream) {
+void Coordinate::toStream(BinaryStream &stream) {
 	stream.write(x);
 	stream.write(y);
 }

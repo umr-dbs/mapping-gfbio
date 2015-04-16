@@ -6,21 +6,21 @@
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/attributes.h"
 
-class Point {
+class Coordinate {
 	private:
-		Point(double x, double y);
-		Point(BinaryStream &stream);
+		Coordinate(double x, double y);
+		Coordinate(BinaryStream &stream);
 		void toStream(BinaryStream &stream);
 	public:
-		Point() = delete;
-		~Point();
+		Coordinate() = delete;
+		~Coordinate();
 
 		// Copy
-		Point(const Point &p) = default;
-		Point &operator=(const Point &p) = default;
+		Coordinate(const Coordinate &p) = default;
+		Coordinate &operator=(const Coordinate &p) = default;
 		// Move
-		Point(Point &&p) = default;
-		Point &operator=(Point &&p) = default;
+		Coordinate(Coordinate &&p) = default;
+		Coordinate &operator=(Coordinate &&p) = default;
 
 		double x, y;
 
@@ -32,18 +32,17 @@ class Point {
 /**
  * Base class for collection data types (Point, Polygon, Line)
  */
-//TODO: make class virtual
 class SimpleFeatureCollection : public SpatioTemporalResult {
 public:
 	SimpleFeatureCollection(const SpatioTemporalReference &stref);
 	virtual ~SimpleFeatureCollection();
 
-	std::vector<Point> points;
+	std::vector<Coordinate> coordinates;
 
 	// Attributes
 	std::vector<time_t> timestamps;
 
-	// global MetaData (one value per PointCollection)
+	// global MetaData (one value per SimpleFeatureCollection)
 	const std::string &getGlobalMDString(const std::string &key) const;
 	double getGlobalMDValue(const std::string &key) const;
 	DirectMetadata<double>* getGlobalMDValueIterator();
@@ -53,11 +52,11 @@ public:
 	void setGlobalMDString(const std::string &key, const std::string &value);
 	void setGlobalMDValue(const std::string &key, double value);
 
-	// global MetaData (one value per collection)
+	// global MetaData (one value per feature)
 	DirectMetadata<std::string> global_md_string;
 	DirectMetadata<double> global_md_value;
 
-	// local MetaData (one value per collection item)
+	// local MetaData (one value per feature)
 	MetadataArrays<std::string> local_md_string;
 	MetadataArrays<double> local_md_value;
 

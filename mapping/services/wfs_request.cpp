@@ -101,7 +101,7 @@ auto WFSRequest::getFeature() -> std::string {
 								(y2 + y1) / (2 * yres)),
 						pv::Dimension((x2 - x1) / (2 * xres),
 								(y2 - y1) / (2 * yres)), 1), 1);
-		for (Point& pointOld : points->points) {
+		for (Coordinate& pointOld : points->coordinates) {
 			clusterer.insert(
 					std::make_shared<pv::Circle>(
 							pv::Coordinate(pointOld.x / xres,

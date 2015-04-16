@@ -62,7 +62,7 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 		Raster2D<uint16_t> *acc = (Raster2D<uint16_t> *) accumulator.get();
 		acc->clear(0);
 
-		for (Point &p : points->points) {
+		for (Coordinate &p : points->coordinates) {
 			double x = p.x, y = p.y;
 
 			auto px = acc->WorldToPixelX(x);
@@ -101,7 +101,7 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 
 		auto &vec = points->local_md_value.getVector(renderattribute);
 		int i=0;
-		for (Point &p : points->points) {
+		for (Coordinate &p : points->coordinates) {
 			double x = p.x, y = p.y;
 
 			auto px = sum->WorldToPixelX(x);

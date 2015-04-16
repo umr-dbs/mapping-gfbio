@@ -31,7 +31,7 @@ public:
 	}
 
 	inline size_t stopRing(size_t index) const {
-		size_t result =index + 1 >= startRing.size() ? points.size() : startRing[index + 1];
+		size_t result =index + 1 >= startRing.size() ? coordinates.size() : startRing[index + 1];
 		return result;
 	}
 

@@ -21,7 +21,7 @@ std::string MultiPolygonCollection::toGeoJSON(bool displayMetadata) {
 				json << "[";
 
 				for(size_t pointIndex = startRing[ringIndex]; pointIndex < stopRing(ringIndex); ++pointIndex){
-					json << "[" << points[pointIndex].x << ", " << points[pointIndex].y << "],";
+					json << "[" << coordinates[pointIndex].x << ", " << coordinates[pointIndex].y << "],";
 				}
 
 				json.seekp(((long)json.tellp()) - 1);

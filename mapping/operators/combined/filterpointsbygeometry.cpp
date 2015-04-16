@@ -49,7 +49,7 @@ std::unique_ptr<MultiPointCollection> FilterPointsByGeometry::getMultiPointColle
 	auto geometry = GeosGeomUtil::createGeosGeometry(*multiPolygons);
 	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 
-	size_t points_count = points->points.size();
+	size_t points_count = points->coordinates.size();
 	std::vector<bool> keep(points_count, false);
 
 	auto prep = geos::geom::prep::PreparedGeometryFactory();
@@ -59,7 +59,7 @@ std::unique_ptr<MultiPointCollection> FilterPointsByGeometry::getMultiPointColle
 
 		auto preparedGeometry = prep.prepare(geometry->getGeometryN(i));
 		for (size_t idx=0;idx<points_count;idx++) {
-			Point &p = points->points[idx];
+			Coordinate &p = points->coordinates[idx];
 			double x = p.x, y = p.y;
 
 			const geos::geom::Coordinate coordinate(x, y);

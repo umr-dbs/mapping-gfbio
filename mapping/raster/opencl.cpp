@@ -74,7 +74,7 @@ void init() {
 			cl_context_properties cprops[3] = {CL_CONTEXT_PLATFORM, (cl_context_properties)(platform)(), 0};
 			try {
 				int device_type = CL_DEVICE_TYPE_GPU;
-				if (Configuration::get("global.opencl.forcecpu", "0") == "1")
+				if (Configuration::getBool("global.opencl.forcecpu", false))
 					device_type = CL_DEVICE_TYPE_CPU;
 
 				context = cl::Context(

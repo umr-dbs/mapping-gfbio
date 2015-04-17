@@ -441,7 +441,7 @@ int main() {
 			timestamp = std::stol(params["timestamp"]);
 		}
 
-		bool debug = false;
+		bool debug = Configuration::getBool("global.debug", false);
 		if (params.count("debug") > 0) {
 			debug = params["debug"] == "1";
 		}

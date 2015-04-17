@@ -138,7 +138,7 @@ void MultiPointCollection::addCoordinate(double x, double y) {
 	coordinates.push_back(Coordinate(x, y));
 }
 
-size_t MultiPointCollection::addFeature(std::vector<Coordinate> &featureCoordinates){
+size_t MultiPointCollection::addFeature(const std::vector<Coordinate> &featureCoordinates){
 	startFeature.push_back(coordinates.size());
 	coordinates.insert(coordinates.end(), featureCoordinates.begin(), featureCoordinates.end());
 

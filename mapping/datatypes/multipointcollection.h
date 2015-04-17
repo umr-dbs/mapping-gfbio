@@ -20,9 +20,9 @@ public:
 	// add a new coordinate,
 	void addCoordinate(double x, double y);
 	//add a new feature consisting of given coordinates, returns new feature index
-	size_t addFeature(std::vector<Coordinate> &coordinates);
+	size_t addFeature(const std::vector<Coordinate> &coordinates);
 	//add a new feature consisting of a single coordinate, returns new feature index
-	size_t addFeature(Coordinate coordinate);
+	size_t addFeature(const Coordinate coordinate);
 
 	std::unique_ptr<MultiPointCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<MultiPointCollection> filter(const std::vector<char> &keep);

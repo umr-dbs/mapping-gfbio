@@ -289,7 +289,7 @@ size_t CLProgram::addMultiPointCollection(MultiPointCollection *pc) {
 
 void CLProgram::addPointCollectionPositions(size_t idx, bool readonly) {
 	if (sizeof(cl_double2) != sizeof(Coordinate))
-		throw OpenCLException("sizeof(cl_double2) != sizeof(Point), cannot use opencl on multipointcollections");
+		throw OpenCLException("sizeof(cl_double2) != sizeof(Coordinate), cannot use opencl on multipointcollections");
 
 	MultiPointCollection *pc = multipointcollections.at(idx);
 	addArg(pc->coordinates, readonly);

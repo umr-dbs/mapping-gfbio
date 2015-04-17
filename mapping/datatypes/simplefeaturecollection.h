@@ -11,9 +11,10 @@ class Coordinate {
 		Coordinate(BinaryStream &stream);
 		void toStream(BinaryStream &stream);
 	public:
-		Coordinate(double x, double y);
+		Coordinate(double x, double y) : x(x), y(y) {}
+
 		Coordinate() = delete;
-		~Coordinate();
+		virtual ~Coordinate() {}
 
 		// Copy
 		Coordinate(const Coordinate &p) = default;
@@ -34,8 +35,9 @@ class Coordinate {
  */
 class SimpleFeatureCollection : public SpatioTemporalResult {
 public:
-	SimpleFeatureCollection(const SpatioTemporalReference &stref);
-	virtual ~SimpleFeatureCollection();
+	SimpleFeatureCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref), has_time(false) {}
+
+	virtual ~SimpleFeatureCollection() {}
 
 	std::vector<Coordinate> coordinates;
 

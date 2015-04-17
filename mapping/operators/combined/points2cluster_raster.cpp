@@ -5,6 +5,7 @@
 #include "datatypes/raster/typejuggling.h"
 #include "operators/operator.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
+#include "raster/exceptions.h"
 
 #include <memory>
 #include <cmath>
@@ -35,7 +36,9 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 	typedef uint8_t T;
 
 	std::unique_ptr<MultiPointCollection> points = getMultiPointCollectionFromSource(0, rect, profiler);
-	//TODO: ensure that each multipoint is a single point?!
+	if(!points->isSimple()){
+		throw OperatorException("PointsToClusterRaster only supports simple collections");
+	}
 
 	DataDescription dd(GDT_Byte, 0, MAX, true, 0);
 

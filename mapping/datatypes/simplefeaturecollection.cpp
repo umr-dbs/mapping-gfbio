@@ -11,12 +11,6 @@
 #include <cmath>
 
 
-Coordinate::Coordinate(double x, double y) : x(x), y(y) {
-}
-
-Coordinate::~Coordinate() {
-}
-
 Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
 	stream.read(&y);
@@ -27,16 +21,7 @@ void Coordinate::toStream(BinaryStream &stream) {
 }
 
 
-SimpleFeatureCollection::SimpleFeatureCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref), has_time(false) {
 
-}
-
-SimpleFeatureCollection::~SimpleFeatureCollection() {
-
-}
-
-
-//Metadata
 /**
  * Global Metadata
  */

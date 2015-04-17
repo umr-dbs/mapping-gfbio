@@ -46,11 +46,11 @@ void PointsFilterByRangeOperator::writeSemanticParameters(std::ostringstream& st
 std::unique_ptr<MultiPointCollection> PointsFilterByRangeOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
 
-	size_t count = points->coordinates.size();
+	size_t count = points->startFeature.size();
 	std::vector<bool> keep(count, false);
 
-	for (size_t idx=0;idx<count;idx++) {
-		double value = points->local_md_value.get(idx, name);
+	for (size_t featureIndex=0;featureIndex<count;featureIndex++) {
+		double value = points->local_md_value.get(featureIndex, name);
 		bool copy = false;
 
 		if (std::isnan(value)) {
@@ -60,7 +60,7 @@ std::unique_ptr<MultiPointCollection> PointsFilterByRangeOperator::getMultiPoint
 			copy = (value >= rangeMin && value <= rangeMax);
 		}
 
-		keep[idx] = copy;
+		keep[featureIndex] = copy;
 	}
 
 	return points->filter(keep);

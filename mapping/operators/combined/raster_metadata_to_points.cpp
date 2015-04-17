@@ -2,7 +2,7 @@
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
-#include "datatypes/pointcollection.h"
+#include "datatypes/multipointcollection.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
@@ -17,7 +17,7 @@ class RasterMetaDataToPoints: public GenericOperator {
 		RasterMetaDataToPoints(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~RasterMetaDataToPoints();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -56,12 +56,12 @@ void RasterMetaDataToPoints::writeSemanticParameters(std::ostringstream& stream)
 
 template<typename T>
 struct PointDataEnhancement {
-	static void execute(Raster2D<T>* raster, PointCollection *points, const std::string &name) {
+	static void execute(Raster2D<T>* raster, MultiPointCollection *points, const std::string &name) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
 		auto &md_vec = points->local_md_value.getVector(name);
 
-		for (auto &point : points->collection) {
+		for (auto &point : points->coordinates) {
 			size_t rasterCoordinateX = floor(raster->lcrs.WorldToPixelX(point.x));
 			size_t rasterCoordinateY = floor(raster->lcrs.WorldToPixelY(point.y));
 
@@ -78,18 +78,18 @@ struct PointDataEnhancement {
 
 #include "operators/combined/raster_metadata_to_points.cl.h"
 
-static void enhance(PointCollection &points, GenericRaster &raster, const std::string name, QueryProfiler &profiler) {
+static void enhance(MultiPointCollection &points, GenericRaster &raster, const std::string name, QueryProfiler &profiler) {
 #ifdef MAPPING_NO_OPENCL
 	points.local_md_value.addVector(name);
 	callUnaryOperatorFunc<PointDataEnhancement>(&raster, &points, name);
 #else
 	RasterOpenCL::init();
 
-	points.local_md_value.addVector(name, points.collection.size());
+	points.local_md_value.addVector(name, points.coordinates.size());
 	try {
 		RasterOpenCL::CLProgram prog;
 		prog.setProfiler(profiler);
-		prog.addPointCollection(&points);
+		prog.addMultiPointCollection(&points);
 		prog.addInRaster(&raster);
 		prog.compile(operators_combined_raster_metadata_to_points, "add_attribute");
 		prog.addPointCollectionPositions(0);
@@ -103,8 +103,9 @@ static void enhance(PointCollection &points, GenericRaster &raster, const std::s
 #endif
 }
 
-std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointsFromSource(0, rect, profiler);
+std::unique_ptr<MultiPointCollection> RasterMetaDataToPoints::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
+	//TODO: ensure that multipoints are points?
 
 	if (points->has_time) {
 		// TODO: sort by time, iterate over all timestamps, fetch the correct raster, then add metadata

@@ -1,4 +1,4 @@
-#include "datatypes/pointcollection.h"
+#include "datatypes/multipointcollection.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
@@ -19,7 +19,7 @@ class PointsDifferenceOperator: public GenericOperator {
 		PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PointsDifferenceOperator();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -43,18 +43,18 @@ void PointsDifferenceOperator::writeSemanticParameters(std::ostringstream& strea
 
 #include "operators/points/points_difference.cl.h"
 
-static double point_distance(const Point &p1, const Point &p2) {
+static double point_distance(const Coordinate &p1, const Coordinate &p2) {
 	double dx = p1.x - p2.x, dy = p1.y - p2.y;
 	return sqrt(dx*dx + dy*dy);
 }
 
-std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto pointsMinuend = getPointsFromSource(0, rect, profiler);
-	auto pointsSubtrahend = getPointsFromSource(1, rect, profiler);
+std::unique_ptr<MultiPointCollection> PointsDifferenceOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto pointsMinuend = getMultiPointCollectionFromSource(0, rect, profiler);
+	auto pointsSubtrahend = getMultiPointCollectionFromSource(1, rect, profiler);
 
 	//fprintf(stderr, "Minuend: %lu, Subtrahend: %lu\n", pointsMinuend->collection.size(), pointsSubtrahend->collection.size());
 
-	size_t count_m = pointsMinuend->collection.size();
+	size_t count_m = pointsMinuend->coordinates.size();
 
 	// TODO: why is there a limitation? remove or make more reasonable abort decisions.
 	if (count_m > 100000)
@@ -64,13 +64,13 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 #ifdef MAPPING_NO_OPENCL
 	std::vector<bool> keep(count_m, true);
 
-	size_t count_s = pointsSubtrahend->collection.size();
+	size_t count_s = pointsSubtrahend->coordinates.size();
 
 	for (size_t idx_m=0;idx_m<count_m;idx_m++) {
-		Point &p_m = pointsMinuend->collection[idx_m];
+		Coordinate &p_m = pointsMinuend->coordinates[idx_m];
 
 		for (size_t idx_s=0;idx_s<count_s;idx_s++) {
-			if (point_distance(p_m, pointsSubtrahend->collection[idx_s]) <= epsilonDistance) {
+			if (point_distance(p_m, pointsSubtrahend->coordinates[idx_s]) <= epsilonDistance) {
 				keep[idx_m] = false;
 				break;
 			}
@@ -84,8 +84,8 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPoints(const Query
 	try {
 		RasterOpenCL::CLProgram prog;
 		prog.setProfiler(profiler);
-		prog.addPointCollection(pointsMinuend.get());
-		prog.addPointCollection(pointsSubtrahend.get());
+		prog.addMultiPointCollection(pointsMinuend.get());
+		prog.addMultiPointCollection(pointsSubtrahend.get());
 		prog.compile(operators_points_points_difference, "difference");
 		prog.addPointCollectionPositions(0, true);
 		prog.addPointCollectionPositions(1, true);

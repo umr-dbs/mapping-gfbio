@@ -16,7 +16,7 @@
 #include <gdal_priv.h>
 
 #include "datatypes/raster/raster_priv.h"
-#include "datatypes/pointcollection.h"
+#include "datatypes/multipointcollection.h"
 
 class QueryProfiler;
 
@@ -44,7 +44,7 @@ namespace RasterOpenCL {
 			void addInRaster(GenericRaster *input_raster);
 			void addOutRaster(GenericRaster *output_raster);
 
-			size_t addPointCollection(PointCollection *pc);
+			size_t addMultiPointCollection(MultiPointCollection *pc);
 			void addPointCollectionPositions(size_t idx, bool readonly = false);
 			void addPointCollectionAttribute(size_t idx, const std::string &name, bool readonly = false);
 
@@ -95,7 +95,7 @@ namespace RasterOpenCL {
 			int iteration_type; // 0 = unknown, 1 = first out_raster, 2 = first pointcollection
 			std::vector<GenericRaster *> in_rasters;
 			std::vector<GenericRaster *> out_rasters;
-			std::vector<PointCollection *> pointcollections;
+			std::vector<MultiPointCollection *> multipointcollections;
 			std::vector<cl::Buffer *> scratch_buffers;
 			std::vector<void *> scratch_maps;
 	};

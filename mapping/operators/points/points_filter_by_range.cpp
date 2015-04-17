@@ -1,4 +1,4 @@
-#include "datatypes/pointcollection.h"
+#include "datatypes/multipointcollection.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
@@ -12,7 +12,7 @@ class PointsFilterByRangeOperator: public GenericOperator {
 		PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 		virtual ~PointsFilterByRangeOperator();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -43,10 +43,10 @@ void PointsFilterByRangeOperator::writeSemanticParameters(std::ostringstream& st
 			<< "\"rangeMax\"" << rangeMax;
 }
 
-std::unique_ptr<PointCollection> PointsFilterByRangeOperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointsFromSource(0, rect, profiler);
+std::unique_ptr<MultiPointCollection> PointsFilterByRangeOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
 
-	size_t count = points->collection.size();
+	size_t count = points->coordinates.size();
 	std::vector<bool> keep(count, false);
 
 	for (size_t idx=0;idx<count;idx++) {

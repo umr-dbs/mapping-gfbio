@@ -1,9 +1,10 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
-#include "datatypes/pointcollection.h"
-#include "datatypes/geometry.h"
+#include "datatypes/multipointcollection.h"
+#include "datatypes/multipolygoncollection.h"
 #include "operators/operator.h"
+#include "datatypes/simplefeaturecollections/geosgeomutil.h"
 
 #include "util/make_unique.h"
 
@@ -17,12 +18,15 @@
 #include <string>
 #include <sstream>
 
+/**
+ * Filter simple multipointcollection by a simple multipolygoncollection
+ */
 class FilterPointsByGeometry : public GenericOperator {
 	public:
 		FilterPointsByGeometry(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~FilterPointsByGeometry();
 
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 
@@ -36,19 +40,24 @@ FilterPointsByGeometry::~FilterPointsByGeometry() {
 }
 REGISTER_OPERATOR(FilterPointsByGeometry, "filterpointsbygeometry");
 
-std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<MultiPointCollection> FilterPointsByGeometry::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	//TODO: check projection
 	const geos::geom::PrecisionModel pm;
 	geos::geom::GeometryFactory gf = geos::geom::GeometryFactory(&pm, 4326);
 	geos::geom::GeometryFactory* geometryFactory = &gf;
 
-	auto points = getPointsFromSource(0, rect, profiler);
+	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
 
-	auto generic_geometry = getGeometryFromSource(0, rect, profiler);
-	auto geometry = generic_geometry->getGeometry();
+	auto multiPolygons = getMultiPolygonCollectionFromSource(0, rect, profiler);
+
+	if(!points->isSimple() || !multiPolygons->isSimple()){
+		throw OperatorException("Filterpointsbygeometry operator only supports simple point- and polygoncollections");
+	}
+
+	auto geometry = GeosGeomUtil::createGeosGeometry(*multiPolygons);
 	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 
-	size_t points_count = points->collection.size();
+	size_t points_count = points->startFeature.size();
 	std::vector<bool> keep(points_count, false);
 
 	auto prep = geos::geom::prep::PreparedGeometryFactory();
@@ -58,7 +67,7 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPoints(const QueryRe
 
 		auto preparedGeometry = prep.prepare(geometry->getGeometryN(i));
 		for (size_t idx=0;idx<points_count;idx++) {
-			Point &p = points->collection[idx];
+			Coordinate &p = points->coordinates[idx];
 			double x = p.x, y = p.y;
 
 			const geos::geom::Coordinate coordinate(x, y);

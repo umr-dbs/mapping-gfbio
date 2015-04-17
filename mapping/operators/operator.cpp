@@ -1,7 +1,8 @@
 
 #include "datatypes/raster.h"
-#include "datatypes/pointcollection.h"
-#include "datatypes/geometry.h"
+#include "datatypes/multipointcollection.h"
+#include "datatypes/multilinecollection.h"
+#include "datatypes/multipolygoncollection.h"
 #include "datatypes/plot.h"
 #include "util/binarystream.h"
 #include "util/debug.h"
@@ -177,24 +178,29 @@ GenericOperator::~GenericOperator() {
 void GenericOperator::writeSemanticParameters(std::ostringstream &) {
 }
 
-void GenericOperator::assumeSources(int rasters, int pointcollections, int geometries) {
+void GenericOperator::assumeSources(int rasters, int multipointcollections, int multilinecollections, int multipolygoncollections) {
 	return;
 	if (rasters >= 0 && sourcecounts[0] != rasters)
 		throw OperatorException("Wrong amount of raster sources");
-	if (pointcollections >= 0 && sourcecounts[1] != pointcollections)
-		throw OperatorException("Wrong amount of pointcollection sources");
-	if (geometries >= 0 && sourcecounts[2] != geometries)
-		throw OperatorException("Wrong amount of geometry sources");
+	if (multipointcollections >= 0 && sourcecounts[1] != multipointcollections)
+		throw OperatorException("Wrong amount of multipointcollection sources");
+	if (multilinecollections >= 0 && sourcecounts[2] != multilinecollections)
+			throw OperatorException("Wrong amount of multilinecollection sources");
+	if (multipolygoncollections >= 0 && sourcecounts[3] != multipolygoncollections)
+		throw OperatorException("Wrong amount of multipolygoncollecion sources");
 }
 
 std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &, QueryProfiler &) {
 	throw OperatorException("getRaster() called on an operator that doesn't return rasters");
 }
-std::unique_ptr<PointCollection> GenericOperator::getPoints(const QueryRectangle &, QueryProfiler &) {
-	throw OperatorException("getPoints() called on an operator that doesn't return points");
+std::unique_ptr<MultiPointCollection> GenericOperator::getMultiPointCollection(const QueryRectangle &, QueryProfiler &) {
+	throw OperatorException("getMultiPointCollection() called on an operator that doesn't return multipoints");
 }
-std::unique_ptr<GenericGeometry> GenericOperator::getGeometry(const QueryRectangle &, QueryProfiler &) {
-	throw OperatorException("getGeometry() called on an operator that doesn't return geometries");
+std::unique_ptr<MultiLineCollection> GenericOperator::getMultiLineCollection(const QueryRectangle &, QueryProfiler &) {
+	throw OperatorException("getMultiPolygonCollection() called on an operator that doesn't return multilines");
+}
+std::unique_ptr<MultiPolygonCollection> GenericOperator::getMultiPolygonCollection(const QueryRectangle &, QueryProfiler &) {
+	throw OperatorException("getMultiPolygonCollection() called on an operator that doesn't return multipolygons");
 }
 std::unique_ptr<GenericPlot> GenericOperator::getPlot(const QueryRectangle &, QueryProfiler &) {
 	throw OperatorException("getPlot() called on an operator that doesn't return data vectors");
@@ -233,21 +239,30 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	parent_profiler += profiler;
 	return result;
 }
-std::unique_ptr<PointCollection> GenericOperator::getCachedPoints(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+std::unique_ptr<MultiPointCollection> GenericOperator::getCachedMultiPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
 	QueryProfiler profiler;
 	profiler.startTimer();
-	auto result = getPoints(rect, profiler);
+	auto result = getMultiPointCollection(rect, profiler);
 	profiler.stopTimer();
 	d_profile(depth, type, "points", profiler);
 	parent_profiler += profiler;
 	return result;
 }
-std::unique_ptr<GenericGeometry> GenericOperator::getCachedGeometry(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+std::unique_ptr<MultiLineCollection> GenericOperator::getCachedMultiLineCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
 	QueryProfiler profiler;
 	profiler.startTimer();
-	auto result = getGeometry(rect, profiler);
+	auto result = getMultiLineCollection(rect, profiler);
 	profiler.stopTimer();
-	d_profile(depth, type, "geom", profiler);
+	d_profile(depth, type, "lines", profiler);
+	parent_profiler += profiler;
+	return result;
+}
+std::unique_ptr<MultiPolygonCollection> GenericOperator::getCachedMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+	QueryProfiler profiler;
+	profiler.startTimer();
+	auto result = getMultiPolygonCollection(rect, profiler);
+	profiler.stopTimer();
+	d_profile(depth, type, "polygons", profiler);
 	parent_profiler += profiler;
 	return result;
 }
@@ -270,21 +285,33 @@ std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, con
 	profiler.startTimer();
 	return result;
 }
-std::unique_ptr<PointCollection> GenericOperator::getPointsFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<MultiPointCollection> GenericOperator::getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (idx < 0 || idx >= sourcecounts[1])
-		throw OperatorException("getChildPoints() called on invalid index");
+		throw OperatorException("getChildMultiPoints() called on invalid index");
 	profiler.stopTimer();
 	int offset = sourcecounts[0] + idx;
-	auto result = sources[offset]->getCachedPoints(rect, profiler);
+	auto result = sources[offset]->getCachedMultiPointCollection(rect, profiler);
 	profiler.startTimer();
 	return result;
 }
-std::unique_ptr<GenericGeometry> GenericOperator::getGeometryFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<MultiLineCollection> GenericOperator::getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (idx < 0 || idx >= sourcecounts[2])
-		throw OperatorException("getChildGeometry() called on invalid index");
+		throw OperatorException("getChildMultiLines() called on invalid index");
 	profiler.stopTimer();
 	int offset = sourcecounts[0] + sourcecounts[1] + idx;
-	auto result = sources[offset]->getCachedGeometry(rect, profiler);
+	auto result = sources[offset]->getCachedMultiLineCollection(rect, profiler);
+	profiler.startTimer();
+	return result;
+}
+std::unique_ptr<MultiPolygonCollection> GenericOperator::getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler) {
+	if (idx < 0 || idx >= sourcecounts[3]){
+		std::stringstream sstm;
+		sstm << "getChildMultiPolygons() called on invalid index: " << idx;
+		throw OperatorException(sstm.str());
+	}
+	profiler.stopTimer();
+	int offset = sourcecounts[0] + sourcecounts[1] + sourcecounts[2] + idx;
+	auto result = sources[offset]->getCachedMultiPolygonCollection(rect, profiler);
 	profiler.startTimer();
 	return result;
 }
@@ -309,7 +336,7 @@ static int parseSourcesFromJSON(Json::Value &sourcelist, GenericOperator *source
 }
 
 std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json, int depth) {
-	std::string sourcetypes[] = { "raster", "points", "geometry" };
+	std::string sourcetypes[] = { "raster", "multipoints", "multilines", "multipolygons" };
 
 	// recursively create all sources
 	Json::Value sourcelist = json["sources"];

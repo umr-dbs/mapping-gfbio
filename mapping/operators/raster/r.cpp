@@ -1,5 +1,5 @@
 #include "datatypes/raster.h"
-#include "datatypes/pointcollection.h"
+#include "datatypes/multipointcollection.h"
 #include "datatypes/plots/text.h"
 #include "datatypes/plots/png.h"
 #include "operators/operator.h"
@@ -26,7 +26,7 @@ class ROperator : public GenericOperator {
 		virtual ~ROperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PointCollection> getPoints(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		void runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type, QueryProfiler &profiler);
@@ -34,7 +34,7 @@ class ROperator : public GenericOperator {
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		friend std::unique_ptr<GenericRaster> query_raster_source(ROperator *op, int childidx, const QueryRectangle &rect);
-		friend std::unique_ptr<PointCollection> query_points_source(ROperator *op, int childidx, const QueryRectangle &rect);
+		friend std::unique_ptr<MultiPointCollection> query_points_source(ROperator *op, int childidx, const QueryRectangle &rect);
 
 		std::string source;
 		std::string result_type;
@@ -70,7 +70,7 @@ void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char
 	stream.write(requested_type);
 	stream.write(source);
 	stream.write((int) getRasterSourceCount());
-	stream.write((int) getPointsSourceCount());
+	stream.write((int) getMultiPointCollectionSourceCount());
 	stream.write(rect);
 
 	char type;
@@ -85,7 +85,7 @@ void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char
 				stream.write(*raster);
 			}
 			else if (type == RSERVER_TYPE_POINTS) {
-				auto points = getPointsFromSource(childidx, qrect, profiler);
+				auto points = getMultiPointCollectionFromSource(childidx, qrect, profiler);
 				stream.write(*points);
 			}
 			else {
@@ -120,14 +120,14 @@ std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect, 
 	return raster;
 }
 
-std::unique_ptr<PointCollection> ROperator::getPoints(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<MultiPointCollection> ROperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (result_type != "points")
 		throw OperatorException("This R script does not return a point collection");
 
 	UnixSocket socket(socketpath.c_str());
 	runScript(socket, rect, RSERVER_TYPE_POINTS, profiler);
 
-	auto points = std::make_unique<PointCollection>(socket);
+	auto points = std::make_unique<MultiPointCollection>(socket);
 	return points;
 }
 

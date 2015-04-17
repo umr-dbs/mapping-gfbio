@@ -240,6 +240,7 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg = EPSG_WEBM
 	 * OpenLayers insists on sending latitude in x and longitude in y.
 	 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
 	 * The simple solution is to swap the x and y coordinates.
+	 * OpenLayers 3 uses the axis orientation of the projection to determine the bbox axis order. https://github.com/openlayers/ol3/blob/master/src/ol/source/imagewmssource.js ~ line 317.
 	 */
 	if (epsg == EPSG_LATLON) {
 		std::swap(bbox[0], bbox[1]);

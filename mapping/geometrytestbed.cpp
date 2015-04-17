@@ -5,6 +5,8 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include "datatypes/multipolygoncollection.h"
+#include "datatypes/multipointcollection.h"
+#include <vector>
 
 geos::geom::Geometry* createGeosGeometry(std::string wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
@@ -27,7 +29,7 @@ void testGeosToMapping(){
 	auto multiPolygonCollection = GeosGeomUtil::createMultiPolygonCollection(*geometry);
 
 	std::cout << "points" << std::endl;
-	for(auto p = multiPolygonCollection->points.begin(); p != multiPolygonCollection->points.end(); ++p){
+	for(auto p = multiPolygonCollection->coordinates.begin(); p != multiPolygonCollection->coordinates.end(); ++p){
 	    std::cout << (*p).x << "," << (*p).y << ' ';
 	}
 
@@ -60,15 +62,33 @@ void testTwoWay(){
 	std::cout << multiPolygonCollection->toGeoJSON(false);
 }
 
+void testMultiPointToCSV(){
+	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
+
+	std::vector<Coordinate> coordinates;
+	coordinates.push_back(Coordinate(1,2));
+
+	multiPointCollection.addFeature(coordinates);
+
+	coordinates.clear();
+	coordinates.push_back(Coordinate(1,2));
+	coordinates.push_back(Coordinate(2,3));
+
+	multiPointCollection.addFeature(coordinates);
+
+	std::cout << multiPointCollection.toCSV();
+}
+
 int main(){
-	std::cout << "hello" << std::endl;
+//	std::cout << "hello" << std::endl;
+//
+//	std::cout << "hello again" << std::endl;
+//
+//
+//	//testGeosToMapping();
+//	testTwoWay();
 
-	std::cout << "hello again" << std::endl;
-
-
-	//testGeosToMapping();
-	testTwoWay();
-
+	testMultiPointToCSV();
 
 	return 0;
 }

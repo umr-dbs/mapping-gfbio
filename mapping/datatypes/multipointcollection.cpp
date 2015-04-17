@@ -85,34 +85,51 @@ std::unique_ptr<MultiPointCollection> MultiPointCollection::filter(const std::ve
 }
 
 MultiPointCollection::MultiPointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
-	size_t count;
-	stream.read(&count);
-	coordinates.reserve(count);
+	size_t coordinateCount;
+	stream.read(&coordinateCount);
+	coordinates.reserve(coordinateCount);
+	size_t featureCount;
+	stream.read(&featureCount);
+	startFeature.reserve(featureCount);
 
 	global_md_string.fromStream(stream);
 	global_md_value.fromStream(stream);
 	local_md_string.fromStream(stream);
 	local_md_value.fromStream(stream);
 
-	for (size_t i=0;i<count;i++) {
+	for (size_t i=0;i<coordinateCount;i++) {
 		coordinates.push_back( Coordinate(stream) );
 	}
+
+	uint32_t offset;
+	for (size_t i=0;i<featureCount;i++) {
+		stream.read(&offset);
+		startFeature.push_back(offset);
+	}
+
 	// TODO: serialize/unserialize time array
 }
 
 void MultiPointCollection::toStream(BinaryStream &stream) {
 	stream.write(stref);
-	size_t count = coordinates.size();
-	stream.write(count);
+	size_t coordinateCount = coordinates.size();
+	stream.write(coordinateCount);
+	size_t featureCount = startFeature.size();
+	stream.write(featureCount);
 
 	stream.write(global_md_string);
 	stream.write(global_md_value);
 	stream.write(local_md_string);
 	stream.write(local_md_value);
 
-	for (size_t i=0;i<count;i++) {
+	for (size_t i=0;i<coordinateCount;i++) {
 		coordinates[i].toStream(stream);
 	}
+
+	for (size_t i=0;i<featureCount;i++) {
+		stream.write(startFeature[i]);
+	}
+
 	// TODO: serialize/unserialize time array
 }
 
@@ -121,7 +138,7 @@ void MultiPointCollection::addCoordinate(double x, double y) {
 	coordinates.push_back(Coordinate(x, y));
 }
 
-size_t MultiPointCollection::addFeature(std::vector<Coordinate> featureCoordinates){
+size_t MultiPointCollection::addFeature(std::vector<Coordinate> &featureCoordinates){
 	startFeature.push_back(coordinates.size());
 	coordinates.insert(coordinates.end(), featureCoordinates.begin(), featureCoordinates.end());
 
@@ -187,25 +204,37 @@ void MultiPointCollection::toOGR(const char *driver = "ESRI Shapefile") {
 }
 #endif
 
-//TODO: migrate to multipoint semantics
+//TODO: include global metadata?
 std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
-/*
-	  { "type": "MultiPoint",
-	    "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
-	    }
-*/
 	std::ostringstream json;
 	json << std::fixed; // std::setprecision(4);
 
-	if(displayMetadata && (local_md_value.size() > 0 || local_md_string.size() > 0 || has_time)) {
+	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
-		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
+	size_t idx = 0;
+	auto value_keys = local_md_value.getKeys();
+	auto string_keys = local_md_string.getKeys();
+	bool isSimpleCollection = isSimple();
+	for (size_t index = 0; index < startFeature.size(); index++) {
+		if(isSimpleCollection){
+			//all features are single points
+			Coordinate &p = coordinates[index];
+			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]}";
+		}
+		else {
+			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPoint\",\"coordinates\":[";
 
-		size_t idx = 0;
-		auto value_keys = local_md_value.getKeys();
-		auto string_keys = local_md_string.getKeys();
-		for (const Coordinate &p : coordinates) {
-			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]},\"properties\":{";
+			for(size_t coordinateIndex = startFeature[index]; coordinateIndex < stopFeature(index); ++coordinateIndex){
+				Coordinate &p = coordinates[coordinateIndex];
+				json << "[" << p.x << "," << p.y << "],";
+			}
+			json.seekp(((long) json.tellp()) - 1); // delete last ,
+
+			json << "]}";
+		}
+
+		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || has_time)){
+			json << ", properties\":{";
 
 			for (auto &key : string_keys) {
 				json << "\"" << key << "\":\"" << local_md_string.get(idx, key) << "\",";
@@ -229,35 +258,18 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
-			json << "}},";
-			idx++;
+			json << "}";
 		}
-
-		json.seekp(((long) json.tellp()) - 1); // delete last ,
-		json << "]}";
-
-	} else {
-
-		//json << "{ \"type\": \"MultiPoint\", \"coordinates\": [ ";
-		json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
-
-		bool first = true;
-		for (const Coordinate &p : coordinates) {
-			if (first)
-				first = false;
-			else
-				json << ", ";
-
-			json << "[" << p.x << "," << p.y << "]";
-		}
-		//json << "] }";
-		json << "] }}]}";
+		json << "},";
 
 	}
 
+	json.seekp(((long) json.tellp()) - 1); // delete last ,
+	json << "]}";
+
 	return json.str();
 }
-
+//TODO: include global metadata?
 std::string MultiPointCollection::toCSV() {
 	std::ostringstream csv;
 	csv << std::fixed; // std::setprecision(4);
@@ -265,7 +277,12 @@ std::string MultiPointCollection::toCSV() {
 	auto string_keys = local_md_string.getKeys();
 	auto value_keys = local_md_value.getKeys();
 
+	bool isSimpleCollection = isSimple();
+
 	//header
+	if(!isSimpleCollection){
+		csv << "feature,";
+	}
 	csv << "lon" << "," << "lat";
 	if (has_time)
 		csv << ",\"time\"";
@@ -278,18 +295,25 @@ std::string MultiPointCollection::toCSV() {
 	csv << std::endl;
 
 	size_t idx = 0;
+	size_t featureIndex = 0;
 	for (const auto &p : coordinates) {
+		if(!isSimpleCollection){
+			if(idx >= stopFeature(featureIndex)){
+				++featureIndex;
+			}
+			csv << featureIndex << ",";
+		}
 		csv << p.x << "," << p.y;
 
 		if (has_time)
-			csv << "," << timestamps[idx];
+			csv << "," << timestamps[featureIndex];
 
 
 		for(auto &key : string_keys) {
-			csv << ",\"" << local_md_string.get(idx, key) << "\"";
+			csv << ",\"" << local_md_string.get(featureIndex, key) << "\"";
 		}
 		for(auto &key : value_keys) {
-			csv << "," << local_md_value.get(idx, key);
+			csv << "," << local_md_value.get(featureIndex, key);
 		}
 		csv << std::endl;
 		idx++;

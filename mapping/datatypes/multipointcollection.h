@@ -17,11 +17,11 @@ public:
 
 	void toStream(BinaryStream &stream);
 
-	// add a new coordinate, returns index of the new coordinate
+	// add a new coordinate,
 	void addCoordinate(double x, double y);
-	//add a new feature consisting of given coordinates
-	size_t addFeature(std::vector<Coordinate> coordinates);
-	//add a new feature consisting of a single coordinate
+	//add a new feature consisting of given coordinates, returns new feature index
+	size_t addFeature(std::vector<Coordinate> &coordinates);
+	//add a new feature consisting of a single coordinate, returns new feature index
 	size_t addFeature(Coordinate coordinate);
 
 	std::unique_ptr<MultiPointCollection> filter(const std::vector<bool> &keep);

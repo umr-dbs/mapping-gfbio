@@ -13,7 +13,7 @@ public:
 	using SimpleFeatureCollection::SimpleFeatureCollection; //inherit constructor
 
 	//starting index of individual features in the points vector
-	std::vector<uint32_t> startFeature;
+	std::vector<uint32_t> start_feature;
 
 	void toStream(BinaryStream &stream);
 
@@ -36,7 +36,7 @@ public:
 
 	//return the index of the next feature in the startPolygon array that is no longer part of the index-th feature
 	inline size_t stopFeature(size_t index) const {
-		return index + 1 >= startFeature.size() ? coordinates.size() : startFeature[index + 1];
+		return index + 1 >= start_feature.size() ? coordinates.size() : start_feature[index + 1];
 	}
 
 	virtual ~MultiPointCollection(){};

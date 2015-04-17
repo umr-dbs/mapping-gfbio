@@ -13,25 +13,25 @@ public:
 	using SimpleFeatureCollection::SimpleFeatureCollection; //inherit constructor
 
 	//starting index of individual rings in the points vector
-	std::vector<uint32_t> startRing;
+	std::vector<uint32_t> start_ring;
 
 	//starting index of individual polygons in the startRing vector
-	std::vector<uint32_t> startPolygon;
+	std::vector<uint32_t> start_polygon;
 
 	//starting index of individual Features in the startPolygon vector
-	std::vector<uint32_t> startFeature;
+	std::vector<uint32_t> start_feature;
 
 	//return the index of the next feature in the startPolygon array that is no longer part of the index-th feature
 	inline size_t stopFeature(size_t index) const {
-		return index + 1 >= startFeature.size() ? startPolygon.size() : startFeature[index + 1];
+		return index + 1 >= start_feature.size() ? start_polygon.size() : start_feature[index + 1];
 	}
 
 	inline size_t stopPolygon(size_t index) const {
-		return index + 1 >= startPolygon.size() ? startRing.size() : startPolygon[index + 1];
+		return index + 1 >= start_polygon.size() ? start_ring.size() : start_polygon[index + 1];
 	}
 
 	inline size_t stopRing(size_t index) const {
-		size_t result =index + 1 >= startRing.size() ? coordinates.size() : startRing[index + 1];
+		size_t result =index + 1 >= start_ring.size() ? coordinates.size() : start_ring[index + 1];
 		return result;
 	}
 

@@ -46,7 +46,7 @@ void PointsFilterByRangeOperator::writeSemanticParameters(std::ostringstream& st
 std::unique_ptr<MultiPointCollection> PointsFilterByRangeOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
 
-	size_t count = points->startFeature.size();
+	size_t count = points->start_feature.size();
 	std::vector<bool> keep(count, false);
 
 	for (size_t featureIndex=0;featureIndex<count;featureIndex++) {

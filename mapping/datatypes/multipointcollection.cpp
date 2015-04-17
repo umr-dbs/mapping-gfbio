@@ -11,7 +11,7 @@
 
 template<typename T>
 std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std::vector<T> &keep) {
-	size_t count = in->startFeature.size();
+	size_t count = in->start_feature.size();
 	if (keep.size() != count) {
 		std::ostringstream msg;
 		msg << "MultiPointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
@@ -25,7 +25,7 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 	}
 
 	auto out = std::make_unique<MultiPointCollection>(in->stref);
-	out->startFeature.reserve(kept_count);
+	out->start_feature.reserve(kept_count);
 	// copy global metadata
 	out->global_md_string = in->global_md_string;
 	out->global_md_value = in->global_md_value;
@@ -33,10 +33,10 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 	// copy features
 	for (size_t featureIndex=0;featureIndex<count;featureIndex++) {
 		if (keep[featureIndex]) {
-			out->startFeature.push_back(out->coordinates.size());
+			out->start_feature.push_back(out->coordinates.size());
 
 			//copy coordinates
-			for(size_t coordinateIndex = in->startFeature[featureIndex]; coordinateIndex < in->stopFeature(featureIndex); ++coordinateIndex){
+			for(size_t coordinateIndex = in->start_feature[featureIndex]; coordinateIndex < in->stopFeature(featureIndex); ++coordinateIndex){
 				Coordinate &p = in->coordinates[coordinateIndex];
 				out->addCoordinate(p.x, p.y);
 			}
@@ -90,7 +90,7 @@ MultiPointCollection::MultiPointCollection(BinaryStream &stream) : SimpleFeature
 	coordinates.reserve(coordinateCount);
 	size_t featureCount;
 	stream.read(&featureCount);
-	startFeature.reserve(featureCount);
+	start_feature.reserve(featureCount);
 
 	global_md_string.fromStream(stream);
 	global_md_value.fromStream(stream);
@@ -104,7 +104,7 @@ MultiPointCollection::MultiPointCollection(BinaryStream &stream) : SimpleFeature
 	uint32_t offset;
 	for (size_t i=0;i<featureCount;i++) {
 		stream.read(&offset);
-		startFeature.push_back(offset);
+		start_feature.push_back(offset);
 	}
 
 	// TODO: serialize/unserialize time array
@@ -114,7 +114,7 @@ void MultiPointCollection::toStream(BinaryStream &stream) {
 	stream.write(stref);
 	size_t coordinateCount = coordinates.size();
 	stream.write(coordinateCount);
-	size_t featureCount = startFeature.size();
+	size_t featureCount = start_feature.size();
 	stream.write(featureCount);
 
 	stream.write(global_md_string);
@@ -127,7 +127,7 @@ void MultiPointCollection::toStream(BinaryStream &stream) {
 	}
 
 	for (size_t i=0;i<featureCount;i++) {
-		stream.write(startFeature[i]);
+		stream.write(start_feature[i]);
 	}
 
 	// TODO: serialize/unserialize time array
@@ -139,16 +139,16 @@ void MultiPointCollection::addCoordinate(double x, double y) {
 }
 
 size_t MultiPointCollection::addFeature(const std::vector<Coordinate> &featureCoordinates){
-	startFeature.push_back(coordinates.size());
+	start_feature.push_back(coordinates.size());
 	coordinates.insert(coordinates.end(), featureCoordinates.begin(), featureCoordinates.end());
 
-	return startFeature.size() - 1;
+	return start_feature.size() - 1;
 }
 
 size_t MultiPointCollection::addFeature(Coordinate coordinate){
-	startFeature.push_back(coordinates.size());
+	start_feature.push_back(coordinates.size());
 	coordinates.push_back(coordinate);
-	return startFeature.size() - 1;
+	return start_feature.size() - 1;
 }
 
 
@@ -215,7 +215,7 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 	auto value_keys = local_md_value.getKeys();
 	auto string_keys = local_md_string.getKeys();
 	bool isSimpleCollection = isSimple();
-	for (size_t index = 0; index < startFeature.size(); index++) {
+	for (size_t index = 0; index < start_feature.size(); index++) {
 		if(isSimpleCollection){
 			//all features are single points
 			Coordinate &p = coordinates[index];
@@ -224,7 +224,7 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 		else {
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPoint\",\"coordinates\":[";
 
-			for(size_t coordinateIndex = startFeature[index]; coordinateIndex < stopFeature(index); ++coordinateIndex){
+			for(size_t coordinateIndex = start_feature[index]; coordinateIndex < stopFeature(index); ++coordinateIndex){
 				Coordinate &p = coordinates[coordinateIndex];
 				json << "[" << p.x << "," << p.y << "],";
 			}
@@ -330,5 +330,5 @@ std::string MultiPointCollection::hash() {
 }
 
 bool MultiPointCollection::isSimple(){
-	return coordinates.size() == startFeature.size();
+	return coordinates.size() == start_feature.size();
 }

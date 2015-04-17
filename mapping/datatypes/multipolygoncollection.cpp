@@ -11,16 +11,16 @@ std::string MultiPolygonCollection::toGeoJSON(bool displayMetadata) {
 	json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
 
-	for(size_t featureIndex = 0; featureIndex < startFeature.size(); ++featureIndex){
+	for(size_t featureIndex = 0; featureIndex < start_feature.size(); ++featureIndex){
 		json << "{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPolygon\", \"coordinates\": [";
 
-		for(size_t polygonIndex = startFeature[featureIndex]; polygonIndex < stopFeature(featureIndex); ++polygonIndex){
+		for(size_t polygonIndex = start_feature[featureIndex]; polygonIndex < stopFeature(featureIndex); ++polygonIndex){
 			json << "[";
 
-			for (size_t ringIndex = startPolygon[polygonIndex]; ringIndex < stopPolygon(polygonIndex); ++ringIndex){
+			for (size_t ringIndex = start_polygon[polygonIndex]; ringIndex < stopPolygon(polygonIndex); ++ringIndex){
 				json << "[";
 
-				for(size_t pointIndex = startRing[ringIndex]; pointIndex < stopRing(ringIndex); ++pointIndex){
+				for(size_t pointIndex = start_ring[ringIndex]; pointIndex < stopRing(ringIndex); ++pointIndex){
 					json << "[" << coordinates[pointIndex].x << ", " << coordinates[pointIndex].y << "],";
 				}
 
@@ -51,5 +51,5 @@ std::string MultiPolygonCollection::toCSV() {
 }
 
 bool MultiPolygonCollection::isSimple(){
-	return startFeature.size() == startPolygon.size();
+	return start_feature.size() == start_polygon.size();
 }

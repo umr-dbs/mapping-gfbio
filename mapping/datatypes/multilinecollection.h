@@ -12,10 +12,10 @@ public:
 	using SimpleFeatureCollection::SimpleFeatureCollection; //inherit constructor
 
 	//starting index of individual lines in the points vector
-	std::vector<uint32_t> startLine;
+	std::vector<uint32_t> start_line;
 
 	//starting index of individual features in the startElement vector
-	std::vector<uint32_t> startFeature;
+	std::vector<uint32_t> start_feature;
 
 	virtual std::string toGeoJSON(bool displayMetadata);
 	virtual std::string toCSV();

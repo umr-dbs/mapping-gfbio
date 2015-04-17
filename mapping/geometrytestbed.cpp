@@ -35,19 +35,19 @@ void testGeosToMapping(){
 
 	std::cout << std::endl;
 	std::cout << "rings" << std::endl;
-	for(auto p = multiPolygonCollection->startRing.begin(); p != multiPolygonCollection->startRing.end(); ++p){
+	for(auto p = multiPolygonCollection->start_ring.begin(); p != multiPolygonCollection->start_ring.end(); ++p){
 		    std::cout << *p << ' ';
 	}
 
 	std::cout << std::endl;
 	std::cout << "polygons" << std::endl;
-	for(auto p = multiPolygonCollection->startPolygon.begin(); p != multiPolygonCollection->startPolygon.end(); ++p){
+	for(auto p = multiPolygonCollection->start_polygon.begin(); p != multiPolygonCollection->start_polygon.end(); ++p){
 		    std::cout << *p << ' ';
 	}
 
 	std::cout << std::endl;
 	std::cout << "features" << std::endl;
-	for(auto p = multiPolygonCollection->startFeature.begin(); p != multiPolygonCollection->startFeature.end(); ++p){
+	for(auto p = multiPolygonCollection->start_feature.begin(); p != multiPolygonCollection->start_feature.end(); ++p){
 		    std::cout << *p << ' ';
 	}
 }

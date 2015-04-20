@@ -7,7 +7,7 @@
 #include "datatypes/multipolygoncollection.h"
 #include "datatypes/multipointcollection.h"
 #include <vector>
-
+#include "raster/opencl.h"
 geos::geom::Geometry* createGeosGeometry(std::string wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
@@ -88,7 +88,9 @@ int main(){
 //	//testGeosToMapping();
 //	testTwoWay();
 
-	testMultiPointToCSV();
+	//testMultiPointToCSV();
 
+	Coordinate coordinate(1,2);
+std::cout << sizeof(Coordinate);
 	return 0;
 }

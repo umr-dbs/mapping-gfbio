@@ -108,9 +108,9 @@ class GenericOperator {
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
-		std::unique_ptr<MultiPointCollection> getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
-		std::unique_ptr<MultiLineCollection> getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
-		std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<MultiPointCollection> getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false);
+		std::unique_ptr<MultiLineCollection> getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false);
+		std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false);
 		// there is no getPlotFromSource, because plots are by definition the final step of a chain
 
 	private:

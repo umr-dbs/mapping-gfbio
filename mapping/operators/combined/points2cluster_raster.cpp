@@ -35,10 +35,7 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 	const int MAX = 255;
 	typedef uint8_t T;
 
-	std::unique_ptr<MultiPointCollection> points = getMultiPointCollectionFromSource(0, rect, profiler);
-	if(!points->isSimple()){
-		throw OperatorException("PointsToClusterRaster only supports simple collections");
-	}
+	std::unique_ptr<MultiPointCollection> points = getMultiPointCollectionFromSource(0, rect, profiler, true);
 
 	DataDescription dd(GDT_Byte, 0, MAX, true, 0);
 

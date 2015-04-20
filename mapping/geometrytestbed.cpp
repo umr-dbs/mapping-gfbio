@@ -79,6 +79,20 @@ void testMultiPointToCSV(){
 	std::cout << multiPointCollection.toCSV();
 }
 
+
+void testGeoJSONWithMetadata(){
+	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
+
+	multiPointCollection.local_md_value.addVector("test");
+
+	multiPointCollection.addFeature(Coordinate(1,2));
+	multiPointCollection.local_md_value.set(0, "test", 5.1);
+	multiPointCollection.addFeature(Coordinate(3,4));
+	multiPointCollection.local_md_value.set(1, "test", 2.4);
+
+	std::cout << multiPointCollection.toGeoJSON(true);
+}
+
 int main(){
 //	std::cout << "hello" << std::endl;
 //
@@ -90,7 +104,6 @@ int main(){
 
 	//testMultiPointToCSV();
 
-	Coordinate coordinate(1,2);
-std::cout << sizeof(Coordinate);
+	testGeoJSONWithMetadata();
 	return 0;
 }

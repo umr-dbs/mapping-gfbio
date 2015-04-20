@@ -211,11 +211,10 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 
 	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
-	size_t idx = 0;
 	auto value_keys = local_md_value.getKeys();
 	auto string_keys = local_md_string.getKeys();
 	bool isSimpleCollection = isSimple();
-	for (size_t index = 0; index < start_feature.size(); index++) {
+	for (size_t index = 0; index < start_feature.size(); ++index) {
 		if(isSimpleCollection){
 			//all features are single points
 			Coordinate &p = coordinates[index];
@@ -234,14 +233,14 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 		}
 
 		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || has_time)){
-			json << ", properties\":{";
+			json << ",\"properties\":{";
 
 			for (auto &key : string_keys) {
-				json << "\"" << key << "\":\"" << local_md_string.get(idx, key) << "\",";
+				json << "\"" << key << "\":\"" << local_md_string.get(index, key) << "\",";
 			}
 
 			for (auto &key : value_keys) {
-				double value = local_md_value.get(idx, key);
+				double value = local_md_value.get(index, key);
 				json << "\"" << key << "\":";
 				if (std::isfinite(value)) {
 					json << value;
@@ -254,7 +253,7 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 			}
 
 			if (has_time) {
-				json << "\"time\":" << timestamps[idx] << ",";
+				json << "\"time\":" << timestamps[index] << ",";
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,

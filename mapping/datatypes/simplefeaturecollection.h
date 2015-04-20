@@ -14,7 +14,7 @@ class Coordinate {
 		Coordinate(double x, double y) : x(x), y(y) {}
 
 		Coordinate() = delete;
-		virtual ~Coordinate() {}
+		~Coordinate() {}
 
 		// Copy
 		Coordinate(const Coordinate &p) = default;

@@ -285,7 +285,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, con
 	profiler.startTimer();
 	return result;
 }
-std::unique_ptr<MultiPointCollection> GenericOperator::getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false) {
+std::unique_ptr<MultiPointCollection> GenericOperator::getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple) {
 	if (idx < 0 || idx >= sourcecounts[1])
 		throw OperatorException("getChildMultiPoints() called on invalid index");
 	profiler.stopTimer();
@@ -299,7 +299,7 @@ std::unique_ptr<MultiPointCollection> GenericOperator::getMultiPointCollectionFr
 	profiler.startTimer();
 	return result;
 }
-std::unique_ptr<MultiLineCollection> GenericOperator::getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false) {
+std::unique_ptr<MultiLineCollection> GenericOperator::getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple) {
 	if (idx < 0 || idx >= sourcecounts[2])
 		throw OperatorException("getChildMultiLines() called on invalid index");
 	profiler.stopTimer();
@@ -313,7 +313,7 @@ std::unique_ptr<MultiLineCollection> GenericOperator::getMultiLineCollectionFrom
 	profiler.startTimer();
 	return result;
 }
-std::unique_ptr<MultiPolygonCollection> GenericOperator::getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false) {
+std::unique_ptr<MultiPolygonCollection> GenericOperator::getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple) {
 	if (idx < 0 || idx >= sourcecounts[3]){
 		std::stringstream sstm;
 		sstm << "getChildMultiPolygons() called on invalid index: " << idx;

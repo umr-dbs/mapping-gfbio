@@ -13,6 +13,7 @@ CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/l
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-luriparser
+LDFLAGS_GTEST=-lgtest -lgtest_main -lpthread
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 OBJ_SERVICES=o/services_wfs_request.o
@@ -32,12 +33,14 @@ OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POI
 OBJ_COMMON=${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
+OBJ_EXEGTEST=${OBJ_COMMON} o/gtest_init.o o/gtest_example.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
 OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
 EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
+EXEGTEST=gtest
 EXEGEOMETRYTESTBED=geometrytestbed
 EXETILESERVER=tileserver
 
@@ -113,6 +116,9 @@ o/operators_combined_%.o: operators/combined/%.cpp $(CL_HEADERS)
 o/operators_plots_%.o: operators/plots/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
+o/gtest_%.o: tests/%.cpp $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} -c $< -o $@
+
 
 o/main_%.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
@@ -129,6 +135,9 @@ ${EXECGI}:	${OBJ_EXECGI}
 ${EXERSERVER}:	${OBJ_RSERVER}
 	${CPP} ${LDFLAGS} ${LDFLAGS_R} $+ -o $@
 	
+${EXEGTEST}:	${OBJ_EXEGTEST}
+	${CPP} $+ ${LDFLAGS} ${LDFLAGS_GTEST} -o $@
+
 ${EXEGEOMETRYTESTBED}:	${OBJ_EXEGEOMETRYTESTBED}
 	${CPP} $+ ${LDFLAGS} -o $@
 

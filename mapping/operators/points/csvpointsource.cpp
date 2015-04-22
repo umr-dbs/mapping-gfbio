@@ -136,7 +136,7 @@ std::unique_ptr<MultiPointCollection> CSVPointSource::getMultiPointCollection(co
 		if (x < minx || x > maxx || y < miny || y > maxy)
 			continue;
 
-		size_t idx = points_out->addFeature(Coordinate(x, y));
+		size_t idx = points_out->addSinglePointFeature(Coordinate(x, y));
 
 		for (size_t i=0; i < tuple.size(); i++) {
 			if (i == pos_x || i == pos_y || i == pos_t)

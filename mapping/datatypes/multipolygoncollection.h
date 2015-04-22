@@ -37,12 +37,12 @@ public:
 	//finishes the definition of the new feature, returns new feature index
 	size_t finishFeature();
 
-	virtual std::string toGeoJSON(bool displayMetadata);
-	virtual std::string toCSV();
+	virtual std::string toGeoJSON(bool displayMetadata) const;
+	virtual std::string toCSV() const;
 
-	virtual bool isSimple();
+	virtual bool isSimple() const final;
 
-	virtual size_t getFeatureCount() const {
+	virtual size_t getFeatureCount() const final{
 		return start_feature.size() - 1;
 	}
 

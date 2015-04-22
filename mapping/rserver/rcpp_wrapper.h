@@ -268,7 +268,7 @@ namespace ***REMOVED*** {
 		for (size_t i=0;i<size;i++) {
 			double x = coords(i, 0);
 			double y = coords(i, 1);
-			points->addFeature(Coordinate(x, y));
+			points->addSinglePointFeature(Coordinate(x, y));
 		}
 
 		***REMOVED***::DataFrame data = ***REMOVED***::as<***REMOVED***::DataFrame>(SPDF.slot("data"));

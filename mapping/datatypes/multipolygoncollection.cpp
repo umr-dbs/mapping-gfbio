@@ -3,7 +3,7 @@
 
 #include <sstream>
 
-std::string MultiPolygonCollection::toGeoJSON(bool displayMetadata) {
+std::string MultiPolygonCollection::toGeoJSON(bool displayMetadata) const {
 	//TODO: implement inclusion of metadata
 
 	std::ostringstream json;
@@ -46,12 +46,12 @@ std::string MultiPolygonCollection::toGeoJSON(bool displayMetadata) {
 
 }
 
-std::string MultiPolygonCollection::toCSV() {
+std::string MultiPolygonCollection::toCSV() const {
 	 //TODO: implement
 	return "";
 }
 
-bool MultiPolygonCollection::isSimple(){
+bool MultiPolygonCollection::isSimple() const {
 	return getFeatureCount() == (start_polygon.size() - 1);
 }
 

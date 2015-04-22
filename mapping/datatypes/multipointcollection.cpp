@@ -146,7 +146,7 @@ size_t MultiPointCollection::finishFeature(){
 	return start_feature.size() -2;
 }
 
-size_t MultiPointCollection::addFeature(Coordinate coordinate){
+size_t MultiPointCollection::addSinglePointFeature(Coordinate coordinate){
 	coordinates.push_back(coordinate);
 	start_feature.push_back(coordinates.size());
 	return start_feature.size() -2;
@@ -206,7 +206,7 @@ void MultiPointCollection::toOGR(const char *driver = "ESRI Shapefile") {
 #endif
 
 //TODO: include global metadata?
-std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
+std::string MultiPointCollection::toGeoJSON(bool displayMetadata) const {
 	std::ostringstream json;
 	json << std::fixed; // std::setprecision(4);
 
@@ -218,14 +218,14 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 	for (size_t index = 0; index < getFeatureCount(); ++index) {
 		if(isSimpleCollection){
 			//all features are single points
-			Coordinate &p = coordinates[index];
+			const Coordinate &p = coordinates[index];
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]}";
 		}
 		else {
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPoint\",\"coordinates\":[";
 
 			for(size_t coordinateIndex = start_feature[index]; coordinateIndex < start_feature[coordinateIndex+1]; ++coordinateIndex){
-				Coordinate &p = coordinates[coordinateIndex];
+				const Coordinate &p = coordinates[coordinateIndex];
 				json << "[" << p.x << "," << p.y << "],";
 			}
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
@@ -270,7 +270,7 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 	return json.str();
 }
 //TODO: include global metadata?
-std::string MultiPointCollection::toCSV() {
+std::string MultiPointCollection::toCSV() const {
 	std::ostringstream csv;
 	csv << std::fixed; // std::setprecision(4);
 
@@ -329,7 +329,7 @@ std::string MultiPointCollection::hash() {
 	return calculateHash((const unsigned char *) csv.c_str(), (int) csv.length()).asHex();
 }
 
-bool MultiPointCollection::isSimple(){
+bool MultiPointCollection::isSimple() const {
 	return coordinates.size() == getFeatureCount();
 }
 

@@ -285,35 +285,35 @@ std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, con
 	profiler.startTimer();
 	return result;
 }
-std::unique_ptr<MultiPointCollection> GenericOperator::getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple) {
+std::unique_ptr<MultiPointCollection> GenericOperator::getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode) {
 	if (idx < 0 || idx >= sourcecounts[1])
 		throw OperatorException("getChildMultiPoints() called on invalid index");
 	profiler.stopTimer();
 	int offset = sourcecounts[0] + idx;
 	auto result = sources[offset]->getCachedMultiPointCollection(rect, profiler);
 
-	if(checkForSimple && !result->isSimple()){
+	if(query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple()){
 		throw OperatorException("Operator does not accept Point features consisting of multiple elements");
 	}
 
 	profiler.startTimer();
 	return result;
 }
-std::unique_ptr<MultiLineCollection> GenericOperator::getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple) {
+std::unique_ptr<MultiLineCollection> GenericOperator::getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode) {
 	if (idx < 0 || idx >= sourcecounts[2])
 		throw OperatorException("getChildMultiLines() called on invalid index");
 	profiler.stopTimer();
 	int offset = sourcecounts[0] + sourcecounts[1] + idx;
 	auto result = sources[offset]->getCachedMultiLineCollection(rect, profiler);
 
-	if(checkForSimple && !result->isSimple()){
+	if(query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple()){
 		throw OperatorException("Operator does not accept Line features consisting of multiple elements");
 	}
 
 	profiler.startTimer();
 	return result;
 }
-std::unique_ptr<MultiPolygonCollection> GenericOperator::getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple) {
+std::unique_ptr<MultiPolygonCollection> GenericOperator::getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode) {
 	if (idx < 0 || idx >= sourcecounts[3]){
 		std::stringstream sstm;
 		sstm << "getChildMultiPolygons() called on invalid index: " << idx;
@@ -323,8 +323,8 @@ std::unique_ptr<MultiPolygonCollection> GenericOperator::getMultiPolygonCollecti
 	int offset = sourcecounts[0] + sourcecounts[1] + sourcecounts[2] + idx;
 	auto result = sources[offset]->getCachedMultiPolygonCollection(rect, profiler);
 
-	if(checkForSimple && !result->isSimple()){
-		throw OperatorException("Operator does not accept Polygon features consisting of multiple elements " + result->getAsString());
+	if(query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple()){
+		throw OperatorException("Operator does not accept Polygon features consisting of multiple elements");
 	}
 
 	profiler.startTimer();

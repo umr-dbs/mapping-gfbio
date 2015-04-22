@@ -120,7 +120,7 @@ auto WFSRequest::getFeature() -> std::string {
 		clusteredPoints->local_md_value.addVector("numberOfPoints",
 				circles.size());
 		for (auto& circle : circles) {
-			size_t idx = clusteredPoints->addFeature(Coordinate(circle->getX() * xres,
+			size_t idx = clusteredPoints->addSinglePointFeature(Coordinate(circle->getX() * xres,
 					circle->getY() * yres));
 			clusteredPoints->local_md_value.set(idx, "radius",
 					circle->getRadius());

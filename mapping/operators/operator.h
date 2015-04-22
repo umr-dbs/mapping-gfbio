@@ -76,6 +76,11 @@ class GenericOperator {
 			LOOSE
 		};
 
+		enum class FeatureCollectionQM {
+			ANY_FEATURE,
+			SINGLE_ELEMENT_FEATURES
+		};
+
 		static const int MAX_INPUT_TYPES = 4;
 		static const int MAX_SOURCES = 20;
 		static std::unique_ptr<GenericOperator> fromJSON(const std::string &json, int depth = 0);
@@ -108,9 +113,9 @@ class GenericOperator {
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
-		std::unique_ptr<MultiPointCollection> getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false);
-		std::unique_ptr<MultiLineCollection> getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false);
-		std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, bool checkForSimple = false);
+		std::unique_ptr<MultiPointCollection> getMultiPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<MultiLineCollection> getMultiLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
 		// there is no getPlotFromSource, because plots are by definition the final step of a chain
 
 	private:

@@ -85,9 +85,9 @@ void testMultiPointGeoJSONWithMetadata(){
 
 	multiPointCollection.local_md_value.addVector("test");
 
-	multiPointCollection.addFeature(Coordinate(1,2));
+	multiPointCollection.addSinglePointFeature(Coordinate(1,2));
 	multiPointCollection.local_md_value.set(0, "test", 5.1);
-	multiPointCollection.addFeature(Coordinate(3,4));
+	multiPointCollection.addSinglePointFeature(Coordinate(3,4));
 	multiPointCollection.local_md_value.set(1, "test", 2.4);
 
 	std::cout << multiPointCollection.toGeoJSON(true);
@@ -126,8 +126,8 @@ void testMultiPolygonGeoJSON(){
 
 void testFilterPoints(){
 	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
-	multiPointCollection.addFeature(Coordinate(1,2));
-	multiPointCollection.addFeature(Coordinate(3,4));
+	multiPointCollection.addSinglePointFeature(Coordinate(1,2));
+	multiPointCollection.addSinglePointFeature(Coordinate(3,4));
 
 	std::cout << multiPointCollection.getAsString();
 

@@ -46,9 +46,9 @@ std::unique_ptr<MultiPointCollection> FilterPointsByGeometry::getMultiPointColle
 	geos::geom::GeometryFactory gf = geos::geom::GeometryFactory(&pm, 4326);
 	geos::geom::GeometryFactory* geometryFactory = &gf;
 
-	auto points = getMultiPointCollectionFromSource(0, rect, profiler, true);
+	auto points = getMultiPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
 
-	auto multiPolygons = getMultiPolygonCollectionFromSource(0, rect, profiler, false);
+	auto multiPolygons = getMultiPolygonCollectionFromSource(0, rect, profiler, FeatureCollectionQM::ANY_FEATURE);
 
 	auto geometry = GeosGeomUtil::createGeosGeometry(*multiPolygons);
 	//fprintf(stderr, "getGeom >> %f", geometry->getArea());

@@ -22,10 +22,10 @@ public:
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
 
-	virtual std::string toGeoJSON(bool displayMetadata);
-	virtual std::string toCSV();
+	virtual std::string toGeoJSON(bool displayMetadata) const;
+	virtual std::string toCSV() const;
 
-	virtual bool isSimple();
+	virtual bool isSimple() const;
 
 	virtual size_t getFeatureCount() const {
 		return start_feature.size() - 1;

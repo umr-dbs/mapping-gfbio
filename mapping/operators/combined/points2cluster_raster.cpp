@@ -35,7 +35,7 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 	const int MAX = 255;
 	typedef uint8_t T;
 
-	std::unique_ptr<MultiPointCollection> points = getMultiPointCollectionFromSource(0, rect, profiler, true);
+	std::unique_ptr<MultiPointCollection> points = getMultiPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
 
 	DataDescription dd(GDT_Byte, 0, MAX, true, 0);
 

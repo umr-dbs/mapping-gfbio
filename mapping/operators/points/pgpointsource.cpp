@@ -72,7 +72,7 @@ std::unique_ptr<MultiPointCollection> PGPointSourceOperator::getMultiPointCollec
 		       y = row[1].as<double>();
 
 
-		size_t idx = points_out->addFeature(Coordinate(x, y));
+		size_t idx = points_out->addSinglePointFeature(Coordinate(x, y));
 		for (pqxx::result::tuple::size_type c = 2;c<column_count;c++) {
 			points_out->local_md_value.set(idx, points.column_name(c), row[c].as<double>());
 		}

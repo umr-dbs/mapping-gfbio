@@ -65,11 +65,11 @@ public:
 	bool has_time;
 
 	// Export
-	virtual std::string toGeoJSON(bool displayMetadata = false) = 0;
-	virtual std::string toCSV() = 0;
+	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;
+	virtual std::string toCSV() const = 0;
 
 	// return true if all features consist of a single element
-	virtual bool isSimple() = 0;
+	virtual bool isSimple() const = 0;
 
 	virtual size_t getFeatureCount() const = 0;
 

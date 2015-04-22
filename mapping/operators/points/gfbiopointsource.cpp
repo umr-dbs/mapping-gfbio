@@ -85,7 +85,7 @@ std::unique_ptr<MultiPointCollection> GFBioPointSourceOperator::getMultiPointCol
 			if (tuple.size() < 1)
 				break;
 
-			size_t idx = points_out->addFeature(Coordinate(std::stod(tuple[0]),std::stod(tuple[1])));
+			size_t idx = points_out->addSinglePointFeature(Coordinate(std::stod(tuple[0]),std::stod(tuple[1])));
 			//double year = std::atof(csv[3].c_str());
 
 			for(int i=2; i < tuple.size(); i++)

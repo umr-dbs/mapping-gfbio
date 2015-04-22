@@ -24,7 +24,7 @@ void testGFBioInput(){
 
 
 void testGeosToMapping(){
-	geos::geom::Geometry* geometry = createGeosGeometry("GEOMETRYCOLLECTION(MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))))");
+	geos::geom::Geometry* geometry = createGeosGeometry("GEOMETRYCOLLECTION(MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))), MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))))");
 
 	auto multiPolygonCollection = GeosGeomUtil::createMultiPolygonCollection(*geometry);
 
@@ -50,6 +50,8 @@ void testGeosToMapping(){
 	for(auto p = multiPolygonCollection->start_feature.begin(); p != multiPolygonCollection->start_feature.end(); ++p){
 		    std::cout << *p << ' ';
 	}
+
+	std::cout << multiPolygonCollection->toGeoJSON(false);
 }
 
 void testTwoWay(){
@@ -65,22 +67,20 @@ void testTwoWay(){
 void testMultiPointToCSV(){
 	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
 
-	std::vector<Coordinate> coordinates;
-	coordinates.push_back(Coordinate(1,2));
+	multiPointCollection.addCoordinate(1,2);
 
-	multiPointCollection.addFeature(coordinates);
+	multiPointCollection.finishFeature();
 
-	coordinates.clear();
-	coordinates.push_back(Coordinate(1,2));
-	coordinates.push_back(Coordinate(2,3));
+	multiPointCollection.addCoordinate(1,2);
+	multiPointCollection.addCoordinate(2,3);
 
-	multiPointCollection.addFeature(coordinates);
+	multiPointCollection.finishFeature();
 
 	std::cout << multiPointCollection.toCSV();
 }
 
 
-void testGeoJSONWithMetadata(){
+void testMultiPointGeoJSONWithMetadata(){
 	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
 
 	multiPointCollection.local_md_value.addVector("test");
@@ -93,17 +93,65 @@ void testGeoJSONWithMetadata(){
 	std::cout << multiPointCollection.toGeoJSON(true);
 }
 
+void testMultiPolygonGeoJSON(){
+	MultiPolygonCollection multiPolygonCollection(SpatioTemporalReference::unreferenced());
+
+	multiPolygonCollection.addCoordinate(1, 2);
+	multiPolygonCollection.addCoordinate(2, 3);
+	multiPolygonCollection.addCoordinate(1, 2);
+	multiPolygonCollection.finishRing();
+	multiPolygonCollection.finishPolygon();
+	multiPolygonCollection.finishFeature();
+
+	for(auto x = multiPolygonCollection.coordinates.begin(); x != multiPolygonCollection.coordinates.end(); ++x){
+		std::cout << (*x).x;
+	}
+	std::cout << std::endl;
+	for(auto x = multiPolygonCollection.start_ring.begin(); x != multiPolygonCollection.start_ring.end(); ++x){
+		std::cout << *x;
+	}
+	std::cout << std::endl;
+	for(auto x = multiPolygonCollection.start_polygon.begin(); x != multiPolygonCollection.start_polygon.end(); ++x){
+		std::cout << *x;
+	}
+	std::cout << std::endl;
+	for(auto x = multiPolygonCollection.start_feature.begin(); x != multiPolygonCollection.start_feature.end(); ++x){
+		std::cout << *x;
+	}
+	std::cout << std::endl;
+
+
+	std::cout << multiPolygonCollection.toGeoJSON(false);
+}
+
+void testFilterPoints(){
+	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
+	multiPointCollection.addFeature(Coordinate(1,2));
+	multiPointCollection.addFeature(Coordinate(3,4));
+
+	std::cout << multiPointCollection.getAsString();
+
+	std::vector<bool> keep;
+	keep.push_back(true);
+	keep.push_back(false);
+
+	auto m = multiPointCollection.filter(keep);
+
+	std::cout << m->toGeoJSON(false);
+}
+
 int main(){
 //	std::cout << "hello" << std::endl;
 //
 //	std::cout << "hello again" << std::endl;
 //
 //
-//	//testGeosToMapping();
+//testGeosToMapping();
 //	testTwoWay();
 
-	//testMultiPointToCSV();
+	//testMultiPolygonGeoJSON();
+	testFilterPoints();
 
-	testGeoJSONWithMetadata();
+
 	return 0;
 }

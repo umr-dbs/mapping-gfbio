@@ -293,7 +293,7 @@ std::unique_ptr<MultiPointCollection> GenericOperator::getMultiPointCollectionFr
 	auto result = sources[offset]->getCachedMultiPointCollection(rect, profiler);
 
 	if(checkForSimple && !result->isSimple()){
-		throw OperatorException("Operator does not accept features consisting of multiple elements");
+		throw OperatorException("Operator does not accept Point features consisting of multiple elements");
 	}
 
 	profiler.startTimer();
@@ -307,7 +307,7 @@ std::unique_ptr<MultiLineCollection> GenericOperator::getMultiLineCollectionFrom
 	auto result = sources[offset]->getCachedMultiLineCollection(rect, profiler);
 
 	if(checkForSimple && !result->isSimple()){
-		throw OperatorException("Operator does not accept features consisting of multiple elements");
+		throw OperatorException("Operator does not accept Line features consisting of multiple elements");
 	}
 
 	profiler.startTimer();
@@ -324,7 +324,7 @@ std::unique_ptr<MultiPolygonCollection> GenericOperator::getMultiPolygonCollecti
 	auto result = sources[offset]->getCachedMultiPolygonCollection(rect, profiler);
 
 	if(checkForSimple && !result->isSimple()){
-		throw OperatorException("Operator does not accept features consisting of multiple elements");
+		throw OperatorException("Operator does not accept Polygon features consisting of multiple elements " + result->getAsString());
 	}
 
 	profiler.startTimer();

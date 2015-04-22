@@ -48,12 +48,12 @@ std::unique_ptr<MultiPointCollection> FilterPointsByGeometry::getMultiPointColle
 
 	auto points = getMultiPointCollectionFromSource(0, rect, profiler, true);
 
-	auto multiPolygons = getMultiPolygonCollectionFromSource(0, rect, profiler, true);
+	auto multiPolygons = getMultiPolygonCollectionFromSource(0, rect, profiler, false);
 
 	auto geometry = GeosGeomUtil::createGeosGeometry(*multiPolygons);
 	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 
-	size_t points_count = points->start_feature.size();
+	size_t points_count = points->getFeatureCount();
 	std::vector<bool> keep(points_count, false);
 
 	auto prep = geos::geom::prep::PreparedGeometryFactory();

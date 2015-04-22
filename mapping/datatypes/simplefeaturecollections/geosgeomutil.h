@@ -16,7 +16,6 @@ public:
 	 */
 	static std::unique_ptr<MultiPolygonCollection> createMultiPolygonCollection(const geos::geom::MultiPolygon& multiPolygon);
 
-	//TODO convert a geos geom (collection, etc.) into a meaningfull MAPPING MultiPolygonCollection
 
 	/**
 	 * Convert a geos geometry(collection) into a MultiPolygonCollection of single polygons
@@ -34,7 +33,7 @@ public:
 	virtual ~GeosGeomUtil();
 
 private:
-	static void addPolygon(MultiPolygonCollection& multiPolygonCollection, const geos::geom::Geometry& polygonGeometry, bool newFeature);
+	static void addPolygon(MultiPolygonCollection& multiPolygonCollection, const geos::geom::Geometry& polygonGeometry);
 
 	static epsg_t resolveGeosSRID(int srid);
 	static int resolveMappingEPSG(epsg_t epsg);

@@ -71,6 +71,8 @@ public:
 	// return true if all features consist of a single element
 	virtual bool isSimple() = 0;
 
+	virtual size_t getFeatureCount() const = 0;
+
 };
 
 #endif

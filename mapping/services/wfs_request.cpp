@@ -44,17 +44,22 @@ auto WFSRequest::getCapabilities() -> std::string {
 }
 
 auto WFSRequest::getFeature() -> std::string {
-	// TODO: this is not valid WFS -> find default configuration
-	int output_width = std::stoi(parameters["width"]);
-	int output_height = std::stoi(parameters["height"]);
+	// read featureId
+	Json::Reader jsonReader{Json::Features::strictMode()};
+	Json::Value featureId;
+	if (!jsonReader.parse(parameters["featureid"], featureId)) {
+		return "unable to parse json of featureId";
+	}
+
+	int output_width = featureId["width"].asInt();
+	int output_height = featureId["height"].asInt();
 	if (output_width <= 0 || output_height <= 0) {
 		return "output_width or output_height not valid";
 	}
 
-	// TODO: this is not valid WFS too
-	time_t timestamp = 42;
-	if (parameters.count("timestamp") > 0) {
-		timestamp = std::stol(parameters.at("timestamp"));
+	time_t timestamp = 42; // TODO: default value
+	if (featureId["timestamp"].isInt()) {
+		timestamp = static_cast<long>(featureId["timestamp"].asInt64());
 	}
 
 	// srsName=CRS
@@ -63,7 +68,7 @@ auto WFSRequest::getFeature() -> std::string {
 	double bbox[4];
 	this->parseBBOX(bbox, parameters.at("bbox"), queryEpsg, true);
 
-	auto graph = GenericOperator::fromJSON(parameters["featureid"]);
+	auto graph = GenericOperator::fromJSON(featureId["query"]);
 
 	// TODO: typeNames
 	// namespace + points or polygons

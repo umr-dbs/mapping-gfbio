@@ -47,7 +47,7 @@ static double point_distance(const Coordinate &p1, const Coordinate &p2) {
 	double dx = p1.x - p2.x, dy = p1.y - p2.y;
 	return sqrt(dx*dx + dy*dy);
 }
-
+//TODO: migrate to new multi semantics
 std::unique_ptr<MultiPointCollection> PointsDifferenceOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto pointsMinuend = getMultiPointCollectionFromSource(0, rect, profiler);
 	auto pointsSubtrahend = getMultiPointCollectionFromSource(1, rect, profiler);

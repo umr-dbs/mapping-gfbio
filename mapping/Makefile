@@ -33,7 +33,7 @@ OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POI
 OBJ_COMMON=${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
-OBJ_EXEGTEST=${OBJ_COMMON} o/gtest_init.o o/gtest_example.o
+OBJ_EXEGTEST=${OBJ_COMMON} o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_polygons.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
 OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
@@ -119,6 +119,8 @@ o/operators_plots_%.o: operators/plots/%.cpp $(CL_HEADERS)
 o/gtest_%.o: tests/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
+o/gtest_simplefeaturecollections_%.o: tests/simplefeaturecollections/%.cpp $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} -c $< -o $@
 
 o/main_%.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@

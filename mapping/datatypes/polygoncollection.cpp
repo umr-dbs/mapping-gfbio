@@ -59,6 +59,7 @@ void PolygonCollection::addCoordinate(double x, double y){
 	coordinates.push_back(Coordinate(x, y));
 }
 
+//TODO: check that ring is closed
 size_t PolygonCollection::finishRing(){
 	if(start_ring.back() >= coordinates.size()){
 		throw FeatureException("Tried to finish ring with 0 coordinates");

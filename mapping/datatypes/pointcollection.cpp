@@ -216,16 +216,16 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 	auto value_keys = local_md_value.getKeys();
 	auto string_keys = local_md_string.getKeys();
 	bool isSimpleCollection = isSimple();
-	for (size_t index = 0; index < getFeatureCount(); ++index) {
+	for (size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex) {
 		if(isSimpleCollection){
 			//all features are single points
-			const Coordinate &p = coordinates[index];
+			const Coordinate &p = coordinates[featureIndex];
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]}";
 		}
 		else {
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPoint\",\"coordinates\":[";
 
-			for(size_t coordinateIndex = start_feature[index]; coordinateIndex < start_feature[coordinateIndex+1]; ++coordinateIndex){
+			for(size_t coordinateIndex = start_feature[featureIndex]; coordinateIndex < start_feature[featureIndex+1]; ++coordinateIndex){
 				const Coordinate &p = coordinates[coordinateIndex];
 				json << "[" << p.x << "," << p.y << "],";
 			}
@@ -238,11 +238,11 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 			json << ",\"properties\":{";
 
 			for (auto &key : string_keys) {
-				json << "\"" << key << "\":\"" << local_md_string.get(index, key) << "\",";
+				json << "\"" << key << "\":\"" << local_md_string.get(featureIndex, key) << "\",";
 			}
 
 			for (auto &key : value_keys) {
-				double value = local_md_value.get(index, key);
+				double value = local_md_value.get(featureIndex, key);
 				json << "\"" << key << "\":";
 				if (std::isfinite(value)) {
 					json << value;
@@ -255,7 +255,7 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 			}
 
 			if (has_time) {
-				json << "\"time\":" << timestamps[index] << ",";
+				json << "\"time\":" << timestamps[featureIndex] << ",";
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,

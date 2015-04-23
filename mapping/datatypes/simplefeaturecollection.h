@@ -73,6 +73,34 @@ public:
 
 	virtual size_t getFeatureCount() const = 0;
 
+protected:
+	/*
+	 * Helper classes for iteration over Collections
+	 */
+	template <typename Collection, template<typename> class value_type>
+	class SimpleFeatureIterator {
+		public:
+			SimpleFeatureIterator(Collection &sfc, size_t idx) : sfc(sfc), idx(idx) {
+			};
+
+	        bool operator!=(const SimpleFeatureIterator &other) const {
+	            return idx != other.idx;
+	        }
+
+	        value_type<Collection> operator*() const {
+	            return value_type<Collection>(sfc, idx);
+	        }
+
+	        void operator++() {
+	            idx++;
+	        }
+
+		private:
+			Collection &sfc;
+			size_t idx;
+	};
 };
+
+
 
 #endif

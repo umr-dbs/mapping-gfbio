@@ -4,15 +4,35 @@
 #include "datatypes/simplefeaturecollection.h"
 #include <memory>
 
+
 /**
- * This collection contains Multi-Points
+ * This collection contains Point-Features, each feature consisting of one or more points
  */
 class PointCollection : public SimpleFeatureCollection {
+private:
+	template<typename C> class PointFeatureReference;
 public:
 	PointCollection(BinaryStream &stream);
 	PointCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref) {
 		start_feature.push_back(0); //end of first feature
 	}
+
+	typedef SimpleFeatureIterator<PointCollection, PointFeatureReference> iterator;
+	typedef SimpleFeatureIterator<const PointCollection, PointFeatureReference> const_iterator;
+
+    inline iterator begin() {
+    	return iterator(*this, 0);
+    }
+    inline iterator end() {
+    	return iterator(*this, getFeatureCount());
+    }
+
+    inline const_iterator begin() const {
+    	return const_iterator(*this, 0);
+    }
+    inline const_iterator end() const {
+    	return const_iterator(*this, getFeatureCount());
+    }
 
 	//starting index of individual features in the points vector, last entry indicates first index out of bounds of coordinates
 	//thus iterating over features has to stop at start_feature.size() -2
@@ -44,6 +64,44 @@ public:
 	std::string getAsString();
 
 	virtual ~PointCollection(){};
+private:
+	/*
+	 * Finally, implement the helper classes for iteration
+	 */
+	template<typename C>
+	class PointFeatureReference {
+		private:
+			C &pc;
+			const size_t idx;
+		public:
+			PointFeatureReference(C &pc, size_t idx) : pc(pc), idx(idx) {};
+
+			typedef decltype(std::declval<C>().coordinates.begin()) iterator;
+			typedef decltype(std::declval<C>().coordinates.cbegin()) const_iterator;
+
+			iterator begin() {
+		    	return std::next(pc.coordinates.begin(), pc.start_feature[idx]);
+		    }
+			iterator end() {
+		    	return std::next(pc.coordinates.begin(), pc.start_feature[idx+1]);
+		    }
+
+		    const_iterator begin() const {
+		    	return std::next(pc.coordinates.cbegin(), pc.start_feature[idx]);
+		    }
+		    const_iterator end() const {
+		    	return std::next(pc.coordinates.cbegin(), pc.start_feature[idx+1]);
+		    }
+
+		    size_t size() const {
+		    	return pc.start_feature[idx+1] - pc.start_feature[idx];
+		    }
+
+		    operator size_t() const {
+		    	return idx;
+		    }
+	};
 };
+
 
 #endif

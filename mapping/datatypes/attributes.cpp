@@ -122,6 +122,11 @@ std::vector<T> &MetadataArrays<T>::getVector(const std::string &key) {
 }
 
 template<typename T>
+const std::vector<T> &MetadataArrays<T>::getVector(const std::string &key) const {
+	return data.at(key);
+}
+
+template<typename T>
 MetadataArrays<T>::MetadataArrays(BinaryStream &stream) {
 	fromStream(stream);
 }

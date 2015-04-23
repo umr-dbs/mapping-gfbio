@@ -4,7 +4,6 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
-#include "datatypes/multipointcollection.h"
 #include "datatypes/plots/text.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
@@ -26,6 +25,7 @@
 #include <sys/wait.h>
 #include <poll.h>
 #include <signal.h>
+#include "datatypes/pointcollection.h"
 
 
 #define LOG(...) {fprintf(stderr, "%d: ", getpid());fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");}
@@ -116,7 +116,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 	return pixels;
 }
 
-std::unique_ptr<MultiPointCollection> query_points_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
+std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Points");
 	LOG("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	is_sending = true;
@@ -125,7 +125,7 @@ std::unique_ptr<MultiPointCollection> query_points_source(BinaryStream &stream, 
 	stream.write(rect);
 	is_sending = false;
 
-	auto points = std::make_unique<MultiPointCollection>(stream);
+	auto points = std::make_unique<PointCollection>(stream);
 	return points;
 }
 
@@ -177,7 +177,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 	std::function<***REMOVED***::NumericVector(int, const QueryRectangle &)> bound_raster_source_as_array = std::bind(query_raster_source_as_array, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.loadRasterAsVector"] = ***REMOVED***::InternalFunction( bound_raster_source_as_array );
 
-	std::function<std::unique_ptr<MultiPointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
+	std::function<std::unique_ptr<PointCollection>(int, const QueryRectangle &)> bound_points_source = std::bind(query_points_source, std::ref(stream), std::placeholders::_1, std::placeholders::_2);
 	R["mapping.pointscount"] = pointssourcecount;
 	R["mapping.loadPoints"] = ***REMOVED***::InternalFunction( bound_points_source );
 
@@ -209,7 +209,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			stream.write(*raster);
 		}
 		else if (type == RSERVER_TYPE_POINTS) {
-			auto points = ***REMOVED***::as<std::unique_ptr<MultiPointCollection>>(result);
+			auto points = ***REMOVED***::as<std::unique_ptr<PointCollection>>(result);
 			is_sending = true;
 			stream.write((char) -RSERVER_TYPE_POINTS);
 			stream.write(*points);

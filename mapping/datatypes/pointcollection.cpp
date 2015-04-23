@@ -1,4 +1,5 @@
-#include "multipointcollection.h"
+#include "pointcollection.h"
+
 #include "raster/exceptions.h"
 #include "util/binarystream.h"
 #include "util/hash.h"
@@ -10,11 +11,11 @@
 #include <cmath>
 
 template<typename T>
-std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std::vector<T> &keep) {
-	size_t count = in->startFeature.size();
+std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T> &keep) {
+	size_t count = in->getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
-		msg << "MultiPointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
+		msg << "PointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
 		throw ArgumentException(msg.str());
 	}
 
@@ -24,8 +25,8 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 			kept_count++;
 	}
 
-	auto out = std::make_unique<MultiPointCollection>(in->stref);
-	out->startFeature.reserve(kept_count);
+	auto out = std::make_unique<PointCollection>(in->stref);
+	out->start_feature.reserve(kept_count);
 	// copy global metadata
 	out->global_md_string = in->global_md_string;
 	out->global_md_value = in->global_md_value;
@@ -33,13 +34,12 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 	// copy features
 	for (size_t featureIndex=0;featureIndex<count;featureIndex++) {
 		if (keep[featureIndex]) {
-			out->startFeature.push_back(out->coordinates.size());
-
 			//copy coordinates
-			for(size_t coordinateIndex = in->startFeature[featureIndex]; coordinateIndex < in->stopFeature(featureIndex); ++coordinateIndex){
+			for(size_t coordinateIndex = in->start_feature[featureIndex]; coordinateIndex < in->start_feature[featureIndex+1]; ++coordinateIndex){
 				Coordinate &p = in->coordinates[coordinateIndex];
 				out->addCoordinate(p.x, p.y);
 			}
+			out->finishFeature();
 		}
 	}
 
@@ -76,62 +76,81 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 	return out;
 }
 
-std::unique_ptr<MultiPointCollection> MultiPointCollection::filter(const std::vector<bool> &keep) {
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) {
 	return ::filter<bool>(this, keep);
 }
 
-std::unique_ptr<MultiPointCollection> MultiPointCollection::filter(const std::vector<char> &keep) {
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) {
 	return ::filter<char>(this, keep);
 }
 
-MultiPointCollection::MultiPointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
-	size_t count;
-	stream.read(&count);
-	coordinates.reserve(count);
+PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
+	size_t coordinateCount;
+	stream.read(&coordinateCount);
+	coordinates.reserve(coordinateCount);
+	size_t featureCount;
+	stream.read(&featureCount);
+	start_feature.reserve(featureCount);
 
 	global_md_string.fromStream(stream);
 	global_md_value.fromStream(stream);
 	local_md_string.fromStream(stream);
 	local_md_value.fromStream(stream);
 
-	for (size_t i=0;i<count;i++) {
+	for (size_t i=0;i<coordinateCount;i++) {
 		coordinates.push_back( Coordinate(stream) );
 	}
+
+	uint32_t offset;
+	for (size_t i=0;i<featureCount;i++) {
+		stream.read(&offset);
+		start_feature.push_back(offset);
+	}
+
 	// TODO: serialize/unserialize time array
 }
 
-void MultiPointCollection::toStream(BinaryStream &stream) {
+void PointCollection::toStream(BinaryStream &stream) {
 	stream.write(stref);
-	size_t count = coordinates.size();
-	stream.write(count);
+	size_t coordinateCount = coordinates.size();
+	stream.write(coordinateCount);
+	size_t featureCount = start_feature.size();
+	stream.write(featureCount);
 
 	stream.write(global_md_string);
 	stream.write(global_md_value);
 	stream.write(local_md_string);
 	stream.write(local_md_value);
 
-	for (size_t i=0;i<count;i++) {
+	for (size_t i=0;i<coordinateCount;i++) {
 		coordinates[i].toStream(stream);
 	}
+
+	for (size_t i=0;i<featureCount;i++) {
+		stream.write(start_feature[i]);
+	}
+
 	// TODO: serialize/unserialize time array
 }
 
 
-void MultiPointCollection::addCoordinate(double x, double y) {
+void PointCollection::addCoordinate(double x, double y) {
 	coordinates.push_back(Coordinate(x, y));
 }
 
-size_t MultiPointCollection::addFeature(std::vector<Coordinate> featureCoordinates){
-	startFeature.push_back(coordinates.size());
-	coordinates.insert(coordinates.end(), featureCoordinates.begin(), featureCoordinates.end());
+size_t PointCollection::finishFeature(){
+	if(start_feature.back() >= coordinates.size()){
+		throw FeatureException("Tried to finish feature with 0 coordinates");
+	}
 
-	return startFeature.size() - 1;
+	start_feature.push_back(coordinates.size());
+	return start_feature.size() -2;
 }
 
-size_t MultiPointCollection::addFeature(Coordinate coordinate){
-	startFeature.push_back(coordinates.size());
+size_t PointCollection::addSinglePointFeature(Coordinate coordinate){
 	coordinates.push_back(coordinate);
-	return startFeature.size() - 1;
+	start_feature.push_back(coordinates.size());
+	return start_feature.size() -2;
 }
 
 
@@ -144,7 +163,7 @@ size_t MultiPointCollection::addFeature(Coordinate coordinate){
 
 void gdal_init(); // implemented in raster/import_gdal.cpp
 
-void MultiPointCollection::toOGR(const char *driver = "ESRI Shapefile") {
+void PointCollection::toOGR(const char *driver = "ESRI Shapefile") {
 	gdal_init();
 
     GDALDriver *poDriver = GetGDALDriverManager()->GetDriverByName(pszDriverName );
@@ -187,32 +206,43 @@ void MultiPointCollection::toOGR(const char *driver = "ESRI Shapefile") {
 }
 #endif
 
-//TODO: migrate to multipoint semantics
-std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
-/*
-	  { "type": "MultiPoint",
-	    "coordinates": [ [100.0, 0.0], [101.0, 1.0] ]
-	    }
-*/
+//TODO: include global metadata?
+std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 	std::ostringstream json;
 	json << std::fixed; // std::setprecision(4);
 
-	if(displayMetadata && (local_md_value.size() > 0 || local_md_string.size() > 0 || has_time)) {
+	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
-		json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
+	auto value_keys = local_md_value.getKeys();
+	auto string_keys = local_md_string.getKeys();
+	bool isSimpleCollection = isSimple();
+	for (size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex) {
+		if(isSimpleCollection){
+			//all features are single points
+			const Coordinate &p = coordinates[featureIndex];
+			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]}";
+		}
+		else {
+			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPoint\",\"coordinates\":[";
 
-		size_t idx = 0;
-		auto value_keys = local_md_value.getKeys();
-		auto string_keys = local_md_string.getKeys();
-		for (const Coordinate &p : coordinates) {
-			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]},\"properties\":{";
+			for(size_t coordinateIndex = start_feature[featureIndex]; coordinateIndex < start_feature[featureIndex+1]; ++coordinateIndex){
+				const Coordinate &p = coordinates[coordinateIndex];
+				json << "[" << p.x << "," << p.y << "],";
+			}
+			json.seekp(((long) json.tellp()) - 1); // delete last ,
+
+			json << "]}";
+		}
+
+		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || has_time)){
+			json << ",\"properties\":{";
 
 			for (auto &key : string_keys) {
-				json << "\"" << key << "\":\"" << local_md_string.get(idx, key) << "\",";
+				json << "\"" << key << "\":\"" << local_md_string.get(featureIndex, key) << "\",";
 			}
 
 			for (auto &key : value_keys) {
-				double value = local_md_value.get(idx, key);
+				double value = local_md_value.get(featureIndex, key);
 				json << "\"" << key << "\":";
 				if (std::isfinite(value)) {
 					json << value;
@@ -225,47 +255,35 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) {
 			}
 
 			if (has_time) {
-				json << "\"time\":" << timestamps[idx] << ",";
+				json << "\"time\":" << timestamps[featureIndex] << ",";
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
-			json << "}},";
-			idx++;
+			json << "}";
 		}
-
-		json.seekp(((long) json.tellp()) - 1); // delete last ,
-		json << "]}";
-
-	} else {
-
-		//json << "{ \"type\": \"MultiPoint\", \"coordinates\": [ ";
-		json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPoint\", \"coordinates\": [ ";
-
-		bool first = true;
-		for (const Coordinate &p : coordinates) {
-			if (first)
-				first = false;
-			else
-				json << ", ";
-
-			json << "[" << p.x << "," << p.y << "]";
-		}
-		//json << "] }";
-		json << "] }}]}";
+		json << "},";
 
 	}
 
+	json.seekp(((long) json.tellp()) - 1); // delete last ,
+	json << "]}";
+
 	return json.str();
 }
-
-std::string MultiPointCollection::toCSV() {
+//TODO: include global metadata?
+std::string PointCollection::toCSV() const {
 	std::ostringstream csv;
 	csv << std::fixed; // std::setprecision(4);
 
 	auto string_keys = local_md_string.getKeys();
 	auto value_keys = local_md_value.getKeys();
 
+	bool isSimpleCollection = isSimple();
+
 	//header
+	if(!isSimpleCollection){
+		csv << "feature,";
+	}
 	csv << "lon" << "," << "lat";
 	if (has_time)
 		csv << ",\"time\"";
@@ -278,18 +296,25 @@ std::string MultiPointCollection::toCSV() {
 	csv << std::endl;
 
 	size_t idx = 0;
+	size_t featureIndex = 0;
 	for (const auto &p : coordinates) {
+		if(!isSimpleCollection){
+			if(idx >= start_feature[featureIndex+1]){
+				++featureIndex;
+			}
+			csv << featureIndex << ",";
+		}
 		csv << p.x << "," << p.y;
 
 		if (has_time)
-			csv << "," << timestamps[idx];
+			csv << "," << timestamps[featureIndex];
 
 
 		for(auto &key : string_keys) {
-			csv << ",\"" << local_md_string.get(idx, key) << "\"";
+			csv << ",\"" << local_md_string.get(featureIndex, key) << "\"";
 		}
 		for(auto &key : value_keys) {
-			csv << "," << local_md_value.get(idx, key);
+			csv << "," << local_md_value.get(featureIndex, key);
 		}
 		csv << std::endl;
 		idx++;
@@ -298,13 +323,30 @@ std::string MultiPointCollection::toCSV() {
 	return csv.str();
 }
 
-std::string MultiPointCollection::hash() {
+std::string PointCollection::hash() {
 	// certainly not the most stable solution, but it has few lines of code..
 	std::string csv = toCSV();
 
 	return calculateHash((const unsigned char *) csv.c_str(), (int) csv.length()).asHex();
 }
 
-bool MultiPointCollection::isSimple(){
-	return coordinates.size() == startFeature.size();
+bool PointCollection::isSimple() const {
+	return coordinates.size() == getFeatureCount();
+}
+
+std::string PointCollection::getAsString(){
+	std::ostringstream string;
+
+	string << "points" << std::endl;
+	for(auto p = coordinates.begin(); p !=coordinates.end(); ++p){
+		string << (*p).x << "," << (*p).y << ' ';
+	}
+
+	string << std::endl;
+	string << "features" << std::endl;
+	for(auto p = start_feature.begin(); p != start_feature.end(); ++p){
+		string << *p << ' ';
+	}
+
+	return string.str();
 }

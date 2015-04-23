@@ -1,4 +1,3 @@
-#include "datatypes/multipointcollection.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "datatypes/plots/histogram.h"
@@ -7,6 +6,7 @@
 #include <json/json.h>
 #include <cmath>
 #include <limits>		// std::numeric_limits
+#include "datatypes/pointcollection.h"
 
 /**
  * This class generates a histogram out of a point set with attached meta data.
@@ -68,7 +68,7 @@ void Points2HistogramOperator::writeSemanticParameters(std::ostringstream& strea
  * Calculates the histogram and returns it.
  */
 std::unique_ptr<GenericPlot> Points2HistogramOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
+	auto points = getPointCollectionFromSource(0, rect, profiler);
 
 	//double raster_max = points->global_md_value.get(name + "_max");
 	//double raster_min = points->global_md_value.get(name + "_min");

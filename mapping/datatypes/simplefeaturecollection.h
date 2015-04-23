@@ -11,9 +11,10 @@ class Coordinate {
 		Coordinate(BinaryStream &stream);
 		void toStream(BinaryStream &stream);
 	public:
-		Coordinate(double x, double y);
+		Coordinate(double x, double y) : x(x), y(y) {}
+
 		Coordinate() = delete;
-		~Coordinate();
+		~Coordinate() {}
 
 		// Copy
 		Coordinate(const Coordinate &p) = default;
@@ -24,7 +25,7 @@ class Coordinate {
 
 		double x, y;
 
-		friend class MultiPointCollection;
+		friend class PointCollection;
 		friend class GeosGeomUtil;
 };
 
@@ -34,8 +35,9 @@ class Coordinate {
  */
 class SimpleFeatureCollection : public SpatioTemporalResult {
 public:
-	SimpleFeatureCollection(const SpatioTemporalReference &stref);
-	virtual ~SimpleFeatureCollection();
+	SimpleFeatureCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref), has_time(false) {}
+
+	virtual ~SimpleFeatureCollection() {}
 
 	std::vector<Coordinate> coordinates;
 
@@ -63,11 +65,13 @@ public:
 	bool has_time;
 
 	// Export
-	virtual std::string toGeoJSON(bool displayMetadata = false) = 0;
-	virtual std::string toCSV() = 0;
+	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;
+	virtual std::string toCSV() const = 0;
 
 	// return true if all features consist of a single element
-	virtual bool isSimple() = 0;
+	virtual bool isSimple() const = 0;
+
+	virtual size_t getFeatureCount() const = 0;
 
 };
 

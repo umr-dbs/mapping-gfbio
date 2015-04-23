@@ -1,4 +1,3 @@
-#include "datatypes/multipointcollection.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
@@ -13,13 +12,14 @@
 #include <geos/geom/Point.h>
 #include <geos/geom/PrecisionModel.h>
 #include <geos/geom/prep/PreparedGeometryFactory.h>
+#include "datatypes/pointcollection.h"
 
 class PointsDifferenceOperator: public GenericOperator {
 	public:
 		PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PointsDifferenceOperator();
 
-		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -47,10 +47,10 @@ static double point_distance(const Coordinate &p1, const Coordinate &p2) {
 	double dx = p1.x - p2.x, dy = p1.y - p2.y;
 	return sqrt(dx*dx + dy*dy);
 }
-
-std::unique_ptr<MultiPointCollection> PointsDifferenceOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto pointsMinuend = getMultiPointCollectionFromSource(0, rect, profiler);
-	auto pointsSubtrahend = getMultiPointCollectionFromSource(1, rect, profiler);
+//TODO: migrate to new multi semantics
+std::unique_ptr<PointCollection> PointsDifferenceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto pointsMinuend = getPointCollectionFromSource(0, rect, profiler);
+	auto pointsSubtrahend = getPointCollectionFromSource(1, rect, profiler);
 
 	//fprintf(stderr, "Minuend: %lu, Subtrahend: %lu\n", pointsMinuend->collection.size(), pointsSubtrahend->collection.size());
 
@@ -84,8 +84,8 @@ std::unique_ptr<MultiPointCollection> PointsDifferenceOperator::getMultiPointCol
 	try {
 		RasterOpenCL::CLProgram prog;
 		prog.setProfiler(profiler);
-		prog.addMultiPointCollection(pointsMinuend.get());
-		prog.addMultiPointCollection(pointsSubtrahend.get());
+		prog.addPointCollection(pointsMinuend.get());
+		prog.addPointCollection(pointsSubtrahend.get());
 		prog.compile(operators_points_points_difference, "difference");
 		prog.addPointCollectionPositions(0, true);
 		prog.addPointCollectionPositions(1, true);

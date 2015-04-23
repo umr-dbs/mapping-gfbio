@@ -1,5 +1,3 @@
-#include "datatypes/multipointcollection.h"
-
 #include "operators/operator.h"
 #include "raster/exceptions.h"
 #include "util/make_unique.h"
@@ -12,13 +10,14 @@
 #include <algorithm>
 #include <json/json.h>
 #include <sys/stat.h>
+#include "datatypes/pointcollection.h"
 
 class CSVPointSource : public GenericOperator {
 	public:
 		CSVPointSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~CSVPointSource();
 
-		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -56,8 +55,8 @@ static uint64_t getFilesize(const char *filename) {
     return -1;
 }
 
-std::unique_ptr<MultiPointCollection> CSVPointSource::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<MultiPointCollection>(rect);
+std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points_out = std::make_unique<PointCollection>(rect);
 
 	auto filesize = getFilesize(filename.c_str());
 	if (filesize <= 0)
@@ -136,7 +135,7 @@ std::unique_ptr<MultiPointCollection> CSVPointSource::getMultiPointCollection(co
 		if (x < minx || x > maxx || y < miny || y > maxy)
 			continue;
 
-		size_t idx = points_out->addFeature(Coordinate(x, y));
+		size_t idx = points_out->addSinglePointFeature(Coordinate(x, y));
 
 		for (size_t i=0; i < tuple.size(); i++) {
 			if (i == pos_x || i == pos_y || i == pos_t)

@@ -13,9 +13,9 @@ namespace ***REMOVED*** {
 	template<> std::unique_ptr<GenericRaster> as(SEXP sexp);
 
 	// PointCollection
-	template<> SEXP wrap(const MultiPointCollection &points);
-	template<> SEXP wrap(const std::unique_ptr<MultiPointCollection> &points);
-	template<> std::unique_ptr<MultiPointCollection> as(SEXP sexp);
+	template<> SEXP wrap(const PointCollection &points);
+	template<> SEXP wrap(const std::unique_ptr<PointCollection> &points);
+	template<> std::unique_ptr<PointCollection> as(SEXP sexp);
 
 }
 
@@ -176,7 +176,7 @@ namespace ***REMOVED*** {
 
 
 	// PointCollection
-	template<> SEXP wrap(const MultiPointCollection &points) {
+	template<> SEXP wrap(const PointCollection &points) {
 		/*
 		new("SpatialPointsDataFrame"
 			, data = structure(list(), .Names = character(0), row.names = integer(0), class = "data.frame")
@@ -239,10 +239,10 @@ namespace ***REMOVED*** {
 
 		return SPDF;
 	}
-	template<> SEXP wrap(const std::unique_ptr<MultiPointCollection> &points) {
+	template<> SEXP wrap(const std::unique_ptr<PointCollection> &points) {
 		return ***REMOVED***::wrap(*points);
 	}
-	template<> std::unique_ptr<MultiPointCollection> as(SEXP sexp) {
+	template<> std::unique_ptr<PointCollection> as(SEXP sexp) {
 		Profiler::Profiler p("***REMOVED***: unwrapping pointcollection");
 		***REMOVED***::S4 SPDF(sexp);
 		if (!SPDF.is("SpatialPointsDataFrame"))
@@ -259,7 +259,7 @@ namespace ***REMOVED*** {
 			throw OperatorException("Result has an unknown epsg");
 		epsg_t epsg = (epsg_t) std::stoi(epsg_s.substr(5, std::string::npos));
 
-		auto points = std::make_unique<MultiPointCollection>(SpatioTemporalReference(epsg, TIMETYPE_UNIX));
+		auto points = std::make_unique<PointCollection>(SpatioTemporalReference(epsg, TIMETYPE_UNIX));
 
 		***REMOVED***::NumericMatrix coords = ***REMOVED***::as<***REMOVED***::NumericMatrix>(SPDF.slot("coords"));
 
@@ -268,7 +268,7 @@ namespace ***REMOVED*** {
 		for (size_t i=0;i<size;i++) {
 			double x = coords(i, 0);
 			double y = coords(i, 1);
-			points->addFeature(Coordinate(x, y));
+			points->addSinglePointFeature(Coordinate(x, y));
 		}
 
 		***REMOVED***::DataFrame data = ***REMOVED***::as<***REMOVED***::DataFrame>(SPDF.slot("data"));

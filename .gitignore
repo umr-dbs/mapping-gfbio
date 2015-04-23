@@ -16,3 +16,5 @@ mapping/mapping_manager
 /docs/mappingDoc/*
 /htdocs/doc/mapping/*
 /mapping/geometrytestbed
+/mapping/gtest
+/mapping/tileserver

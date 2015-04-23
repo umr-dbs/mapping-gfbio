@@ -5,10 +5,11 @@
 #include <cmath>
 #include <map>
 #include <sstream>
+#include <json/json.h>
+#include "datatypes/pointcollection.h"
 
 #include "datatypes/raster.h"
 #include "operators/operator.h"
-#include "datatypes/multipointcollection.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
 
 enum WFSRequestType {

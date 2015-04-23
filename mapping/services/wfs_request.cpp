@@ -44,17 +44,22 @@ auto WFSRequest::getCapabilities() -> std::string {
 }
 
 auto WFSRequest::getFeature() -> std::string {
-	// TODO: this is not valid WFS -> find default configuration
-	int output_width = std::stoi(parameters["width"]);
-	int output_height = std::stoi(parameters["height"]);
+	// read featureId
+	Json::Reader jsonReader{Json::Features::strictMode()};
+	Json::Value featureId;
+	if (!jsonReader.parse(parameters["featureid"], featureId)) {
+		return "unable to parse json of featureId";
+	}
+
+	int output_width = featureId["width"].asInt();
+	int output_height = featureId["height"].asInt();
 	if (output_width <= 0 || output_height <= 0) {
 		return "output_width or output_height not valid";
 	}
 
-	// TODO: this is not valid WFS too
-	time_t timestamp = 42;
-	if (parameters.count("timestamp") > 0) {
-		timestamp = std::stol(parameters.at("timestamp"));
+	time_t timestamp = 42; // TODO: default value
+	if (featureId["timestamp"].isInt()) {
+		timestamp = static_cast<long>(featureId["timestamp"].asInt64());
 	}
 
 	// srsName=CRS
@@ -63,13 +68,13 @@ auto WFSRequest::getFeature() -> std::string {
 	double bbox[4];
 	this->parseBBOX(bbox, parameters.at("bbox"), queryEpsg, true);
 
-	auto graph = GenericOperator::fromJSON(parameters["featureid"]);
+	auto graph = GenericOperator::fromJSON(featureId["query"]);
 
 	// TODO: typeNames
 	// namespace + points or polygons
 
 	QueryProfiler profiler;
-	auto points = graph->getCachedMultiPointCollection(
+	auto points = graph->getCachedPointCollection(
 			QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3],
 					output_width, output_height, queryEpsg), profiler);
 
@@ -87,7 +92,7 @@ auto WFSRequest::getFeature() -> std::string {
 	//		</Cluster>
 	// </Filter>
 	if (this->to_bool(parameters["clustered"]) == true) {
-		auto clusteredPoints = std::make_unique<MultiPointCollection>(points->stref);
+		auto clusteredPoints = std::make_unique<PointCollection>(points->stref);
 
 		auto x1 = bbox[0];
 		auto x2 = bbox[2];
@@ -120,7 +125,7 @@ auto WFSRequest::getFeature() -> std::string {
 		clusteredPoints->local_md_value.addVector("numberOfPoints",
 				circles.size());
 		for (auto& circle : circles) {
-			size_t idx = clusteredPoints->addFeature(Coordinate(circle->getX() * xres,
+			size_t idx = clusteredPoints->addSinglePointFeature(Coordinate(circle->getX() * xres,
 					circle->getY() * yres));
 			clusteredPoints->local_md_value.set(idx, "radius",
 					circle->getRadius());

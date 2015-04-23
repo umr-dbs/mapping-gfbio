@@ -1,0 +1,49 @@
+#ifndef DATATYPES_POINTCOLLECTION_H_
+#define DATATYPES_POINTCOLLECTION_H_
+
+#include "datatypes/simplefeaturecollection.h"
+#include <memory>
+
+/**
+ * This collection contains Multi-Points
+ */
+class PointCollection : public SimpleFeatureCollection {
+public:
+	PointCollection(BinaryStream &stream);
+	PointCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref) {
+		start_feature.push_back(0); //end of first feature
+	}
+
+	//starting index of individual features in the points vector, last entry indicates first index out of bounds of coordinates
+	//thus iterating over features has to stop at start_feature.size() -2
+	std::vector<uint32_t> start_feature;
+
+	void toStream(BinaryStream &stream);
+
+	//add a new coordinate, to a new feature. After adding all coordinates, finishFeature() has to be called
+	void addCoordinate(double x, double y);
+	//finishes the definition of the new feature, returns new feature index
+	size_t finishFeature();
+	//add a new feature consisting of a single coordinate, returns new feature index
+	size_t addSinglePointFeature(const Coordinate coordinate);
+
+	std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep);
+	std::unique_ptr<PointCollection> filter(const std::vector<char> &keep);
+
+	std::string hash();
+
+	virtual std::string toGeoJSON(bool displayMetadata) const;
+	virtual std::string toCSV() const;
+
+	virtual bool isSimple() const final;
+
+	virtual size_t getFeatureCount() const final {
+		return start_feature.size() - 1;
+	}
+
+	std::string getAsString();
+
+	virtual ~PointCollection(){};
+};
+
+#endif

@@ -1,7 +1,5 @@
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
-#include "datatypes/multipointcollection.h"
-#include "datatypes/multipolygoncollection.h"
 #include "datatypes/plot.h"
 #include "raster/colors.h"
 #include "raster/profiler.h"
@@ -26,6 +24,8 @@
 
 #include <uriparser/Uri.h>
 #include <json/json.h>
+#include "datatypes/pointcollection.h"
+#include "datatypes/polygoncollection.h"
 
 #include "pointvisualization/CircleClusteringQuadTree.h"
 
@@ -174,19 +174,19 @@ void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, 
 }
 
 
-void outputMultiPointCollection(MultiPointCollection *points, bool displayMetadata = false) {
+void outputPointCollection(PointCollection *points, bool displayMetadata = false) {
 	print_debug_header();
 	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON(displayMetadata).c_str());
 }
 
-void outputMultiPointCollectionCSV(MultiPointCollection *points) {
+void outputPointCollectionCSV(PointCollection *points) {
 	print_debug_header();
 	printf("Content-type: text/csv\r\nContent-Disposition: attachment; filename=\"export.csv\"\r\n\r\n%s", points->toCSV().c_str());
 }
 
-void outputMultiPolygonCollection(MultiPolygonCollection& multiPolygonCollection, bool displayMetadata = false){
+void outputPolygonCollection(PolygonCollection& polygonCollection, bool displayMetadata = false){
 	print_debug_header();
-	printf("Content-type: application/json\r\n\r\n%s", multiPolygonCollection.toGeoJSON(displayMetadata).c_str());
+	printf("Content-type: application/json\r\n\r\n%s", polygonCollection.toGeoJSON(displayMetadata).c_str());
 }
 
 //TODO: output for other feature types
@@ -452,7 +452,7 @@ int main() {
 		if (!query_string) {
 			//query_string = "geometryquery={\"type\":\"projection\",\"params\":{\"src_epsg\":4326,\"dest_epsg\":3857},\"sources\":{\"geometry\":[{\"type\":\"gfbiogeometrysource\",\"params\":{\"datasource\":\"IUCN\",\"query\":\"{\\\"globalAttributes\\\":{\\\"speciesName\\\":\\\"Puma concolor\\\"},\\\"localAttributes\\\":{}}\"}}]}}&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
 			//query_string = "pointquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22points%22%3A%5B%7B%22type%22%3A%22filterpointsbygeometry%22%2C%22sources%22%3A%7B%22points%22%3A%5B%7B%22type%22%3A%22gfbiopointsource%22%2C%22params%22%3A%7B%22datasource%22%3A%22GBIF%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%2C%22geometry%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
-			//query_string = "geometryquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22multipolygons%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
+			//query_string = "geometryquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22polygons%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
 			abort("No query string given");
 		}
 
@@ -468,7 +468,7 @@ int main() {
 			timestamp = parseIso8601DateTime(params["time"]);
 		}
 
-		bool debug = false;
+		bool debug = Configuration::getBool("global.debug", false);
 		if (params.count("debug") > 0) {
 			debug = params["debug"] == "1";
 		}
@@ -493,19 +493,19 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 
 			QueryProfiler profiler;
-			auto points = graph->getCachedMultiPointCollection(QueryRectangle(timestamp, /*-180, -90, 180, 90*/-20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+			auto points = graph->getCachedPointCollection(QueryRectangle(timestamp, /*-180, -90, 180, 90*/-20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
 				format = params["format"];
 			if (format == "csv") {
-				outputMultiPointCollectionCSV(points.get());
+				outputPointCollectionCSV(points.get());
 			}
 			else if (format == "geojsonfull") {
-				outputMultiPointCollection(points.get(), true);
+				outputPointCollection(points.get(), true);
 			}
 			else {
-				outputMultiPointCollection(points.get(), false);
+				outputPointCollection(points.get(), false);
 			}
 			return 0;
 		}
@@ -520,9 +520,9 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
 
 			QueryProfiler profiler;
-			auto geometry = graph->getCachedMultiPolygonCollection(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+			auto geometry = graph->getCachedPolygonCollection(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
 
-			outputMultiPolygonCollection(*geometry.get(), false);
+			outputPolygonCollection(*geometry.get(), false);
 			return 0;
 		}
 

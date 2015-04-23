@@ -12,7 +12,7 @@ public:
 	WKBUtil() = delete;
 
 	static std::unique_ptr<PolygonCollection> readPolygonCollection(std::stringstream& wkb);
-
+	static std::unique_ptr<PolygonCollection> readPolygonCollection(std::string& wkt);
 };
 
 #endif

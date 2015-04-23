@@ -69,32 +69,38 @@ void testTwoWay(){
 }
 
 void testMultiPointToCSV(){
-	PointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	points.local_md_value.addVector("test");
 
-	multiPointCollection.addCoordinate(1,2);
+	points.addCoordinate(1,2);
+	points.finishFeature();
+	points.local_md_value.set(0, "test", 5.1);
 
-	multiPointCollection.finishFeature();
+	points.addCoordinate(1,2);
+	points.addCoordinate(2,3);
+	points.local_md_value.set(1, "test", 2.1);
 
-	multiPointCollection.addCoordinate(1,2);
-	multiPointCollection.addCoordinate(2,3);
+	points.finishFeature();
 
-	multiPointCollection.finishFeature();
-
-	std::cout << multiPointCollection.toCSV();
+	std::cout << points.toCSV();
 }
 
 
 void testMultiPointGeoJSONWithMetadata(){
-	PointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
+	PointCollection points(SpatioTemporalReference::unreferenced());
 
-	multiPointCollection.local_md_value.addVector("test");
+	points.local_md_value.addVector("test");
 
-	multiPointCollection.addSinglePointFeature(Coordinate(1,2));
-	multiPointCollection.local_md_value.set(0, "test", 5.1);
-	multiPointCollection.addSinglePointFeature(Coordinate(3,4));
-	multiPointCollection.local_md_value.set(1, "test", 2.4);
+	points.addCoordinate(1,2);
+	points.finishFeature();
+	points.local_md_value.set(0, "test", 5.1);
 
-	std::cout << multiPointCollection.toGeoJSON(true);
+	points.addCoordinate(2,3);
+	points.addCoordinate(3,4);
+	points.finishFeature();
+	points.local_md_value.set(1, "test", 2.1);
+
+	std::cout << points.toGeoJSON(true);
 }
 
 void testMultiPolygonGeoJSON(){
@@ -323,5 +329,20 @@ int main(){
 
 	iteratorBenchmarks();
 
+	//testMultiPointToCSV();
+	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
+
+	points.local_md_value.addVector("test");
+
+	points.addCoordinate(1,2);
+	points.finishFeature();
+	points.local_md_value.set(0, "test", 5.1);
+
+	points.addCoordinate(2,3);
+	points.addCoordinate(3,4);
+	points.finishFeature();
+	points.local_md_value.set(1, "test", 2.1);
+
+	std::cout << points.toGeoJSON(true);
 	return 0;
 }

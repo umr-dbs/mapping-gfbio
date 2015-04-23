@@ -1,4 +1,5 @@
-#include "multipointcollection.h"
+#include "pointcollection.h"
+
 #include "raster/exceptions.h"
 #include "util/binarystream.h"
 #include "util/hash.h"
@@ -10,11 +11,11 @@
 #include <cmath>
 
 template<typename T>
-std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std::vector<T> &keep) {
+std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T> &keep) {
 	size_t count = in->getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
-		msg << "MultiPointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
+		msg << "PointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
 		throw ArgumentException(msg.str());
 	}
 
@@ -24,7 +25,7 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 			kept_count++;
 	}
 
-	auto out = std::make_unique<MultiPointCollection>(in->stref);
+	auto out = std::make_unique<PointCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
 	// copy global metadata
 	out->global_md_string = in->global_md_string;
@@ -75,15 +76,15 @@ std::unique_ptr<MultiPointCollection> filter(MultiPointCollection *in, const std
 	return out;
 }
 
-std::unique_ptr<MultiPointCollection> MultiPointCollection::filter(const std::vector<bool> &keep) {
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) {
 	return ::filter<bool>(this, keep);
 }
 
-std::unique_ptr<MultiPointCollection> MultiPointCollection::filter(const std::vector<char> &keep) {
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) {
 	return ::filter<char>(this, keep);
 }
 
-MultiPointCollection::MultiPointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
+PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
 	size_t coordinateCount;
 	stream.read(&coordinateCount);
 	coordinates.reserve(coordinateCount);
@@ -109,7 +110,7 @@ MultiPointCollection::MultiPointCollection(BinaryStream &stream) : SimpleFeature
 	// TODO: serialize/unserialize time array
 }
 
-void MultiPointCollection::toStream(BinaryStream &stream) {
+void PointCollection::toStream(BinaryStream &stream) {
 	stream.write(stref);
 	size_t coordinateCount = coordinates.size();
 	stream.write(coordinateCount);
@@ -133,11 +134,11 @@ void MultiPointCollection::toStream(BinaryStream &stream) {
 }
 
 
-void MultiPointCollection::addCoordinate(double x, double y) {
+void PointCollection::addCoordinate(double x, double y) {
 	coordinates.push_back(Coordinate(x, y));
 }
 
-size_t MultiPointCollection::finishFeature(){
+size_t PointCollection::finishFeature(){
 	if(start_feature.back() >= coordinates.size()){
 		throw FeatureException("Tried to finish feature with 0 coordinates");
 	}
@@ -146,7 +147,7 @@ size_t MultiPointCollection::finishFeature(){
 	return start_feature.size() -2;
 }
 
-size_t MultiPointCollection::addSinglePointFeature(Coordinate coordinate){
+size_t PointCollection::addSinglePointFeature(Coordinate coordinate){
 	coordinates.push_back(coordinate);
 	start_feature.push_back(coordinates.size());
 	return start_feature.size() -2;
@@ -162,7 +163,7 @@ size_t MultiPointCollection::addSinglePointFeature(Coordinate coordinate){
 
 void gdal_init(); // implemented in raster/import_gdal.cpp
 
-void MultiPointCollection::toOGR(const char *driver = "ESRI Shapefile") {
+void PointCollection::toOGR(const char *driver = "ESRI Shapefile") {
 	gdal_init();
 
     GDALDriver *poDriver = GetGDALDriverManager()->GetDriverByName(pszDriverName );
@@ -206,7 +207,7 @@ void MultiPointCollection::toOGR(const char *driver = "ESRI Shapefile") {
 #endif
 
 //TODO: include global metadata?
-std::string MultiPointCollection::toGeoJSON(bool displayMetadata) const {
+std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 	std::ostringstream json;
 	json << std::fixed; // std::setprecision(4);
 
@@ -270,7 +271,7 @@ std::string MultiPointCollection::toGeoJSON(bool displayMetadata) const {
 	return json.str();
 }
 //TODO: include global metadata?
-std::string MultiPointCollection::toCSV() const {
+std::string PointCollection::toCSV() const {
 	std::ostringstream csv;
 	csv << std::fixed; // std::setprecision(4);
 
@@ -322,18 +323,18 @@ std::string MultiPointCollection::toCSV() const {
 	return csv.str();
 }
 
-std::string MultiPointCollection::hash() {
+std::string PointCollection::hash() {
 	// certainly not the most stable solution, but it has few lines of code..
 	std::string csv = toCSV();
 
 	return calculateHash((const unsigned char *) csv.c_str(), (int) csv.length()).asHex();
 }
 
-bool MultiPointCollection::isSimple() const {
+bool PointCollection::isSimple() const {
 	return coordinates.size() == getFeatureCount();
 }
 
-std::string MultiPointCollection::getAsString(){
+std::string PointCollection::getAsString(){
 	std::ostringstream string;
 
 	string << "points" << std::endl;

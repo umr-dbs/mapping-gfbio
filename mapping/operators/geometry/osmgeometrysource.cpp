@@ -1,4 +1,3 @@
-#include "datatypes/multilinecollection.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
@@ -7,6 +6,7 @@
 #include <geos/io/WKTReader.h>
 #include <string>
 #include <sstream>
+#include "datatypes/linecollection.h"
 
 
 class OSMGeometrySourceOperator : public GenericOperator {

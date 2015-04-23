@@ -1,7 +1,6 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
-#include "datatypes/multipointcollection.h"
 #include "datatypes/raster/typejuggling.h"
 #include "operators/operator.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
@@ -10,6 +9,7 @@
 #include <memory>
 #include <cmath>
 #include <algorithm>
+#include "datatypes/pointcollection.h"
 
 class PointsToClusterRasterOperator : public GenericOperator {
 	public:
@@ -35,7 +35,7 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 	const int MAX = 255;
 	typedef uint8_t T;
 
-	std::unique_ptr<MultiPointCollection> points = getMultiPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
+	std::unique_ptr<PointCollection> points = getPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
 
 	DataDescription dd(GDT_Byte, 0, MAX, true, 0);
 

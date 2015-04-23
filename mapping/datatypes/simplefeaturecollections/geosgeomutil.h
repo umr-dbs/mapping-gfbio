@@ -1,7 +1,7 @@
 #ifndef DATATYPES_COLLECTIONS_GEOSGEOMUTIL_H_
 #define DATATYPES_COLLECTIONS_GEOSGEOMUTIL_H_
 
-#include "datatypes/multipolygoncollection.h"
+#include "datatypes/polygoncollection.h"
 #include <geos/geom/MultiPolygon.h>
 
 /**
@@ -12,28 +12,28 @@ public:
 	GeosGeomUtil() = delete;
 
 	/**
-	 * Convert a geos multipolygon into a MultiPolygonCollection of single polygons
+	 * Convert a geos multipolygon into a PolygonCollection of single polygons
 	 */
-	static std::unique_ptr<MultiPolygonCollection> createMultiPolygonCollection(const geos::geom::MultiPolygon& multiPolygon);
+	static std::unique_ptr<PolygonCollection> createPolygonCollection(const geos::geom::MultiPolygon& multiPolygon);
 
 
 	/**
-	 * Convert a geos geometry(collection) into a MultiPolygonCollection of single polygons
+	 * Convert a geos geometry(collection) into a PolygonCollection of single polygons
 	 */
-	static std::unique_ptr<MultiPolygonCollection> createMultiPolygonCollection(const geos::geom::Geometry& geometry);
+	static std::unique_ptr<PolygonCollection> createPolygonCollection(const geos::geom::Geometry& geometry);
 
 
 
 	/**
-	 * Convert a MultiPolygonCollection into a geos Geometry
+	 * Convert a PolygonCollection into a geos Geometry
 	 */
-	static std::unique_ptr<geos::geom::Geometry> createGeosGeometry(const MultiPolygonCollection& polygonCollection);
+	static std::unique_ptr<geos::geom::Geometry> createGeosGeometry(const PolygonCollection& polygonCollection);
 
 
 	virtual ~GeosGeomUtil();
 
 private:
-	static void addPolygon(MultiPolygonCollection& multiPolygonCollection, const geos::geom::Geometry& polygonGeometry);
+	static void addPolygon(PolygonCollection& polygonCollection, const geos::geom::Geometry& polygonGeometry);
 
 	static epsg_t resolveGeosSRID(int srid);
 	static int resolveMappingEPSG(epsg_t epsg);

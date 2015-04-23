@@ -4,9 +4,10 @@
 #include <geos/io/WKTWriter.h>
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
-#include "datatypes/multipolygoncollection.h"
-#include "datatypes/multipointcollection.h"
 #include <vector>
+
+#include "datatypes/pointcollection.h"
+#include "datatypes/polygoncollection.h"
 #include "raster/opencl.h"
 geos::geom::Geometry* createGeosGeometry(std::string wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
@@ -26,7 +27,7 @@ void testGFBioInput(){
 void testGeosToMapping(){
 	geos::geom::Geometry* geometry = createGeosGeometry("GEOMETRYCOLLECTION(MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))), MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))))");
 
-	auto multiPolygonCollection = GeosGeomUtil::createMultiPolygonCollection(*geometry);
+	auto multiPolygonCollection = GeosGeomUtil::createPolygonCollection(*geometry);
 
 	std::cout << "points" << std::endl;
 	for(auto p = multiPolygonCollection->coordinates.begin(); p != multiPolygonCollection->coordinates.end(); ++p){
@@ -57,7 +58,7 @@ void testGeosToMapping(){
 void testTwoWay(){
 	geos::geom::Geometry* geometry = createGeosGeometry("GEOMETRYCOLLECTION(MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))))");
 
-	auto multiPolygonCollection = GeosGeomUtil::createMultiPolygonCollection(*geometry);
+	auto multiPolygonCollection = GeosGeomUtil::createPolygonCollection(*geometry);
 
 	auto geos = GeosGeomUtil::createGeosGeometry(*multiPolygonCollection);
 
@@ -65,7 +66,7 @@ void testTwoWay(){
 }
 
 void testMultiPointToCSV(){
-	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
+	PointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
 
 	multiPointCollection.addCoordinate(1,2);
 
@@ -81,7 +82,7 @@ void testMultiPointToCSV(){
 
 
 void testMultiPointGeoJSONWithMetadata(){
-	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
+	PointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
 
 	multiPointCollection.local_md_value.addVector("test");
 
@@ -94,7 +95,7 @@ void testMultiPointGeoJSONWithMetadata(){
 }
 
 void testMultiPolygonGeoJSON(){
-	MultiPolygonCollection multiPolygonCollection(SpatioTemporalReference::unreferenced());
+	PolygonCollection multiPolygonCollection(SpatioTemporalReference::unreferenced());
 
 	multiPolygonCollection.addCoordinate(1, 2);
 	multiPolygonCollection.addCoordinate(2, 3);
@@ -125,7 +126,7 @@ void testMultiPolygonGeoJSON(){
 }
 
 void testFilterPoints(){
-	MultiPointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
+	PointCollection multiPointCollection(SpatioTemporalReference::unreferenced());
 	multiPointCollection.addSinglePointFeature(Coordinate(1,2));
 	multiPointCollection.addSinglePointFeature(Coordinate(3,4));
 

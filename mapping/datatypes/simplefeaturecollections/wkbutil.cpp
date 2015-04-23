@@ -10,7 +10,7 @@
 
 
 //read Multipolygon as we currently need it for GFBioWS
-std::unique_ptr<MultiPolygonCollection> WKBUtil::readMultiPolygonCollection(std::stringstream& wkb){
+std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::stringstream& wkb){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKBReader wkbreader(*gf);
 
@@ -22,11 +22,11 @@ std::unique_ptr<MultiPolygonCollection> WKBUtil::readMultiPolygonCollection(std:
 	}
 
 
-	auto multiPolygonCollection = GeosGeomUtil::createMultiPolygonCollection(*geom);
+	auto polygonCollection = GeosGeomUtil::createPolygonCollection(*geom);
 
 	gf->destroyGeometry(geom);
 
 	std::cerr << "OK";
 
-	return multiPolygonCollection;
+	return polygonCollection;
 }

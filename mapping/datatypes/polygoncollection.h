@@ -1,5 +1,5 @@
-#ifndef DATATYPES_MULTIPOLYGONCOLLECTION_H_
-#define DATATYPES_MULTIPOLYGONCOLLECTION_H_
+#ifndef DATATYPES_POLYGONCOLLECTION_H_
+#define DATATYPES_POLYGONCOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
 
@@ -7,10 +7,10 @@
  * This collection stores Multi-Polygons. Each Polygon consists of one outer and zero
  * or more inner rings (holes) that are stored in this order
  */
-class MultiPolygonCollection : public SimpleFeatureCollection {
+class PolygonCollection : public SimpleFeatureCollection {
 public:
 
-	MultiPolygonCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref){
+	PolygonCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref){
 		start_feature.push_back(0); //end of first feature
 		start_polygon.push_back(0); //end of first polygon
 		start_ring.push_back(0); //end of first ring
@@ -46,7 +46,7 @@ public:
 		return start_feature.size() - 1;
 	}
 
-	virtual ~MultiPolygonCollection(){};
+	virtual ~PolygonCollection(){};
 
 	std::string getAsString();
 };

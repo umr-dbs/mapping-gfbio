@@ -1,4 +1,3 @@
-#include "datatypes/multipointcollection.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "datatypes/plots/xygraph.h"
@@ -9,6 +8,7 @@
 #include <vector>
 #include <array>
 #include <cmath>
+#include "datatypes/pointcollection.h"
 
 class PointsMetadataToGraph: public GenericOperator {
 	public:
@@ -24,7 +24,7 @@ class PointsMetadataToGraph: public GenericOperator {
 		std::vector<std::string> names;
 
 		template<std::size_t size>
-			std::unique_ptr<GenericPlot> createXYGraph(MultiPointCollection& points);
+			std::unique_ptr<GenericPlot> createXYGraph(PointCollection& points);
 };
 
 PointsMetadataToGraph::PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -49,7 +49,7 @@ void PointsMetadataToGraph::writeSemanticParameters(std::ostringstream& stream) 
 }
 
 template<std::size_t size>
-auto PointsMetadataToGraph::createXYGraph(MultiPointCollection& points) -> std::unique_ptr<GenericPlot> {
+auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::unique_ptr<GenericPlot> {
 	auto xyGraph = std::make_unique<XYGraph<size>>();
 
 	for (size_t featureIndex = 0; featureIndex < points.getFeatureCount(); ++featureIndex) {
@@ -76,7 +76,7 @@ auto PointsMetadataToGraph::createXYGraph(MultiPointCollection& points) -> std::
 }
 
 std::unique_ptr<GenericPlot> PointsMetadataToGraph::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
+	auto points = getPointCollectionFromSource(0, rect, profiler);
 
 	// TODO: GENERALIZE
 	if(names.size() == 3) {

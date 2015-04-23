@@ -25,7 +25,7 @@ class Coordinate {
 
 		double x, y;
 
-		friend class MultiPointCollection;
+		friend class PointCollection;
 		friend class GeosGeomUtil;
 };
 

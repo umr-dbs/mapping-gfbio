@@ -1,9 +1,9 @@
-#include "multipolygoncollection.h"
 #include "raster/exceptions.h"
 
 #include <sstream>
+#include "polygoncollection.h"
 
-std::string MultiPolygonCollection::toGeoJSON(bool displayMetadata) const {
+std::string PolygonCollection::toGeoJSON(bool displayMetadata) const {
 	//TODO: implement inclusion of metadata
 
 	std::ostringstream json;
@@ -46,20 +46,20 @@ std::string MultiPolygonCollection::toGeoJSON(bool displayMetadata) const {
 
 }
 
-std::string MultiPolygonCollection::toCSV() const {
+std::string PolygonCollection::toCSV() const {
 	 //TODO: implement
 	return "";
 }
 
-bool MultiPolygonCollection::isSimple() const {
+bool PolygonCollection::isSimple() const {
 	return getFeatureCount() == (start_polygon.size() - 1);
 }
 
-void MultiPolygonCollection::addCoordinate(double x, double y){
+void PolygonCollection::addCoordinate(double x, double y){
 	coordinates.push_back(Coordinate(x, y));
 }
 
-size_t MultiPolygonCollection::finishRing(){
+size_t PolygonCollection::finishRing(){
 	if(start_ring.back() >= coordinates.size()){
 		throw FeatureException("Tried to finish ring with 0 coordinates");
 	}
@@ -67,7 +67,7 @@ size_t MultiPolygonCollection::finishRing(){
 	return start_ring.size() -2;
 }
 
-size_t MultiPolygonCollection::finishPolygon(){
+size_t PolygonCollection::finishPolygon(){
 	if(start_polygon.back() >= start_ring.size()){
 		throw FeatureException("Tried to finish polygon with 0 rings");
 	}
@@ -75,7 +75,7 @@ size_t MultiPolygonCollection::finishPolygon(){
 	return start_polygon.size() -2;
 }
 
-size_t MultiPolygonCollection::finishFeature(){
+size_t PolygonCollection::finishFeature(){
 	if(start_feature.back() >= start_polygon.size()){
 		throw FeatureException("Tried to finish feature with 0 polygons");
 	}
@@ -83,7 +83,7 @@ size_t MultiPolygonCollection::finishFeature(){
 	return start_feature.size() -2;
 }
 
-std::string MultiPolygonCollection::getAsString(){
+std::string PolygonCollection::getAsString(){
 	std::ostringstream string;
 
 	string << "points" << std::endl;

@@ -1,4 +1,3 @@
-#include "datatypes/multipointcollection.h"
 #include "operators/operator.h"
 #include "raster/exceptions.h"
 #include "util/make_unique.h"
@@ -8,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <json/json.h>
+#include "datatypes/pointcollection.h"
 
 
 class PGPointSourceOperator : public GenericOperator {
@@ -15,7 +15,7 @@ class PGPointSourceOperator : public GenericOperator {
 		PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PGPointSourceOperator();
 
-		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -48,7 +48,7 @@ void PGPointSourceOperator::writeSemanticParameters(std::ostringstream& stream) 
 	stream << "\"querystring\":\"" << querystring << "\"";
 }
 
-std::unique_ptr<MultiPointCollection> PGPointSourceOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PointCollection> PGPointSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 
 	if (rect.epsg != EPSG_WEBMERCATOR)
 		throw OperatorException("PGPointSourceOperator: Shouldn't load points in a projection other than webmercator");
@@ -59,7 +59,7 @@ std::unique_ptr<MultiPointCollection> PGPointSourceOperator::getMultiPointCollec
 	pqxx::work transaction(*connection, "load_points");
 	pqxx::result points = transaction.exec(sql.str());
 
-	auto points_out = std::make_unique<MultiPointCollection>(rect);
+	auto points_out = std::make_unique<PointCollection>(rect);
 
 	auto column_count = points.columns();
 	for (pqxx::result::size_type c = 2;c<column_count;c++) {

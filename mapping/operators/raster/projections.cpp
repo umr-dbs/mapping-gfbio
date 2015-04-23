@@ -1,7 +1,5 @@
 
 #include "datatypes/raster.h"
-#include "datatypes/multipointcollection.h"
-#include "datatypes/multipolygoncollection.h"
 #include "datatypes/raster/typejuggling.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include "operators/operator.h"
@@ -14,6 +12,8 @@
 #include <vector>
 #include <json/json.h>
 #include <geos/geom/util/GeometryTransformer.h>
+#include "datatypes/pointcollection.h"
+#include "datatypes/polygoncollection.h"
 
 class ProjectionOperator : public GenericOperator {
 	public:
@@ -21,8 +21,8 @@ class ProjectionOperator : public GenericOperator {
 		virtual ~ProjectionOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 	protected:
 		void writeSemanticParameters(std::ostringstream &stream);
 	private:
@@ -224,11 +224,11 @@ std::unique_ptr<GenericRaster> ProjectionOperator::getRaster(const QueryRectangl
 }
 
 
-std::unique_ptr<MultiPointCollection> ProjectionOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 	if (src_epsg == dest_epsg)
-		return getMultiPointCollectionFromSource(0, rect, profiler);
+		return getPointCollectionFromSource(0, rect, profiler);
 
 
 	// Need to transform "backwards" to project the query rectangle..
@@ -239,7 +239,7 @@ std::unique_ptr<MultiPointCollection> ProjectionOperator::getMultiPointCollectio
 	GDAL::CRSTransformer transformer(src_epsg, dest_epsg);
 
 
-	auto points_in = getMultiPointCollectionFromSource(0, src_rect, profiler);
+	auto points_in = getPointCollectionFromSource(0, src_rect, profiler);
 
 	if (src_epsg != points_in->stref.epsg) {
 		std::ostringstream msg;
@@ -329,7 +329,7 @@ class ProjectionTransformer: public geos::geom::util::GeometryTransformer {
 };
 
 //TODO: why is this in raster folder?
-std::unique_ptr<MultiPolygonCollection> ProjectionOperator::getMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (src_epsg == EPSG_GEOSMSG || dest_epsg == EPSG_GEOSMSG)
 		throw OperatorException("Projection: cannot transform Geometries to or from MSAT2 projection");
 	if (dest_epsg != rect.epsg)
@@ -340,13 +340,13 @@ std::unique_ptr<MultiPolygonCollection> ProjectionOperator::getMultiPolygonColle
 
 	//TODO: reproject without GEOS workaround
 
-	auto multiPolygonCollection = getMultiPolygonCollectionFromSource(0, src_rect, profiler);
+	auto polygonCollection = getPolygonCollectionFromSource(0, src_rect, profiler);
 
-	auto geom_in = GeosGeomUtil::createGeosGeometry(*multiPolygonCollection);
+	auto geom_in = GeosGeomUtil::createGeosGeometry(*polygonCollection);
 
-	if (src_epsg != multiPolygonCollection->stref.epsg) {
+	if (src_epsg != polygonCollection->stref.epsg) {
 		std::ostringstream msg;
-		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << (int) src_epsg << " got " << (int) multiPolygonCollection->stref.epsg;
+		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << (int) src_epsg << " got " << (int) polygonCollection->stref.epsg;
 		throw OperatorException(msg.str());
 	}
 
@@ -355,7 +355,7 @@ std::unique_ptr<MultiPolygonCollection> ProjectionOperator::getMultiPolygonColle
 	auto geom_out = pt.transform(geom_in.get());
 
 
-	return 	GeosGeomUtil::createMultiPolygonCollection(*geom_out.get());
+	return 	GeosGeomUtil::createPolygonCollection(*geom_out.get());
 }
 
 

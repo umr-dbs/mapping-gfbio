@@ -1,15 +1,15 @@
-#ifndef DATATYPES_MULTILINECOLLECTION_H_
-#define DATATYPES_MULTILINECOLLECTION_H_
+#ifndef DATATYPES_LINECOLLECTION_H_
+#define DATATYPES_LINECOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
 
 /**
  * This collection contains Multi-Lines
  */
-class MultiLineCollection : public SimpleFeatureCollection {
+class LineCollection : public SimpleFeatureCollection {
 public:
 
-	MultiLineCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref) {
+	LineCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref) {
 		start_feature.push_back(0); //end of first feature
 		start_line.push_back(0); //end of first line
 	}
@@ -31,7 +31,7 @@ public:
 		return start_feature.size() - 1;
 	}
 
-	virtual ~MultiLineCollection(){};
+	virtual ~LineCollection(){};
 };
 
 #endif

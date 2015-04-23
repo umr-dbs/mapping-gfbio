@@ -1,5 +1,5 @@
-#ifndef DATATYPES_MULTIPOINTCOLLECTION_H_
-#define DATATYPES_MULTIPOINTCOLLECTION_H_
+#ifndef DATATYPES_POINTCOLLECTION_H_
+#define DATATYPES_POINTCOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
 #include <memory>
@@ -7,10 +7,10 @@
 /**
  * This collection contains Multi-Points
  */
-class MultiPointCollection : public SimpleFeatureCollection {
+class PointCollection : public SimpleFeatureCollection {
 public:
-	MultiPointCollection(BinaryStream &stream);
-	MultiPointCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref) {
+	PointCollection(BinaryStream &stream);
+	PointCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref) {
 		start_feature.push_back(0); //end of first feature
 	}
 
@@ -27,8 +27,8 @@ public:
 	//add a new feature consisting of a single coordinate, returns new feature index
 	size_t addSinglePointFeature(const Coordinate coordinate);
 
-	std::unique_ptr<MultiPointCollection> filter(const std::vector<bool> &keep);
-	std::unique_ptr<MultiPointCollection> filter(const std::vector<char> &keep);
+	std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep);
+	std::unique_ptr<PointCollection> filter(const std::vector<char> &keep);
 
 	std::string hash();
 
@@ -43,7 +43,7 @@ public:
 
 	std::string getAsString();
 
-	virtual ~MultiPointCollection(){};
+	virtual ~PointCollection(){};
 };
 
 #endif

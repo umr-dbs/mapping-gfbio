@@ -46,7 +46,7 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 	// copy local MD
 	for (auto &keyValue : in->local_md_string) {
 		const auto &vec_in = in->local_md_string.getVector(keyValue.first);
-		auto &vec_out = out->local_md_string.addVector(keyValue.first, kept_count);
+		auto &vec_out = out->local_md_string.addEmptyVector(keyValue.first, kept_count);
 		for (size_t idx=0;idx<count;idx++) {
 			if (keep[idx])
 				vec_out.push_back(vec_in[idx]);
@@ -55,7 +55,7 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 
 	for (auto &keyValue : in->local_md_value) {
 		const auto &vec_in = in->local_md_value.getVector(keyValue.first);
-		auto &vec_out = out->local_md_value.addVector(keyValue.first, kept_count);
+		auto &vec_out = out->local_md_value.addEmptyVector(keyValue.first, kept_count);
 		for (size_t idx=0;idx<count;idx++) {
 			if (keep[idx])
 				vec_out.push_back(vec_in[idx]);

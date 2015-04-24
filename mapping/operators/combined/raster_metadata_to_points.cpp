@@ -80,12 +80,12 @@ struct PointDataEnhancement {
 
 static void enhance(PointCollection &points, GenericRaster &raster, const std::string name, QueryProfiler &profiler) {
 #ifdef MAPPING_NO_OPENCL
-	points.local_md_value.addVector(name);
+	points.local_md_value.addEmptyVector(name, points.getFeatureCount());
 	callUnaryOperatorFunc<PointDataEnhancement>(&raster, &points, name);
 #else
 	RasterOpenCL::init();
 
-	points.local_md_value.addVector(name, points.coordinates.size());
+	points.local_md_value.addVector(name, points.getFeatureCount());
 	try {
 		RasterOpenCL::CLProgram prog;
 		prog.setProfiler(profiler);

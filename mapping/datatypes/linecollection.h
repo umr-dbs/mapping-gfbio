@@ -22,6 +22,13 @@ public:
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
 
+	//add a new coordinate, to a new feature. After adding all coordinates, finishLine() has to be called
+	void addCoordinate(double x, double y);
+	//finishes the definition of the new feature, returns new feature index
+	size_t finishLine();
+	//finishes the definition of the new feature, returns new feature index
+	size_t finishFeature();
+
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 

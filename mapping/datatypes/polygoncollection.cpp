@@ -5,6 +5,7 @@
 
 std::string PolygonCollection::toGeoJSON(bool displayMetadata) const {
 	//TODO: implement inclusion of metadata
+	//TODO: output MultiPolygon that consists of single polygon as Polygon?
 
 	std::ostringstream json;
 	json << std::fixed;

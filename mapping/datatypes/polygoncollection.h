@@ -58,6 +58,9 @@ public:
 	//finishes the definition of the new feature, returns new feature index
 	size_t finishFeature();
 
+	std::unique_ptr<PolygonCollection> filter(const std::vector<bool> &keep) { throw 1; } // TODO: implement
+	std::unique_ptr<PolygonCollection> filter(const std::vector<char> &keep) { throw 1; }
+
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 

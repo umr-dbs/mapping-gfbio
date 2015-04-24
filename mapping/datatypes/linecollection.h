@@ -22,6 +22,9 @@ public:
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
 
+	std::unique_ptr<LineCollection> filter(const std::vector<bool> &keep) { throw 1; } // TODO: implement
+	std::unique_ptr<LineCollection> filter(const std::vector<char> &keep) { throw 1; }
+
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 

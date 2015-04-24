@@ -54,7 +54,7 @@ TEST_LOGS:=$(TEST_QUERIES:.json=.log)
 
 .SECONDARY: $(CL_HEADERS)
 
-.PHONY: clean systemtest system_testenvironment system_testcases unittest
+.PHONY: clean systemtest system_testenvironment system_testcases unittest doc
 
 .DELETE_ON_ERROR:
 
@@ -205,8 +205,8 @@ webinstall:
 	php htdocs/get_javascript.php > htdocs/compiled/compiled.release.js
 	php htdocs/get_templates.php > htdocs/compiled/compiled.release.soy.js
 
-docs:
-	doxygen Doxyfile
+doc:
+	./../docs/makeDoc
 
 clean:
 	rm -f o/*.o ${EXE} ${EXECGI} ${EXERSERVER} $(CL_HEADERS)

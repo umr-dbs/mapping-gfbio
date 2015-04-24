@@ -58,8 +58,11 @@ auto WFSRequest::getFeature() -> std::string {
 	}
 
 	time_t timestamp = 42; // TODO: default value
-	if (featureId["timestamp"].isInt()) {
-		timestamp = static_cast<long>(featureId["timestamp"].asInt64());
+	//if(featureId["timestamp"].isInt()) {
+	//	timestamp = static_cast<long>(featureId["timestamp"].asInt64());
+	//}
+	if(parameters.count("time") > 0){
+		timestamp = this->parseIso8601DateTime(parameters["time"]);
 	}
 
 	// srsName=CRS
@@ -121,8 +124,8 @@ auto WFSRequest::getFeature() -> std::string {
 		// TYPENAMES=ns1:F1,ns1:F1&ALIASES=C,D&FILTER=<Filter>…for C,D…</Filter>
 
 		auto circles = clusterer.getCircles();
-		clusteredPoints->local_md_value.addVector("radius", circles.size());
-		clusteredPoints->local_md_value.addVector("numberOfPoints",
+		clusteredPoints->local_md_value.addEmptyVector("radius", circles.size());
+		clusteredPoints->local_md_value.addEmptyVector("numberOfPoints",
 				circles.size());
 		for (auto& circle : circles) {
 			size_t idx = clusteredPoints->addSinglePointFeature(Coordinate(circle->getX() * xres,
@@ -271,4 +274,23 @@ auto WFSRequest::epsg_from_param(const std::map<std::string, std::string> &param
 	if (params.count(key) < 1)
 		return def;
 	return epsg_from_param(params.at(key), def);
+}
+
+/**
+ * This function converts a "datetime"-string in ISO8601 format into a time_t using UTC
+ * @param dateTimeString a string with ISO8601 "datetime"
+ * @returns The time_t representing the "datetime"
+ */
+auto WFSRequest::parseIso8601DateTime(const std::string &dateTimeString) const -> time_t {
+	const std::string dateTimeFormat{"%Y-%m-%dT%H:%M:%S"}; //TODO: we should allow millisec -> "%Y-%m-%dT%H:%M:%S.SSSZ" std::get_time and the tm struct dont have them.
+
+	//std::stringstream dateTimeStream{dateTimeString}; //TODO: use this with gcc >5.0
+	tm queryDateTime{0};
+	//std::get_time(&queryDateTime, dateTimeFormat); //TODO: use this with gcc >5.0
+	strptime(dateTimeString.c_str(), dateTimeFormat.c_str(), &queryDateTime); //TODO: remove this with gcc >5.0
+	time_t queryTimestamp = timegm(&queryDateTime); //TODO: is there a c++ version for timegm?
+
+	//TODO: parse millisec
+
+	return (queryTimestamp);
 }

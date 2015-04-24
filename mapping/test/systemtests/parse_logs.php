@@ -21,7 +21,7 @@ echo <<<EOS
 
 EOS;
 
-define('ROOT', 'test/queries/');
+define('ROOT', 'test/systemtests/queries/');
 
 $logs = array();
 $dir = opendir(ROOT);

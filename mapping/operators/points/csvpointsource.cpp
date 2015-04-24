@@ -105,9 +105,9 @@ std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryR
 		if (i == pos_x || i == pos_y || i == pos_t)
 			continue;
 		if (is_numeric[i])
-			points_out->local_md_value.addVector(headers[i]);
+			points_out->local_md_value.addEmptyVector(headers[i]);
 		else
-			points_out->local_md_string.addVector(headers[i]);
+			points_out->local_md_string.addEmptyVector(headers[i]);
 	}
 
 	auto minx = rect.minx();

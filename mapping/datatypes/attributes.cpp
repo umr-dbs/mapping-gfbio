@@ -80,8 +80,10 @@ MetadataArrays<T>::~MetadataArrays() {
 
 template<typename T>
 void MetadataArrays<T>::set(size_t idx, const std::string &key, const T &value) {
-	if (data.count(key) == 0)
-		data[key] = std::vector<T>();
+	if (data.count(key) == 0) {
+		//data[key] = std::vector<T>();
+		throw MetadataException("Metadata with key "+key+" does not exist. Call addVector() first.");
+	}
 
 	auto &vec = data[key];
 	if (idx == vec.size()) {
@@ -114,6 +116,16 @@ std::vector<T> &MetadataArrays<T>::addVector(const std::string &key, size_t capa
 		throw MetadataException("Metadata with key "+key+" already exists");
 	data[key] = std::vector<T>(capacity);
 	return data.at(key);
+}
+template<typename T>
+std::vector<T> &MetadataArrays<T>::addEmptyVector(const std::string &key, size_t reserve) {
+	if (data.count(key) > 0)
+		throw MetadataException("Metadata with key "+key+" already exists");
+	data[key] = std::vector<T>();
+	auto &vec = data.at(key);
+	if (reserve > 0)
+		vec.reserve(reserve);
+	return vec;
 }
 
 template<typename T>

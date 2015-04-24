@@ -2,8 +2,8 @@
 #define DATATYPES_POLYGONCOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
+#include <memory>
 
-class PointFeatureReference;
 
 /**
  * This collection contains Polygon-Features. Each Feature consists of one or more polygons.

@@ -2,6 +2,8 @@
 #define DATATYPES_LINECOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
+#include <memory>
+
 
 /**
  * This collection contains Multi-Lines

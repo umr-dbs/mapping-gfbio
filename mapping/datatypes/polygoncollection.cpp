@@ -11,39 +11,33 @@ std::string PolygonCollection::toGeoJSON(bool displayMetadata) const {
 
 	json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
-
-	for(size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex){
+	for (auto feature: *this) {
 		json << "{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPolygon\", \"coordinates\": [";
 
-		for(size_t polygonIndex = start_feature[featureIndex]; polygonIndex < start_feature[featureIndex + 1]; ++polygonIndex){
+		for (auto polygon : feature) {
 			json << "[";
 
-			for (size_t ringIndex = start_polygon[polygonIndex]; ringIndex < start_polygon[polygonIndex + 1]; ++ringIndex){
+			for (auto ring : polygon) {
 				json << "[";
 
-				for(size_t pointIndex = start_ring[ringIndex]; pointIndex < start_ring[ringIndex + 1]; ++pointIndex){
-					json << "[" << coordinates[pointIndex].x << ", " << coordinates[pointIndex].y << "],";
+				for (auto & coordinate : ring) {
+					json << "[" << coordinate.x << ", " << coordinate.y << "],";
 				}
 
 				json.seekp(((long)json.tellp()) - 1);
-
 				json << "],";
 			}
 
 			json.seekp(((long)json.tellp()) - 1);
-
 			json << "],";
 		}
 		json.seekp(((long)json.tellp()) - 1);
-
 		json << "]}},";
 	}
 	json.seekp(((long)json.tellp()) - 1);
-
 	json << "]}";
 
 	return json.str();
-
 }
 
 std::string PolygonCollection::toCSV() const {

@@ -76,7 +76,7 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPointCollection(co
 		auto header = parser.readHeaders();
 		//TODO: distinguish between double and string properties
 		for(int i=2; i < header.size(); i++){
-			points_out->local_md_string.addVector(header[i]);
+			points_out->local_md_string.addEmptyVector(header[i]);
 		}
 
 		while(true){

@@ -279,13 +279,13 @@ namespace ***REMOVED*** {
 			std::string attr = ***REMOVED***::as<std::string>(a[i]);
 			try {
 				***REMOVED***::NumericVector rvec = data[attr];
-				auto vec = points->local_md_value.addVector(attr, size);
+				auto & vec = points->local_md_value.addVector(attr, size);
 				for (size_t i=0;i<size;i++)
 					vec[i] = rvec[i];
 			}
 			catch (const ***REMOVED***::not_compatible &e) {
 				***REMOVED***::StringVector rvec = data[attr];
-				auto vec = points->local_md_string.addVector(attr, size);
+				auto & vec = points->local_md_string.addVector(attr, size);
 				for (size_t i=0;i<size;i++)
 					vec[i] = rvec[i];
 			}

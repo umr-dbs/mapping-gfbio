@@ -25,6 +25,7 @@
 #include <uriparser/Uri.h>
 #include <json/json.h>
 #include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
 #include "datatypes/polygoncollection.h"
 
 #include "pointvisualization/CircleClusteringQuadTree.h"
@@ -139,6 +140,25 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 	return query_params;
 }
 
+/**
+ * This function converts a "datetime"-string in ISO8601 format into a time_t using UTC
+ * @param dateTimeString a string with ISO8601 "datetime"
+ * @returns The time_t representing the "datetime"
+ */
+static time_t parseIso8601DateTime(std::string dateTimeString){
+	const std::string dateTimeFormat{"%Y-%m-%dT%H:%M:%S"}; //TODO: we should allow millisec -> "%Y-%m-%dT%H:%M:%S.SSSZ" std::get_time and the tm struct dont have them.
+
+	//std::stringstream dateTimeStream{dateTimeString}; //TODO: use this with gcc >5.0
+	tm queryDateTime{0};
+	//std::get_time(&queryDateTime, dateTimeFormat); //TODO: use this with gcc >5.0
+	strptime(dateTimeString.c_str(), dateTimeFormat.c_str(), &queryDateTime); //TODO: remove this with gcc >5.0
+	time_t queryTimestamp = timegm(&queryDateTime); //TODO: is there a c++ version for timegm?
+
+	//TODO: parse millisec
+
+	return (queryTimestamp);
+}
+
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
 	auto colorizer = Colorizer::make(colors);
@@ -163,6 +183,11 @@ void outputPointCollection(PointCollection *points, bool displayMetadata = false
 void outputPointCollectionCSV(PointCollection *points) {
 	print_debug_header();
 	printf("Content-type: text/csv\r\nContent-Disposition: attachment; filename=\"export.csv\"\r\n\r\n%s", points->toCSV().c_str());
+}
+
+void outputLineCollection(LineCollection& lineCollection, bool displayMetadata = false){
+	print_debug_header();
+	printf("Content-type: application/json\r\n\r\n%s", lineCollection.toGeoJSON(displayMetadata).c_str());
 }
 
 void outputPolygonCollection(PolygonCollection& polygonCollection, bool displayMetadata = false){
@@ -240,6 +265,7 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg = EPSG_WEBM
 	 * OpenLayers insists on sending latitude in x and longitude in y.
 	 * The MAPPING code (including gdal's projection classes) don't agree: east/west should be in x.
 	 * The simple solution is to swap the x and y coordinates.
+	 * OpenLayers 3 uses the axis orientation of the projection to determine the bbox axis order. https://github.com/openlayers/ol3/blob/master/src/ol/source/imagewmssource.js ~ line 317.
 	 */
 	if (epsg == EPSG_LATLON) {
 		std::swap(bbox[0], bbox[1]);
@@ -432,7 +458,8 @@ int main() {
 		if (!query_string) {
 			//query_string = "geometryquery={\"type\":\"projection\",\"params\":{\"src_epsg\":4326,\"dest_epsg\":3857},\"sources\":{\"geometry\":[{\"type\":\"gfbiogeometrysource\",\"params\":{\"datasource\":\"IUCN\",\"query\":\"{\\\"globalAttributes\\\":{\\\"speciesName\\\":\\\"Puma concolor\\\"},\\\"localAttributes\\\":{}}\"}}]}}&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
 			//query_string = "pointquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22points%22%3A%5B%7B%22type%22%3A%22filterpointsbygeometry%22%2C%22sources%22%3A%7B%22points%22%3A%5B%7B%22type%22%3A%22gfbiopointsource%22%2C%22params%22%3A%7B%22datasource%22%3A%22GBIF%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%2C%22geometry%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
-			//query_string = "geometryquery=%7B%22type%22%3A%22projection%22%2C%22params%22%3A%7B%22src_epsg%22%3A4326%2C%22dest_epsg%22%3A3857%7D%2C%22sources%22%3A%7B%22polygons%22%3A%5B%7B%22type%22%3A%22gfbiogeometrysource%22%2C%22params%22%3A%7B%22datasource%22%3A%22IUCN%22%2C%22query%22%3A%22%7B%5C%22globalAttributes%5C%22%3A%7B%5C%22speciesName%5C%22%3A%5C%22Puma%20concolor%5C%22%7D%2C%5C%22localAttributes%5C%22%3A%7B%7D%7D%22%7D%7D%5D%7D%7D&colors=grey&CRS=EPSG:3857&CRS=EPSG:3857";
+			//query_string = "linequery={\"type\":\"projection\",\"params\":{\"src_epsg\":4326,\"dest_epsg\":3857},\"sources\":{\"lines\":[{\"type\":\"wktlinesource\",\"params\":{\"wkt\":\"GEOMETRYCOLLECTION(LINESTRING (30 10, 10 30, 40 40))\"}}]}}";
+			//query_string = R"DELIM(linequery={"type":"projection","params":{"src_epsg":4326,"dest_epsg":3857},"sources":{"lines":[{"type":"wktlinesource","params":{"wkt":"GEOMETRYCOLLECTION(LINESTRING (30 10, 10 30, 40 40))"}}]}})DELIM";
 			abort("No query string given");
 		}
 
@@ -443,6 +470,9 @@ int main() {
 		time_t timestamp = 1295266500; // 2011-1-17 12:15
 		if (params.count("timestamp") > 0) {
 			timestamp = std::stol(params["timestamp"]);
+		}
+		if (params.count("time") > 0) { //TODO: prefer time over timestamp?
+			timestamp = parseIso8601DateTime(params["time"]);
 		}
 
 		bool debug = Configuration::getBool("global.debug", false);
@@ -487,14 +517,26 @@ int main() {
 			return 0;
 		}
 
-		// Geometry as GeoJSON
-		//TODO migrate to new simplefeaturecollections
-		if (params.count("geometryquery") > 0) {
-			std::string foo = params["geometryquery"];
+		if (params.count("linequery") > 0) {
+			std::string foo = params["linequery"];
 
 			std::cerr << foo;
 
-			auto graph = GenericOperator::fromJSON(params["geometryquery"]);
+			auto graph = GenericOperator::fromJSON(params["linequery"]);
+
+			QueryProfiler profiler;
+			auto geometry = graph->getCachedLineCollection(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+
+			outputLineCollection(*geometry.get(), false);
+			return 0;
+		}
+
+		if (params.count("polygonquery") > 0) {
+			std::string foo = params["polygonquery"];
+
+			std::cerr << foo;
+
+			auto graph = GenericOperator::fromJSON(params["polygonquery"]);
 
 			QueryProfiler profiler;
 			auto geometry = graph->getCachedPolygonCollection(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);

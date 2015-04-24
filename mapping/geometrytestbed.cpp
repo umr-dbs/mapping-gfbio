@@ -63,7 +63,7 @@ void testTwoWay(){
 
 	auto multiPolygonCollection = GeosGeomUtil::createPolygonCollection(*geometry);
 
-	auto geos = GeosGeomUtil::createGeosGeometry(*multiPolygonCollection);
+	auto geos = GeosGeomUtil::createGeosPolygonCollection(*multiPolygonCollection);
 
 	std::cout << multiPolygonCollection->toGeoJSON(false);
 }

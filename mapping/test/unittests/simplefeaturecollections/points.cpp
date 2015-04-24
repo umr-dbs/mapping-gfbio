@@ -76,7 +76,7 @@ TEST(PointCollection, toGeoJSON) {
 TEST(PointCollection, toGeoJSONWithMetadata) {
 	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
 
-	points.local_md_value.addVector("test");
+	points.local_md_value.addEmptyVector("test");
 
 	points.addCoordinate(1,2);
 	points.finishFeature();
@@ -93,7 +93,7 @@ TEST(PointCollection, toGeoJSONWithMetadata) {
 
 TEST(PointCollection, toCSV) {
 	PointCollection points(SpatioTemporalReference::unreferenced());
-	points.local_md_value.addVector("test");
+	points.local_md_value.addEmptyVector("test");
 
 	points.addCoordinate(1,2);
 	points.finishFeature();
@@ -110,7 +110,7 @@ TEST(PointCollection, toCSV) {
 
 TEST(PointCollection, filter) {
 	PointCollection points(SpatioTemporalReference::unreferenced());
-	points.local_md_value.addVector("test");
+	points.local_md_value.addEmptyVector("test");
 
 	points.addCoordinate(1,2);
 	points.finishFeature();

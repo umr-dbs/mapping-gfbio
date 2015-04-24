@@ -32,12 +32,11 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 	out->global_md_value = in->global_md_value;
 
 	// copy features
-	for (size_t featureIndex=0;featureIndex<count;featureIndex++) {
-		if (keep[featureIndex]) {
+	for (auto feature : *in) {
+		if (keep[feature]) {
 			//copy coordinates
-			for(size_t coordinateIndex = in->start_feature[featureIndex]; coordinateIndex < in->start_feature[featureIndex+1]; ++coordinateIndex){
-				Coordinate &p = in->coordinates[coordinateIndex];
-				out->addCoordinate(p.x, p.y);
+			for (auto & c : feature) {
+				out->addCoordinate(c.x, c.y);
 			}
 			out->finishFeature();
 		}
@@ -46,7 +45,7 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 	// copy local MD
 	for (auto &keyValue : in->local_md_string) {
 		const auto &vec_in = in->local_md_string.getVector(keyValue.first);
-		auto &vec_out = out->local_md_string.addVector(keyValue.first, kept_count);
+		auto &vec_out = out->local_md_string.addEmptyVector(keyValue.first, kept_count);
 		for (size_t idx=0;idx<count;idx++) {
 			if (keep[idx])
 				vec_out.push_back(vec_in[idx]);
@@ -55,7 +54,7 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 
 	for (auto &keyValue : in->local_md_value) {
 		const auto &vec_in = in->local_md_value.getVector(keyValue.first);
-		auto &vec_out = out->local_md_value.addVector(keyValue.first, kept_count);
+		auto &vec_out = out->local_md_value.addEmptyVector(keyValue.first, kept_count);
 		for (size_t idx=0;idx<count;idx++) {
 			if (keep[idx])
 				vec_out.push_back(vec_in[idx]);
@@ -216,18 +215,17 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 	auto value_keys = local_md_value.getKeys();
 	auto string_keys = local_md_string.getKeys();
 	bool isSimpleCollection = isSimple();
-	for (size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex) {
+	for (auto feature : *this) {
 		if(isSimpleCollection){
 			//all features are single points
-			const Coordinate &p = coordinates[featureIndex];
-			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << p.x << "," << p.y << "]}";
+			const Coordinate &c = *(feature.begin());
+			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << c.x << "," << c.y << "]}";
 		}
 		else {
 			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPoint\",\"coordinates\":[";
 
-			for(size_t coordinateIndex = start_feature[featureIndex]; coordinateIndex < start_feature[featureIndex+1]; ++coordinateIndex){
-				const Coordinate &p = coordinates[coordinateIndex];
-				json << "[" << p.x << "," << p.y << "],";
+			for (auto &c : feature) {
+				json << "[" << c.x << "," << c.y << "],";
 			}
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
 
@@ -238,11 +236,11 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 			json << ",\"properties\":{";
 
 			for (auto &key : string_keys) {
-				json << "\"" << key << "\":\"" << local_md_string.get(featureIndex, key) << "\",";
+				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
 			}
 
 			for (auto &key : value_keys) {
-				double value = local_md_value.get(featureIndex, key);
+				double value = local_md_value.get(feature, key);
 				json << "\"" << key << "\":";
 				if (std::isfinite(value)) {
 					json << value;
@@ -255,7 +253,7 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 			}
 
 			if (has_time) {
-				json << "\"time\":" << timestamps[featureIndex] << ",";
+				json << "\"time\":" << timestamps[feature] << ",";
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,

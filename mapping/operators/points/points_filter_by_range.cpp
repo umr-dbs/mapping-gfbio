@@ -1,3 +1,7 @@
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
+
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
@@ -5,14 +9,16 @@
 #include <json/json.h>
 #include <limits>
 #include <cmath>
-#include "datatypes/pointcollection.h"
 
-class PointsFilterByRangeOperator: public GenericOperator {
+
+class FilterFeaturesByRangeOperator: public GenericOperator {
 	public:
-		PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
-		virtual ~PointsFilterByRangeOperator();
+		FilterFeaturesByRangeOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
+		virtual ~FilterFeaturesByRangeOperator();
 
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -23,45 +29,71 @@ class PointsFilterByRangeOperator: public GenericOperator {
 		double rangeMin, rangeMax;
 	};
 
-PointsFilterByRangeOperator::PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
+FilterFeaturesByRangeOperator::FilterFeaturesByRangeOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
-	name = params.get("name", "raster").asString();
+	name = params.get("name", "").asString();
 	includeNoData = params.get("includeNoData", false).asBool();
 	rangeMin = params.get("rangeMin", std::numeric_limits<double>::min()).asDouble();
 	rangeMax = params.get("rangeMax", std::numeric_limits<double>::max()).asDouble();
 }
 
-PointsFilterByRangeOperator::~PointsFilterByRangeOperator() {
+FilterFeaturesByRangeOperator::~FilterFeaturesByRangeOperator() {
 }
-REGISTER_OPERATOR(PointsFilterByRangeOperator, "points_filter_by_range");
+REGISTER_OPERATOR(FilterFeaturesByRangeOperator, "features_filter_by_range");
 
-void PointsFilterByRangeOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"attributeName\":\"" << name << "\","
+void FilterFeaturesByRangeOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"name\":\"" << name << "\","
 			<< "\"includeNoData\":" << includeNoData
 			<< "\"rangeMin\"" << rangeMin
 			<< "\"rangeMax\"" << rangeMax;
 }
 
-std::unique_ptr<PointCollection> PointsFilterByRangeOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointCollectionFromSource(0, rect, profiler);
-
-	size_t count = points->getFeatureCount();
+std::vector<bool> filter(const SimpleFeatureCollection &collection, const std::string &name, double min, double max, bool keepNAN) {
+	size_t count = collection.getFeatureCount();
 	std::vector<bool> keep(count, false);
 
-	for (size_t featureIndex=0;featureIndex<count;featureIndex++) {
-		double value = points->local_md_value.get(featureIndex, name);
+	auto &attributes = collection.local_md_value.getVector(name);
+
+	for (size_t i=0;i<count;i++) {
+		double value = attributes[i];
 		bool copy = false;
 
 		if (std::isnan(value)) {
-			copy = includeNoData;
+			copy = keepNAN;
 		}
 		else {
-			copy = (value >= rangeMin && value <= rangeMax);
+			copy = (value >= min && value <= max);
 		}
 
-		keep[featureIndex] = copy;
+		keep[i] = copy;
 	}
 
+	return keep;
+}
+
+std::unique_ptr<PointCollection> FilterFeaturesByRangeOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points = getPointCollectionFromSource(0, rect, profiler);
+	auto keep = filter(*points, name, rangeMin, rangeMax, includeNoData);
 	return points->filter(keep);
 }
+
+std::unique_ptr<LineCollection> FilterFeaturesByRangeOperator::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto lines = getLineCollectionFromSource(0, rect, profiler);
+	auto keep = filter(*lines, name, rangeMin, rangeMax, includeNoData);
+	return lines->filter(keep);
+}
+std::unique_ptr<PolygonCollection> FilterFeaturesByRangeOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto polys = getPolygonCollectionFromSource(0, rect, profiler);
+	auto keep = filter(*polys, name, rangeMin, rangeMax, includeNoData);
+	return polys->filter(keep);
+}
+
+
+
+// obsolete, keep for backwards compatibility for a while
+class PointsFilterByRangeOperator : public FilterFeaturesByRangeOperator {
+	public:
+		PointsFilterByRangeOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : FilterFeaturesByRangeOperator(sourcecounts, sources, params) {}
+};
+REGISTER_OPERATOR(PointsFilterByRangeOperator, "points_filter_by_range");

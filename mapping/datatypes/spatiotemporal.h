@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cmath>
+#include <string>
 
 /*
  * Coordinate systems for space, mapping an x/y coordinate to a place on earth.
@@ -14,6 +15,13 @@ enum epsg_t : uint16_t {
 	EPSG_WEBMERCATOR = 3857, // 3785 is deprecated
 	EPSG_LATLON = 4326 // http://spatialreference.org/ref/epsg/wgs-84/
 };
+
+/**
+ * This function parses the ID of an EPSG-spatial reference system
+ * @param srsString The string containing the SRS as 'AUTHORITY:ID'
+ * @param def The default value to return if srsString is empty -> ""
+ */
+epsg_t epsgCodeFromSrsString(const std::string &srsString, epsg_t def = EPSG_WEBMERCATOR);
 
 /*
  * Coordinate systems for time, mapping a t value to a time.

@@ -44,8 +44,8 @@ class MeteosatLatLongOperator : public GenericOperator {
 
 
 ProjectionOperator::ProjectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
-	src_epsg = (epsg_t) params.get("src_epsg", EPSG_UNKNOWN).asInt();
-	dest_epsg = (epsg_t) params.get("dest_epsg", EPSG_UNKNOWN).asInt();
+	src_epsg = epsgCodeFromSrsString(params["src_projection"].asString(), EPSG_UNKNOWN);
+	dest_epsg = epsgCodeFromSrsString(params["dest_projection"].asString(), EPSG_UNKNOWN);
 	if (src_epsg == EPSG_UNKNOWN || dest_epsg == EPSG_UNKNOWN)
 		throw OperatorException("Unknown EPSG");
 	assumeSources(1);

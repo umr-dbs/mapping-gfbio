@@ -98,3 +98,13 @@ void SpatioTemporalReference::validate() const {
 void SpatioTemporalResult::replaceSTRef(const SpatioTemporalReference &newstref) {
 	const_cast<SpatioTemporalReference&>(this->stref) = newstref;
 }
+
+epsg_t epsgCodeFromSrsString(const std::string &srsString, epsg_t def) {
+	if (srsString == "")
+		return def;
+	if (srsString.compare(0,5,"EPSG:") == 0)
+		return (epsg_t) std::stoi(srsString.substr(5, std::string::npos));
+	throw ArgumentException("Unknown CRS specified");
+}
+
+

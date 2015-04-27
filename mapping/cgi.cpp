@@ -428,18 +428,10 @@ int processWCS(std::map<std::string, std::string> &params) {
 	return 1;
 }
 
-epsg_t epsg_from_param(const std::string &crs, epsg_t def = EPSG_WEBMERCATOR) {
-	if (crs == "")
-		return def;
-	if (crs.compare(0,5,"EPSG:") == 0)
-		return (epsg_t) std::stoi(crs.substr(5, std::string::npos));
-	throw ArgumentException("Unknown CRS specified");
-}
-
-epsg_t epsg_from_param(const std::map<std::string, std::string> &params, const std::string &key, epsg_t def = EPSG_WEBMERCATOR) {
+epsg_t epsg_from_param(const std::map<std::string, std::string> &params, const std::string &key, epsg_t def = EPSG_WEBMERCATOR) { //TODO: rename epsg to spatialRefrenceSystem
 	if (params.count(key) < 1)
 		return def;
-	return epsg_from_param(params.at(key), def);
+	return epsgCodeFromSrsString(params.at(key), def);
 }
 
 

@@ -35,14 +35,18 @@ class Coordinate {
  */
 class SimpleFeatureCollection : public SpatioTemporalResult {
 public:
-	SimpleFeatureCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref), has_time(false) {}
+	SimpleFeatureCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref) {}
 
 	virtual ~SimpleFeatureCollection() {}
 
 	std::vector<Coordinate> coordinates;
 
-	// Attributes
-	std::vector<time_t> timestamps;
+	// Timestamps
+	std::vector<time_t> time_start;
+	std::vector<time_t> time_end;
+	bool hasTime() const;
+	void addDefaultTimestamps();
+	void addDefaultTimestamps(double min, double max);
 
 	// global MetaData (one value per SimpleFeatureCollection)
 	const std::string &getGlobalMDString(const std::string &key) const;
@@ -61,8 +65,6 @@ public:
 	// local MetaData (one value per feature)
 	MetadataArrays<std::string> local_md_string;
 	MetadataArrays<double> local_md_value;
-
-	bool has_time;
 
 	// Export
 	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;

@@ -106,7 +106,7 @@ static void enhance(PointCollection &points, GenericRaster &raster, const std::s
 std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points = getPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
 
-	if (points->has_time) {
+	if (points->hasTime()) {
 		// TODO: sort by time, iterate over all timestamps, fetch the correct raster, then add metadata
 		throw OperatorException("raster_metadata_to_points: Cannot yet handle PointCollections with timestamps");
 	}

@@ -2,8 +2,8 @@
 #define DATATYPES_POLYGONCOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
+#include <memory>
 
-class PointFeatureReference;
 
 /**
  * This collection contains Polygon-Features. Each Feature consists of one or more polygons.
@@ -57,6 +57,9 @@ public:
 	size_t finishPolygon();
 	//finishes the definition of the new feature, returns new feature index
 	size_t finishFeature();
+
+	std::unique_ptr<PolygonCollection> filter(const std::vector<bool> &keep) { throw 1; } // TODO: implement
+	std::unique_ptr<PolygonCollection> filter(const std::vector<char> &keep) { throw 1; }
 
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;

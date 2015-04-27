@@ -22,6 +22,7 @@ class ProjectionOperator : public GenericOperator {
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 	protected:
 		void writeSemanticParameters(std::ostringstream &stream);
@@ -328,6 +329,36 @@ class ProjectionTransformer: public geos::geom::util::GeometryTransformer {
 		const GDAL::CRSTransformer &transformer;
 };
 
+std::unique_ptr<LineCollection> ProjectionOperator::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	if (src_epsg == EPSG_GEOSMSG || dest_epsg == EPSG_GEOSMSG)
+		throw OperatorException("Projection: cannot transform Geometries to or from MSAT2 projection");
+	if (dest_epsg != rect.epsg)
+		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
+
+	GDAL::CRSTransformer qrect_transformer(dest_epsg, src_epsg);
+	QueryRectangle src_rect = projectQueryRectangle(rect, qrect_transformer);
+
+	//TODO: reproject without GEOS workaround
+
+	auto lineCollection = getLineCollectionFromSource(0, src_rect, profiler);
+
+	auto geom_in = GeosGeomUtil::createGeosLineCollection(*lineCollection);
+
+	if (src_epsg != lineCollection->stref.epsg) {
+		std::ostringstream msg;
+		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << (int) src_epsg << " got " << (int) lineCollection->stref.epsg;
+		throw OperatorException(msg.str());
+	}
+
+	GDAL::CRSTransformer geom_transformer(src_epsg, dest_epsg);
+	ProjectionTransformer pt(geom_transformer);
+	auto geom_out = pt.transform(geom_in.get());
+
+	//restore metadata
+
+	return 	GeosGeomUtil::createLineCollection(*geom_out.get());
+}
+
 //TODO: why is this in raster folder?
 std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (src_epsg == EPSG_GEOSMSG || dest_epsg == EPSG_GEOSMSG)
@@ -342,7 +373,7 @@ std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(cons
 
 	auto polygonCollection = getPolygonCollectionFromSource(0, src_rect, profiler);
 
-	auto geom_in = GeosGeomUtil::createGeosGeometry(*polygonCollection);
+	auto geom_in = GeosGeomUtil::createGeosPolygonCollection(*polygonCollection);
 
 	if (src_epsg != polygonCollection->stref.epsg) {
 		std::ostringstream msg;
@@ -354,12 +385,10 @@ std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(cons
 	ProjectionTransformer pt(geom_transformer);
 	auto geom_out = pt.transform(geom_in.get());
 
+	//TODO: restore metadata
 
 	return 	GeosGeomUtil::createPolygonCollection(*geom_out.get());
 }
-
-
-
 
 #if 0
 template<typename T>

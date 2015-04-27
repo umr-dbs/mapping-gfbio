@@ -50,7 +50,7 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPointCollection(cons
 
 	auto multiPolygons = getPolygonCollectionFromSource(0, rect, profiler, FeatureCollectionQM::ANY_FEATURE);
 
-	auto geometry = GeosGeomUtil::createGeosGeometry(*multiPolygons);
+	auto geometry = GeosGeomUtil::createGeosPolygonCollection(*multiPolygons);
 	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 
 	size_t points_count = points->getFeatureCount();

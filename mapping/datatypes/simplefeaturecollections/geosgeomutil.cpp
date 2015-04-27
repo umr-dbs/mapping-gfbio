@@ -6,6 +6,7 @@
 #include <geos/geom/Point.h>
 #include <geos/geom/LineString.h>
 #include <geos/geom/LinearRing.h>
+#include <geos/geom/MultiLineString.h>
 #include "util/make_unique.h"
 #include "raster/exceptions.h"
 
@@ -34,6 +35,114 @@ int GeosGeomUtil::resolveMappingEPSG(epsg_t epsg){
 		case EPSG_WEBMERCATOR: return 3857;
 		default: return 0;
 	}
+}
+
+
+std::unique_ptr<PointCollection> GeosGeomUtil::createPointCollection(const geos::geom::Geometry& geometry){
+	if(geometry.getGeometryTypeId() != geos::geom::GeometryTypeId::GEOS_GEOMETRYCOLLECTION){
+		throw ConverterException("GEOS Geometry is not a geometry collection");
+	}
+
+	std::unique_ptr<PointCollection> pointCollection = std::make_unique<PointCollection>(SpatioTemporalReference(resolveGeosSRID(geometry.getSRID()), timetype_t::TIMETYPE_UNKNOWN));
+
+	for(size_t i=0; i  < geometry.getNumGeometries(); ++i){
+
+		if(geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_POINT){
+			auto& coordinate = *geometry.getGeometryN(i)->getCoordinate();
+			pointCollection->addSinglePointFeature(Coordinate(coordinate.x, coordinate.y));
+		}
+		else if (geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_MULTIPOINT){
+			const geos::geom::Geometry& multiPoint = *geometry.getGeometryN(i);
+			for(size_t pointIndex = 0; pointIndex < multiPoint.getNumGeometries(); ++pointIndex){
+				auto& coordinate = *multiPoint.getGeometryN(i)->getCoordinate();
+				pointCollection->addCoordinate(coordinate.x, coordinate.y);
+			}
+			pointCollection->finishFeature();
+		}
+		else {
+			throw ConverterException("GEOS GeometryCollection contains non point element");
+		}
+	}
+
+	return pointCollection;
+}
+
+std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosPointCollection(const PointCollection& pointCollection){
+	//TODO: implement
+	throw FeatureException("Conversion not yet implemented");
+}
+
+std::unique_ptr<LineCollection> GeosGeomUtil::createLineCollection(const geos::geom::Geometry& geometry){
+	if(geometry.getGeometryTypeId() != geos::geom::GeometryTypeId::GEOS_GEOMETRYCOLLECTION){
+		throw ConverterException("GEOS Geometry is not a geometry collection");
+	}
+
+	std::unique_ptr<LineCollection> lineCollection = std::make_unique<LineCollection>(SpatioTemporalReference(resolveGeosSRID(geometry.getSRID()), timetype_t::TIMETYPE_UNKNOWN));
+
+	for(size_t i=0; i < geometry.getNumGeometries(); ++i){
+
+		if(geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_LINESTRING){
+			const geos::geom::Geometry& lineString = *geometry.getGeometryN(i);
+			const auto& coordinates = lineString.getCoordinates();
+			for(size_t coordinateIndex = 0; coordinateIndex < coordinates->size(); ++coordinateIndex){
+				lineCollection->addCoordinate(coordinates->getX(coordinateIndex), coordinates->getY(coordinateIndex));
+			}
+			lineCollection->finishLine();
+			lineCollection->finishFeature();
+		}
+		else if (geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_MULTILINESTRING){
+			const geos::geom::Geometry& multiLineString = *geometry.getGeometryN(i);
+
+			for(size_t lineIndex = 0; lineIndex < multiLineString.getNumGeometries(); ++lineIndex){
+				const geos::geom::Geometry& lineString = *multiLineString.getGeometryN(lineIndex);
+				const auto& coordinates = lineString.getCoordinates();
+				for(size_t coordinateIndex = 0; coordinateIndex < coordinates->size(); ++coordinateIndex){
+					lineCollection->addCoordinate(coordinates->getX(coordinateIndex), coordinates->getY(coordinateIndex));
+				}
+				lineCollection->finishLine();
+			}
+			lineCollection->finishFeature();
+		}
+		else {
+			throw ConverterException("GEOS GeometryCollection contains non point element");
+		}
+	}
+
+	return lineCollection;
+}
+
+std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosLineCollection(const LineCollection& lineCollection){
+
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+
+	std::unique_ptr<std::vector<geos::geom::Geometry*>> multiLines(new std::vector<geos::geom::Geometry*>);
+
+	for(size_t featureIndex = 0; featureIndex < lineCollection.getFeatureCount(); ++featureIndex){
+		std::unique_ptr<std::vector<geos::geom::Geometry*>> lines(new std::vector<geos::geom::Geometry*>);
+
+		for(size_t lineIndex = lineCollection.start_feature[featureIndex]; lineIndex < lineCollection.start_feature[featureIndex + 1]; ++lineIndex){
+
+			std::unique_ptr<std::vector<geos::geom::Coordinate>> coordinates (new std::vector<geos::geom::Coordinate>);
+			for(size_t pointsIndex = lineCollection.start_line[lineIndex]; pointsIndex < lineCollection.start_line[lineIndex + 1]; ++pointsIndex){
+				const Coordinate& point = lineCollection.coordinates[pointsIndex];
+				coordinates->push_back(geos::geom::Coordinate(point.x, point.y));
+			}
+
+			const geos::geom::CoordinateSequenceFactory* csf = geos::geom::CoordinateArraySequenceFactory::instance();
+			geos::geom::CoordinateSequence* coordinateSequence = csf->create(coordinates.release());
+
+			lines->push_back(gf->createLineString(coordinateSequence));
+		}
+
+		multiLines->push_back(gf->createMultiLineString(lines.release()));
+	}
+
+	std::unique_ptr<geos::geom::Geometry> collection (gf->createGeometryCollection(multiLines.release()));
+
+	//do this beforehand?
+	collection->setSRID(resolveMappingEPSG(lineCollection.stref.epsg));
+
+	return collection;
 }
 
 //construct PolygonCollection as we currently need it for GFBioWS,
@@ -116,7 +225,7 @@ std::unique_ptr<PolygonCollection> GeosGeomUtil::createPolygonCollection(const g
 }
 
 //for now always create collection of multipolygons
-std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosGeometry(const PolygonCollection& polygonCollection){
+std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosPolygonCollection(const PolygonCollection& polygonCollection){
 
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 

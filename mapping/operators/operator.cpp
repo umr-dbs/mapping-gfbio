@@ -197,7 +197,7 @@ std::unique_ptr<PointCollection> GenericOperator::getPointCollection(const Query
 	throw OperatorException("getPointCollection() called on an operator that doesn't return points");
 }
 std::unique_ptr<LineCollection> GenericOperator::getLineCollection(const QueryRectangle &, QueryProfiler &) {
-	throw OperatorException("getPolygonCollection() called on an operator that doesn't return lines");
+	throw OperatorException("getLineCollection() called on an operator that doesn't return lines");
 }
 std::unique_ptr<PolygonCollection> GenericOperator::getPolygonCollection(const QueryRectangle &, QueryProfiler &) {
 	throw OperatorException("getPolygonCollection() called on an operator that doesn't return polygons");

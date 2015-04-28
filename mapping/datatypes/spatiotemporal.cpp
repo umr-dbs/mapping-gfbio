@@ -8,27 +8,25 @@
 #include <limits>
 #include <sstream>
 
-
-SpatioTemporalReference::SpatioTemporalReference(epsg_t epsg, timetype_t timetype) : epsg(epsg), timetype(timetype) {
+/**
+ * SpatialReference
+ */
+SpatialReference::SpatialReference(epsg_t epsg) : epsg(epsg) {
 	x1 = -std::numeric_limits<double>::infinity();
 	y1 = -std::numeric_limits<double>::infinity();
 	x2 = std::numeric_limits<double>::infinity();
 	y2 = std::numeric_limits<double>::infinity();
 
-	t1 = -std::numeric_limits<double>::infinity();
-	t2 = std::numeric_limits<double>::infinity();
-
 	validate();
 };
 
-
-SpatioTemporalReference::SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, timetype_t timetype, double t1, double t2)
-	: epsg(epsg), timetype(timetype), x1(x1), y1(y1), x2(x2), y2(y2), t1(t1), t2(t2) {
+SpatialReference::SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2)
+	: epsg(epsg), x1(x1), y1(y1), x2(x2), y2(y2) {
 	validate();
 };
 
-SpatioTemporalReference::SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy, timetype_t time, double t1, double t2)
-	: epsg(epsg), timetype(timetype), x1(x1), y1(y1), x2(x2), y2(y2), t1(t1), t2(t2) {
+SpatialReference::SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy)
+	: epsg(epsg), x1(x1), y1(y1), x2(x2), y2(y2) {
 	flipx = flipy = false;
 	if (x1 > x2) {
 		flipx = true;
@@ -41,7 +39,7 @@ SpatioTemporalReference::SpatioTemporalReference(epsg_t epsg, double x1, double 
 	validate();
 }
 
-SpatioTemporalReference::SpatioTemporalReference(const QueryRectangle &rect) {
+SpatialReference::SpatialReference(const QueryRectangle &rect) {
 	x1 = std::min(rect.x1, rect.x2);
 	x2 = std::max(rect.x1, rect.x2);
 
@@ -50,6 +48,58 @@ SpatioTemporalReference::SpatioTemporalReference(const QueryRectangle &rect) {
 
 	epsg = rect.epsg;
 
+	validate();
+};
+
+SpatialReference::SpatialReference(BinaryStream &stream) {
+	uint32_t uint;
+	stream.read(&uint);
+	epsg = (epsg_t) uint;
+
+	stream.read(&x1);
+	stream.read(&y1);
+	stream.read(&x2);
+	stream.read(&y2);
+
+	validate();
+}
+
+void SpatialReference::toStream(BinaryStream &stream) const {
+	stream.write((uint32_t) epsg);
+	stream.write(x1);
+	stream.write(y1);
+	stream.write(x2);
+	stream.write(y2);
+}
+
+
+void SpatialReference::validate() const {
+	if (x1 > x2 || y1 > y2) {
+		std::stringstream msg;
+		msg << "SpatialReference invalid, requires x1:" << x1 << " <= x2:" << x2 << ", y1:" << y1 << " <= y2:" << y2;
+		throw ArgumentException(msg.str());
+	}
+}
+
+
+/**
+ * TemporalReference
+ */
+
+TemporalReference::TemporalReference(timetype_t timetype) : timetype(timetype) {
+	t1 = -std::numeric_limits<double>::infinity();
+	t2 = std::numeric_limits<double>::infinity();
+
+	validate();
+};
+
+
+TemporalReference::TemporalReference(timetype_t timetype, double t1, double t2)
+	: timetype(timetype), t1(t1), t2(t2) {
+	validate();
+};
+
+TemporalReference::TemporalReference(const QueryRectangle &rect) {
 	t1 = rect.timestamp;
 	t2 = t1;
 	timetype = TIMETYPE_UNIX;
@@ -57,48 +107,59 @@ SpatioTemporalReference::SpatioTemporalReference(const QueryRectangle &rect) {
 	validate();
 };
 
-SpatioTemporalReference::SpatioTemporalReference(BinaryStream &stream) {
+TemporalReference::TemporalReference(BinaryStream &stream) {
 	uint32_t uint;
-	stream.read(&uint);
-	epsg = (epsg_t) uint;
 	stream.read(&uint);
 	timetype = (timetype_t) uint;
 
-	stream.read(&x1);
-	stream.read(&y1);
-	stream.read(&x2);
-	stream.read(&y2);
 	stream.read(&t1);
 	stream.read(&t2);
 
 	validate();
 }
 
-void SpatioTemporalReference::toStream(BinaryStream &stream) const {
-	stream.write((uint32_t) epsg);
+void TemporalReference::toStream(BinaryStream &stream) const {
 	stream.write((uint32_t) timetype);
-	stream.write(x1);
-	stream.write(y1);
-	stream.write(x2);
-	stream.write(y2);
 	stream.write(t1);
 	stream.write(t2);
 }
 
 
-void SpatioTemporalReference::validate() const {
-	if (x1 > x2 || y1 > y2 || t1 > t2) {
+void TemporalReference::validate() const {
+	if (t1 > t2) {
 		std::stringstream msg;
-		msg << "SpatioTemporalReference invalid, requires x1:" << x1 << " <= x2:" << x2 << ", y1:" << y1 << " <= y2:" << y2 << " and t1:" << t1 << " <= t2:" << t2;
+		msg << "TemporalReference invalid, requires t1:" << t1 << " <= t2:" << t2;
 		throw ArgumentException(msg.str());
 	}
 }
 
 
+/**
+ * SpatioTemporalReference
+ */
+SpatioTemporalReference::SpatioTemporalReference(BinaryStream &stream) : SpatialReference(stream), TemporalReference(stream) {
+}
+
+void SpatioTemporalReference::toStream(BinaryStream &stream) const {
+	SpatialReference::toStream(stream);
+	TemporalReference::toStream(stream);
+}
+
+void SpatioTemporalReference::validate() const {
+	SpatialReference::validate();
+	TemporalReference::validate();
+}
+
+/**
+ * SpatioTemporalResult
+ */
 void SpatioTemporalResult::replaceSTRef(const SpatioTemporalReference &newstref) {
 	const_cast<SpatioTemporalReference&>(this->stref) = newstref;
 }
 
+/**
+ * helper functions
+ */
 epsg_t epsgCodeFromSrsString(const std::string &srsString, epsg_t def) {
 	if (srsString == "")
 		return def;

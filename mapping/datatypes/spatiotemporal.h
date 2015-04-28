@@ -35,6 +35,101 @@ enum timetype_t : uint16_t {
 class QueryRectangle;
 class BinaryStream;
 
+class SpatialReference {
+	public:
+		/*
+		 * No default constructor.
+		 */
+		SpatialReference() = delete;
+		/**
+		 * Construct a reference that spans the known universe.
+		 * The actual endpoints are taken from the epsg_t t when known;
+		 * if in doubt they're set to +- Infinity.
+		 */
+		SpatialReference(epsg_t epsg);
+		/*
+		 * Constructs a reference with all values
+		 */
+		SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2);
+		/*
+		 * Constructs a reference with all values, but flips the endpoints if required
+		 */
+		SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy);
+		/*
+		 * Constructs a reference from a QueryRectangle
+		 */
+		SpatialReference(const QueryRectangle &rect);
+		/*
+		 * Read a SpatialReference from a stream
+		 */
+		SpatialReference(BinaryStream &stream);
+		/*
+		 * Write to a binary stream
+		 */
+		void toStream(BinaryStream &stream) const;
+		/*
+		 * Validate if all invariants are met
+		 */
+		void validate() const;
+
+		/*
+		 * Named constructor for returning a reference that returns a valid reference which does not reference any
+		 * point in space.
+		 * This shall be used to instantiate rasters etc without an actual geo-reference.
+		 */
+		static SpatialReference unreferenced() {
+			return SpatialReference(EPSG_UNREFERENCED, 0.0, 0.0, 1.0, 1.0);
+		}
+		// TODO: split into crs_authority_t / crs_code_t
+		epsg_t epsg;
+		double x1, y1, x2, y2;
+};
+
+class TemporalReference {
+	public:
+		/*
+		 * No default constructor.
+		 */
+		TemporalReference() = delete;
+		/**
+		 * Construct a reference that spans the known universe in time.
+		 * The actual endpoints are taken from the timetype_t when known;
+		 * if in doubt they're set to +- Infinity.
+		 */
+		TemporalReference(timetype_t timetype);
+		/*
+		 * Constructs a reference with all values
+		 */
+		TemporalReference(timetype_t time, double t1, double t2);
+		/*
+		 * Constructs a reference from a QueryRectangle
+		 */
+		TemporalReference(const QueryRectangle &rect);
+		/*
+		 * Read a TemporalReference from a stream
+		 */
+		TemporalReference(BinaryStream &stream);
+		/*
+		 * Write to a binary stream
+		 */
+		void toStream(BinaryStream &stream) const;
+		/*
+		 * Validate if all invariants are met
+		 */
+		void validate() const;
+
+		/*
+		 * Named constructor for returning a reference that returns a valid reference which does not reference any
+		 * point in time.
+		 * This shall be used to instantiate rasters etc without an actual geo-reference.
+		 */
+		static TemporalReference unreferenced() {
+			return TemporalReference(TIMETYPE_UNREFERENCED, 0.0, 1.0);
+		}
+		timetype_t timetype;
+		double t1, t2;
+};
+
 /**
  * This class models a rectangle in space and an interval in time as a 3-dimensional cube.
  *
@@ -49,7 +144,7 @@ class BinaryStream;
  *
  * The default constructor will create an invalid reference.
  */
-class SpatioTemporalReference {
+class SpatioTemporalReference : public SpatialReference, public TemporalReference {
 	public:
 		/*
 		 * No default constructor.
@@ -60,19 +155,23 @@ class SpatioTemporalReference {
 		 * The actual endpoints are taken from the epsg_t or timetype_t when known;
 		 * if in doubt they're set to +- Infinity.
 		 */
-		SpatioTemporalReference(epsg_t epsg, timetype_t timetype);
+		SpatioTemporalReference(epsg_t epsg, timetype_t timetype)
+			: SpatialReference(epsg), TemporalReference(timetype) {};
 		/*
 		 * Constructs a reference with all values
 		 */
-		SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, timetype_t time, double t1, double t2);
+		SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, timetype_t timetype, double t1, double t2)
+			: SpatialReference(epsg, x1, y1, x2, y2), TemporalReference(timetype, t1, t2) {};
 		/*
 		 * Constructs a reference with all values, but flips the endpoints if required
 		 */
-		SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy, timetype_t time, double t1, double t2);
+		SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2)
+			: SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy), TemporalReference(timetype, t1, t2) {};
 		/*
 		 * Constructs a reference from a QueryRectangle
 		 */
-		SpatioTemporalReference(const QueryRectangle &rect);
+		SpatioTemporalReference(const QueryRectangle &rect)
+			: SpatialReference(rect), TemporalReference(rect) {};
 		/*
 		 * Read a SpatioTemporalReference from a stream
 		 */
@@ -94,11 +193,6 @@ class SpatioTemporalReference {
 		static SpatioTemporalReference unreferenced() {
 			return SpatioTemporalReference(EPSG_UNREFERENCED, 0.0, 0.0, 1.0, 1.0, TIMETYPE_UNREFERENCED, 0.0, 1.0);
 		}
-
-		epsg_t epsg;
-		timetype_t timetype;
-		double x1, y1, x2, y2;
-		double t1, t2;
 };
 
 /**

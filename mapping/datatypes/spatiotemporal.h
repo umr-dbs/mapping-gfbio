@@ -117,6 +117,10 @@ class TemporalReference {
 		 * Validate if all invariants are met
 		 */
 		void validate() const;
+		/*
+		 * Sets this reference to the intersection of the two references.
+		 */
+		void intersect(const TemporalReference &other);
 
 		/*
 		 * Named constructor for returning a reference that returns a valid reference which does not reference any
@@ -167,6 +171,11 @@ class SpatioTemporalReference : public SpatialReference, public TemporalReferenc
 		 */
 		SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2)
 			: SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy), TemporalReference(timetype, t1, t2) {};
+		/*
+		 * Constructs a reference from a SpatialReference and a TemporalReference
+		 */
+		SpatioTemporalReference(const SpatialReference &sref, const TemporalReference &tref)
+			: SpatialReference(sref), TemporalReference(tref) {};
 		/*
 		 * Constructs a reference from a QueryRectangle
 		 */

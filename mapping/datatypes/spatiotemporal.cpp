@@ -8,6 +8,8 @@
 #include <limits>
 #include <sstream>
 
+
+
 /**
  * SpatialReference
  */
@@ -131,6 +133,17 @@ void TemporalReference::validate() const {
 		msg << "TemporalReference invalid, requires t1:" << t1 << " <= t2:" << t2;
 		throw ArgumentException(msg.str());
 	}
+}
+
+
+void TemporalReference::intersect(const TemporalReference &other) {
+	if (timetype != other.timetype)
+		throw ArgumentException("Cannot intersect() TemporalReferences with different timetype");
+
+	t1 = std::max(t1, other.t1);
+	t2 = std::min(t2, other.t2);
+	if (t1 > t2)
+		throw ArgumentException("intersect(): both TemporalReferences do not intersect");
 }
 
 

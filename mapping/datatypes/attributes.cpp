@@ -3,6 +3,7 @@
 #include "datatypes/attributes.h"
 #include "util/binarystream.h"
 
+#include <limits>
 
 /*
  * DirectMetadata
@@ -110,11 +111,24 @@ const T &MetadataArrays<T>::get(size_t idx, const std::string &key, const T &def
 	}
 }
 
+template<typename T> struct defaultvalue {
+};
+
+template <> struct defaultvalue<double> {
+	static const double value;
+};
+const double defaultvalue<double>::value = std::numeric_limits<double>::quiet_NaN();
+
+template <> struct defaultvalue<std::string> {
+	static const std::string value;
+};
+const std::string defaultvalue<std::string>::value = "";
+
 template<typename T>
 std::vector<T> &MetadataArrays<T>::addVector(const std::string &key, size_t capacity) {
 	if (data.count(key) > 0)
 		throw MetadataException("Metadata with key "+key+" already exists");
-	data[key] = std::vector<T>(capacity);
+	data[key] = std::vector<T>(capacity, defaultvalue<T>::value);
 	return data.at(key);
 }
 template<typename T>

@@ -141,10 +141,8 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 					auto rasterCoordinateY = raster->WorldToPixelY(c.y);
 					if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->width && rasterCoordinateY < raster->height) {
 						double value = raster->getAsDouble(rasterCoordinateX, rasterCoordinateY);
-						if (!raster->dd.is_no_data(value)) {
-							printf("Setting %lu to %f from raster %f -> %f\n", featureidx, value, raster->stref.t1, raster->stref.t2);
+						if (!raster->dd.is_no_data(value))
 							attributevector[featureidx] = value;
-						}
 					}
 
 					current_idx++;

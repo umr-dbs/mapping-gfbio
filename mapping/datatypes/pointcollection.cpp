@@ -295,29 +295,23 @@ std::string PointCollection::toCSV() const {
 	}
 	csv << std::endl;
 
-	size_t idx = 0;
-	size_t featureIndex = 0;
-	for (const auto &p : coordinates) {
-		if(!isSimpleCollection){
-			if(idx >= start_feature[featureIndex+1]){
-				++featureIndex;
+	for (auto feature : *this) {
+		for (auto & c : feature) {
+			if(!isSimpleCollection)
+				csv << (size_t) feature << ",";
+			csv << c.x << "," << c.y;
+
+			if (hasTime())
+				csv << "," << time_start[feature] << "," << time_end[feature];
+
+			for(auto &key : string_keys) {
+				csv << ",\"" << local_md_string.get(feature, key) << "\"";
 			}
-			csv << featureIndex << ",";
+			for(auto &key : value_keys) {
+				csv << "," << local_md_value.get(feature, key);
+			}
+			csv << std::endl;
 		}
-		csv << p.x << "," << p.y;
-
-		if (hasTime())
-			csv << "," << time_start[featureIndex] << "," << time_end[featureIndex];
-
-
-		for(auto &key : string_keys) {
-			csv << ",\"" << local_md_string.get(featureIndex, key) << "\"";
-		}
-		for(auto &key : value_keys) {
-			csv << "," << local_md_value.get(featureIndex, key);
-		}
-		csv << std::endl;
-		idx++;
 	}
 
 	return csv.str();

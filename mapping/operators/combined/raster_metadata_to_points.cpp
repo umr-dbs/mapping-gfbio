@@ -131,20 +131,26 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 			while (current_idx < featurecount) {
 				QueryRectangle rect2 = rect;
 				rect2.timestamp = temporal_index[current_idx].second;
-				auto raster = getRasterFromSource(r, rect2, profiler);
-				while (current_idx < featurecount && temporal_index[current_idx].second < raster->stref.t2) {
-					// load point and add
-					auto featureidx = temporal_index[current_idx].first;
-					const auto &c = points->coordinates[featureidx];
+				try {
+					auto raster = getRasterFromSource(r, rect2, profiler);
+					while (current_idx < featurecount && temporal_index[current_idx].second < raster->stref.t2) {
+						// load point and add
+						auto featureidx = temporal_index[current_idx].first;
+						const auto &c = points->coordinates[featureidx];
 
-					auto rasterCoordinateX = raster->WorldToPixelX(c.x);
-					auto rasterCoordinateY = raster->WorldToPixelY(c.y);
-					if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->width && rasterCoordinateY < raster->height) {
-						double value = raster->getAsDouble(rasterCoordinateX, rasterCoordinateY);
-						if (!raster->dd.is_no_data(value))
-							attributevector[featureidx] = value;
+						auto rasterCoordinateX = raster->WorldToPixelX(c.x);
+						auto rasterCoordinateY = raster->WorldToPixelY(c.y);
+						if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->width && rasterCoordinateY < raster->height) {
+							double value = raster->getAsDouble(rasterCoordinateX, rasterCoordinateY);
+							if (!raster->dd.is_no_data(value))
+								attributevector[featureidx] = value;
+						}
+
+						current_idx++;
 					}
-
+				}
+				catch (const SourceException &e) {
+					// no data available, keep it as NaN and continue
 					current_idx++;
 				}
 			}

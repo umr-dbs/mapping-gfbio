@@ -25,3 +25,52 @@ TEST(LineCollection, GeosGeomConversion) {
 
 	EXPECT_EQ(2, geometry->getNumGeometries());
 }
+
+
+TEST(LineCollection, Iterators) {
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	for (int f=0;f<10000;f++) {
+		for (int l=0;l<=f%3;l++) {
+			for (int c=0;c<10;c++)
+				lines.addCoordinate(f+l, c);
+			lines.finishLine();
+		}
+		lines.finishFeature();
+	}
+
+	double res_loop = 0;
+	auto featurecount = lines.getFeatureCount();
+	for (size_t i=0;i<featurecount;i++) {
+		auto startf = lines.start_feature[i];
+		auto endf = lines.start_feature[i+1];
+		for (size_t l = startf; l < endf; l++) {
+			auto startl = lines.start_line[l];
+			auto endl = lines.start_line[l+1];
+			for (size_t c = startl; c < endl; c++) {
+				res_loop += lines.coordinates[c].x;
+			}
+		}
+	}
+
+	double res_iter = 0;
+	for (auto feature : lines) {
+		for (auto line : feature) {
+			for (auto & c : line) {
+				res_iter += c.x;
+			}
+		}
+	}
+
+	double res_citer = 0;
+	const LineCollection &clines = lines;
+	for (auto feature : clines) {
+		for (auto line : feature) {
+			for (auto & c : line) {
+				res_citer += c.x;
+			}
+		}
+	}
+
+	EXPECT_EQ(res_loop, res_iter);
+	EXPECT_EQ(res_loop, res_citer);
+}

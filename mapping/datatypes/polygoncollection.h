@@ -144,9 +144,6 @@ private:
 	};
 	template<typename C>
 	class PolygonRingReference {
-		private:
-			C &pc;
-			const size_t idx;
 		public:
 			PolygonRingReference(C &pc, size_t idx) : pc(pc), idx(idx) {};
 
@@ -170,6 +167,9 @@ private:
 		    size_t size() const {
 		    	return pc.start_ring[idx+1] - pc.start_ring[idx];
 		    }
+		private:
+			C &pc;
+			const size_t idx;
 	};
 };
 

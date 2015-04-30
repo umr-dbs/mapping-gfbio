@@ -364,5 +364,41 @@ $app->group ( '/scripts', function () use($app) {
 	} );
 } );
 
+/**
+ * GFBio related WS
+ */
+$app->group ( '/gfbio', function () use($app) {
+
+	/**
+	 * get Baskets for liferay ID
+	 */
+	$app->get ( '/baskets/:liferayId', function ($liferayId) use($app) {
+		//TODO: get user's liferayId from database instead of taking it as an parameter
+		$curl = curl_init();		
+		
+		curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+		curl_setopt($curl, CURLOPT_USERPWD, "vat_system@outlook.de:RL6z1Q1");
+		
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($curl, CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
+		curl_setopt($curl, CURLOPT_FAILONERROR, true);
+		
+		curl_setopt($curl, CURLOPT_URL, "http://gfbio-dev1.inf-bb.uni-jena.de:8080/api/jsonws/GFBioProject-portlet.basket/get-baskets-by-user-id");
+		curl_setopt($curl, CURLOPT_POST, 1);
+		curl_setopt($curl, CURLOPT_POSTFIELDS, "userId=".$liferayId);
+		
+		$result = curl_exec($curl);
+		
+		if($result === false){
+			$app->response->write( 'Curl-Fehler: ' . curl_error($curl));
+		}
+		else {
+			$app->response->write($result);
+		}
+		
+		curl_close($curl);		
+	});
+});
+	
 $app->run ();
 ?>

@@ -5,10 +5,11 @@
 #include <cmath>
 #include <map>
 #include <sstream>
+#include <json/json.h>
+#include "datatypes/pointcollection.h"
 
 #include "datatypes/raster.h"
 #include "operators/operator.h"
-#include "datatypes/multipointcollection.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
 
 enum WFSRequestType {
@@ -38,6 +39,8 @@ private:
 	auto to_bool(std::string str) const -> bool;
 	auto epsg_from_param(const std::string &crs, epsg_t def = EPSG_WEBMERCATOR) const -> epsg_t;
 	auto epsg_from_param(const std::map<std::string, std::string> &params, const std::string &key, epsg_t def = EPSG_WEBMERCATOR) const -> epsg_t;
+	auto parseIso8601DateTime(const std::string &dateTimeString) const -> time_t;
+
 	// TODO: extract commons to utils class
 
 	const std::map<std::string, WFSRequestType> stringToRequest {

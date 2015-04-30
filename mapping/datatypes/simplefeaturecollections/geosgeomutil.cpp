@@ -6,6 +6,7 @@
 #include <geos/geom/Point.h>
 #include <geos/geom/LineString.h>
 #include <geos/geom/LinearRing.h>
+#include <geos/geom/MultiLineString.h>
 #include "util/make_unique.h"
 #include "raster/exceptions.h"
 
@@ -36,81 +37,183 @@ int GeosGeomUtil::resolveMappingEPSG(epsg_t epsg){
 	}
 }
 
-//construct MultiPolygonCollection as we currently need it for GFBioWS,
-//i.e. each polygon in geos multipolygon becomes one elements in a MAPPING MultiPolygonCollection
-std::unique_ptr<MultiPolygonCollection> GeosGeomUtil::createMultiPolygonCollection(const geos::geom::MultiPolygon& multiPolygon){
 
-	std::unique_ptr<MultiPolygonCollection> multiPolygonCollection = std::make_unique<MultiPolygonCollection>(SpatioTemporalReference(resolveGeosSRID(multiPolygon.getSRID()), timetype_t::TIMETYPE_UNKNOWN));
-
-	for(size_t polygonIndex = 0; polygonIndex < multiPolygon.getNumGeometries(); ++polygonIndex){
-		addPolygon(*multiPolygonCollection, *multiPolygon.getGeometryN(polygonIndex), true);
+std::unique_ptr<PointCollection> GeosGeomUtil::createPointCollection(const geos::geom::Geometry& geometry){
+	if(geometry.getGeometryTypeId() != geos::geom::GeometryTypeId::GEOS_GEOMETRYCOLLECTION){
+		throw ConverterException("GEOS Geometry is not a geometry collection");
 	}
 
-	return multiPolygonCollection;
+	std::unique_ptr<PointCollection> pointCollection = std::make_unique<PointCollection>(SpatioTemporalReference(resolveGeosSRID(geometry.getSRID()), timetype_t::TIMETYPE_UNKNOWN));
+
+	for(size_t i=0; i  < geometry.getNumGeometries(); ++i){
+
+		if(geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_POINT){
+			auto& coordinate = *geometry.getGeometryN(i)->getCoordinate();
+			pointCollection->addSinglePointFeature(Coordinate(coordinate.x, coordinate.y));
+		}
+		else if (geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_MULTIPOINT){
+			const geos::geom::Geometry& multiPoint = *geometry.getGeometryN(i);
+			for(size_t pointIndex = 0; pointIndex < multiPoint.getNumGeometries(); ++pointIndex){
+				auto& coordinate = *multiPoint.getGeometryN(i)->getCoordinate();
+				pointCollection->addCoordinate(coordinate.x, coordinate.y);
+			}
+			pointCollection->finishFeature();
+		}
+		else {
+			throw ConverterException("GEOS GeometryCollection contains non point element");
+		}
+	}
+
+	return pointCollection;
+}
+
+std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosPointCollection(const PointCollection& pointCollection){
+	//TODO: implement
+	throw FeatureException("Conversion not yet implemented");
+}
+
+std::unique_ptr<LineCollection> GeosGeomUtil::createLineCollection(const geos::geom::Geometry& geometry){
+	if(geometry.getGeometryTypeId() != geos::geom::GeometryTypeId::GEOS_GEOMETRYCOLLECTION){
+		throw ConverterException("GEOS Geometry is not a geometry collection");
+	}
+
+	std::unique_ptr<LineCollection> lineCollection = std::make_unique<LineCollection>(SpatioTemporalReference(resolveGeosSRID(geometry.getSRID()), timetype_t::TIMETYPE_UNKNOWN));
+
+	for(size_t i=0; i < geometry.getNumGeometries(); ++i){
+
+		if(geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_LINESTRING){
+			const geos::geom::Geometry& lineString = *geometry.getGeometryN(i);
+			const auto& coordinates = lineString.getCoordinates();
+			for(size_t coordinateIndex = 0; coordinateIndex < coordinates->size(); ++coordinateIndex){
+				lineCollection->addCoordinate(coordinates->getX(coordinateIndex), coordinates->getY(coordinateIndex));
+			}
+			lineCollection->finishLine();
+			lineCollection->finishFeature();
+		}
+		else if (geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_MULTILINESTRING){
+			const geos::geom::Geometry& multiLineString = *geometry.getGeometryN(i);
+
+			for(size_t lineIndex = 0; lineIndex < multiLineString.getNumGeometries(); ++lineIndex){
+				const geos::geom::Geometry& lineString = *multiLineString.getGeometryN(lineIndex);
+				const auto& coordinates = lineString.getCoordinates();
+				for(size_t coordinateIndex = 0; coordinateIndex < coordinates->size(); ++coordinateIndex){
+					lineCollection->addCoordinate(coordinates->getX(coordinateIndex), coordinates->getY(coordinateIndex));
+				}
+				lineCollection->finishLine();
+			}
+			lineCollection->finishFeature();
+		}
+		else {
+			throw ConverterException("GEOS GeometryCollection contains non point element");
+		}
+	}
+
+	return lineCollection;
+}
+
+std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosLineCollection(const LineCollection& lineCollection){
+
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+
+	std::unique_ptr<std::vector<geos::geom::Geometry*>> multiLines(new std::vector<geos::geom::Geometry*>);
+
+	for(size_t featureIndex = 0; featureIndex < lineCollection.getFeatureCount(); ++featureIndex){
+		std::unique_ptr<std::vector<geos::geom::Geometry*>> lines(new std::vector<geos::geom::Geometry*>);
+
+		for(size_t lineIndex = lineCollection.start_feature[featureIndex]; lineIndex < lineCollection.start_feature[featureIndex + 1]; ++lineIndex){
+
+			std::unique_ptr<std::vector<geos::geom::Coordinate>> coordinates (new std::vector<geos::geom::Coordinate>);
+			for(size_t pointsIndex = lineCollection.start_line[lineIndex]; pointsIndex < lineCollection.start_line[lineIndex + 1]; ++pointsIndex){
+				const Coordinate& point = lineCollection.coordinates[pointsIndex];
+				coordinates->push_back(geos::geom::Coordinate(point.x, point.y));
+			}
+
+			const geos::geom::CoordinateSequenceFactory* csf = geos::geom::CoordinateArraySequenceFactory::instance();
+			geos::geom::CoordinateSequence* coordinateSequence = csf->create(coordinates.release());
+
+			lines->push_back(gf->createLineString(coordinateSequence));
+		}
+
+		multiLines->push_back(gf->createMultiLineString(lines.release()));
+	}
+
+	std::unique_ptr<geos::geom::Geometry> collection (gf->createGeometryCollection(multiLines.release()));
+
+	//do this beforehand?
+	collection->setSRID(resolveMappingEPSG(lineCollection.stref.epsg));
+
+	return collection;
+}
+
+//construct PolygonCollection as we currently need it for GFBioWS,
+//i.e. each polygon in geos multipolygon becomes one elements in a MAPPING PolygonCollection
+std::unique_ptr<PolygonCollection> GeosGeomUtil::createPolygonCollection(const geos::geom::MultiPolygon& multiPolygon){
+
+	std::unique_ptr<PolygonCollection> polygonCollection = std::make_unique<PolygonCollection>(SpatioTemporalReference(resolveGeosSRID(multiPolygon.getSRID()), timetype_t::TIMETYPE_UNKNOWN));
+
+	for(size_t polygonIndex = 0; polygonIndex < multiPolygon.getNumGeometries(); ++polygonIndex){
+		addPolygon(*polygonCollection, *multiPolygon.getGeometryN(polygonIndex));
+		polygonCollection->finishFeature();
+	}
+
+	return polygonCollection;
 }
 
 
 /**
- * Append a new polygon to the MultiPolygonCollection. If newFeature is true then a new element (=multipolygon) is started
- * otherwise it as added to the last multipolygon
+ * Append a new polygon to the PolygonCollection
  */
-void GeosGeomUtil::addPolygon(MultiPolygonCollection& multiPolygonCollection, const geos::geom::Geometry& polygonGeometry, bool newFeature){
+void GeosGeomUtil::addPolygon(PolygonCollection& polygonCollection, const geos::geom::Geometry& polygonGeometry){
 	if(polygonGeometry.getGeometryTypeId() != geos::geom::GeometryTypeId::GEOS_POLYGON){
 		throw ConverterException("GEOS Geometry is not a Polygon");
 	}
 
 	const geos::geom::Polygon& polygon = dynamic_cast<const geos::geom::Polygon&> (polygonGeometry);
 
-	auto& startRing = multiPolygonCollection.startRing;
-	auto& startPolygon = multiPolygonCollection.startPolygon;
-	auto& startFeature = multiPolygonCollection.startFeature;
-	auto& points = multiPolygonCollection.points;
-
-	//add new polygon
-	if(newFeature) {
-		//(=feature in this case)
-		startFeature.push_back(startPolygon.size());
-	}
-
-	startPolygon.push_back(startRing.size());
+	auto& startRing = polygonCollection.start_ring;
+	auto& startPolygon = polygonCollection.start_polygon;
+	auto& startFeature = polygonCollection.start_feature;
+	auto& coordinates = polygonCollection.coordinates;
 
 	//outer ring
 	auto outerRing = polygon.getExteriorRing()->getCoordinates();
-	startRing.push_back(points.size());
 	for(size_t i = 0; i < outerRing->getSize(); ++i){
-		points.push_back(Point(outerRing->getX(i), outerRing->getY(i)));
+		polygonCollection.addCoordinate(outerRing->getX(i), outerRing->getY(i));
 	}
+	polygonCollection.finishRing();
 
 	//inner rings
 	for(size_t innerRingIndex = 0; innerRingIndex < polygon.getNumInteriorRing(); ++innerRingIndex){
 		auto innerRing = polygon.getInteriorRingN(innerRingIndex)->getCoordinates();
-		startRing.push_back(points.size());
 
 		for(size_t i = 0; i < innerRing->getSize(); ++i){
-			points.push_back(Point(innerRing->getX(i), innerRing->getY(i)));
+			polygonCollection.addCoordinate(innerRing->getX(i), innerRing->getY(i));
 		}
+		polygonCollection.finishRing();
 	}
+
+	polygonCollection.finishPolygon();
 }
 
-std::unique_ptr<MultiPolygonCollection> GeosGeomUtil::createMultiPolygonCollection(const geos::geom::Geometry& geometry){
+std::unique_ptr<PolygonCollection> GeosGeomUtil::createPolygonCollection(const geos::geom::Geometry& geometry){
 	if(geometry.getGeometryTypeId() != geos::geom::GeometryTypeId::GEOS_GEOMETRYCOLLECTION){
 		throw ConverterException("GEOS Geometry is not a geometry collection");
 	}
 
-	std::unique_ptr<MultiPolygonCollection> multiPolygonCollection = std::make_unique<MultiPolygonCollection>(SpatioTemporalReference(resolveGeosSRID(geometry.getSRID()), timetype_t::TIMETYPE_UNKNOWN));
+	std::unique_ptr<PolygonCollection> polygonCollection = std::make_unique<PolygonCollection>(SpatioTemporalReference(resolveGeosSRID(geometry.getSRID()), timetype_t::TIMETYPE_UNKNOWN));
 
 	for(size_t i=0; i  < geometry.getNumGeometries(); ++i){
 
 		if(geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_POLYGON){
-			addPolygon(*multiPolygonCollection, *geometry.getGeometryN(i), true);
+			addPolygon(*polygonCollection, *geometry.getGeometryN(i));
+			polygonCollection->finishFeature();
 		}
 		else if (geometry.getGeometryN(i)->getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_MULTIPOLYGON){
 			const geos::geom::Geometry& multiPolygon = *geometry.getGeometryN(i);
-			bool first = true;
 			for(size_t polygonIndex = 0; polygonIndex < multiPolygon.getNumGeometries(); ++polygonIndex){
-				addPolygon(*multiPolygonCollection, *multiPolygon.getGeometryN(polygonIndex), first);
-				first = false;
+				addPolygon(*polygonCollection, *multiPolygon.getGeometryN(polygonIndex));
 			}
+			polygonCollection->finishFeature();
 		}
 		else {
 			throw ConverterException("GEOS GeometryCollection contains non polygon element");
@@ -118,31 +221,31 @@ std::unique_ptr<MultiPolygonCollection> GeosGeomUtil::createMultiPolygonCollecti
 
 	}
 
-	return multiPolygonCollection;
+	return polygonCollection;
 }
 
 //for now always create collection of multipolygons
-std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosGeometry(const MultiPolygonCollection& multiPolygonCollection){
+std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosPolygonCollection(const PolygonCollection& polygonCollection){
 
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 
 	//TODO: calculate size beforehand
 	std::unique_ptr<std::vector<geos::geom::Geometry*>> multiPolygons(new std::vector<geos::geom::Geometry*>);
 
-	for(size_t featureIndex = 0; featureIndex < multiPolygonCollection.startFeature.size(); ++featureIndex){
+	for(size_t featureIndex = 0; featureIndex < polygonCollection.getFeatureCount(); ++featureIndex){
 		std::unique_ptr<std::vector<geos::geom::Geometry*>> polygons(new std::vector<geos::geom::Geometry*>);
 
-		for(size_t polygonIndex = multiPolygonCollection.startFeature[featureIndex]; polygonIndex < multiPolygonCollection.stopFeature(featureIndex); ++polygonIndex){
+		for(size_t polygonIndex = polygonCollection.start_feature[featureIndex]; polygonIndex < polygonCollection.start_feature[featureIndex + 1]; ++polygonIndex){
 
 			//outer ring
-			size_t ringIndex = multiPolygonCollection.startPolygon[polygonIndex];
+			size_t ringIndex = polygonCollection.start_polygon[polygonIndex];
 
 			//TODO: calculate size beforehand
 			std::unique_ptr<std::vector<geos::geom::Coordinate>> coordinates (new std::vector<geos::geom::Coordinate>);
 
 			//outer ring
-			for(size_t pointsIndex = multiPolygonCollection.startRing[ringIndex]; pointsIndex < multiPolygonCollection.stopRing(ringIndex); ++pointsIndex){
-				const Point& point = multiPolygonCollection.points[pointsIndex];
+			for(size_t pointsIndex = polygonCollection.start_ring[ringIndex]; pointsIndex < polygonCollection.start_ring[ringIndex + 1]; ++pointsIndex){
+				const Coordinate& point = polygonCollection.coordinates[pointsIndex];
 				coordinates->push_back(geos::geom::Coordinate(point.x, point.y));
 			}
 
@@ -157,11 +260,11 @@ std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosGeometry(const Mul
 			//TODO calculate size beforehand
 			std::unique_ptr<std::vector<geos::geom::Geometry*>> innerRings (new std::vector<geos::geom::Geometry*>);
 
-			for(++ringIndex; ringIndex < multiPolygonCollection.stopPolygon(ringIndex); ++ringIndex){
+			for(++ringIndex; ringIndex < polygonCollection.start_polygon[polygonIndex + 1]; ++ringIndex){
 				coordinates.reset(new std::vector<geos::geom::Coordinate>);
 
-				for(size_t pointsIndex = multiPolygonCollection.startRing[ringIndex]; pointsIndex < multiPolygonCollection.stopRing(ringIndex); ++pointsIndex){
-					const Point& point = multiPolygonCollection.points[pointsIndex];
+				for(size_t pointsIndex = polygonCollection.start_ring[ringIndex]; pointsIndex < polygonCollection.start_ring[ringIndex + 1]; ++pointsIndex){
+					const Coordinate& point = polygonCollection.coordinates[pointsIndex];
 					coordinates->push_back(geos::geom::Coordinate(point.x, point.y));
 				}
 
@@ -180,7 +283,7 @@ std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosGeometry(const Mul
 	std::unique_ptr<geos::geom::Geometry> collection (gf->createGeometryCollection(multiPolygons.release()));
 
 	//do this beforehand?
-	collection->setSRID(resolveMappingEPSG(multiPolygonCollection.stref.epsg));
+	collection->setSRID(resolveMappingEPSG(polygonCollection.stref.epsg));
 
 	return collection;
 }

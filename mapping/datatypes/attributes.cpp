@@ -3,6 +3,7 @@
 #include "datatypes/attributes.h"
 #include "util/binarystream.h"
 
+#include <limits>
 
 /*
  * DirectMetadata
@@ -80,8 +81,10 @@ MetadataArrays<T>::~MetadataArrays() {
 
 template<typename T>
 void MetadataArrays<T>::set(size_t idx, const std::string &key, const T &value) {
-	if (data.count(key) == 0)
-		data[key] = std::vector<T>();
+	if (data.count(key) == 0) {
+		//data[key] = std::vector<T>();
+		throw MetadataException("Metadata with key "+key+" does not exist. Call addVector() first.");
+	}
 
 	auto &vec = data[key];
 	if (idx == vec.size()) {
@@ -108,16 +111,44 @@ const T &MetadataArrays<T>::get(size_t idx, const std::string &key, const T &def
 	}
 }
 
+template<typename T> struct defaultvalue {
+};
+
+template <> struct defaultvalue<double> {
+	static const double value;
+};
+const double defaultvalue<double>::value = std::numeric_limits<double>::quiet_NaN();
+
+template <> struct defaultvalue<std::string> {
+	static const std::string value;
+};
+const std::string defaultvalue<std::string>::value = "";
+
 template<typename T>
 std::vector<T> &MetadataArrays<T>::addVector(const std::string &key, size_t capacity) {
 	if (data.count(key) > 0)
 		throw MetadataException("Metadata with key "+key+" already exists");
-	data[key] = std::vector<T>(capacity);
+	data[key] = std::vector<T>(capacity, defaultvalue<T>::value);
 	return data.at(key);
+}
+template<typename T>
+std::vector<T> &MetadataArrays<T>::addEmptyVector(const std::string &key, size_t reserve) {
+	if (data.count(key) > 0)
+		throw MetadataException("Metadata with key "+key+" already exists");
+	data[key] = std::vector<T>();
+	auto &vec = data.at(key);
+	if (reserve > 0)
+		vec.reserve(reserve);
+	return vec;
 }
 
 template<typename T>
 std::vector<T> &MetadataArrays<T>::getVector(const std::string &key) {
+	return data.at(key);
+}
+
+template<typename T>
+const std::vector<T> &MetadataArrays<T>::getVector(const std::string &key) const {
 	return data.at(key);
 }
 

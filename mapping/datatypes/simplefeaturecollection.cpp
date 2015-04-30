@@ -9,34 +9,39 @@
 #include <iomanip>
 #include <iostream>
 #include <cmath>
+#include <limits>
 
-
-Point::Point(double x, double y) : x(x), y(y) {
-}
-
-Point::~Point() {
-}
-
-Point::Point(BinaryStream &stream) {
+Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
 	stream.read(&y);
 }
-void Point::toStream(BinaryStream &stream) {
+void Coordinate::toStream(BinaryStream &stream) {
 	stream.write(x);
 	stream.write(y);
 }
 
-
-SimpleFeatureCollection::SimpleFeatureCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref), has_time(false) {
-
+/**
+ * Timestamps
+ */
+bool SimpleFeatureCollection::hasTime() const {
+	return time_start.size() == getFeatureCount();
 }
 
-SimpleFeatureCollection::~SimpleFeatureCollection() {
+void SimpleFeatureCollection::addDefaultTimestamps() {
+	addDefaultTimestamps(std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
+}
 
+void SimpleFeatureCollection::addDefaultTimestamps(double min, double max) {
+	if (hasTime())
+		return;
+	auto fcount = getFeatureCount();
+	time_start.empty();
+	time_start.resize(fcount, min);
+	time_end.empty();
+	time_end.resize(fcount, max);
 }
 
 
-//Metadata
 /**
  * Global Metadata
  */

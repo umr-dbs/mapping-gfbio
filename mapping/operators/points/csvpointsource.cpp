@@ -1,5 +1,3 @@
-#include "datatypes/multipointcollection.h"
-
 #include "operators/operator.h"
 #include "raster/exceptions.h"
 #include "util/make_unique.h"
@@ -12,13 +10,14 @@
 #include <algorithm>
 #include <json/json.h>
 #include <sys/stat.h>
+#include "datatypes/pointcollection.h"
 
 class CSVPointSource : public GenericOperator {
 	public:
 		CSVPointSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~CSVPointSource();
 
-		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -56,8 +55,18 @@ static uint64_t getFilesize(const char *filename) {
     return -1;
 }
 
-std::unique_ptr<MultiPointCollection> CSVPointSource::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<MultiPointCollection>(rect);
+static double parseDate(const std::string &str) {
+	std::tm tm;
+	// 13-Jul-2010  17:35
+	time_t t = 0;
+	if (strptime(str.c_str(), "%d-%B-%Y  %H:%M", &tm)) {
+		t = mktime(&tm);
+	}
+	return (double) t;
+}
+
+std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points_out = std::make_unique<PointCollection>(rect);
 
 	auto filesize = getFilesize(filename.c_str());
 	if (filesize <= 0)
@@ -79,7 +88,7 @@ std::unique_ptr<MultiPointCollection> CSVPointSource::getMultiPointCollection(co
 	std::vector<bool> is_numeric(headers.size(), false);
 
 	size_t no_pos = std::numeric_limits<size_t>::max();
-	size_t pos_x = no_pos, pos_y = no_pos, pos_t = no_pos;
+	size_t pos_x = no_pos, pos_y = no_pos, pos_t_start = no_pos, pos_t_end = no_pos;
 	for (size_t i=0; i < headers.size(); i++) {
 		std::string lc = headers[i];
 		std::transform(lc.begin(), lc.end(), lc.begin(), ::tolower);
@@ -88,8 +97,10 @@ std::unique_ptr<MultiPointCollection> CSVPointSource::getMultiPointCollection(co
 			pos_x = i;
 		if (lc == "y" || lc == "lat" || lc == "latitude")
 			pos_y = i;
-		if (lc == "time" || lc == "date" || lc == "datet")
-			pos_t = i;
+		if (lc == "time" || lc == "time_start" || lc == "date" || lc == "datet")
+			pos_t_start = i;
+		if (lc == "time_end")
+			pos_t_end = i;
 		if (lc == "plz" || lc == "value")
 			is_numeric[i] = true;
 	}
@@ -97,18 +108,14 @@ std::unique_ptr<MultiPointCollection> CSVPointSource::getMultiPointCollection(co
 	if (pos_x == no_pos || pos_y == no_pos)
 		throw OperatorException("No georeferenced columns found in CSV. Name them \"x\" and \"y\", \"lat\" and \"lon\" or \"latitude\" and \"longitude\"");
 
-	if (pos_t != no_pos) {
-		points_out->has_time = true;
-	}
-
 	//TODO: distinguish between double and string properties
 	for (size_t i=0; i < headers.size(); i++) {
-		if (i == pos_x || i == pos_y || i == pos_t)
+		if (i == pos_x || i == pos_y || i == pos_t_start || i == pos_t_end)
 			continue;
 		if (is_numeric[i])
-			points_out->local_md_value.addVector(headers[i]);
+			points_out->local_md_value.addEmptyVector(headers[i]);
 		else
-			points_out->local_md_string.addVector(headers[i]);
+			points_out->local_md_string.addEmptyVector(headers[i]);
 	}
 
 	auto minx = rect.minx();
@@ -136,28 +143,25 @@ std::unique_ptr<MultiPointCollection> CSVPointSource::getMultiPointCollection(co
 		if (x < minx || x > maxx || y < miny || y > maxy)
 			continue;
 
-		size_t idx = points_out->addPoint(x, y);
+		size_t idx = points_out->addSinglePointFeature(Coordinate(x, y));
 
 		for (size_t i=0; i < tuple.size(); i++) {
-			if (i == pos_x || i == pos_y || i == pos_t)
+			if (i == pos_x || i == pos_y || i == pos_t_start || i == pos_t_end)
 				continue;
 			if (is_numeric[i])
 				points_out->local_md_value.set(idx, headers[i], std::strtod(tuple[i].c_str(), nullptr));
 			else
 				points_out->local_md_string.set(idx, headers[i], tuple[i]);
 		}
-		if (pos_t != no_pos) {
-			const auto &str = tuple[pos_t];
-			std::tm tm;
-			// 13-Jul-2010  17:35
-			time_t t = 0;
-			if (strptime(str.c_str(), "%d-%B-%Y  %H:%M", &tm)) {
-				t = mktime(&tm);
-			}
-			points_out->timestamps.push_back(t);
+		if (pos_t_start != no_pos) {
+			auto t_start = parseDate(tuple[pos_t_start]);
+			auto t_end = t_start + 1;
+			if (pos_t_end != no_pos)
+				t_end = parseDate(tuple[pos_t_end]);
+			points_out->time_start.push_back(t_start);
+			points_out->time_end.push_back(t_end);
 		}
 	}
-	//fprintf(stderr, data.str().c_str());
 
 	return points_out;
 }

@@ -83,7 +83,7 @@ void LocalRasterDBBackend::init() {
 			" rasterid INTEGER NOT NULL,"
 			" x1 INTEGER NOT NULL,"
 			" y1 INTEGER NOT NULL,"
-			" z1 INTERGET NOT NULL,"
+			" z1 INTEGER NOT NULL,"
 			" x2 INTEGER NOT NULL,"
 			" y2 INTEGER NOT NULL,"
 			" z2 INTEGER NOT NULL,"

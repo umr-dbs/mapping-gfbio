@@ -6,25 +6,26 @@
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/attributes.h"
 
-class Point {
+class Coordinate {
 	private:
-		Point(double x, double y);
-		Point(BinaryStream &stream);
+		Coordinate(BinaryStream &stream);
 		void toStream(BinaryStream &stream);
 	public:
-		Point() = delete;
-		~Point();
+		Coordinate(double x, double y) : x(x), y(y) {}
+
+		Coordinate() = delete;
+		~Coordinate() {}
 
 		// Copy
-		Point(const Point &p) = default;
-		Point &operator=(const Point &p) = default;
+		Coordinate(const Coordinate &p) = default;
+		Coordinate &operator=(const Coordinate &p) = default;
 		// Move
-		Point(Point &&p) = default;
-		Point &operator=(Point &&p) = default;
+		Coordinate(Coordinate &&p) = default;
+		Coordinate &operator=(Coordinate &&p) = default;
 
 		double x, y;
 
-		friend class MultiPointCollection;
+		friend class PointCollection;
 		friend class GeosGeomUtil;
 };
 
@@ -32,18 +33,22 @@ class Point {
 /**
  * Base class for collection data types (Point, Polygon, Line)
  */
-//TODO: make class virtual
 class SimpleFeatureCollection : public SpatioTemporalResult {
 public:
-	SimpleFeatureCollection(const SpatioTemporalReference &stref);
-	virtual ~SimpleFeatureCollection();
+	SimpleFeatureCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref) {}
 
-	std::vector<Point> points;
+	virtual ~SimpleFeatureCollection() {}
 
-	// Attributes
-	std::vector<time_t> timestamps;
+	std::vector<Coordinate> coordinates;
 
-	// global MetaData (one value per PointCollection)
+	// Timestamps
+	std::vector<time_t> time_start;
+	std::vector<time_t> time_end;
+	bool hasTime() const;
+	void addDefaultTimestamps();
+	void addDefaultTimestamps(double min, double max);
+
+	// global MetaData (one value per SimpleFeatureCollection)
 	const std::string &getGlobalMDString(const std::string &key) const;
 	double getGlobalMDValue(const std::string &key) const;
 	DirectMetadata<double>* getGlobalMDValueIterator();
@@ -53,20 +58,51 @@ public:
 	void setGlobalMDString(const std::string &key, const std::string &value);
 	void setGlobalMDValue(const std::string &key, double value);
 
-	// global MetaData (one value per collection)
+	// global MetaData (one value per feature)
 	DirectMetadata<std::string> global_md_string;
 	DirectMetadata<double> global_md_value;
 
-	// local MetaData (one value per collection item)
+	// local MetaData (one value per feature)
 	MetadataArrays<std::string> local_md_string;
 	MetadataArrays<double> local_md_value;
 
-	bool has_time;
-
 	// Export
-	virtual std::string toGeoJSON(bool displayMetadata = false) = 0;
-	virtual std::string toCSV() = 0;
+	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;
+	virtual std::string toCSV() const = 0;
 
+	// return true if all features consist of a single element
+	virtual bool isSimple() const = 0;
+
+	virtual size_t getFeatureCount() const = 0;
+
+protected:
+	/*
+	 * Helper classes for iteration over Collections
+	 */
+	template <typename Collection, template<typename> class value_type>
+	class SimpleFeatureIterator {
+		public:
+			SimpleFeatureIterator(Collection &sfc, size_t idx) : sfc(sfc), idx(idx) {
+			};
+
+	        bool operator!=(const SimpleFeatureIterator &other) const {
+	            return idx != other.idx;
+	        }
+
+	        value_type<Collection> operator*() const {
+	            return value_type<Collection>(sfc, idx);
+	        }
+
+	        void operator++() {
+	            idx++;
+	        }
+
+		private:
+			Collection &sfc;
+			size_t idx;
+	};
 };
+
+
 
 #endif

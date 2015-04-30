@@ -1,5 +1,4 @@
 #include "datatypes/raster.h"
-#include "datatypes/multipointcollection.h"
 #include "rasterdb/rasterdb.h"
 #include "raster/colors.h"
 
@@ -18,6 +17,7 @@
 #include <memory>
 
 #include <json/json.h>
+#include "datatypes/pointcollection.h"
 
 static char *program_name;
 static void usage() {
@@ -244,7 +244,7 @@ static void runquery(int argc, char *argv[]) {
 	}
 	else if (result == "points") {
 		QueryProfiler profiler;
-		auto points = graph->getCachedMultiPointCollection(qrect_from_json(root), profiler);
+		auto points = graph->getCachedPointCollection(qrect_from_json(root), profiler);
 		auto csv = points->toCSV();
 		FILE *f = fopen(out_filename, "w");
 		if (f) {
@@ -302,7 +302,7 @@ static int testquery(int argc, char *argv[]) {
 		}
 		else if (result == "points") {
 			QueryProfiler profiler;
-			auto points = graph->getCachedMultiPointCollection(qrect_from_json(root), profiler);
+			auto points = graph->getCachedPointCollection(qrect_from_json(root), profiler);
 			real_hash = points->hash();
 		}
 		else {

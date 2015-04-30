@@ -1,7 +1,6 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
-#include "datatypes/multipointcollection.h"
 #include "datatypes/raster/typejuggling.h"
 #include "operators/operator.h"
 #include "raster/opencl.h"
@@ -11,6 +10,7 @@
 #include <memory>
 #include <cmath>
 #include <algorithm>
+#include "datatypes/pointcollection.h"
 
 class PointsToRasterOperator : public GenericOperator {
 	public:
@@ -53,8 +53,8 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 
 	QueryRectangle rect2 = rect;
 	rect2.enlarge(radius);
-	auto points = getMultiPointCollectionFromSource(0, rect2, profiler);
-	//TODO: ensure that multipoints are single points?!
+	auto points = getPointCollectionFromSource(0, rect2, profiler);
+	//TODO: ensure that points are single points?!
 
 	if (renderattribute == "") {
 		DataDescription dd_acc(GDT_UInt16, 0, 65535, true, 0);
@@ -62,7 +62,7 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 		Raster2D<uint16_t> *acc = (Raster2D<uint16_t> *) accumulator.get();
 		acc->clear(0);
 
-		for (Point &p : points->points) {
+		for (Coordinate &p : points->coordinates) {
 			double x = p.x, y = p.y;
 
 			auto px = acc->WorldToPixelX(x);
@@ -101,7 +101,7 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 
 		auto &vec = points->local_md_value.getVector(renderattribute);
 		int i=0;
-		for (Point &p : points->points) {
+		for (Coordinate &p : points->coordinates) {
 			double x = p.x, y = p.y;
 
 			auto px = sum->WorldToPixelX(x);

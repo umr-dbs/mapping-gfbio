@@ -44,17 +44,25 @@ auto WFSRequest::getCapabilities() -> std::string {
 }
 
 auto WFSRequest::getFeature() -> std::string {
-	// TODO: this is not valid WFS -> find default configuration
-	int output_width = std::stoi(parameters["width"]);
-	int output_height = std::stoi(parameters["height"]);
+	// read featureId
+	Json::Reader jsonReader{Json::Features::strictMode()};
+	Json::Value featureId;
+	if (!jsonReader.parse(parameters["featureid"], featureId)) {
+		return "unable to parse json of featureId";
+	}
+
+	int output_width = featureId["width"].asInt();
+	int output_height = featureId["height"].asInt();
 	if (output_width <= 0 || output_height <= 0) {
 		return "output_width or output_height not valid";
 	}
 
-	// TODO: this is not valid WFS too
-	time_t timestamp = 42;
-	if (parameters.count("timestamp") > 0) {
-		timestamp = std::stol(parameters.at("timestamp"));
+	time_t timestamp = 42; // TODO: default value
+	//if(featureId["timestamp"].isInt()) {
+	//	timestamp = static_cast<long>(featureId["timestamp"].asInt64());
+	//}
+	if(parameters.count("time") > 0){
+		timestamp = this->parseIso8601DateTime(parameters["time"]);
 	}
 
 	// srsName=CRS
@@ -63,13 +71,13 @@ auto WFSRequest::getFeature() -> std::string {
 	double bbox[4];
 	this->parseBBOX(bbox, parameters.at("bbox"), queryEpsg, true);
 
-	auto graph = GenericOperator::fromJSON(parameters["featureid"]);
+	auto graph = GenericOperator::fromJSON(featureId["query"]);
 
 	// TODO: typeNames
 	// namespace + points or polygons
 
 	QueryProfiler profiler;
-	auto points = graph->getCachedMultiPointCollection(
+	auto points = graph->getCachedPointCollection(
 			QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3],
 					output_width, output_height, queryEpsg), profiler);
 
@@ -87,7 +95,7 @@ auto WFSRequest::getFeature() -> std::string {
 	//		</Cluster>
 	// </Filter>
 	if (this->to_bool(parameters["clustered"]) == true) {
-		auto clusteredPoints = std::make_unique<MultiPointCollection>(points->stref);
+		auto clusteredPoints = std::make_unique<PointCollection>(points->stref);
 
 		auto x1 = bbox[0];
 		auto x2 = bbox[2];
@@ -101,7 +109,7 @@ auto WFSRequest::getFeature() -> std::string {
 								(y2 + y1) / (2 * yres)),
 						pv::Dimension((x2 - x1) / (2 * xres),
 								(y2 - y1) / (2 * yres)), 1), 1);
-		for (Point& pointOld : points->points) {
+		for (Coordinate& pointOld : points->coordinates) {
 			clusterer.insert(
 					std::make_shared<pv::Circle>(
 							pv::Coordinate(pointOld.x / xres,
@@ -116,12 +124,12 @@ auto WFSRequest::getFeature() -> std::string {
 		// TYPENAMES=ns1:F1,ns1:F1&ALIASES=C,D&FILTER=<Filter>…for C,D…</Filter>
 
 		auto circles = clusterer.getCircles();
-		clusteredPoints->local_md_value.addVector("radius", circles.size());
-		clusteredPoints->local_md_value.addVector("numberOfPoints",
+		clusteredPoints->local_md_value.addEmptyVector("radius", circles.size());
+		clusteredPoints->local_md_value.addEmptyVector("numberOfPoints",
 				circles.size());
 		for (auto& circle : circles) {
-			size_t idx = clusteredPoints->addPoint(circle->getX() * xres,
-					circle->getY() * yres);
+			size_t idx = clusteredPoints->addSinglePointFeature(Coordinate(circle->getX() * xres,
+					circle->getY() * yres));
 			clusteredPoints->local_md_value.set(idx, "radius",
 					circle->getRadius());
 			clusteredPoints->local_md_value.set(idx, "numberOfPoints",
@@ -266,4 +274,23 @@ auto WFSRequest::epsg_from_param(const std::map<std::string, std::string> &param
 	if (params.count(key) < 1)
 		return def;
 	return epsg_from_param(params.at(key), def);
+}
+
+/**
+ * This function converts a "datetime"-string in ISO8601 format into a time_t using UTC
+ * @param dateTimeString a string with ISO8601 "datetime"
+ * @returns The time_t representing the "datetime"
+ */
+auto WFSRequest::parseIso8601DateTime(const std::string &dateTimeString) const -> time_t {
+	const std::string dateTimeFormat{"%Y-%m-%dT%H:%M:%S"}; //TODO: we should allow millisec -> "%Y-%m-%dT%H:%M:%S.SSSZ" std::get_time and the tm struct dont have them.
+
+	//std::stringstream dateTimeStream{dateTimeString}; //TODO: use this with gcc >5.0
+	tm queryDateTime{0};
+	//std::get_time(&queryDateTime, dateTimeFormat); //TODO: use this with gcc >5.0
+	strptime(dateTimeString.c_str(), dateTimeFormat.c_str(), &queryDateTime); //TODO: remove this with gcc >5.0
+	time_t queryTimestamp = timegm(&queryDateTime); //TODO: is there a c++ version for timegm?
+
+	//TODO: parse millisec
+
+	return (queryTimestamp);
 }

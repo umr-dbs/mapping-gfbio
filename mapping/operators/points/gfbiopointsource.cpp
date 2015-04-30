@@ -1,6 +1,3 @@
-#include "datatypes/multipointcollection.h"
-#include "datatypes/multipolygoncollection.h"
-
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 
 #include "operators/operator.h"
@@ -16,6 +13,8 @@
 #include <geos/geom/CoordinateSequence.h>
 #include <geos/io/WKBReader.h>
 #include <json/json.h>
+#include "datatypes/pointcollection.h"
+#include "datatypes/polygoncollection.h"
 
 
 class GFBioPointSourceOperator : public GenericOperator {
@@ -23,8 +22,8 @@ class GFBioPointSourceOperator : public GenericOperator {
 		GFBioPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~GFBioPointSourceOperator();
 
-		virtual std::unique_ptr<MultiPointCollection> getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<MultiPolygonCollection> getMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -64,8 +63,8 @@ REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
 
 
-std::unique_ptr<MultiPointCollection> GFBioPointSourceOperator::getMultiPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<MultiPointCollection>(rect);
+std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto points_out = std::make_unique<PointCollection>(rect);
 
 	std::stringstream data;
 	getStringFromServer(rect, data, "CSV");
@@ -77,7 +76,7 @@ std::unique_ptr<MultiPointCollection> GFBioPointSourceOperator::getMultiPointCol
 		auto header = parser.readHeaders();
 		//TODO: distinguish between double and string properties
 		for(int i=2; i < header.size(); i++){
-			points_out->local_md_string.addVector(header[i]);
+			points_out->local_md_string.addEmptyVector(header[i]);
 		}
 
 		while(true){
@@ -85,7 +84,7 @@ std::unique_ptr<MultiPointCollection> GFBioPointSourceOperator::getMultiPointCol
 			if (tuple.size() < 1)
 				break;
 
-			size_t idx = points_out->addPoint(std::stod(tuple[0]),std::stod(tuple[1]));
+			size_t idx = points_out->addSinglePointFeature(Coordinate(std::stod(tuple[0]),std::stod(tuple[1])));
 			//double year = std::atof(csv[3].c_str());
 
 			for(int i=2; i < tuple.size(); i++)
@@ -104,7 +103,7 @@ std::unique_ptr<MultiPointCollection> GFBioPointSourceOperator::getMultiPointCol
 
 
 // pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/WKB?datasource=IUCN&query={"globalAttributes":{"speciesName":"Puma concolor"}}
-std::unique_ptr<MultiPolygonCollection> GFBioPointSourceOperator::getMultiPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PolygonCollection> GFBioPointSourceOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	if (rect.epsg != EPSG_LATLON) {
 		std::ostringstream msg;
 		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << (int) rect.epsg << ", expected " << (int) EPSG_LATLON << ")";
@@ -115,9 +114,9 @@ std::unique_ptr<MultiPolygonCollection> GFBioPointSourceOperator::getMultiPolygo
 	getStringFromServer(rect, data, "WKB");
 	profiler.addIOCost( data.tellp() );
 
-	auto multiPolygonCollection = WKBUtil::readMultiPolygonCollection(data);
+	auto polygonCollection = WKBUtil::readPolygonCollection(data);
 
-	return multiPolygonCollection;
+	return polygonCollection;
 }
 
 void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format) {

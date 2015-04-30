@@ -1,0 +1,38 @@
+
+{
+	"endtime" : 42,
+	"name" : "Projektion",
+	"query" : 
+	{
+		"params" : 
+		{
+			"dest_epsg" : 3857,
+			"src_epsg" : 4326
+		},
+		"sources" : 
+		{
+			"raster" : 
+			[
+				
+				{
+					"params" : 
+					{
+						"channel" : 0,
+						"sourcename" : "world1"
+					},
+					"type" : "source"
+				}
+			]
+		},
+		"type" : "projection"
+	},
+	"query_expected_hash" : "b18f52a43f3d0e823edec81ae1f6cc65",
+	"query_x1" : -10018754,
+	"query_x2" : 10018754,
+	"query_xres" : 1000,
+	"query_y1" : -10018754,
+	"query_y2" : 10018754,
+	"query_yres" : 1000,
+	"starttime" : 42,
+	"timeinterval" : 1
+}

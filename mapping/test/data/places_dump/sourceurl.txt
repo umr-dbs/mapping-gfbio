@@ -1,6 +1,0 @@
-This dataset was found linked on http://freegisdata.rtwilson.com/.
-The url of the full dataset is at
-http://s3.amazonaws.com/simplegeo-public/places_dump_20110628.zip
-
-The csv was extracted from places_dump_DE.geojson using the php script included in this directory.
-

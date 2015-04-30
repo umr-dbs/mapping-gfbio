@@ -112,3 +112,14 @@ const std::string &Configuration::get(const std::string &name, const std::string
 		return defaultValue;
 	return it->second;
 }
+
+
+bool Configuration::getBool(const std::string &name, const bool defaultValue) {
+	auto it = values.find(name);
+	if (it == values.end())
+		return defaultValue;
+	auto &str = it->second;
+	if (str == "1" || str == "true" || str == "TRUE" || str == "yes" || str == "YES")
+		return true;
+	return false;
+}

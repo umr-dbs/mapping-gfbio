@@ -47,8 +47,10 @@ class MetadataArrays {
 		const T &get(size_t idx, const std::string &key) const;
 		const T &get(size_t idx, const std::string &key, const T &defaultvalue) const;
 
-		std::vector<T> &addVector(const std::string &key, size_t capacity = 0);
+		std::vector<T> &addVector(const std::string &key, size_t capacity);
+		std::vector<T> &addEmptyVector(const std::string &key, size_t reserve = 0);
 		std::vector<T> &getVector(const std::string &key);
+		const std::vector<T> &getVector(const std::string &key) const;
 
 		//typename std::map<std::string, std::vector<T>>::iterator begin() { return data.begin(); }
 		typename std::map<std::string, std::vector<T>>::const_iterator begin() const { return data.begin(); }

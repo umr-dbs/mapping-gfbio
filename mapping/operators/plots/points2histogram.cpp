@@ -1,4 +1,4 @@
-#include "datatypes/multipointcollection.h"
+#include "raster/exceptions.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "datatypes/plots/histogram.h"
@@ -7,14 +7,17 @@
 #include <json/json.h>
 #include <cmath>
 #include <limits>		// std::numeric_limits
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
 
 /**
- * This class generates a histogram out of a point set with attached meta data.
+ * This class generates a histogram out of a feature set with attached attributes.
  */
-class Points2HistogramOperator : public GenericOperator {
+class HistogramFromFeaturesOperator : public GenericOperator {
 	public:
-		Points2HistogramOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
-		virtual ~Points2HistogramOperator();
+		HistogramFromFeaturesOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
+		virtual ~HistogramFromFeaturesOperator();
 
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
@@ -22,7 +25,7 @@ class Points2HistogramOperator : public GenericOperator {
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
-		std::string name;
+		std::string attributename;
 		unsigned int numberOfBuckets;
 		double rangeMin, rangeMax;
 		bool autoRange;
@@ -32,10 +35,11 @@ class Points2HistogramOperator : public GenericOperator {
  * The constructor takes the meta data field as parameter and the range.
  * If autorange is set to true the range will be calculated automatically.
  */
-Points2HistogramOperator::Points2HistogramOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
+HistogramFromFeaturesOperator::HistogramFromFeaturesOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
-	name = params.get("name", "raster").asString();
+	rangeMin = rangeMax = 0;
+	attributename = params.get("name", "").asString();
 	numberOfBuckets = params.get("numberOfBuckets", Histogram::DEFAULT_NUMBER_OF_BUCKETS).asUInt();
 
 	autoRange = params.get("autoRange", true).asBool();
@@ -45,58 +49,62 @@ Points2HistogramOperator::Points2HistogramOperator(int sourcecounts[], GenericOp
 
 		// fallback if range is invalid or 0
 		if(rangeMax <= rangeMin) {
-			autoRange = true;
+			throw ArgumentException("HistogramFromFeaturesOperator: rangeMin must be smaller than rangeMax");
 		}
 	}
 }
 
-Points2HistogramOperator::~Points2HistogramOperator() {
+HistogramFromFeaturesOperator::~HistogramFromFeaturesOperator() {
 }
-REGISTER_OPERATOR(Points2HistogramOperator, "points2histogram");
+REGISTER_OPERATOR(HistogramFromFeaturesOperator, "histogram_from_features");
 
-void Points2HistogramOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"attributeName\":\"" << name << "\"," << stream
+void HistogramFromFeaturesOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"name\":\"" << attributename << "\","
 			<< "\"numberOfBuckets\":" << numberOfBuckets << ",";
 	if(autoRange) {
 		stream << "\"autoRange\":true";
 	} else {
-		stream << "\"rangeMin\":" << rangeMin << ",\"rangeMax\":" << rangeMax;
+		stream << "\"autoRange\":false, \"rangeMin\":" << rangeMin << ",\"rangeMax\":" << rangeMax;
 	}
 }
 
 /**
  * Calculates the histogram and returns it.
  */
-std::unique_ptr<GenericPlot> Points2HistogramOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getMultiPointCollectionFromSource(0, rect, profiler);
+std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+	std::unique_ptr<SimpleFeatureCollection> features;
+	if (getPointCollectionSourceCount() > 0) {
+		features = getPointCollectionFromSource(0, rect, profiler);
+	}
+	else if (getLineCollectionSourceCount() > 0) {
+		features = getLineCollectionFromSource(0, rect, profiler);
+	}
+	else if (getPolygonCollectionSourceCount() > 0) {
+		features = getPolygonCollectionFromSource(0, rect, profiler);
+	}
+	else
+		throw OperatorException("HistogramFromFeaturesOperator: need a source");
 
-	//double raster_max = points->global_md_value.get(name + "_max");
-	//double raster_min = points->global_md_value.get(name + "_min");
 
-	size_t pointSize = points->points.size();
-	auto& valueVector = points->local_md_value.getVector(name);
+	size_t featurecount = features->getFeatureCount();
+	auto &valueVector = features->local_md_value.getVector(attributename);
 
 	// detect range automatically
-	if(autoRange) {
+	if (autoRange) {
 		rangeMin = std::numeric_limits<double>::max();
 		rangeMax = std::numeric_limits<double>::min();
 
-		for (size_t i=0; i < pointSize; i++) {
+		for (size_t i=0; i < featurecount; i++) {
 			double value = valueVector[i];
-			if (!std::isnan(value) /* is no NaN */) {
-				if(value > rangeMax) {
-					rangeMax = value;
-				}
-				if(value < rangeMin) {
-					rangeMin = value;
-				}
+			if (!std::isnan(value)) {
+				rangeMin = std::min(value, rangeMin);
+				rangeMax = std::max(value, rangeMax);
 			}
 		}
 	}
 
 	auto histogram = std::make_unique<Histogram>(numberOfBuckets, rangeMin, rangeMax);
-
-	for (size_t i=0; i< pointSize; i++) {
+	for (size_t i=0; i < featurecount; i++) {
 		double value = valueVector[i];
 		if (std::isnan(value) /* is NaN */)
 			histogram->incNoData();

@@ -1,0 +1,65 @@
+
+{
+	"endtime" : 42,
+	"name" : "Einfache Ausgabe",
+	"query" : 
+	{
+		"params" : 
+		{
+			"dest_epsg" : 3857,
+			"src_epsg" : 4326
+		},
+		"sources" : 
+		{
+			"geometry" : [],
+			"points" : [],
+			"raster" : 
+			[
+				
+				{
+					"params" : 
+					{
+						"datatype" : "input",
+						"expression" : "A",
+						"max" : 255,
+						"min" : 71
+					},
+					"sources" : 
+					{
+						"geometry" : [],
+						"points" : [],
+						"raster" : 
+						[
+							
+							{
+								"params" : 
+								{
+									"channel" : 0,
+									"sourcename" : "world1"
+								},
+								"sources" : 
+								{
+									"geometry" : [],
+									"points" : [],
+									"raster" : []
+								},
+								"type" : "source"
+							}
+						]
+					},
+					"type" : "expression"
+				}
+			]
+		},
+		"type" : "projection"
+	},
+	"query_expected_hash" : "7bd2f0effb943c8df75851e24db473ce",
+	"query_x1" : -9037508,
+	"query_x2" : 15024179,
+	"query_xres" : 845,
+	"query_y1" : -7017402,
+	"query_y2" : 3756234,
+	"query_yres" : 329,
+	"starttime" : 42,
+	"timeinterval" : 1
+}

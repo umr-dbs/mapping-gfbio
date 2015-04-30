@@ -2,6 +2,7 @@
 #include <geos/geom/CoordinateSequence.h>
 #include <geos/geom/MultiPolygon.h>
 #include <geos/io/WKBReader.h>
+#include <geos/io/WKTReader.h>
 #include "wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <sstream>
@@ -9,13 +10,17 @@
 #include "raster/exceptions.h"
 
 
-WKBUtil::~WKBUtil() {
-
+std::unique_ptr<PointCollection> WKBUtil::readPointCollection(std::stringstream& wkb){
+	//TODO: implement
+	throw FeatureException("Read not yet implemented");
 }
 
-//read Multipolygon as we currently need it for GFBioWS
-//TODO: support Polygons, MultiPolygons, Collection of Polygons, Collection of MultiPolygon, Collection of mixed (Multi-)Polygons
-std::unique_ptr<MultiPolygonCollection> WKBUtil::readMultiPolygonCollection(std::stringstream& wkb){
+std::unique_ptr<LineCollection> WKBUtil::readLineCollection(std::stringstream& wkb){
+	//TODO: implement
+	throw FeatureException("Read not yet implemented");
+}
+
+std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::stringstream& wkb){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKBReader wkbreader(*gf);
 
@@ -26,17 +31,49 @@ std::unique_ptr<MultiPolygonCollection> WKBUtil::readMultiPolygonCollection(std:
 		throw ConverterException("GEOS Geometry is not a geometry collection");
 	}
 
-	if(geom->getNumGeometries() == 0 || geom->getGeometryN(0)->getGeometryTypeId() != geos::geom::GeometryTypeId::GEOS_MULTIPOLYGON){
-			throw ConverterException("GEOS Geometry is not a geometry MultiPolygon or does not exist");
-	}
 
-	const geos::geom::MultiPolygon* multiPolygon = dynamic_cast<const geos::geom::MultiPolygon*>(geom->getGeometryN(0));
-
-	auto multiPolygonCollection = GeosGeomUtil::createMultiPolygonCollection(*multiPolygon);
+	auto polygonCollection = GeosGeomUtil::createPolygonCollection(*geom);
 
 	gf->destroyGeometry(geom);
 
-	std::cerr << "OK";
+	return polygonCollection;
+}
 
-	return multiPolygonCollection;
+std::unique_ptr<PointCollection> WKBUtil::readPointCollection(std::string& wkt){
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+	geos::io::WKTReader wktreader(*gf);
+
+	geos::geom::Geometry* geom = wktreader.read(wkt);
+
+	auto pointCollection = GeosGeomUtil::createPointCollection(*geom);
+
+	gf->destroyGeometry(geom);
+
+	return pointCollection;
+}
+
+std::unique_ptr<LineCollection> WKBUtil::readLineCollection(std::string& wkt){
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+	geos::io::WKTReader wktreader(*gf);
+
+	geos::geom::Geometry* geom = wktreader.read(wkt);
+
+	auto lineCollection = GeosGeomUtil::createLineCollection(*geom);
+
+	gf->destroyGeometry(geom);
+
+	return lineCollection;
+}
+
+std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::string& wkt){
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+	geos::io::WKTReader wktreader(*gf);
+
+	geos::geom::Geometry* geom = wktreader.read(wkt);
+
+	auto polygonCollection = GeosGeomUtil::createPolygonCollection(*geom);
+
+	gf->destroyGeometry(geom);
+
+	return polygonCollection;
 }

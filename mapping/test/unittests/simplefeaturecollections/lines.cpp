@@ -74,3 +74,51 @@ TEST(LineCollection, Iterators) {
 	EXPECT_EQ(res_loop, res_iter);
 	EXPECT_EQ(res_loop, res_citer);
 }
+
+TEST(LineCollection, filter) {
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	lines.local_md_value.addEmptyVector("test");
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_value.set(0, "test", 5.1);
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.finishLine();
+	lines.addCoordinate(2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_value.set(1, "test", 4.1);
+
+	lines.addCoordinate(7,8);
+	lines.addCoordinate(6,5);
+	lines.addCoordinate(6,2);
+	lines.finishLine();
+	lines.addCoordinate(1,4);
+	lines.addCoordinate(12,6);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_value.set(2, "test", 3.1);
+
+	lines.addCoordinate(5,6);
+	lines.addCoordinate(6,7);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_value.set(3, "test", 2.1);
+
+	std::vector<bool> keep {false, true, true};
+
+	EXPECT_THROW(lines.filter(keep), ArgumentException);
+
+	keep.push_back(false);
+	auto linesFiltered = lines.filter(keep);
+
+	EXPECT_EQ(2, linesFiltered->getFeatureCount());
+	EXPECT_EQ(9, linesFiltered->coordinates.size());
+	EXPECT_EQ(2, linesFiltered->local_md_value.getVector("test").size());
+	EXPECT_DOUBLE_EQ(3.1, linesFiltered->local_md_value.get(1, "test"));
+}

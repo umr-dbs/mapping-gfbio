@@ -79,3 +79,68 @@ TEST(PolygonCollection, Iterators) {
 	EXPECT_EQ(res_loop, res_iter);
 	EXPECT_EQ(res_loop, res_citer);
 }
+
+TEST(PolygonCollection, filter) {
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+	polygons.local_md_value.addEmptyVector("test");
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_value.set(0, "test", 5.1);
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_value.set(1, "test", 4.1);
+
+	polygons.addCoordinate(11,21);
+	polygons.addCoordinate(11,31);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(11,21);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(51,81);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(71,61);
+	polygons.addCoordinate(51,81);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_value.set(2, "test", 3.1);
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_value.set(3, "test", 2.1);
+
+	std::vector<bool> keep {false, true, true};
+
+	EXPECT_THROW(polygons.filter(keep), ArgumentException);
+
+	keep.push_back(false);
+	auto polygonsFiltered = polygons.filter(keep);
+
+	EXPECT_EQ(2, polygonsFiltered->getFeatureCount());
+	EXPECT_EQ(16, polygonsFiltered->coordinates.size());
+	EXPECT_EQ(2, polygonsFiltered->local_md_value.getVector("test").size());
+	EXPECT_DOUBLE_EQ(3.1, polygonsFiltered->local_md_value.get(1, "test"));
+}

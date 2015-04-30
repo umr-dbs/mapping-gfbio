@@ -125,8 +125,10 @@ std::unique_ptr<GenericRaster> MSG_Pansharpening_Operator::getRaster(const Query
 	// Interpolate:
 	// interpolate low res matrices to high res and combine them to the result matrix:
 
-	// TODO: temporalen Schnitt nehmen!
-	auto raster_out = GenericRaster::create(raster_lowres->dd, *raster_hrv, GenericRaster::OPENCL);
+	TemporalReference tref(raster_hrv->stref);
+	tref.intersect(raster_lowres->stref);
+	SpatioTemporalReference stref(raster_hrv->stref, tref);
+	auto raster_out = GenericRaster::create(raster_lowres->dd, stref, raster_hrv->width, raster_hrv->height, 0, GenericRaster::OPENCL);
 
 	RasterOpenCL::CLProgram prog_interpolate;
 	prog_interpolate.setProfiler(profiler);

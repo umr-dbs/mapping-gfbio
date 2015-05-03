@@ -16,11 +16,9 @@ Histogram::Histogram(int number_of_buckets, double min, double max)
 		throw ArgumentException("Histogram: min >= max");
 }
 
-
 Histogram::~Histogram() {
 
 }
-
 
 void Histogram::inc(double value) {
 	if (value < min || value > max) {
@@ -41,11 +39,8 @@ int Histogram::calculateBucketForValue(double value){
 }
 
 double Histogram::calculateBucketLowerBorder(int bucket){
-	double value = (bucket * ((max - min) / counts.size())) + min;
-	return value;
+	return (bucket * ((max - min) / counts.size())) + min;
 }
-
-
 
 void Histogram::incNoData() {
 	nodata_count++;
@@ -59,6 +54,10 @@ int Histogram::getValidDataCount(){
 	    sum += i;
 	  }
 	return sum;
+}
+
+void Histogram::addMarker(double bucket, std::string label){
+	markers.emplace_back(bucket, label);
 }
 
 std::string Histogram::toJSON() {

@@ -49,15 +49,12 @@ class Histogram : public GenericPlot {
 		/**
 		 * add a marker
 		 */
-		void addMarker(double bucket, std::string label){
-			markers.emplace_back(bucket, label);
-		}
+		void addMarker(double bucket, std::string label);
 
 	private:
 		std::vector<int> counts;
 		int nodata_count;
 		double min, max;
-
 		std::vector<std::pair<double, std::string>> markers;
 };
 

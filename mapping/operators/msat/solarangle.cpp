@@ -19,8 +19,6 @@
 #include <json/json.h>
 #include <gdal_priv.h>
 
-#include <iostream>
-#include <fstream>
 
 enum class SolarAngles {AZIMUTH, ZENITH};
 

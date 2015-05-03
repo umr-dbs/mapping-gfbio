@@ -70,7 +70,16 @@ ClassificationOperator::~ClassificationOperator() {
 REGISTER_OPERATOR(ClassificationOperator, "reclass");
 
 void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"reclass\":[" << "TODO" << "]";
+	stream << "\"lower:\":[";
+	for(const auto &low : classification_lower_border)
+		stream << low << ",";
+	stream << "],\"upper:\":";
+	for(const auto &up : classification_upper_border)
+		stream << up << ",";
+	stream << "],\"class:\":";
+	for(const auto &cla : classification_classes)
+		stream << cla << ",";
+	stream << "],\"reclassNoData\":" << reclassNoData <<",\"noDataClass\":" << noDataClass << "]";
 }
 
 

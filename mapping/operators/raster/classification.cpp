@@ -70,15 +70,18 @@ ClassificationOperator::~ClassificationOperator() {
 REGISTER_OPERATOR(ClassificationOperator, "reclass");
 
 void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"lower:\":[";
-	for(const auto &low : classification_lower_border)
-		stream << low << ",";
-	stream << "],\"upper:\":";
-	for(const auto &up : classification_upper_border)
-		stream << up << ",";
-	stream << "],\"class:\":";
-	for(const auto &cla : classification_classes)
-		stream << cla << ",";
+	if(!(classification_lower_border.size() == classification_upper_border.size() && classification_upper_border.size() == classification_classes.size()))
+		throw OperatorException("ClassificationOperator::writeSemanticParameters: unequal parameter vector sizes!");
+
+	const size_t size =classification_classes.size();
+
+	stream << "\"RemapRange:\":[";
+	if(size >= 1){
+		stream << "[" << classification_lower_border.at(0) <<"," <<classification_upper_border.at(0) <<","<< classification_classes.at(0) << "]";
+	}
+	for(size_t i = 1; i < size; i++){
+		stream << ",[" << classification_lower_border.at(i) <<"," <<classification_upper_border.at(i) <<","<< classification_classes.at(i) << "]";
+	}
 	stream << "],\"reclassNoData\":" << reclassNoData <<",\"noDataClass\":" << noDataClass << "]";
 }
 

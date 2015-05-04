@@ -133,29 +133,6 @@ if ($action == 'examplequerylist.get') {
 		}
 	}
 },
-"reflectance": {
-	"starttime": 42,
-	"endtime": 42,
-	"timeinterval": 1,
-
-	"name": "_MSat2 #6 Radiance",
-
-	"query": {
-		"type": "msatradiance",
-		"params": {
-		},
-		"sources": {
-			"raster": [{
-				"type": "source",
-				"params": {
-					"sourcename": "msat2",
-					"channel": 6,
-					"transform": false
-				}
-			}]
-		}
-	}
-},
 "temperature": {
 	"starttime": 42,
 	"endtime": 42,
@@ -171,7 +148,7 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "source",
 				"params": {
-					"sourcename": "msat2",
+					"sourcename": "msg9_geos",
 					"channel": 6,
 					"transform": false
 				}
@@ -188,27 +165,18 @@ if ($action == 'examplequerylist.get') {
 	"name": "Fake cloud-detection algorithm",
 
 	"query": {
-		"type": "projection",
+		"type": "expression",
 		"params": {
-			"src_epsg": 62866,
-			"dest_epsg": 3857
+			"expression": "A < 300 ? 1 : 0",
+			"min": 0,
+			"max": 1
 		},
 		"sources": {
 			"raster": [{
-				"type": "expression",
+				"type": "source",
 				"params": {
-					"expression": "A < 300 ? 1 : 0",
-					"min": 0,
-					"max": 1
-				},
-				"sources": {
-					"raster": [{
-						"type": "source",
-						"params": {
-							"sourcename": "msat2",
-							"channel": 6
-						}
-					}]
+					"sourcename": "msg9_geos",
+					"channel": 6
 				}
 			}]
 		}
@@ -245,30 +213,22 @@ if ($action == 'examplequerylist.get') {
 	"name": "A test-expression inverting a meteosat-layer",
 
 	"query": {
-		"type": "projection",
+		"type": "expression",
 		"params": {
-			"src_epsg": 62866,
-			"dest_epsg": 3857
+			"expression": "1024-A",
+			"min": 0,
+			"max": 1024
 		},
 		"sources": {
 			"raster": [{
-				"type": "expression",
+				"type": "source",
 				"params": {
-					"expression": "1024-A",
-					"min": 0,
-					"max": 1024
-				},
-				"sources": {
-					"raster": [{
-						"type": "source",
-						"params": {
-							"sourcename": "msat2",
-							"channel": 0
-						}
-					}]
+					"sourcename": "msg9_geos",
+					"channel": 0
 				}
 			}]
 		}
+			
 	}
 },
 "msat0_edge": {
@@ -288,14 +248,14 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "projection",
 				"params": {
-					"src_epsg": 62866,
+					"src_epsg": 40453,
 					"dest_epsg": 3857
 				},
 				"sources": {
 					"raster": [{
 						"type": "source",
 						"params": {
-							"sourcename": "msat2",
+							"sourcename": "msg9_geos",
 							"channel": 0
 						}
 					}]
@@ -314,7 +274,7 @@ if ($action == 'examplequerylist.get') {
 	"query": {
 		"type": "projection",
 		"params": {
-			"src_epsg": 62866,
+			"src_epsg": 40453,
 			"dest_epsg": 3857
 		},
 		"sources": {
@@ -328,7 +288,7 @@ if ($action == 'examplequerylist.get') {
 					"raster": [{
 						"type": "source",
 						"params": {
-							"sourcename": "msat2",
+							"sourcename": "msg9_geos",
 							"channel": 0
 						}
 					}]
@@ -396,7 +356,7 @@ if ($action == 'examplequerylist.get') {
 			"raster": [{
 				"type": "projection",
 				"params": {
-					"src_epsg": 62866,
+					"src_epsg": 40453,
 					"dest_epsg": 3857
 				},
 				"sources": {
@@ -411,7 +371,7 @@ if ($action == 'examplequerylist.get') {
 							"raster": [{
 								"type": "source",
 								"params": {
-									"sourcename": "msat2",
+									"sourcename": "msg9_geos",
 									"channel": 6
 								}
 							}]
@@ -544,6 +504,62 @@ if ($action == 'examplequerylist.get') {
 	                      {"type":"gfbiopointsource","params":{"datasource":"GBIF","query":"{\"traits\":[{\"datasource\":\"TRY\", \"trait\":\"epiphyte\", \"value\":\"epiphyte\"}],\"localAttributes\":{}}"},"sources":[]}
 	                     ]}]
 	         }
+},
+"msat_cloudclass": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Preprocessing for Meteosat Cloudclassification",
+
+	"query": {
+		
+				"type": "expression",
+				"params": {
+					"expression": "A-B",
+					"min": -100,
+					"max": 100
+				},
+				"sources": {
+					"raster": [{
+						"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":8,"transform":false}}]}
+					},
+					{
+						"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":3,"transform":false}}]}
+					}]
+				}
+		
+	}
+},
+"msat_cloudclass_positive": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "positive cloud pixel tests",
+
+	"query": {"type":"expression","params":{"expression":"(A<253)|(A<233)|((B-C)<13)|(B<240)|(C<220)","datatype":"input","min":0,"max":1},"sources":{"raster":[{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":8,"transform":false}}]}},{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":5,"transform":false}}]}},{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":4,"transform":false}}]}}]}}
+		
+	
+},
+"msat_cloudclass_negative": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "Excluding cloud pixel tests",
+
+	"query": {"type":"expression","params":{"expression":"(A==1)|(B==1)","datatype":"Byte","min":0,"max":1},"sources":{"raster":[{"type":"expression","params":{"expression":"(A==1)&((C/B)>1.5)","datatype":"Byte","min":0,"max":1},"sources":{"raster":[{"type":"expression","params":{"expression":"(A<=93)?1:((A>=100)?2:3)","datatype":"input","min":1,"max":3},"sources":{"raster":[{"type":"msatsolarangle","params":{"solarangle":"zenith"},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":0,"transform":false}}]}}]}},{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":0,"transform":false}}]}},{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":2,"transform":false}}]}}]}},{"type":"expression","params":{"expression":"(D==1)&(C>0.4)&(A>265)&(B>0.11)","datatype":"input","min":0,"max":1},"sources":{"raster":[{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":8,"transform":false}}]}},{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":1,"transform":false}}]}},{"type":"expression","params":{"expression":"(A-B)/(A+B)","datatype":"input","min":-5,"max":5},"sources":{"raster":[{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":0,"transform":false}}]}},{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":2,"transform":false}}]}}]}},{"type":"expression","params":{"expression":"(A<=93)?1:((A>=100)?2:3)","datatype":"input","min":1,"max":3},"sources":{"raster":[{"type":"msatsolarangle","params":{"solarangle":"zenith"},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":0,"transform":false}}]}}]}}]}}]}}
+	
+},
+"msat_cloudclass_v1": {
+	"starttime": 42,
+	"endtime": 42,
+	"timeinterval": 1,
+
+	"name": "sofos cloudclass v1",
+
+	"query": {"type":"expression","params":{"expression":"((A==1)|(B==1))&(!C)","datatype":"input","min":0,"max":1},"sources":{"raster":[{"type":"expression","params":{"expression":"(A-B)<-2.5","datatype":"Byte","min":0,"max":1},"sources":{"raster":[{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":8,"transform":false}}]}},{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":3,"transform":false}}]}}]}},{"type":"expression","params":{"expression":"(A<253)|(A<233)|((B-C)<13)|(B<240)|(C<220)","datatype":"input","min":0,"max":1},"sources":{"raster":[{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":8,"transform":false}}]}},{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":5,"transform":false}}]}},{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":4,"transform":false}}]}}]}},{"type":"expression","params":{"expression":"(A==1)|(B==1)","datatype":"Byte","min":0,"max":1},"sources":{"raster":[{"type":"expression","params":{"expression":"(A==1)&((C/B)>1.5)","datatype":"Byte","min":0,"max":1},"sources":{"raster":[{"type":"expression","params":{"expression":"(A<=93)?1:((A>=100)?2:3)","datatype":"input","min":1,"max":3},"sources":{"raster":[{"type":"msatsolarangle","params":{"solarangle":"zenith"},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":0,"transform":false}}]}}]}},{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":0,"transform":false}}]}},{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":2,"transform":false}}]}}]}},{"type":"expression","params":{"expression":"(D==1)&(C>0.4)&(A>265)&(B>0.11)","datatype":"input","min":0,"max":1},"sources":{"raster":[{"type":"msattemperature","sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":8,"transform":false}}]}},{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":1,"transform":false}}]}},{"type":"expression","params":{"expression":"(A-B)/(A+B)","datatype":"input","min":-5,"max":5},"sources":{"raster":[{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":0,"transform":false}}]}},{"type":"msatradiance","params":{"conversion":false},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":2,"transform":false}}]}}]}},{"type":"expression","params":{"expression":"(A<=93)?1:((A>=100)?2:3)","datatype":"input","min":1,"max":3},"sources":{"raster":[{"type":"msatsolarangle","params":{"solarangle":"zenith"},"sources":{"raster":[{"type":"source","params":{"sourcename":"msg9_geos","channel":0,"transform":false}}]}}]}}]}}]}}]}}
 }
 }
 EOS

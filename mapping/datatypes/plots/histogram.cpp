@@ -16,11 +16,9 @@ Histogram::Histogram(int number_of_buckets, double min, double max)
 		throw ArgumentException("Histogram: min >= max");
 }
 
-
 Histogram::~Histogram() {
 
 }
-
 
 void Histogram::inc(double value) {
 	if (value < min || value > max) {
@@ -40,9 +38,26 @@ int Histogram::calculateBucketForValue(double value){
 	return bucket;
 }
 
+double Histogram::calculateBucketLowerBorder(int bucket){
+	return (bucket * ((max - min) / counts.size())) + min;
+}
 
 void Histogram::incNoData() {
 	nodata_count++;
+}
+
+int Histogram::getValidDataCount(){
+	//return std::accumulate(counts.begin(), counts.end(), 0);
+	int sum = 0;
+	for (int &i: counts)
+	  {
+	    sum += i;
+	  }
+	return sum;
+}
+
+void Histogram::addMarker(double bucket, const std::string &label){
+	markers.emplace_back(bucket, label);
 }
 
 std::string Histogram::toJSON() {
@@ -50,10 +65,24 @@ std::string Histogram::toJSON() {
 	buffer << "{\"type\": \"histogram\", ";
 	buffer << "\"metadata\": {\"min\": " << min << ", \"max\": " << max << ", \"nodata\": " << nodata_count << ", \"numberOfBuckets\": " << counts.size() << "}, ";
 	buffer << "\"data\": [";
-	for(int& bucket : counts) {
-		buffer << bucket << ",";
+	for(int i=0; i < counts.size(); i++){
+				if(i != 0)
+					buffer <<" ,";
+		buffer << counts.at(i);
 	}
-	buffer.seekp(((long) buffer.tellp()) - 1);
-	buffer << "]}";
+	buffer << "] ";
+	if(markers.size() > 0){
+		buffer << ", ";
+		buffer <<"\"lines\":[";
+
+		for(int i=0; i < markers.size(); i++){
+			if(i != 0)
+				buffer <<" ,";
+			auto marker = markers.at(i);
+			buffer <<"{\"name\":\"" << marker.second << "\" ,\"pos\":" << std::to_string(marker.first) << "}";
+		}
+		buffer << "]";
+	}
+	buffer << "} ";
 	return buffer.str();
 }

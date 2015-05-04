@@ -65,7 +65,7 @@ std::string Histogram::toJSON() {
 	buffer << "{\"type\": \"histogram\", ";
 	buffer << "\"metadata\": {\"min\": " << min << ", \"max\": " << max << ", \"nodata\": " << nodata_count << ", \"numberOfBuckets\": " << counts.size() << "}, ";
 	buffer << "\"data\": [";
-	for(int i=0; i < counts.size(); i++){
+	for(size_t i=0; i < counts.size(); i++){
 				if(i != 0)
 					buffer <<" ,";
 		buffer << counts.at(i);
@@ -75,7 +75,7 @@ std::string Histogram::toJSON() {
 		buffer << ", ";
 		buffer <<"\"lines\":[";
 
-		for(int i=0; i < markers.size(); i++){
+		for(size_t i=0; i < markers.size(); i++){
 			if(i != 0)
 				buffer <<" ,";
 			auto marker = markers.at(i);

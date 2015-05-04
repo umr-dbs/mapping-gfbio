@@ -49,7 +49,7 @@ class Histogram : public GenericPlot {
 		/**
 		 * add a marker
 		 */
-		void addMarker(double bucket, std::string label);
+		void addMarker(double bucket, const std::string &label);
 
 	private:
 		std::vector<int> counts;

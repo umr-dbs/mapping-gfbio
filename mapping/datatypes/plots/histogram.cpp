@@ -56,7 +56,7 @@ int Histogram::getValidDataCount(){
 	return sum;
 }
 
-void Histogram::addMarker(double bucket, std::string label){
+void Histogram::addMarker(double bucket, const std::string &label){
 	markers.emplace_back(bucket, label);
 }
 

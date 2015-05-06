@@ -248,21 +248,23 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const Qu
 		throw OperatorException(msg.str());
 	}
 
-	std::vector<bool> keep(points_in->coordinates.size(), true);
+	std::vector<bool> keep(points_in->getFeatureCount(), true);
 	bool has_filter = false;
 
 	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
-	size_t size = points_in->coordinates.size();
-	for (size_t idx = 0; idx < size; idx++) {
-		Coordinate &point = points_in->coordinates[idx];
-		double x = point.x, y = point.y;
-		if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
-			keep[idx] = false;
-			has_filter = true;
-		}
-		else {
-			point.x = x;
-			point.y = y;
+
+	for(auto feature : *points_in){
+		for(auto& coordinate : feature){
+			double x = coordinate.x, y = coordinate.y;
+			if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
+				keep[feature] = false;
+				has_filter = true;
+				break;
+			}
+			else {
+				coordinate.x = x;
+				coordinate.y = y;
+			}
 		}
 	}
 
@@ -276,118 +278,109 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const Qu
 
 
 
-class ProjectionTransformer: public geos::geom::util::GeometryTransformer {
-	public:
-		ProjectionTransformer(const GDAL::CRSTransformer &transformer) : geos::geom::util::GeometryTransformer(), transformer(transformer) {};
-		virtual ~ProjectionTransformer() {};
-
-	protected:
-		virtual geos::geom::CoordinateSequence::AutoPtr transformCoordinates(const geos::geom::CoordinateSequence* coords, const geos::geom::Geometry* parent) {
-			size_t size = coords->getSize();
-
-			auto coords_out = std::auto_ptr<std::vector<geos::geom::Coordinate> >(new std::vector<geos::geom::Coordinate>());
-			coords_out->reserve(size);
-
-			for (size_t i=0;i<size;i++) {
-				const geos::geom::Coordinate &c = coords->getAt(i);
-				double x = c.x, y = c.y, z = c.z;
-				if (transformer.transform(x, y, z))
-					coords_out->push_back(geos::geom::Coordinate(x+1, y, z));
-				// TODO: if too few coordinates remain, this will throw an exception rather than skip the invalid geometry
-			}
-
-			return createCoordinateSequence(coords_out);
-		}
-
-
-		/*
-		virtual geos::geom::Geometry::AutoPtr transformPoint(const geos::geom::Point* geom,
-				const geos::geom::Geometry* parent);
-
-		virtual geos::geom::Geometry::AutoPtr transformMultiPoint(const geos::geom::MultiPoint* geom,
-				const geos::geom::Geometry* parent);
-
-		virtual geos::geom::Geometry::AutoPtr transformLinearRing(const geos::geom::LinearRing* geom,
-				const geos::geom::Geometry* parent);
-
-		virtual geos::geom::Geometry::AutoPtr transformLineString(const geos::geom::LineString* geom,
-				const geos::geom::Geometry* parent);
-
-		virtual geos::geom::Geometry::AutoPtr transformMultiLineString(
-				const geos::geom::MultiLineString* geom, const geos::geom::Geometry* parent);
-
-		virtual geos::geom::Geometry::AutoPtr transformPolygon(const geos::geom::Polygon* geom,
-				const geos::geom::Geometry* parent);
-
-		virtual geos::geom::Geometry::AutoPtr transformMultiPolygon(const geos::geom::MultiPolygon* geom,
-				const geos::geom::Geometry* parent);
-
-		virtual geos::geom::Geometry::AutoPtr transformGeometryCollection(
-				const geos::geom::GeometryCollection* geom, const geos::geom::Geometry* parent);
-		*/
-	private:
-		const GDAL::CRSTransformer &transformer;
-};
 
 std::unique_ptr<LineCollection> ProjectionOperator::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	if (src_epsg == EPSG_GEOSMSG || dest_epsg == EPSG_GEOSMSG)
-		throw OperatorException("Projection: cannot transform Geometries to or from MSAT2 projection");
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 
 	GDAL::CRSTransformer qrect_transformer(dest_epsg, src_epsg);
 	QueryRectangle src_rect = projectQueryRectangle(rect, qrect_transformer);
 
-	//TODO: reproject without GEOS workaround
+	GDAL::CRSTransformer transformer(src_epsg, dest_epsg);
 
-	auto lineCollection = getLineCollectionFromSource(0, src_rect, profiler);
+	auto lines_in = getLineCollectionFromSource(0, src_rect, profiler);
 
-	auto geom_in = GeosGeomUtil::createGeosLineCollection(*lineCollection);
-
-	if (src_epsg != lineCollection->stref.epsg) {
+	if (src_epsg != lines_in->stref.epsg) {
 		std::ostringstream msg;
-		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << (int) src_epsg << " got " << (int) lineCollection->stref.epsg;
+		msg << "ProjectionOperator: Source Lines not in expected projection, expected " << (int) src_epsg << " got " << (int) lines_in->stref.epsg;
 		throw OperatorException(msg.str());
 	}
 
-	GDAL::CRSTransformer geom_transformer(src_epsg, dest_epsg);
-	ProjectionTransformer pt(geom_transformer);
-	auto geom_out = pt.transform(geom_in.get());
+	std::vector<bool> keep(lines_in->getFeatureCount(), true);
+	bool has_filter = false;
 
-	//restore metadata
+	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
 
-	return 	GeosGeomUtil::createLineCollection(*geom_out.get());
+	for(auto feature : *lines_in){
+		for(auto line : feature){
+			for(auto& coordinate : line){
+				double x = coordinate.x, y = coordinate.y;
+				if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
+					keep[feature] = false;
+					has_filter = true;
+					break;
+				}
+				else {
+					coordinate.x = x;
+					coordinate.y = y;
+				}
+			}
+			if(!keep[feature])
+				break;
+		}
+	}
+
+	lines_in->replaceSTRef(rect);
+
+	if (!has_filter)
+		return lines_in;
+	else
+		return lines_in->filter(keep);
 }
 
 //TODO: why is this in raster folder?
 std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	if (src_epsg == EPSG_GEOSMSG || dest_epsg == EPSG_GEOSMSG)
-		throw OperatorException("Projection: cannot transform Geometries to or from MSAT2 projection");
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 
 	GDAL::CRSTransformer qrect_transformer(dest_epsg, src_epsg);
 	QueryRectangle src_rect = projectQueryRectangle(rect, qrect_transformer);
 
-	//TODO: reproject without GEOS workaround
+	GDAL::CRSTransformer transformer(src_epsg, dest_epsg);
 
-	auto polygonCollection = getPolygonCollectionFromSource(0, src_rect, profiler);
 
-	auto geom_in = GeosGeomUtil::createGeosPolygonCollection(*polygonCollection);
+	auto polygons_in = getPolygonCollectionFromSource(0, src_rect, profiler);
 
-	if (src_epsg != polygonCollection->stref.epsg) {
+	if (src_epsg != polygons_in->stref.epsg) {
 		std::ostringstream msg;
-		msg << "ProjectionOperator: Source Geometry not in expected projection, expected " << (int) src_epsg << " got " << (int) polygonCollection->stref.epsg;
+		msg << "ProjectionOperator: Source Polygons not in expected projection, expected " << (int) src_epsg << " got " << (int) polygons_in->stref.epsg;
 		throw OperatorException(msg.str());
 	}
 
-	GDAL::CRSTransformer geom_transformer(src_epsg, dest_epsg);
-	ProjectionTransformer pt(geom_transformer);
-	auto geom_out = pt.transform(geom_in.get());
+	std::vector<bool> keep(polygons_in->getFeatureCount(), true);
+	bool has_filter = false;
 
-	//TODO: restore metadata
+	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
 
-	return 	GeosGeomUtil::createPolygonCollection(*geom_out.get());
+	for(auto feature : *polygons_in){
+		for(auto polygon : feature){
+			for(auto ring : polygon){
+				for(auto& coordinate : ring){
+					double x = coordinate.x, y = coordinate.y;
+					if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
+						keep[feature] = false;
+						has_filter = true;
+						break;
+					}
+					else {
+						coordinate.x = x;
+						coordinate.y = y;
+					}
+				}
+				if(!keep[feature])
+					break;
+			}
+			if(!keep[feature])
+				break;
+		}
+	}
+
+	polygons_in->replaceSTRef(rect);
+
+	if (!has_filter)
+		return polygons_in;
+	else
+		return polygons_in->filter(keep);
 }
 
 #if 0

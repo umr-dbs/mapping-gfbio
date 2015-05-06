@@ -58,8 +58,8 @@ public:
 	//finishes the definition of the new feature, returns new feature index
 	size_t finishFeature();
 
-	std::unique_ptr<PolygonCollection> filter(const std::vector<bool> &keep) { throw 1; } // TODO: implement
-	std::unique_ptr<PolygonCollection> filter(const std::vector<char> &keep) { throw 1; }
+	std::unique_ptr<PolygonCollection> filter(const std::vector<bool> &keep);
+	std::unique_ptr<PolygonCollection> filter(const std::vector<char> &keep);
 
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
@@ -144,9 +144,6 @@ private:
 	};
 	template<typename C>
 	class PolygonRingReference {
-		private:
-			C &pc;
-			const size_t idx;
 		public:
 			PolygonRingReference(C &pc, size_t idx) : pc(pc), idx(idx) {};
 
@@ -170,6 +167,9 @@ private:
 		    size_t size() const {
 		    	return pc.start_ring[idx+1] - pc.start_ring[idx];
 		    }
+		private:
+			C &pc;
+			const size_t idx;
 	};
 };
 

@@ -398,9 +398,9 @@ int processWCS(std::map<std::string, std::string> &params) {
 		unsigned int sizeY = getWfsParameterInteger(params["size_y"]);
 
 		//TODO: parse datetime!
-
+		time_t timestamp = 1295266500; // 2011-1-17 12:15
 		//build the queryRectangle and get the data
-		QueryRectangle query_rect{42, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, sizeX, sizeY, query_crsId};
+		QueryRectangle query_rect{timestamp, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, sizeX, sizeY, query_crsId};
 		QueryProfiler profiler;
 		auto result_raster = graph->getCachedRaster(query_rect, profiler);
 

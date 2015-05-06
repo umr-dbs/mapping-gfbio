@@ -2,6 +2,89 @@
 
 #include <sstream>
 #include "polygoncollection.h"
+#include "util/make_unique.h"
+
+template<typename T>
+std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vector<T> &keep) {
+	size_t count = in->getFeatureCount();
+	if (keep.size() != count) {
+		std::ostringstream msg;
+		msg << "PolygonCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
+		throw ArgumentException(msg.str());
+	}
+
+	size_t kept_count = 0;
+	for (size_t idx=0;idx<count;idx++) {
+		if (keep[idx])
+			kept_count++;
+	}
+
+	auto out = std::make_unique<PolygonCollection>(in->stref);
+	out->start_feature.reserve(kept_count);
+	// copy global metadata
+	out->global_md_string = in->global_md_string;
+	out->global_md_value = in->global_md_value;
+
+	// copy features
+	for (auto feature : *in) {
+		if (keep[feature]) {
+			//copy polygons
+			for(auto polygon : feature){
+				for(auto ring : polygon){
+					//copy coordinates
+					for (auto & c : ring) {
+						out->addCoordinate(c.x, c.y);
+					}
+					out->finishRing();
+				}
+				out->finishPolygon();
+			}
+			out->finishFeature();
+		}
+	}
+
+	// copy local MD
+	for (auto &keyValue : in->local_md_string) {
+		const auto &vec_in = in->local_md_string.getVector(keyValue.first);
+		auto &vec_out = out->local_md_string.addEmptyVector(keyValue.first, kept_count);
+		for (size_t idx=0;idx<count;idx++) {
+			if (keep[idx])
+				vec_out.push_back(vec_in[idx]);
+		}
+	}
+
+	for (auto &keyValue : in->local_md_value) {
+		const auto &vec_in = in->local_md_value.getVector(keyValue.first);
+		auto &vec_out = out->local_md_value.addEmptyVector(keyValue.first, kept_count);
+		for (size_t idx=0;idx<count;idx++) {
+			if (keep[idx])
+				vec_out.push_back(vec_in[idx]);
+		}
+	}
+	// copy time arrays
+	if (in->hasTime()) {
+		out->time_start.reserve(kept_count);
+		out->time_end.reserve(kept_count);
+		for (auto i=0;i<count;i++) {
+			for (size_t idx=0;idx<count;idx++) {
+				if (keep[idx]) {
+					out->time_start.push_back(in->time_start[idx]);
+					out->time_end.push_back(in->time_end[idx]);
+				}
+			}
+		}
+	}
+
+	return out;
+}
+
+std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<bool> &keep) {
+	return ::filter<bool>(this, keep);
+}
+
+std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<char> &keep) {
+	return ::filter<char>(this, keep);
+}
 
 std::string PolygonCollection::toGeoJSON(bool displayMetadata) const {
 	//TODO: implement inclusion of metadata

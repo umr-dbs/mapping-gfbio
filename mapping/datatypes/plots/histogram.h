@@ -34,15 +34,28 @@ class Histogram : public GenericPlot {
 		int getNumberOfBuckets(){
 			return counts.size();
 		}
+		/*
+		 * returns the count of all inserted elements (without NoData)
+		 */
+		int getValidDataCount();
 		/**
 		 * calculates the bucket where a value would be inserted
 		 */
 		int calculateBucketForValue(double value);
+		/**
+		 * calculates the bucket minimum
+		 */
+		double calculateBucketLowerBorder(int bucket);
+		/**
+		 * add a marker
+		 */
+		void addMarker(double bucket, const std::string &label);
 
 	private:
 		std::vector<int> counts;
 		int nodata_count;
 		double min, max;
+		std::vector<std::pair<double, std::string>> markers;
 };
 
 #endif

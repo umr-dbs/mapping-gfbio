@@ -43,13 +43,24 @@ float RadianceTable::getTempFromRadiance(float radiance) {
 	for(int i=1;i<length;i++) {
 		float prev = radiances[i-1], next = radiances[i];
 		if (prev == radiance)
-			return temperatures[i];
+			return temperatures[i-1];
 		if (prev < radiance && next > radiance) {
+
+			/* TODO: selector for multiple methods
 			// Return a linear interpolation between the two values.
 			// The table should be dense enough that this returns reasonably accurate results.
 			float l = (next - prev) / (radiance - prev); // [0..1]
 			l = std::min(1.0f, std::max(0.0f, l)); // just in case..
 			return temperatures[i-1] + l * (temperatures[i]-temperatures[i-1]);
+			*/
+
+			float distPrev = std::abs(radiance - prev);
+			float distNext = std::abs(radiance - next);
+			if(distPrev < distNext )
+				return temperatures[i-1];
+			else
+				return temperatures[i];
+
 		}
 	}
 
@@ -84,14 +95,6 @@ static RadianceTable *getRadianceTable(int channel) {
 	throw ArgumentException(msg.str());
 }
 
-/*
-
-Reflektanz:
-* für jeden Pixel lat/lon ausrechnen
-* Sonnenstand (tag des jahres)? Zenitwinkelkorrektur?
-*
-
- */
 
 class MSATTemperatureOperator : public GenericOperator {
 	public:
@@ -134,8 +137,8 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 	lut.reserve(1024);
 	for(int i = 0; i < 1024; i++) {
 		float radiance = offset + i * slope;
-		lut.push_back(table->getTempFromRadiance(radiance));
-		printf("%d: %f\n", i, lut[i]);
+		float temperature = table->getTempFromRadiance(radiance);
+		lut.push_back(temperature);
 	}
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");

@@ -89,9 +89,9 @@ class GenericOperator {
 		virtual ~GenericOperator();
 
 		std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
-		std::unique_ptr<PointCollection> getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		std::unique_ptr<LineCollection> getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		std::unique_ptr<PolygonCollection> getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<PointCollection> getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<LineCollection> getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<PolygonCollection> getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
 		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		const std::string &getSemanticId() { return semantic_id; }

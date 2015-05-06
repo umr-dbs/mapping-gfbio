@@ -142,3 +142,41 @@ TEST(PointCollection, filter) {
 	EXPECT_EQ(2, pointsFiltered->local_md_value.getVector("test").size());
 	EXPECT_DOUBLE_EQ(3.1, pointsFiltered->local_md_value.get(1, "test"));
 }
+
+TEST(PointCollection, Iterators) {
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	for (size_t i=0;i<100000;i++) {
+		points.addCoordinate(i,i+1);
+		if (i % 3 == 0)
+			points.addCoordinate(i,i+2);
+		points.finishFeature();
+	}
+
+	double res_loop = 0;
+	auto featurecount = points.getFeatureCount();
+	for (size_t i=0;i<featurecount;i++) {
+		auto start = points.start_feature[i];
+		auto end = points.start_feature[i+1];
+		for (size_t j = start; j < end; j++) {
+			res_loop += points.coordinates[j].x;
+		}
+	}
+
+	double res_iter = 0;
+	for (auto feature : points) {
+		for (auto & c : feature) {
+			res_iter += c.x;
+		}
+	}
+
+	double res_citer = 0;
+	const PointCollection &cpoints = points;
+	for (auto feature : cpoints) {
+		for (auto & c : feature) {
+			res_citer += c.x;
+		}
+	}
+
+	EXPECT_EQ(res_loop, res_iter);
+	EXPECT_EQ(res_loop, res_citer);
+}

@@ -6,58 +6,35 @@
 /**
  * Operator that takes Well-Known-Text as parameter
  */
-class WKTPointSource : public GenericOperator {
+class WKTSource : public GenericOperator {
 	public:
-		WKTPointSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
+	WKTSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 			assumeSources(0);
 			wkt = params.get("wkt", "").asString();
+			type = params.get("type", "").asString();
 		}
 
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 			return WKBUtil::readPointCollection(wkt);
 		}
 
-		virtual ~WKTPointSource(){};
-
-	private:
-		std::string wkt;
-};
-REGISTER_OPERATOR(WKTPointSource, "wktpointsource");
-
-class WKTLineSource : public GenericOperator {
-	public:
-	WKTLineSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
-			assumeSources(0);
-			wkt = params.get("wkt", "").asString();
-		}
-
 		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler){
-			return WKBUtil::readLineCollection(wkt);
-		}
-
-		virtual ~WKTLineSource(){};
-
-	private:
-		std::string wkt;
-};
-REGISTER_OPERATOR(WKTLineSource, "wktlinesource");
-
-class WKTPolygonSource : public GenericOperator {
-	public:
-		WKTPolygonSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
-			assumeSources(0);
-			wkt = params.get("wkt", "").asString();
-		}
+				return WKBUtil::readLineCollection(wkt);
+			}
 
 		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 			return WKBUtil::readPolygonCollection(wkt);
 		}
 
-		virtual ~WKTPolygonSource(){};
+		void writeSemanticParameters(std::ostringstream& stream) {
+			stream << "\"type\":\"" << type << "\","
+					<< "\"wkt\":\"" << wkt << "\"";
+		}
+
+		virtual ~WKTSource(){};
 
 	private:
 		std::string wkt;
+		std::string type;
 };
-REGISTER_OPERATOR(WKTPolygonSource, "wktpolygonsource");
-
-
+REGISTER_OPERATOR(WKTSource, "wktsource");

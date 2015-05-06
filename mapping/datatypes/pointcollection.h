@@ -70,9 +70,6 @@ private:
 	 */
 	template<typename C>
 	class PointFeatureReference {
-		private:
-			C &pc;
-			const size_t idx;
 		public:
 			PointFeatureReference(C &pc, size_t idx) : pc(pc), idx(idx) {};
 
@@ -100,6 +97,9 @@ private:
 		    operator size_t() const {
 		    	return idx;
 		    }
+		private:
+			C &pc;
+			const size_t idx;
 	};
 };
 

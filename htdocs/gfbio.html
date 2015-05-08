@@ -25,16 +25,6 @@
 				    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 				}
 				
-				function Widget_GFBioSearchResults() {
-					Session.ajax2("GET", "/ajax/gfbio/baskets/" + liferayId, {}, function(success, data) {
-						if (success) {
-							alert(JSON.stringify(data));
-						}
-					});
-					this.container.innerHTML = "HI";
-				}
-				Widget.inheritTo(Widget_GFBioSearchResults);
-				
 				liferayId = getParameterByName('liferayId');
 				if(liferayId == ""){
 					UI.showUI(UI_Login, 'GFBio');

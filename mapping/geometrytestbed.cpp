@@ -11,6 +11,7 @@
 #include "raster/opencl.h"
 
 #include "operators/operator.h"
+#include <boost/tokenizer.hpp>
 
 geos::geom::Geometry* createGeosGeometry(std::string wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
@@ -327,22 +328,32 @@ int main(){
 	//testMultiPolygonGeoJSON();
 	//testFilterPoints();
 
-	iteratorBenchmarks();
+//	iteratorBenchmarks();
+//
+//	//testMultiPointToCSV();
+//	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
+//
+//	points.local_md_value.addEmptyVector("test");
+//
+//	points.addCoordinate(1,2);
+//	points.finishFeature();
+//	points.local_md_value.set(0, "test", 5.1);
+//
+//	points.addCoordinate(2,3);
+//	points.addCoordinate(3,4);
+//	points.finishFeature();
+//	points.local_md_value.set(1, "test", 2.1);
+//
+//	std::cout << points.toGeoJSON(true);
 
-	//testMultiPointToCSV();
-	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
+	std::string string = "this thing\nis. not\na\ntest";
+	boost::char_delimiters_separator<char> lineSeparator(false, "", "\n");
 
-	points.local_md_value.addEmptyVector("test");
+	boost::tokenizer<boost::char_delimiters_separator<char>> lineTokenizer(string, lineSeparator);
 
-	points.addCoordinate(1,2);
-	points.finishFeature();
-	points.local_md_value.set(0, "test", 5.1);
+	for(auto lineToken = lineTokenizer.begin(); lineToken != lineTokenizer.end(); ++lineToken){
+		std::cout << ">" << *lineToken <<  "<" << std::endl;
+	}
 
-	points.addCoordinate(2,3);
-	points.addCoordinate(3,4);
-	points.finishFeature();
-	points.local_md_value.set(1, "test", 2.1);
-
-	std::cout << points.toGeoJSON(true);
 	return 0;
 }

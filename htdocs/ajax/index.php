@@ -387,13 +387,36 @@ $app->group ( '/gfbio', function () use($app) {
 		curl_setopt($curl, CURLOPT_POST, 1);
 		curl_setopt($curl, CURLOPT_POSTFIELDS, "userId=".$liferayId);
 		
-		$result = curl_exec($curl);
+		$curlResult= curl_exec($curl);
 		
-		if($result === false){
+		if($curlResult === false){
 			$app->response->write( 'Curl-Fehler: ' . curl_error($curl));
 		}
 		else {
-			$app->response->write($result);
+			$baskets = array();
+			$liferayBaskets = json_decode($curlResult);
+			foreach ($liferayBaskets as $liferayBasket){
+				$basketJSON = json_decode($liferayBasket->basketJSON);			
+				$basket = array("query" => json_decode($liferayBasket->queryJSON)->query->function_score->query->filtered->query->simple_query_string->query, 
+						"results" => array());
+				
+				foreach ($basketJSON->selected as $basketEntryJSON){
+					$basketEntry = array("metadataLink" => $basketEntryJSON->metadataLink);
+					
+					if(strpos($basketEntryJSON->metadataLink, "doi.pangaea.de")){						
+						$basketEntry["type"] = "pangaea";
+						$offset = strpos($basketEntryJSON->metadataLink, "doi.pangaea.de/") + strlen("doi.pangaea.de/");
+						$basketEntry["doi"] = substr($basketEntryJSON->metadataLink, $offset);
+					} else {
+						$basketEntry["type"] = "abcd";
+					}
+					array_push($basket["results"], $basketEntry);
+				}				
+				
+				array_push($baskets, $basket);
+			}
+			
+			$app->response->write ( json_encode ( $baskets ) );			
 		}
 		
 		curl_close($curl);		

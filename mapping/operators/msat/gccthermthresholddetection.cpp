@@ -274,10 +274,10 @@ std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster
 	//get the threshold
 	double temperature_threshold_night = findGccThermThreshold(histogram_night_ptr.get());
 
-	//build vectors for classification ->
-	std::vector<float> classification_bounds_lower{static_cast<float>(cloudclass::solar_zenith_angle_min_day), static_cast<float>(cloudclass::solar_zenith_angle_min_night)};
-	std::vector<float> classification_bounds_upper{static_cast<float>(cloudclass::solar_zenith_angle_max_day), static_cast<float>(cloudclass::solar_zenith_angle_max_night)};
-	std::vector<float> classification_classes{static_cast<float>(temperature_threshold_day), static_cast<float>(temperature_threshold_night)};
+	//build vectors for classification -> The class in the middle sets a threshold of -9999 which will never happen in reality.  This is needed to prevent filling "twilight" areas with NaN.
+	std::vector<float> classification_bounds_lower{static_cast<float>(cloudclass::solar_zenith_angle_min_day), static_cast<float>(cloudclass::solar_zenith_angle_max_day), static_cast<float>(cloudclass::solar_zenith_angle_min_night)};
+	std::vector<float> classification_bounds_upper{static_cast<float>(cloudclass::solar_zenith_angle_max_day), static_cast<float>(cloudclass::solar_zenith_angle_min_night), static_cast<float>(cloudclass::solar_zenith_angle_max_night)};
+	std::vector<float> classification_classes{static_cast<float>(temperature_threshold_day), -9999 , static_cast<float>(temperature_threshold_night)};
 
 	//move the zenith_angle_raster to the device
 	solar_zenith_angle_raster->setRepresentation(GenericRaster::Representation::CPU); //TODO: do GPU
@@ -298,7 +298,7 @@ std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster
 	prog.addArg(classification_bounds_lower);
 	prog.addArg(classification_bounds_upper);
 	prog.addArg(classification_classes);
-	prog.addArg(2);
+	prog.addArg(static_cast<int>(classification_classes.size()));
 	prog.addArg(static_cast<float>(out_dd.no_data)); //keep nodata as nodata
 	prog.run();
 

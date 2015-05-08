@@ -34,13 +34,12 @@ class MSATRadianceOperator : public GenericOperator {
 MSATRadianceOperator::MSATRadianceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
-	std::string conversion = params.get("conversion", "false").asString();
-	this->convert = (conversion == "true");
-
+	this->convert = params.get("conversion", "false").asBool();
 }
+
 MSATRadianceOperator::~MSATRadianceOperator() {
 }
-// We do not need this operator any more, the raster source can scale automatically.
+
 REGISTER_OPERATOR(MSATRadianceOperator, "msatradiance");
 
 void MSATRadianceOperator::writeSemanticParameters(std::ostringstream& stream) {

@@ -60,15 +60,17 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 				vec_out.push_back(vec_in[idx]);
 		}
 	}
-	// copy time array
-	out->has_time = false;
-	out->timestamps.clear();
-	if (in->has_time) {
-		out->has_time = true;
-		out->timestamps.reserve(kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				out->timestamps.push_back(in->timestamps[idx]);
+	// copy time arrays
+	if (in->hasTime()) {
+		out->time_start.reserve(kept_count);
+		out->time_end.reserve(kept_count);
+		for (auto i=0;i<count;i++) {
+			for (size_t idx=0;idx<count;idx++) {
+				if (keep[idx]) {
+					out->time_start.push_back(in->time_start[idx]);
+					out->time_end.push_back(in->time_end[idx]);
+				}
+			}
 		}
 	}
 
@@ -232,7 +234,7 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 			json << "]}";
 		}
 
-		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || has_time)){
+		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || hasTime())){
 			json << ",\"properties\":{";
 
 			for (auto &key : string_keys) {
@@ -252,8 +254,8 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 				json << ",";
 			}
 
-			if (has_time) {
-				json << "\"time\":" << timestamps[feature] << ",";
+			if (hasTime()) {
+				json << "\"time_start\":" << time_start[feature] << ",\"time_end\":" << time_end[feature] << ",";
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
@@ -283,8 +285,8 @@ std::string PointCollection::toCSV() const {
 		csv << "feature,";
 	}
 	csv << "lon" << "," << "lat";
-	if (has_time)
-		csv << ",\"time\"";
+	if (hasTime())
+		csv << ",\"time_start\",\"time_end\"";
 	for(auto &key : string_keys) {
 		csv << ",\"" << key << "\"";
 	}
@@ -293,29 +295,23 @@ std::string PointCollection::toCSV() const {
 	}
 	csv << std::endl;
 
-	size_t idx = 0;
-	size_t featureIndex = 0;
-	for (const auto &p : coordinates) {
-		if(!isSimpleCollection){
-			if(idx >= start_feature[featureIndex+1]){
-				++featureIndex;
+	for (auto feature : *this) {
+		for (auto & c : feature) {
+			if(!isSimpleCollection)
+				csv << (size_t) feature << ",";
+			csv << c.x << "," << c.y;
+
+			if (hasTime())
+				csv << "," << time_start[feature] << "," << time_end[feature];
+
+			for(auto &key : string_keys) {
+				csv << ",\"" << local_md_string.get(feature, key) << "\"";
 			}
-			csv << featureIndex << ",";
+			for(auto &key : value_keys) {
+				csv << "," << local_md_value.get(feature, key);
+			}
+			csv << std::endl;
 		}
-		csv << p.x << "," << p.y;
-
-		if (has_time)
-			csv << "," << timestamps[featureIndex];
-
-
-		for(auto &key : string_keys) {
-			csv << ",\"" << local_md_string.get(featureIndex, key) << "\"";
-		}
-		for(auto &key : value_keys) {
-			csv << "," << local_md_value.get(featureIndex, key);
-		}
-		csv << std::endl;
-		idx++;
 	}
 
 	return csv.str();

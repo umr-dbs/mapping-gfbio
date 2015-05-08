@@ -81,7 +81,8 @@ __kernel void azimuthKernel(__global const IN_TYPE0 *in_data, __global const Ras
 	geosPosition.x = (posx * in_info->scale[0] + in_info->origin[0]);
 	geosPosition.y = (posy * in_info->scale[1] + in_info->origin[1]);
 
-	double2 satelliteViewAngle = geosPosition * toViewAngleFac * (double2)(-1,1);
+	//The relationship between the METEOSAT scan angle and the GEOS Coordinates is: scanAngle = GEOS * 65536 / (CFAC * ColumnDirGridStep). The multiplication with (-1,1) is needed as the GEOS CRS x-axis is west -> east and the METEOSAT scan angle is east-> west.
+	double2 satelliteViewAngle = geosPosition * toViewAngleFac * (double2)(-1,1); //
 	double2 latLonPosition = satelliteViewAngleToLatLon(satelliteViewAngle, 0.0);
 	double2 azimuthZenith = solarAzimuthZenith(dGreenwichMeanSiderealTime, dRightAscension, dDeclination, latLonPosition);
 

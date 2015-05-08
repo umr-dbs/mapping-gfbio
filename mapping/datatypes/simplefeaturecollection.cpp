@@ -9,7 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <cmath>
-
+#include <limits>
 
 Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
@@ -20,6 +20,26 @@ void Coordinate::toStream(BinaryStream &stream) {
 	stream.write(y);
 }
 
+/**
+ * Timestamps
+ */
+bool SimpleFeatureCollection::hasTime() const {
+	return time_start.size() == getFeatureCount();
+}
+
+void SimpleFeatureCollection::addDefaultTimestamps() {
+	addDefaultTimestamps(std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
+}
+
+void SimpleFeatureCollection::addDefaultTimestamps(double min, double max) {
+	if (hasTime())
+		return;
+	auto fcount = getFeatureCount();
+	time_start.empty();
+	time_start.resize(fcount, min);
+	time_end.empty();
+	time_end.resize(fcount, max);
+}
 
 
 /**

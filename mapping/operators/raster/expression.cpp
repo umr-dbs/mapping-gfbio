@@ -74,10 +74,14 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	GenericRaster *raster_in = in_rasters[0].get();
 	raster_in->setRepresentation(GenericRaster::OPENCL);
 
+	// figure out the largest time interval common to all input rasters
+	TemporalReference tref(raster_in->stref);
+
 	QueryRectangle exact_rect(*raster_in);
 	for (int i=1;i<rastercount;i++) {
 		in_rasters.push_back(getRasterFromSource(i, exact_rect, profiler, RasterQM::EXACT));
 		in_rasters[i]->setRepresentation(GenericRaster::OPENCL);
+		tref.intersect(in_rasters[i]->stref);
 	}
 
 	/*
@@ -119,7 +123,8 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	if (raster_in->dd.has_no_data)
 		out_dd.addNoData();
 
-	auto raster_out = GenericRaster::create(out_dd, *raster_in);
+	SpatioTemporalReference out_stref(raster_in->stref, tref);
+	auto raster_out = GenericRaster::create(out_dd, out_stref, raster_in->width, raster_in->height, 0, GenericRaster::Representation::OPENCL);
 
 	/*
 	 * Run the kernel

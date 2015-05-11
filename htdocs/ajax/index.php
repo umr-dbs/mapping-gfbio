@@ -397,11 +397,15 @@ $app->group ( '/gfbio', function () use($app) {
 			$liferayBaskets = json_decode($curlResult);
 			foreach ($liferayBaskets as $liferayBasket){
 				$basketJSON = json_decode($liferayBasket->basketJSON);			
-				$basket = array("query" => json_decode($liferayBasket->queryJSON)->query->function_score->query->filtered->query->simple_query_string->query, 
+				$basket = array("query" => json_decode($liferayBasket->queryJSON)->query->function_score->query->filtered->query->simple_query_string->query,
+						"datetime" => gmdate("Y-m-d\TH:i:s\Z", $liferayBasket->lastModifiedDate/1000), 
 						"results" => array());
 				
 				foreach ($basketJSON->selected as $basketEntryJSON){
-					$basketEntry = array("metadataLink" => $basketEntryJSON->metadataLink);
+					$basketEntry = array("title" => $basketEntryJSON->title,
+							"authors" => $basketEntryJSON->authors,
+							"dataCenter" => $basketEntryJSON->dataCenter,
+							"metadataLink" => $basketEntryJSON->metadataLink);
 					
 					if(strpos($basketEntryJSON->metadataLink, "doi.pangaea.de")){						
 						$basketEntry["type"] = "pangaea";

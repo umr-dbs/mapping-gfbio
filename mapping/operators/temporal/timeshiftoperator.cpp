@@ -13,20 +13,31 @@
 #include "datatypes/polygoncollection.h"
 #include "datatypes/pointcollection.h"
 #include "datatypes/linecollection.h"
+#include "datatypes/spatiotemporal.h"
 
 #include "raster/exceptions.h"
 
-/**
- * A common virtual class for time modifications.
- */
-class TimeModification {
+class TimeShift {
 	public:
-		virtual ~TimeModification() = default;
+		/**
+		 * Shift the timestamp.
+		 *
+		 * @param input
+		 *
+		 * @return shifted time
+		 */
+		virtual auto apply(const time_t& input) -> time_t = 0;
 
 		/**
-		 * Apply the instance to t time_t and modify it.
+		 * Revert the time shift for the output timestamp.
+		 *
+		 * @param input
+		 *
+		 * @return reverted output time.
 		 */
-		virtual auto operator()(const time_t& input) const -> time_t = 0;
+		virtual auto reverse(const time_t& input) -> time_t = 0;
+
+		virtual ~TimeShift() = default;
 	protected:
 		using time_t = std::time_t;
 
@@ -57,9 +68,12 @@ class TimeModification {
 /**
  * This operator yields the identity of the input.
  */
-class Identity : public TimeModification {
+class Identity : public TimeShift {
 	public:
-		auto operator()(const time_t& input) const -> time_t {
+		auto apply(const time_t& input) -> time_t {
+			return input;
+		}
+		auto reverse(const time_t& input) -> time_t {
 			return input;
 		}
 };
@@ -67,7 +81,7 @@ class Identity : public TimeModification {
 /**
  * Use a relative shift by amounts of units.
  */
-class RelativeShift : public TimeModification {
+class RelativeShift : public TimeShift {
 	public:
 		/**
 		 * Units for time shifting.
@@ -96,12 +110,19 @@ class RelativeShift : public TimeModification {
 		 * @param amount
 		 * @param unit
 		 */
-		RelativeShift(int amount, ShiftUnit unit) : shift_value(amount), unit(unit) {}
+		RelativeShift(int amount, ShiftUnit unit) : unit(unit), shift_value(amount) {}
 
-		auto operator()(const time_t& input) const -> time_t {
-			PTime time = shift(toPTime(input));
-			return toTime_t(time);
+		auto apply(const time_t& input) -> time_t {
+			PTime ptime = shift(toPTime(input));
+			time_t result = toTime_t(ptime);
+			time_difference = result - input;
+			return result;
 		}
+
+		auto reverse(const time_t& input) -> time_t {
+			return input - time_difference;
+		}
+
 	private:
 		ShiftUnit unit;
 		int shift_value;
@@ -125,6 +146,8 @@ class RelativeShift : public TimeModification {
 					return PTime(time.date() + boost::gregorian::years(shift_value), time.time_of_day());
 			}
 		}
+
+		time_t time_difference = 0;
 };
 const std::map<std::string, RelativeShift::ShiftUnit> RelativeShift::string_to_enum{
 	{"seconds", ShiftUnit::seconds},
@@ -138,24 +161,92 @@ const std::map<std::string, RelativeShift::ShiftUnit> RelativeShift::string_to_e
 /**
  * Use an absolute posix timestamp to modify the time.
  */
-class AbsoluteShift : public TimeModification {
+class AbsoluteShift : public TimeShift {
 	public:
 		/**
 		 * Creates an instance using a ptime.
 		 *
 		 * @param absolute_time
 		 */
-		AbsoluteShift(PTime absolute_time) : absolute_time(absolute_time) {}
+		AbsoluteShift(PTime absolute_time) : result_time(toTime_t(absolute_time)) {}
 
-		auto operator()(const time_t& input) const -> time_t {
-			return toTime_t(absolute_time);
+		auto apply(const time_t& input) -> time_t {
+			time_difference = result_time - input;
+			return result_time;
+		}
+
+		auto reverse(const time_t& input) -> time_t {
+			return input - time_difference;
 		}
 	private:
-		PTime absolute_time;
+		time_t result_time;
+
+		// TODO: need better default behavior
+		time_t time_difference = 0;
 };
 
 /**
- * Filter simple pointcollection by a polygoncollection
+ * A common virtual class for time modifications.
+ */
+class TimeModification {
+	public:
+		TimeModification(std::unique_ptr<TimeShift> from_shift, std::unique_ptr<TimeShift> to_shift) : from_shift(std::move(from_shift)), to_shift(std::move(to_shift)) {}
+		~TimeModification() = default;
+
+		/**
+		 * Shift the timestamp.
+		 *
+		 * @param input
+		 *
+		 * @return shifted time
+		 */
+		auto apply(const TemporalReference& input) -> const TemporalReference {
+			isApplyCalled = true;
+
+			switch(input.timetype) {
+				case TIMETYPE_UNKNOWN:
+					throw OperatorException("It is not possible to modify an unknown time type.");
+				case TIMETYPE_UNREFERENCED:
+					throw OperatorException("It is not possible to modify an unreferenced time type.");
+				case TIMETYPE_UNIX:
+					const std::time_t time_from = static_cast<std::time_t>(input.t1);
+					const std::time_t time_to = static_cast<std::time_t>(input.t2);
+					return TemporalReference(TIMETYPE_UNIX, static_cast<double>(from_shift->apply(time_from)), to_shift->apply(time_to));
+			}
+		}
+
+		/**
+		 * Revert the time shift for the output timestamp.
+		 *
+		 * @param input
+		 *
+		 * @return reverted output time.
+		 */
+		auto reverse(const TemporalReference& input) -> const TemporalReference {
+			if(!isApplyCalled) {
+				throw OperatorException("You must call apply before reverse.");
+			}
+
+			switch(input.timetype) {
+				case TIMETYPE_UNKNOWN:
+					throw OperatorException("It is not possible to modify an unknown time type.");
+				case TIMETYPE_UNREFERENCED:
+					throw OperatorException("It is not possible to modify an unreferenced time type.");
+				case TIMETYPE_UNIX:
+					const std::time_t time_from = static_cast<std::time_t>(input.t1);
+					const std::time_t time_to = static_cast<std::time_t>(input.t2);
+					return TemporalReference(TIMETYPE_UNIX, static_cast<double>(from_shift->reverse(time_from)), to_shift->reverse(time_to));
+			}
+		}
+	private:
+		std::unique_ptr<TimeShift> from_shift;
+		std::unique_ptr<TimeShift> to_shift;
+
+		bool isApplyCalled = false;
+};
+
+/**
+ * Change the time of the query rectangle.
  */
 class TimeShiftOperator : public GenericOperator {
 	public:
@@ -173,13 +264,12 @@ class TimeShiftOperator : public GenericOperator {
 		 * @param shift_parameter A {@ref Json} value containing shift information.
 		 * @return A {@ref TimeModification} unique pointer.
 		 */
-		auto parseShiftValues(const Json::Value& shift_parameter) -> std::unique_ptr<TimeModification>;
+		auto parseShiftValues(const Json::Value& shift_parameter) -> std::unique_ptr<TimeShift>;
 
-		std::unique_ptr<TimeModification> from;
-		std::unique_ptr<TimeModification> to;
+		std::unique_ptr<TimeModification> time_modification;
 };
 
-auto TimeShiftOperator::parseShiftValues(const Json::Value& shift_parameter) -> std::unique_ptr<TimeModification> {
+auto TimeShiftOperator::parseShiftValues(const Json::Value& shift_parameter) -> std::unique_ptr<TimeShift> {
 	std::string unit = shift_parameter.get("unit", "none").asString();
 	if(unit.compare("none") == 0) {
 		throw ArgumentException("Unit must not be <none>.");
@@ -197,6 +287,9 @@ auto TimeShiftOperator::parseShiftValues(const Json::Value& shift_parameter) -> 
 
 TimeShiftOperator::TimeShiftOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
+
+	std::unique_ptr<TimeShift> from;
+	std::unique_ptr<TimeShift> to;
 
 	// process shift parameters
 	auto shift_parameter = params.get("shift", Json::nullValue);
@@ -216,31 +309,70 @@ TimeShiftOperator::TimeShiftOperator(int sourcecounts[], GenericOperator *source
 
 	// TODO: snap
 
+	time_modification = std::make_unique<TimeModification>(std::move(from), std::move(to));
 }
 
 TimeShiftOperator::~TimeShiftOperator() {}
 REGISTER_OPERATOR(TimeShiftOperator, "timeShiftOperator");
 
 auto TimeShiftOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<GenericRaster> {
-	QueryRectangle query_rectangle{(*from)(rect.timestamp), rect.x1, rect.y1, rect.x2, rect.y2, rect.xres, rect.yres, rect.epsg};
+	// TODO: extract function
 
-	return getRasterFromSource(0, query_rectangle, profiler);
+	TemporalReference temporal_reference(TIMETYPE_UNIX, rect.timestamp, rect.timestamp+1);
+
+	TemporalReference modified_temporal_reference = time_modification->apply(temporal_reference);
+
+	QueryRectangle query_rectangle{static_cast<time_t>(modified_temporal_reference.t1), rect.x1, rect.y1, rect.x2, rect.y2, rect.xres, rect.yres, rect.epsg};
+
+	auto result = getRasterFromSource(0, query_rectangle, profiler);
+
+	SpatioTemporalReference result_stref{result->stref, time_modification->reverse(result->stref)};
+	result->replaceSTRef(result_stref);
+
+	return result;
 }
 
 auto TimeShiftOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<PointCollection> {
-	QueryRectangle query_rectangle{(*from)(rect.timestamp), rect.x1, rect.y1, rect.x2, rect.y2, rect.xres, rect.yres, rect.epsg};
+	TemporalReference temporal_reference(TIMETYPE_UNIX, rect.timestamp, rect.timestamp+1);
 
-	return getPointCollectionFromSource(0, query_rectangle, profiler);
+	TemporalReference modified_temporal_reference = time_modification->apply(temporal_reference);
+
+	QueryRectangle query_rectangle{static_cast<time_t>(modified_temporal_reference.t1), rect.x1, rect.y1, rect.x2, rect.y2, rect.xres, rect.yres, rect.epsg};
+
+	auto result = getPointCollectionFromSource(0, query_rectangle, profiler);
+
+	SpatioTemporalReference result_stref{result->stref, time_modification->reverse(result->stref)};
+	result->replaceSTRef(result_stref);
+
+	return result;
 }
 
 auto TimeShiftOperator::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<LineCollection> {
-	QueryRectangle query_rectangle{(*from)(rect.timestamp), rect.x1, rect.y1, rect.x2, rect.y2, rect.xres, rect.yres, rect.epsg};
+	TemporalReference temporal_reference(TIMETYPE_UNIX, rect.timestamp, rect.timestamp+1);
 
-	return getLineCollectionFromSource(0, query_rectangle, profiler);
+	TemporalReference modified_temporal_reference = time_modification->apply(temporal_reference);
+
+	QueryRectangle query_rectangle{static_cast<time_t>(modified_temporal_reference.t1), rect.x1, rect.y1, rect.x2, rect.y2, rect.xres, rect.yres, rect.epsg};
+
+	auto result = getLineCollectionFromSource(0, query_rectangle, profiler);
+
+	SpatioTemporalReference result_stref{result->stref, time_modification->reverse(result->stref)};
+	result->replaceSTRef(result_stref);
+
+	return result;
 }
 
 auto TimeShiftOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<PolygonCollection> {
-	QueryRectangle query_rectangle{(*from)(rect.timestamp), rect.x1, rect.y1, rect.x2, rect.y2, rect.xres, rect.yres, rect.epsg};
+	TemporalReference temporal_reference(TIMETYPE_UNIX, rect.timestamp, rect.timestamp+1);
 
-	return getPolygonCollectionFromSource(0, query_rectangle, profiler);
+	TemporalReference modified_temporal_reference = time_modification->apply(temporal_reference);
+
+	QueryRectangle query_rectangle{static_cast<time_t>(modified_temporal_reference.t1), rect.x1, rect.y1, rect.x2, rect.y2, rect.xres, rect.yres, rect.epsg};
+
+	auto result = getPolygonCollectionFromSource(0, query_rectangle, profiler);
+
+	SpatioTemporalReference result_stref{result->stref, time_modification->reverse(result->stref)};
+	result->replaceSTRef(result_stref);
+
+	return result;
 }

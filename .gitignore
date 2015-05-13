@@ -6,15 +6,16 @@ _*
 datasources
 *.o
 *.cl.h
-htdocs/cgi-bin/*
+
+# compiled binaries
 mapping/mapping_manager
+mapping/r_server
+mapping/geometrytestbed
+mapping/gtest
+mapping/tileserver
 
-/mapping/r_server
-
-/docs/waveDoc/*
-/htdocs/doc/wave/*
-/docs/mappingDoc/*
-/htdocs/doc/mapping/*
-/mapping/geometrytestbed
-/mapping/gtest
-/mapping/tileserver
+# generated documentation
+docs/waveDoc/*
+htdocs/doc/wave/*
+docs/mappingDoc/*
+htdocs/doc/mapping/*

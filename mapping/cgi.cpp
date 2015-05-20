@@ -7,6 +7,7 @@
 #include "util/configuration.h"
 #include "util/debug.h"
 #include "services/wfs_request.h"
+#include "cache/cachetask.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -355,7 +356,29 @@ int getWfsParameterInteger(const std::string &wfsParameterString){
 //
 //
 //}
+std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJson, const QueryRectangle &rect, bool cache_enabled ) {
+	// normal behavior
+	if ( !cache_enabled ) {
+		QueryProfiler profiler;
+		auto graph = GenericOperator::fromJSON(graphJson);
+		return graph->getCachedRaster(rect, profiler);
+	}
+	// Request cache-server
+	else {
+		std::string host = Configuration::get("cacheserver.host","localhost");
+		int port = atoi( Configuration::get("cacheserver.port","12346").c_str() );
 
+		RasterRequest req(graphJson, rect, GenericOperator::RasterQM::EXACT);
+		UnixSocket sock(host.c_str(),port);
+		req.toStream(sock);
+		RasterResponse resp(sock);
+
+		if ( resp.success )
+			return std::move(resp.data);
+		else
+			throw OperatorException("Cache-Error");
+	}
+}
 
 int processWCS(std::map<std::string, std::string> &params) {
 
@@ -445,6 +468,13 @@ int main() {
 	//printf("Content-type: text/plain\r\n\r\nDebugging:\n");
 	try {
 		Configuration::loadFromDefaultPaths();
+		bool cache_enabled = Configuration::getBool("cache.enabled",false);
+
+		// Plug in Cache-Dummy if cache is disabled
+		if ( !cache_enabled ) {
+			std::unique_ptr<CacheManager> mgrImpl( new NopCacheManager() );
+			CacheManager::init( mgrImpl );
+		}
 
 		const char *query_string = getenv("QUERY_STRING");
 		if (!query_string) {
@@ -585,7 +615,6 @@ int main() {
 					double bbox[4];
 					parseBBOX(bbox, params.at("bbox"), query_epsg, false);
 
-					auto graph = GenericOperator::fromJSON(params["layers"]);
 					std::string colorizer;
 					if (params.count("colors") > 0)
 						colorizer = params["colors"];
@@ -598,6 +627,7 @@ int main() {
 					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
 
 					if (format == "application/json") {
+						auto graph = GenericOperator::fromJSON(params["layers"]);
 						QueryProfiler profiler;
 						std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect, profiler);
 
@@ -605,9 +635,7 @@ int main() {
 						printf(dataVector->toJSON().c_str());
 					}
 					else {
-						QueryProfiler profiler;
-						auto result_raster = graph->getCachedRaster(qrect, profiler, GenericOperator::RasterQM::EXACT);
-
+						auto result_raster = processRasterRequest(params["layers"],qrect,cache_enabled);
 						bool flipx = (bbox[2] > bbox[0]) != (result_raster->pixel_scale_x > 0);
 						bool flipy = (bbox[3] > bbox[1]) == (result_raster->pixel_scale_y > 0);
 

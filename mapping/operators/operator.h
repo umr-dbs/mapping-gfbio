@@ -8,6 +8,7 @@
 #include <sstream>
 #include <memory>
 #include "util/make_unique.h"
+#include "cache/cache.h"
 
 namespace Json {
 	class Value;
@@ -19,6 +20,7 @@ class LineCollection;
 class PolygonCollection;
 class GenericPlot;
 class BinaryStream;
+class RasterProducer;
 
 class QueryRectangle {
 	public:
@@ -70,6 +72,7 @@ class QueryProfiler {
 };
 
 class GenericOperator {
+	friend class RasterProducer;
 	public:
 		enum class RasterQM {
 			EXACT,
@@ -127,6 +130,20 @@ class GenericOperator {
 		int depth;
 
 		void operator=(GenericOperator &) = delete;
+};
+
+
+class RasterProducer : public Producer<GenericRaster> {
+public:
+	RasterProducer( GenericOperator &op, const QueryRectangle &qr, QueryProfiler &profiler ) : op(op), qr(qr), profiler(profiler) {};
+	virtual ~RasterProducer() {};
+	std::unique_ptr<GenericRaster> create() const {
+		return op.getRaster(qr,profiler);
+	}
+private:
+	GenericOperator &op;
+	const QueryRectangle &qr;
+	QueryProfiler &profiler;
 };
 
 

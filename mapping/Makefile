@@ -8,7 +8,7 @@ CPATH := /usr/local/include/:$(CPATH)
 
 #CPP=g++
 CPP=clang++-3.5
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
+CPPFLAGS=-g -O0 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
@@ -31,19 +31,21 @@ OBJ_OPERATORS_MSAT=o/operators_msat_temperature.o o/operators_msat_reflectance.o
 OBJ_OPERATORS_PLOTS=o/operators_plots_histogram.o o/operators_plots_points2histogram.o o/operators_plots_points_metadata_tograph.o
 OBJ_OPERATORS_TEMPORAL=o/operators_temporal_timeshiftoperator.o
 OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) ${OBJ_OPERATORS_TEMPORAL}
-OBJ_COMMON=${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
+OBJ_COMMON=o/cache_log.o o/cache_cache.o ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
-OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
-OBJ_EXEGTEST=${OBJ_COMMON} o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o
+OBJ_CACHE=o/cache_server_main.o o/cache_server.o o/cache_cachetask.o ${OBJ_COMMON}
+OBJ_EXECGI=o/main_cgi.o o/cache_cachetask.o ${OBJ_COMMON}
+OBJ_EXEGTEST=${OBJ_COMMON} o/cache_server.o o/cache_cachetask.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_cache_stcache.o o/gtest_cache_server.o o/gtest_cache_util.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
-OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
+OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o o/cache_log.o o/cache_cache.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
 EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
 EXEGTEST=gtest
 EXEGEOMETRYTESTBED=geometrytestbed
 EXETILESERVER=tileserver
+EXECACHESERVER=cache_server
 
 
 VALGRIND=valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --suppressions=test/systemtests/valgrind_suppression.supp --error-exitcode=2
@@ -126,11 +128,17 @@ o/gtest_%.o: test/unittests/%.cpp $(CL_HEADERS)
 o/gtest_simplefeaturecollections_%.o: test/unittests/simplefeaturecollections/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
+o/gtest_cache_%.o: test/unittests/cache/%.cpp $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} -c $< -o $@
+
 o/main_%.o: %.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
 
+o/cache_%.o: cache/%.cpp $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} -c $< -o $@
 
-all: ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER}
+
+all: ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHESERVER}
 
 ${EXE}:	${OBJ_EXE}
 	${CPP} $+ ${LDFLAGS} -o $@
@@ -148,6 +156,9 @@ ${EXEGEOMETRYTESTBED}:	${OBJ_EXEGEOMETRYTESTBED}
 	${CPP} $+ ${LDFLAGS} -o $@
 
 ${EXETILESERVER}: o/rasterdb_tileserver.o o/rasterdb_backend.o o/rasterdb_backend_local.o o/datatypes_attributes.o o/util_binarystream.o o/util_sqlite.o o/util_configuration.o
+	${CPP} ${LDFLAGS} $+ -o $@
+
+${EXECACHESERVER}:	${OBJ_CACHE}
 	${CPP} ${LDFLAGS} $+ -o $@
 
 
@@ -213,4 +224,4 @@ doc:
 	./../docs/makeDoc
 
 clean:
-	rm -f o/*.o ${EXE} ${EXECGI} ${EXERSERVER} $(CL_HEADERS)
+	rm -f o/*.o ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHESERVER} $(CL_HEADERS) ${EXEGTEST}

@@ -35,7 +35,7 @@ OBJ_COMMON=o/cache_log.o o/cache_cache.o ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CO
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_CACHE=o/cache_server_main.o o/cache_server.o o/cache_cachetask.o ${OBJ_COMMON}
 OBJ_EXECGI=o/main_cgi.o o/cache_cachetask.o ${OBJ_COMMON}
-OBJ_EXEGTEST=${OBJ_COMMON} o/cache_server.o o/cache_cachetask.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_cache_stcache.o o/gtest_cache_server.o o/gtest_cache_util.o
+OBJ_EXEGTEST=${OBJ_COMMON} o/cache_server.o o/cache_cachetask.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_stcache.o o/gtest_cache_server.o o/gtest_cache_util.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
 OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o o/cache_log.o o/cache_cache.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}

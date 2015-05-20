@@ -68,8 +68,23 @@ std::unique_ptr<PointCollection> GeosGeomUtil::createPointCollection(const geos:
 }
 
 std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosPointCollection(const PointCollection& pointCollection){
-	//TODO: implement
-	throw FeatureException("Conversion not yet implemented");
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+
+	std::unique_ptr<std::vector<geos::geom::Geometry*>> geometries(new std::vector<geos::geom::Geometry*>);
+
+	std::vector<geos::geom::Coordinate> coordinates;
+	for(auto feature : pointCollection){
+
+
+		for(auto& coordinate : feature){
+			coordinates.push_back(geos::geom::Coordinate(coordinate.x, coordinate.y));
+		}
+		geometries->push_back(gf->createMultiPoint(coordinates));
+	}
+
+	std::unique_ptr<geos::geom::Geometry> points (gf->createGeometryCollection(geometries.release()));
+
+	return points;
 }
 
 std::unique_ptr<LineCollection> GeosGeomUtil::createLineCollection(const geos::geom::Geometry& geometry){

@@ -16,7 +16,7 @@
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/raster.h"
 #include "cache/replacementpolicy.h"
-#include "cache/log.h"
+#include "util/log.h"
 
 class QueryRectangle;
 
@@ -123,7 +123,7 @@ private:
 	size_t current_size;
 	std::unique_ptr<ReplacementPolicy<EType>> policy;
 	std::unordered_map<std::string,STCacheStructure<EType>*> caches;
-	std::recursive_mutex mtx;
+	std::mutex mtx;
 
 
 };

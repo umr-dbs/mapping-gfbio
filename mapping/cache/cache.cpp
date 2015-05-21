@@ -8,7 +8,6 @@
 #include <iostream>
 #include <sstream>
 
-#include "cache/log.h"
 #include "cache/cache.h"
 #include "raster/exceptions.h"
 #include "operators/operator.h"
@@ -77,9 +76,9 @@ bool STRasterCacheStructure::matches(const QueryRectangle& spec,
 
 	//Log::log(INFO, "Comparing:\n%s\n%s", qrToString(spec).c_str(), strefToString(stref).c_str() );
 
-	// Shrink Query-Rectangle by degrees of half a pixel in each direction
-	double h_spacing = (spec.x2 - spec.x1) / entry->result->width / 2.0;
-	double v_spacing = (spec.y2 - spec.y1) / entry->result->height / 2.0;
+	// Enlarge result by degrees of half a pixel in each direction
+	double h_spacing = (stref.x2 - stref.x1) / entry->result->width / 2.0;
+	double v_spacing = (stref.y2 - stref.y1) / entry->result->height / 2.0;
 
 // DEBUGGING PART
 //	bool res = spec.epsg == stref.epsg;
@@ -91,13 +90,31 @@ bool STRasterCacheStructure::matches(const QueryRectangle& spec,
 //	// FIXME: Shouldn't that be half open intervals? World1 -> Webmercator will never result in a hit if < instead of <= is used
 //	res &= spec.timestamp <= stref.t2;
 
-
-	return (spec.epsg == stref.epsg && (spec.x1 + h_spacing) >= stref.x1
-			&& (spec.x2 - h_spacing) <= stref.x2
-			&& (spec.y1 + v_spacing) >= stref.y1
-			&& (spec.y2 - v_spacing) <= stref.y2
+	// Check query rectangle
+	if ( spec.epsg == stref.epsg
+			&& spec.x1 >= stref.x1 - h_spacing
+			&& spec.x2 <= stref.x2 + h_spacing
+			&& spec.y1 >= stref.y1 - v_spacing
+			&& spec.y2 <= stref.y2 + v_spacing
 			&& spec.timestamp >= stref.t1
-			&& spec.timestamp <= stref.t2);
+			&& spec.timestamp <= stref.t2 ) {
+		// Check resolution
+		double ohspan = stref.x2 - stref.x1;
+		double ovspan = stref.y2 - stref.y1;
+		double qhspan = spec.x2 - spec.x1;
+		double qvspan = spec.y2 - spec.y1;
+
+		double hfact = qhspan / ohspan;
+		double vfact = qvspan / ovspan;
+
+		double clip_width  = entry->result->width  * hfact;
+		double clip_height = entry->result->height * vfact;
+
+		return clip_width >= spec.xres && clip_height >= spec.yres &&
+			   clip_width < 2*spec.xres && clip_height < 2*spec.yres;
+	}
+	else
+		return false;
 }
 
 //
@@ -131,8 +148,8 @@ STCacheStructure<EType>* STCache<EType>::getStructure(const std::string &key,
 template<typename EType>
 void STCache<EType>::put(const std::string &key,
 		const std::unique_ptr<EType> &item) {
+	std::lock_guard<std::mutex> lock(mtx);
 	Log::log(DEBUG, "Adding entry for key \"%s\"", key.c_str());
-	std::lock_guard<std::recursive_mutex> lock(mtx);
 
 	auto cache = getStructure(key, true);
 
@@ -147,8 +164,7 @@ void STCache<EType>::put(const std::string &key,
 			Log::log(DEBUG, "New entry exhausts cache size. Cleaning up.");
 			while (current_size + ce->size > max_size) {
 				auto victim = policy->evict();
-				Log::log(DEBUG, "Removing entry (size: %d bytes).",
-						victim->size);
+				Log::log(INFO, "Evicting entry (%ld bytes): \"%s\"", victim->size, strefToString(victim->result->stref).c_str() );
 				victim->structure->remove(victim);
 				current_size -= victim->size;
 			};
@@ -165,9 +181,9 @@ void STCache<EType>::put(const std::string &key,
 template<typename EType>
 std::unique_ptr<EType> STCache<EType>::get(const std::string &key,
 		const QueryRectangle &qr) {
+	std::lock_guard<std::mutex> lock(mtx);
 	Log::log(DEBUG, "Get: Quering \"%s\" in cache \"%s\"",
-			qrToString(qr).c_str(), key.c_str());
-	std::lock_guard<std::recursive_mutex> lock(mtx);
+				qrToString(qr).c_str(), key.c_str());
 
 	auto cache = getStructure(key);
 	if (cache != nullptr) {
@@ -275,3 +291,4 @@ std::unique_ptr<GenericRaster> NopCacheManager::getRaster(
 		const Producer<GenericRaster>& producer) {
 	return producer.create();
 }
+

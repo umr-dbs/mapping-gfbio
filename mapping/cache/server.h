@@ -10,7 +10,7 @@
 
 #include "cache/blockingqueue.h"
 #include "cache/cachetask.h"
-#include "cache/log.h"
+#include "util/log.h"
 #include "raster/exceptions.h"
 
 #include <string>

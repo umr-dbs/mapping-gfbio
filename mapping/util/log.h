@@ -7,6 +7,7 @@
 
 #ifndef LOG_H_
 #define LOG_H_
+//#define DISABLE_LOGGING
 
 #include <stdlib.h>
 #include <stdio.h>

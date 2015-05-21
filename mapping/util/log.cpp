@@ -5,7 +5,7 @@
  *      Author: mika
  */
 
-#include "cache/log.h"
+#include "util/log.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <ctime>
@@ -20,8 +20,10 @@ void Log::setLevel(LogLevel level) {
 	Log::level = level;
 }
 
+#ifndef DISABLE_LOGGING
 void Log::log(LogLevel level, const char *msg, ...) {
 	if (level <= Log::level) {
+		std::ostringstream ss;
 
 		// Time
 		time_t     now = time(0);
@@ -30,31 +32,33 @@ void Log::log(LogLevel level, const char *msg, ...) {
 		tstruct = *localtime(&now);
 		strftime(buf, sizeof(buf), "%F %H:%M:%S.", &tstruct);
 
+		ss << "[" << buf << (now%1000) << "] [";
+
 		// level
-		std::string levelstr = "TRACE";
 		switch ( level ) {
-			case DEBUG: levelstr = "DEBUG"; break;
-			case INFO: levelstr  = "INFO"; break;
-			case WARN: levelstr  = "WARN"; break;
-			case ERROR: levelstr = "ERROR"; break;
-			default: break;
+			case TRACE: ss << "TRACE"; break;
+			case DEBUG: ss << "DEBUG"; break;
+			case INFO:  ss << "INFO "; break;
+			case WARN:  ss << "WARN "; break;
+			case ERROR: ss << "ERROR"; break;
+			default:    ss << "UNKNW";
 		}
 
 		// Thread-ID
-		std::ostringstream ss;
-		ss << std::this_thread::get_id();
 
-		fprintf(fd, "[%s] [%-5s] [%-6s] ", buf, levelstr.c_str(), ss.str().c_str());
-		//fprintf(fd, "[%s%3ld] [%-5s] ", buf, (now % 1000), levelstr.c_str());
+		ss << "] [" << std::this_thread::get_id() << "] " << msg << "\n";
 
 		// Do the actual logging
 		va_list arglist;
 		va_start(arglist, msg);
-		vfprintf(fd, msg, arglist);
+		vfprintf(fd, ss.str().c_str(), arglist);
 		va_end(arglist);
-		fprintf(fd, "\n");
 	}
 }
+#endif
+#ifdef DISABLE_LOGGING
+void Log::log(LogLevel level, const char *msg, ...) {}
+#endif
 
 LogLevel Log::level = INFO;
 FILE *Log::fd = stderr;

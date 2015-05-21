@@ -47,7 +47,7 @@ void CacheServer::main_loop() {
 
 	while (!shutdown) {
 		Log::log(DEBUG,"Waiting for incoming connection");
-		struct timeval tv{5,0};
+		struct timeval tv{2,0};
 		fd_set readfds;
 		FD_ZERO(&readfds);
 		FD_SET(listensocket, &readfds);
@@ -66,7 +66,7 @@ void CacheServer::main_loop() {
 			queue.push( std::move(con) );
 		}
 	}
-	Log::log(DEBUG, "cache-server done");
+	Log::log(INFO, "cache-server done");
 	close(listensocket);
 }
 

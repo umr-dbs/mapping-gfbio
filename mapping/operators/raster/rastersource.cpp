@@ -19,8 +19,11 @@ class SourceOperator : public GenericOperator {
 		virtual ~SourceOperator();
 
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+	protected:
+		void writeSemanticParameters(std::ostringstream &stream);
 	private:
 		std::shared_ptr<RasterDB> rasterdb;
+		std::string sourcename;
 		int channel;
 		bool transform;
 };
@@ -29,7 +32,7 @@ class SourceOperator : public GenericOperator {
 // RasterSource Operator
 SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rasterdb(nullptr) {
 	assumeSources(0);
-	std::string sourcename = params.get("sourcename", "").asString();
+	sourcename = params.get("sourcename", "").asString();
 	if (sourcename.length() == 0)
 		throw OperatorException("SourceOperator: missing sourcename");
 
@@ -56,3 +59,6 @@ std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &r
 	return rasterdb->query(rect, profiler, channel, transform);
 }
 
+void SourceOperator::writeSemanticParameters(std::ostringstream &stream) {
+	stream << "\"sourcename\": \"" << sourcename << "\"";
+}

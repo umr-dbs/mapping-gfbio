@@ -12,17 +12,23 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
-
-enum LogLevel {
-	ERROR = 1, WARN = 2, INFO = 3, DEBUG = 4, TRACE = 5
-};
+#include <string>
 
 class Log {
 public:
+	enum class LogLevel {
+		ERROR, WARN, INFO, DEBUG, TRACE
+	};
+
 	static void setLogFd(FILE *fd);
 	static void setLevel(LogLevel level);
-	static void log(LogLevel level, const char *msg, ...);
+	static void error(const char *msg, ...);
+	static void warn(const char *msg, ...);
+	static void info(const char *msg, ...);
+	static void debug(const char *msg, ...);
+	static void trace(const char *msg, ...);
 private:
+	static void log(LogLevel level, const char *msg, va_list vargs);
 	static LogLevel level;
 	static FILE *fd;
 };

@@ -8,12 +8,11 @@
 #include <gtest/gtest.h>
 #include "test/unittests/cache/util.h"
 #include "util/configuration.h"
+#include "operators/operator.h"
+#include "cache/cache.h"
 #include "cache/server.h"
 
 #include <iostream>
-
-
-using namespace std;
 
 TEST(CacheServerTest,SimpleTest) {
 	Configuration::loadFromDefaultPaths();
@@ -23,7 +22,7 @@ TEST(CacheServerTest,SimpleTest) {
 
 	CacheManager::init( mgrImpl );
 
-	const char *json = "{\"type\":\"source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}";
+	std::string json = "{\"type\":\"source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}";
 	std::string timestr("2010-06-06T18:00:00.000Z");
 	epsg_t epsg = EPSG_LATLON;
 	uint32_t width = 256, height = 256;
@@ -38,26 +37,28 @@ TEST(CacheServerTest,SimpleTest) {
 	double bbox[4];
 
 	CacheServer cs(12346,4);
-	unique_ptr<thread> cst = cs.runAsync();
+	std::unique_ptr<std::thread> cst = cs.runAsync();
 
 	for ( int i = 0; i < 4; i++ ) {
 		parseBBOX(bbox, bboxes[i], epsg, false);
 		QueryRectangle qr(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], width, height, epsg);
 
-		RasterRequest rr(json,qr,GenericOperator::RasterQM::EXACT);
 
-		// Connect to server
-		UnixSocket socket("localhost", 12346);
-		rr.toStream( socket );
+		uint8_t cmd = CacheServer::COMMAND_GET_RASTER;
+		uint8_t querymode = 1;
+		UnixSocket sock("localhost",12346);
+		BinaryStream &stream = sock;
 
-		RasterResponse res(socket);
+		stream.write(cmd);
+		qr.toStream(stream);
+		stream.write(json);
+		stream.write(querymode);
 
-		if ( !res.success )
-			cout << res.message << endl;
-		else {
-			string strefstr = strefToString( res.data->stref );
-			cout << "Result: " << strefstr << endl;
-		}
+		uint8_t resp_code;
+		stream.read(&resp_code);
+
+		uint8_t expected = CacheServer::RESPONSE_OK;
+		ASSERT_EQ( expected, resp_code );
 	}
 
 	cs.stop();

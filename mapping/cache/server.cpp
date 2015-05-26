@@ -7,6 +7,7 @@
 
 // project-stuff
 #include "cache/server.h"
+#include "operators/operator.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -18,10 +19,46 @@
 
 #include <unistd.h>
 
-
-
 void Connection::process() {
-	CacheRequest::fromStream(*stream)->execute(*stream);
+	uint8_t cmd;
+	if (!stream->read(&cmd, true)) {
+		Log::debug("Disconnect on socket: %d", fd);
+		throw DisconnectException("Connection closed");
+	}
+
+	Log::debug("Received command: %d", cmd);
+	try {
+		switch (cmd) {
+		case CacheServer::COMMAND_GET_RASTER: {
+			uint8_t qmval;
+			std::string graphstr;
+
+			QueryRectangle rect(*stream);
+			stream->read(&graphstr);
+			stream->read(&qmval);
+
+			auto graph = GenericOperator::fromJSON(graphstr);
+			GenericOperator::RasterQM querymode =
+					(qmval == 0) ?
+							GenericOperator::RasterQM::LOOSE :
+							GenericOperator::RasterQM::EXACT;
+			QueryProfiler profiler;
+			auto result = graph->getCachedRaster(rect, profiler, querymode);
+			uint8_t code = CacheServer::RESPONSE_OK;
+			stream->write( code );
+			result->toStream(*stream);
+			break;
+		}
+		default:
+			throw NetworkException("Unknown command.");
+		}
+	} catch ( OperatorException &oe ) {
+		Log::warn("Operator caused exception: %s", oe.what());
+		uint8_t code = CacheServer::RESPONSE_ERROR;
+//		std::string err_msg = ;
+		stream->write( code );
+		stream->write( std::string(oe.what()) );
+	}
 }
 
 CacheServer::~CacheServer() {
@@ -31,42 +68,86 @@ void CacheServer::thread_loop() {
 	while (!shutdown) {
 		try {
 			auto connection = queue.pop();
-			Log::log(DEBUG,"Received task. Processing");
+			Log::debug("Received task. Processing");
 			connection->process();
-			Log::log(DEBUG,"Processing finished.");
-		} catch ( ShutdownException &se ) {
-			Log::log(INFO,"Worker stopped.");
+			Log::debug("Command processed. Releasing connection.");
+			std::lock_guard<std::mutex> lg_cons(connection_mtx);
+			connections.push_back( std::move(connection) );
+		} catch (ShutdownException &se) {
+			Log::info("Worker stopped.");
 			break;
+		} catch (DisconnectException &de) {
+		} catch (std::exception &e ) {
+			Log::warn("Error occured while processing request. Discarding connection. Reason: %s", e.what());
 		}
 	}
 }
 
 void CacheServer::main_loop() {
 	int listensocket = getListeningSocket(listenport);
-	Log::log(DEBUG, "cache-server: listening on port %d", listenport);
+	Log::info("cache-server: listening on port %d", listenport);
 
 	while (!shutdown) {
-		Log::log(DEBUG,"Waiting for incoming connection");
-		struct timeval tv{2,0};
+		Log::debug("Waiting for incoming connection");
+		struct timeval tv { 2, 0 };
 		fd_set readfds;
 		FD_ZERO(&readfds);
 		FD_SET(listensocket, &readfds);
-		select(listensocket + 1, &readfds, nullptr, nullptr, &tv);
-		if (FD_ISSET(listensocket, &readfds)) {
-			struct sockaddr_storage remote_addr;
-			socklen_t sin_size = sizeof(remote_addr);
-			int new_fd = accept(listensocket, (struct sockaddr *) &remote_addr, &sin_size);
-			if (new_fd == -1) {
-				if (errno != EAGAIN)
-					perror("accept");
-				continue;
+
+		int maxfd = listensocket;
+
+		// Lock while looping
+		{
+			std::lock_guard<std::mutex> lg_cons(connection_mtx);
+			for (auto &e : connections) {
+				FD_SET(e->fd, &readfds);
+				maxfd = std::max(e->fd, maxfd);
 			}
-			Log::log(DEBUG,"New connection established, adding to worker-queue.");
-			std::unique_ptr<Connection> con( new Connection(new_fd) );
-			queue.push( std::move(con) );
+		}
+
+		int sel_ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
+		if (sel_ret < 0 && errno != EINTR) {
+			Log::error("Select returned error: %s", strerror(errno));
+		}
+		if (sel_ret < 0 && errno == EINTR) {
+			Log::info("Exiting main_loop.");
+			break;
+		}
+		else if (sel_ret > 0) {
+
+			// Check reads
+			{
+				std::lock_guard<std::mutex> lg_cons(connection_mtx);
+				auto it = connections.begin();
+				while (it != connections.end()) {
+					auto &c = *it;
+					if (FD_ISSET(c->fd, &readfds)) {
+						// move from idle to processing queue
+						queue.push( c );
+						it = connections.erase(it);
+					}
+					else
+						++it;
+				}
+			}
+
+			// New connection
+			if (FD_ISSET(listensocket, &readfds)) {
+				struct sockaddr_storage remote_addr;
+				socklen_t sin_size = sizeof(remote_addr);
+				int new_fd = accept(listensocket,
+						(struct sockaddr *) &remote_addr, &sin_size);
+				if (new_fd == -1) {
+					if (errno != EAGAIN)
+						perror("accept");
+					continue;
+				}
+				Log::debug("New connection established on fd: %d", new_fd);
+				std::lock_guard<std::mutex> lg_cons(connection_mtx);
+				connections.push_back( std::unique_ptr<Connection>(new Connection(new_fd)) );
+			}
 		}
 	}
-	Log::log(INFO, "cache-server done");
 	close(listensocket);
 }
 
@@ -89,11 +170,13 @@ int CacheServer::getListeningSocket(int port, int backlog) {
 
 	// loop through all the results and bind to the first we can
 	for (p = servinfo; p != nullptr; p = p->ai_next) {
-		if ((sock = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK, p->ai_protocol)) == -1)
+		if ((sock = socket(p->ai_family, p->ai_socktype | SOCK_NONBLOCK,
+				p->ai_protocol)) == -1)
 			continue;
 
 		int yes = 1;
-		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
+		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))
+				== -1) {
 			freeaddrinfo(servinfo); // all done with this structure
 			throw NetworkException("setsockopt() failed");
 		}
@@ -118,32 +201,36 @@ int CacheServer::getListeningSocket(int port, int backlog) {
 }
 
 void CacheServer::run() {
-	Log::log(INFO,"Starting cache-server,");
-	Log::log(INFO,"Firing up %d worker-threads", num_threads);
-	for ( int i = 0; i < num_threads; i++ ) {
-		workers.push_back( std::unique_ptr<std::thread>( new std::thread(&CacheServer::thread_loop, this) ) );
+	Log::info("Starting cache-server,");
+	Log::info("Firing up %d worker-threads", num_threads);
+	for (int i = 0; i < num_threads; i++) {
+		workers.push_back(
+				std::unique_ptr<std::thread>(
+						new std::thread(&CacheServer::thread_loop, this)));
 	}
-	Log::log(INFO,"Starting main-loop", num_threads);
+	Log::info("Starting main-loop", num_threads);
 	main_loop();
 }
 
 std::unique_ptr<std::thread> CacheServer::runAsync() {
-	Log::log(INFO,"Starting cache-server,");
-	Log::log(INFO,"Firing up %d worker-threads", num_threads);
-	for ( int i = 0; i < num_threads; i++ ) {
-		workers.push_back( std::unique_ptr<std::thread>( new std::thread(&CacheServer::thread_loop, this) ) );
+	Log::info("Starting cache-server,");
+	Log::info("Firing up %d worker-threads", num_threads);
+	for (int i = 0; i < num_threads; i++) {
+		workers.push_back(
+				std::unique_ptr<std::thread>(
+						new std::thread(&CacheServer::thread_loop, this)));
 	}
-	Log::log(INFO,"Starting main-loop");
-	return std::unique_ptr<std::thread>( new std::thread(&CacheServer::main_loop,this) );
+	Log::info("Starting main-loop");
+	return std::unique_ptr<std::thread>(
+			new std::thread(&CacheServer::main_loop, this));
 }
 
 void CacheServer::stop() {
-	Log::log(INFO,"Shutting down workers.");
+	Log::info("Shutting down workers.");
 	shutdown = true;
 	queue.shutdown();
-	for ( auto& t : workers ) {
+	for (auto& t : workers) {
 		t->join();
 	}
 	workers.clear();
-	Log::log(INFO,"Waiting for main_loop.");
 }

@@ -5,18 +5,15 @@
 #include "util/configuration.h"
 
 
-using namespace std;
-
-
 TEST(STCacheTest,SimpleTest) {
 	Configuration::loadFromDefaultPaths();
 
-	const char *json = "{\"type\":\"source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}";
+	std::string json = "{\"type\":\"source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}";
 	std::string timestr("2010-06-06T18:00:00.000Z");
 	epsg_t epsg = EPSG_LATLON;
 	uint32_t width = 256, height = 256;
 	time_t timestamp = parseIso8601DateTime(timestr);
-	GenericOperator *op = GenericOperator::fromJSON( string(json) ).release();
+	GenericOperator *op = GenericOperator::fromJSON( json ).release();
 
 
 	std::string bboxes[] = {
@@ -35,6 +32,6 @@ TEST(STCacheTest,SimpleTest) {
 		QueryRectangle qr(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], width, height, epsg);
 		QueryProfiler qp;
 		RasterProducer p1(*op,qr,qp);
-		unique_ptr<GenericRaster> res = cache.getOrCreate(op->getSemanticId(), qr, p1 );
+		std::unique_ptr<GenericRaster> res = cache.getOrCreate(op->getSemanticId(), qr, p1 );
 	}
 }

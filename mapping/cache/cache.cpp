@@ -34,6 +34,23 @@ std::string strefToString(const SpatioTemporalReference &ref) {
 // List-Structure
 //
 
+//
+// A simple std::vector based implementation of the
+// STCacheStructure interface
+//
+template<typename EType>
+class STListCacheStructure : public STCacheStructure<EType> {
+public:
+	virtual ~STListCacheStructure() {};
+	virtual void insert( const std::shared_ptr<STCacheEntry<EType>> &entry );
+	virtual std::shared_ptr<STCacheEntry<EType>> query( const QueryRectangle &spec );
+	virtual void remove( const std::shared_ptr<STCacheEntry<EType>> &entry );
+protected:
+	virtual bool matches( const QueryRectangle &spec, const EType &ref ) const = 0;
+private:
+	std::vector<std::shared_ptr<STCacheEntry<EType>>> entries;
+};
+
 template<typename EType>
 void STListCacheStructure<EType>::insert(
 		const std::shared_ptr<STCacheEntry<EType>> &entry) {
@@ -43,9 +60,9 @@ void STListCacheStructure<EType>::insert(
 template<typename EType>
 std::shared_ptr<STCacheEntry<EType>> STListCacheStructure<EType>::query(
 		const QueryRectangle &spec) {
-	for (auto iter = entries.begin(); iter != entries.end(); ++iter) {
-		if (matches(spec, *iter)) {
-			return *iter;
+	for ( auto entry : entries ) {
+		if (matches( spec, *entry->result ) ) {
+			return entry;
 		}
 	}
 	return nullptr;
@@ -63,52 +80,60 @@ void STListCacheStructure<EType>::remove(
 }
 
 //
+// List implementation of the raster cache
+//
+
+class STRasterCacheStructure : public STListCacheStructure<GenericRaster> {
+public:
+	virtual ~STRasterCacheStructure() {};
+protected:
+	virtual bool matches( const QueryRectangle &spec, const GenericRaster &entry ) const;
+};
+
+//
 // Raster Structure
 //
 
 bool STRasterCacheStructure::matches(const QueryRectangle& spec,
-		const std::shared_ptr<STCacheEntry<GenericRaster> >& entry) const {
-	const SpatioTemporalReference &stref = entry->result->stref;
+		const GenericRaster &result) const {
 
-	if (stref.timetype != TIMETYPE_UNIX)
+	if (result.stref.timetype != TIMETYPE_UNIX)
 		throw ArgumentException(
 				std::string("Cache only accepts unix timestamps"));
 
-	//Log::log(INFO, "Comparing:\n%s\n%s", qrToString(spec).c_str(), strefToString(stref).c_str() );
-
 	// Enlarge result by degrees of half a pixel in each direction
-	double h_spacing = (stref.x2 - stref.x1) / entry->result->width / 2.0;
-	double v_spacing = (stref.y2 - stref.y1) / entry->result->height / 2.0;
+	double h_spacing = (result.stref.x2 - result.stref.x1) / result.width / 100.0;
+	double v_spacing = (result.stref.y2 - result.stref.y1) / result.height / 100.0;
 
 // DEBUGGING PART
-//	bool res = spec.epsg == stref.epsg;
-//	res &= (spec.x1 + h_spacing) >= stref.x1;
-//	res &= (spec.x2 - h_spacing) <= stref.x2;
-//	res &= (spec.y1 + v_spacing) >= stref.y1;
-//	res &= (spec.y2 - v_spacing) <= stref.y2;
-//	res &= spec.timestamp >= stref.t1;
-//	// FIXME: Shouldn't that be half open intervals? World1 -> Webmercator will never result in a hit if < instead of <= is used
-//	res &= spec.timestamp <= stref.t2;
+	bool res = spec.epsg == result.stref.epsg;
+	res &= spec.x1 >= result.stref.x1 - h_spacing;
+	res &= spec.x2 <= result.stref.x2 + h_spacing;
+	res &= spec.y1 >= result.stref.y1 - v_spacing;
+	res &= spec.y2 <= result.stref.y2 + v_spacing;
+	res &= spec.timestamp >= result.stref.t1;
+	// FIXME: Shouldn't that be half open intervals? World1 -> Webmercator will never result in a hit if < instead of <= is used
+	res &= spec.timestamp <= result.stref.t2;
 
 	// Check query rectangle
-	if ( spec.epsg == stref.epsg
-			&& spec.x1 >= stref.x1 - h_spacing
-			&& spec.x2 <= stref.x2 + h_spacing
-			&& spec.y1 >= stref.y1 - v_spacing
-			&& spec.y2 <= stref.y2 + v_spacing
-			&& spec.timestamp >= stref.t1
-			&& spec.timestamp <= stref.t2 ) {
+	if ( spec.epsg == result.stref.epsg
+			&& spec.x1 >= result.stref.x1 - h_spacing
+			&& spec.x2 <= result.stref.x2 + h_spacing
+			&& spec.y1 >= result.stref.y1 - v_spacing
+			&& spec.y2 <= result.stref.y2 + v_spacing
+			&& spec.timestamp >= result.stref.t1
+			&& spec.timestamp <= result.stref.t2 ) {
 		// Check resolution
-		double ohspan = stref.x2 - stref.x1;
-		double ovspan = stref.y2 - stref.y1;
+		double ohspan = result.stref.x2 - result.stref.x1;
+		double ovspan = result.stref.y2 - result.stref.y1;
 		double qhspan = spec.x2 - spec.x1;
 		double qvspan = spec.y2 - spec.y1;
 
 		double hfact = qhspan / ohspan;
 		double vfact = qvspan / ovspan;
 
-		double clip_width  = entry->result->width  * hfact;
-		double clip_height = entry->result->height * vfact;
+		double clip_width  = result.width  * hfact;
+		double clip_height = result.height * vfact;
 
 		return clip_width >= spec.xres && clip_height >= spec.yres &&
 			   clip_width < 2*spec.xres && clip_height < 2*spec.yres;
@@ -122,8 +147,8 @@ bool STRasterCacheStructure::matches(const QueryRectangle& spec,
 //
 template<typename EType>
 STCache<EType>::~STCache() {
-	for (auto it = caches.cbegin(); it != caches.cend(); ++it) {
-		delete it->second;
+	for( auto &entry : caches ) {
+		delete entry.second;
 	}
 }
 
@@ -135,7 +160,7 @@ STCacheStructure<EType>* STCache<EType>::getStructure(const std::string &key,
 	auto got = caches.find(key);
 
 	if (got == caches.end() && create) {
-		Log::log(DEBUG, "No cache-structure for key found. Creating.");
+		Log::debug("No cache-structure for key found. Creating.");
 		cache = newStructure();
 		caches[key] = cache;
 	} else if (got != caches.end())
@@ -149,29 +174,29 @@ template<typename EType>
 void STCache<EType>::put(const std::string &key,
 		const std::unique_ptr<EType> &item) {
 	std::lock_guard<std::mutex> lock(mtx);
-	Log::log(DEBUG, "Adding entry for key \"%s\"", key.c_str());
+	Log::debug( "Adding entry for key \"%s\"", key.c_str());
 
 	auto cache = getStructure(key, true);
 
 	auto ce = newEntry(cache, item);
-	Log::log(DEBUG, "Size of new Entry: %d bytes", ce->size);
+	Log::debug("Size of new Entry: %d bytes", ce->size);
 	if (ce->size > max_size) {
-		Log::log(WARN,
+		Log::warn(
 				"Size of entry is greater than assigned cache-size of: %d bytes. Not inserting.",
 				max_size);
 	} else {
 		if (current_size + ce->size > max_size) {
-			Log::log(DEBUG, "New entry exhausts cache size. Cleaning up.");
+			Log::debug("New entry exhausts cache size. Cleaning up.");
 			while (current_size + ce->size > max_size) {
 				auto victim = policy->evict();
-				Log::log(INFO, "Evicting entry (%ld bytes): \"%s\"", victim->size, strefToString(victim->result->stref).c_str() );
+				Log::info("Evicting entry (%ld bytes): \"%s\"", victim->size, strefToString(victim->result->stref).c_str() );
 				victim->structure->remove(victim);
 				current_size -= victim->size;
 			};
-			Log::log(DEBUG, "Cleanup finished. Free space: %d bytes",
+			Log::debug("Cleanup finished. Free space: %d bytes",
 					(max_size - current_size));
 		}
-		Log::log(DEBUG, "Inserting new entry into Cache-Structure.");
+		Log::debug("Inserting new entry into Cache-Structure.");
 		current_size += ce->size;
 		policy->inserted(ce);
 		cache->insert(ce);
@@ -182,7 +207,7 @@ template<typename EType>
 std::unique_ptr<EType> STCache<EType>::get(const std::string &key,
 		const QueryRectangle &qr) {
 	std::lock_guard<std::mutex> lock(mtx);
-	Log::log(DEBUG, "Get: Quering \"%s\" in cache \"%s\"",
+	Log::debug("Get: Quering \"%s\" in cache \"%s\"",
 				qrToString(qr).c_str(), key.c_str());
 
 	auto cache = getStructure(key);
@@ -190,14 +215,14 @@ std::unique_ptr<EType> STCache<EType>::get(const std::string &key,
 		auto entry = cache->query(qr);
 		if (entry != nullptr) {
 			policy->accessed(entry);
-			Log::log(INFO, "HIT for query \"%s\"", qrToString(qr).c_str());
+			Log::info("HIT for query \"%s\"", qrToString(qr).c_str());
 			return copyContent(entry->result);
 		} else {
-			Log::log(INFO, "MISS for query \"%s\"", qrToString(qr).c_str());
+			Log::info("MISS for query \"%s\"", qrToString(qr).c_str());
 			throw NoSucheElementException("Entry not found");
 		}
 	} else {
-		Log::log(INFO, "MISS for query \"%s\"", qrToString(qr).c_str());
+		Log::info("MISS for query \"%s\"", qrToString(qr).c_str());
 		throw NoSucheElementException("Entry not found");
 	}
 
@@ -206,19 +231,19 @@ std::unique_ptr<EType> STCache<EType>::get(const std::string &key,
 template<typename EType>
 std::unique_ptr<EType> STCache<EType>::getOrCreate(const std::string &key,
 		const QueryRectangle &qr, const Producer<EType> &producer) {
-	Log::log(DEBUG, "GetOrCreate: Quering \"%s\" in cache \"%s\"",
+	Log::debug("GetOrCreate: Quering \"%s\" in cache \"%s\"",
 			qrToString(qr).c_str(), key.c_str());
 	try {
 		return get(key, qr);
 	} catch (NoSucheElementException &nse) {
-		Log::log(DEBUG, "Calling producer for entry: \"%s\" in cache \"%s\"",
+		Log::debug("Calling producer for entry: \"%s\" in cache \"%s\"",
 				qrToString(qr).c_str(), key.c_str());
 		try {
 			std::unique_ptr<EType> result = producer.create();
 			put(key, result);
 			return result;
 		} catch (std::exception &e) {
-			Log::log(ERROR, "Error calling producer: %s", e.what());
+			Log::error("Error calling producer: %s", e.what());
 			throw e;
 		}
 	}
@@ -239,6 +264,7 @@ std::shared_ptr<STCacheEntry<EType>> STCache<EType>::newEntry(
 
 size_t RasterCache::getContentSize(
 		const std::unique_ptr<GenericRaster>& content) {
+	// TODO: Get correct size
 	return sizeof(*content) + content->getDataSize();
 }
 

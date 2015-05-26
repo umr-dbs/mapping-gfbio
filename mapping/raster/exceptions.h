@@ -28,6 +28,7 @@ _CUSTOM_EXCEPTION_CLASS(FeatureException);
 _CUSTOM_EXCEPTION_CLASS(NoSucheElementException);
 _CUSTOM_EXCEPTION_CLASS(ShutdownException);
 _CUSTOM_EXCEPTION_CLASS(NotInitializedException);
+_CUSTOM_EXCEPTION_CLASS(DisconnectException);
 
 
 

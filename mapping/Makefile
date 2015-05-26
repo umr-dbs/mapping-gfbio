@@ -8,7 +8,7 @@ CPATH := /usr/local/include/:$(CPATH)
 
 #CPP=g++
 CPP=clang++-3.5
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
+CPPFLAGS=-g -O0 -g3 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
@@ -33,9 +33,9 @@ OBJ_OPERATORS_TEMPORAL=o/operators_temporal_timeshiftoperator.o
 OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) ${OBJ_OPERATORS_TEMPORAL}
 OBJ_COMMON=o/cache_cache.o ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
-OBJ_CACHE=o/cache_server_main.o o/cache_server.o o/cache_cachetask.o ${OBJ_COMMON}
-OBJ_EXECGI=o/main_cgi.o o/cache_cachetask.o ${OBJ_COMMON}
-OBJ_EXEGTEST=${OBJ_COMMON} o/cache_server.o o/cache_cachetask.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_stcache.o o/gtest_cache_server.o o/gtest_cache_util.o
+OBJ_CACHE=o/cache_server_main.o o/cache_server.o ${OBJ_COMMON}
+OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
+OBJ_EXEGTEST=${OBJ_COMMON} o/cache_server.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_stcache.o o/gtest_cache_server.o o/gtest_cache_util.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
 OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o o/cache_cache.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}

@@ -17,8 +17,8 @@ template <typename T>
 class ReplacementPolicy {
 public:
 	virtual ~ReplacementPolicy() {};
-	virtual void inserted( std::shared_ptr<STCacheEntry<T>> entry ) = 0;
-	virtual void accessed( std::shared_ptr<STCacheEntry<T>> entry ) = 0;
+	virtual void inserted( const std::shared_ptr<STCacheEntry<T>> &entry ) = 0;
+	virtual void accessed( const std::shared_ptr<STCacheEntry<T>> &entry ) = 0;
 	virtual std::shared_ptr<STCacheEntry<T>> evict() = 0;
 };
 
@@ -27,8 +27,8 @@ class LRUPolicy : public ReplacementPolicy<T> {
 public:
 	LRUPolicy();
 	virtual ~LRUPolicy();
-	virtual void inserted( std::shared_ptr<STCacheEntry<T>> entry );
-	virtual void accessed( std::shared_ptr<STCacheEntry<T>> entry );
+	virtual void inserted( const std::shared_ptr<STCacheEntry<T>> &entry );
+	virtual void accessed( const std::shared_ptr<STCacheEntry<T>> &entry );
 	virtual std::shared_ptr<STCacheEntry<T>> evict();
 private:
 	LinkedHashMap<std::shared_ptr<STCacheEntry<T>>,std::shared_ptr<STCacheEntry<T>>> map;
@@ -38,12 +38,12 @@ template <typename T> LRUPolicy<T>::LRUPolicy() : map(true) {};
 template <typename T> LRUPolicy<T>::~LRUPolicy() {};
 
 template <typename T>
-void LRUPolicy<T>::inserted( std::shared_ptr<STCacheEntry<T>> entry ) {
+void LRUPolicy<T>::inserted( const std::shared_ptr<STCacheEntry<T>> &entry ) {
 	map.put(entry,entry);
 }
 
 template <typename T>
-void LRUPolicy<T>::accessed( std::shared_ptr<STCacheEntry<T>> entry ) {
+void LRUPolicy<T>::accessed( const std::shared_ptr<STCacheEntry<T>> &entry ) {
 	map.get(entry);
 }
 

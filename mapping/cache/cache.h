@@ -40,7 +40,7 @@ public:
 				  STCacheStructure<EType> *structure ) :
 					  size(sizeof(STCacheEntry) + size), structure(structure), result(std::move(result) ) {};
 	~STCacheEntry() {
-		Log::log(DEBUG, "STCacheEntry destroyed");
+		Log::debug("STCacheEntry destroyed");
 	}
 	std::unique_ptr<EType> result;
 	size_t size;
@@ -63,30 +63,6 @@ public:
 };
 
 //
-// A simple std::vector based implementation of the
-// STCacheStructure interface
-//
-template<typename EType>
-class STListCacheStructure : public STCacheStructure<EType> {
-public:
-	virtual ~STListCacheStructure() {};
-	virtual void insert( const std::shared_ptr<STCacheEntry<EType>> &entry );
-	virtual std::shared_ptr<STCacheEntry<EType>> query( const QueryRectangle &spec );
-	virtual void remove( const std::shared_ptr<STCacheEntry<EType>> &entry );
-protected:
-	virtual bool matches( const QueryRectangle &spec, const std::shared_ptr<STCacheEntry<EType>> &entry ) const = 0;
-private:
-	std::vector<std::shared_ptr<STCacheEntry<EType>>> entries;
-};
-
-class STRasterCacheStructure : public STListCacheStructure<GenericRaster> {
-public:
-	virtual ~STRasterCacheStructure() {};
-protected:
-	virtual bool matches( const QueryRectangle &spec, const std::shared_ptr<STCacheEntry<GenericRaster>> &entry ) const;
-};
-
-//
 // Virtual class encapsulating result-generation
 // on cache misses.
 //
@@ -104,7 +80,7 @@ template<typename EType>
 class STCache {
 public:
 	STCache( size_t max_size ) : max_size(max_size), current_size(0) {
-		Log::log( DEBUG, "Creating new cache with max-size: %d", max_size);
+		Log::debug("Creating new cache with max-size: %d", max_size);
 		policy = std::unique_ptr<ReplacementPolicy<EType>>( new LRUPolicy<EType>() );
 	};
 	virtual ~STCache();

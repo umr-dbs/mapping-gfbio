@@ -20,7 +20,7 @@ public:
 	BlockingQueue();
 	virtual ~BlockingQueue();
 	T pop();
-	void push(T elem);
+	void push(T &elem);
 	void shutdown();
 private:
 	bool is_shutdown = false;
@@ -38,7 +38,7 @@ BlockingQueue<T>::~BlockingQueue() {
 }
 
 template<typename T>
-void BlockingQueue<T>::push( T value ) {
+void BlockingQueue<T>::push( T &value ) {
 	{
 		std::unique_lock<std::mutex> lock(mutex);
 		deque.push_front(std::move(value));

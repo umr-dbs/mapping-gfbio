@@ -9,10 +9,8 @@
 #define LOG_H_
 //#define DISABLE_LOGGING
 
-#include <stdlib.h>
-#include <stdio.h>
+#include <cstdio>
 #include <stdarg.h>
-#include <string>
 
 class Log {
 public:

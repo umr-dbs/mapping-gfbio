@@ -34,7 +34,7 @@ public:
 	V get(const K &key);
 	V removeEldestEntry();
 	void remove(const K &key);
-	uint size();
+	size_t size();
 
 private:
 	bool accessOrder;
@@ -69,7 +69,7 @@ void LinkedHashMap<K, V>::put(const K &key, const V &value) {
 }
 
 template<typename K, typename V>
-uint LinkedHashMap<K, V>::size() {
+size_t LinkedHashMap<K, V>::size() {
 	return map.size();
 }
 

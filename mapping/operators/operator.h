@@ -132,21 +132,6 @@ class GenericOperator {
 		void operator=(GenericOperator &) = delete;
 };
 
-
-class RasterProducer : public Producer<GenericRaster> {
-public:
-	RasterProducer( GenericOperator &op, const QueryRectangle &qr, QueryProfiler &profiler ) : op(op), qr(qr), profiler(profiler) {};
-	virtual ~RasterProducer() {};
-	std::unique_ptr<GenericRaster> create() const {
-		return op.getRaster(qr,profiler);
-	}
-private:
-	GenericOperator &op;
-	const QueryRectangle &qr;
-	QueryProfiler &profiler;
-};
-
-
 class OperatorRegistration {
 	public:
 		OperatorRegistration(const char *name, std::unique_ptr<GenericOperator> (*constructor)(int sourcecounts[], GenericOperator *sources[], Json::Value &params));

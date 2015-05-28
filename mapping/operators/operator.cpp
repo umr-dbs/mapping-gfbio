@@ -256,13 +256,15 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	QueryProfiler profiler;
 	std::unique_ptr<GenericRaster> result;
 	{
-		RasterProducer producer(*this,rect,profiler);
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
-		result = CacheManager::getInstance().getRaster(
-				semantic_id,
-				rect,
-				producer
-		);
+		try {
+			result = CacheManager::getInstance().getRaster(
+					semantic_id,
+					rect);
+		} catch ( NoSuchElementException &nse ) {
+			result = getRaster(rect,profiler);
+			CacheManager::getInstance().putRaster(semantic_id,result);
+		}
 	}
 	d_profile(depth, type, "raster", profiler, result->getDataSize());
 

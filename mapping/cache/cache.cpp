@@ -219,34 +219,13 @@ std::unique_ptr<EType> STCache<EType>::get(const std::string &key,
 			return copyContent(entry->result);
 		} else {
 			Log::info("MISS for query \"%s\"", qrToString(qr).c_str());
-			throw NoSucheElementException("Entry not found");
+			throw NoSuchElementException("Entry not found");
 		}
 	} else {
 		Log::info("MISS for query \"%s\"", qrToString(qr).c_str());
-		throw NoSucheElementException("Entry not found");
+		throw NoSuchElementException("Entry not found");
 	}
 
-}
-
-template<typename EType>
-std::unique_ptr<EType> STCache<EType>::getOrCreate(const std::string &key,
-		const QueryRectangle &qr, const Producer<EType> &producer) {
-	Log::debug("GetOrCreate: Quering \"%s\" in cache \"%s\"",
-			qrToString(qr).c_str(), key.c_str());
-	try {
-		return get(key, qr);
-	} catch (NoSucheElementException &nse) {
-		Log::debug("Calling producer for entry: \"%s\" in cache \"%s\"",
-				qrToString(qr).c_str(), key.c_str());
-		try {
-			std::unique_ptr<EType> result = producer.create();
-			put(key, result);
-			return result;
-		} catch (std::exception &e) {
-			Log::error("Error calling producer: %s", e.what());
-			throw e;
-		}
-	}
 }
 
 template<typename EType>
@@ -304,17 +283,28 @@ void CacheManager::init(std::unique_ptr<CacheManager>& impl) {
 // Default local cache
 //
 std::unique_ptr<GenericRaster> DefaultCacheManager::getRaster(
-		const std::string &semantic_id, const QueryRectangle &rect,
-		const Producer<GenericRaster> &producer) {
-	return rasterCache.getOrCreate(semantic_id, rect, producer);
+		const std::string &semantic_id, const QueryRectangle &rect) {
+	return rasterCache.get(semantic_id, rect);
+}
+
+void DefaultCacheManager::putRaster(const std::string& semantic_id,
+		std::unique_ptr<GenericRaster>& raster) {
+	rasterCache.put( semantic_id, raster );
 }
 
 //
 // NopCache
 //
 std::unique_ptr<GenericRaster> NopCacheManager::getRaster(
-		const std::string& semantic_id, const QueryRectangle& rect,
-		const Producer<GenericRaster>& producer) {
-	return producer.create();
+		const std::string& semantic_id, const QueryRectangle& rect) {
+	(void) semantic_id;
+	(void) rect;
+	throw NoSuchElementException("Cache Miss");
 }
 
+void NopCacheManager::putRaster(const std::string& semantic_id,
+		std::unique_ptr<GenericRaster>& raster) {
+	(void) semantic_id;
+	(void) raster;
+	// Nothing TODO
+}

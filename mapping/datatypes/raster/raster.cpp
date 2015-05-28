@@ -427,7 +427,7 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 	if (z1 != 0 || depth != 0)
 		throw MetadataException("cut() should not specify 3d coordinates on a 2d raster");
 
-	if (x1 < 0 || x1 + width > (int) width || y1 < 0 || y1 + height > (int) height)
+	if (x1 < 0 || x1 + width > (int) this->width || y1 < 0 || y1 + height > (int) this->height)
 		throw MetadataException("cut() not inside the raster");
 
 	double world_x1 = PixelToWorldX(x1) - pixel_scale_x * 0.5;
@@ -461,6 +461,9 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 	}
 */
 #endif
+	// TODO: copy metadata?
+	outputraster_guard->md_string = this->md_string;
+	outputraster_guard->md_value = this->md_value;
 	return outputraster_guard;
 }
 
@@ -500,6 +503,9 @@ std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int dep
 		}
 	}
 
+	// TODO: copy metadata?
+	outputraster_guard->md_string = this->md_string;
+	outputraster_guard->md_value = this->md_value;
 	return outputraster_guard;
 }
 
@@ -518,6 +524,8 @@ std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
 		}
 	}
 	// TODO: copy metadata?
+	flipped_raster->md_string = this->md_string;
+	flipped_raster->md_value = this->md_value;
 	return flipped_raster;
 }
 
@@ -572,6 +580,8 @@ std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRecta
 		}
 	}
 	// TODO: copy metadata?
+	out->md_string = this->md_string;
+	out->md_value = this->md_value;
 	return out;
 }
 

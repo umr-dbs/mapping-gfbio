@@ -58,7 +58,7 @@ std::unique_ptr<GenericRaster> MSG_Pansharpening_Operator::getRaster(const Query
 	auto raster_lowres = getRasterFromSource(1, rect, profiler, RasterQM::LOOSE);
 
 	// query the HRV canal with triple the resolution
-	QueryRectangle rect2 = QueryRectangle(raster_lowres->stref.t1, raster_lowres->stref.x1, raster_lowres->stref.y1, raster_lowres->stref.x2, raster_lowres->stref.y2, raster_lowres->width*3, raster_lowres->height*3, rect.epsg);
+	QueryRectangle rect2(raster_lowres->stref.t1, raster_lowres->stref.x1, raster_lowres->stref.y1, raster_lowres->stref.x2, raster_lowres->stref.y2, raster_lowres->width*3, raster_lowres->height*3, rect.epsg);
 	auto raster_hrv = getRasterFromSource(0, rect2, profiler, RasterQM::EXACT);
 
 	Profiler::Profiler p("CL_PANSHARPENING_OPERATOR");

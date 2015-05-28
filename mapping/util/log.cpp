@@ -66,7 +66,7 @@ void Log::log(LogLevel level, const char *msg, va_list vargs) {
 		strftime(buf, sizeof(buf), "%F %H:%M:%S.", &tstruct);
 
 
-		ss << "[" << buf << std::setfill('0') << std::setw(20) << (now % 1000) << "] [";
+		ss << "[" << buf << std::setfill('0') << std::setw(3) << (now % 1000) << "] [";
 
 		// level
 		switch (level) {

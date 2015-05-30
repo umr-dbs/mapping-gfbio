@@ -7,8 +7,8 @@
 #include "util/configuration.h"
 #include "util/debug.h"
 #include "services/wfs_request.h"
-#include "cache/server.h"
 #include "util/binarystream.h"
+#include "cache/client.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -366,34 +366,10 @@ std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJso
 	}
 	// Request cache-server
 	else {
-		std::string host = Configuration::get("cacheserver.host");
-		int port = atoi( Configuration::get("cacheserver.port").c_str() );
-
-		uint8_t cmd = CacheServer::COMMAND_GET_RASTER;
-		uint8_t querymode = 1;
-		UnixSocket sock(host.c_str(),port);
-		BinaryStream &stream = sock;
-
-		stream.write(cmd);
-		rect.toStream(stream);
-		stream.write(graphJson);
-		stream.write(querymode);
-
-		uint8_t resp_code;
-		stream.read(&resp_code);
-
-		if ( resp_code == CacheServer::RESPONSE_OK )
-			return GenericRaster::fromStream(sock);
-		else if ( resp_code == CacheServer::RESPONSE_PARTIAL ) {
-			// TODO:
-			throw OperatorException("Partial result handling not implemented yet.");
-		}
-		else if ( resp_code == CacheServer::RESPONSE_ERROR ){
-			std::string msg;
-			stream.read(&msg);
-			Log::warn("Cache-Server returned error: %s", msg.c_str() );
-			throw OperatorException(msg);
-		}
+		std::string host = Configuration::get("indexserver.host");
+		int port = atoi( Configuration::get("indexserver.port.frontend").c_str() );
+		CacheClient client(host,port);
+		return client.get_raster(graphJson,rect, GenericOperator::RasterQM::EXACT);
 	}
 }
 

@@ -8,7 +8,7 @@ CPATH := /usr/local/include/:$(CPATH)
 
 #CPP=g++
 CPP=clang++-3.5
-CPPFLAGS=-g -O0 -g3 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
+CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
@@ -31,11 +31,12 @@ OBJ_OPERATORS_MSAT=o/operators_msat_temperature.o o/operators_msat_reflectance.o
 OBJ_OPERATORS_PLOTS=o/operators_plots_histogram.o o/operators_plots_points2histogram.o o/operators_plots_points_metadata_tograph.o
 OBJ_OPERATORS_TEMPORAL=o/operators_temporal_timeshiftoperator.o
 OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) ${OBJ_OPERATORS_TEMPORAL}
-OBJ_COMMON=o/cache_cache.o ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
+OBJ_COMMON=o/cache_common.o o/cache_cache.o ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
-OBJ_CACHE=o/cache_server_main.o o/cache_server.o ${OBJ_COMMON}
-OBJ_EXECGI=o/main_cgi.o ${OBJ_COMMON}
-OBJ_EXEGTEST=${OBJ_COMMON} o/cache_server.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_stcache.o o/gtest_cache_server.o o/gtest_cache_util.o
+OBJ_CACHE_NODE=o/cache_node_nodeserver_main.o o/cache_node_nodeserver.o ${OBJ_COMMON}
+OBJ_CACHE_INDEX=o/cache_index_indexserver_main.o o/cache_index_indexserver.o ${OBJ_COMMON}
+OBJ_EXECGI=o/main_cgi.o o/cache_client.o ${OBJ_COMMON}
+OBJ_EXEGTEST=${OBJ_COMMON} o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_util.o o/gtest_cache_stcache.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
 OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o o/cache_cache.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
@@ -45,7 +46,8 @@ EXERSERVER=r_server
 EXEGTEST=gtest
 EXEGEOMETRYTESTBED=geometrytestbed
 EXETILESERVER=tileserver
-EXECACHESERVER=cache_server
+EXECACHEINDEX=cache_index
+EXECACHENODE=cache_node
 
 
 VALGRIND=valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --suppressions=test/systemtests/valgrind_suppression.supp --error-exitcode=2
@@ -140,8 +142,13 @@ o/main_%.o: %.cpp
 o/cache_%.o: cache/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 
-
-all: ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHESERVER}
+o/cache_index_%.o: cache/index/%.cpp $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} -c $< -o $@
+	
+o/cache_node_%.o: cache/node/%.cpp $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} -c $< -o $@
+	
+all: ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE}
 
 ${EXE}:	${OBJ_EXE}
 	${CPP} $+ ${LDFLAGS} -o $@
@@ -161,9 +168,11 @@ ${EXEGEOMETRYTESTBED}:	${OBJ_EXEGEOMETRYTESTBED}
 ${EXETILESERVER}: o/rasterdb_tileserver.o o/rasterdb_backend.o o/rasterdb_backend_local.o o/datatypes_attributes.o o/util_binarystream.o o/util_sqlite.o o/util_configuration.o
 	${CPP} ${LDFLAGS} $+ -o $@
 
-${EXECACHESERVER}:	${OBJ_CACHE}
+${EXECACHEINDEX}:	${OBJ_CACHE_INDEX}
 	${CPP} ${LDFLAGS} $+ -o $@
 
+${EXECACHENODE}:	${OBJ_CACHE_NODE}
+	${CPP} ${LDFLAGS} $+ -o $@
 
 btw2015_paper_demo_datasource:	${EXE}
 	/mnt/data/raster_import/btw2015_paper_demo.sh $$(readlink -f ./${EXE})
@@ -227,4 +236,4 @@ doc:
 	./../docs/makeDoc
 
 clean:
-	rm -f o/*.o ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHESERVER} $(CL_HEADERS) ${EXEGTEST}
+	rm -f o/*.o ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} $(CL_HEADERS) ${EXEGTEST}

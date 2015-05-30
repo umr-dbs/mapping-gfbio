@@ -24,6 +24,9 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
+	std::unique_ptr<CacheManager> impl( new NopCacheManager() );
+	CacheManager::init( impl );
+
 	RasterCache cache(114508*2 + 17);
 
 
@@ -31,7 +34,13 @@ TEST(STCacheTest,SimpleTest) {
 		parseBBOX(bbox, bboxes[i], epsg, false);
 		QueryRectangle qr(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], width, height, epsg);
 		QueryProfiler qp;
-		RasterProducer p1(*op,qr,qp);
-		std::unique_ptr<GenericRaster> res = cache.getOrCreate(op->getSemanticId(), qr, p1 );
+		try {
+			cache.get(op->getSemanticId(),qr);
+			FAIL();
+		} catch ( NoSuchElementException &nse ) {
+			auto res = op->getCachedRaster(qr,qp);
+			cache.put(op->getSemanticId(), res);
+			auto cached = cache.get(op->getSemanticId(),qr);
+		}
 	}
 }

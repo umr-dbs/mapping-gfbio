@@ -20,7 +20,6 @@ class LineCollection;
 class PolygonCollection;
 class GenericPlot;
 class BinaryStream;
-class RasterProducer;
 
 class QueryRectangle {
 	public:

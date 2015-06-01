@@ -29,6 +29,7 @@ _CUSTOM_EXCEPTION_CLASS(NoSuchElementException);
 _CUSTOM_EXCEPTION_CLASS(NotInitializedException);
 _CUSTOM_EXCEPTION_CLASS(TimeoutException);
 _CUSTOM_EXCEPTION_CLASS(InterruptedException);
+_CUSTOM_EXCEPTION_CLASS(DeliveryException);
 
 
 

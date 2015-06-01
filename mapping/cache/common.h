@@ -11,6 +11,7 @@
 #include "util/binarystream.h"
 #include "raster/exceptions.h"
 #include "operators/operator.h"
+#include "datatypes/raster.h"
 #include <memory>
 
 #include <sstream>
@@ -207,6 +208,11 @@ public:
 	// Creates a listening socket on the given port.
 	//
 	static int getListeningSocket(int port, bool nonblock = true, int backlog = 10);
+
+	//
+	// Fetches a raster from the given delivery response
+	//
+	static std::unique_ptr<GenericRaster> fetch_raster(const DeliveryResponse& dr);
 
 	//
 	// Helper to read from a stream with a given timeout. Basically wraps

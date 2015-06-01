@@ -70,6 +70,32 @@ int Common::getListeningSocket(int port, bool nonblock, int backlog) {
 	return sock;
 }
 
+std::unique_ptr<GenericRaster> Common::fetch_raster(const DeliveryResponse& dr) {
+	Log::debug("Fetching cache-entry from: %s:%d", dr.host.c_str(), dr.port);
+	SocketConnection dc(dr.host.c_str(),dr.port);
+	uint8_t cmd = Common::CMD_DELIVERY_GET;
+	dc.stream->write(cmd);
+	dc.stream->write(dr.delivery_id);
+
+	uint8_t resp;
+	dc.stream->read(&resp);
+	switch (resp) {
+		case Common::RESP_DELIVERY_OK: {
+			return GenericRaster::fromStream(*dc.stream);
+		}
+		case Common::RESP_DELIVERY_ERROR: {
+			std::string err_msg;
+			dc.stream->read(&err_msg);
+			Log::error("Delivery returned error: %s", err_msg.c_str());
+			throw DeliveryException(err_msg);
+		}
+		default: {
+			Log::error("Delivery returned unknown code: %d", resp);
+			throw DeliveryException("Delivery returned unknown code");
+		}
+	}
+}
+
 //
 // Connection class
 //

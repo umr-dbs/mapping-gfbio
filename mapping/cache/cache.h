@@ -133,6 +133,7 @@ private:
 };
 
 class NopCacheManager : public CacheManager {
+public:
 	virtual ~NopCacheManager() {};
 	virtual std::unique_ptr<GenericRaster> getRaster( const std::string &semantic_id, const QueryRectangle &rect ) ;
 	virtual void putRaster( const std::string &semantic_id, std::unique_ptr<GenericRaster> &raster );

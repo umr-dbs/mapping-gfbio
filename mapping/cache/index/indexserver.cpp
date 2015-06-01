@@ -7,6 +7,7 @@
 
 #include "cache/common.h"
 #include "cache/index/indexserver.h"
+#include "util/make_unique.h"
 
 #include <deque>
 #include <memory>
@@ -87,7 +88,7 @@ std::unique_ptr<Job> RasterJobDef::create_job(NP &node, CP worker_connection) {
 	worker_connection->stream->write(cmd);
 	Common::writeRasterRequest(*worker_connection, graph_json, query, query_mode);
 
-	return std::unique_ptr<Job>(new Job(node, frontend_connection, worker_connection));
+	return std::make_unique<Job>(node, frontend_connection, worker_connection);
 }
 
 RasterJobDef::~RasterJobDef() {
@@ -230,7 +231,7 @@ void IndexServer::stop() {
 }
 
 std::unique_ptr<std::thread> IndexServer::run_async() {
-	return std::unique_ptr<std::thread>(new std::thread(&IndexServer::run, this));
+	return std::make_unique<std::thread>(&IndexServer::run, this);
 }
 
 void IndexServer::check_node_connections(fd_set* readfds) {
@@ -373,7 +374,7 @@ void IndexServer::check_frontend_handshake(fd_set* readfds, int frontend_socket)
 		}
 		else if (new_fd > 0) {
 			Log::debug("New front-connection established on fd: %d", new_fd);
-			frontend_connections.push_back(std::unique_ptr<SocketConnection>(new SocketConnection(new_fd)));
+			frontend_connections.push_back(std::make_unique<SocketConnection>(new_fd));
 		}
 	}
 }
@@ -390,7 +391,7 @@ void IndexServer::check_frontend_connections(fd_set* readfds) {
 				if (fc->stream->read(&cmd, true)) {
 					switch (cmd) {
 						case Common::CMD_INDEX_GET_RASTER: {
-							std::unique_ptr<JobDefinition> jd(new RasterJobDef(fc));
+							std::unique_ptr<JobDefinition> jd = std::make_unique<RasterJobDef>(fc);
 							try {
 								NP node = get_node_for_job(jd);
 								// We can process the job directly

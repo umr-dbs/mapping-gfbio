@@ -3,6 +3,7 @@
 #include "cache/cache.h"
 #include "operators/operator.h"
 #include "util/configuration.h"
+#include "util/make_unique.h"
 
 
 TEST(STCacheTest,SimpleTest) {
@@ -24,7 +25,7 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
-	std::unique_ptr<CacheManager> impl( new NopCacheManager() );
+	std::unique_ptr<CacheManager> impl = std::make_unique<NopCacheManager>();
 	CacheManager::init( impl );
 
 	RasterCache cache(114508*2 + 17);

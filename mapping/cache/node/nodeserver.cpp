@@ -9,6 +9,7 @@
 #include "cache/node/nodeserver.h"
 #include "cache/index/indexserver.h"
 #include "raster/exceptions.h"
+#include "util/make_unique.h"
 #include <sstream>
 
 #include <sys/select.h>
@@ -103,7 +104,7 @@ void DeliveryManager::run() {
 			}
 			else if (new_fd > 0) {
 				Log::debug("New delivery-connection established on fd: %d", new_fd);
-				connections.push_back(std::unique_ptr<SocketConnection>(new SocketConnection(new_fd)));
+				connections.push_back(std::make_unique<SocketConnection>(new_fd));
 			}
 		}
 
@@ -138,7 +139,7 @@ void DeliveryManager::run() {
 }
 
 std::unique_ptr<std::thread> DeliveryManager::run_async() {
-	return std::unique_ptr<std::thread>(new std::thread(&DeliveryManager::run, this));
+	return std::make_unique<std::thread>(&DeliveryManager::run, this);
 }
 
 void DeliveryManager::stop() {
@@ -233,7 +234,7 @@ void NodeServer::run() {
 			workers_up = true;
 			for (int i = 0; i < num_treads; i++)
 				workers.push_back(
-						std::unique_ptr<std::thread>(new std::thread(&NodeServer::worker_loop, this)));
+						std::make_unique<std::thread>(&NodeServer::worker_loop, this));
 
 			// Read on control
 			while (!shutdown) {
@@ -307,7 +308,7 @@ void NodeServer::setup_control_connection() {
 }
 
 std::unique_ptr<std::thread> NodeServer::run_async() {
-	return std::unique_ptr<std::thread>(new std::thread(&NodeServer::run, this));
+	return std::make_unique<std::thread>(&NodeServer::run, this);
 }
 
 void NodeServer::stop() {

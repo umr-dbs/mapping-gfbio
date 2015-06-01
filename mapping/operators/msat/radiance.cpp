@@ -1,11 +1,9 @@
 
 #include "datatypes/raster.h"
 #include "datatypes/raster/typejuggling.h"
-#include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "msg_constants.h"
-
 
 #include <limits>
 #include <memory>
@@ -34,7 +32,7 @@ class MSATRadianceOperator : public GenericOperator {
 MSATRadianceOperator::MSATRadianceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
-	this->convert = params.get("conversion", "false").asBool();
+	this->convert = params.get("conversion", false).asBool();
 }
 
 MSATRadianceOperator::~MSATRadianceOperator() {
@@ -54,8 +52,6 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	float slope = raster->md_value.get("CalibrationSlope");
 	int channel = (int) raster->md_value.get("Channel");
 
-
-	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
 
 	double newmin = offset + raster->dd.min * slope;
@@ -82,6 +78,9 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	prog.addArg(slope);
 	prog.addArg(conversionFactor);
 	prog.run();
+
+	raster_out->md_value = raster->md_value;
+	raster_out->md_string = raster->md_string;
 
 	return raster_out;
 }

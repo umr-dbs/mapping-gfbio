@@ -2,6 +2,7 @@
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/raster/typejuggling.h"
 #include "raster/opencl.h"
+#include "raster/profiler.h"
 #include "util/hash.h"
 #include "util/binarystream.h"
 #include "operators/operator.h" // for QueryRectangle
@@ -255,13 +256,29 @@ std::unique_ptr<GenericRaster> GenericRaster::fromStream(BinaryStream &stream) {
 
 
 
+static void * alloc_aligned_buffer(size_t size) {
+	const size_t ALIGN = 4096;
+
+	if (size % ALIGN != 0)
+		size = size - (size % ALIGN) + ALIGN;
+
+	void *data = aligned_alloc(ALIGN, size);
+	if (data == nullptr)
+		throw std::bad_alloc();
+	memset(data, 0, size);
+	return data;
+}
 
 
 template<typename T, int dimensions>
 Raster<T, dimensions>::Raster(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth)
 	: GenericRaster(datadescription, stref, width, height, depth), clhostptr(nullptr),clbuffer(nullptr), clbuffer_info(nullptr) {
 	auto count = getPixelCount();
-	data = new T[count + 1];
+
+	size_t required_size = (count+1) * sizeof(T);
+	data = (T *) alloc_aligned_buffer(required_size);
+	//data = new T[count + 1];
+
 	data[count] = 42;
 }
 
@@ -274,7 +291,8 @@ Raster<T, dimensions>::~Raster() {
 			exit(6);
 		}
 
-		delete [] data;
+		free(data);
+		//delete [] data;
 		data = nullptr;
 	}
 	if (clbuffer) {
@@ -302,6 +320,7 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 #else
 		// https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/clCreateBuffer.html
 		try {
+			Profiler::Profiler p(s.c_str());
 #if MAPPING_OPENCL_USE_HOST_PTR
 			clbuffer = new cl::Buffer(
 				*RasterOpenCL::getContext(),
@@ -311,6 +330,7 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 			);
 			clhostptr = RasterOpenCL::getQueue()->enqueueMapBuffer(*clbuffer, CL_TRUE, CL_MAP_READ | CL_MAP_WRITE, 0, getDataSize());
 #else
+			//printf("Creating clbuffer with size %lu of %lu\n", getDataSize(), RasterOpenCL::getMaxAllocSize());
 			clbuffer = new cl::Buffer(
 				*RasterOpenCL::getContext(),
 				CL_MEM_READ_WRITE, // | CL_MEM_USE_HOST_PTR, // CL_MEM_COPY_HOST_PTR
@@ -318,7 +338,8 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 				nullptr //data
 			);
 			RasterOpenCL::getQueue()->enqueueWriteBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
-			delete [] data;
+			//delete [] data;
+			free(data);
 			data = nullptr;
 #endif
 		}
@@ -335,16 +356,21 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 #ifdef MAPPING_NO_OPENCL
 		throw PlatformException("No OpenCL support");
 #else
-		//printf("Migrating raster back to CPU\n");
+		{
+			Profiler::Profiler p(s.c_str());
 #if MAPPING_OPENCL_USE_HOST_PTR
-		RasterOpenCL::getQueue()->enqueueUnmapMemObject(*clbuffer, clhostptr);
-		clhostptr = nullptr;
+			RasterOpenCL::getQueue()->enqueueUnmapMemObject(*clbuffer, clhostptr);
+			clhostptr = nullptr;
 #else
-		auto count = getPixelCount();
-		data = new T[count + 1];
-		data[count] = 42;
-		RasterOpenCL::getQueue()->enqueueReadBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
+			auto count = getPixelCount();
+			size_t required_size = (count+1) * sizeof(T);
+			data = (T *) alloc_aligned_buffer(required_size);
+			//data = new T[count + 1];
+			data[count] = 42;
+
+			RasterOpenCL::getQueue()->enqueueReadBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
 #endif
+		}
 		delete clbuffer;
 		clbuffer = nullptr;
 		delete clbuffer_info;

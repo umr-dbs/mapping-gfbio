@@ -202,16 +202,12 @@ void NodeServer::process_worker_command(uint8_t cmd, SocketConnection& con) {
 	switch (cmd) {
 	case Common::CMD_WORKER_GET_RASTER:
 		Log::trace("Reading raster-request.");
-		std::string graph_str;
-		uint8_t mode;
+		RasterRequest rr(*con.stream);
 		QueryProfiler profiler;
-		con.stream->read(&graph_str);
-		QueryRectangle qr(*con.stream);
-		con.stream->read(&mode);
 		Log::trace("Fetching raster from operator-graph");
-		std::unique_ptr<GenericRaster> res = GenericOperator::fromJSON(graph_str)->getCachedRaster(qr,
-				profiler, mode == 1 ? GenericOperator::RasterQM::EXACT : GenericOperator::RasterQM::LOOSE);
-		Log::trace("Handing rater over to delivery-manager");
+		std::unique_ptr<GenericRaster> res = GenericOperator::fromJSON(rr.graph_json)->
+				getCachedRaster(rr.query, profiler, rr.query_mode );
+		Log::trace("Handing raster over to delivery-manager");
 		uint64_t delivery_id = delivery_manager.add_delivery(res);
 		Log::trace("Sending response");
 		uint8_t resp = Common::RESP_WORKER_RESULT_READY;

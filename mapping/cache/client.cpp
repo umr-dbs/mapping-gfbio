@@ -22,26 +22,20 @@ std::unique_ptr<GenericRaster> CacheClient::get_raster(const std::string& graph_
 	SocketConnection idx_con(index_host.c_str(), index_port);
 
 	uint8_t idx_cmd = Common::CMD_INDEX_GET_RASTER;
+	RasterRequest rr(query,graph_json,query_mode);
 	idx_con.stream->write(idx_cmd);
-	Common::writeRasterRequest(idx_con, graph_json, query, query_mode);
+	rr.toStream( *idx_con.stream );
 
-	std::string del_host;
-	uint32_t del_port;
-	uint64_t del_id;
-	read_index_response(idx_con, &del_host, &del_port, &del_id);
-	return fetch_raster(del_host, del_port, del_id);
+	DeliveryResponse resp = read_index_response(idx_con);
+	return fetch_raster(resp);
 }
 
-void CacheClient::read_index_response(SocketConnection& idx_con, std::string* host, uint32_t* port,
-		uint64_t* delivery_id) {
+DeliveryResponse CacheClient::read_index_response(SocketConnection& idx_con) {
 	uint8_t idx_resp;
 	idx_con.stream->read(&idx_resp);
 	switch (idx_resp) {
 		case Common::RESP_INDEX_GET: {
-			idx_con.stream->read(host);
-			idx_con.stream->read(port);
-			idx_con.stream->read(delivery_id);
-			break;
+			return DeliveryResponse(*idx_con.stream);
 		}
 		case Common::RESP_INDEX_ERROR: {
 			std::string err_msg;
@@ -56,14 +50,13 @@ void CacheClient::read_index_response(SocketConnection& idx_con, std::string* ho
 	}
 }
 
-std::unique_ptr<GenericRaster> CacheClient::fetch_raster(const std::string& host, uint32_t port,
-		uint64_t delivery_id) {
+std::unique_ptr<GenericRaster> CacheClient::fetch_raster(const DeliveryResponse &resp) {
 
-	SocketConnection del_con(host.c_str(), port);
+	SocketConnection del_con(resp.host.c_str(), resp.port);
 
 	uint8_t del_cmd = Common::CMD_DELIVERY_GET;
 	del_con.stream->write(del_cmd);
-	del_con.stream->write(delivery_id);
+	del_con.stream->write(resp.delivery_id);
 
 	uint8_t del_resp;
 	del_con.stream->read(&del_resp);

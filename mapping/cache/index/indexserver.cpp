@@ -41,57 +41,16 @@ Job::Job(NP &node, CP &frontend_connection, CP &worker_connection) :
 //
 ////////////////////////////////////////////////////////////
 
-JobDefinition::JobDefinition(CP &frontend_connection, const std::string &graph_json,
-		const QueryRectangle& query) :
-		frontend_connection(std::move(frontend_connection)), query(query), graph_json(graph_json) {
+JobDefinition::JobDefinition(CP &frontend_connection, std::unique_ptr<CacheRequest> &request ) :
+		frontend_connection(std::move(frontend_connection)), request(std::move(request)) {
 }
 
-// TODO: Why is there no implementation of the declared default constructor of QueryRectangle
-JobDefinition::JobDefinition(CP& frontend_connection) :
-		frontend_connection(std::move(frontend_connection)), query(0, 0, 0, 0, 0, 0, 0, EPSG_UNKNOWN) {
-}
-
-JobDefinition::~JobDefinition() {
-}
-
-class RasterJobDef: public JobDefinition {
-public:
-	RasterJobDef(const RasterJobDef&) = delete;
-	RasterJobDef operator=(const RasterJobDef&) = delete;
-	RasterJobDef(CP &frontend_connection);
-	RasterJobDef(CP &frontend_connection, const std::string &graph_json, const QueryRectangle& query,
-			GenericOperator::RasterQM query_mode);
-	virtual ~RasterJobDef();
-	virtual std::unique_ptr<Job> create_job(NP &node, CP worker_connection);
-	GenericOperator::RasterQM query_mode;
-};
-
-RasterJobDef::RasterJobDef(CP &frontend_connection, const std::string &graph_json,
-		const QueryRectangle& query, GenericOperator::RasterQM query_mode) :
-		JobDefinition(frontend_connection, graph_json, query), query_mode(query_mode) {
-}
-
-RasterJobDef::RasterJobDef(CP& frontend_connection) :
-		JobDefinition(frontend_connection) {
-	// Read the request directly from the connection
-	this->frontend_connection->stream->read(&graph_json);
-	QueryRectangle q(*this->frontend_connection->stream);
-	uint8_t qm;
-	this->frontend_connection->stream->read(&qm);
-	query = q;
-	query_mode = (qm == 1) ? GenericOperator::RasterQM::EXACT : GenericOperator::RasterQM::LOOSE;
-}
-
-std::unique_ptr<Job> RasterJobDef::create_job(NP &node, CP worker_connection) {
+std::unique_ptr<Job> JobDefinition::create_job(NP &node, CP worker_connection) {
 	// Send request to worker
 	uint8_t cmd = Common::CMD_WORKER_GET_RASTER;
 	worker_connection->stream->write(cmd);
-	Common::writeRasterRequest(*worker_connection, graph_json, query, query_mode);
-
+	request->toStream(*worker_connection->stream);
 	return std::make_unique<Job>(node, frontend_connection, worker_connection);
-}
-
-RasterJobDef::~RasterJobDef() {
 }
 
 ////////////////////////////////////////////////////////////
@@ -391,9 +350,10 @@ void IndexServer::check_frontend_connections(fd_set* readfds) {
 				if (fc->stream->read(&cmd, true)) {
 					switch (cmd) {
 						case Common::CMD_INDEX_GET_RASTER: {
-							std::unique_ptr<JobDefinition> jd = std::make_unique<RasterJobDef>(fc);
+							std::unique_ptr<CacheRequest> req = std::make_unique<RasterRequest>(*fc->stream);
 							try {
-								NP node = get_node_for_job(jd);
+								NP node = get_node_for_job(req);
+								std::unique_ptr<JobDefinition> jd = std::make_unique<JobDefinition>(fc,req);
 								// We can process the job directly
 								if (node->has_worker())
 									jobs.push_back(jd->create_job(node, node->get_worker()));
@@ -401,13 +361,8 @@ void IndexServer::check_frontend_connections(fd_set* readfds) {
 								else
 									node->add_pending_job(jd);
 							} catch (NoSuchElementException &nse) {
-								// TODO: This is ugly
-								fc = std::move(jd->frontend_connection);
-								std::string msg = "No worker-node available";
 								Log::error("No node registered for processing this request.");
-								uint8_t resp = Common::RESP_INDEX_ERROR;
-								fc->stream->write(resp);
-								fc->stream->write(msg);
+								send_error(*fc,"No worker-node available");
 								remove_connection = false;
 							}
 
@@ -466,15 +421,22 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 
 						// Send delivery-id and node address
 						uint8_t f_resp = Common::RESP_INDEX_GET;
+						DeliveryResponse dr(job->node->host,job->node->port,delivery_id);
 						fc->stream->write(f_resp);
-						fc->stream->write(job->node->host);
-						fc->stream->write(job->node->port);
-						fc->stream->write(delivery_id);
+						dr.toStream(*fc->stream);
 						Log::debug("Worker finished processing request.");
 						break;
 					}
+					case Common::CMD_INDEX_QUERY_CACHE: {
+						Log::debug("Worker requested a cache-query.");
+						CacheRequest req(*fc->stream);
+
+
+						done = false;
+						break;
+					}
 					case Common::RESP_WORKER_NEW_CACHE_ENTRY: {
-						Log::info("Worker returned new result to cache.");
+						Log::debug("Worker returned new result to cache.");
 						done = false;
 						break;
 					}
@@ -482,17 +444,12 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 						std::string msg;
 						wc->stream->read(&msg);
 						Log::warn("Worker returned error %s", msg.c_str());
-						uint8_t f_resp = Common::RESP_INDEX_ERROR;
-						fc->stream->write(f_resp);
-						fc->stream->write(msg);
+						send_error(*fc,msg);
 						break;
 					}
 					default: {
 						Log::error("Worker returned unknown code: %d. Terminating worker-connection.", resp);
-						uint8_t f_resp = Common::RESP_INDEX_ERROR;
-						std::string msg = "Internal error";
-						fc->stream->write(f_resp);
-						fc->stream->write(msg);
+						send_error(*fc,"Internal error");
 						reuse_worker = false;
 						break;
 					}
@@ -534,9 +491,15 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 	}
 }
 
-IndexServer::NP IndexServer::get_node_for_job(const std::unique_ptr<JobDefinition> &job_def) {
+void IndexServer::send_error(const SocketConnection& con, std::string msg) {
+	uint8_t code = Common::RESP_INDEX_ERROR;
+	con.stream->write(code);
+	con.stream->write(msg);
+}
+
+IndexServer::NP IndexServer::get_node_for_job(const std::unique_ptr<CacheRequest> &request) {
 	// TODO: BIG TODO
-	(void) job_def;
+	(void) request;
 	if (nodes.empty())
 		throw NoSuchElementException("No nodes available");
 	else

@@ -86,11 +86,66 @@ SocketConnection::SocketConnection(const char* host, int port) : fd(-1) {
 SocketConnection::~SocketConnection() {
 }
 
-void Common::writeRasterRequest(SocketConnection& con,
-		const std::string& graph_json, const QueryRectangle& query,
-		GenericOperator::RasterQM query_mode) {
+CacheRequest::CacheRequest(const CacheRequest& r) : query(r.query), graph_json(r.graph_json) {
+}
+
+CacheRequest::CacheRequest(const QueryRectangle& query, const std::string& graph_json) :
+	query(query), graph_json(graph_json){
+}
+
+CacheRequest::CacheRequest(BinaryStream &stream) :
+	query(stream) {
+	stream.read(&graph_json);
+}
+
+CacheRequest::~CacheRequest() {
+}
+
+void CacheRequest::toStream(BinaryStream& stream) {
+	query.toStream(stream);
+	stream.write(graph_json);
+}
+
+
+RasterRequest::RasterRequest(const RasterRequest& r) : CacheRequest(r), query_mode(r.query_mode){
+}
+
+RasterRequest::RasterRequest(const QueryRectangle& query, const std::string& graph_json,
+		GenericOperator::RasterQM query_mode) : CacheRequest(query,graph_json), query_mode(query_mode) {
+}
+
+RasterRequest::RasterRequest(BinaryStream& stream) : CacheRequest(stream) {
+	uint8_t qm;
+	stream.read(&qm);
+	query_mode = (qm == 1) ? GenericOperator::RasterQM::EXACT : GenericOperator::RasterQM::LOOSE;
+}
+
+void RasterRequest::toStream(BinaryStream& stream) {
 	uint8_t qm = (query_mode == GenericOperator::RasterQM::EXACT) ? 1 : 0;
-	con.stream->write(graph_json);
-	query.toStream(*con.stream);
-	con.stream->write(qm);
+	CacheRequest::toStream(stream);
+	stream.write(qm);
+}
+
+RasterRequest::~RasterRequest() {
+}
+
+
+DeliveryResponse::DeliveryResponse(const DeliveryResponse& r) :
+	host(r.host), port(r.port), delivery_id(r.delivery_id) {
+}
+
+DeliveryResponse::DeliveryResponse(std::string host, uint32_t port, uint64_t delivery_id) :
+			host(host), port(port), delivery_id(delivery_id) {
+}
+
+DeliveryResponse::DeliveryResponse(BinaryStream& stream) {
+	stream.read(&host);
+	stream.read(&port);
+	stream.read(&delivery_id);
+}
+
+void DeliveryResponse::toStream(BinaryStream& stream) {
+	stream.write(host);
+	stream.write(port);
+	stream.write(delivery_id);
 }

@@ -21,8 +21,8 @@ public:
 												const QueryRectangle &query,
 												const GenericOperator::RasterQM query_mode = GenericOperator::RasterQM::EXACT );
 private:
-	void read_index_response( SocketConnection &idx_con, std::string *host, uint32_t *port, uint64_t *delivery_id );
-	std::unique_ptr<GenericRaster> fetch_raster( const std::string &host, uint32_t port, uint64_t delivery_id );
+	DeliveryResponse read_index_response( SocketConnection &idx_con );
+	std::unique_ptr<GenericRaster> fetch_raster( const DeliveryResponse &resp );
 	std::string index_host;
 	uint32_t index_port;
 };

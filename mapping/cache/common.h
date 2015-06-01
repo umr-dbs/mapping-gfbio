@@ -18,6 +18,40 @@
 #include <sys/select.h>
 #include <errno.h>
 
+class CacheRequest {
+public:
+	virtual ~CacheRequest();
+	CacheRequest( const CacheRequest &r );
+	CacheRequest( const QueryRectangle &query, const std::string &graph_json );
+	CacheRequest( BinaryStream &stream);
+	virtual void toStream( BinaryStream &stream );
+	QueryRectangle query;
+	std::string graph_json;
+};
+
+class RasterRequest : public CacheRequest {
+public:
+	virtual ~RasterRequest();
+	RasterRequest( const RasterRequest &r );
+	RasterRequest( const QueryRectangle &query, const std::string &graph_json, GenericOperator::RasterQM query_mode );
+	RasterRequest( BinaryStream &stream);
+	virtual void toStream( BinaryStream &stream );
+	GenericOperator::RasterQM query_mode;
+};
+
+
+class DeliveryResponse {
+public:
+	DeliveryResponse( const DeliveryResponse &r );
+	DeliveryResponse(std::string host, uint32_t port, uint64_t delivery_id );
+	DeliveryResponse( BinaryStream &stream );
+	void toStream( BinaryStream &stream );
+	std::string host;
+	uint32_t port;
+	uint64_t delivery_id;
+};
+
+
 //
 // Wraps a BinaryStream and stores the underlying
 // FileDescriptor for use in select().
@@ -69,6 +103,12 @@ public:
 	//
 	static const uint8_t CMD_INDEX_GET_RASTER = 3;
 
+	//
+	// Expected data on stream is:
+	// QueryRectangle
+	// OperatorGraph as JSON:string
+	//
+	static const uint8_t CMD_INDEX_QUERY_CACHE = 4;
 
 	//
 	// Expected data on stream is:
@@ -105,6 +145,21 @@ public:
 	// port:uint32_t
 	// delivery_id:uint64_t
 	static const uint8_t RESP_INDEX_GET = 31;
+
+	//
+	// Response from index-server after successfully
+	// probing the cache for a CMD_INDEX_QUERY_CACHE.
+	// Data on stream is:
+	// host:string
+	// port:uint32_t
+	// delivery_id:uint64_t
+	static const uint8_t RESP_INDEX_HIT = 32;
+
+	//
+	// Response from index-server after unsuccessfuly
+	// probing the cache for a CMD_INDEX_QUERY_CACHE.
+	// Theres no data on stream.
+	static const uint8_t RESP_INDEX_MISS = 33;
 
 	//
 	// Response for ready to deliver response. Data on stream is:
@@ -152,12 +207,6 @@ public:
 	// Creates a listening socket on the given port.
 	//
 	static int getListeningSocket(int port, bool nonblock = true, int backlog = 10);
-
-	//
-	// Writes a raster-request to the given connection.
-	// Note that the command must be sent before.
-	//
-	static void writeRasterRequest( SocketConnection &con, const std::string &graph_json, const QueryRectangle &query, GenericOperator::RasterQM query_mode );
 
 	//
 	// Helper to read from a stream with a given timeout. Basically wraps

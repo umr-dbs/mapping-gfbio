@@ -53,19 +53,15 @@ public:
 //
 
 class JobDefinition {
-protected:
 	typedef std::unique_ptr<SocketConnection> CP;
 	typedef std::shared_ptr<Node> NP;
-	JobDefinition(CP &frontend_connection);
-	JobDefinition(CP &frontend_connection, const std::string &graph_json, const QueryRectangle &query );
 public:
-	virtual ~JobDefinition();
-	virtual std::unique_ptr<Job> create_job( NP &node, CP worker_connection ) = 0;
+	JobDefinition(CP &frontend_connection, std::unique_ptr<CacheRequest> &request );
+	std::unique_ptr<Job> create_job( NP &node, CP worker_connection );
 	// The connection which issued this job
 	CP frontend_connection;
-	// Common parts of a query
-	QueryRectangle query;
-	std::string graph_json;
+	// The unerlying request
+	std::unique_ptr<CacheRequest> request;
 };
 
 
@@ -193,7 +189,10 @@ private:
 	// Desired behaviour:
 	// If response is cached: Choose node which holds it
 	// else: Round-robbin or sth.
-	NP get_node_for_job(const std::unique_ptr<JobDefinition> &job_def);
+	NP get_node_for_job(const std::unique_ptr<CacheRequest> &request);
+
+	// Sends an error to the given connection, including error-code
+	void send_error( const SocketConnection &con, std::string msg );
 
 	// Indicator telling if the server should shutdown
 	bool shutdown;

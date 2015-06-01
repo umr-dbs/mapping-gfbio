@@ -99,6 +99,7 @@ class GenericRaster : public GridSpatioTemporalResult {
 		}
 		static std::unique_ptr<GenericRaster> fromGDAL(const char *filename, int rasterid, epsg_t epsg = EPSG_UNKNOWN);
 		static std::unique_ptr<GenericRaster> fromGDAL(const char *filename, int rasterid, bool &flipx, bool &flipy, epsg_t epsg = EPSG_UNKNOWN);
+		static std::unique_ptr<GenericRaster> fromGDAL(const char *filename, int rasterid, bool &flipx, bool &flipy, epsg_t epsg, double x1, double y1, double x2, double y2);
 
 		virtual ~GenericRaster();
 		GenericRaster(const GenericRaster &) = delete;

@@ -9,6 +9,7 @@
 #include <sstream>
 
 #include "cache/cache.h"
+#include "cache/common.h"
 #include "raster/exceptions.h"
 #include "operators/operator.h"
 
@@ -282,13 +283,13 @@ void CacheManager::init(std::unique_ptr<CacheManager>& impl) {
 //
 // Default local cache
 //
-std::unique_ptr<GenericRaster> DefaultCacheManager::getRaster(
+std::unique_ptr<GenericRaster> LocalCacheManager::getRaster(
 		const std::string &semantic_id, const QueryRectangle &rect) {
 	return rasterCache.get(semantic_id, rect);
 }
 
-void DefaultCacheManager::putRaster(const std::string& semantic_id,
-		std::unique_ptr<GenericRaster>& raster) {
+void LocalCacheManager::putRaster(const std::string& semantic_id,
+		const std::unique_ptr<GenericRaster>& raster) {
 	rasterCache.put( semantic_id, raster );
 }
 
@@ -303,8 +304,80 @@ std::unique_ptr<GenericRaster> NopCacheManager::getRaster(
 }
 
 void NopCacheManager::putRaster(const std::string& semantic_id,
-		std::unique_ptr<GenericRaster>& raster) {
+		const std::unique_ptr<GenericRaster>& raster) {
 	(void) semantic_id;
 	(void) raster;
 	// Nothing TODO
+}
+
+
+std::unique_ptr<GenericRaster> RemoteCacheManager::getRaster(const std::string& semantic_id,
+		const QueryRectangle& rect) {
+	SocketConnection *con = thread_to_con.at(std::this_thread::get_id());
+
+	// Send request
+	uint8_t cmd = Common::CMD_INDEX_QUERY_CACHE;
+	CacheRequest cr(rect,semantic_id);
+	con->stream->write(cmd);
+	cr.toStream(*con->stream);
+
+	uint8_t resp;
+	con->stream->read(&resp);
+	switch ( resp ) {
+		case Common::RESP_INDEX_HIT: {
+			Log::debug("Index found cache-entry. Reading response.");
+			DeliveryResponse dr(*con->stream);
+			try {
+				return Common::fetch_raster(dr);
+			} catch ( std::exception &e ) {
+				Log::error("Error while fetching raster from %s:%d", dr.host.c_str(), dr.port);
+				// TODO: Maybe not...
+				throw NoSuchElementException("Error fetching raster from remote");
+			}
+			break;
+		}
+		case Common::RESP_INDEX_MISS: {
+			Log::debug("MISS from index-server.");
+			throw NoSuchElementException("No cache-entry found on index.");
+		}
+		default: {
+			throw NetworkException("Received unknown response from index.");
+		}
+	}
+}
+
+void RemoteCacheManager::putRaster(const std::string& semantic_id,
+		const std::unique_ptr<GenericRaster>& raster) {
+	//SocketConnection *con = thread_to_con.at(std::this_thread::get_id());
+	(void) semantic_id;
+	(void) raster;
+	// TODO: Implement
+}
+
+void RemoteCacheManager::set_thread_connection(SocketConnection& con) {
+	thread_to_con[ std::this_thread::get_id() ] = &con;
+}
+
+void RemoteCacheManager::clear_thread_connections() {
+	thread_to_con.clear();
+}
+
+std::unique_ptr<GenericRaster> HybridCacheManager::getRaster(const std::string& semantic_id,
+		const QueryRectangle& rect) {
+	try {
+		return local_cache.getRaster(semantic_id,rect);
+	} catch ( NoSuchElementException &nse ) {
+		Log::debug("MISS on local cache. Asking index-server.");
+		return RemoteCacheManager::getRaster(semantic_id, rect);
+	}
+
+}
+
+void HybridCacheManager::putRaster(const std::string& semantic_id, const std::unique_ptr<GenericRaster>& raster) {
+	try {
+		RemoteCacheManager::putRaster(semantic_id,raster);
+		local_cache.putRaster(semantic_id,raster);
+	} catch ( std::exception &e ) {
+		Log::error("Could not store entry in cache: %s", e.what());
+	}
 }

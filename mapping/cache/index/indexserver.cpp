@@ -429,9 +429,11 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 					}
 					case Common::CMD_INDEX_QUERY_CACHE: {
 						Log::debug("Worker requested a cache-query.");
-						CacheRequest req(*fc->stream);
+						CacheRequest req(*wc->stream);
 
-
+						// TODO: implement
+						uint8_t resp = Common::RESP_INDEX_MISS;
+						wc->stream->write(resp);
 						done = false;
 						break;
 					}

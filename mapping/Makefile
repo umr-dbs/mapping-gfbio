@@ -39,7 +39,7 @@ OBJ_EXECGI=o/main_cgi.o o/cache_client.o ${OBJ_COMMON}
 OBJ_EXEGTEST=${OBJ_COMMON} o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_util.o o/gtest_cache_stcache.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
-OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o o/cache_cache.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
+OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o o/cache_cache.o o/cache_common.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
 EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server

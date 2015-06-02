@@ -74,7 +74,7 @@ void DeliveryManager::process_delivery(uint8_t cmd, SocketConnection& con) {
 
 void DeliveryManager::run() {
 	Log::info("Starting Delivery-Manager");
-	int delivery_fd = Common::getListeningSocket(listen_port);
+	int delivery_fd = Common::get_listening_socket(listen_port);
 
 	// Read on delivery-socket
 	while (!shutdown) {

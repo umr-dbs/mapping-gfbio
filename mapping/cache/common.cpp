@@ -21,7 +21,25 @@
 
 #include <unistd.h>
 
-int Common::getListeningSocket(int port, bool nonblock, int backlog) {
+std::string Common::qr_to_string(const QueryRectangle &rect) {
+	std::ostringstream os;
+	os << "QueryRectangle[ epsg: " << (uint16_t) rect.epsg << ", timestamp: "
+			<< rect.timestamp << ", x: [" << rect.x1 << "," << rect.x2 << "]"
+			<< ", y: [" << rect.y1 << "," << rect.y2 << "]" << ", res: ["
+			<< rect.xres << "," << rect.yres << "] ]";
+	return os.str();
+}
+
+std::string Common::stref_to_string(const SpatioTemporalReference &ref) {
+	std::ostringstream os;
+	os << "SpatioTemporalReference[ epsg: " << (uint16_t) ref.epsg
+			<< ", timetype: " << (uint16_t) ref.timetype << ", time: ["
+			<< ref.t1 << "," << ref.t2 << "]" << ", x: [" << ref.x1 << ","
+			<< ref.x2 << "]" << ", y: [" << ref.y1 << "," << ref.y2 << "] ]";
+	return os.str();
+}
+
+int Common::get_listening_socket(int port, bool nonblock, int backlog) {
 	int sock;
 	struct addrinfo hints, *servinfo, *p;
 
@@ -111,6 +129,10 @@ SocketConnection::SocketConnection(const char* host, int port) : fd(-1) {
 
 SocketConnection::~SocketConnection() {
 }
+
+//
+// Request/response classes
+//
 
 CacheRequest::CacheRequest(const CacheRequest& r) : query(r.query), graph_json(r.graph_json) {
 }

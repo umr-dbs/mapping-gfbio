@@ -127,8 +127,8 @@ IndexServer::~IndexServer() {
 }
 
 void IndexServer::run() {
-	int node_socket = Common::getListeningSocket(node_port);
-	int frontend_socket = Common::getListeningSocket(frontend_port);
+	int node_socket = Common::get_listening_socket(node_port);
+	int frontend_socket = Common::get_listening_socket(frontend_port);
 	Log::info("index-server: listening on node-port: %d and frontend-port: %d", node_port, frontend_port);
 
 	while (!shutdown) {
@@ -182,6 +182,7 @@ void IndexServer::run() {
 	}
 	close(node_socket);
 	close(frontend_socket);
+	Log::info("Index-Server done.");
 }
 
 void IndexServer::stop() {

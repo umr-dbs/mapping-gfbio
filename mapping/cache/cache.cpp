@@ -13,23 +13,6 @@
 #include "raster/exceptions.h"
 #include "operators/operator.h"
 
-std::string qrToString(const QueryRectangle &rect) {
-	std::ostringstream os;
-	os << "QueryRectangle[ epsg: " << (uint16_t) rect.epsg << ", timestamp: "
-			<< rect.timestamp << ", x: [" << rect.x1 << "," << rect.x2 << "]"
-			<< ", y: [" << rect.y1 << "," << rect.y2 << "]" << ", res: ["
-			<< rect.xres << "," << rect.yres << "] ]";
-	return os.str();
-}
-
-std::string strefToString(const SpatioTemporalReference &ref) {
-	std::ostringstream os;
-	os << "SpatioTemporalReference[ epsg: " << (uint16_t) ref.epsg
-			<< ", timetype: " << (uint16_t) ref.timetype << ", time: ["
-			<< ref.t1 << "," << ref.t2 << "]" << ", x: [" << ref.x1 << ","
-			<< ref.x2 << "]" << ", y: [" << ref.y1 << "," << ref.y2 << "] ]";
-	return os.str();
-}
 
 //
 // List-Structure
@@ -154,7 +137,7 @@ STCache<EType>::~STCache() {
 }
 
 template<typename EType>
-STCacheStructure<EType>* STCache<EType>::getStructure(const std::string &key,
+STCacheStructure<EType>* STCache<EType>::get_structure(const std::string &key,
 		bool create) {
 
 	STCacheStructure<EType> *cache;
@@ -162,7 +145,7 @@ STCacheStructure<EType>* STCache<EType>::getStructure(const std::string &key,
 
 	if (got == caches.end() && create) {
 		Log::debug("No cache-structure for key found. Creating.");
-		cache = newStructure();
+		cache = new_structure();
 		caches[key] = cache;
 	} else if (got != caches.end())
 		cache = got->second;
@@ -177,9 +160,9 @@ void STCache<EType>::put(const std::string &key,
 	std::lock_guard<std::mutex> lock(mtx);
 	Log::debug( "Adding entry for key \"%s\"", key.c_str());
 
-	auto cache = getStructure(key, true);
+	auto cache = get_structure(key, true);
 
-	auto ce = newEntry(cache, item);
+	auto ce = new_entry(cache, item);
 	Log::debug("Size of new Entry: %d bytes", ce->size);
 	if (ce->size > max_size) {
 		Log::warn(
@@ -190,7 +173,7 @@ void STCache<EType>::put(const std::string &key,
 			Log::debug("New entry exhausts cache size. Cleaning up.");
 			while (current_size + ce->size > max_size) {
 				auto victim = policy->evict();
-				Log::info("Evicting entry (%ld bytes): \"%s\"", victim->size, strefToString(victim->result->stref).c_str() );
+				Log::info("Evicting entry (%ld bytes): \"%s\"", victim->size, Common::stref_to_string(victim->result->stref).c_str() );
 				victim->structure->remove(victim);
 				current_size -= victim->size;
 			};
@@ -209,32 +192,32 @@ std::unique_ptr<EType> STCache<EType>::get(const std::string &key,
 		const QueryRectangle &qr) {
 	std::lock_guard<std::mutex> lock(mtx);
 	Log::debug("Get: Quering \"%s\" in cache \"%s\"",
-				qrToString(qr).c_str(), key.c_str());
+				Common::qr_to_string(qr).c_str(), key.c_str());
 
-	auto cache = getStructure(key);
+	auto cache = get_structure(key);
 	if (cache != nullptr) {
 		auto entry = cache->query(qr);
 		if (entry != nullptr) {
 			policy->accessed(entry);
-			Log::info("HIT for query \"%s\"", qrToString(qr).c_str());
-			return copyContent(entry->result);
+			Log::info("HIT for query \"%s\"", Common::qr_to_string(qr).c_str());
+			return copy_content(entry->result);
 		} else {
-			Log::info("MISS for query \"%s\"", qrToString(qr).c_str());
+			Log::info("MISS for query \"%s\"", Common::qr_to_string(qr).c_str());
 			throw NoSuchElementException("Entry not found");
 		}
 	} else {
-		Log::info("MISS for query \"%s\"", qrToString(qr).c_str());
+		Log::info("MISS for query \"%s\"", Common::qr_to_string(qr).c_str());
 		throw NoSuchElementException("Entry not found");
 	}
 
 }
 
 template<typename EType>
-std::shared_ptr<STCacheEntry<EType>> STCache<EType>::newEntry(
+std::shared_ptr<STCacheEntry<EType>> STCache<EType>::new_entry(
 		STCacheStructure<EType>* structure,
 		const std::unique_ptr<EType>& result) {
 	return std::shared_ptr<STCacheEntry<EType>>(
-			new STCacheEntry<EType>(copyContent(result), getContentSize(result),
+			new STCacheEntry<EType>(copy_content(result), get_content_size(result),
 					structure));
 }
 
@@ -242,13 +225,13 @@ std::shared_ptr<STCacheEntry<EType>> STCache<EType>::newEntry(
 // RasterCache
 //
 
-size_t RasterCache::getContentSize(
+size_t RasterCache::get_content_size(
 		const std::unique_ptr<GenericRaster>& content) {
 	// TODO: Get correct size
 	return sizeof(*content) + content->getDataSize();
 }
 
-std::unique_ptr<GenericRaster> RasterCache::copyContent(
+std::unique_ptr<GenericRaster> RasterCache::copy_content(
 		const std::unique_ptr<GenericRaster> &content) {
 	std::unique_ptr<GenericRaster> copy = GenericRaster::create(content->dd,
 			*content.get(), content->getRepresentation());
@@ -256,7 +239,7 @@ std::unique_ptr<GenericRaster> RasterCache::copyContent(
 	return copy;
 }
 
-STCacheStructure<GenericRaster>* RasterCache::newStructure() {
+STCacheStructure<GenericRaster>* RasterCache::new_structure() {
 	return new STRasterCacheStructure();
 }
 
@@ -285,12 +268,12 @@ thread_local SocketConnection* CacheManager::remote_connection = nullptr;
 //
 // Default local cache
 //
-std::unique_ptr<GenericRaster> LocalCacheManager::getRaster(
+std::unique_ptr<GenericRaster> LocalCacheManager::get_raster(
 		const std::string &semantic_id, const QueryRectangle &rect) {
 	return rasterCache.get(semantic_id, rect);
 }
 
-void LocalCacheManager::putRaster(const std::string& semantic_id,
+void LocalCacheManager::put_raster(const std::string& semantic_id,
 		const std::unique_ptr<GenericRaster>& raster) {
 	rasterCache.put( semantic_id, raster );
 }
@@ -298,14 +281,14 @@ void LocalCacheManager::putRaster(const std::string& semantic_id,
 //
 // NopCache
 //
-std::unique_ptr<GenericRaster> NopCacheManager::getRaster(
+std::unique_ptr<GenericRaster> NopCacheManager::get_raster(
 		const std::string& semantic_id, const QueryRectangle& rect) {
 	(void) semantic_id;
 	(void) rect;
 	throw NoSuchElementException("Cache Miss");
 }
 
-void NopCacheManager::putRaster(const std::string& semantic_id,
+void NopCacheManager::put_raster(const std::string& semantic_id,
 		const std::unique_ptr<GenericRaster>& raster) {
 	(void) semantic_id;
 	(void) raster;
@@ -313,7 +296,7 @@ void NopCacheManager::putRaster(const std::string& semantic_id,
 }
 
 
-std::unique_ptr<GenericRaster> RemoteCacheManager::getRaster(const std::string& semantic_id,
+std::unique_ptr<GenericRaster> RemoteCacheManager::get_raster(const std::string& semantic_id,
 		const QueryRectangle& rect) {
 	if ( remote_connection == nullptr )
 		throw NetworkException("No connection to remote-index set.");
@@ -349,7 +332,7 @@ std::unique_ptr<GenericRaster> RemoteCacheManager::getRaster(const std::string& 
 	}
 }
 
-void RemoteCacheManager::putRaster(const std::string& semantic_id,
+void RemoteCacheManager::put_raster(const std::string& semantic_id,
 		const std::unique_ptr<GenericRaster>& raster) {
 	//SocketConnection *con = thread_to_con.at(std::this_thread::get_id());
 	(void) semantic_id;
@@ -357,21 +340,21 @@ void RemoteCacheManager::putRaster(const std::string& semantic_id,
 	// TODO: Implement
 }
 
-std::unique_ptr<GenericRaster> HybridCacheManager::getRaster(const std::string& semantic_id,
+std::unique_ptr<GenericRaster> HybridCacheManager::get_raster(const std::string& semantic_id,
 		const QueryRectangle& rect) {
 	try {
-		return local_cache.getRaster(semantic_id,rect);
+		return local_cache.get_raster(semantic_id,rect);
 	} catch ( NoSuchElementException &nse ) {
 		Log::debug("MISS on local cache. Asking index-server.");
-		return RemoteCacheManager::getRaster(semantic_id, rect);
+		return RemoteCacheManager::get_raster(semantic_id, rect);
 	}
 
 }
 
-void HybridCacheManager::putRaster(const std::string& semantic_id, const std::unique_ptr<GenericRaster>& raster) {
+void HybridCacheManager::put_raster(const std::string& semantic_id, const std::unique_ptr<GenericRaster>& raster) {
 	try {
-		RemoteCacheManager::putRaster(semantic_id,raster);
-		local_cache.putRaster(semantic_id,raster);
+		RemoteCacheManager::put_raster(semantic_id,raster);
+		local_cache.put_raster(semantic_id,raster);
 	} catch ( std::exception &e ) {
 		Log::error("Could not store entry in cache: %s", e.what());
 	}

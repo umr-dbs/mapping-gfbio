@@ -16,12 +16,13 @@ class LinkedHashMap {
 protected:
 	class _LinkedEntry {
 	public:
-		_LinkedEntry(const std::pair<K,V> &item, _LinkedEntry *prev = nullptr,
+		_LinkedEntry(const K &key, const V &value, _LinkedEntry *prev = nullptr,
 				_LinkedEntry *next = nullptr) :
-				value(item), prev(prev), next(next) {
+				key(key), value(value), prev(prev), next(next) {
 		}
 		;
-		const std::pair<K,V> value;
+		K key;
+		V value;
 		_LinkedEntry *prev, *next;
 
 	};
@@ -57,8 +58,7 @@ LinkedHashMap<K, V>::~LinkedHashMap() {
 
 template<typename K, typename V>
 void LinkedHashMap<K, V>::put(const K &key, const V &value) {
-	std::pair<K,V> entry(key,value);
-	_LinkedEntry *link = new _LinkedEntry(entry, nullptr, first);
+	_LinkedEntry *link = new _LinkedEntry(key,value, nullptr, first);
 	if (link->next != nullptr) {
 		link->next->prev = link;
 	}
@@ -96,9 +96,9 @@ V LinkedHashMap<K, V>::get(const K &key) {
 			first->prev = e;
 			first = e;
 		}
-		return e->value.second;;
+		return e->value;
 	} else {
-		return got->second->value.second;
+		return got->second->value;
 	}
 }
 
@@ -133,7 +133,7 @@ template<typename K, typename V>
 V LinkedHashMap<K, V>::removeEldestEntry() {
 	if ( last != nullptr ) {
 		_LinkedEntry *tmp = last;
-		V res = last->value.second;
+		V res = last->value;
 		if ( last != first ) {
 			last = last->prev;
 			last->next = nullptr;
@@ -141,7 +141,7 @@ V LinkedHashMap<K, V>::removeEldestEntry() {
 		else {
 			last = first = nullptr;
 		}
-		map.erase(tmp->value.first);
+		map.erase(tmp->key);
 		delete tmp;
 		return res;
 	}

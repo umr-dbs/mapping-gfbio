@@ -207,12 +207,17 @@ public:
 	//
 	// Creates a listening socket on the given port.
 	//
-	static int getListeningSocket(int port, bool nonblock = true, int backlog = 10);
+	static int get_listening_socket(int port, bool nonblock = true, int backlog = 10);
 
 	//
 	// Fetches a raster from the given delivery response
 	//
 	static std::unique_ptr<GenericRaster> fetch_raster(const DeliveryResponse& dr);
+
+
+	static std::string qr_to_string( const QueryRectangle &rect );
+
+	static std::string stref_to_string( const SpatioTemporalReference &ref );
 
 	//
 	// Helper to read from a stream with a given timeout. Basically wraps

@@ -25,11 +25,6 @@ template<typename EType>
 class STCacheStructure;
 
 
-std::string qrToString( const QueryRectangle &rect );
-
-std::string strefToString( const SpatioTemporalReference &ref );
-
-
 //
 // Represents a single entry in the cache
 //
@@ -77,12 +72,12 @@ public:
 	void   put( const std::string &key, const std::unique_ptr<EType> &item);
 	std::unique_ptr<EType> get( const std::string &key, const QueryRectangle &qr );
 protected:
-	virtual size_t getContentSize( const std::unique_ptr<EType> &content )= 0;
-	virtual std::unique_ptr<EType> copyContent( const std::unique_ptr<EType> &content ) = 0;
-	virtual STCacheStructure<EType>* newStructure() = 0;
+	virtual size_t get_content_size( const std::unique_ptr<EType> &content )= 0;
+	virtual std::unique_ptr<EType> copy_content( const std::unique_ptr<EType> &content ) = 0;
+	virtual STCacheStructure<EType>* new_structure() = 0;
 private:
-	STCacheStructure<EType>* getStructure( const std::string &key, bool create = false );
-	std::shared_ptr<STCacheEntry<EType>> newEntry( STCacheStructure<EType> *structure, const std::unique_ptr<EType> &result );
+	STCacheStructure<EType>* get_structure( const std::string &key, bool create = false );
+	std::shared_ptr<STCacheEntry<EType>> new_entry( STCacheStructure<EType> *structure, const std::unique_ptr<EType> &result );
 	size_t max_size;
 	size_t current_size;
 	std::unique_ptr<ReplacementPolicy<EType>> policy;
@@ -101,9 +96,9 @@ public:
 	RasterCache() = delete;
 	RasterCache( size_t size ) : STCache(size) {};
 protected:
-	virtual size_t getContentSize( const std::unique_ptr<GenericRaster> &content );
-	virtual std::unique_ptr<GenericRaster> copyContent( const std::unique_ptr<GenericRaster> &content );
-	virtual STCacheStructure<GenericRaster>* newStructure();
+	virtual size_t get_content_size( const std::unique_ptr<GenericRaster> &content );
+	virtual std::unique_ptr<GenericRaster> copy_content( const std::unique_ptr<GenericRaster> &content );
+	virtual STCacheStructure<GenericRaster>* new_structure();
 };
 
 
@@ -117,8 +112,8 @@ public:
 	static void init( std::unique_ptr<CacheManager> &impl );
 	static thread_local SocketConnection *remote_connection;
 	virtual ~CacheManager() {};
-	virtual std::unique_ptr<GenericRaster> getRaster( const std::string &semantic_id, const QueryRectangle &rect ) = 0;
-	virtual void putRaster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster ) = 0;
+	virtual std::unique_ptr<GenericRaster> get_raster( const std::string &semantic_id, const QueryRectangle &rect ) = 0;
+	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster ) = 0;
 private:
 	static std::unique_ptr<CacheManager> impl;
 };
@@ -127,8 +122,8 @@ class LocalCacheManager : public CacheManager {
 public:
 	LocalCacheManager( size_t rasterCacheSize ) : rasterCache(rasterCacheSize) {};
 	virtual ~LocalCacheManager() {};
-	virtual std::unique_ptr<GenericRaster> getRaster( const std::string &semantic_id, const QueryRectangle &rect ) ;
-	virtual void putRaster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
+	virtual std::unique_ptr<GenericRaster> get_raster( const std::string &semantic_id, const QueryRectangle &rect ) ;
+	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
 private:
 	RasterCache rasterCache;
 };
@@ -136,22 +131,22 @@ private:
 class NopCacheManager : public CacheManager {
 public:
 	virtual ~NopCacheManager() {};
-	virtual std::unique_ptr<GenericRaster> getRaster( const std::string &semantic_id, const QueryRectangle &rect ) ;
-	virtual void putRaster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
+	virtual std::unique_ptr<GenericRaster> get_raster( const std::string &semantic_id, const QueryRectangle &rect ) ;
+	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
 };
 
 class RemoteCacheManager : public CacheManager {
 public:
 	virtual ~RemoteCacheManager() {};
-	virtual std::unique_ptr<GenericRaster> getRaster( const std::string &semantic_id, const QueryRectangle &rect ) ;
-	virtual void putRaster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
+	virtual std::unique_ptr<GenericRaster> get_raster( const std::string &semantic_id, const QueryRectangle &rect ) ;
+	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
 };
 
 class HybridCacheManager : public RemoteCacheManager {
 public:
 	HybridCacheManager( size_t rasterCacheSize ) : local_cache(rasterCacheSize) {};
-	virtual std::unique_ptr<GenericRaster> getRaster( const std::string &semantic_id, const QueryRectangle &rect ) ;
-	virtual void putRaster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
+	virtual std::unique_ptr<GenericRaster> get_raster( const std::string &semantic_id, const QueryRectangle &rect ) ;
+	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
 private:
 	LocalCacheManager local_cache;
 };

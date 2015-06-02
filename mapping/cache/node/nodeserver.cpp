@@ -172,7 +172,7 @@ void NodeServer::worker_loop() {
 			sc.stream->write(cmd);
 			sc.stream->write(my_id);
 
-			CacheManager::getInstance().set_thread_connection(sc);
+			CacheManager::remote_connection = &sc;
 
 			while (workers_up && !shutdown) {
 				try {
@@ -262,7 +262,6 @@ void NodeServer::run() {
 				w->join();
 			}
 			workers.clear();
-			CacheManager::getInstance().clear_thread_connections();
 		} catch (NetworkException &ne_c) {
 			Log::warn("Could not connect to index-server. Retrying in 5s. Reason: %s", ne_c.what());
 			std::this_thread::sleep_for(std::chrono::seconds(5));

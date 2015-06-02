@@ -280,6 +280,8 @@ void CacheManager::init(std::unique_ptr<CacheManager>& impl) {
 	CacheManager::impl.reset(impl.release());
 }
 
+thread_local SocketConnection* CacheManager::remote_connection = nullptr;
+
 //
 // Default local cache
 //
@@ -313,20 +315,21 @@ void NopCacheManager::putRaster(const std::string& semantic_id,
 
 std::unique_ptr<GenericRaster> RemoteCacheManager::getRaster(const std::string& semantic_id,
 		const QueryRectangle& rect) {
-	SocketConnection *con = thread_to_con.at(std::this_thread::get_id());
+	if ( remote_connection == nullptr )
+		throw NetworkException("No connection to remote-index set.");
 
 	// Send request
 	uint8_t cmd = Common::CMD_INDEX_QUERY_CACHE;
 	CacheRequest cr(rect,semantic_id);
-	con->stream->write(cmd);
-	cr.toStream(*con->stream);
+	remote_connection->stream->write(cmd);
+	cr.toStream(*remote_connection->stream);
 
 	uint8_t resp;
-	con->stream->read(&resp);
+	remote_connection->stream->read(&resp);
 	switch ( resp ) {
 		case Common::RESP_INDEX_HIT: {
 			Log::debug("Index found cache-entry. Reading response.");
-			DeliveryResponse dr(*con->stream);
+			DeliveryResponse dr(*remote_connection->stream);
 			try {
 				return Common::fetch_raster(dr);
 			} catch ( std::exception &e ) {
@@ -352,14 +355,6 @@ void RemoteCacheManager::putRaster(const std::string& semantic_id,
 	(void) semantic_id;
 	(void) raster;
 	// TODO: Implement
-}
-
-void RemoteCacheManager::set_thread_connection(SocketConnection& con) {
-	thread_to_con[ std::this_thread::get_id() ] = &con;
-}
-
-void RemoteCacheManager::clear_thread_connections() {
-	thread_to_con.clear();
 }
 
 std::unique_ptr<GenericRaster> HybridCacheManager::getRaster(const std::string& semantic_id,

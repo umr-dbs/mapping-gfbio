@@ -115,11 +115,10 @@ class CacheManager {
 public:
 	static CacheManager& getInstance();
 	static void init( std::unique_ptr<CacheManager> &impl );
+	static thread_local SocketConnection *remote_connection;
 	virtual ~CacheManager() {};
 	virtual std::unique_ptr<GenericRaster> getRaster( const std::string &semantic_id, const QueryRectangle &rect ) = 0;
 	virtual void putRaster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster ) = 0;
-	virtual void set_thread_connection( SocketConnection &con ) {};
-	virtual void clear_thread_connections() {};
 private:
 	static std::unique_ptr<CacheManager> impl;
 };
@@ -146,10 +145,6 @@ public:
 	virtual ~RemoteCacheManager() {};
 	virtual std::unique_ptr<GenericRaster> getRaster( const std::string &semantic_id, const QueryRectangle &rect ) ;
 	virtual void putRaster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
-	virtual void set_thread_connection( SocketConnection &con );
-	virtual void clear_thread_connections();
-private:
-	std::map<std::thread::id,SocketConnection*> thread_to_con;
 };
 
 class HybridCacheManager : public RemoteCacheManager {

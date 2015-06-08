@@ -89,7 +89,7 @@ int Common::get_listening_socket(int port, bool nonblock, int backlog) {
 }
 
 std::unique_ptr<GenericRaster> Common::fetch_raster(const DeliveryResponse& dr) {
-	Log::debug("Fetching cache-entry from: %s:%d", dr.host.c_str(), dr.port);
+	Log::debug("Fetching raster from: %s:%d", dr.host.c_str(), dr.port);
 	SocketConnection dc(dr.host.c_str(),dr.port);
 	uint8_t cmd = Common::CMD_DELIVERY_GET;
 	dc.stream->write(cmd);
@@ -114,6 +114,35 @@ std::unique_ptr<GenericRaster> Common::fetch_raster(const DeliveryResponse& dr) 
 	}
 }
 
+
+std::unique_ptr<GenericRaster> Common::fetch_raster(const std::string & host, uint32_t port,
+		const STCacheKey &key ) {
+	Log::debug("Fetching cache-entry from: %s:%d", host.c_str(), port);
+	SocketConnection dc(host.c_str(),port);
+	uint8_t cmd = Common::CMD_DELIVERY_GET_CACHED_RASTER;
+	dc.stream->write(cmd);
+	key.toStream(*dc.stream);
+
+	uint8_t resp;
+	dc.stream->read(&resp);
+	switch (resp) {
+		case Common::RESP_DELIVERY_OK: {
+			return GenericRaster::fromStream(*dc.stream);
+		}
+		case Common::RESP_DELIVERY_ERROR: {
+			std::string err_msg;
+			dc.stream->read(&err_msg);
+			Log::error("Delivery returned error: %s", err_msg.c_str());
+			throw DeliveryException(err_msg);
+		}
+		default: {
+			Log::error("Delivery returned unknown code: %d", resp);
+			throw DeliveryException("Delivery returned unknown code");
+		}
+	}
+}
+
+
 //
 // Connection class
 //
@@ -134,16 +163,20 @@ SocketConnection::~SocketConnection() {
 // Request/response classes
 //
 
-CacheRequest::CacheRequest(const CacheRequest& r) : query(r.query), graph_json(r.graph_json) {
+CacheRequest::CacheRequest(const CacheRequest& r) : query(r.query), semantic_id(r.semantic_id) {
 }
 
 CacheRequest::CacheRequest(const QueryRectangle& query, const std::string& graph_json) :
-	query(query), graph_json(graph_json){
+	query(query), semantic_id( GenericOperator::fromJSON(graph_json)->getSemanticId() ){
 }
 
 CacheRequest::CacheRequest(BinaryStream &stream) :
 	query(stream) {
+	std::string graph_json;
 	stream.read(&graph_json);
+	Log::debug("Read graph-json: %s", graph_json.c_str());
+	auto op = GenericOperator::fromJSON(graph_json);
+	semantic_id = op->getSemanticId();
 }
 
 CacheRequest::~CacheRequest() {
@@ -151,7 +184,7 @@ CacheRequest::~CacheRequest() {
 
 void CacheRequest::toStream(BinaryStream& stream) {
 	query.toStream(stream);
-	stream.write(graph_json);
+	stream.write(semantic_id);
 }
 
 

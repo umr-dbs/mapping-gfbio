@@ -27,7 +27,7 @@ public:
 	CacheRequest( BinaryStream &stream);
 	virtual void toStream( BinaryStream &stream );
 	QueryRectangle query;
-	std::string graph_json;
+	std::string semantic_id;
 };
 
 class RasterRequest : public CacheRequest {
@@ -109,7 +109,7 @@ public:
 	// QueryRectangle
 	// OperatorGraph as JSON:string
 	//
-	static const uint8_t CMD_INDEX_QUERY_CACHE = 4;
+	static const uint8_t CMD_INDEX_QUERY_RASTER_CACHE = 4;
 
 	//
 	// Expected data on stream is:
@@ -125,6 +125,13 @@ public:
 	// delivery_id:uint64_t
 	//
 	static const uint8_t CMD_DELIVERY_GET = 20;
+
+	//
+	// Command to pick up a delivery.
+	// Expected data on stream is:
+	// key:STCacheKey
+	//
+	static const uint8_t CMD_DELIVERY_GET_CACHED_RASTER = 21;
 
 
 	//////////////////////////////////////////////////
@@ -153,7 +160,7 @@ public:
 	// Data on stream is:
 	// host:string
 	// port:uint32_t
-	// delivery_id:uint64_t
+	// key:STCacheKey
 	static const uint8_t RESP_INDEX_HIT = 32;
 
 	//
@@ -163,15 +170,18 @@ public:
 	static const uint8_t RESP_INDEX_MISS = 33;
 
 	//
-	// Response for ready to deliver response. Data on stream is:
-	// delivery_id:uint64_t
+	// Response for ready to deliver result. Data on stream is:
+	// delivery-id:uint64_t
 	//
 	static const uint8_t RESP_WORKER_RESULT_READY = 40;
 
 	//
-	// Send if a new entry is added to the local cache
+	// Send if a new raster-entry is added to the local cache
+	// Data on stream is:
+	// key:STCacheKey
+	// cube:RasterCacheCube
 	//
-	static const uint8_t RESP_WORKER_NEW_CACHE_ENTRY = 41;
+	static const uint8_t RESP_WORKER_NEW_RASTER_CACHE_ENTRY = 41;
 
 	//
 	// Response if delivery is send. Data:
@@ -199,7 +209,7 @@ public:
 
 	//
 	// Response if delivery faild. Data:
-	// reason:string
+	// message:string -- a description of the error
 	//
 	static const uint8_t RESP_DELIVERY_ERROR = 80;
 
@@ -213,6 +223,13 @@ public:
 	// Fetches a raster from the given delivery response
 	//
 	static std::unique_ptr<GenericRaster> fetch_raster(const DeliveryResponse& dr);
+
+	//
+	// Fetches a raster directly from the cache, omitting the operator-graph.
+	// To be used by Cache-Manager only
+	//
+	static std::unique_ptr<GenericRaster> fetch_raster(const std::string & host, uint32_t port,
+			const STCacheKey &key );
 
 
 	static std::string qr_to_string( const QueryRectangle &rect );

@@ -55,7 +55,7 @@ int main(void) {
 	// Inititalize cache
 	if (Configuration::getBool("cache.enabled", false)) {
 		size_t raster_size = atoi(Configuration::get("cache.raster.size", "5242880").c_str());
-		cache_impl.reset(new HybridCacheManager(raster_size));
+		cache_impl.reset(new RemoteCacheManager(raster_size));
 
 	} else {
 		cache_impl.reset(new NopCacheManager());

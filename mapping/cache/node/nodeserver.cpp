@@ -8,6 +8,7 @@
 // project-stuff
 #include "cache/node/nodeserver.h"
 #include "cache/index/indexserver.h"
+#include "cache/cache.h"
 #include "raster/exceptions.h"
 #include "util/make_unique.h"
 #include <sstream>
@@ -45,7 +46,7 @@ std::unique_ptr<GenericRaster> DeliveryManager::get_delivery(uint64_t id) {
 
 void DeliveryManager::process_delivery(uint8_t cmd, SocketConnection& con) {
 	switch (cmd) {
-	case Common::CMD_DELIVERY_GET:
+	case Common::CMD_DELIVERY_GET: {
 		uint64_t id;
 		con.stream->read(&id);
 		try {
@@ -64,6 +65,25 @@ void DeliveryManager::process_delivery(uint8_t cmd, SocketConnection& con) {
 			con.stream->write(msg.str());
 		}
 		break;
+	}
+	case Common::CMD_DELIVERY_GET_CACHED_RASTER: {
+		STCacheKey key(*con.stream);
+		try {
+			Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+			auto res = CacheManager::getInstance().get_raster(key);
+			uint8_t resp = Common::RESP_DELIVERY_OK;
+			con.stream->write(resp);
+			res->toStream(*con.stream);
+			Log::debug("Finished sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+		} catch ( NoSuchElementException  &nse ) {
+			uint8_t resp = Common::RESP_DELIVERY_ERROR;
+			std::ostringstream msg;
+			msg << "No cache-entry found for key: " << key.semantic_id << ":" << key.entry_id;
+			con.stream->write(resp);
+			con.stream->write(msg.str());
+		}
+		break;
+	}
 	default:
 		// Unknown command
 		std::ostringstream ss;
@@ -207,7 +227,7 @@ void NodeServer::process_worker_command(uint8_t cmd, SocketConnection& con) {
 		RasterRequest rr(*con.stream);
 		QueryProfiler profiler;
 		Log::trace("Fetching raster from operator-graph");
-		std::unique_ptr<GenericRaster> res = GenericOperator::fromJSON(rr.graph_json)->
+		std::unique_ptr<GenericRaster> res = GenericOperator::fromJSON(rr.semantic_id)->
 				getCachedRaster(rr.query, profiler, rr.query_mode );
 		Log::trace("Handing raster over to delivery-manager");
 		uint64_t delivery_id = delivery_manager.add_delivery(res);

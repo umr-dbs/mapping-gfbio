@@ -36,12 +36,12 @@ TEST(STCacheTest,SimpleTest) {
 		QueryRectangle qr(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], width, height, epsg);
 		QueryProfiler qp;
 		try {
-			cache.get(op->getSemanticId(),qr);
+			cache.query(op->getSemanticId(),qr);
 			FAIL();
 		} catch ( NoSuchElementException &nse ) {
 			auto res = op->getCachedRaster(qr,qp);
 			cache.put(op->getSemanticId(), res);
-			auto cached = cache.get(op->getSemanticId(),qr);
+			auto cached = cache.query(op->getSemanticId(),qr);
 		}
 	}
 }

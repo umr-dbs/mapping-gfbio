@@ -7,9 +7,11 @@
 
 #include "cache/common.h"
 #include "cache/index/indexserver.h"
+#include "cache/cache.h"
 #include "util/make_unique.h"
 
 #include <deque>
+#include <unordered_map>
 #include <memory>
 
 #include <stdlib.h>
@@ -23,6 +25,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <cstring>
+
 
 ////////////////////////////////////////////////////////////
 //
@@ -215,6 +218,7 @@ void IndexServer::check_node_connections(fd_set* readfds) {
 			} catch (NetworkException &ne) {
 				Log::error("Error on control-connection for node: %d. Dropping. Reason: %s", node->id,  ne.what());
 				// TODO: Redistribute queued jobs
+				raster_cache.remove_all_by_node(nit->first);
 				nit = nodes.erase(nit);
 			}
 		}
@@ -428,18 +432,30 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 						Log::debug("Worker finished processing request.");
 						break;
 					}
-					case Common::CMD_INDEX_QUERY_CACHE: {
+					case Common::CMD_INDEX_QUERY_RASTER_CACHE: {
 						Log::debug("Worker requested a cache-query.");
 						CacheRequest req(*wc->stream);
-
-						// TODO: implement
-						uint8_t resp = Common::RESP_INDEX_MISS;
-						wc->stream->write(resp);
+						try {
+							auto res = raster_cache.query( req.semantic_id, req.query );
+							auto &node = nodes.at( res->node_id );
+							uint8_t resp = Common::RESP_INDEX_HIT;
+							wc->stream->write(resp);
+							wc->stream->write(node->host);
+							wc->stream->write(node->port);
+							wc->stream->write(res->cache_id);
+						}catch (NoSuchElementException &nse) {
+							uint8_t resp = Common::RESP_INDEX_MISS;
+							wc->stream->write(resp);
+						}
 						done = false;
 						break;
 					}
-					case Common::RESP_WORKER_NEW_CACHE_ENTRY: {
-						Log::debug("Worker returned new result to cache.");
+					case Common::RESP_WORKER_NEW_RASTER_CACHE_ENTRY: {
+						STCacheKey key(*wc->stream);
+						RasterCacheCube cube(*wc->stream);
+						Log::debug("Worker returned new result to raster-cache, key: %s:%d", key.semantic_id.c_str(), key.entry_id);
+						std::unique_ptr<RasterRef> e = std::make_unique<RasterRef>(job->node->id, key.entry_id, cube );
+						raster_cache.put(key.semantic_id, e );
 						done = false;
 						break;
 					}
@@ -502,9 +518,26 @@ void IndexServer::send_error(const SocketConnection& con, std::string msg) {
 
 IndexServer::NP IndexServer::get_node_for_job(const std::unique_ptr<CacheRequest> &request) {
 	// TODO: BIG TODO
-	(void) request;
 	if (nodes.empty())
 		throw NoSuchElementException("No nodes available");
-	else
+
+	// First check cache
+	try {
+		Log::debug("Looking up raster-request in cache.");
+		auto res = raster_cache.query( request->semantic_id, request->query );
+		Log::debug("Request cached at node: %d", res->node_id);
+		return nodes.at(res->node_id);
+	// If not found pick an idle worker
+	} catch ( NoSuchElementException &nse ) {
+		for ( auto &e : nodes ) {
+			if ( e.second->has_worker() ) {
+				Log::debug("Nothing cached for answering reqeust. Assigning job to idle node: %d", e.second->id);
+				return e.second;
+			}
+		}
+		Log::debug("No idle node present... picking first");
+		// No idle node... TODO
 		return nodes.begin()->second;
+	}
 }
+

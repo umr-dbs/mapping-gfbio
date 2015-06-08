@@ -140,8 +140,6 @@ private:
 
 
 class IndexServer {
-	typedef std::unique_ptr<SocketConnection> CP;
-	typedef std::shared_ptr<Node> NP;
 public:
 	IndexServer( int frontend_port, int node_port );
 	virtual ~IndexServer();
@@ -156,6 +154,17 @@ public:
 	// behaviour
 	virtual void stop();
 
+protected:
+	typedef std::unique_ptr<SocketConnection> CP;
+	typedef std::shared_ptr<Node> NP;
+	// BIG TODO
+	// Fetches the right node for handling the given job
+	// Desired behaviour:
+	// If response is cached: Choose node which holds it
+	// else: Round-robbin or sth.
+	virtual NP get_node_for_job(const std::unique_ptr<CacheRequest> &request);
+	// The currently known nodes
+	std::map<uint32_t,NP> nodes;
 private:
 	// Checks if there are new connections from the frontend
 	void check_frontend_handshake( fd_set *readfds, int frontend_socket );
@@ -184,13 +193,6 @@ private:
 	// corresponding node-instance
 	void handleWorkerRegistration( CP &connection );
 
-	// BIG TODO
-	// Fetches the right node for handling the given job
-	// Desired behaviour:
-	// If response is cached: Choose node which holds it
-	// else: Round-robbin or sth.
-	NP get_node_for_job(const std::unique_ptr<CacheRequest> &request);
-
 	// Sends an error to the given connection, including error-code
 	void send_error( const SocketConnection &con, std::string msg );
 
@@ -200,8 +202,6 @@ private:
 	int frontend_port;
 	// The port to accept connections from cache-nodes on
 	int node_port;
-	// The currently known nodes
-	std::map<uint32_t,NP> nodes;
 	// The currently idle frontend-connections
 	std::vector<CP> frontend_connections;
 	// The currently scheduled jobs
@@ -210,6 +210,8 @@ private:
 	std::vector<int> new_node_fds;
 	// The next id to assign to a node
 	uint32_t next_node_id;
+	// Cache
+	RasterRefCache raster_cache;
 
 };
 

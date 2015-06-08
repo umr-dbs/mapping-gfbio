@@ -114,7 +114,7 @@ class GenericRaster : public GridSpatioTemporalResult {
 		virtual void toGDAL(const char *filename, const char *driver, bool flipx = false, bool flipy = false) = 0;
 
 		virtual const void *getData() = 0;
-		virtual size_t getDataSize() = 0;
+		virtual size_t getDataSize() const = 0;
 		virtual cl::Buffer *getCLBuffer() = 0;
 		virtual cl::Buffer *getCLInfoBuffer() = 0;
 		virtual void *getDataForWriting() = 0;

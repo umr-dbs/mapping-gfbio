@@ -102,6 +102,12 @@ protected:
 	// it attempts to reconnect -- only if the
 	// control-connection is alive
 	void worker_loop();
+
+	// The thread of the delivery-manager
+	std::unique_ptr<std::thread> delivery_thread;
+
+	// The currently running workers
+	std::vector<std::unique_ptr<std::thread>> workers;
 private:
 	// Sets up the control-connection to the server
 	void setup_control_connection();
@@ -130,8 +136,6 @@ private:
 	int num_treads;
 	// The control-connection
 	std::unique_ptr<SocketConnection> control_connection;
-	// The currently running workers
-	std::vector<std::unique_ptr<std::thread>> workers;
 	// The delivery-manager
 	DeliveryManager delivery_manager;
 };

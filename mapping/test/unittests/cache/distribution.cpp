@@ -6,6 +6,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <vector>
 #include "test/unittests/cache/util.h"
 #include "cache/cache.h"
 #include "cache/index/indexserver.h"
@@ -23,21 +24,44 @@ private:
 	uint64_t last_node = 0;
 };
 
-class TestCacheMan : public CacheManager {
-	static thread_local RemoteCacheManager *rcm;
+class TestNodeServer : public NodeServer {
 public:
-	virtual std::unique_ptr<GenericRaster> query_raster( const GenericOperator &op, const QueryRectangle &rect ) {
-		return TestCacheMan::rcm->query_raster(op, rect);
-	}
-	virtual std::unique_ptr<GenericRaster> get_raster( const std::string &semantic_id, uint64_t entry_id ) {
-		return TestCacheMan::rcm->get_raster(semantic_id, entry_id);
-	}
-	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster ) {
-		TestCacheMan::rcm->put_raster(semantic_id, raster);
-	}
+	TestNodeServer( std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port ) :
+		NodeServer(my_host,my_port,index_host,index_port,1), rcm( 5 * 1024 * 1024 ) {};
+	bool owns_current_thread();
+	RemoteCacheManager rcm;
 };
 
-thread_local RemoteCacheManager *TestCacheMan::rcm = new RemoteCacheManager(5*1024*1024);
+
+class TestCacheMan : public CacheManager {
+public:
+	virtual std::unique_ptr<GenericRaster> query_raster( const GenericOperator &op, const QueryRectangle &rect ) {
+		for ( auto i : instances ) {
+			if ( i->owns_current_thread() )
+				return i->rcm.query_raster(op,rect);
+		}
+		throw ArgumentException("Unregistered instance called cache-manager");
+	}
+	virtual std::unique_ptr<GenericRaster> get_raster( const std::string &semantic_id, uint64_t entry_id ) {
+		for ( auto i : instances ) {
+				if ( i->owns_current_thread() )
+					return i->rcm.get_raster(semantic_id, entry_id);
+		}
+		throw ArgumentException("Unregistered instance called cache-manager");
+	}
+	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster ) {
+		for ( auto i : instances ) {
+				if ( i->owns_current_thread() )
+					return i->rcm.put_raster(semantic_id, raster);
+		}
+		throw ArgumentException("Unregistered instance called cache-manager");
+	}
+	void add_instance( TestNodeServer *inst ) {
+		instances.push_back( inst );
+	}
+private:
+	std::vector<TestNodeServer*> instances;
+};
 
 
 IndexServer::NP TestIdxServer::get_node_for_job(const std::unique_ptr<CacheRequest>& request) {
@@ -55,14 +79,29 @@ IndexServer::NP TestIdxServer::get_node_for_job(const std::unique_ptr<CacheReque
 	return it->second;
 }
 
+bool TestNodeServer::owns_current_thread() {
+	for ( auto &t : workers ) {
+		if ( std::this_thread::get_id() == t->get_id() )
+			return true;
+	}
+	return std::this_thread::get_id() == delivery_thread->get_id();
+}
+
 TEST(DistributionTest,TestRemoteNodeFetch) {
 
-	std::unique_ptr<CacheManager> impl = std::make_unique<TestCacheMan>();
+
+	std::unique_ptr<TestCacheMan> cm = std::make_unique<TestCacheMan>();
+	TestIdxServer is(12346,12347);
+	TestNodeServer    ns1( "localhost", 12348, "localhost", 12347 );
+	TestNodeServer    ns2( "localhost", 12349, "localhost", 12347 );
+
+	cm->add_instance(&ns1);
+	cm->add_instance(&ns2);
+
+	std::unique_ptr<CacheManager> impl = std::move(cm);
 	CacheManager::init( impl );
 
-	TestIdxServer is(12346,12347);
-	NodeServer    ns1( "localhost", 12348, "localhost", 12347, 1);
-	NodeServer    ns2( "localhost", 12349, "localhost", 12347, 1);
+
 	std::vector<TP> ts;
 	ts.push_back(is.run_async());
 	std::this_thread::sleep_for( std::chrono::milliseconds(500));

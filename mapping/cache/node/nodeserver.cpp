@@ -243,7 +243,7 @@ void NodeServer::process_worker_command(uint8_t cmd, SocketConnection& con) {
 void NodeServer::run() {
 	Log::info("Starting Node-Server");
 
-	auto delivery_thread = delivery_manager.run_async();
+	delivery_thread = delivery_manager.run_async();
 
 	while (!shutdown) {
 		try {

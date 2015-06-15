@@ -402,7 +402,7 @@ int processWCS(std::map<std::string, std::string> &params) {
 		//build the queryRectangle and get the data
 		QueryRectangle query_rect{timestamp, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, sizeX, sizeY, query_crsId};
 		QueryProfiler profiler;
-		auto result_raster = graph->getCachedRaster(query_rect, profiler);
+		auto result_raster = graph->getCachedRaster(query_rect, profiler, GenericOperator::RasterQM::EXACT);
 
 		//setup the output parameters
 		std::string gdalDriver = "GTiff";

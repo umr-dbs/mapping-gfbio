@@ -320,7 +320,7 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 #else
 		// https://www.khronos.org/registry/cl/sdk/1.0/docs/man/xhtml/clCreateBuffer.html
 		try {
-			Profiler::Profiler p(s.c_str());
+			//Profiler::Profiler p("migrate to GPU");
 #if MAPPING_OPENCL_USE_HOST_PTR
 			clbuffer = new cl::Buffer(
 				*RasterOpenCL::getContext(),
@@ -357,7 +357,7 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 		throw PlatformException("No OpenCL support");
 #else
 		{
-			Profiler::Profiler p(s.c_str());
+			//Profiler::Profiler p("migrate to CPU");
 #if MAPPING_OPENCL_USE_HOST_PTR
 			RasterOpenCL::getQueue()->enqueueUnmapMemObject(*clbuffer, clhostptr);
 			clhostptr = nullptr;

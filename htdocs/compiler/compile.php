@@ -107,6 +107,7 @@ function outputJSVariables($directorypath) {
 if ($type == 'css' || $type == 'js') {
 	outputFiles(SOURCEPATH.'external/', $type);
 	if ($type == 'js') {
+		echo "var PROJECT = '$project';\n";
 		outputJSVariables(SOURCEPATH.$project.'/');
 		outputJSVariables(SOURCEPATH);
 		outputJSVariables(SOURCEPATH.'operators/');

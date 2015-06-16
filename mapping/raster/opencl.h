@@ -33,6 +33,7 @@ namespace RasterOpenCL {
 
 	cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster);
 
+	size_t getMaxAllocSize();
 
 	class CLProgram {
 		public:

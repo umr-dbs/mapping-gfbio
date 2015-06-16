@@ -34,6 +34,10 @@ static cl::Device device;
 
 static cl::CommandQueue queue;
 
+static size_t max_alloc_size = 0;
+size_t getMaxAllocSize() {
+	return max_alloc_size;
+}
 
 void init() {
 	if (initialization_status == 0) {
@@ -93,6 +97,10 @@ void init() {
 			if (deviceList.size() == 0)
 				throw PlatformException("No CL devices found");
 			device = deviceList[0];
+
+			cl_ulong _max_alloc_size = 0;
+			device.getInfo((cl_platform_info) CL_DEVICE_MAX_MEM_ALLOC_SIZE, &_max_alloc_size);
+			max_alloc_size = _max_alloc_size;
 
 
 			// Command Queue
@@ -340,7 +348,7 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 	try {
 		cl::Program::Sources sources(1, std::make_pair(final_source.c_str(), final_source.length()));
 		program = cl::Program(context, sources);
-		program.build(deviceList,"");
+		program.build(deviceList,""); // "-cl-std=CL2.0"
 	}
 	catch (const cl::Error &e) {
 		std::stringstream msg;

@@ -215,7 +215,8 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadDataset(const char *filen
 	}
 
 
-	const char *drivername = dataset->GetDriverName();
+	const char *drivername = dataset->GetDriver()->GetDescription();
+	//const char *drivername = dataset->GetDriverName();
 	//printf("Driver: %s\n", drivername);
 	if (strcmp(drivername, "MSG") == 0) {
 		if (epsg != EPSG_GEOSMSG)

@@ -44,6 +44,10 @@ SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], J
 SourceOperator::~SourceOperator() {
 }
 
+void SourceOperator::writeSemanticParameters(std::ostringstream &stream) {
+        stream << "\"sourcename\": \"" << sourcename << "\"";
+}
+
 REGISTER_OPERATOR(SourceOperator, "rastersource");
 
 // obsolete, keep for backwards compatibility for a while

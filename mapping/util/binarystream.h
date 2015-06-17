@@ -88,6 +88,9 @@ class UnixSocket : public BinaryStream {
 		virtual void write(const char *buffer, size_t len);
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false);
 
+		int getReadFD() const { return read_fd; }
+		int getWriteFD() const { return write_fd; }
+
 		bool eof() { return is_eof; }
 	private:
 		bool is_eof;

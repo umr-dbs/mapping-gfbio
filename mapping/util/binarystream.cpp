@@ -3,6 +3,7 @@
 
 #include <sstream>
 #include <string.h> // memset(), strerror()
+#include <errno.h>
 #include <memory>
 
 #include <unistd.h>

@@ -57,7 +57,7 @@ ProjectionOperator::~ProjectionOperator() {
 REGISTER_OPERATOR(ProjectionOperator, "projection");
 
 void ProjectionOperator::writeSemanticParameters(std::ostringstream &stream) {
-	stream << "\"src_epsg\": " << (int) src_epsg << ", \"dest_epsg\": " << (int) dest_epsg;
+	stream << "\"src_projection\": \"EPSG:" << (int) src_epsg << "\", \"dest_projection\": \"EPSG:" << (int) dest_epsg << "\"";
 }
 
 template<typename T>

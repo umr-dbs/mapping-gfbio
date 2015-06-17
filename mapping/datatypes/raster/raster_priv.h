@@ -8,7 +8,7 @@ template<typename T, int dimensions> class Raster : public GenericRaster {
 		Raster(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
 		virtual ~Raster();
 
-		virtual size_t getDataSize() { return sizeof(T)*getPixelCount(); };
+		virtual size_t getDataSize() const { return sizeof(T)*getPixelCount(); };
 		virtual int getBPP() { return sizeof(T); }
 
 		virtual void setRepresentation(Representation);

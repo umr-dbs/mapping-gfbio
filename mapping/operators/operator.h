@@ -8,6 +8,7 @@
 #include <sstream>
 #include <memory>
 #include "util/make_unique.h"
+#include "cache/cache.h"
 
 namespace Json {
 	class Value;
@@ -70,6 +71,7 @@ class QueryProfiler {
 };
 
 class GenericOperator {
+	friend class RasterProducer;
 	public:
 		enum class RasterQM {
 			EXACT,
@@ -94,7 +96,8 @@ class GenericOperator {
 		std::unique_ptr<PolygonCollection> getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
 		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
-		const std::string &getSemanticId() { return semantic_id; }
+		const std::string &getSemanticId() const { return semantic_id; }
+		const int getDepth() const { return depth; }
 
 	protected:
 		GenericOperator(int sourcecounts[], GenericOperator *sources[]);
@@ -128,7 +131,6 @@ class GenericOperator {
 
 		void operator=(GenericOperator &) = delete;
 };
-
 
 class OperatorRegistration {
 	public:

@@ -24,6 +24,14 @@ _CUSTOM_EXCEPTION_CLASS(SQLiteException);
 _CUSTOM_EXCEPTION_CLASS(GDALException);
 _CUSTOM_EXCEPTION_CLASS(NetworkException);
 _CUSTOM_EXCEPTION_CLASS(FeatureException);
+// Added Micha
+_CUSTOM_EXCEPTION_CLASS(NoSuchElementException);
+_CUSTOM_EXCEPTION_CLASS(NotInitializedException);
+_CUSTOM_EXCEPTION_CLASS(TimeoutException);
+_CUSTOM_EXCEPTION_CLASS(InterruptedException);
+_CUSTOM_EXCEPTION_CLASS(DeliveryException);
+
+
 
 #undef _CUSTOM_EXCEPTION_CLASS
 

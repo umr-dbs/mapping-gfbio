@@ -1,0 +1,55 @@
+.timeline text {
+    z-index: 20;
+    font-family:"Segoe UI", Frutiger, "Frutiger Linotype", "Dejavu Sans", "Helvetica Neue", Arial, sans-serif;
+}
+.timeline .background.pane{
+    cursor: move;
+    fill: darkgray;
+    fill-opacity: 0.5;
+    pointer-events: all;
+}
+.timeline{
+	
+	border: none;
+}
+
+svg .timeline{
+		overflow: hidden;	
+}
+
+.timelineContainer {
+    cursor: move;
+    pointer-events: all;
+}
+.timeline .axis path, .axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+.timeline .axis text {
+    shape-rendering: crispEdges;
+}
+
+.timeline .axis .ticks text {
+}
+
+.timeline .axis .ticks path, .axis .ticks line {
+    fill: none;
+    stroke: white;
+    stroke-width: 1px;
+    shape-rendering: crispEdges;
+    stroke-opacity: 0.5;
+}
+
+.timeline .data .element {
+	shape-rendering: crispEdges;
+}
+
+.timeline-center-line {
+    stroke: white;
+    stroke-opacity: 0.33;
+    stroke-width: 5px;
+    pointer-events: none;
+    shape-rendering: crispEdges;
+
+}

@@ -18,7 +18,7 @@
 	border-color: #E5E5E5;
 }
 
-.layerControls, .plotControls {
+.layerControls, .plotControls, .gfbioSearchControls {
 	position: absolute;
 	top: 5px;
 	bottom: 40px;
@@ -32,7 +32,7 @@
 	font-size: 14px;
 }
 
-.layerControls_buttons, .plotControls_buttons {
+.layerControls_buttons, .plotControls_buttons, .gfbioSearchControls_buttons {
 	position: absolute;
 	bottom: 0px;
 	height: 40px;
@@ -41,7 +41,7 @@
 	text-align: center;	
 }
 
-.layerControls_emptymsg, .plotControls_emptymsg {
+.layerControls_emptymsg, .plotControls_emptymsg, .gfbioSearchControls_emptymsg  {
 	display: none;
 
 	position: absolute;
@@ -243,7 +243,7 @@
 }
 
 .collapseSidebar.collapsed:before {
-	content: "";
+	content: "ï�“";
 }
 
 .ol3Control_backgroundLayer {

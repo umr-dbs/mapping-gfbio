@@ -26,3 +26,26 @@ R import:
 
 Security? RAppArmor?
 RServe? http://rforge.net/Rserve/ - LGPL, weniger startup-overhead, aber eigener Server
+
+
+
+
+
+
+apt-get install clang-3.5
+apt-get install gcc
+apt-get install make
+
+apt-get install libjsoncpp-dev
+apt-get install libpng-dev
+apt-get install libjpeg-dev
+apt-get install libgeos-dev
+apt-get install libgeos++-dev
+apt-get install libbz2-dev
+apt-get install libcurl3-dev
+apt-get install libboost-date-time-dev
+apt-get install libsqlite3-dev
+
+apt-get install libproj-dev
+apt-get install git
+apt-get install valgrind

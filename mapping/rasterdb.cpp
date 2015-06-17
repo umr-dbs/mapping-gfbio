@@ -6,6 +6,8 @@
 #include "converters/converter.h"
 #include "raster/profiler.h"
 #include "util/configuration.h"
+#include "util/gdal.h"
+#include "util/debug.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -197,11 +199,13 @@ static QueryRectangle qrect_from_json(Json::Value &root) {
 }
 
 static void runquery(int argc, char *argv[]) {
-	if (argc < 4) {
+	if (argc < 3) {
 		usage();
 	}
 	char *in_filename = argv[2];
-	char *out_filename = argv[3];
+	char *out_filename = nullptr;
+	if (argc > 3)
+		out_filename = argv[3];
 
 	/*
 	 * Step #1: open the query.json file and parse it
@@ -232,32 +236,43 @@ static void runquery(int argc, char *argv[]) {
 		if (flipx || flipy)
 			raster = raster->flip(flipx, flipy);
 
-		{
-			Profiler::Profiler p("TO_GTIFF");
-			raster->toGDAL((std::string(out_filename) + ".tif").c_str(), "GTiff", flipx, flipy);
+		if (out_filename) {
+			{
+				Profiler::Profiler p("TO_GTIFF");
+				raster->toGDAL((std::string(out_filename) + ".tif").c_str(), "GTiff", flipx, flipy);
+			}
+			{
+				Profiler::Profiler p("TO_PNG");
+				auto colors = Colorizer::make("grey");
+				raster->toPNG((std::string(out_filename) + ".png").c_str(), *colors);
+			}
 		}
-		{
-			Profiler::Profiler p("TO_PNG");
-			auto colors = Colorizer::make("grey");
-			raster->toPNG((std::string(out_filename) + ".png").c_str(), *colors);
-		}
+		else
+			printf("No output filename given, discarding result of size %d x %d\n", raster->width, raster->height);
 	}
 	else if (result == "points") {
 		QueryProfiler profiler;
 		auto points = graph->getCachedPointCollection(qrect_from_json(root), profiler);
 		auto csv = points->toCSV();
-		FILE *f = fopen(out_filename, "w");
-		if (f) {
-			fwrite(csv.c_str(), csv.length(), 1, f);
-			fclose(f);
+		if (out_filename) {
+			FILE *f = fopen(out_filename, "w");
+			if (f) {
+				fwrite(csv.c_str(), csv.length(), 1, f);
+				fclose(f);
+			}
 		}
+		else
+			printf("No output filename given, discarding result\n");
 	}
 	else {
 		printf("Unknown result type: %s\n", result.c_str());
 		exit(5);
 	}
 
-	Profiler::print("\n");
+	auto msgs = get_debug_messages();
+	for (auto &m : msgs) {
+		printf("%s\n", m.c_str());
+	}
 }
 
 static int testquery(int argc, char *argv[]) {
@@ -371,6 +386,20 @@ int main(int argc, char *argv[]) {
 	}
 	else if (strcmp(command, "testquery") == 0) {
 		return testquery(argc, argv);
+	}
+	else if (strcmp(command, "msgcoord") == 0) {
+		GDAL::CRSTransformer t(EPSG_LATLON, EPSG_GEOSMSG);
+		auto f = [&] (double x, double y) -> void {
+			double px = x, py = y;
+			if (t.transform(px, py))
+				printf("%f, %f -> %f, %f\n", x, y, px, py);
+			else
+				printf("%f, %f -> failed\n", x, y);
+		};
+		f(11, -16);
+		f(36, -36);
+		f(11, -36);
+		f(36, -16);
 	}
 	else {
 		usage();

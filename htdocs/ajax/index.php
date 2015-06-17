@@ -364,5 +364,68 @@ $app->group ( '/scripts', function () use($app) {
 	} );
 } );
 
+/**
+ * GFBio related WS
+ */
+$app->group ( '/gfbio', function () use($app) {
+
+	/**
+	 * get Baskets for liferay ID
+	 */
+	$app->get ( '/baskets/:liferayId', function ($liferayId) use($app) {
+		//TODO: get user's liferayId from database instead of taking it as an parameter
+		$curl = curl_init();		
+		
+		curl_setopt($curl, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+		curl_setopt($curl, CURLOPT_USERPWD, "vat_system@outlook.de:RL6z1Q1");
+		
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, 1);
+		curl_setopt($curl, CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
+		curl_setopt($curl, CURLOPT_FAILONERROR, true);
+		
+		curl_setopt($curl, CURLOPT_URL, "http://gfbio-dev1.inf-bb.uni-jena.de:8080/api/jsonws/GFBioProject-portlet.basket/get-baskets-by-user-id");
+		curl_setopt($curl, CURLOPT_POST, 1);
+		curl_setopt($curl, CURLOPT_POSTFIELDS, "userId=".$liferayId);
+		
+		$curlResult= curl_exec($curl);
+		
+		if($curlResult === false){
+			$app->response->write( 'Curl-Fehler: ' . curl_error($curl));
+		}
+		else {
+			$baskets = array();
+			$liferayBaskets = json_decode($curlResult);
+			foreach ($liferayBaskets as $liferayBasket){
+				$basketJSON = json_decode($liferayBasket->basketJSON);			
+				$basket = array("query" => json_decode($liferayBasket->queryJSON)->query->function_score->query->filtered->query->simple_query_string->query,
+						"datetime" => gmdate("Y-m-d\TH:i:s\Z", $liferayBasket->lastModifiedDate/1000), 
+						"results" => array());
+				
+				foreach ($basketJSON->selected as $basketEntryJSON){
+					$basketEntry = array("title" => $basketEntryJSON->title,
+							"authors" => $basketEntryJSON->authors,
+							"dataCenter" => $basketEntryJSON->dataCenter,
+							"metadataLink" => $basketEntryJSON->metadataLink);
+					
+					if(strpos($basketEntryJSON->metadataLink, "doi.pangaea.de")){						
+						$basketEntry["type"] = "pangaea";
+						$offset = strpos($basketEntryJSON->metadataLink, "doi.pangaea.de/") + strlen("doi.pangaea.de/");
+						$basketEntry["doi"] = substr($basketEntryJSON->metadataLink, $offset);
+					} else {
+						$basketEntry["type"] = "abcd";
+					}
+					array_push($basket["results"], $basketEntry);
+				}				
+				
+				array_push($baskets, $basket);
+			}
+			
+			$app->response->write ( json_encode ( $baskets ) );			
+		}
+		
+		curl_close($curl);		
+	});
+});
+	
 $app->run ();
 ?>

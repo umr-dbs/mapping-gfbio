@@ -32,7 +32,7 @@ OBJ_OPERATORS_PLOTS=o/operators_plots_histogram.o o/operators_plots_points2histo
 OBJ_OPERATORS_TEMPORAL=o/operators_temporal_timeshiftoperator.o
 OBJ_OPERATORS_GFBIO=o/operators_gfbio_pangaeasource.o
 OBJ_OPERATORS=o/operators_operator.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) ${OBJ_OPERATORS_TEMPORAL} $(OBJ_OPERATORS_GFBIO)
-OBJ_COMMON=o/cache_common.o o/cache_cache.o o/cache_types.o ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
+OBJ_COMMON=o/cache_common.o o/cache_cache.o o/cache_manager.o o/cache_priv_transfer.o o/cache_priv_types.o ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_CACHE_NODE=o/cache_node_nodeserver_main.o o/cache_node_nodeserver.o ${OBJ_COMMON}
 OBJ_CACHE_INDEX=o/cache_index_indexserver_main.o o/cache_index_indexserver.o ${OBJ_COMMON}
@@ -40,7 +40,7 @@ OBJ_EXECGI=o/main_cgi.o o/cache_client.o ${OBJ_COMMON}
 OBJ_EXEGTEST=${OBJ_COMMON} o/cache_node_nodeserver.o o/cache_index_indexserver.o o/cache_client.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_util.o o/gtest_cache_stcache.o o/gtest_cache_distribution.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
-OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o o/cache_cache.o o/cache_common.o o/cache_types.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
+OBJ_RSERVER=o/rserver_rserver.o o/operators_operator.o o/cache_cache.o o/cache_manager.o o/cache_common.o o/cache_priv_transfer.o o/cache_priv_types.o ${OBJ_CONVERTERS} ${OBJ_RASTER} ${OBJ_DATATYPES} ${OBJ_UTIL}
 EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
@@ -150,6 +150,9 @@ o/cache_index_%.o: cache/index/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 	
 o/cache_node_%.o: cache/node/%.cpp $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} -c $< -o $@
+	
+o/cache_priv_%.o: cache/priv/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 	
 all: ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE}

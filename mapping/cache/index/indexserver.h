@@ -8,6 +8,8 @@
 #ifndef INDEX_INDEXSERVER_H_
 #define INDEX_INDEXSERVER_H_
 
+#include "cache/priv/transfer.h"
+#include "cache/cache.h"
 #include "cache/common.h"
 #include "util/log.h"
 
@@ -56,12 +58,14 @@ class JobDefinition {
 	typedef std::unique_ptr<SocketConnection> CP;
 	typedef std::shared_ptr<Node> NP;
 public:
-	JobDefinition(CP &frontend_connection, std::unique_ptr<CacheRequest> &request );
+	JobDefinition(CP &frontend_connection, uint8_t worker_cmd, std::unique_ptr<BaseRequest> &request );
 	std::unique_ptr<Job> create_job( NP &node, CP worker_connection );
+	// The command to be send to the worker
+	uint8_t worker_cmd;
 	// The connection which issued this job
 	CP frontend_connection;
 	// The unerlying request
-	std::unique_ptr<CacheRequest> request;
+	std::unique_ptr<BaseRequest> request;
 };
 
 
@@ -157,21 +161,23 @@ public:
 protected:
 	typedef std::unique_ptr<SocketConnection> CP;
 	typedef std::shared_ptr<Node> NP;
-	// BIG TODO
-	// Fetches the right node for handling the given job
-	// Desired behaviour:
-	// If response is cached: Choose node which holds it
-	// else: Round-robbin or sth.
-	virtual NP get_node_for_job(const std::unique_ptr<CacheRequest> &request);
+	virtual NP pick_worker();
+
+	// Cache-request from client
+	virtual void process_raster_request( CP &client_con, const RasterBaseRequest &req );
+
+	// Cache-request from node
+	virtual void process_node_raster_request( CP &worker_con, const BaseRequest& req);
+
 	// The currently known nodes
 	std::map<uint32_t,NP> nodes;
 private:
 	// Checks if there are new connections from the frontend
-	void check_frontend_handshake( fd_set *readfds, int frontend_socket );
+	void check_client_handshake( fd_set *readfds, int frontend_socket );
 
 	// Checks idle frontend-connections for data
 	// and creates the corresponding jobs on requests
-	void check_frontend_connections( fd_set *readfds );
+	void check_client_connections( fd_set *readfds );
 
 	// Checks if there are new connections from node-servers.
 	// Also handles hello requests from nodes and workers.
@@ -203,7 +209,7 @@ private:
 	// The port to accept connections from cache-nodes on
 	int node_port;
 	// The currently idle frontend-connections
-	std::vector<CP> frontend_connections;
+	std::vector<CP> client_connections;
 	// The currently scheduled jobs
 	std::vector<std::unique_ptr<Job>> jobs;
 	// Holds fds of newly accepted connections from workers

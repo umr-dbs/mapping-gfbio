@@ -7,13 +7,23 @@
 
 #include "cache/cache.h"
 #include "cache/common.h"
+#include "cache/priv/transfer.h"
 #include "raster/exceptions.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 
 #include <iostream>
+#include <vector>
+#include <queue>
 #include <sstream>
 #include <unordered_map>
+
+////////////////////////////////////////////////////////
+//
+// Cache-Key
+//
+////////////////////////////////////////////////////////
+
 
 STCacheKey::STCacheKey(const std::string& semantic_id, uint64_t entry_id) :
 		semantic_id(semantic_id), entry_id(entry_id) {
@@ -29,76 +39,247 @@ void STCacheKey::toStream(BinaryStream& stream) const {
 	stream.write(entry_id);
 }
 
+std::string STCacheKey::to_string() const {
+	std::ostringstream ss;
+	ss << "STCacheKey: " << semantic_id << ":" << entry_id;
+	return ss.str();
+}
+
+////////////////////////////////////////////////////////
+//
+// Query-Result
+//
+////////////////////////////////////////////////////////
 
 
+STQueryResult::STQueryResult(const QueryRectangle& query) :
+	covered( Common::empty_geom() ),
+	remainder( Common::create_square(query.x1,query.y1,query.x2,query.y2) ),
+	coverage(0) {
+}
+
+STQueryResult::STQueryResult( GeomP& covered, GeomP& remainder, double coverage, const std::vector<uint64_t>& ids) :
+	covered( std::move(covered) ),
+	remainder( std::move(remainder) ),
+	coverage(coverage),
+	ids( ids ) {
+	if ( !this->remainder->isEmpty() && !this->remainder->isRectangle() )
+		throw ArgumentException("Remainder must be a rectangle");
+}
+
+STQueryResult::STQueryResult(const STQueryResult& r) :
+	covered( GeomP( r.covered->clone() ) ),
+	remainder( GeomP( r.remainder->clone() ) ),
+	coverage(r.coverage),
+	ids( r.ids ) {
+}
+
+STQueryResult::STQueryResult(STQueryResult&& r) :
+	covered( std::move(r.covered) ),
+	remainder( std::move(r.remainder) ),
+	coverage(r.coverage),
+	ids( std::move(r.ids) ) {
+}
+
+
+STQueryResult& STQueryResult::operator =(const STQueryResult& r) {
+	covered.reset( r.covered->clone() );
+	remainder.reset( r.remainder->clone() );
+	coverage = r.coverage;
+	ids.clear();
+	ids.insert( ids.cbegin(), r.ids.cbegin(), r.ids.cend() );
+	return *this;
+}
+
+STQueryResult& STQueryResult::operator =(STQueryResult&& r) {
+	covered = std::move(r.covered);
+	remainder = std::move(r.remainder);
+	coverage = r.coverage;
+	ids = std::move(r.ids);
+	return *this;
+}
+
+bool STQueryResult::has_remainder() {
+	return !remainder->isEmpty();
+}
+
+bool STQueryResult::has_hit() {
+	return !covered->isEmpty();
+}
+
+std::string STQueryResult::to_string() {
+	std::ostringstream ss;
+	ss << "STQueryResult:" << std::endl;
+	ss << "  has_hit: " << has_hit() << std::endl;
+	ss << "  has_remainder: " << has_remainder() << std::endl;
+	ss << "  covered: " << covered->toString() << std::endl;
+	ss << "  remainder: " << remainder->toString() << std::endl;
+	ss << "  ids: [";
+	for ( std::vector<uint64_t>::size_type i = 0; i < ids.size(); i++ ) {
+		if ( i > 0 )
+			ss << ", ";
+		ss << ids.at(i);
+	}
+	ss << "]";
+	return ss.str();
+}
+
+///////////////////////////////////////////////////////////////////
 //
-// Represents a single entry in the cache
+// CACHE-STRUCTURE
 //
+///////////////////////////////////////////////////////////////////
+
+template<typename EType>
+STCacheStructure<EType>::~STCacheStructure() {
+}
+
+template<typename EType>
+const STQueryResult STCacheStructure<EType>::query(const QueryRectangle& spec) const {
+
+	// Get intersecting entries
+	auto partials = get_query_candidates( spec );
+
+	Log::trace("Querying cache for: %s", Common::qr_to_string(spec).c_str() );
+
+	// No candidates found
+	if ( partials->empty() ) {
+		Log::trace("No candidates cached.");
+		return STQueryResult(spec);
+	}
+
+	std::vector<uint64_t> ids;
+	STQueryResult::GeomP remainder;
+	STQueryResult::GeomP p_union = Common::empty_geom();
+	STQueryResult::GeomP qbox    = Common::create_square(spec.x1,spec.y1,spec.x2,spec.y2);
+
+	// Add entries until we cover the whole area or nothing is left
+	while (!partials->empty() && !p_union->contains( qbox.get() )) {
+		auto qi = partials->top();
+		Log::trace("Candidate: %s", qi.to_string().c_str());
+
+		// Create the intersection and check if it enhances the covered area
+		std::unique_ptr<geos::geom::Polygon> box = Common::create_square(
+			std::max(spec.x1,qi.x1),
+			std::max(spec.y1,qi.y1),
+			std::min(spec.x2,qi.x2),
+			std::min(spec.y2,qi.y2)
+		);
+		if ( !p_union->contains( box.get() ) ) {
+			p_union = Common::union_geom( p_union, box );
+			Log::trace("Added candidate. Covered area is now: %s", p_union->toString().c_str());
+			ids.push_back(qi.cache_id);
+		}
+		else {
+			Log::trace("Omitting candidate, does not enlarge covered area");
+		}
+		partials->pop();
+	}
+
+	double coverage;
+	// Full coverage
+	if ( p_union->contains( qbox.get() ) ) {
+		Log::trace("Query can be fully answered from cache.");
+		remainder = Common::empty_geom();
+		coverage = 0;
+	}
+	// Calculate remainder
+	else {
+		geos::geom::Geometry *rem_poly = qbox->difference(p_union.get());
+		coverage = rem_poly->getArea() / qbox->getArea();
+		remainder.reset(rem_poly->getEnvelope());
+		delete rem_poly;
+		Log::trace("Query can be partially answered from cache. Remainder rectangle: %s", remainder->toString().c_str());
+	}
+	return STQueryResult( p_union, remainder, coverage, ids);
+}
+
+///////////////////////////////////////////////////////////////////
+//
+// CACHE-ENTRY
+//
+///////////////////////////////////////////////////////////////////
+
 template<typename EType>
 class STCacheEntry {
 public:
-	STCacheEntry(uint64_t id, std::shared_ptr<EType> result, std::unique_ptr<CacheCube> cube, uint64_t size) :
-			id(id), result(result), cube(std::move(cube)), size(sizeof(STCacheEntry) + size) {
-	}
-	;
-	~STCacheEntry() {
-		Log::debug("STCacheEntry destroyed");
-	}
+	STCacheEntry(uint64_t id, const std::shared_ptr<EType> &result, std::unique_ptr<STEntryBounds> &bounds, uint64_t size);
 	const uint64_t id;
 	const std::shared_ptr<EType> result;
-	const std::unique_ptr<CacheCube> cube;
+	const std::unique_ptr<STEntryBounds> bounds;
 	const uint64_t size;
 };
 
+template<typename EType>
+STCacheEntry<EType>::STCacheEntry(uint64_t id, const std::shared_ptr<EType> &result,
+		std::unique_ptr<STEntryBounds> &bounds, uint64_t size)  :
+	id(id), result(result), bounds(std::move(bounds)), size(sizeof(STCacheEntry) + size) {
+}
+
+///////////////////////////////////////////////////////////////////
 //
-// A simple std::map based implementation of the
-// STCacheStructure interface
+// MAP-CACHE-STRUCTURE
 //
+///////////////////////////////////////////////////////////////////
+
 template<typename EType>
 class STMapCacheStructure: public STCacheStructure<EType> {
 public:
-	STMapCacheStructure() : next_id(1) {}
-	;
-	virtual ~STMapCacheStructure() {
-	}
-	;
+	STMapCacheStructure();
+	virtual ~STMapCacheStructure();
 	virtual uint64_t insert(const std::unique_ptr<EType> &result);
 	virtual std::unique_ptr<EType> get_copy(const uint64_t id) const;
-	virtual std::unique_ptr<EType> query_copy(const QueryRectangle &spec) const;
 	virtual const std::shared_ptr<EType> get(const uint64_t id) const;
-	virtual const std::shared_ptr<EType> query(const QueryRectangle &spec) const;
 	virtual uint64_t get_entry_size(const uint64_t id) const;
 	virtual void remove(const uint64_t id);
 protected:
+	virtual std::unique_ptr<std::priority_queue<STQueryInfo>> get_query_candidates( const QueryRectangle &spec ) const;
 	virtual std::unique_ptr<EType> copy(const EType &content) const = 0;
-	virtual std::unique_ptr<CacheCube> create_cube(const EType &content) const = 0;
+	virtual std::unique_ptr<STEntryBounds> create_bounds(const EType &content) const = 0;
 	virtual uint64_t get_content_size(const EType &content) const = 0;
 private:
-	std::unordered_map<uint64_t, std::shared_ptr<STCacheEntry<EType>>>entries;
+	std::unordered_map<uint64_t, std::shared_ptr<STCacheEntry<EType>>> entries;
 	uint64_t next_id;
 };
+
+template<typename EType>
+STMapCacheStructure<EType>::STMapCacheStructure() : next_id(1) {
+}
+
+template<typename EType>
+STMapCacheStructure<EType>::~STMapCacheStructure() {
+	//Nothing to-do
+}
 
 template<typename EType>
 uint64_t STMapCacheStructure<EType>::insert(const std::unique_ptr<EType> &result) {
 	auto cpy = copy(*result);
 	std::shared_ptr<EType> sp(cpy.release());
 
+	uint64_t id   = next_id++;
+	uint64_t size = get_content_size(*result) + sizeof(STCacheEntry<EType>);
+	std::unique_ptr<STEntryBounds> bounds = create_bounds(*result);
+
+	Log::trace("Inserting new entry. Id: %d, size: %d, bounds: %s", id, size, bounds->to_string().c_str() );
+
 	std::shared_ptr<STCacheEntry<EType>> entry(
-			new STCacheEntry<EType>( next_id++,
+			new STCacheEntry<EType>( id,
 									 sp,
-									 create_cube(*result),
+									 bounds,
 									 get_content_size(*result) ) );
 
-	entries[entry->id] = entry;
-	return entry->id;
+	entries.emplace(id, entry);
+	return id;
 }
 
 template<typename EType>
 const std::shared_ptr<EType> STMapCacheStructure<EType>::get(const uint64_t id) const {
+	Log::trace("Retrieving cache-entry with id: %d", id);
 	try {
 		auto &e = entries.at(id);
 		return e->result;
 	} catch (std::out_of_range &oor) {
+		Log::trace("No entry found for id: %d", id);
 		std::ostringstream msg;
 		msg << "No cache-entry with id: " << id;
 		throw NoSuchElementException(msg.str());
@@ -107,27 +288,9 @@ const std::shared_ptr<EType> STMapCacheStructure<EType>::get(const uint64_t id) 
 
 template<typename EType>
 std::unique_ptr<EType> STMapCacheStructure<EType>::get_copy(const uint64_t id) const {
-	auto tmp = get(id);
-	return copy(*tmp);
+	Log::trace("Returning copy of entry with id: %d", id);
+	return copy(*get(id));
 }
-
-template<typename EType>
-const std::shared_ptr<EType> STMapCacheStructure<EType>::query(const QueryRectangle& spec) const {
-	for (auto &e : entries) {
-		if (e.second->cube->matches(spec))
-			return e.second->result;
-	}
-	std::ostringstream msg;
-	msg << "No entry matching query: " << Common::qr_to_string(spec);
-	throw NoSuchElementException(msg.str());
-}
-
-template<typename EType>
-std::unique_ptr<EType> STMapCacheStructure<EType>::query_copy(const QueryRectangle& spec) const {
-	auto tmp = query(spec);
-	return copy(*tmp);
-}
-
 
 template<typename EType>
 uint64_t STMapCacheStructure<EType>::get_entry_size(const uint64_t id) const {
@@ -143,23 +306,47 @@ uint64_t STMapCacheStructure<EType>::get_entry_size(const uint64_t id) const {
 
 template<typename EType>
 void STMapCacheStructure<EType>::remove(const uint64_t id) {
+	Log::trace("Removing entry with id: %d", id);
 	entries.erase(id);
 }
 
+template<typename EType>
+std::unique_ptr<std::priority_queue<STQueryInfo> > STMapCacheStructure<EType>::get_query_candidates(
+		const QueryRectangle& spec) const {
+	Log::trace("Fetching candidates for query: %s", Common::qr_to_string(spec).c_str() );
+	std::unique_ptr<std::priority_queue<STQueryInfo>> partials = std::make_unique<std::priority_queue<STQueryInfo>>();
+	for (auto &e : entries) {
+		STEntryBounds &bounds = *e.second->bounds;
+		double coverage = bounds.get_coverage(spec);
+		Log::trace("Coverage for entry %d: %f", e.first, coverage);
+		if ( coverage > 0 )
+			partials->push(STQueryInfo( coverage, bounds.x1, bounds.x2, bounds.y1, bounds.y2, e.first ));
+	}
+	Log::trace("Found %d candidates for query: %s", partials->size(), Common::qr_to_string(spec).c_str() );
+	return partials;
+}
+
+
+
+///////////////////////////////////////////////////////////////////
 //
-// Map implementation of the raster cache
+// RASTER-MAP-CACHE-STRUCTURE
 //
+///////////////////////////////////////////////////////////////////
 
 class STRasterCacheStructure: public STMapCacheStructure<GenericRaster> {
 public:
-	virtual ~STRasterCacheStructure() {
-	}
-	;
+	virtual ~STRasterCacheStructure();
 protected:
 	virtual std::unique_ptr<GenericRaster> copy(const GenericRaster &content) const;
-		virtual std::unique_ptr<CacheCube> create_cube(const GenericRaster &content) const;
-		virtual uint64_t get_content_size(const GenericRaster &content) const;
+	virtual std::unique_ptr<STEntryBounds> create_bounds(const GenericRaster &content) const;
+	virtual uint64_t get_content_size(const GenericRaster &content) const;
 };
+
+
+STRasterCacheStructure::~STRasterCacheStructure() {
+	// Nothing to-do
+}
 
 std::unique_ptr<GenericRaster> STRasterCacheStructure::copy(
 		const GenericRaster& content) const {
@@ -168,9 +355,9 @@ std::unique_ptr<GenericRaster> STRasterCacheStructure::copy(
 	return copy;
 }
 
-std::unique_ptr<CacheCube> STRasterCacheStructure::create_cube(
+std::unique_ptr<STEntryBounds> STRasterCacheStructure::create_bounds(
 		const GenericRaster& content) const {
-	return std::make_unique<RasterCacheCube>(content);
+	return std::make_unique<STRasterEntryBounds>(content);
 }
 
 uint64_t STRasterCacheStructure::get_content_size(const GenericRaster& content) const {
@@ -179,54 +366,49 @@ uint64_t STRasterCacheStructure::get_content_size(const GenericRaster& content) 
 }
 
 
+///////////////////////////////////////////////////////////////////
 //
-// Index cache
+// RASTER-REFERENCE CACHE-STRUCTURE (FOR USE IN INDEX)
 //
+///////////////////////////////////////////////////////////////////
 
-class RasterRefStructure : public STCacheStructure<RasterRef> {
+class RasterRefStructure : public STCacheStructure<STRasterRef> {
 public:
 	RasterRefStructure() : next_id(1) {};
 	virtual ~RasterRefStructure() {};
-	virtual uint64_t insert(const std::unique_ptr<RasterRef> &result);
-	virtual std::unique_ptr<RasterRef> get_copy(const uint64_t id) const;
-	virtual std::unique_ptr<RasterRef> query_copy(const QueryRectangle &spec) const;
-	virtual const std::shared_ptr<RasterRef> get(const uint64_t id) const;
-	virtual const std::shared_ptr<RasterRef> query(const QueryRectangle &spec) const;
+	virtual uint64_t insert(const std::unique_ptr<STRasterRef> &result);
+	virtual std::unique_ptr<STRasterRef> get_copy(const uint64_t id) const;
+	virtual const std::shared_ptr<STRasterRef> get(const uint64_t id) const;
 	virtual uint64_t get_entry_size(const uint64_t id) const;
 	virtual void remove(const uint64_t id);
+protected:
+	virtual std::unique_ptr<std::priority_queue<STQueryInfo>> get_query_candidates( const QueryRectangle &spec ) const;
 private:
-	std::unordered_map<uint64_t, std::shared_ptr<RasterRef>> entries;
+	std::unordered_map<uint64_t, std::shared_ptr<STRasterRef>> entries;
 	uint64_t next_id;
 };
 
-uint64_t RasterRefStructure::insert(const std::unique_ptr<RasterRef>& result) {
+uint64_t RasterRefStructure::insert(const std::unique_ptr<STRasterRef>& result) {
 	uint64_t id = next_id++;
-	entries.emplace(id,std::shared_ptr<RasterRef>( new RasterRef(*result) ) );
+	Log::trace("Inserting new reference-entry. Id: %d, bounds: %s", id, result->bounds.to_string().c_str() );
+	entries.emplace(id,std::shared_ptr<STRasterRef>( new STRasterRef(*result) ) );
 	return id;
 }
 
-const std::shared_ptr<RasterRef> RasterRefStructure::get(const uint64_t id) const {
+const std::shared_ptr<STRasterRef> RasterRefStructure::get(const uint64_t id) const {
+	Log::trace("Retrieving cache-reference with id: %d", id);
 	try {
 		return entries.at(id);
 	} catch ( std::out_of_range &oor ) {
-		throw NoSuchElementException("No entry found");
+		std::ostringstream msg;
+		msg << "No cache-entry with id: " << id;
+		throw NoSuchElementException(msg.str());
 	}
 }
 
-std::unique_ptr<RasterRef> RasterRefStructure::get_copy(const uint64_t id) const {
-	return std::make_unique<RasterRef>( *get(id) );
-}
-
-const std::shared_ptr<RasterRef> RasterRefStructure::query(const QueryRectangle& spec) const {
-	for ( auto &e : entries ) {
-		if ( e.second->cube.matches(spec) )
-			return e.second;
-	}
-	throw NoSuchElementException("No entry found");
-}
-
-std::unique_ptr<RasterRef> RasterRefStructure::query_copy(const QueryRectangle& spec) const {
-	return std::make_unique<RasterRef>( *query(spec) );
+std::unique_ptr<STRasterRef> RasterRefStructure::get_copy(const uint64_t id) const {
+	Log::trace("Returning copy of reference with id: %d", id);
+	return std::make_unique<STRasterRef>( *get(id) );
 }
 
 uint64_t RasterRefStructure::get_entry_size(const uint64_t id) const {
@@ -235,15 +417,38 @@ uint64_t RasterRefStructure::get_entry_size(const uint64_t id) const {
 }
 
 void RasterRefStructure::remove(const uint64_t id) {
+	Log::trace("Removing reference with id: %d", id);
 	entries.erase(id);
 }
 
+inline std::unique_ptr<std::priority_queue<STQueryInfo> > RasterRefStructure::get_query_candidates(
+		const QueryRectangle& spec) const {
+	Log::trace("Fetching candidates for query: %s", Common::qr_to_string(spec).c_str() );
+	std::unique_ptr<std::priority_queue<STQueryInfo>> partials = std::make_unique<std::priority_queue<STQueryInfo>>();
+	for (auto &e : entries) {
+		const STEntryBounds &bounds = e.second->bounds;
+		double coverage = bounds.get_coverage(spec);
+		Log::trace("Coverage for reference %d: %f", e.first, coverage);
+		if ( coverage > 0 )
+			partials->push(STQueryInfo( coverage, bounds.x1, bounds.x2, bounds.y1, bounds.y2, e.first ));
+	}
+	Log::trace("Found %d candidates for query: %s", partials->size(), Common::qr_to_string(spec).c_str() );
+	return partials;
 
+}
 
-
+///////////////////////////////////////////////////////////////////
 //
-// Cache implementation
+// BASIC CACHE-IMPLEMENTATION
 //
+///////////////////////////////////////////////////////////////////
+
+template<typename EType>
+STCache<EType>::STCache(size_t max_size) : max_size(max_size), current_size(0) {
+	Log::debug("Creating new cache with max-size: %d", max_size);
+	//policy = std::unique_ptr<ReplacementPolicy<EType>>( new LRUPolicy<EType>() );
+}
+
 template<typename EType>
 STCache<EType>::~STCache() {
 	for (auto &entry : caches) {
@@ -254,13 +459,15 @@ STCache<EType>::~STCache() {
 template<typename EType>
 STCacheStructure<EType>* STCache<EType>::get_structure(const std::string &key, bool create) const {
 
+	Log::trace("Retrieving cache-structure for semantic_id: %s", key.c_str() );
+
 	STCacheStructure<EType> *cache;
 	auto got = caches.find(key);
 
 	if (got == caches.end() && create) {
-		Log::debug("No cache-structure for key found. Creating.");
+		Log::trace("No cache-structure found for semantic_id: %s. Creating.", key.c_str() );
 		cache = new_structure();
-		caches[key] = cache;
+		caches.emplace(key,cache);
 	}
 	else if (got != caches.end())
 		cache = got->second;
@@ -278,37 +485,23 @@ template<typename EType>
 void STCache<EType>::remove(const std::string& semantic_id, uint64_t id) {
 	std::lock_guard<std::mutex> lock(mtx);
 	auto cache = get_structure(semantic_id);
-	if (cache != nullptr)
-		return cache->remove(id);
+	if (cache != nullptr) {
+		try {
+			auto size = cache->get_entry_size(id);
+			current_size -= size;
+			cache->remove(id);
+		} catch ( NoSuchElementException &nse ) {
+		}
+	}
 }
 
 template<typename EType>
 STCacheKey STCache<EType>::put(const std::string &key, const std::unique_ptr<EType> &item) {
 	std::lock_guard<std::mutex> lock(mtx);
-	Log::debug("Adding entry for key \"%s\"", key.c_str());
 
 	auto cache = get_structure(key, true);
 	auto id = cache->insert(item);
-	auto size = cache->get_entry_size(id);
-	current_size += size;
-
-	Log::debug("Size of new Entry: %d bytes", size);
-//	if (size > max_size) {
-//		Log::warn("Size of entry is greater than assigned cache-size of: %d bytes. Not inserting.", max_size);
-//	}
-//	else {
-//		if (current_size + ce->size > max_size) {
-//			Log::debug("New entry exhausts cache size. Cleaning up.");
-//			while (current_size + ce->size > max_size) {
-//				auto victim = policy->evict();
-//				Log::info("Evicting entry (%ld bytes): \"%s\"", victim->size,
-//						Common::stref_to_string(victim->result->stref).c_str());
-//				victim->structure->remove(victim);
-//				current_size -= victim->size;
-//			};
-//			Log::debug("Cleanup finished. Free space: %d bytes", (max_size - current_size));
-//		}
-//	}
+	current_size += cache->get_entry_size(id);
 	return STCacheKey(key,id);
 }
 
@@ -328,19 +521,6 @@ const std::shared_ptr<EType> STCache<EType>::get(const std::string& semantic_id,
 }
 
 template<typename EType>
-const std::shared_ptr<EType> STCache<EType>::query(const std::string &key, const QueryRectangle &qr) const {
-	std::lock_guard<std::mutex> lock(mtx);
-	auto cache = get_structure(key);
-	if (cache != nullptr)
-		return cache->query(qr);
-	else {
-		std::ostringstream msg;
-		throw NoSuchElementException("Entry not found");
-	}
-
-}
-
-template<typename EType>
 std::unique_ptr<EType> STCache<EType>::get_copy(const STCacheKey& key) const {
 	return get_copy(key.semantic_id, key.entry_id);
 }
@@ -356,30 +536,45 @@ std::unique_ptr<EType> STCache<EType>::get_copy(const std::string& semantic_id, 
 }
 
 template<typename EType>
-std::unique_ptr<EType> STCache<EType>::query_copy(const std::string &key, const QueryRectangle &qr) const {
+STQueryResult STCache<EType>::query(const std::string& semantic_id, const QueryRectangle& qr) const {
 	std::lock_guard<std::mutex> lock(mtx);
-	auto cache = get_structure(key);
+	auto cache = get_structure(semantic_id);
 	if (cache != nullptr)
-		return cache->query_copy(qr);
+		return cache->query(qr);
 	else {
-		std::ostringstream msg;
-		throw NoSuchElementException("Entry not found");
+		return STQueryResult(qr);
 	}
 }
 
+///////////////////////////////////////////////////////////////////
 //
-// RasterCache
+// RASTER CACHE-IMPLEMENTATION
 //
+///////////////////////////////////////////////////////////////////
+
+RasterCache::RasterCache(size_t size) : STCache(size) {
+}
+
+RasterCache::~RasterCache() {
+}
 
 STCacheStructure<GenericRaster>* RasterCache::new_structure() const {
 	return new STRasterCacheStructure();
 }
 
+///////////////////////////////////////////////////////////////////
+//
+// RASTER-REFERENCE CACHE-IMPLEMENTATION
+//
+///////////////////////////////////////////////////////////////////
 
-//
-// Index Cache
-//
-STCacheStructure<RasterRef>* RasterRefCache::new_structure() const {
+RasterRefCache::RasterRefCache() : STCache( (size_t) 1 << 63) {
+}
+
+RasterRefCache::~RasterRefCache() {
+}
+
+STCacheStructure<STRasterRef>* RasterRefCache::new_structure() const {
 	return new RasterRefStructure();
 }
 
@@ -387,8 +582,8 @@ STCacheStructure<RasterRef>* RasterRefCache::new_structure() const {
 // We have to manage our *_by_node structure here
 //
 
-STCacheKey RasterRefCache::put(const std::string& semantic_id, const std::unique_ptr<RasterRef>& item) {
-	STCacheKey key = STCache<RasterRef>::put(semantic_id,item);
+STCacheKey RasterRefCache::put(const std::string& semantic_id, const std::unique_ptr<STRasterRef>& item) {
+	STCacheKey key = STCache<STRasterRef>::put(semantic_id,item);
 	try {
 		auto &v = entries_by_node.at(item->node_id);
 		v.push_back( key );
@@ -411,7 +606,7 @@ void RasterRefCache::remove(const std::string& semantic_id, uint64_t id) {
 			else
 				++e_it;
 		}
-		STCache<RasterRef>::remove(semantic_id,id);
+		STCache<STRasterRef>::remove(semantic_id,id);
 	} catch ( NoSuchElementException &nse ) {
 		// Nothing todo here
 	}
@@ -420,7 +615,7 @@ void RasterRefCache::remove(const std::string& semantic_id, uint64_t id) {
 void RasterRefCache::remove_all_by_node(uint32_t node_id) {
 	try {
 		for ( auto &k : entries_by_node.at(node_id) )
-			STCache<RasterRef>::remove( k );
+			STCache<STRasterRef>::remove( k.semantic_id, k.entry_id );
 	} catch ( std::out_of_range &oor ) {
 
 	}
@@ -429,162 +624,4 @@ void RasterRefCache::remove_all_by_node(uint32_t node_id) {
 
 // Instantiate all
 template class STCache<GenericRaster> ;
-template class STCache<RasterRef>;
-
-
-//
-// Cache-Manager
-//
-std::unique_ptr<CacheManager> CacheManager::impl;
-
-CacheManager& CacheManager::getInstance() {
-	if (CacheManager::impl)
-		return *impl;
-	else
-		throw NotInitializedException(
-				"CacheManager was not initialized. Please use CacheManager::init first.");
-}
-
-void CacheManager::init(std::unique_ptr<CacheManager>& impl) {
-	CacheManager::impl.reset(impl.release());
-}
-
-thread_local SocketConnection* CacheManager::remote_connection = nullptr;
-
-std::unique_ptr<GenericRaster> CacheManager::get_raster(const STCacheKey& key) {
-	return get_raster(key.semantic_id,key.entry_id);
-}
-
-//
-// Default local cache
-//
-std::unique_ptr<GenericRaster> LocalCacheManager::query_raster(const GenericOperator &op,
-		const QueryRectangle &rect) {
-	return rasterCache.query_copy(op.getSemanticId(), rect);
-}
-
-std::unique_ptr<GenericRaster> LocalCacheManager::get_raster(const std::string& semantic_id,
-		uint64_t entry_id) {
-	return rasterCache.get_copy(semantic_id,entry_id);
-}
-
-void LocalCacheManager::put_raster(const std::string& semantic_id,
-		const std::unique_ptr<GenericRaster>& raster) {
-	rasterCache.put(semantic_id, raster);
-}
-
-//
-// NopCache
-//
-std::unique_ptr<GenericRaster> NopCacheManager::query_raster(const GenericOperator &op,
-		const QueryRectangle& rect) {
-	(void) op;
-	(void) rect;
-	throw NoSuchElementException("Cache Miss");
-}
-
-std::unique_ptr<GenericRaster> NopCacheManager::get_raster(const std::string& semantic_id,
-		uint64_t entry_id) {
-	(void) semantic_id;
-	(void) entry_id;
-	throw NoSuchElementException("Cache Miss");
-}
-
-void NopCacheManager::put_raster(const std::string& semantic_id,
-		const std::unique_ptr<GenericRaster>& raster) {
-	(void) semantic_id;
-	(void) raster;
-	// Nothing TODO
-}
-
-//
-// Remote Cache
-//
-
-void RemoteCacheManager::put_raster(const std::string& semantic_id,
-		const std::unique_ptr<GenericRaster>& raster) {
-	if (remote_connection == nullptr)
-		throw NetworkException("No connection to remote-index set.");
-
-	auto id = local_cache.put(semantic_id, raster);
-	RasterCacheCube cube(*raster);
-
-	uint8_t cmd = Common::RESP_WORKER_NEW_RASTER_CACHE_ENTRY;
-	remote_connection->stream->write(cmd);
-	id.toStream(*remote_connection->stream);
-	cube.toStream(*remote_connection->stream);
-	// TODO: Do we need a confirmation
-}
-
-std::unique_ptr<GenericRaster> RemoteCacheManager::query_raster(const GenericOperator &op,
-		const QueryRectangle& rect) {
-	try {
-		std::unique_ptr<GenericRaster> res;
-		// Omit remote lookup on root operator
-		if (op.getDepth() == 0) {
-			res = local_cache.query_copy(op.getSemanticId(), rect);
-			Log::info("HIT on local cache.");
-		}
-		else {
-			try {
-				res = local_cache.query_copy(op.getSemanticId(), rect);
-				Log::info("HIT on local cache.");
-			} catch (NoSuchElementException &nse) {
-
-				Log::info("MISS on local cache. Asking index-server.");
-				res = get_raster_from_remote(op, rect);
-				Log::info("HIT on remote cache.");
-			}
-		}
-		return res;
-	} catch ( NoSuchElementException &nse2 ) {
-		Log::info("MISS on local and remote cache.");
-		throw nse2;
-	}
-}
-
-std::unique_ptr<GenericRaster> RemoteCacheManager::get_raster(const std::string& semantic_id,
-		uint64_t entry_id) {
-	return local_cache.get_copy(semantic_id,entry_id);
-}
-
-std::unique_ptr<GenericRaster> RemoteCacheManager::get_raster_from_remote(const GenericOperator &op,
-		const QueryRectangle& rect) {
-	if (remote_connection == nullptr)
-		throw NetworkException("No connection to remote-index set.");
-
-	// Send request
-	uint8_t cmd = Common::CMD_INDEX_QUERY_RASTER_CACHE;
-	CacheRequest cr(rect, op.getSemanticId());
-	remote_connection->stream->write(cmd);
-	cr.toStream(*remote_connection->stream);
-
-	uint8_t resp;
-	remote_connection->stream->read(&resp);
-	switch (resp) {
-		case Common::RESP_INDEX_HIT: {
-			Log::debug("Index found cache-entry. Reading response.");
-			std::string host;
-			uint32_t port;
-			uint64_t id;
-			remote_connection->stream->read(&host);
-			remote_connection->stream->read(&port);
-			remote_connection->stream->read(&id);
-			try {
-				return Common::fetch_raster(host, port, STCacheKey(op.getSemanticId(),id) );
-			} catch (std::exception &e) {
-				Log::error("Error while fetching raster from %s:%d", host.c_str(), port);
-				// TODO: Maybe not...
-				throw NoSuchElementException("Error fetching raster from remote");
-			}
-			break;
-		}
-		case Common::RESP_INDEX_MISS: {
-			Log::debug("MISS from index-server.");
-			throw NoSuchElementException("No cache-entry found on index.");
-		}
-		default: {
-			throw NetworkException("Received unknown response from index.");
-		}
-	}
-}
+template class STCache<STRasterRef>;

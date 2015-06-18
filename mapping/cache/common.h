@@ -12,6 +12,8 @@
 #include "raster/exceptions.h"
 #include "operators/operator.h"
 #include "datatypes/raster.h"
+#include "cache/priv/transfer.h"
+#include "cache/manager.h"
 #include <memory>
 
 #include <sstream>
@@ -19,39 +21,13 @@
 #include <sys/select.h>
 #include <errno.h>
 
-class CacheRequest {
-public:
-	virtual ~CacheRequest();
-	CacheRequest( const CacheRequest &r );
-	CacheRequest( const QueryRectangle &query, const std::string &graph_json );
-	CacheRequest( BinaryStream &stream);
-	virtual void toStream( BinaryStream &stream );
-	QueryRectangle query;
-	std::string semantic_id;
-};
-
-class RasterRequest : public CacheRequest {
-public:
-	virtual ~RasterRequest();
-	RasterRequest( const RasterRequest &r );
-	RasterRequest( const QueryRectangle &query, const std::string &graph_json, GenericOperator::RasterQM query_mode );
-	RasterRequest( BinaryStream &stream);
-	virtual void toStream( BinaryStream &stream );
-	GenericOperator::RasterQM query_mode;
-};
-
-
-class DeliveryResponse {
-public:
-	DeliveryResponse( const DeliveryResponse &r );
-	DeliveryResponse(std::string host, uint32_t port, uint64_t delivery_id );
-	DeliveryResponse( BinaryStream &stream );
-	void toStream( BinaryStream &stream );
-	std::string host;
-	uint32_t port;
-	uint64_t delivery_id;
-};
-
+#include <geos/geom/Coordinate.h>
+#include <geos/geom/CoordinateSequence.h>
+#include <geos/geom/CoordinateArraySequence.h>
+#include <geos/geom/GeometryFactory.h>
+#include <geos/geom/Geometry.h>
+#include <geos/geom/LinearRing.h>
+#include <geos/geom/Polygon.h>
 
 //
 // Wraps a BinaryStream and stores the underlying
@@ -113,11 +89,21 @@ public:
 
 	//
 	// Expected data on stream is:
-	// QueryRectangle
-	// OperatorGraph as JSON:string
-	// RasterQM: uint8_t (1 == exact, 0 == loose)
+	// request:RasterBaseRequest
 	//
-	static const uint8_t CMD_WORKER_GET_RASTER = 10;
+	static const uint8_t CMD_WORKER_CREATE_RASTER = 10;
+
+	//
+	// Expected data on stream is:
+	// request:RasterDeliveryRequest
+	//
+	static const uint8_t CMD_WORKER_DELIVER_RASTER = 11;
+
+	//
+	// Expected data on stream is:
+	// request:RasterPuzzleRequest
+	//
+	static const uint8_t CMD_WORKER_PUZZLE_RASTER = 12;
 
 	//
 	// Command to pick up a delivery.
@@ -158,9 +144,7 @@ public:
 	// Response from index-server after successfully
 	// probing the cache for a CMD_INDEX_QUERY_CACHE.
 	// Data on stream is:
-	// host:string
-	// port:uint32_t
-	// key:STCacheKey
+	// ref:CacheRef
 	static const uint8_t RESP_INDEX_HIT = 32;
 
 	//
@@ -168,6 +152,14 @@ public:
 	// probing the cache for a CMD_INDEX_QUERY_CACHE.
 	// Theres no data on stream.
 	static const uint8_t RESP_INDEX_MISS = 33;
+
+	//
+	// Response from index-server after successfully
+	// probing the cache for a CMD_INDEX_QUERY_CACHE.
+	// Data on stream is:
+	// puzzle-request: PuzzleRequest
+	static const uint8_t RESP_INDEX_PARTIAL = 34;
+
 
 	//
 	// Response for ready to deliver result. Data on stream is:
@@ -219,22 +211,21 @@ public:
 	//
 	static int get_listening_socket(int port, bool nonblock = true, int backlog = 10);
 
-	//
-	// Fetches a raster from the given delivery response
-	//
-	static std::unique_ptr<GenericRaster> fetch_raster(const DeliveryResponse& dr);
-
-	//
-	// Fetches a raster directly from the cache, omitting the operator-graph.
-	// To be used by Cache-Manager only
-	//
-	static std::unique_ptr<GenericRaster> fetch_raster(const std::string & host, uint32_t port,
-			const STCacheKey &key );
-
-
 	static std::string qr_to_string( const QueryRectangle &rect );
 
 	static std::string stref_to_string( const SpatioTemporalReference &ref );
+
+	//
+	// Fetches a raster directly from the delivery-manager of the given node
+	// by passing the unique STCacheKey
+	//
+	static std::unique_ptr<GenericRaster> fetch_raster(const std::string & host, uint32_t port, const STCacheKey &key );
+
+	//
+	// Puzzles a raster by combinig parts
+	//
+	static std::unique_ptr<GenericRaster> process_raster_puzzle(const PuzzleRequest &req, std::string my_host,
+		uint32_t my_port);
 
 	//
 	// Helper to read from a stream with a given timeout. Basically wraps
@@ -265,8 +256,17 @@ public:
 		}
 	}
 
+	//
+	// Geos Helper functions used by the caches query function
+	//
+	static std::unique_ptr<geos::geom::Geometry> empty_geom();
+	static std::unique_ptr<geos::geom::Polygon> create_square( double lx, double ly, double ux, double uy );
+	static std::unique_ptr<geos::geom::Geometry> union_geom( const std::unique_ptr<geos::geom::Geometry> &p1,
+															   const std::unique_ptr<geos::geom::Polygon> &p2);
+
 
 private:
+	static geos::geom::GeometryFactory gf;
 	Common() {};
 	~Common() {};
 };

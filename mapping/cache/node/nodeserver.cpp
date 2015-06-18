@@ -8,6 +8,7 @@
 // project-stuff
 #include "cache/node/nodeserver.h"
 #include "cache/index/indexserver.h"
+#include "cache/priv/transfer.h"
 #include "cache/cache.h"
 #include "raster/exceptions.h"
 #include "util/make_unique.h"
@@ -25,7 +26,7 @@
 DeliveryManager::DeliveryManager(uint32_t listen_port) :
 		shutdown(false), listen_port(listen_port), delivery_id(1) {
 }
-;
+
 
 uint64_t DeliveryManager::add_delivery(std::unique_ptr<GenericRaster>& result) {
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
@@ -46,49 +47,49 @@ std::unique_ptr<GenericRaster> DeliveryManager::get_delivery(uint64_t id) {
 
 void DeliveryManager::process_delivery(uint8_t cmd, SocketConnection& con) {
 	switch (cmd) {
-	case Common::CMD_DELIVERY_GET: {
-		uint64_t id;
-		con.stream->read(&id);
-		try {
-			auto res = get_delivery(id);
-			Log::debug("Sending delivery: %d", id);
-			uint8_t resp = Common::RESP_DELIVERY_OK;
-			con.stream->write(resp);
-			res->toStream(*con.stream);
-			Log::debug("Finished sending delivery: %d", id);
-		} catch (std::out_of_range &oor) {
-			Log::info("Received request for unknown delivery-id: %d", id);
-			uint8_t resp = Common::RESP_DELIVERY_ERROR;
-			std::ostringstream msg;
-			msg << "Invalid delivery id: " << id;
-			con.stream->write(resp);
-			con.stream->write(msg.str());
+		case Common::CMD_DELIVERY_GET: {
+			uint64_t id;
+			con.stream->read(&id);
+			try {
+				auto res = get_delivery(id);
+				Log::debug("Sending delivery: %d", id);
+				uint8_t resp = Common::RESP_DELIVERY_OK;
+				con.stream->write(resp);
+				res->toStream(*con.stream);
+				Log::debug("Finished sending delivery: %d", id);
+			} catch (std::out_of_range &oor) {
+				Log::info("Received request for unknown delivery-id: %d", id);
+				uint8_t resp = Common::RESP_DELIVERY_ERROR;
+				std::ostringstream msg;
+				msg << "Invalid delivery id: " << id;
+				con.stream->write(resp);
+				con.stream->write(msg.str());
+			}
+			break;
 		}
-		break;
-	}
-	case Common::CMD_DELIVERY_GET_CACHED_RASTER: {
-		STCacheKey key(*con.stream);
-		try {
-			Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-			auto res = CacheManager::getInstance().get_raster(key);
-			uint8_t resp = Common::RESP_DELIVERY_OK;
-			con.stream->write(resp);
-			res->toStream(*con.stream);
-			Log::debug("Finished sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-		} catch ( NoSuchElementException  &nse ) {
-			uint8_t resp = Common::RESP_DELIVERY_ERROR;
-			std::ostringstream msg;
-			msg << "No cache-entry found for key: " << key.semantic_id << ":" << key.entry_id;
-			con.stream->write(resp);
-			con.stream->write(msg.str());
+		case Common::CMD_DELIVERY_GET_CACHED_RASTER: {
+			STCacheKey key(*con.stream);
+			try {
+				Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+				auto res = CacheManager::getInstance().get_raster(key);
+				uint8_t resp = Common::RESP_DELIVERY_OK;
+				con.stream->write(resp);
+				res->toStream(*con.stream);
+				Log::debug("Finished sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+			} catch (NoSuchElementException &nse) {
+				uint8_t resp = Common::RESP_DELIVERY_ERROR;
+				std::ostringstream msg;
+				msg << "No cache-entry found for key: " << key.semantic_id << ":" << key.entry_id;
+				con.stream->write(resp);
+				con.stream->write(msg.str());
+			}
+			break;
 		}
-		break;
-	}
-	default:
-		// Unknown command
-		std::ostringstream ss;
-		ss << "Unknown command on delivery connection: " << cmd << ". Dropping connection.";
-		throw NetworkException(ss.str());
+		default:
+			// Unknown command
+			std::ostringstream ss;
+			ss << "Unknown command on delivery connection: " << cmd << ". Dropping connection.";
+			throw NetworkException(ss.str());
 	}
 }
 
@@ -135,7 +136,7 @@ void DeliveryManager::run() {
 			auto &dc = *dciter;
 			if (FD_ISSET(dc->fd, &readfds)) {
 				try {
-					if ( dc->stream->read(&cmd, true ) ) {
+					if (dc->stream->read(&cmd, true)) {
 						process_delivery(cmd, *dc);
 						++dciter;
 					}
@@ -145,7 +146,8 @@ void DeliveryManager::run() {
 					}
 
 				} catch (NetworkException &ne) {
-					Log::error("Error on delivery-connection with fd: %d. Dropping. Reason: %s", dc->fd, ne.what());
+					Log::error("Error on delivery-connection with fd: %d. Dropping. Reason: %s", dc->fd,
+							ne.what());
 					dciter = connections.erase(dciter);
 				}
 			}
@@ -197,8 +199,6 @@ void NodeServer::worker_loop() {
 			while (workers_up && !shutdown) {
 				try {
 					uint8_t cmd;
-					Log::trace("Worker waiting for command.");
-
 					if (Common::read(&cmd, sc, 2, true)) {
 						process_worker_command(cmd, sc);
 					}
@@ -207,35 +207,83 @@ void NodeServer::worker_loop() {
 						break;
 					}
 				} catch (TimeoutException &te) {
-					Log::trace("Read on worker-connection timed out. Trying again");
+					//Log::trace("Read on worker-connection timed out. Trying again");
 				} catch (InterruptedException &ie) {
 					Log::info("Read on worker-connection interrupted. Trying again.");
+				} catch (NetworkException &ne ) {
+					// Re-throw network-error to outer catch.
+					throw;
+				} catch ( std::exception &e ) {
+					std::ostringstream os;
+					os << "Unexpected error while processing request: " << e.what();
+					uint8_t resp = Common::RESP_WORKER_ERROR;
+					std::string msg = os.str();
+					sc.stream->write(resp);
+					sc.stream->write(msg);
 				}
 			}
 		} catch (NetworkException &ne) {
-			Log::info("Worker lost connection to index... Retrying. Reason: %s", ne.what());
+			Log::info("Worker lost connection to index... Reconnecting. Reason: %s", ne.what());
 		}
 	}
 	Log::info("Worker done.");
 }
 
 void NodeServer::process_worker_command(uint8_t cmd, SocketConnection& con) {
-	Log::debug("Processing command: %d", cmd);
+	Log::debug("Received command: %d", cmd);
 	switch (cmd) {
-	case Common::CMD_WORKER_GET_RASTER:
-		Log::trace("Reading raster-request.");
-		RasterRequest rr(*con.stream);
-		QueryProfiler profiler;
-		Log::trace("Fetching raster from operator-graph");
-		std::unique_ptr<GenericRaster> res = GenericOperator::fromJSON(rr.semantic_id)->
-				getCachedRaster(rr.query, profiler, rr.query_mode );
-		Log::trace("Handing raster over to delivery-manager");
-		uint64_t delivery_id = delivery_manager.add_delivery(res);
-		Log::trace("Sending response");
-		uint8_t resp = Common::RESP_WORKER_RESULT_READY;
-		con.stream->write(resp);
-		con.stream->write(delivery_id);
-		break;
+		case Common::CMD_WORKER_CREATE_RASTER: {
+			RasterBaseRequest rr(*con.stream);
+			QueryProfiler profiler;
+			Log::debug("Processing request: %s", rr.to_string().c_str());
+			std::unique_ptr<GenericRaster> res = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(
+					rr.query, profiler, rr.query_mode);
+			Log::debug("Handing raster over to delivery-manager");
+			uint64_t delivery_id = delivery_manager.add_delivery(res);
+			Log::debug("Sending response");
+			uint8_t resp = Common::RESP_WORKER_RESULT_READY;
+			con.stream->write(resp);
+			con.stream->write(delivery_id);
+			break;
+		}
+		case Common::CMD_WORKER_DELIVER_RASTER: {
+			RasterDeliveryRequest rr(*con.stream);
+			Log::debug("Processing request: %s", rr.to_string().c_str());
+			auto result = CacheManager::getInstance().get_raster(rr.semantic_id,rr.entry_id);
+			if ( rr.query_mode == GenericOperator::RasterQM::EXACT ) {
+				result = result->fitToQueryRectangle(rr.query);
+			}
+			Log::debug("Handing raster over to delivery-manager");
+			uint64_t delivery_id = delivery_manager.add_delivery(result);
+			Log::debug("Sending response");
+			uint8_t resp = Common::RESP_WORKER_RESULT_READY;
+			con.stream->write(resp);
+			con.stream->write(delivery_id);
+			break;
+		}
+		case Common::CMD_WORKER_PUZZLE_RASTER: {
+			RasterPuzzleRequest rr(*con.stream);
+			Log::debug("Processing request: %s", rr.to_string().c_str());
+			std::unique_ptr<GenericRaster> res = Common::process_raster_puzzle(rr,my_host,my_port);
+			Log::debug("Adding puzzled raster to cache.");
+			CacheManager::getInstance().put_raster(rr.semantic_id, res);
+
+			if ( rr.query_mode == RasterPuzzleRequest::QM::EXACT ) {
+				Log::debug("Fitting result to query.");
+				res = res->fitToQueryRectangle(rr.query);
+			}
+			Log::debug("Handing raster over to delivery-manager");
+			uint64_t delivery_id = delivery_manager.add_delivery(res);
+			Log::debug("Sending response");
+			uint8_t resp = Common::RESP_WORKER_RESULT_READY;
+			con.stream->write(resp);
+			con.stream->write(delivery_id);
+			break;
+		}
+		default: {
+			Log::error("Unknown command from index-server: %d. Dropping connection.", cmd);
+			throw NetworkException("Unknown command from index-server");
+		}
 	}
 	Log::debug("Finished processing command: %d", cmd);
 }
@@ -243,7 +291,7 @@ void NodeServer::process_worker_command(uint8_t cmd, SocketConnection& con) {
 void NodeServer::run() {
 	Log::info("Starting Node-Server");
 
-	auto delivery_thread = delivery_manager.run_async();
+	delivery_thread = delivery_manager.run_async();
 
 	while (!shutdown) {
 		try {
@@ -251,8 +299,7 @@ void NodeServer::run() {
 
 			workers_up = true;
 			for (int i = 0; i < num_treads; i++)
-				workers.push_back(
-						std::make_unique<std::thread>(&NodeServer::worker_loop, this));
+				workers.push_back(std::make_unique<std::thread>(&NodeServer::worker_loop, this));
 
 			// Read on control
 			while (!shutdown) {
@@ -266,7 +313,7 @@ void NodeServer::run() {
 						break;
 					}
 				} catch (TimeoutException &te) {
-					Log::trace("Timeout on read from control-connection.");
+					//Log::trace("Timeout on read from control-connection.");
 
 				} catch (InterruptedException &ie) {
 					Log::info("Interrupt on read from control-connection.");
@@ -337,4 +384,3 @@ void NodeServer::stop() {
 NodeServer::~NodeServer() {
 	stop();
 }
-

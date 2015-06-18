@@ -86,8 +86,7 @@ STQueryResult& STQueryResult::operator =(const STQueryResult& r) {
 	covered.reset( r.covered->clone() );
 	remainder.reset( r.remainder->clone() );
 	coverage = r.coverage;
-	ids.clear();
-	ids.insert( ids.cbegin(), r.ids.cbegin(), r.ids.cend() );
+	ids = r.ids;
 	return *this;
 }
 

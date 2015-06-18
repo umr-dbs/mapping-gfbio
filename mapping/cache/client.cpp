@@ -22,12 +22,12 @@ std::unique_ptr<GenericRaster> CacheClient::get_raster(const std::string& graph_
 	SocketConnection idx_con(index_host.c_str(), index_port);
 
 	uint8_t idx_cmd = Common::CMD_INDEX_GET_RASTER;
-	RasterRequest rr(query,graph_json,query_mode);
+	RasterBaseRequest rr(graph_json,query,query_mode);
 	idx_con.stream->write(idx_cmd);
 	rr.toStream( *idx_con.stream );
 
 	DeliveryResponse resp = read_index_response(idx_con);
-	return Common::fetch_raster(resp);
+	return fetch_raster(resp);
 }
 
 DeliveryResponse CacheClient::read_index_response(SocketConnection& idx_con) {
@@ -50,3 +50,28 @@ DeliveryResponse CacheClient::read_index_response(SocketConnection& idx_con) {
 	}
 }
 
+std::unique_ptr<GenericRaster> CacheClient::fetch_raster(const DeliveryResponse& dr) {
+	Log::debug("Fetching raster from: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
+	SocketConnection dc(dr.host.c_str(),dr.port);
+	uint8_t cmd = Common::CMD_DELIVERY_GET;
+	dc.stream->write(cmd);
+	dc.stream->write(dr.delivery_id);
+
+	uint8_t resp;
+	dc.stream->read(&resp);
+	switch (resp) {
+		case Common::RESP_DELIVERY_OK: {
+			return GenericRaster::fromStream(*dc.stream);
+		}
+		case Common::RESP_DELIVERY_ERROR: {
+			std::string err_msg;
+			dc.stream->read(&err_msg);
+			Log::error("Delivery returned error: %s", err_msg.c_str());
+			throw DeliveryException(err_msg);
+		}
+		default: {
+			Log::error("Delivery returned unknown code: %d", resp);
+			throw DeliveryException("Delivery returned unknown code");
+		}
+	}
+}

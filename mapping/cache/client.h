@@ -8,8 +8,9 @@
 #ifndef CLIENT_CLIENT_H_
 #define CLIENT_CLIENT_H_
 
-#include "cache/common.h"
+#include "cache/priv/transfer.h"
 #include "datatypes/raster.h"
+#include "cache/common.h"
 
 #include <memory>
 

@@ -23,7 +23,6 @@ class ExpressionOperator : public GenericOperator {
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		std::string expression;
-		std::string datatype;
 		GDALDataType output_type;
 		double output_min, output_max;
 };
@@ -32,7 +31,7 @@ class ExpressionOperator : public GenericOperator {
 ExpressionOperator::ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 	expression = params.get("expression", "value").asString();
-	datatype = params.get("datatype", "input").asString();
+	std::string datatype = params.get("datatype", "input").asString();
 	if (datatype == "input")
 		output_type = GDT_Unknown;
 	else {
@@ -54,7 +53,7 @@ REGISTER_OPERATOR(ExpressionOperator, "expression");
 
 void ExpressionOperator::writeSemanticParameters(std::ostringstream& stream) {
 	stream << "\"expression\":\"" << expression << "\","
-			<< "\"datatype\":\"" << datatype << "\","
+			<< "\"datatype\":\"" << (output_type == GDT_Unknown ? "input" : GDALGetDataTypeName(output_type)) << "\","
 			<< "\"min\":" << output_min << ","
 			<< "\"max\":" << output_max;
 }

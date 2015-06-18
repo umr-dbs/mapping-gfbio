@@ -8,7 +8,6 @@
 #include <sstream>
 #include <memory>
 #include "util/make_unique.h"
-#include "cache/cache.h"
 
 namespace Json {
 	class Value;

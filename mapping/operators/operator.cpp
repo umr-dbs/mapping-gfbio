@@ -5,6 +5,7 @@
 #include "util/debug.h"
 
 #include "operators/operator.h"
+#include "cache/manager.h"
 
 #include <algorithm>
 #include <memory>

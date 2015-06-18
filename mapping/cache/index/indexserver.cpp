@@ -5,9 +5,7 @@
  *      Author: mika
  */
 
-#include "cache/common.h"
 #include "cache/index/indexserver.h"
-#include "cache/cache.h"
 #include "util/make_unique.h"
 
 #include <deque>
@@ -44,14 +42,13 @@ Job::Job(NP &node, CP &frontend_connection, CP &worker_connection) :
 //
 ////////////////////////////////////////////////////////////
 
-JobDefinition::JobDefinition(CP &frontend_connection, std::unique_ptr<CacheRequest> &request ) :
-		frontend_connection(std::move(frontend_connection)), request(std::move(request)) {
+JobDefinition::JobDefinition(CP &frontend_connection, uint8_t worker_cmd, std::unique_ptr<BaseRequest> &request ) :
+		worker_cmd(worker_cmd), frontend_connection(std::move(frontend_connection)), request(std::move(request)) {
 }
 
 std::unique_ptr<Job> JobDefinition::create_job(NP &node, CP worker_connection) {
 	// Send request to worker
-	uint8_t cmd = Common::CMD_WORKER_GET_RASTER;
-	worker_connection->stream->write(cmd);
+	worker_connection->stream->write(worker_cmd);
 	request->toStream(*worker_connection->stream);
 	return std::make_unique<Job>(node, frontend_connection, worker_connection);
 }
@@ -99,7 +96,7 @@ void Node::check_idle_workers(fd_set* readfds) {
 	while (wit != workers.end()) {
 		auto &wc = *wit;
 		if (FD_ISSET(wc->fd, readfds)) {
-			Log::error("Idle workers should never send date. Dropping worker.");
+			Log::error("Idle workers should never send data. Dropping worker.");
 			wit = workers.erase(wit);
 		}
 		else
@@ -158,7 +155,7 @@ void IndexServer::run() {
 		}
 
 		// Add frontend-connections
-		for (auto &fc : frontend_connections) {
+		for (auto &fc : client_connections) {
 			FD_SET(fc->fd, &readfds);
 			maxfd = std::max(maxfd, fc->fd);
 		}
@@ -177,8 +174,8 @@ void IndexServer::run() {
 			check_node_connections(&readfds);
 			check_node_handshake(&readfds, node_socket);
 
-			check_frontend_handshake(&readfds, frontend_socket);
-			check_frontend_connections(&readfds);
+			check_client_handshake(&readfds, frontend_socket);
+			check_client_connections(&readfds);
 
 			handle_jobs(&readfds);
 		}
@@ -289,14 +286,10 @@ void IndexServer::handleNodeHello(CP &connection) {
 
 		uint32_t id = next_node_id++;
 
-		Log::info("Connection fd: %d", connection->fd);
-
 		NP node(new Node(id, host, port, connection));
 
-
-		Log::info("New node registered. ID: %d", id);
+		Log::info("New node registered. ID: %d, control-connected fd: %d", id, node->control_connection->fd);
 		uint8_t code = Common::RESP_INDEX_NODE_HELLO;
-		Log::info("Node-Connection fd: %d", node->control_connection->fd);
 		node->control_connection->stream->write(code);
 		node->control_connection->stream->write(id);
 
@@ -326,8 +319,8 @@ void IndexServer::handleWorkerRegistration(CP &connection) {
 	}
 }
 
-void IndexServer::check_frontend_handshake(fd_set* readfds, int frontend_socket) {
-	// Accept new node connection
+void IndexServer::check_client_handshake(fd_set* readfds, int frontend_socket) {
+	// Accept new client connection
 	if (FD_ISSET(frontend_socket, readfds)) {
 		struct sockaddr_storage remote_addr;
 		socklen_t sin_size = sizeof(remote_addr);
@@ -337,15 +330,15 @@ void IndexServer::check_frontend_handshake(fd_set* readfds, int frontend_socket)
 			Log::error("Accept failed: %d", strerror(errno));
 		}
 		else if (new_fd > 0) {
-			Log::debug("New front-connection established on fd: %d", new_fd);
-			frontend_connections.push_back(std::make_unique<SocketConnection>(new_fd));
+			Log::debug("New client-connection established on fd: %d", new_fd);
+			client_connections.push_back(std::make_unique<SocketConnection>(new_fd));
 		}
 	}
 }
 
-void IndexServer::check_frontend_connections(fd_set* readfds) {
-	auto it = frontend_connections.begin();
-	while (it != frontend_connections.end()) {
+void IndexServer::check_client_connections(fd_set* readfds) {
+	auto it = client_connections.begin();
+	while (it != client_connections.end()) {
 		// Remove connection from idle frontend connections?
 		bool remove_connection = true;
 		auto &fc = *it;
@@ -355,16 +348,10 @@ void IndexServer::check_frontend_connections(fd_set* readfds) {
 				if (fc->stream->read(&cmd, true)) {
 					switch (cmd) {
 						case Common::CMD_INDEX_GET_RASTER: {
-							std::unique_ptr<CacheRequest> req = std::make_unique<RasterRequest>(*fc->stream);
+							RasterBaseRequest req(*fc->stream);
 							try {
-								NP node = get_node_for_job(req);
-								std::unique_ptr<JobDefinition> jd = std::make_unique<JobDefinition>(fc,req);
-								// We can process the job directly
-								if (node->has_worker())
-									jobs.push_back(jd->create_job(node, node->get_worker()));
-								// Add this job to the node's queue
-								else
-									node->add_pending_job(jd);
+								Log::debug("Processing raster-request from client.");
+								process_raster_request( fc, req );
 							} catch (NoSuchElementException &nse) {
 								Log::error("No node registered for processing this request.");
 								send_error(*fc,"No worker-node available");
@@ -388,7 +375,7 @@ void IndexServer::check_frontend_connections(fd_set* readfds) {
 						ne.what());
 			}
 			if ( remove_connection )
-				it = frontend_connections.erase(it);
+				it = client_connections.erase(it);
 			else
 				++it;
 		}
@@ -422,39 +409,29 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 						// Read delivery id
 						uint64_t delivery_id;
 						wc->stream->read(&delivery_id);
-						Log::debug("Worker returned result. Delivery-ID: %d", delivery_id);
+						Log::debug("Worker returned result, delivery_id: %d", delivery_id);
 
 						// Send delivery-id and node address
 						uint8_t f_resp = Common::RESP_INDEX_GET;
 						DeliveryResponse dr(job->node->host,job->node->port,delivery_id);
 						fc->stream->write(f_resp);
 						dr.toStream(*fc->stream);
-						Log::debug("Worker finished processing request.");
+						Log::debug("Finished processing raster-request from client.");
 						break;
 					}
 					case Common::CMD_INDEX_QUERY_RASTER_CACHE: {
-						Log::debug("Worker requested a cache-query.");
-						CacheRequest req(*wc->stream);
-						try {
-							auto res = raster_cache.query( req.semantic_id, req.query );
-							auto &node = nodes.at( res->node_id );
-							uint8_t resp = Common::RESP_INDEX_HIT;
-							wc->stream->write(resp);
-							wc->stream->write(node->host);
-							wc->stream->write(node->port);
-							wc->stream->write(res->cache_id);
-						}catch (NoSuchElementException &nse) {
-							uint8_t resp = Common::RESP_INDEX_MISS;
-							wc->stream->write(resp);
-						}
+						Log::debug("Processing raster-request from worker.");
+						BaseRequest req(*wc->stream);
+						process_node_raster_request(wc,req);
+						Log::debug("Finished processing raster-request from worker.");
 						done = false;
 						break;
 					}
 					case Common::RESP_WORKER_NEW_RASTER_CACHE_ENTRY: {
 						STCacheKey key(*wc->stream);
-						RasterCacheCube cube(*wc->stream);
+						STRasterEntryBounds cube(*wc->stream);
 						Log::debug("Worker returned new result to raster-cache, key: %s:%d", key.semantic_id.c_str(), key.entry_id);
-						std::unique_ptr<RasterRef> e = std::make_unique<RasterRef>(job->node->id, key.entry_id, cube );
+						std::unique_ptr<STRasterRef> e = std::make_unique<STRasterRef>(job->node->id, key.entry_id, cube );
 						raster_cache.put(key.semantic_id, e );
 						done = false;
 						break;
@@ -462,7 +439,7 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 					case Common::RESP_WORKER_ERROR: {
 						std::string msg;
 						wc->stream->read(&msg);
-						Log::warn("Worker returned error %s", msg.c_str());
+						Log::warn("Worker returned error: %s", msg.c_str());
 						send_error(*fc,msg);
 						break;
 					}
@@ -483,7 +460,7 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 				// Release frontend connection
 				if (reuse_frontend) {
 					Log::debug("Releasing frontend-connection.");
-					frontend_connections.push_back(std::move(fc));
+					client_connections.push_back(std::move(fc));
 				}
 
 				// Schedule next if available
@@ -510,34 +487,119 @@ void IndexServer::handle_jobs(fd_set* readfds) {
 	}
 }
 
+void IndexServer::process_raster_request( CP &client_con, const RasterBaseRequest& req) {
+
+	Log::debug("Querying raster-cache for: %s::%s", req.semantic_id.c_str(), Common::qr_to_string(req.query).c_str());
+
+	STQueryResult res = raster_cache.query( req.semantic_id, req.query );
+
+	Log::debug("QueryResult: %s", res.to_string().c_str() );
+
+	uint8_t j_cmd;
+	std::unique_ptr<BaseRequest> w_req;
+	std::shared_ptr<Node> node;
+
+	// Full single hit
+	if ( res.ids.size() == 1 && !res.has_remainder() ) {
+		Log::debug("Creating raster-delivery job.");
+		auto ref = raster_cache.get( req.semantic_id, res.ids[0] );
+		j_cmd = Common::CMD_WORKER_DELIVER_RASTER;
+		node = nodes.at( ref->node_id );
+		w_req.reset( new RasterDeliveryRequest(req.semantic_id,req.query,ref->cache_id,req.query_mode) );
+	}
+	// Puzzle -- only if we cover more than 10%
+	else if ( res.has_hit() && res.coverage > 0.1 ) {
+		Log::debug("Creating raster-puzzle job.");
+		j_cmd = Common::CMD_WORKER_PUZZLE_RASTER;
+		std::vector<CacheRef> entries;
+		for ( auto id : res.ids ) {
+			auto ref = raster_cache.get( req.semantic_id, id );
+			auto e_node = nodes.at( ref->node_id );
+			// Assing first free worker-node
+			if ( node == nullptr && e_node->has_worker() )
+				node = e_node;
+			entries.push_back( CacheRef(e_node->host,e_node->port,ref->cache_id) );
+		}
+		// If no node was found...
+		if ( node == nullptr )
+			node = nodes.at(raster_cache.get( req.semantic_id, res.ids[0] )->node_id);
+
+		w_req.reset( new RasterPuzzleRequest( req.semantic_id, req.query, res.covered,
+				res.remainder, entries, req.query_mode ) );
+
+	}
+	// Full miss
+	else {
+		Log::debug("Creating raster-create job.");
+		j_cmd = Common::CMD_WORKER_CREATE_RASTER;
+		node = pick_worker();
+		w_req.reset( new RasterBaseRequest(req) );
+	}
+
+	Log::debug("Sending request to %s:%d: %s", node->host.c_str(), node->port, w_req->to_string().c_str() );
+
+	std::unique_ptr<JobDefinition> jd = std::make_unique<JobDefinition>(client_con,j_cmd,w_req);
+
+	if (node->has_worker())
+		jobs.push_back(jd->create_job(node, node->get_worker()));
+	// Add this job to the node's queue
+	else
+		node->add_pending_job(jd);
+}
+
+void IndexServer::process_node_raster_request( CP &worker_con, const BaseRequest& req) {
+
+	Log::debug("Querying raster-cache for: %s::%s", req.semantic_id.c_str(), Common::qr_to_string(req.query).c_str());
+
+	STQueryResult res = raster_cache.query( req.semantic_id, req.query );
+
+	Log::debug("QueryResult: %s", res.to_string().c_str() );
+
+	uint8_t resp;
+
+	// Full single hit
+	if ( res.ids.size() == 1 && !res.has_remainder() ) {
+		Log::debug("Full HIT. Sending reference.");
+		auto ref = raster_cache.get( req.semantic_id, res.ids[0] );
+		auto node = nodes.at( ref->node_id );
+		resp = Common::RESP_INDEX_HIT;
+		CacheRef cr(node->host,node->port,ref->cache_id);
+		worker_con->stream->write(resp);
+		cr.toStream(*worker_con->stream);
+	}
+	// Puzzle
+	else if ( res.has_hit() ) {
+		Log::debug("Partial HIT. Sending puzzle-request.");
+		std::vector<CacheRef> entries;
+		for ( auto id : res.ids ) {
+			auto ref = raster_cache.get( req.semantic_id, id );
+			auto node = nodes.at( ref->node_id );
+			entries.push_back( CacheRef(node->host,node->port,ref->cache_id) );
+		}
+		PuzzleRequest pr( req.semantic_id, req.query, res.covered, res.remainder, entries );
+		resp = Common::RESP_INDEX_PARTIAL;
+		worker_con->stream->write(resp);
+		pr.toStream(*worker_con->stream);
+	}
+	// Full miss
+	else {
+		Log::debug("Full MISS.");
+		resp = Common::RESP_INDEX_MISS;
+		worker_con->stream->write(resp);
+	}
+}
+
 void IndexServer::send_error(const SocketConnection& con, std::string msg) {
 	uint8_t code = Common::RESP_INDEX_ERROR;
 	con.stream->write(code);
 	con.stream->write(msg);
 }
 
-IndexServer::NP IndexServer::get_node_for_job(const std::unique_ptr<CacheRequest> &request) {
-	// TODO: BIG TODO
+IndexServer::NP IndexServer::pick_worker() {
 	if (nodes.empty())
 		throw NoSuchElementException("No nodes available");
 
-	// First check cache
-	try {
-		Log::debug("Looking up raster-request in cache.");
-		auto res = raster_cache.query( request->semantic_id, request->query );
-		Log::debug("Request cached at node: %d", res->node_id);
-		return nodes.at(res->node_id);
-	// If not found pick an idle worker
-	} catch ( NoSuchElementException &nse ) {
-		for ( auto &e : nodes ) {
-			if ( e.second->has_worker() ) {
-				Log::debug("Nothing cached for answering reqeust. Assigning job to idle node: %d", e.second->id);
-				return e.second;
-			}
-		}
-		Log::debug("No idle node present... picking first");
-		// No idle node... TODO
-		return nodes.begin()->second;
-	}
+	// TODO: Pick node
+	return nodes.begin()->second;
 }
 

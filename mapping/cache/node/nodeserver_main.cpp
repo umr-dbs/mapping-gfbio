@@ -6,7 +6,8 @@
  */
 
 #include "cache/node/nodeserver.h"
-#include "cache/cache.h"
+#include "cache/manager.h"
+#include "cache/node/puzzletracer.h"
 #include "util/configuration.h"
 #include <signal.h>
 
@@ -50,12 +51,13 @@ int main(void) {
 	auto numThreadsstr = Configuration::get("nodeserver.threads", "4");
 	auto num_threads = atoi(numThreadsstr.c_str());
 
+	//PuzzleTracer::init();
 
 	std::unique_ptr<CacheManager> cache_impl;
 	// Inititalize cache
 	if (Configuration::getBool("cache.enabled", false)) {
 		size_t raster_size = atoi(Configuration::get("cache.raster.size", "5242880").c_str());
-		cache_impl.reset(new RemoteCacheManager(raster_size));
+		cache_impl.reset(new RemoteCacheManager(raster_size,hoststr,portnr));
 
 	} else {
 		cache_impl.reset(new NopCacheManager());

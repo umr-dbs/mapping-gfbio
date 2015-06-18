@@ -6,6 +6,7 @@
  */
 
 #include "cache/common.h"
+#include "cache/priv/types.h"
 #include "util/log.h"
 #include "raster/exceptions.h"
 
@@ -21,21 +22,21 @@
 
 #include <unistd.h>
 
+geos::geom::GeometryFactory Common::gf;
+
 std::string Common::qr_to_string(const QueryRectangle &rect) {
 	std::ostringstream os;
-	os << "QueryRectangle[ epsg: " << (uint16_t) rect.epsg << ", timestamp: "
-			<< rect.timestamp << ", x: [" << rect.x1 << "," << rect.x2 << "]"
-			<< ", y: [" << rect.y1 << "," << rect.y2 << "]" << ", res: ["
-			<< rect.xres << "," << rect.yres << "] ]";
+	os << "QueryRectangle[ epsg: " << (uint16_t) rect.epsg << ", timestamp: " << rect.timestamp << ", x: ["
+		<< rect.x1 << "," << rect.x2 << "]" << ", y: [" << rect.y1 << "," << rect.y2 << "]" << ", res: ["
+		<< rect.xres << "," << rect.yres << "] ]";
 	return os.str();
 }
 
 std::string Common::stref_to_string(const SpatioTemporalReference &ref) {
 	std::ostringstream os;
-	os << "SpatioTemporalReference[ epsg: " << (uint16_t) ref.epsg
-			<< ", timetype: " << (uint16_t) ref.timetype << ", time: ["
-			<< ref.t1 << "," << ref.t2 << "]" << ", x: [" << ref.x1 << ","
-			<< ref.x2 << "]" << ", y: [" << ref.y1 << "," << ref.y2 << "] ]";
+	os << "SpatioTemporalReference[ epsg: " << (uint16_t) ref.epsg << ", timetype: "
+		<< (uint16_t) ref.timetype << ", time: [" << ref.t1 << "," << ref.t2 << "]" << ", x: [" << ref.x1
+		<< "," << ref.x2 << "]" << ", y: [" << ref.y1 << "," << ref.y2 << "] ]";
 	return os.str();
 }
 
@@ -59,13 +60,11 @@ int Common::get_listening_socket(int port, bool nonblock, int backlog) {
 	for (p = servinfo; p != nullptr; p = p->ai_next) {
 		int type = nonblock ? p->ai_socktype | nonblock : p->ai_socktype;
 
-		if ((sock = socket(p->ai_family, type,
-				p->ai_protocol)) == -1)
+		if ((sock = socket(p->ai_family, type, p->ai_protocol)) == -1)
 			continue;
 
 		int yes = 1;
-		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int))
-				== -1) {
+		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
 			freeaddrinfo(servinfo); // all done with this structure
 			throw NetworkException("setsockopt() failed");
 		}
@@ -88,37 +87,10 @@ int Common::get_listening_socket(int port, bool nonblock, int backlog) {
 	return sock;
 }
 
-std::unique_ptr<GenericRaster> Common::fetch_raster(const DeliveryResponse& dr) {
-	Log::debug("Fetching raster from: %s:%d", dr.host.c_str(), dr.port);
-	SocketConnection dc(dr.host.c_str(),dr.port);
-	uint8_t cmd = Common::CMD_DELIVERY_GET;
-	dc.stream->write(cmd);
-	dc.stream->write(dr.delivery_id);
-
-	uint8_t resp;
-	dc.stream->read(&resp);
-	switch (resp) {
-		case Common::RESP_DELIVERY_OK: {
-			return GenericRaster::fromStream(*dc.stream);
-		}
-		case Common::RESP_DELIVERY_ERROR: {
-			std::string err_msg;
-			dc.stream->read(&err_msg);
-			Log::error("Delivery returned error: %s", err_msg.c_str());
-			throw DeliveryException(err_msg);
-		}
-		default: {
-			Log::error("Delivery returned unknown code: %d", resp);
-			throw DeliveryException("Delivery returned unknown code");
-		}
-	}
-}
-
-
 std::unique_ptr<GenericRaster> Common::fetch_raster(const std::string & host, uint32_t port,
-		const STCacheKey &key ) {
-	Log::debug("Fetching cache-entry from: %s:%d", host.c_str(), port);
-	SocketConnection dc(host.c_str(),port);
+	const STCacheKey &key) {
+	Log::debug("Fetching cache-entry from: %s:%d, key: %s", host.c_str(), port, key.to_string().c_str());
+	SocketConnection dc(host.c_str(), port);
 	uint8_t cmd = Common::CMD_DELIVERY_GET_CACHED_RASTER;
 	dc.stream->write(cmd);
 	key.toStream(*dc.stream);
@@ -142,91 +114,100 @@ std::unique_ptr<GenericRaster> Common::fetch_raster(const std::string & host, ui
 	}
 }
 
+std::unique_ptr<GenericRaster> Common::process_raster_puzzle(const PuzzleRequest& req, std::string my_host,
+	uint32_t my_port) {
+	typedef std::unique_ptr<GenericRaster> RP;
+	typedef std::unique_ptr<geos::geom::Geometry> GP;
+
+	Log::trace("Processing puzzle-request: %s", req.to_string().c_str());
+
+	std::vector<RP> items;
+
+	GP covered(req.covered->clone());
+
+	// Fetch puzzle parts
+	Log::trace("Fetching all puzzle-parts");
+	for (const CacheRef &cr : req.parts) {
+		if (cr.host == my_host && cr.port == my_port) {
+			Log::trace("Fetching puzzle-piece from local cache, key: %s:%d", req.semantic_id.c_str(),
+				cr.entry_id);
+			items.push_back( CacheManager::getInstance().get_raster(req.semantic_id, cr.entry_id) );
+		}
+		else {
+			Log::debug("Fetching puzzle-piece from %s:%d, key: %s:%d", cr.host.c_str(), cr.port,
+				req.semantic_id.c_str(), cr.entry_id);
+			items.push_back( fetch_raster(cr.host, cr.port, STCacheKey(req.semantic_id, cr.entry_id)) );
+		}
+	}
+
+	// Create remainder
+	if (!req.remainder->isEmpty()) {
+		Log::trace("Creating remainder: %s", req.remainder->toString().c_str());
+		auto graph = GenericOperator::fromJSON(req.semantic_id);
+		QueryProfiler qp;
+		auto &f = items.at(0);
+
+		QueryRectangle rqr = req.get_remainder_query(f->pixel_scale_x,f->pixel_scale_y);
+		RP rem = graph->getCachedRaster(rqr, qp, GenericOperator::RasterQM::LOOSE);
+
+		if ( std::abs( 1.0 - f->pixel_scale_x / rem->pixel_scale_x) > 0.01 ||
+			 std::abs( 1.0 - f->pixel_scale_y / rem->pixel_scale_y) > 0.01 ) {
+			Log::error("Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s",
+				f->pixel_scale_x, f->pixel_scale_y, rem->pixel_scale_x, rem->pixel_scale_y,
+				((rqr.x2-rqr.x1) / rqr.xres), ((rqr.y2-rqr.y1) / rqr.yres), qr_to_string(rqr).c_str());
+
+			throw OperatorException("Incompatible resolution on remainder");
+		}
+
+		STRasterEntryBounds rcc(*rem);
+		GP cube_square = Common::create_square(rcc.x1, rcc.y1, rcc.x2, rcc.y2);
+		covered = GP(covered->Union(cube_square.get()));
+		items.push_back(std::move(rem));
+	}
+
+	RP result = CacheManager::do_puzzle(req.query, *covered, items );
+	Log::trace("Finished processing puzzle-request: %s", req.to_string().c_str());
+	return result;
+}
+
+std::unique_ptr<geos::geom::Polygon> Common::create_square(double lx, double ly, double ux, double uy) {
+	geos::geom::CoordinateSequence *coords = new geos::geom::CoordinateArraySequence();
+
+	coords->add(geos::geom::Coordinate(lx, ly));
+	coords->add(geos::geom::Coordinate(ux, ly));
+	coords->add(geos::geom::Coordinate(ux, uy));
+	coords->add(geos::geom::Coordinate(lx, uy));
+	coords->add(geos::geom::Coordinate(lx, ly));
+
+	geos::geom::LinearRing *shell = gf.createLinearRing(coords);
+	std::vector<geos::geom::Geometry*> *empty = new std::vector<geos::geom::Geometry*>;
+	return std::unique_ptr<geos::geom::Polygon>(gf.createPolygon(shell, empty));
+}
+
+std::unique_ptr<geos::geom::Geometry> Common::empty_geom() {
+	return std::unique_ptr<geos::geom::Geometry>(gf.createEmptyGeometry());
+}
+
+std::unique_ptr<geos::geom::Geometry> Common::union_geom(const std::unique_ptr<geos::geom::Geometry>& p1,
+	const std::unique_ptr<geos::geom::Polygon>& p2) {
+	return std::unique_ptr<geos::geom::Geometry>(p1->Union(p2.get()));
+}
 
 //
 // Connection class
 //
-SocketConnection::SocketConnection(int fd) : fd(fd) {
+SocketConnection::SocketConnection(int fd) :
+	fd(fd) {
 	stream.reset(new UnixSocket(fd, fd));
-};
+}
+;
 
-SocketConnection::SocketConnection(const char* host, int port) : fd(-1) {
-	UnixSocket *sck = new UnixSocket(host,port);
+SocketConnection::SocketConnection(const char* host, int port) :
+	fd(-1) {
+	UnixSocket *sck = new UnixSocket(host, port);
 	fd = sck->getReadFD();
-	stream.reset( sck );
+	stream.reset(sck);
 }
 
 SocketConnection::~SocketConnection() {
-}
-
-//
-// Request/response classes
-//
-
-CacheRequest::CacheRequest(const CacheRequest& r) : query(r.query), semantic_id(r.semantic_id) {
-}
-
-CacheRequest::CacheRequest(const QueryRectangle& query, const std::string& graph_json) :
-	query(query), semantic_id( GenericOperator::fromJSON(graph_json)->getSemanticId() ){
-}
-
-CacheRequest::CacheRequest(BinaryStream &stream) :
-	query(stream) {
-	std::string graph_json;
-	stream.read(&graph_json);
-	Log::debug("Read graph-json: %s", graph_json.c_str());
-	auto op = GenericOperator::fromJSON(graph_json);
-	semantic_id = op->getSemanticId();
-}
-
-CacheRequest::~CacheRequest() {
-}
-
-void CacheRequest::toStream(BinaryStream& stream) {
-	query.toStream(stream);
-	stream.write(semantic_id);
-}
-
-
-RasterRequest::RasterRequest(const RasterRequest& r) : CacheRequest(r), query_mode(r.query_mode){
-}
-
-RasterRequest::RasterRequest(const QueryRectangle& query, const std::string& graph_json,
-		GenericOperator::RasterQM query_mode) : CacheRequest(query,graph_json), query_mode(query_mode) {
-}
-
-RasterRequest::RasterRequest(BinaryStream& stream) : CacheRequest(stream) {
-	uint8_t qm;
-	stream.read(&qm);
-	query_mode = (qm == 1) ? GenericOperator::RasterQM::EXACT : GenericOperator::RasterQM::LOOSE;
-}
-
-void RasterRequest::toStream(BinaryStream& stream) {
-	uint8_t qm = (query_mode == GenericOperator::RasterQM::EXACT) ? 1 : 0;
-	CacheRequest::toStream(stream);
-	stream.write(qm);
-}
-
-RasterRequest::~RasterRequest() {
-}
-
-
-DeliveryResponse::DeliveryResponse(const DeliveryResponse& r) :
-	host(r.host), port(r.port), delivery_id(r.delivery_id) {
-}
-
-DeliveryResponse::DeliveryResponse(std::string host, uint32_t port, uint64_t delivery_id) :
-			host(host), port(port), delivery_id(delivery_id) {
-}
-
-DeliveryResponse::DeliveryResponse(BinaryStream& stream) {
-	stream.read(&host);
-	stream.read(&port);
-	stream.read(&delivery_id);
-}
-
-void DeliveryResponse::toStream(BinaryStream& stream) {
-	stream.write(host);
-	stream.write(port);
-	stream.write(delivery_id);
 }

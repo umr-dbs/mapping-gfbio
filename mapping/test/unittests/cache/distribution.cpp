@@ -19,7 +19,7 @@ class TestIdxServer : public IndexServer {
 public:
 	TestIdxServer( uint32_t frontend_port, uint32_t node_port ) : IndexServer(frontend_port,node_port) {}
 protected:
-	virtual NP get_node_for_job(const std::unique_ptr<CacheRequest> &request);
+	virtual NP pick_worker();
 private:
 	uint64_t last_node = 0;
 };
@@ -27,7 +27,7 @@ private:
 class TestNodeServer : public NodeServer {
 public:
 	TestNodeServer( std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port ) :
-		NodeServer(my_host,my_port,index_host,index_port,1), rcm( 5 * 1024 * 1024 ) {};
+		NodeServer(my_host,my_port,index_host,index_port,1), rcm( 5 * 1024 * 1024, my_host, my_port ) {};
 	bool owns_current_thread();
 	RemoteCacheManager rcm;
 };
@@ -64,8 +64,7 @@ private:
 };
 
 
-IndexServer::NP TestIdxServer::get_node_for_job(const std::unique_ptr<CacheRequest>& request) {
-	(void) request;
+IndexServer::NP TestIdxServer::pick_worker() {
 	int node = last_node++ % nodes.size();
 
 	auto it = nodes.begin();

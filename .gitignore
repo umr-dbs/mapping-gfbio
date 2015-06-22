@@ -13,6 +13,8 @@ mapping/r_server
 mapping/geometrytestbed
 mapping/gtest
 mapping/tileserver
+mapping/cache_index
+mapping/cache_node
 
 # generated documentation
 docs/waveDoc/*

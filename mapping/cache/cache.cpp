@@ -184,10 +184,12 @@ const STQueryResult STCacheStructure<EType>::query(const QueryRectangle& spec) c
 	}
 	// Calculate remainder
 	else {
-		geos::geom::Geometry *rem_poly = qbox->difference(p_union.get());
-		coverage = rem_poly->getArea() / qbox->getArea();
+		geos::geom::Geometry *isect = qbox->intersection( p_union.get() );
+		geos::geom::Geometry *rem_poly = qbox->difference(isect);
+		coverage = isect->getArea() / qbox->getArea();
 		remainder.reset(rem_poly->getEnvelope());
 		delete rem_poly;
+		delete isect;
 		Log::trace("Query can be partially answered from cache. Remainder rectangle: %s", remainder->toString().c_str());
 	}
 	return STQueryResult( p_union, remainder, coverage, ids);
@@ -607,7 +609,7 @@ void RasterRefCache::remove(const std::string& semantic_id, uint64_t id) {
 		}
 		STCache<STRasterRef>::remove(semantic_id,id);
 	} catch ( NoSuchElementException &nse ) {
-		// Nothing todo here
+		// Nothing to-do here
 	}
 }
 

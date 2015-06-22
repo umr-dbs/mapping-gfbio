@@ -24,9 +24,9 @@ public:
 	~RasterWriter();
 	void write_raster( GenericRaster &raster, std::string prefix = "" );
 	void write_meta( const QueryRectangle &query, const geos::geom::Geometry &covered );
+	const std::string dir;
 private:
 	int file_no;
-	std::string dir;
 	std::ofstream meta;
 };
 

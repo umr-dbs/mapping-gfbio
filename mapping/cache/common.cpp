@@ -131,12 +131,12 @@ std::unique_ptr<GenericRaster> Common::process_raster_puzzle(const PuzzleRequest
 		if (cr.host == my_host && cr.port == my_port) {
 			Log::trace("Fetching puzzle-piece from local cache, key: %s:%d", req.semantic_id.c_str(),
 				cr.entry_id);
-			items.push_back( CacheManager::getInstance().get_raster(req.semantic_id, cr.entry_id) );
+			items.push_back(CacheManager::getInstance().get_raster(req.semantic_id, cr.entry_id));
 		}
 		else {
 			Log::debug("Fetching puzzle-piece from %s:%d, key: %s:%d", cr.host.c_str(), cr.port,
 				req.semantic_id.c_str(), cr.entry_id);
-			items.push_back( fetch_raster(cr.host, cr.port, STCacheKey(req.semantic_id, cr.entry_id)) );
+			items.push_back(fetch_raster(cr.host, cr.port, STCacheKey(req.semantic_id, cr.entry_id)));
 		}
 	}
 
@@ -147,25 +147,33 @@ std::unique_ptr<GenericRaster> Common::process_raster_puzzle(const PuzzleRequest
 		QueryProfiler qp;
 		auto &f = items.at(0);
 
-		QueryRectangle rqr = req.get_remainder_query(f->pixel_scale_x,f->pixel_scale_y);
-		RP rem = graph->getCachedRaster(rqr, qp, GenericOperator::RasterQM::LOOSE);
+		QueryRectangle rqr = req.get_remainder_query(f->pixel_scale_x, f->pixel_scale_y);
 
-		if ( std::abs( 1.0 - f->pixel_scale_x / rem->pixel_scale_x) > 0.01 ||
-			 std::abs( 1.0 - f->pixel_scale_y / rem->pixel_scale_y) > 0.01 ) {
-			Log::error("Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s",
-				f->pixel_scale_x, f->pixel_scale_y, rem->pixel_scale_x, rem->pixel_scale_y,
-				((rqr.x2-rqr.x1) / rqr.xres), ((rqr.y2-rqr.y1) / rqr.yres), qr_to_string(rqr).c_str());
+		try {
+			RP rem = graph->getCachedRaster(rqr, qp, GenericOperator::RasterQM::LOOSE);
 
-			throw OperatorException("Incompatible resolution on remainder");
+			if (std::abs(1.0 - f->pixel_scale_x / rem->pixel_scale_x) > 0.01
+				|| std::abs(1.0 - f->pixel_scale_y / rem->pixel_scale_y) > 0.01) {
+				Log::error(
+					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s",
+					f->pixel_scale_x, f->pixel_scale_y, rem->pixel_scale_x, rem->pixel_scale_y,
+					((rqr.x2 - rqr.x1) / rqr.xres), ((rqr.y2 - rqr.y1) / rqr.yres),
+					qr_to_string(rqr).c_str());
+
+				throw OperatorException("Incompatible resolution on remainder");
+			}
+
+			STRasterEntryBounds rcc(*rem);
+			GP cube_square = Common::create_square(rcc.x1, rcc.y1, rcc.x2, rcc.y2);
+			covered = GP(covered->Union(cube_square.get()));
+			items.push_back(std::move(rem));
+		} catch (MetadataException &me) {
+			Log::error("Error fetching remainder: %s. Query: %s", me.what(), qr_to_string(rqr).c_str());
+			throw;
 		}
-
-		STRasterEntryBounds rcc(*rem);
-		GP cube_square = Common::create_square(rcc.x1, rcc.y1, rcc.x2, rcc.y2);
-		covered = GP(covered->Union(cube_square.get()));
-		items.push_back(std::move(rem));
 	}
 
-	RP result = CacheManager::do_puzzle(req.query, *covered, items );
+	RP result = CacheManager::do_puzzle(req.query, *covered, items);
 	Log::trace("Finished processing puzzle-request: %s", req.to_string().c_str());
 	return result;
 }

@@ -259,6 +259,12 @@ QueryRectangle PuzzleRequest::get_remainder_query(double xres, double yres) cons
 	}
 	delete cos;
 
+	// Enlarge by 2 pixels in each direction
+	x1 -= (2*xres);
+	x2 += (2*xres);
+	y1 -= (2*yres);
+	y2 += (2*yres);
+
 	uint32_t width  = std::floor( (x2-x1) / xres );
 	uint32_t height = std::floor( (y2-y1) / yres );
 	return QueryRectangle( query.timestamp, x1, y1, x2, y2, width, height, query.epsg );

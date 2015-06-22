@@ -51,7 +51,7 @@ int main(void) {
 	auto numThreadsstr = Configuration::get("nodeserver.threads", "4");
 	auto num_threads = atoi(numThreadsstr.c_str());
 
-	//PuzzleTracer::init();
+//	PuzzleTracer::init();
 
 	std::unique_ptr<CacheManager> cache_impl;
 	// Inititalize cache

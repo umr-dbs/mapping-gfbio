@@ -509,7 +509,7 @@ void IndexServer::process_raster_request( CP &client_con, const RasterBaseReques
 	}
 	// Puzzle -- only if we cover more than 10%
 	else if ( res.has_hit() && res.coverage > 0.1 ) {
-		Log::debug("Creating raster-puzzle job.");
+		Log::debug("Creating raster-puzzle job, coverage: %f", res.coverage);
 		j_cmd = Common::CMD_WORKER_PUZZLE_RASTER;
 		std::vector<CacheRef> entries;
 		for ( auto id : res.ids ) {
@@ -568,8 +568,8 @@ void IndexServer::process_node_raster_request( CP &worker_con, const BaseRequest
 		cr.toStream(*worker_con->stream);
 	}
 	// Puzzle
-	else if ( res.has_hit() ) {
-		Log::debug("Partial HIT. Sending puzzle-request.");
+	else if ( res.has_hit() && res.coverage > 0.1 ) {
+		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f", res.coverage);
 		std::vector<CacheRef> entries;
 		for ( auto id : res.ids ) {
 			auto ref = raster_cache.get( req.semantic_id, id );

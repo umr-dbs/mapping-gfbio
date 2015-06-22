@@ -5,19 +5,19 @@
  *      Author: mika
  */
 
-#include <puzzletracer.h>
+#include "cache/node/puzzletracer.h"
 #include "cache/common.h"
 #include <sstream>
 
 
-RasterWriter::RasterWriter(std::string dir) : file_no(1), dir(dir), meta(dir + "/meta.txt") {
+RasterWriter::RasterWriter(std::string dir) : dir(dir), file_no(1), meta(dir + "/meta.txt") {
 }
 
 RasterWriter::~RasterWriter() {
 	meta.close();
 }
 
-RasterWriter::RasterWriter(RasterWriter&& rw) : file_no(rw.file_no), dir(std::move(dir)), meta(dir + "/meta.txt", std::ios::app) {
+RasterWriter::RasterWriter(RasterWriter&& rw) : dir(std::move(dir)), file_no(rw.file_no), meta(dir + "/meta.txt", std::ios::app) {
 }
 
 void RasterWriter::write_meta(const QueryRectangle& query, const geos::geom::Geometry& covered) {

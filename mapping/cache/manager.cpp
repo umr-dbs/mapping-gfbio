@@ -91,12 +91,16 @@ std::unique_ptr<GenericRaster> CacheManager::do_puzzle(const QueryRectangle &que
 		auto x = result->WorldToPixelX( raster->stref.x1 );
 		auto y = result->WorldToPixelY( raster->stref.y1 );
 
-		// TODO: Fix this case
+		// TODO: Fix this case... Update: Should be fixed
 		if ( x >= width || y >= height ||
 			 x + raster->width <= 0 || y + raster->height <= 0 )
-			Log::debug("Puzzle piece out of result-raster");
+			Log::info("Puzzle piece out of result-raster, result: %s, piece: %s", Common::stref_to_string(result->stref).c_str(), Common::stref_to_string(raster->stref).c_str() );
 		else {
-			result->blit( raster.get(), x, y );
+			try {
+				result->blit( raster.get(), x, y );
+			} catch ( MetadataException &me ) {
+				Log::error("Blit error. Result: %s, piece: %s", Common::stref_to_string(result->stref).c_str(), Common::stref_to_string(raster->stref).c_str() );
+			}
 		}
 //		w.write_raster(*result, "dest_");
 	}

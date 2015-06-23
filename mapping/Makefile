@@ -8,9 +8,10 @@ CPATH := /usr/local/include/:$(CPATH)
 
 #CPP=g++
 CPP=clang++-3.5
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ #-DMAPPING_NO_OPENCL
+CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
-LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lOpenCL -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
+LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
+LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-luriparser
 LDFLAGS_GTEST=-lgtest -lgtest_main -lpthread
@@ -19,7 +20,9 @@ CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 OBJ_SERVICES=o/services_wfs_request.o
 OBJ_RASTER=o/raster_colors.o o/raster_opencl.o o/raster_profiler.o
 OBJ_RASTERDB=o/rasterdb_rasterdb.o o/rasterdb_backend.o o/rasterdb_backend_local.o o/rasterdb_backend_remote.o
-OBJ_DATATYPES=o/datatypes_attributes.o o/datatypes_spatiotemporal.o o/datatypes_raster_raster.o o/datatypes_raster_import_gdal.o o/datatypes_raster_export_pgm.o o/datatypes_raster_export_yuv.o o/datatypes_raster_export_png.o o/datatypes_raster_export_jpeg.o o/datatypes_simplefeaturecollection.o o/datatypes_pointcollection.o o/datatypes_linecollection.o o/datatypes_polygoncollection.o o/datatypes_simplefeaturecollections_geosgeomutil.o o/datatypes_simplefeaturecollections_wkbutil.o
+OBJ_DATATYPES_COMMON=o/datatypes_attributes.o o/datatypes_spatiotemporal.o o/datatypes_raster_import_gdal.o o/datatypes_raster_export_pgm.o o/datatypes_raster_export_yuv.o o/datatypes_raster_export_png.o o/datatypes_raster_export_jpeg.o o/datatypes_simplefeaturecollection.o o/datatypes_pointcollection.o o/datatypes_linecollection.o o/datatypes_polygoncollection.o o/datatypes_simplefeaturecollections_geosgeomutil.o o/datatypes_simplefeaturecollections_wkbutil.o
+OBJ_DATATYPES=${OBJ_DATATYPES_COMMON} o/datatypes_raster_raster.o
+OBJ_DATATYPES_NOCL=${OBJ_DATATYPES_COMMON} o/datatypes_raster_raster_nocl.o
 OBJ_PLOT=o/datatypes_plots_histogram.o o/datatypes_plots_text.o o/datatypes_plots_png.o
 OBJ_UTIL=o/util_gdal.o o/util_hash.o o/util_curl.o o/util_sqlite.o o/util_sunpos.o o/util_binarystream.o o/util_csvparser.o o/util_base64.o o/util_configuration.o o/util_debug.o o/util_timemodification.o o/util_log.o
 OBJ_POINTVISUALIZATION=o/pointvisualization_BoundingBox.o o/pointvisualization_Circle.o o/pointvisualization_Coordinate.o o/pointvisualization_Dimension.o o/pointvisualization_FindResult.o o/pointvisualization_QuadTreeNode.o o/pointvisualization_CircleClusteringQuadTree.o
@@ -32,16 +35,18 @@ OBJ_OPERATORS_MSAT=o/operators_msat_temperature.o o/operators_msat_reflectance.o
 OBJ_OPERATORS_PLOTS=o/operators_plots_histogram.o o/operators_plots_points2histogram.o o/operators_plots_points_metadata_tograph.o
 OBJ_OPERATORS_TEMPORAL=o/operators_temporal_timeshiftoperator.o
 OBJ_OPERATORS_GFBIO=o/operators_gfbio_pangaeasource.o
-OBJ_OPERATORS=o/operators_operator.o o/operators_queryrectangle.o o/operators_queryprofiler.o $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) ${OBJ_OPERATORS_TEMPORAL} $(OBJ_OPERATORS_GFBIO)
-OBJ_COMMON=o/cache_common.o o/cache_cache.o o/cache_manager.o o/cache_priv_transfer.o o/cache_priv_types.o ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
+OBJ_CACHE_COMMON=o/cache_common.o o/cache_cache.o o/cache_manager.o o/cache_priv_transfer.o o/cache_priv_types.o
+OBJ_OPERATORS_COMMON=o/operators_operator.o o/operators_queryrectangle.o o/operators_queryprofiler.o
+OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) ${OBJ_OPERATORS_TEMPORAL} $(OBJ_OPERATORS_GFBIO)
+OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
 OBJ_CACHE_NODE=o/cache_node_nodeserver_main.o o/cache_node_nodeserver.o ${OBJ_COMMON}
-OBJ_CACHE_INDEX=o/cache_index_indexserver_main.o o/cache_index_indexserver.o ${OBJ_COMMON}
+OBJ_CACHE_INDEX=o/cache_index_indexserver_main.o o/cache_index_indexserver.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster_colors.o o/raster_profiler.o
 OBJ_EXECGI=o/main_cgi.o o/cache_client.o ${OBJ_COMMON}
 OBJ_EXEGTEST=${OBJ_COMMON} o/cache_node_nodeserver.o o/cache_index_indexserver.o o/cache_client.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_util.o o/gtest_cache_stcache.o o/gtest_cache_distribution.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
-OBJ_RSERVER=o/rserver_rserver.o o/operators_queryrectangle.o o/operators_queryprofiler.o ${OBJ_DATATYPES} ${OBJ_RASTER} ${OBJ_UTIL}
+OBJ_RSERVER=o/rserver_rserver.o o/operators_queryrectangle.o o/operators_queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster_colors.o o/raster_profiler.o
 EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
@@ -89,6 +94,9 @@ o/converters_%.o: converters/%.cpp
 
 o/datatypes_%.o: datatypes/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
+
+o/datatypes_raster_%_nocl.o: datatypes/raster/%.cpp
+	${CPP} ${CPPFLAGS} -DMAPPING_NO_OPENCL=1 -c $+ -o $@
 	
 o/datatypes_raster_%.o: datatypes/raster/%.cpp
 	${CPP} ${CPPFLAGS} -c $+ -o $@
@@ -156,22 +164,22 @@ o/cache_node_%.o: cache/node/%.cpp $(CL_HEADERS)
 o/cache_priv_%.o: cache/priv/%.cpp $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -c $< -o $@
 	
-all: ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE}
+all: ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED}
 
 ${EXE}:	${OBJ_EXE}
-	${CPP} $+ ${LDFLAGS} -o $@
+	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} -o $@
 
 ${EXECGI}:	${OBJ_EXECGI}
-	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CGI} -o $@
+	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_CGI} -o $@
 
 ${EXERSERVER}:	${OBJ_RSERVER}
 	${CPP} ${LDFLAGS} ${LDFLAGS_R} $+ -o $@
 	
 ${EXEGTEST}:	${OBJ_EXEGTEST}
-	${CPP} $+ ${LDFLAGS} ${LDFLAGS_GTEST} -o $@
+	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST} -o $@
 
 ${EXEGEOMETRYTESTBED}:	${OBJ_EXEGEOMETRYTESTBED}
-	${CPP} $+ ${LDFLAGS} -o $@
+	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} -o $@
 
 ${EXETILESERVER}: o/rasterdb_tileserver.o o/rasterdb_backend.o o/rasterdb_backend_local.o o/datatypes_attributes.o o/util_binarystream.o o/util_sqlite.o o/util_configuration.o
 	${CPP} ${LDFLAGS} $+ -o $@
@@ -180,7 +188,7 @@ ${EXECACHEINDEX}:	${OBJ_CACHE_INDEX}
 	${CPP} ${LDFLAGS} $+ -o $@
 
 ${EXECACHENODE}:	${OBJ_CACHE_NODE}
-	${CPP} ${LDFLAGS} $+ -o $@
+	${CPP} ${LDFLAGS} ${LDFLAGS_CL} $+ -o $@
 
 btw2015_paper_demo_datasource:	${EXE}
 	/mnt/data/raster_import/btw2015_paper_demo.sh $$(readlink -f ./${EXE})

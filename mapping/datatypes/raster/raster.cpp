@@ -1,7 +1,9 @@
 
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/raster/typejuggling.h"
+#ifndef MAPPING_NO_OPENCL
 #include "raster/opencl.h"
+#endif
 #include "raster/profiler.h"
 #include "util/hash.h"
 #include "util/binarystream.h"
@@ -295,12 +297,14 @@ Raster<T, dimensions>::~Raster() {
 		//delete [] data;
 		data = nullptr;
 	}
+#ifndef MAPPING_NO_OPENCL
 	if (clbuffer) {
 		delete clbuffer;
 		clbuffer = nullptr;
 		delete clbuffer_info;
 		clbuffer_info = nullptr;
 	}
+#endif
 }
 
 

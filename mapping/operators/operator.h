@@ -96,7 +96,7 @@ class GenericOperator {
 		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		const std::string &getSemanticId() const { return semantic_id; }
-		const int getDepth() const { return depth; }
+		int getDepth() const { return depth; }
 
 	protected:
 		GenericOperator(int sourcecounts[], GenericOperator *sources[]);

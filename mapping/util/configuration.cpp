@@ -6,6 +6,11 @@
 #include <sstream>
 #include <string>
 #include <algorithm>
+#include <cstdlib>
+
+#include <unistd.h>
+#include <sys/types.h>
+#include <pwd.h>
 
 #include <unistd.h>
 #include <string.h>
@@ -92,12 +97,32 @@ void Configuration::loadFromEnvironment() {
 }
 
 
+static const char* getHomeDirectory() {
+	// Note that $HOME is not set for the cgi-bin executed by apache
+	auto homedir = getenv("HOME");
+	if (homedir)
+		return homedir;
+
+	auto pw = getpwuid(getuid());
+	return pw->pw_dir;
+
+	return nullptr;
+}
+
+
 void Configuration::loadFromDefaultPaths() {
 	load("/etc/mapping.conf");
+
+	auto homedir = getHomeDirectory();
+	if (homedir && strlen(homedir) > 0) {
+		std::string path = "";
+		path += homedir;
+		path += "/mapping.conf";
+		load(path.c_str());
+	}
+
 	load("./mapping.conf");
 	loadFromEnvironment();
-	//for (auto key : values)
-	//	std::cerr << key.first << " = " << key.second << "\n";
 }
 
 

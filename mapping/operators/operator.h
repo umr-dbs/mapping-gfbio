@@ -2,6 +2,8 @@
 #define OPERATORS_OPERATOR_H
 
 #include "datatypes/spatiotemporal.h"
+#include "operators/queryrectangle.h"
+#include "operators/queryprofiler.h"
 
 #include <ctime>
 #include <string>
@@ -18,56 +20,7 @@ class PointCollection;
 class LineCollection;
 class PolygonCollection;
 class GenericPlot;
-class BinaryStream;
 
-class QueryRectangle {
-	public:
-		QueryRectangle();
-		QueryRectangle(time_t timestamp, double x1, double y1, double x2, double y2, uint32_t xres, uint32_t yres, epsg_t epsg) : timestamp(timestamp), x1(std::min(x1,x2)), y1(std::min(y1,y2)), x2(std::max(x1,x2)), y2(std::max(y1,y2)), xres(xres), yres(yres), epsg(epsg) {};
-		QueryRectangle(const GridSpatioTemporalResult &grid);
-		QueryRectangle(BinaryStream &stream);
-
-		void toStream(BinaryStream &stream) const;
-
-		double minx() const;
-		double maxx() const;
-		double miny() const;
-		double maxy() const;
-
-		void enlarge(int pixels);
-
-		time_t timestamp;
-		double x1, y1, x2, y2;
-		uint32_t xres, yres;
-		epsg_t epsg;
-};
-
-class QueryProfiler {
-	public:
-		QueryProfiler();
-		QueryProfiler(const QueryProfiler& that) = delete;
-
-		static double getTimestamp();
-
-		double self_cpu;
-		double all_cpu;
-		double self_gpu;
-		double all_gpu;
-		size_t self_io;
-		size_t all_io;
-		// TODO: track GPU cost? Separately track things like Postgres queries?
-		// TODO: track cached costs separately?
-
-		void startTimer();
-		void stopTimer();
-		void addGPUCost(double seconds);
-		void addIOCost(size_t bytes);
-
-		QueryProfiler & operator+=(QueryProfiler &other);
-
-	private:
-		double t_start;
-};
 
 class GenericOperator {
 	friend class RasterProducer;

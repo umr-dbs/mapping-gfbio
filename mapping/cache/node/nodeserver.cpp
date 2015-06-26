@@ -8,6 +8,7 @@
 // project-stuff
 #include "cache/node/nodeserver.h"
 #include "cache/index/indexserver.h"
+#include "cache/index/connection.h"
 #include "cache/priv/transfer.h"
 #include "cache/cache.h"
 #include "raster/exceptions.h"
@@ -190,8 +191,8 @@ void NodeServer::worker_loop() {
 		try {
 			Log::debug("Worker connecting to index-server");
 			SocketConnection sc(index_host.c_str(), index_port);
-			uint8_t cmd = Common::CMD_INDEX_REGISTER_WORKER;
-			sc.stream->write(cmd);
+			uint32_t magic = WorkerConnection::MAGIC_NUMBER;
+			sc.stream->write(magic);
 			sc.stream->write(my_id);
 
 			CacheManager::remote_connection = &sc;
@@ -352,8 +353,8 @@ void NodeServer::setup_control_connection() {
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
-	uint8_t cmd = Common::CMD_INDEX_NODE_HELLO;
-	this->control_connection->stream->write(cmd);
+	uint32_t magic = ControlConnection::MAGIC_NUMBER;
+	this->control_connection->stream->write(magic);
 	this->control_connection->stream->write(my_host);
 	this->control_connection->stream->write(my_port);
 

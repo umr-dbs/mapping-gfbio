@@ -38,13 +38,11 @@ void set_signal_handler() {
 int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
-	auto w_portstr = Configuration::get("indexserver.port.node");
-	auto f_portstr = Configuration::get("indexserver.port.frontend");
+	auto portstr = Configuration::get("indexserver.port");
 
-	auto w_portnr = atoi(w_portstr.c_str());
-	auto f_portnr = atoi(f_portstr.c_str());
+	auto portnr = atoi(portstr.c_str());
 
-	instance = new IndexServer(f_portnr, w_portnr);
+	instance = new IndexServer(portnr);
 	instance->run();
 	return 0;
 }

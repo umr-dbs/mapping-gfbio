@@ -79,8 +79,7 @@ std::string CacheRef::to_string() const {
 
 
 BaseRequest::BaseRequest(const std::string& sem_id, const QueryRectangle& rect) :
-	// Make sure we have a unique representation of the operator-graph
-	semantic_id(GenericOperator::fromJSON(sem_id)->getSemanticId()),
+	semantic_id(sem_id),
 	query(rect) {
 }
 

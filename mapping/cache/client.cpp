@@ -7,6 +7,7 @@
 
 #include "cache/client.h"
 #include "cache/common.h"
+#include "cache/index/connection.h"
 #include "util/log.h"
 
 CacheClient::CacheClient(std::string index_host, uint32_t index_port) :
@@ -20,6 +21,10 @@ std::unique_ptr<GenericRaster> CacheClient::get_raster(const std::string& graph_
 		const QueryRectangle& query, const GenericOperator::RasterQM query_mode) {
 
 	SocketConnection idx_con(index_host.c_str(), index_port);
+	uint32_t magic = ClientConnection::MAGIC_NUMBER;
+	idx_con.stream->write(magic);
+
+
 
 	uint8_t idx_cmd = Common::CMD_INDEX_GET_RASTER;
 	RasterBaseRequest rr(graph_json,query,query_mode);

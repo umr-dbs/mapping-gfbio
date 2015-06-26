@@ -367,9 +367,10 @@ std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJso
 	// Request cache-server
 	else {
 		std::string host = Configuration::get("indexserver.host");
-		int port = atoi( Configuration::get("indexserver.port.frontend").c_str() );
+		int port = atoi( Configuration::get("indexserver.port").c_str() );
 		CacheClient client(host,port);
-		return client.get_raster(graphJson,rect, GenericOperator::RasterQM::EXACT);
+		// Normalize json
+		return client.get_raster(GenericOperator::fromJSON(graphJson)->getSemanticId(), rect, GenericOperator::RasterQM::EXACT);
 	}
 }
 

@@ -17,9 +17,9 @@ typedef std::unique_ptr<std::thread> TP;
 
 class TestIdxServer : public IndexServer {
 public:
-	TestIdxServer( uint32_t frontend_port, uint32_t node_port ) : IndexServer(frontend_port,node_port) {}
+	TestIdxServer( uint32_t port ) : IndexServer(port) {}
 protected:
-	virtual NP pick_worker();
+	virtual uint64_t pick_worker();
 private:
 	uint64_t last_node = 0;
 };
@@ -64,18 +64,8 @@ private:
 };
 
 
-IndexServer::NP TestIdxServer::pick_worker() {
-	int node = last_node++ % nodes.size();
-
-	auto it = nodes.begin();
-	while ( node > 0 ) {
-		++it;
-		node--;
-	}
-
-	Log::debug("Picking node: %d", it->second->id);
-
-	return it->second;
+uint64_t TestIdxServer::pick_worker() {
+	return IndexServer::pick_worker();
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -90,9 +80,9 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 
 
 	std::unique_ptr<TestCacheMan> cm = std::make_unique<TestCacheMan>();
-	TestIdxServer is(12346,12347);
-	TestNodeServer    ns1( "localhost", 12348, "localhost", 12347 );
-	TestNodeServer    ns2( "localhost", 12349, "localhost", 12347 );
+	TestIdxServer is(12346);
+	TestNodeServer    ns1( "localhost", 12347, "localhost", 12346 );
+	TestNodeServer    ns2( "localhost", 12348, "localhost", 12346 );
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
@@ -102,7 +92,7 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 
 
 	std::vector<TP> ts;
-	ts.push_back(is.run_async());
+	ts.push_back( std::make_unique<std::thread>(&IndexServer::run, &is) );
 	std::this_thread::sleep_for( std::chrono::milliseconds(500));
 	ts.push_back(ns1.run_async());
 	std::this_thread::sleep_for( std::chrono::milliseconds(500));

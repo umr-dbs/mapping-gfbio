@@ -8,7 +8,7 @@
 // project-stuff
 #include "cache/node/nodeserver.h"
 #include "cache/index/indexserver.h"
-#include "cache/index/connection.h"
+#include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
 #include "cache/cache.h"
 #include "raster/exceptions.h"
@@ -25,9 +25,8 @@
 ////////////////////////////////////////////////////////////
 
 DeliveryManager::DeliveryManager(uint32_t listen_port) :
-		shutdown(false), listen_port(listen_port), delivery_id(1) {
+	shutdown(false), listen_port(listen_port), delivery_id(1) {
 }
-
 
 uint64_t DeliveryManager::add_delivery(std::unique_ptr<GenericRaster>& result) {
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
@@ -46,57 +45,11 @@ std::unique_ptr<GenericRaster> DeliveryManager::get_delivery(uint64_t id) {
 	return res;
 }
 
-void DeliveryManager::process_delivery(uint8_t cmd, SocketConnection& con) {
-	switch (cmd) {
-		case Common::CMD_DELIVERY_GET: {
-			uint64_t id;
-			con.stream->read(&id);
-			try {
-				auto res = get_delivery(id);
-				Log::debug("Sending delivery: %d", id);
-				uint8_t resp = Common::RESP_DELIVERY_OK;
-				con.stream->write(resp);
-				res->toStream(*con.stream);
-				Log::debug("Finished sending delivery: %d", id);
-			} catch (std::out_of_range &oor) {
-				Log::info("Received request for unknown delivery-id: %d", id);
-				uint8_t resp = Common::RESP_DELIVERY_ERROR;
-				std::ostringstream msg;
-				msg << "Invalid delivery id: " << id;
-				con.stream->write(resp);
-				con.stream->write(msg.str());
-			}
-			break;
-		}
-		case Common::CMD_DELIVERY_GET_CACHED_RASTER: {
-			STCacheKey key(*con.stream);
-			try {
-				Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-				auto res = CacheManager::getInstance().get_raster(key);
-				uint8_t resp = Common::RESP_DELIVERY_OK;
-				con.stream->write(resp);
-				res->toStream(*con.stream);
-				Log::debug("Finished sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-			} catch (NoSuchElementException &nse) {
-				uint8_t resp = Common::RESP_DELIVERY_ERROR;
-				std::ostringstream msg;
-				msg << "No cache-entry found for key: " << key.semantic_id << ":" << key.entry_id;
-				con.stream->write(resp);
-				con.stream->write(msg.str());
-			}
-			break;
-		}
-		default:
-			// Unknown command
-			std::ostringstream ss;
-			ss << "Unknown command on delivery connection: " << cmd << ". Dropping connection.";
-			throw NetworkException(ss.str());
-	}
-}
-
 void DeliveryManager::run() {
 	Log::info("Starting Delivery-Manager");
-	int delivery_fd = Common::get_listening_socket(listen_port);
+	int delivery_fd = CacheCommon::get_listening_socket(listen_port);
+
+	std::vector<int> new_fds;
 
 	// Read on delivery-socket
 	while (!shutdown) {
@@ -107,14 +60,91 @@ void DeliveryManager::run() {
 
 		int maxfd = delivery_fd;
 
-		for (auto &dc : connections) {
-			FD_SET(dc->fd, &readfds);
-			maxfd = std::max(maxfd, dc->fd);
+		for (auto &fd : new_fds) {
+			FD_SET(fd, &readfds);
+			maxfd = std::max(maxfd, fd);
+		}
+
+		// Current connections
+		auto dciter = connections.begin();
+		while (dciter != connections.end()) {
+			DeliveryConnection &dc = **dciter;
+			if ( dc.is_faulty() )
+				dciter = connections.erase(dciter);
+			else {
+				FD_SET(dc.get_read_fd(), &readfds);
+				maxfd = std::max(maxfd, dc.get_read_fd());
+				++dciter;
+			}
 		}
 
 		int ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
 		if (ret <= 0)
 			continue;
+
+		// Current connections
+		// Action on delivery connections
+		for ( auto &dc : connections ) {
+			if ( FD_ISSET(dc->get_read_fd(), &readfds)) {
+				dc->input();
+				// Skip faulty connections
+				if ( dc->is_faulty() )
+					continue;
+				switch ( dc->get_state() ) {
+					case DeliveryConnection::State::DELIVERY_REQUEST_READ: {
+						uint64_t id = dc->get_delivery_id();
+						try {
+							auto res = get_delivery(id);
+							Log::debug("Sending delivery: %d", id);
+							dc->send_raster(*res);
+							Log::debug("Finished sending delivery: %d", id);
+						} catch (std::out_of_range &oor) {
+							Log::info("Received request for unknown delivery-id: %d", id);
+							dc->send_error(concat("Invalid delivery id: ",id));
+						}
+						break;
+					}
+					case DeliveryConnection::State::RASTER_CACHE_REQUEST_READ: {
+						auto &key = dc->get_key();
+						try {
+							Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+							auto res = CacheManager::getInstance().get_raster(key);
+							dc->send_raster(*res);
+							Log::debug("Finished sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+						} catch (NoSuchElementException &nse) {
+							dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
+						}
+						break;
+					}
+					default: {
+						Log::trace("Nothing todo on delivery connection: %d", dc->id);
+					}
+				}
+			}
+		}
+
+		// Handshake
+		auto fd_it = new_fds.begin();
+		while (fd_it != new_fds.end()) {
+			if (FD_ISSET(*fd_it, &readfds)) {
+				std::unique_ptr<UnixSocket> socket = std::make_unique<UnixSocket>(*fd_it, *fd_it);
+				BinaryStream &stream = *socket;
+				uint32_t magic;
+				stream.read(&magic);
+				if (magic == DeliveryConnection::MAGIC_NUMBER) {
+					std::unique_ptr<DeliveryConnection> dc = std::make_unique<DeliveryConnection>(socket);
+					Log::info("New delivery-connection created on fd: %d", *fd_it);
+					connections.push_back(std::move(dc));
+				}
+				else {
+					Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
+				}
+				fd_it = new_fds.erase(fd_it);
+			}
+			else {
+				++fd_it;
+			}
+		}
 
 		// New delivery connection
 		if (FD_ISSET(delivery_fd, &readfds)) {
@@ -125,39 +155,11 @@ void DeliveryManager::run() {
 				Log::error("Accept failed: %d", strerror(errno));
 			}
 			else if (new_fd > 0) {
-				Log::debug("New delivery-connection established on fd: %d", new_fd);
-				connections.push_back(std::make_unique<SocketConnection>(new_fd));
+				Log::debug("New delivery-connection accepted on fd: %d", new_fd);
+				new_fds.push_back(new_fd);
 			}
-		}
-
-		// Action on delivery connections
-		auto dciter = connections.begin();
-		uint8_t cmd;
-		while (dciter != connections.end()) {
-			auto &dc = *dciter;
-			if (FD_ISSET(dc->fd, &readfds)) {
-				try {
-					if (dc->stream->read(&cmd, true)) {
-						process_delivery(cmd, *dc);
-						++dciter;
-					}
-					else {
-						Log::debug("Delivery-connection closed on fd: %d", dc->fd);
-						dciter = connections.erase(dciter);
-					}
-
-				} catch (NetworkException &ne) {
-					Log::error("Error on delivery-connection with fd: %d. Dropping. Reason: %s", dc->fd,
-							ne.what());
-					dciter = connections.erase(dciter);
-				}
-			}
-			else
-				++dciter;
-
 		}
 	}
-
 	Log::info("Delivery-Manager done.");
 }
 
@@ -181,27 +183,28 @@ DeliveryManager::~DeliveryManager() {
 ////////////////////////////////////////////////////////////
 
 NodeServer::NodeServer(std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port,
-		int num_threads) :
-		shutdown(false), workers_up(false), my_id(-1), my_host(my_host), my_port(my_port), index_host(
-				index_host), index_port(index_port), num_treads(num_threads), delivery_manager(my_port) {
+	int num_threads) :
+	shutdown(false), workers_up(false), my_id(-1), my_host(my_host), my_port(my_port), index_host(index_host), index_port(
+		index_port), num_treads(num_threads), delivery_manager(my_port) {
 }
 
 void NodeServer::worker_loop() {
 	while (workers_up && !shutdown) {
 		try {
-			Log::debug("Worker connecting to index-server");
-			SocketConnection sc(index_host.c_str(), index_port);
+			UnixSocket sock(index_host.c_str(), index_port);
+			Log::debug("Worker connected to index-server");
+			BinaryStream &stream = sock;
 			uint32_t magic = WorkerConnection::MAGIC_NUMBER;
-			sc.stream->write(magic);
-			sc.stream->write(my_id);
+			stream.write(magic);
+			stream.write(my_id);
 
-			CacheManager::remote_connection = &sc;
+			CacheManager::remote_connection = &sock;
 
 			while (workers_up && !shutdown) {
 				try {
 					uint8_t cmd;
-					if (Common::read(&cmd, sc, 2, true)) {
-						process_worker_command(cmd, sc);
+					if (CacheCommon::read(&cmd, sock, 2, true)) {
+						process_worker_command(cmd, stream);
 					}
 					else {
 						Log::info("Disconnect on worker.");
@@ -211,74 +214,71 @@ void NodeServer::worker_loop() {
 					//Log::trace("Read on worker-connection timed out. Trying again");
 				} catch (InterruptedException &ie) {
 					Log::info("Read on worker-connection interrupted. Trying again.");
-				} catch (NetworkException &ne ) {
+				} catch (NetworkException &ne) {
 					// Re-throw network-error to outer catch.
 					throw;
-				} catch ( std::exception &e ) {
+				} catch (std::exception &e) {
 					std::ostringstream os;
 					os << "Unexpected error while processing request: " << e.what();
-					uint8_t resp = Common::RESP_WORKER_ERROR;
 					std::string msg = os.str();
-					sc.stream->write(resp);
-					sc.stream->write(msg);
+					stream.write(WorkerConnection::RESP_ERROR);
+					stream.write(msg);
 				}
 			}
 		} catch (NetworkException &ne) {
 			Log::info("Worker lost connection to index... Reconnecting. Reason: %s", ne.what());
 		}
+		std::this_thread::sleep_for( std::chrono::seconds(2) );
 	}
 	Log::info("Worker done.");
 }
 
-void NodeServer::process_worker_command(uint8_t cmd, SocketConnection& con) {
+void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
 	Log::debug("Received command: %d", cmd);
 	switch (cmd) {
-		case Common::CMD_WORKER_CREATE_RASTER: {
-			RasterBaseRequest rr(*con.stream);
+		case WorkerConnection::CMD_CREATE_RASTER: {
+			RasterBaseRequest rr(stream);
 			QueryProfiler profiler;
 			Log::debug("Processing request: %s", rr.to_string().c_str());
 			std::unique_ptr<GenericRaster> res = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(
-					rr.query, profiler, rr.query_mode);
+				rr.query, profiler, rr.query_mode);
 			Log::debug("Handing raster over to delivery-manager");
 			uint64_t delivery_id = delivery_manager.add_delivery(res);
 			Log::debug("Sending response");
-			uint8_t resp = Common::RESP_WORKER_RESULT_READY;
-			con.stream->write(resp);
-			con.stream->write(delivery_id);
+			stream.write(WorkerConnection::RESP_RESULT_READY);
+			stream.write(delivery_id);
 			break;
 		}
-		case Common::CMD_WORKER_DELIVER_RASTER: {
-			RasterDeliveryRequest rr(*con.stream);
+		case WorkerConnection::CMD_DELIVER_RASTER: {
+			RasterDeliveryRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			auto result = CacheManager::getInstance().get_raster(rr.semantic_id,rr.entry_id);
-			if ( rr.query_mode == GenericOperator::RasterQM::EXACT ) {
+			auto result = CacheManager::getInstance().get_raster(rr.semantic_id, rr.entry_id);
+			if (rr.query_mode == GenericOperator::RasterQM::EXACT) {
 				result = result->fitToQueryRectangle(rr.query);
 			}
 			Log::debug("Handing raster over to delivery-manager");
 			uint64_t delivery_id = delivery_manager.add_delivery(result);
 			Log::debug("Sending response");
-			uint8_t resp = Common::RESP_WORKER_RESULT_READY;
-			con.stream->write(resp);
-			con.stream->write(delivery_id);
+			stream.write(WorkerConnection::RESP_RESULT_READY);
+			stream.write(delivery_id);
 			break;
 		}
-		case Common::CMD_WORKER_PUZZLE_RASTER: {
-			RasterPuzzleRequest rr(*con.stream);
+		case WorkerConnection::CMD_PUZZLE_RASTER: {
+			RasterPuzzleRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			std::unique_ptr<GenericRaster> res = Common::process_raster_puzzle(rr,my_host,my_port);
+			std::unique_ptr<GenericRaster> res = CacheCommon::process_raster_puzzle(rr, my_host, my_port);
 			Log::debug("Adding puzzled raster to cache.");
 			CacheManager::getInstance().put_raster(rr.semantic_id, res);
 
-			if ( rr.query_mode == RasterPuzzleRequest::QM::EXACT ) {
+			if (rr.query_mode == RasterPuzzleRequest::QM::EXACT) {
 				Log::debug("Fitting result to query.");
 				res = res->fitToQueryRectangle(rr.query);
 			}
 			Log::debug("Handing raster over to delivery-manager");
 			uint64_t delivery_id = delivery_manager.add_delivery(res);
 			Log::debug("Sending response");
-			uint8_t resp = Common::RESP_WORKER_RESULT_READY;
-			con.stream->write(resp);
-			con.stream->write(delivery_id);
+			stream.write(WorkerConnection::RESP_RESULT_READY);
+			stream.write(delivery_id);
 			break;
 		}
 		default: {
@@ -306,7 +306,7 @@ void NodeServer::run() {
 			while (!shutdown) {
 				try {
 					uint8_t cmd;
-					if (Common::read(&cmd, *control_connection, 2, true)) {
+					if (CacheCommon::read(&cmd, *control_connection, 2, true)) {
 						process_control_command(cmd);
 					}
 					else {
@@ -349,21 +349,22 @@ void NodeServer::setup_control_connection() {
 	Log::info("Connecting to index-server: %s:%d", index_host.c_str(), index_port);
 
 	// Establish connection
-	this->control_connection.reset(new SocketConnection(index_host.c_str(), index_port));
+	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
+	BinaryStream &stream = *this->control_connection;
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
 	uint32_t magic = ControlConnection::MAGIC_NUMBER;
-	this->control_connection->stream->write(magic);
-	this->control_connection->stream->write(my_host);
-	this->control_connection->stream->write(my_port);
+	stream.write(magic);
+	stream.write(my_host);
+	stream.write(my_port);
 
 	Log::debug("Waiting for response from index-server");
 	// Read node-id
 	uint8_t resp;
-	this->control_connection->stream->read(&resp);
-	if (resp == Common::RESP_INDEX_NODE_HELLO) {
-		this->control_connection->stream->read(&my_id);
+	stream.read(&resp);
+	if (resp == ControlConnection::RESP_HELLO) {
+		stream.read(&my_id);
 		Log::info("Successfuly connected to index-server. My Id is: %d", my_id);
 	}
 	else {

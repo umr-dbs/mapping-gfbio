@@ -8,7 +8,8 @@
 #ifndef SERVER_H_
 #define SERVER_H_
 
-#include "cache/common.h"
+#include <cache/common.h>
+#include "cache/priv/connection.h"
 #include "operators/operator.h"
 #include "util/log.h"
 
@@ -28,6 +29,7 @@
 // TODO: Add timeout to deliveries -- easy peasy
 class DeliveryManager {
 	friend class std::thread;
+	friend class DeliveryConnection;
 public:
 	DeliveryManager(uint32_t listen_port);
 	~DeliveryManager();
@@ -53,9 +55,6 @@ private:
 	// for the given id
 	std::unique_ptr<GenericRaster> get_delivery(uint64_t id);
 
-	// Process a command received on a delivery-connection
-	void process_delivery(uint8_t cmd, SocketConnection &con);
-
 	// Indicator telling if the manager should shutdown
 	bool shutdown;
 	// The port the manager listens at
@@ -67,7 +66,7 @@ private:
 	// the currently stored deliveries
 	std::map<uint64_t, std::unique_ptr<GenericRaster>> deliveries;
 	// the currently open connections
-	std::vector<std::unique_ptr<SocketConnection>> connections;
+	std::vector<std::unique_ptr<DeliveryConnection>> connections;
 };
 
 //
@@ -113,7 +112,7 @@ private:
 	void setup_control_connection();
 
 	// Separation of command-processing for the workers
-	void process_worker_command(uint8_t cmd, SocketConnection &con);
+	void process_worker_command(uint8_t cmd, BinaryStream &stream);
 	// Process a command received on the control-connection
 	void process_control_command(uint8_t cmd);
 
@@ -135,7 +134,7 @@ private:
 	// The number of worker-threads to use
 	int num_treads;
 	// The control-connection
-	std::unique_ptr<SocketConnection> control_connection;
+	std::unique_ptr<UnixSocket> control_connection;
 	// The delivery-manager
 	DeliveryManager delivery_manager;
 };

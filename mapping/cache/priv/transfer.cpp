@@ -5,9 +5,8 @@
  *      Author: mika
  */
 
+#include <cache/common.h>
 #include "cache/priv/transfer.h"
-#include "cache/common.h"
-
 #include <geos/io/WKBWriter.h>
 #include <geos/io/WKBReader.h>
 
@@ -100,7 +99,7 @@ std::string BaseRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "BaseRequest:" << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
-	ss << "  query: " << Common::qr_to_string(query);
+	ss << "  query: " << CacheCommon::qr_to_string(query);
 	return ss.str();
 }
 
@@ -130,7 +129,7 @@ std::string DeliveryRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "DeliveryRequest:" << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
-	ss << "  query: " << Common::qr_to_string(query) << std::endl;
+	ss << "  query: " << CacheCommon::qr_to_string(query) << std::endl;
 	ss << "  entry_id: " << entry_id;
 	return ss.str();
 }
@@ -230,7 +229,7 @@ std::string PuzzleRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "PuzzleRequest:" << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
-	ss << "  query: " << Common::qr_to_string(query) << std::endl;
+	ss << "  query: " << CacheCommon::qr_to_string(query) << std::endl;
 	ss << "  covered: " << covered->toString() << std::endl;
 	ss << "  remainder: " << remainder->toString() << std::endl;
 	ss << "  parts: [";

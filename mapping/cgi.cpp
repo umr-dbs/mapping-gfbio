@@ -9,6 +9,7 @@
 #include "services/wfs_request.h"
 #include "util/binarystream.h"
 #include "cache/client.h"
+#include "cache/manager.h"
 
 #include <cstdio>
 #include <cstdlib>

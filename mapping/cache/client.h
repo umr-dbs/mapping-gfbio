@@ -10,7 +10,6 @@
 
 #include "cache/priv/transfer.h"
 #include "datatypes/raster.h"
-#include "cache/common.h"
 
 #include <memory>
 
@@ -22,7 +21,7 @@ public:
 												const QueryRectangle &query,
 												const GenericOperator::RasterQM query_mode = GenericOperator::RasterQM::EXACT );
 private:
-	DeliveryResponse read_index_response( SocketConnection &idx_con );
+	DeliveryResponse read_index_response( BinaryStream &idx_con );
 	std::unique_ptr<GenericRaster> fetch_raster( const DeliveryResponse &resp );
 	std::string index_host;
 	uint32_t index_port;

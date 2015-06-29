@@ -1,7 +1,7 @@
+#include <cache/common.h>
 #include <gtest/gtest.h>
 #include "test/unittests/cache/util.h"
 #include "cache/cache.h"
-#include "cache/common.h"
 #include "operators/operator.h"
 #include "util/configuration.h"
 #include "util/make_unique.h"

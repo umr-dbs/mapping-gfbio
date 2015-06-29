@@ -15,6 +15,21 @@ class QueryRectangle;
 class GenericRaster;
 
 //
+// Unique key generated for an entry in the cache
+//
+class STCacheKey {
+public:
+	STCacheKey( const std::string &semantic_id, uint64_t entry_id );
+	STCacheKey( BinaryStream &stream );
+
+	void toStream( BinaryStream &stream ) const;
+	std::string to_string() const;
+
+	std::string semantic_id;
+	uint64_t entry_id;
+};
+
+//
 // Holds information about the spatial coverage of an entry
 // for a query.
 //
@@ -98,6 +113,13 @@ public:
 	const uint32_t node_id;
 	const uint64_t cache_id;
 	const STRasterEntryBounds bounds;
+};
+
+class STRasterRefKeyed : public STRasterRef {
+public:
+	STRasterRefKeyed( uint32_t node_id, const std::string &semantic_id, uint64_t cache_id, const STRasterEntryBounds &bounds );
+	STRasterRefKeyed( uint32_t node_id, const STCacheKey &key, const STRasterEntryBounds &bounds );
+	const std::string semantic_id;
 };
 
 #endif /* TYPES_H_ */

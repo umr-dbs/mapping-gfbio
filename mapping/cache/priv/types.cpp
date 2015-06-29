@@ -13,6 +13,33 @@
 
 ////////////////////////////////////////////////////////
 //
+// Cache-Key
+//
+////////////////////////////////////////////////////////
+
+
+STCacheKey::STCacheKey(const std::string& semantic_id, uint64_t entry_id) :
+		semantic_id(semantic_id), entry_id(entry_id) {
+}
+
+STCacheKey::STCacheKey(BinaryStream& stream) {
+	stream.read(&semantic_id);
+	stream.read(&entry_id);
+}
+
+void STCacheKey::toStream(BinaryStream& stream) const {
+	stream.write(semantic_id);
+	stream.write(entry_id);
+}
+
+std::string STCacheKey::to_string() const {
+	std::ostringstream ss;
+	ss << "STCacheKey: " << semantic_id << ":" << entry_id;
+	return ss.str();
+}
+
+////////////////////////////////////////////////////////
+//
 // Query-Info
 //
 ////////////////////////////////////////////////////////
@@ -38,12 +65,20 @@ double STQueryInfo::get_score() const {
 
 ////////////////////////////////////////////////////////
 //
-// Query-Info
+// Raster-Reference
 //
 ////////////////////////////////////////////////////////
 
 STRasterRef::STRasterRef(uint32_t node_id, uint64_t cache_id, const STRasterEntryBounds& bounds) :
 	node_id(node_id), cache_id(cache_id), bounds(bounds) {
+}
+
+STRasterRefKeyed::STRasterRefKeyed(uint32_t node_id, const std::string& semantic_id, uint64_t cache_id,
+	const STRasterEntryBounds& bounds) : STRasterRef(node_id,cache_id,bounds), semantic_id(semantic_id) {
+}
+
+STRasterRefKeyed::STRasterRefKeyed(uint32_t node_id, const STCacheKey& key,
+	const STRasterEntryBounds& bounds) : STRasterRef(node_id,key.entry_id,bounds), semantic_id(key.semantic_id) {
 }
 
 ////////////////////////////////////////////////////////

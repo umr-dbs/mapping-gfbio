@@ -20,41 +20,14 @@
 
 ////////////////////////////////////////////////////////
 //
-// Cache-Key
-//
-////////////////////////////////////////////////////////
-
-
-STCacheKey::STCacheKey(const std::string& semantic_id, uint64_t entry_id) :
-		semantic_id(semantic_id), entry_id(entry_id) {
-}
-
-STCacheKey::STCacheKey(BinaryStream& stream) {
-	stream.read(&semantic_id);
-	stream.read(&entry_id);
-}
-
-void STCacheKey::toStream(BinaryStream& stream) const {
-	stream.write(semantic_id);
-	stream.write(entry_id);
-}
-
-std::string STCacheKey::to_string() const {
-	std::ostringstream ss;
-	ss << "STCacheKey: " << semantic_id << ":" << entry_id;
-	return ss.str();
-}
-
-////////////////////////////////////////////////////////
-//
 // Query-Result
 //
 ////////////////////////////////////////////////////////
 
 
 STQueryResult::STQueryResult(const QueryRectangle& query) :
-	covered( Common::empty_geom() ),
-	remainder( Common::create_square(query.x1,query.y1,query.x2,query.y2) ),
+	covered( CacheCommon::empty_geom() ),
+	remainder( CacheCommon::create_square(query.x1,query.y1,query.x2,query.y2) ),
 	coverage(0) {
 }
 
@@ -111,6 +84,7 @@ std::string STQueryResult::to_string() {
 	ss << "STQueryResult:" << std::endl;
 	ss << "  has_hit: " << has_hit() << std::endl;
 	ss << "  has_remainder: " << has_remainder() << std::endl;
+	ss << "  coverage: " << coverage << std::endl;
 	ss << "  covered: " << covered->toString() << std::endl;
 	ss << "  remainder: " << remainder->toString() << std::endl;
 	ss << "  ids: [";
@@ -139,7 +113,7 @@ const STQueryResult STCacheStructure<EType>::query(const QueryRectangle& spec) c
 	// Get intersecting entries
 	auto partials = get_query_candidates( spec );
 
-	Log::trace("Querying cache for: %s", Common::qr_to_string(spec).c_str() );
+	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
 
 	// No candidates found
 	if ( partials->empty() ) {
@@ -149,8 +123,8 @@ const STQueryResult STCacheStructure<EType>::query(const QueryRectangle& spec) c
 
 	std::vector<uint64_t> ids;
 	STQueryResult::GeomP remainder;
-	STQueryResult::GeomP p_union = Common::empty_geom();
-	STQueryResult::GeomP qbox    = Common::create_square(spec.x1,spec.y1,spec.x2,spec.y2);
+	STQueryResult::GeomP p_union = CacheCommon::empty_geom();
+	STQueryResult::GeomP qbox    = CacheCommon::create_square(spec.x1,spec.y1,spec.x2,spec.y2);
 
 	// Add entries until we cover the whole area or nothing is left
 	while (!partials->empty() && !p_union->contains( qbox.get() )) {
@@ -158,14 +132,14 @@ const STQueryResult STCacheStructure<EType>::query(const QueryRectangle& spec) c
 		Log::trace("Candidate: %s", qi.to_string().c_str());
 
 		// Create the intersection and check if it enhances the covered area
-		std::unique_ptr<geos::geom::Polygon> box = Common::create_square(
+		std::unique_ptr<geos::geom::Polygon> box = CacheCommon::create_square(
 			std::max(spec.x1,qi.x1),
 			std::max(spec.y1,qi.y1),
 			std::min(spec.x2,qi.x2),
 			std::min(spec.y2,qi.y2)
 		);
 		if ( !p_union->contains( box.get() ) ) {
-			p_union = Common::union_geom( p_union, box );
+			p_union = CacheCommon::union_geom( p_union, box );
 			Log::trace("Added candidate. Covered area is now: %s", p_union->toString().c_str());
 			ids.push_back(qi.cache_id);
 		}
@@ -179,7 +153,7 @@ const STQueryResult STCacheStructure<EType>::query(const QueryRectangle& spec) c
 	// Full coverage
 	if ( p_union->contains( qbox.get() ) ) {
 		Log::trace("Query can be fully answered from cache.");
-		remainder = Common::empty_geom();
+		remainder = CacheCommon::empty_geom();
 		coverage = 0;
 	}
 	// Calculate remainder
@@ -314,7 +288,7 @@ void STMapCacheStructure<EType>::remove(const uint64_t id) {
 template<typename EType>
 std::unique_ptr<std::priority_queue<STQueryInfo> > STMapCacheStructure<EType>::get_query_candidates(
 		const QueryRectangle& spec) const {
-	Log::trace("Fetching candidates for query: %s", Common::qr_to_string(spec).c_str() );
+	Log::trace("Fetching candidates for query: %s", CacheCommon::qr_to_string(spec).c_str() );
 	std::unique_ptr<std::priority_queue<STQueryInfo>> partials = std::make_unique<std::priority_queue<STQueryInfo>>();
 	for (auto &e : entries) {
 		STEntryBounds &bounds = *e.second->bounds;
@@ -323,7 +297,7 @@ std::unique_ptr<std::priority_queue<STQueryInfo> > STMapCacheStructure<EType>::g
 		if ( coverage > 0 )
 			partials->push(STQueryInfo( coverage, bounds.x1, bounds.x2, bounds.y1, bounds.y2, e.first ));
 	}
-	Log::trace("Found %d candidates for query: %s", partials->size(), Common::qr_to_string(spec).c_str() );
+	Log::trace("Found %d candidates for query: %s", partials->size(), CacheCommon::qr_to_string(spec).c_str() );
 	return partials;
 }
 
@@ -424,7 +398,7 @@ void RasterRefStructure::remove(const uint64_t id) {
 
 inline std::unique_ptr<std::priority_queue<STQueryInfo> > RasterRefStructure::get_query_candidates(
 		const QueryRectangle& spec) const {
-	Log::trace("Fetching candidates for query: %s", Common::qr_to_string(spec).c_str() );
+	Log::trace("Fetching candidates for query: %s", CacheCommon::qr_to_string(spec).c_str() );
 	std::unique_ptr<std::priority_queue<STQueryInfo>> partials = std::make_unique<std::priority_queue<STQueryInfo>>();
 	for (auto &e : entries) {
 		const STEntryBounds &bounds = e.second->bounds;
@@ -433,7 +407,7 @@ inline std::unique_ptr<std::priority_queue<STQueryInfo> > RasterRefStructure::ge
 		if ( coverage > 0 )
 			partials->push(STQueryInfo( coverage, bounds.x1, bounds.x2, bounds.y1, bounds.y2, e.first ));
 	}
-	Log::trace("Found %d candidates for query: %s", partials->size(), Common::qr_to_string(spec).c_str() );
+	Log::trace("Found %d candidates for query: %s", partials->size(), CacheCommon::qr_to_string(spec).c_str() );
 	return partials;
 
 }

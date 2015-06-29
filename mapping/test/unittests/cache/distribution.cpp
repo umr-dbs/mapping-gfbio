@@ -18,10 +18,6 @@ typedef std::unique_ptr<std::thread> TP;
 class TestIdxServer : public IndexServer {
 public:
 	TestIdxServer( uint32_t port ) : IndexServer(port) {}
-protected:
-	virtual uint64_t pick_worker();
-private:
-	uint64_t last_node = 0;
 };
 
 class TestNodeServer : public NodeServer {
@@ -63,10 +59,6 @@ private:
 	std::vector<TestNodeServer*> instances;
 };
 
-
-uint64_t TestIdxServer::pick_worker() {
-	return IndexServer::pick_worker();
-}
 
 bool TestNodeServer::owns_current_thread() {
 	for ( auto &t : workers ) {

@@ -6,6 +6,7 @@
  */
 
 #include "cache/common.h"
+#include "cache/priv/connection.h"
 #include "cache/priv/types.h"
 #include "util/log.h"
 #include "raster/exceptions.h"
@@ -22,9 +23,9 @@
 
 #include <unistd.h>
 
-geos::geom::GeometryFactory Common::gf;
+geos::geom::GeometryFactory CacheCommon::gf;
 
-std::string Common::qr_to_string(const QueryRectangle &rect) {
+std::string CacheCommon::qr_to_string(const QueryRectangle &rect) {
 	std::ostringstream os;
 	os << "QueryRectangle[ epsg: " << (uint16_t) rect.epsg << ", timestamp: " << rect.timestamp << ", x: ["
 		<< rect.x1 << "," << rect.x2 << "]" << ", y: [" << rect.y1 << "," << rect.y2 << "]" << ", res: ["
@@ -32,7 +33,7 @@ std::string Common::qr_to_string(const QueryRectangle &rect) {
 	return os.str();
 }
 
-std::string Common::stref_to_string(const SpatioTemporalReference &ref) {
+std::string CacheCommon::stref_to_string(const SpatioTemporalReference &ref) {
 	std::ostringstream os;
 	os << "SpatioTemporalReference[ epsg: " << (uint16_t) ref.epsg << ", timetype: "
 		<< (uint16_t) ref.timetype << ", time: [" << ref.t1 << "," << ref.t2 << "]" << ", x: [" << ref.x1
@@ -40,7 +41,7 @@ std::string Common::stref_to_string(const SpatioTemporalReference &ref) {
 	return os.str();
 }
 
-int Common::get_listening_socket(int port, bool nonblock, int backlog) {
+int CacheCommon::get_listening_socket(int port, bool nonblock, int backlog) {
 	int sock;
 	struct addrinfo hints, *servinfo, *p;
 
@@ -87,23 +88,25 @@ int Common::get_listening_socket(int port, bool nonblock, int backlog) {
 	return sock;
 }
 
-std::unique_ptr<GenericRaster> Common::fetch_raster(const std::string & host, uint32_t port,
+std::unique_ptr<GenericRaster> CacheCommon::fetch_raster(const std::string & host, uint32_t port,
 	const STCacheKey &key) {
 	Log::debug("Fetching cache-entry from: %s:%d, key: %s", host.c_str(), port, key.to_string().c_str());
-	SocketConnection dc(host.c_str(), port);
-	uint8_t cmd = Common::CMD_DELIVERY_GET_CACHED_RASTER;
-	dc.stream->write(cmd);
-	key.toStream(*dc.stream);
+	UnixSocket sock(host.c_str(), port);
+	BinaryStream &stream = sock;
+
+	stream.write(DeliveryConnection::MAGIC_NUMBER);
+	stream.write(DeliveryConnection::CMD_GET_CACHED_RASTER);
+	key.toStream(stream);
 
 	uint8_t resp;
-	dc.stream->read(&resp);
+	stream.read(&resp);
 	switch (resp) {
-		case Common::RESP_DELIVERY_OK: {
-			return GenericRaster::fromStream(*dc.stream);
+		case DeliveryConnection::RESP_OK: {
+			return GenericRaster::fromStream(stream);
 		}
-		case Common::RESP_DELIVERY_ERROR: {
+		case DeliveryConnection::RESP_ERROR: {
 			std::string err_msg;
-			dc.stream->read(&err_msg);
+			stream.read(&err_msg);
 			Log::error("Delivery returned error: %s", err_msg.c_str());
 			throw DeliveryException(err_msg);
 		}
@@ -114,7 +117,7 @@ std::unique_ptr<GenericRaster> Common::fetch_raster(const std::string & host, ui
 	}
 }
 
-std::unique_ptr<GenericRaster> Common::process_raster_puzzle(const PuzzleRequest& req, std::string my_host,
+std::unique_ptr<GenericRaster> CacheCommon::process_raster_puzzle(const PuzzleRequest& req, std::string my_host,
 	uint32_t my_port) {
 	typedef std::unique_ptr<GenericRaster> RP;
 	typedef std::unique_ptr<geos::geom::Geometry> GP;
@@ -164,7 +167,7 @@ std::unique_ptr<GenericRaster> Common::process_raster_puzzle(const PuzzleRequest
 			}
 
 			STRasterEntryBounds rcc(*rem);
-			GP cube_square = Common::create_square(rcc.x1, rcc.y1, rcc.x2, rcc.y2);
+			GP cube_square = CacheCommon::create_square(rcc.x1, rcc.y1, rcc.x2, rcc.y2);
 			covered = GP(covered->Union(cube_square.get()));
 			items.push_back(std::move(rem));
 		} catch (MetadataException &me) {
@@ -178,7 +181,7 @@ std::unique_ptr<GenericRaster> Common::process_raster_puzzle(const PuzzleRequest
 	return result;
 }
 
-std::unique_ptr<geos::geom::Polygon> Common::create_square(double lx, double ly, double ux, double uy) {
+std::unique_ptr<geos::geom::Polygon> CacheCommon::create_square(double lx, double ly, double ux, double uy) {
 	geos::geom::CoordinateSequence *coords = new geos::geom::CoordinateArraySequence();
 
 	coords->add(geos::geom::Coordinate(lx, ly));
@@ -192,30 +195,11 @@ std::unique_ptr<geos::geom::Polygon> Common::create_square(double lx, double ly,
 	return std::unique_ptr<geos::geom::Polygon>(gf.createPolygon(shell, empty));
 }
 
-std::unique_ptr<geos::geom::Geometry> Common::empty_geom() {
+std::unique_ptr<geos::geom::Geometry> CacheCommon::empty_geom() {
 	return std::unique_ptr<geos::geom::Geometry>(gf.createEmptyGeometry());
 }
 
-std::unique_ptr<geos::geom::Geometry> Common::union_geom(const std::unique_ptr<geos::geom::Geometry>& p1,
+std::unique_ptr<geos::geom::Geometry> CacheCommon::union_geom(const std::unique_ptr<geos::geom::Geometry>& p1,
 	const std::unique_ptr<geos::geom::Polygon>& p2) {
 	return std::unique_ptr<geos::geom::Geometry>(p1->Union(p2.get()));
-}
-
-//
-// Connection class
-//
-SocketConnection::SocketConnection(int fd) :
-	fd(fd) {
-	stream.reset(new UnixSocket(fd, fd));
-}
-;
-
-SocketConnection::SocketConnection(const char* host, int port) :
-	fd(-1) {
-	UnixSocket *sck = new UnixSocket(host, port);
-	fd = sck->getReadFD();
-	stream.reset(sck);
-}
-
-SocketConnection::~SocketConnection() {
 }

@@ -8,10 +8,10 @@
 #ifndef INDEX_INDEXSERVER_H_
 #define INDEX_INDEXSERVER_H_
 
-#include "cache/index/connection.h"
+#include <cache/common.h>
+#include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
 #include "cache/cache.h"
-#include "cache/common.h"
 #include "util/log.h"
 
 #include <string>
@@ -19,6 +19,42 @@
 #include <map>
 #include <vector>
 #include <deque>
+
+
+class JobDescription {
+public:
+	virtual ~JobDescription();
+	ClientConnection &client_connection;
+	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
+protected:
+	JobDescription( ClientConnection &client_connection, std::unique_ptr<BaseRequest> request );
+	const std::unique_ptr<BaseRequest> request;
+};
+
+class RasterCreateJob : public JobDescription {
+public:
+	RasterCreateJob( ClientConnection &client_connection, std::unique_ptr<RasterBaseRequest> &request );
+	virtual ~RasterCreateJob();
+	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+};
+
+class RasterDeliverJob : public JobDescription {
+public:
+	RasterDeliverJob( ClientConnection &client_connection, std::unique_ptr<RasterDeliveryRequest> &request, uint32_t node );
+	virtual ~RasterDeliverJob();
+	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+private:
+	uint32_t node;
+};
+
+class RasterPuzzleJob : public JobDescription {
+public:
+	RasterPuzzleJob( ClientConnection &client_connection, std::unique_ptr<RasterPuzzleRequest> &request, std::vector<uint32_t> &nodes );
+	virtual ~RasterPuzzleJob();
+	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+private:
+	std::vector<uint32_t> nodes;
+};
 
 //
 // Represents a cache-node.
@@ -60,28 +96,31 @@ public:
 	// Subsequent calls to run or run_async have undefined
 	// behaviour
 	virtual void stop();
-
-protected:
-	typedef std::shared_ptr<Node> NP;
-	virtual uint64_t pick_worker();
 private:
 	// The currently known nodes
-	std::map<uint32_t,NP> nodes;
+	std::map<uint32_t,std::shared_ptr<Node>> nodes;
+	// Connections
 	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
 	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
 
-	void process_accept(int listen_socket, fd_set *readfds);
-	void read_control_connections(fd_set *readfds);
-	void read_worker_connections(fd_set *readfds);
-	void read_client_connections(fd_set *readfds);
+	// Adds the fds of all connections to the read-set
+	// and kills faulty connections
+	int setup_fdset( fd_set *readfds);
 
-	void handle_control_connection( ControlConnection &cc );
-	void handle_worker_connection( WorkerConnection &wc );
-	void handle_client_connection( ClientConnection &cc );
+	// Processes the handshake on newly established connections
+	void process_handshake( std::vector<int> &new_fds, fd_set *readfds);
 
-	void process_raster_request( ClientConnection &con );
-	uint64_t get_worker_for_node( uint32_t node_id );
+	void process_control_connections(fd_set *readfds);
+	void process_worker_connections(fd_set *readfds);
+	void process_client_connections(fd_set *readfds);
+
+	void process_client_request( ClientConnection &con );
+	std::unique_ptr<JobDescription> process_client_raster_request( ClientConnection &con );
+	void process_worker_raster_query( WorkerConnection &con );
+
+	// Schedules pending jobs
+	void schedule_jobs();
 
 	// The port the index-server is listening on
 	int port;
@@ -93,6 +132,8 @@ private:
 	uint32_t next_node_id;
 	// Cache
 	RasterRefCache raster_cache;
+	// The jobs to be scheduled
+	std::vector<std::unique_ptr<JobDescription>> pending_jobs;
 };
 
 #endif /* INDEX_INDEXSERVER_H_ */

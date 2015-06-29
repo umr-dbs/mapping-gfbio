@@ -1,7 +1,6 @@
 #include "util/binarystream.h"
 #include "raster/exceptions.h"
 
-#include <sstream>
 #include <string.h> // memset(), strerror()
 #include <errno.h>
 #include <memory>
@@ -76,11 +75,8 @@ UnixSocket::UnixSocket(const char *hostname, int port) : is_eof(false), read_fd(
 	char portstr[16];
 	snprintf(portstr, 16, "%d", port);
 	int status = getaddrinfo(hostname, portstr, &hints, &servinfo);
-	if (status != 0) {
-	    std::ostringstream msg;
-	    msg << "getaddrinfo() failed: " << gai_strerror(status);
-	    throw NetworkException(msg.str());
-	}
+	if (status != 0)
+	    throw NetworkException(concat("getaddrinfo() failed: ", gai_strerror(status)));
 
 	int new_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
 	if (new_fd < 0) {
@@ -91,9 +87,7 @@ UnixSocket::UnixSocket(const char *hostname, int port) : is_eof(false), read_fd(
 	if (connect(new_fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
 		freeaddrinfo(servinfo);
 		::close(new_fd);
-		std::ostringstream msg;
-		msg << "UnixSocket: unable to connect(" << hostname << ":" << port << "/" << portstr << "): " << strerror(errno);
-		throw NetworkException(msg.str());
+		throw NetworkException(concat("UnixSocket: unable to connect(", hostname, ":", port, "/", portstr, "): ", strerror(errno)));
 	}
 
 	read_fd = new_fd;
@@ -126,9 +120,7 @@ void UnixSocket::close() {
 
 void UnixSocket::write(const char *buffer, size_t len) {
 	if (write_fd < 0) {
-		std::ostringstream msg;
-		msg << "UnixSocket: cannot write to closed socket " << write_fd << " in pid " << getpid();
-		throw NetworkException(msg.str());
+		throw NetworkException(concat("UnixSocket: cannot write to closed socket ", write_fd, " in pid ", getpid()));
 	}
 	//auto res = ::send(write_fd, buffer, len, MSG_NOSIGNAL);
 	size_t written = 0;
@@ -137,16 +129,11 @@ void UnixSocket::write(const char *buffer, size_t len) {
 		auto res = ::write(write_fd, &buffer[written], remaining);
 		if ((size_t) res == remaining)
 			return;
-		if (res <= 0) {
-			std::ostringstream msg;
-			msg << "UnixSocket: write() failed: " << strerror(errno) << "(" << remaining << " requested, " << res << " written)";
-			throw NetworkException(msg.str());
-		}
-		if ((size_t) res > remaining) {
-			std::ostringstream msg;
-			msg << "UnixSocket: write() wrote too much bytes: " << remaining << " requested, " << res << " written";
-			throw NetworkException(msg.str());
-		}
+		if (res <= 0)
+			throw NetworkException(concat("UnixSocket: write() failed: ", strerror(errno), "(", remaining, " requested, ", res, " written)"));
+
+		if ((size_t) res > remaining)
+			throw NetworkException(concat("UnixSocket: write() wrote too much bytes: ", remaining, " requested, ", res, " written"));
 		written += res;
 	}
 	//fprintf(stderr, "UnixSocket: written %lu bytes\n", len);
@@ -154,11 +141,8 @@ void UnixSocket::write(const char *buffer, size_t len) {
 
 
 size_t UnixSocket::read(char *buffer, size_t len, bool allow_eof) {
-	if (read_fd < 0) {
-		std::ostringstream msg;
-		msg << "UnixSocket: cannot read from closed socket " << read_fd << " in pid " << getpid();
-		throw NetworkException(msg.str());
-	}
+	if (read_fd < 0)
+		throw NetworkException(concat("UnixSocket: cannot read from closed socket ", read_fd, " in pid ", getpid()));
 	if (is_eof)
 		throw NetworkException("UnixSocket: tried to read from a socket which is eof'ed");
 
@@ -174,11 +158,8 @@ size_t UnixSocket::read(char *buffer, size_t len, bool allow_eof) {
 				throw NetworkException("UnixSocket: unexpected eof");
 			return bytes_read;
 		}
-		if (r < 0) {
-			std::ostringstream msg;
-			msg << "UnixSocket: read() failed: " << strerror(errno);
-			throw NetworkException(msg.str());
-		}
+		if (r < 0)
+			throw NetworkException(concat("UnixSocket: read() failed: ", strerror(errno)));
 		bytes_read += r;
 		buffer += r;
 		remaining -= r;

@@ -44,11 +44,8 @@ cURL::~cURL() {
 
 void cURL::perform() {
 	CURLcode success = curl_easy_perform(handle);
-	if (success != CURLE_OK) {
-		std::stringstream ss;
-		ss << "cURL::perform(): " << success << " " << errorbuffer;
-		throw cURLException(ss.str());
-	}
+	if (success != CURLE_OK)
+		throw cURLException(concat("cURL::perform(): ", success, " ", errorbuffer));
 }
 
 

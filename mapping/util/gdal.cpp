@@ -60,9 +60,7 @@ std::string SRSFromEPSG(epsg_t epsg) {
 			//check for success and throw an exception if something went wrong
 			OSRExportToWkt( hSRS, &pszResult );
 		else {
-			std::ostringstream msg;
-			msg << "SRS could not be created for epsg " << (int) epsg;
-			throw GDALException(msg.str());
+			throw GDALException(concat("SRS could not be created for epsg ", (int) epsg));
 			/*
 				CPLError( CE_Failure, CPLE_AppDefined,
 									"Translating source or target SRS failed:\n%s",

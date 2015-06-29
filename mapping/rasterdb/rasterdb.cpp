@@ -25,7 +25,6 @@
 
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <memory>
 #include <string>
 
@@ -379,11 +378,8 @@ struct raster_transformed_blit {
 		int x2 = std::min(raster_dest->width, destx+raster_src->width);
 		int y2 = std::min(raster_dest->height, desty+raster_src->height);
 
-		if (x1 >= x2 || y1 >= y2) {
-			std::ostringstream msg;
-			msg << "transformedBlit without overlapping region: " << raster_src->width << "x" << raster_src->height << " blitted onto " << raster_dest->width << "x" << raster_dest->height << " at (" << destx << "," << desty << "), overlap (" << x1 << "," << y1 << ") -> (" << x2 << "," << y2 << ")";
-			throw ArgumentException(msg.str());
-		}
+		if (x1 >= x2 || y1 >= y2)
+			throw ArgumentException(concat("transformedBlit without overlapping region: ", raster_src->width, "x", raster_src->height, " blitted onto ", raster_dest->width, "x", raster_dest->height, " at (", destx, ",", desty, "), overlap (", x1, ",", y1, ") -> (", x2, ",", y2, ")"));
 
 		for (int y=y1;y<y2;y++) {
 			for (int x=x1;x<x2;x++) {
@@ -430,21 +426,15 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, i
 	auto resultstref = zoomed_and_cut_crs.toSpatioTemporalReference(flipx, flipy, TIMETYPE_UNIX, rasterdescription.time_start, rasterdescription.time_end);
 
 	/*
-	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom)) {
-		std::stringstream ss;
-		ss << "RasterDB::load, fractions of a pixel requested: (x: " << x2 << " <-> " << (x1 + (width<<zoom)) << " y: " << y2 << " <-> " << (y1 + (height<<zoom));
-		throw SourceException(ss.str());
-	}
+	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom))
+		throw SourceException(concat("RasterDB::load, fractions of a pixel requested: (x: ", x2, " <-> ", (x1 + (width<<zoom)), " y: ", y2, " <-> ", (y1 + (height<<zoom))));
 	*/
 	// Make sure no fractional pixels are requested
 	//x2 = x1 + (width << zoom);
 	//y2 = y1 + (height << zoom);
 
-	if (x1 > x2 || y1 > y2) {
-		std::stringstream ss;
-		ss << "RasterDB::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords swapped";
-		throw SourceException(ss.str());
-	}
+	if (x1 > x2 || y1 > y2)
+		throw SourceException(concat("RasterDB::load(", channelid, ", ", timestamp, ", [",x1,",",y1," -> ",x2,",",y2,"]): coords swapped"));
 
 	decltype(GenericRaster::md_value) result_md_value;
 	decltype(GenericRaster::md_string) result_md_string;
@@ -488,11 +478,8 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, i
 
 
 std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
-	if (crs->epsg != rect.epsg) {
-		std::stringstream msg;
-		msg << "SourceOperator: wrong epsg requested. Source is " << (int) crs->epsg << ", requested " << (int) rect.epsg;
-		throw OperatorException(msg.str());
-	}
+	if (crs->epsg != rect.epsg)
+		throw OperatorException(concat("SourceOperator: wrong epsg requested. Source is ", (int) crs->epsg, ", requested ", (int) rect.epsg));
 
 	// Get all pixel coordinates that need to be returned. The endpoints of the QueryRectangle are inclusive.
 	double px1 = crs->WorldToPixelX(rect.x1);

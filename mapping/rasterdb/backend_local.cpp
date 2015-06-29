@@ -10,7 +10,7 @@
 
 #include <iostream>
 #include <fstream>
-#include <sstream>
+
 #include "util/make_unique.h"
 
 
@@ -260,11 +260,8 @@ RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int ch
 	stmt.bind(1, channelid);
 	stmt.bind(2, timestamp);
 	stmt.bind(3, timestamp);
-	if (!stmt.next()) {
-		std::ostringstream msg;
-		msg << "No raster found for the given timestamp (source=" << sourcename << ", channel=" << channelid << ", time=" << timestamp << ")";
-		throw SourceException(msg.str());
-	}
+	if (!stmt.next())
+		throw SourceException( concat("No raster found for the given timestamp (source=", sourcename, ", channel=", channelid, ", time=", timestamp, ")"));
 
 	auto rasterid = stmt.getInt64(0);
 	double time_start = stmt.getDouble(1);

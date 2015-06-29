@@ -1,11 +1,11 @@
 #ifndef RASTER_EXCEPTIONS_H
 #define RASTER_EXCEPTIONS_H
 
+#include "util/concat.h"
+
 #include <string>
 #include <exception>
 #include <stdexcept>
-
-#include <iostream>
 
 
 #define _CUSTOM_EXCEPTION_CLASS(C) class C : public std::runtime_error { public: C(const std::string &msg) : std::runtime_error(std::string(#C) + ": " + msg) {}}

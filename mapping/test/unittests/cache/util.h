@@ -9,7 +9,7 @@
 #define UNITTESTS_CACHE_UTIL_H_
 
 #include "datatypes/spatiotemporal.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <iostream>
 #include <string>

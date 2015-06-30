@@ -1,7 +1,7 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 
 #include "operators/operator.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/curl.h"
 #include "util/csvparser.h"
 #include "util/configuration.h"

@@ -1,6 +1,6 @@
 #include "linecollection.h"
 #include <sstream>
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/make_unique.h"
 
 

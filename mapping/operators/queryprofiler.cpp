@@ -1,6 +1,6 @@
 
 #include "operators/queryprofiler.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <unistd.h>
 #include <time.h>

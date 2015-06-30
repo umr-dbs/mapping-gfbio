@@ -1,5 +1,5 @@
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/curl.h"
 
 #include <curl/curl.h>

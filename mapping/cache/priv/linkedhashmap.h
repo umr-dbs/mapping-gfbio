@@ -9,7 +9,7 @@
 #define LINKEDHASHMAP_H_
 
 #include <unordered_map>
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 template<typename K, typename V>
 class LinkedHashMap {

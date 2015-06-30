@@ -11,7 +11,7 @@
 #include "datatypes/linecollection.h"
 #include "datatypes/spatiotemporal.h"
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include "util/timemodification.h"
 

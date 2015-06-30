@@ -1,5 +1,5 @@
 #include "datatypes/spatiotemporal.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "operators/operator.h"
 #include "util/binarystream.h"
 #include "util/debug.h"

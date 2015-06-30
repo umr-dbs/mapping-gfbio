@@ -1,5 +1,5 @@
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/sqlite.h"
 
 #include <sqlite3.h>

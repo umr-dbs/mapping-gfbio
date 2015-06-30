@@ -11,7 +11,7 @@
 #include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
 #include "cache/cache.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/make_unique.h"
 #include <sstream>
 

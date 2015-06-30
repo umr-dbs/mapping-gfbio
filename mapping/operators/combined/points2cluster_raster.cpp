@@ -4,7 +4,7 @@
 #include "datatypes/raster/typejuggling.h"
 #include "operators/operator.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <memory>
 #include <cmath>

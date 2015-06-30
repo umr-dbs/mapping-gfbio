@@ -1,4 +1,4 @@
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "rasterdb/backend.h"
 #include "rasterdb/backend_local.h"
 #include "rasterdb/backend_remote.h"

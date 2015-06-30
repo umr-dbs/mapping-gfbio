@@ -1,5 +1,5 @@
 #include "operators/operator.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/csvparser.h"
 

@@ -8,7 +8,7 @@
 #include <geos/geom/LinearRing.h>
 #include <geos/geom/MultiLineString.h>
 #include "util/make_unique.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 //TODO: LineString?
 

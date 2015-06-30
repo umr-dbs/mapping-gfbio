@@ -1,4 +1,4 @@
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "datatypes/plots/histogram.h"

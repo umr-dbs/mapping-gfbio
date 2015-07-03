@@ -10,9 +10,11 @@
 
 #include "datatypes/spatiotemporal.h"
 #include "util/binarystream.h"
+#include <memory>
 
 class QueryRectangle;
 class GenericRaster;
+class DeliveryConnection;
 
 //
 // Unique key generated for an entry in the cache
@@ -121,5 +123,29 @@ public:
 	STRasterRefKeyed( uint32_t node_id, const STCacheKey &key, const STRasterEntryBounds &bounds );
 	const std::string semantic_id;
 };
+
+
+class Delivery {
+private:
+	enum class Type { RASTER };
+public:
+	Delivery( uint64_t id, unsigned int count, std::unique_ptr<GenericRaster> &raster );
+
+	Delivery( const Delivery &d ) = delete;
+	Delivery( Delivery &&d );
+
+	Delivery& operator=(const Delivery &d) = delete;
+	Delivery& operator=(Delivery &&d) = delete;
+
+	const uint64_t id;
+	const time_t creation_time;
+	unsigned int count;
+	void send( DeliveryConnection &connection );
+private:
+	Type type;
+	std::unique_ptr<GenericRaster> raster;
+};
+
+
 
 #endif /* TYPES_H_ */

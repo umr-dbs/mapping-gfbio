@@ -64,7 +64,7 @@ void ClientConnection::process_command(uint8_t cmd) {
 
 	switch (cmd) {
 		case CMD_GET_RASTER: {
-			raster_request.reset(new RasterBaseRequest(stream));
+			request.reset(new BaseRequest(stream));
 			request_type = RequestType::RASTER;
 			state = State::AWAIT_RESPONSE;
 			break;
@@ -118,15 +118,14 @@ ClientConnection::RequestType ClientConnection::get_request_type() const {
 	throw IllegalStateException("Can only tell type in state AWAIT_RESPONSE");
 }
 
-const RasterBaseRequest& ClientConnection::get_raster_request() const {
+const BaseRequest& ClientConnection::get_request() const {
 	if (state == State::AWAIT_RESPONSE && request_type == RequestType::RASTER)
-		return *raster_request;
-	throw IllegalStateException(
-		"Can only return raster_request in state AWAIT_RESPONSE and type was RASTER");
+		return *request;
+	throw IllegalStateException("Can only return raster_request in state AWAIT_RESPONSE and type was RASTER");
 }
 
 void ClientConnection::reset() {
-	raster_request.release();
+	request.release();
 	request_type = RequestType::NONE;
 	state = State::IDLE;
 }
@@ -154,18 +153,23 @@ WorkerConnection::State WorkerConnection::get_state() const {
 }
 
 void WorkerConnection::process_command(uint8_t cmd) {
-	if (state != State::PROCESSING)
-		throw IllegalStateException("Can only accept input in PROCESSING-state.");
+	if (state != State::PROCESSING && state != State::WAITING_DELIVERY)
+		throw IllegalStateException("Can only accept input in state PROCESSING or WAITING_DELIVERY.");
 
 	switch (cmd) {
 		case RESP_RESULT_READY: {
 			// Read delivery id
-			uint64_t delivery_id;
-			stream.read(&delivery_id);
-			Log::debug("Worker returned result, delivery_id: %d", delivery_id);
-			result.reset(new DeliveryResponse(node->host, node->port, delivery_id));
+			Log::debug("Worker finished processing. Determinig delivery qty.");
 			state = State::DONE;
 			Log::debug("Finished processing raster-request from client.");
+			break;
+		}
+		case RESP_DELIVERY_READY: {
+			Log::debug("Worker created delivery. Done");
+			uint64_t delivery_id;
+			stream.read(&delivery_id);
+			result.reset(new DeliveryResponse(node->host, node->port, delivery_id));
+			state = State::DELIVERY_READY;
 			break;
 		}
 		case CMD_QUERY_RASTER_CACHE: {
@@ -264,8 +268,24 @@ void WorkerConnection::send_miss() {
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
 }
 
+void WorkerConnection::send_delivery_qty(uint32_t qty) {
+	if (state == State::DONE) {
+		try {
+			stream.write(RESP_DELIVERY_QTY);
+			stream.write(qty);
+			state = State::WAITING_DELIVERY;
+		} catch (NetworkException &ne) {
+			Log::error("Could not send MISS-response to worker: %d", id);
+			faulty = true;
+		}
+	}
+	else
+		throw IllegalStateException("Can only send delivery qty in state DONE");
+
+}
+
 void WorkerConnection::release() {
-	if ( state == State::DONE || state == State::ERROR )
+	if (state == State::DELIVERY_READY || state == State::ERROR)
 		reset();
 	else
 		throw IllegalStateException("Can only release worker in state DONE or ERROR");
@@ -288,9 +308,9 @@ const BaseRequest& WorkerConnection::get_raster_query() const {
 }
 
 const DeliveryResponse& WorkerConnection::get_result() const {
-	if (state == State::DONE)
+	if (state == State::DELIVERY_READY)
 		return *result;
-	throw IllegalStateException("Can only return result in state DONE");
+	throw IllegalStateException("Can only return result in state DELIVERY_READY");
 }
 
 const std::string& WorkerConnection::get_error_message() const {
@@ -319,12 +339,14 @@ const uint8_t WorkerConnection::CMD_CREATE_RASTER;
 const uint8_t WorkerConnection::CMD_DELIVER_RASTER;
 const uint8_t WorkerConnection::CMD_PUZZLE_RASTER;
 const uint8_t WorkerConnection::RESP_RESULT_READY;
+const uint8_t WorkerConnection::RESP_DELIVERY_READY;
 const uint8_t WorkerConnection::RESP_NEW_RASTER_CACHE_ENTRY;
 const uint8_t WorkerConnection::CMD_QUERY_RASTER_CACHE;
 const uint8_t WorkerConnection::RESP_ERROR;
 const uint8_t WorkerConnection::RESP_QUERY_HIT;
 const uint8_t WorkerConnection::RESP_QUERY_MISS;
 const uint8_t WorkerConnection::RESP_QUERY_PARTIAL;
+const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 
 /////////////////////////////////////////////////
 //

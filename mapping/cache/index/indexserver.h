@@ -31,26 +31,26 @@ protected:
 	const std::unique_ptr<BaseRequest> request;
 };
 
-class RasterCreateJob : public JobDescription {
+class CreateJob : public JobDescription {
 public:
-	RasterCreateJob( ClientConnection &client_connection, std::unique_ptr<RasterBaseRequest> &request );
-	virtual ~RasterCreateJob();
+	CreateJob( ClientConnection &client_connection, std::unique_ptr<BaseRequest> &request );
+	virtual ~CreateJob();
 	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
 };
 
-class RasterDeliverJob : public JobDescription {
+class DeliverJob : public JobDescription {
 public:
-	RasterDeliverJob( ClientConnection &client_connection, std::unique_ptr<RasterDeliveryRequest> &request, uint32_t node );
-	virtual ~RasterDeliverJob();
+	DeliverJob( ClientConnection &client_connection, std::unique_ptr<DeliveryRequest> &request, uint32_t node );
+	virtual ~DeliverJob();
 	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
 private:
 	uint32_t node;
 };
 
-class RasterPuzzleJob : public JobDescription {
+class PuzzleJob : public JobDescription {
 public:
-	RasterPuzzleJob( ClientConnection &client_connection, std::unique_ptr<RasterPuzzleRequest> &request, std::vector<uint32_t> &nodes );
-	virtual ~RasterPuzzleJob();
+	PuzzleJob( ClientConnection &client_connection, std::unique_ptr<PuzzleRequest> &request, std::vector<uint32_t> &nodes );
+	virtual ~PuzzleJob();
 	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
 private:
 	std::vector<uint32_t> nodes;

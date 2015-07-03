@@ -40,10 +40,10 @@ OBJ_OPERATORS_COMMON=o/operators_operator.o o/operators_queryrectangle.o o/opera
 OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) ${OBJ_OPERATORS_TEMPORAL} $(OBJ_OPERATORS_GFBIO)
 OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 OBJ_EXE=o/main_rasterdb.o ${OBJ_COMMON}
-OBJ_CACHE_NODE=o/cache_node_nodeserver_main.o o/cache_node_nodeserver.o ${OBJ_COMMON}
+OBJ_CACHE_NODE=o/cache_node_nodeserver_main.o o/cache_node_nodeserver.o o/cache_node_delivery.o ${OBJ_COMMON}
 OBJ_CACHE_INDEX=o/cache_index_indexserver_main.o o/cache_index_indexserver.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster_colors.o o/raster_profiler.o
 OBJ_EXECGI=o/main_cgi.o o/cache_client.o ${OBJ_COMMON}
-OBJ_EXEGTEST=${OBJ_COMMON} o/cache_node_nodeserver.o o/cache_index_indexserver.o o/cache_client.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_util.o o/gtest_cache_stcache.o o/gtest_cache_distribution.o
+OBJ_EXEGTEST=${OBJ_COMMON} o/cache_node_nodeserver.o o/cache_index_indexserver.o o/cache_client.o o/cache_node_delivery.o o/gtest_init.o o/gtest_example.o o/gtest_simplefeaturecollections_points.o o/gtest_simplefeaturecollections_lines.o o/gtest_simplefeaturecollections_polygons.o o/gtest_temporal_timeshift.o o/gtest_cache_util.o o/gtest_cache_stcache.o o/gtest_cache_distribution.o
 OBJ_EXEGEOMETRYTESTBED=o/main_geometrytestbed.o ${OBJ_COMMON}
 # TODO: more fine grained selection of the required objects
 OBJ_RSERVER=o/rserver_rserver.o o/operators_queryrectangle.o o/operators_queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster_colors.o o/raster_profiler.o

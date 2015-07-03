@@ -30,14 +30,14 @@ JobDescription::JobDescription(ClientConnection& client_connection, std::unique_
 	client_connection(client_connection), request(std::move(request)) {
 }
 
-RasterCreateJob::RasterCreateJob(ClientConnection& client_connection, std::unique_ptr<RasterBaseRequest>& request) :
+CreateJob::CreateJob(ClientConnection& client_connection, std::unique_ptr<BaseRequest>& request) :
 	JobDescription(client_connection, std::unique_ptr<BaseRequest>(request.release())) {
 }
 
-RasterCreateJob::~RasterCreateJob() {
+CreateJob::~CreateJob() {
 }
 
-bool RasterCreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
+bool CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
 	for (auto &e : connections) {
 		auto &con = *e.second;
 		if (!con.is_faulty() && con.get_state() == WorkerConnection::State::IDLE) {
@@ -48,15 +48,15 @@ bool RasterCreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerCo
 	return false;
 }
 
-RasterDeliverJob::RasterDeliverJob(ClientConnection& client_connection, std::unique_ptr<RasterDeliveryRequest>& request,
+DeliverJob::DeliverJob(ClientConnection& client_connection, std::unique_ptr<DeliveryRequest>& request,
 	uint32_t node) :
 	JobDescription(client_connection, std::unique_ptr<BaseRequest>(request.release())), node(node) {
 }
 
-RasterDeliverJob::~RasterDeliverJob() {
+DeliverJob::~DeliverJob() {
 }
 
-bool RasterDeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
+bool DeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
 	for (auto &e : connections) {
 		auto &con = *e.second;
 		if (!con.is_faulty() && con.node->id == node && con.get_state() == WorkerConnection::State::IDLE) {
@@ -67,15 +67,15 @@ bool RasterDeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerC
 	return false;
 }
 
-RasterPuzzleJob::RasterPuzzleJob(ClientConnection& client_connection, std::unique_ptr<RasterPuzzleRequest>& request,
+PuzzleJob::PuzzleJob(ClientConnection& client_connection, std::unique_ptr<PuzzleRequest>& request,
 	std::vector<uint32_t>& nodes) :
 	JobDescription(client_connection, std::unique_ptr<BaseRequest>(request.release())), nodes(std::move(nodes)) {
 }
 
-RasterPuzzleJob::~RasterPuzzleJob() {
+PuzzleJob::~PuzzleJob() {
 }
 
-bool RasterPuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
+bool PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
 	for (auto &node : nodes) {
 		for (auto &e : connections) {
 			auto &con = *e.second;
@@ -346,8 +346,13 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 					break;
 				}
 				case WorkerConnection::State::DONE: {
-					Log::debug("Worker returned result: %s. Forwarding to client.",
-						wc.get_result().to_string().c_str());
+					Log::debug("Worker returned result. Determinig delivery qty.");
+					// TODO: Implement batching
+					wc.send_delivery_qty(1);
+					break;
+				}
+				case WorkerConnection::State::DELIVERY_READY: {
+					Log::debug("Worker returned delivery: %s", wc.get_result().to_string().c_str() );
 					auto &cc = *client_connections.at(wc.get_client_id());
 					cc.send_response(wc.get_result());
 					wc.release();
@@ -387,7 +392,7 @@ void IndexServer::process_client_request(ClientConnection& con) {
 }
 
 std::unique_ptr<JobDescription> IndexServer::process_client_raster_request(ClientConnection &con) {
-	auto &req = con.get_raster_request();
+	auto &req = con.get_request();
 	STQueryResult res = raster_cache.query(req.semantic_id, req.query);
 	Log::debug("QueryResult: %s", res.to_string().c_str());
 
@@ -397,9 +402,9 @@ std::unique_ptr<JobDescription> IndexServer::process_client_raster_request(Clien
 
 		auto &ref = raster_cache.get(req.semantic_id, res.ids.at(0));
 
-		std::unique_ptr<RasterDeliveryRequest> jreq = std::make_unique<RasterDeliveryRequest>(req.semantic_id,
-			req.query, ref->cache_id, req.query_mode);
-		return std::make_unique<RasterDeliverJob>(con, jreq, ref->node_id);
+		std::unique_ptr<DeliveryRequest> jreq = std::make_unique<DeliveryRequest>(req.semantic_id,
+			req.query, ref->cache_id);
+		return std::make_unique<DeliverJob>(con, jreq, ref->node_id);
 	}
 	// Puzzle
 	else if (res.has_hit() && res.coverage > 0.1) {
@@ -412,15 +417,15 @@ std::unique_ptr<JobDescription> IndexServer::process_client_raster_request(Clien
 			node_ids.push_back(ref->node_id);
 			entries.push_back(CacheRef(node->host, node->port, ref->cache_id));
 		}
-		std::unique_ptr<RasterPuzzleRequest> jreq = std::make_unique<RasterPuzzleRequest>(req.semantic_id, req.query,
-			res.covered, res.remainder, entries, req.query_mode);
-		return std::make_unique<RasterPuzzleJob>(con, jreq, node_ids);
+		std::unique_ptr<PuzzleRequest> jreq = std::make_unique<PuzzleRequest>(req.semantic_id, req.query,
+			res.covered, res.remainder, entries);
+		return std::make_unique<PuzzleJob>(con, jreq, node_ids);
 	}
 	// Full miss
 	else {
 		Log::debug("Full MISS.");
-		std::unique_ptr<RasterBaseRequest> jreq = std::make_unique<RasterBaseRequest>(req);
-		return std::make_unique<RasterCreateJob>(con, jreq);
+		std::unique_ptr<BaseRequest> jreq = std::make_unique<BaseRequest>(req);
+		return std::make_unique<CreateJob>(con, jreq);
 	}
 }
 

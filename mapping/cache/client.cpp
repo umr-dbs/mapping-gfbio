@@ -27,12 +27,16 @@ std::unique_ptr<GenericRaster> CacheClient::get_raster(const std::string& graph_
 
 
 
-	RasterBaseRequest rr(graph_json,query,query_mode);
+	BaseRequest rr(graph_json,query);
 	stream.write(ClientConnection::CMD_GET_RASTER);
 	rr.toStream( stream );
 
 	DeliveryResponse resp = read_index_response(idx_con);
-	return fetch_raster(resp);
+	std::unique_ptr<GenericRaster> res = fetch_raster(resp);
+	if ( query_mode == GenericOperator::RasterQM::EXACT )
+		return res->fitToQueryRectangle(query);
+	else
+		return res;
 }
 
 DeliveryResponse CacheClient::read_index_response(BinaryStream& idx_con) {

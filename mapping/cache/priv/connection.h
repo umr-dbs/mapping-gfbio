@@ -74,7 +74,7 @@ public:
 	void send_error(const std::string &message);
 
 	RequestType get_request_type() const;
-	const RasterBaseRequest& get_raster_request() const;
+	const BaseRequest& get_request() const;
 
 protected:
 	virtual void process_command( uint8_t cmd );
@@ -83,13 +83,13 @@ private:
 	void reset();
 	State state;
 	RequestType request_type;
-	std::unique_ptr<RasterBaseRequest> raster_request;
+	std::unique_ptr<BaseRequest> request;
 };
 
 class WorkerConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, PROCESSING, NEW_RASTER_ENTRY, RASTER_QUERY_REQUESTED, DONE, ERROR
+		IDLE, PROCESSING, NEW_RASTER_ENTRY, RASTER_QUERY_REQUESTED, DONE, WAITING_DELIVERY, DELIVERY_READY, ERROR
 	};
 	static const uint32_t MAGIC_NUMBER = 0x32345678;
 
@@ -118,10 +118,14 @@ public:
 	static const uint8_t CMD_QUERY_RASTER_CACHE = 23;
 
 	//
-	// Response for ready to deliver result. Data on stream is:
-	// delivery-id:uint64_t
+	// Response from worker to signal finished computation
 	//
 	static const uint8_t RESP_RESULT_READY = 30;
+
+	//
+	// Response from worker to signal ready to delivery
+	//
+	static const uint8_t RESP_DELIVERY_READY = 31;
 
 	//
 	// Send if a new raster-entry is added to the local cache
@@ -129,27 +133,34 @@ public:
 	// key:STCacheKey
 	// cube:RasterCacheCube
 	//
-	static const uint8_t RESP_NEW_RASTER_CACHE_ENTRY = 31;
+	static const uint8_t RESP_NEW_RASTER_CACHE_ENTRY = 32;
 
 	//
 	// Response from index-server after successfully
 	// probing the cache for a RESP_QUERY_RASTER_CACHE.
 	// Data on stream is:
 	// ref:CacheRef
-	static const uint8_t RESP_QUERY_HIT = 32;
+	static const uint8_t RESP_QUERY_HIT = 33;
 
 	//
 	// Response from index-server after unsuccessfuly
 	// probing the cache for a CMD_INDEX_QUERY_CACHE.
 	// Theres no data on stream.
-	static const uint8_t RESP_QUERY_MISS = 33;
+	static const uint8_t RESP_QUERY_MISS = 34;
 
 	//
 	// Response from index-server after successfully
 	// probing the cache for a CMD_INDEX_QUERY_CACHE.
 	// Data on stream is:
 	// puzzle-request: PuzzleRequest
-	static const uint8_t RESP_QUERY_PARTIAL = 34;
+	static const uint8_t RESP_QUERY_PARTIAL = 36;
+
+	//
+	// Response from index to tell delivery qty
+	// Data on stream:
+	// qty:uint32_t
+	//
+	static const uint8_t RESP_DELIVERY_QTY = 37;
 
 	//
 	// Send if a worker cannot fulfill the request
@@ -167,6 +178,7 @@ public:
 	void send_hit( const CacheRef &cr );
 	void send_partial_hit( const PuzzleRequest &pr );
 	void send_miss();
+	void send_delivery_qty(uint32_t qty);
 	void release();
 
 	uint64_t get_client_id() const;

@@ -5,11 +5,14 @@
  *      Author: mika
  */
 
+#include "cache/priv/connection.h"
 #include "cache/priv/types.h"
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/raster.h"
 #include "operators/operator.h"
 #include "util/log.h"
+
+#include <cstdio>
 
 ////////////////////////////////////////////////////////
 //
@@ -225,4 +228,26 @@ std::string STRasterEntryBounds::to_string() const {
 	ss << "x_res:[" << x_res_from << "," << x_res_to << "], ";
 	ss << "y_res:[" << y_res_from << "," << y_res_to << "]";
 	return ss.str();
+}
+
+Delivery::Delivery(uint64_t id, unsigned int count, std::unique_ptr<GenericRaster> &raster) :
+	id(id), creation_time(time(0)), count(count), type(Type::RASTER), raster(std::move(raster)) {
+}
+
+void Delivery::send(DeliveryConnection& connection) {
+	count--;
+	switch ( type ) {
+		case Type::RASTER: {
+			connection.send_raster( *raster );
+			break;
+		}
+		default: {
+			Log::error("Currently only raster supported");
+		}
+	}
+}
+
+Delivery::Delivery(Delivery&& d) :
+	id(d.id), creation_time(d.creation_time),
+	count(d.count), type(d.type), raster(std::move(d.raster)) {
 }

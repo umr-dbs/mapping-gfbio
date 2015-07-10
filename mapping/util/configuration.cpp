@@ -1,4 +1,5 @@
 
+#include "util/exceptions.h"
 #include "util/configuration.h"
 #include <map>
 #include <iostream>
@@ -127,7 +128,10 @@ void Configuration::loadFromDefaultPaths() {
 
 
 const std::string &Configuration::get(const std::string &name) {
-	return values.at(name);
+	auto it = values.find(name);
+	if (it == values.end())
+		throw ArgumentException(concat("No configuration found for key ", name));
+	return it->second;
 }
 
 

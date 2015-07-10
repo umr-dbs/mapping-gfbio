@@ -8,7 +8,7 @@
 #ifndef BLOCKINGQUEUE_H_
 #define BLOCKINGQUEUE_H_
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <mutex>
 #include <condition_variable>

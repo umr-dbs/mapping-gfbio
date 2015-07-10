@@ -1,5 +1,5 @@
 #include "util/binarystream.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <string.h> // memset(), strerror()
 #include <errno.h>

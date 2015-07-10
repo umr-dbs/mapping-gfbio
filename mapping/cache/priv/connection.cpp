@@ -7,7 +7,7 @@
 
 #include "cache/priv/connection.h"
 #include "cache/index/indexserver.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/log.h"
 #include "util/make_unique.h"
 #include "util/concat.h"

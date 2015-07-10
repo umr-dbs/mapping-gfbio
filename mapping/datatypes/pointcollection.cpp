@@ -1,6 +1,6 @@
 #include "pointcollection.h"
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/binarystream.h"
 #include "util/hash.h"
 #include "util/make_unique.h"

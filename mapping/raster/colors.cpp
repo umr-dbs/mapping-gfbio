@@ -1,7 +1,7 @@
 
 
 #include "raster/colors.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/make_unique.h"
 
 #include <cmath>

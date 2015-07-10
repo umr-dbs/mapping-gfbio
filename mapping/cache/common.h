@@ -9,7 +9,7 @@
 #define COMMON_H_
 
 #include "util/binarystream.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "operators/operator.h"
 #include "datatypes/raster.h"
 #include "cache/priv/transfer.h"

@@ -8,7 +8,7 @@
 #include "cache/cache.h"
 #include "cache/common.h"
 #include "cache/priv/transfer.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 

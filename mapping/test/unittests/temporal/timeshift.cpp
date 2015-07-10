@@ -2,7 +2,7 @@
 
 #include "util/timemodification.h"
 #include "datatypes/spatiotemporal.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <ctime>
 #include <memory>

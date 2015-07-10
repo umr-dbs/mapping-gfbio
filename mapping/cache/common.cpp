@@ -9,7 +9,7 @@
 #include "cache/priv/connection.h"
 #include "cache/priv/types.h"
 #include "util/log.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <stdlib.h>
 #include <stdio.h>

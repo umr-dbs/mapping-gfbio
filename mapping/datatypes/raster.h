@@ -8,7 +8,7 @@
 #include <ostream>
 #include <memory>
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/attributes.h"
 

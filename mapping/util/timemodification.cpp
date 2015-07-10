@@ -1,6 +1,6 @@
 #include "timemodification.h"
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 auto TimeShift::toPTime(time_t time) -> PTime {
 	return boost::posix_time::from_time_t(time);

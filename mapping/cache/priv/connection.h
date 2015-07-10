@@ -173,7 +173,7 @@ public:
 
 	State get_state() const;
 
-	void process_request(uint64_t client_id, uint8_t command, const BaseRequest &request);
+	void process_request(uint8_t command, const BaseRequest &request);
 	void raster_cached();
 	void send_hit( const CacheRef &cr );
 	void send_partial_hit( const PuzzleRequest &pr );
@@ -181,7 +181,6 @@ public:
 	void send_delivery_qty(uint32_t qty);
 	void release();
 
-	uint64_t get_client_id() const;
 	const STRasterRefKeyed& get_new_raster_entry() const;
 	const BaseRequest& get_raster_query() const;
 
@@ -198,7 +197,6 @@ private:
 	void process_raster_request(const BaseRequest &req);
 
 	State state;
-	uint64_t client_id;
 	std::unique_ptr<DeliveryResponse> result;
 	std::unique_ptr<STRasterRefKeyed> new_raster_entry;
 	std::unique_ptr<BaseRequest> raster_query;

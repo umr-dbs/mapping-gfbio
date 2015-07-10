@@ -8,7 +8,8 @@
 #ifndef INDEX_INDEXSERVER_H_
 #define INDEX_INDEXSERVER_H_
 
-#include <cache/common.h>
+#include "cache/common.h"
+#include "cache/index/querymanager.h"
 #include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
 #include "cache/cache.h"
@@ -20,41 +21,6 @@
 #include <vector>
 #include <deque>
 
-
-class JobDescription {
-public:
-	virtual ~JobDescription();
-	ClientConnection &client_connection;
-	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
-protected:
-	JobDescription( ClientConnection &client_connection, std::unique_ptr<BaseRequest> request );
-	const std::unique_ptr<BaseRequest> request;
-};
-
-class CreateJob : public JobDescription {
-public:
-	CreateJob( ClientConnection &client_connection, std::unique_ptr<BaseRequest> &request );
-	virtual ~CreateJob();
-	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
-};
-
-class DeliverJob : public JobDescription {
-public:
-	DeliverJob( ClientConnection &client_connection, std::unique_ptr<DeliveryRequest> &request, uint32_t node );
-	virtual ~DeliverJob();
-	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
-private:
-	uint32_t node;
-};
-
-class PuzzleJob : public JobDescription {
-public:
-	PuzzleJob( ClientConnection &client_connection, std::unique_ptr<PuzzleRequest> &request, std::vector<uint32_t> &nodes );
-	virtual ~PuzzleJob();
-	virtual bool schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
-private:
-	std::vector<uint32_t> nodes;
-};
 
 //
 // Represents a cache-node.
@@ -119,9 +85,6 @@ private:
 	std::unique_ptr<JobDescription> process_client_raster_request( ClientConnection &con );
 	void process_worker_raster_query( WorkerConnection &con );
 
-	// Schedules pending jobs
-	void schedule_jobs();
-
 	// The port the index-server is listening on
 	int port;
 
@@ -132,8 +95,8 @@ private:
 	uint32_t next_node_id;
 	// Cache
 	RasterRefCache raster_cache;
-	// The jobs to be scheduled
-	std::vector<std::unique_ptr<JobDescription>> pending_jobs;
+
+	QueryManager query_manager;
 };
 
 #endif /* INDEX_INDEXSERVER_H_ */

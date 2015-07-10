@@ -142,7 +142,7 @@ const uint8_t ClientConnection::RESP_ERROR;
 /////////////////////////////////////////////////
 
 WorkerConnection::WorkerConnection(std::unique_ptr<UnixSocket> &socket, const std::shared_ptr<Node> &node) :
-	BaseConnection(socket), node(node), state(State::IDLE), client_id(-1) {
+	BaseConnection(socket), node(node), state(State::IDLE) {
 }
 
 WorkerConnection::~WorkerConnection() {
@@ -204,10 +204,9 @@ void WorkerConnection::process_command(uint8_t cmd) {
 
 // ACTIONS
 
-void WorkerConnection::process_request(uint64_t client_id, uint8_t command, const BaseRequest& request) {
+void WorkerConnection::process_request(uint8_t command, const BaseRequest& request) {
 	if (state == State::IDLE) {
 		state = State::PROCESSING;
-		this->client_id = client_id;
 		stream.write(command);
 		request.toStream(stream);
 	}
@@ -319,14 +318,7 @@ const std::string& WorkerConnection::get_error_message() const {
 	throw IllegalStateException("Can only return error-message in state ERROR");
 }
 
-uint64_t WorkerConnection::get_client_id() const {
-	if (state != State::IDLE)
-		return client_id;
-	throw IllegalStateException("Can only return client_id when not in state IDLE");
-}
-
 void WorkerConnection::reset() {
-	client_id = -1;
 	error_msg = "";
 	result.release();
 	new_raster_entry.release();

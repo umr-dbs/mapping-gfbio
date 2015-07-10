@@ -23,72 +23,6 @@
 #include <unistd.h>
 #include <errno.h>
 
-JobDescription::~JobDescription() {
-}
-
-JobDescription::JobDescription(ClientConnection& client_connection, std::unique_ptr<BaseRequest> request) :
-	client_connection(client_connection), request(std::move(request)) {
-}
-
-CreateJob::CreateJob(ClientConnection& client_connection, std::unique_ptr<BaseRequest>& request) :
-	JobDescription(client_connection, std::unique_ptr<BaseRequest>(request.release())) {
-}
-
-CreateJob::~CreateJob() {
-}
-
-bool CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.get_state() == WorkerConnection::State::IDLE) {
-			con.process_request(client_connection.id, WorkerConnection::CMD_CREATE_RASTER, *request);
-			return true;
-		}
-	}
-	return false;
-}
-
-DeliverJob::DeliverJob(ClientConnection& client_connection, std::unique_ptr<DeliveryRequest>& request,
-	uint32_t node) :
-	JobDescription(client_connection, std::unique_ptr<BaseRequest>(request.release())), node(node) {
-}
-
-DeliverJob::~DeliverJob() {
-}
-
-bool DeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.node->id == node && con.get_state() == WorkerConnection::State::IDLE) {
-			con.process_request(client_connection.id, WorkerConnection::CMD_DELIVER_RASTER, *request);
-			return true;
-		}
-	}
-	return false;
-}
-
-PuzzleJob::PuzzleJob(ClientConnection& client_connection, std::unique_ptr<PuzzleRequest>& request,
-	std::vector<uint32_t>& nodes) :
-	JobDescription(client_connection, std::unique_ptr<BaseRequest>(request.release())), nodes(std::move(nodes)) {
-}
-
-PuzzleJob::~PuzzleJob() {
-}
-
-bool PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &node : nodes) {
-		for (auto &e : connections) {
-			auto &con = *e.second;
-			if (!con.is_faulty() && con.node->id == node
-				&& con.get_state() == WorkerConnection::State::IDLE) {
-				con.process_request(client_connection.id, WorkerConnection::CMD_PUZZLE_RASTER, *request);
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
 ////////////////////////////////////////////////////////////
 //
 // NODE
@@ -106,7 +40,7 @@ Node::Node(uint32_t id, const std::string &host, uint32_t port) :
 ////////////////////////////////////////////////////////////
 
 IndexServer::IndexServer(int port) :
-	port(port), shutdown(false), next_node_id(1) {
+	port(port), shutdown(false), next_node_id(1), raster_cache(), query_manager(raster_cache, nodes) {
 }
 
 IndexServer::~IndexServer() {
@@ -164,7 +98,7 @@ void IndexServer::run() {
 				}
 			}
 		}
-		schedule_jobs();
+		query_manager.schedule_pending_jobs(worker_connections);
 	}
 	close(listen_socket);
 	Log::info("Index-Server done.");
@@ -178,15 +112,8 @@ int IndexServer::setup_fdset(fd_set* readfds) {
 		while (wit != worker_connections.end()) {
 			WorkerConnection &wc = *wit->second;
 			if (wc.is_faulty()) {
-				// Reschedule job
-				uint64_t client_id = 0;
-				if (wc.get_state() != WorkerConnection::State::IDLE) {
-					client_id = wc.get_client_id();
-				}
+				// TODO: Reschedule
 				worker_connections.erase(wit++);
-				if (client_id != 0) {
-					process_client_request(*client_connections.at(client_id));
-				}
 			}
 			else {
 				FD_SET(wc.get_read_fd(), readfds);
@@ -340,21 +267,34 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 				case WorkerConnection::State::ERROR: {
 					Log::warn("Worker returned error: %s. Forwarding to client.",
 						wc.get_error_message().c_str());
-					auto &cc = *client_connections.at(wc.get_client_id());
-					cc.send_error(wc.get_error_message());
+
+					auto clients = query_manager.release_worker(wc.id);
+					for ( auto &cid : clients ) {
+						try {
+							client_connections.at(cid)->send_error(wc.get_error_message());
+						} catch ( std::out_of_range &oor ) {
+							Log::warn("Client %d does not exist.", cid );
+						}
+					}
 					wc.release();
 					break;
 				}
 				case WorkerConnection::State::DONE: {
 					Log::debug("Worker returned result. Determinig delivery qty.");
-					// TODO: Implement batching
-					wc.send_delivery_qty(1);
+					unsigned int qty = query_manager.get_query_count( wc.id );
+					wc.send_delivery_qty(qty);
 					break;
 				}
 				case WorkerConnection::State::DELIVERY_READY: {
 					Log::debug("Worker returned delivery: %s", wc.get_result().to_string().c_str() );
-					auto &cc = *client_connections.at(wc.get_client_id());
-					cc.send_response(wc.get_result());
+					auto clients = query_manager.release_worker(wc.id);
+					for ( auto &cid : clients ) {
+						try {
+							client_connections.at(cid)->send_response(wc.get_result());
+						} catch ( std::out_of_range &oor ) {
+							Log::warn("Client %d does not exist.", cid );
+						}
+					}
 					wc.release();
 					break;
 				}
@@ -384,48 +324,10 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 void IndexServer::process_client_request(ClientConnection& con) {
 	switch (con.get_request_type()) {
 		case ClientConnection::RequestType::RASTER:
-			pending_jobs.push_back(process_client_raster_request(con));
+			query_manager.add_raster_request( con.id, con.get_request() );
 			break;
 		default:
 			throw std::runtime_error("Request-type not implemented yet.");
-	}
-}
-
-std::unique_ptr<JobDescription> IndexServer::process_client_raster_request(ClientConnection &con) {
-	auto &req = con.get_request();
-	STQueryResult res = raster_cache.query(req.semantic_id, req.query);
-	Log::debug("QueryResult: %s", res.to_string().c_str());
-
-	// Full single hit
-	if (res.ids.size() == 1 && !res.has_remainder()) {
-		Log::debug("Full HIT. Sending reference.");
-
-		auto &ref = raster_cache.get(req.semantic_id, res.ids.at(0));
-
-		std::unique_ptr<DeliveryRequest> jreq = std::make_unique<DeliveryRequest>(req.semantic_id,
-			req.query, ref->cache_id);
-		return std::make_unique<DeliverJob>(con, jreq, ref->node_id);
-	}
-	// Puzzle
-	else if (res.has_hit() && res.coverage > 0.1) {
-		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f", res.coverage);
-		std::vector<uint32_t> node_ids;
-		std::vector<CacheRef> entries;
-		for (auto id : res.ids) {
-			auto &ref = raster_cache.get(req.semantic_id, id);
-			auto &node = nodes.at(ref->node_id);
-			node_ids.push_back(ref->node_id);
-			entries.push_back(CacheRef(node->host, node->port, ref->cache_id));
-		}
-		std::unique_ptr<PuzzleRequest> jreq = std::make_unique<PuzzleRequest>(req.semantic_id, req.query,
-			res.covered, res.remainder, entries);
-		return std::make_unique<PuzzleJob>(con, jreq, node_ids);
-	}
-	// Full miss
-	else {
-		Log::debug("Full MISS.");
-		std::unique_ptr<BaseRequest> jreq = std::make_unique<BaseRequest>(req);
-		return std::make_unique<CreateJob>(con, jreq);
 	}
 }
 
@@ -458,15 +360,5 @@ void IndexServer::process_worker_raster_query(WorkerConnection& con) {
 	else {
 		Log::debug("Full MISS.");
 		con.send_miss();
-	}
-}
-
-void IndexServer::schedule_jobs() {
-	auto it = pending_jobs.begin();
-	while (it != pending_jobs.end()) {
-		if ((*it)->schedule(worker_connections))
-			it = pending_jobs.erase(it);
-		else
-			++it;
 	}
 }

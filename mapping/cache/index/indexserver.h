@@ -12,6 +12,7 @@
 #include "cache/index/querymanager.h"
 #include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
+#include "cache/priv/redistribution.h"
 #include "cache/cache.h"
 #include "util/log.h"
 
@@ -62,14 +63,14 @@ public:
 	// Subsequent calls to run or run_async have undefined
 	// behaviour
 	virtual void stop();
-private:
+protected:
 	// The currently known nodes
 	std::map<uint32_t,std::shared_ptr<Node>> nodes;
 	// Connections
 	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
 	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
-
+private:
 	// Adds the fds of all connections to the read-set
 	// and kills faulty connections
 	int setup_fdset( fd_set *readfds);
@@ -82,8 +83,10 @@ private:
 	void process_client_connections(fd_set *readfds);
 
 	void process_client_request( ClientConnection &con );
-	std::unique_ptr<JobDescription> process_client_raster_request( ClientConnection &con );
 	void process_worker_raster_query( WorkerConnection &con );
+
+	// Reorg
+	void handle_reorg_result( uint32_t new_node, const ReorgResult &res );
 
 	// The port the index-server is listening on
 	int port;

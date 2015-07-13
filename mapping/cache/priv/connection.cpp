@@ -360,21 +360,94 @@ ControlConnection::ControlConnection(std::unique_ptr<UnixSocket>& socket, const 
 ControlConnection::~ControlConnection() {
 }
 
+ControlConnection::State ControlConnection::get_state() const {
+	return state;
+}
+
 void ControlConnection::process_command(uint8_t cmd) {
-	if (state != State::IDLE)
-		throw IllegalStateException("Can only accept input in IDLE-state.");
+	if (state != State::IDLE && state != State::REORGANIZING)
+		throw IllegalStateException("Can only accept input in state IDLE or REORGANIZING");
 
 	switch (cmd) {
+		case CMD_REORG_ITEM_MOVED: {
+			Log::debug("Received notification about reorganized entry.");
+			reorg_result.reset(new ReorgResult(stream));
+			state = State::REORG_RESULT_READ;
+			break;
+		}
+		case CMD_REORG_DONE: {
+			Log::debug("Node %d finished reorganization.", node->id);
+			state = State::REORG_FINISHED;
+			break;
+		}
 		default: {
-			std::ostringstream msg;
-			msg << "Received illegal command on control-connection for node: " << node->id;
-			throw NetworkException(msg.str());
+			throw NetworkException(
+				concat("Received illegal command on control-connection for node: ", node->id));
 		}
 	}
 }
 
+// ACTIONS
+
+void ControlConnection::send_reorg(const ReorgDescription& desc) {
+	if ( state == State::IDLE ) {
+		try {
+			stream.write(RESP_REORG);
+			desc.toStream(stream);
+			state = State::REORGANIZING;
+		} catch ( NetworkException &ne ) {
+			Log::error("Could not send Reorg-request to node: %d", node->id);
+			faulty = true;
+		}
+	}
+	else
+		throw IllegalStateException("Can only trigger reorg in state IDLE");
+}
+
+void ControlConnection::confirm_reorg() {
+	if (state == State::REORG_RESULT_READ) {
+		try {
+			stream.write(RESP_REORG_ITEM_OK);
+			state = State::REORGANIZING;
+		} catch (NetworkException &ne) {
+			Log::error("Could not send MISS-response to worker: %d", id);
+			faulty = true;
+		}
+	}
+	else
+		throw IllegalStateException("Can only send raster query result in state REORG_RESULT_READ");
+
+}
+
+void ControlConnection::release() {
+	if (state == State::REORG_FINISHED)
+		reset();
+	else
+		throw IllegalStateException("Can only release control-connection in state REORG_FINISHED or ERROR");
+}
+
+//
+// GETTER
+//
+
+const ReorgResult& ControlConnection::get_result() {
+	if ( state == State::REORG_RESULT_READ )
+		return * reorg_result;
+	else
+		throw IllegalStateException("Can only return ReorgResult in state REORG_RESULT_READ");
+}
+
+void ControlConnection::reset() {
+	reorg_result.release();
+	state = State::IDLE;
+}
+
 const uint32_t ControlConnection::MAGIC_NUMBER;
 const uint8_t ControlConnection::RESP_HELLO;
+const uint8_t ControlConnection::RESP_REORG;
+const uint8_t ControlConnection::RESP_REORG_ITEM_OK;
+const uint8_t ControlConnection::CMD_REORG_DONE;
+const uint8_t ControlConnection::CMD_REORG_ITEM_MOVED;
 
 /////////////////////////////////////////////////
 //
@@ -390,8 +463,8 @@ DeliveryConnection::~DeliveryConnection() {
 }
 
 void DeliveryConnection::process_command(uint8_t cmd) {
-	if (state != State::IDLE)
-		throw IllegalStateException("Can only read from socket in state IDLE");
+	if (state != State::IDLE && state != State::AWAITING_MOVE_CONFIRM)
+		throw IllegalStateException("Can only read from socket in state IDLE and AWAITING_MOVE_CONFIRM");
 
 	switch (cmd) {
 		case CMD_GET: {
@@ -402,6 +475,15 @@ void DeliveryConnection::process_command(uint8_t cmd) {
 		case CMD_GET_CACHED_RASTER: {
 			cache_key = STCacheKey(stream);
 			state = State::RASTER_CACHE_REQUEST_READ;
+			break;
+		}
+		case CMD_MOVE_RASTER: {
+			cache_key = STCacheKey(stream);
+			state = State::RASTER_MOVE_REQUEST_READ;
+			break;
+		}
+		case CMD_MOVE_DONE: {
+			state = State::MOVE_DONE;
 			break;
 		}
 		default:
@@ -415,7 +497,10 @@ DeliveryConnection::State DeliveryConnection::get_state() const {
 }
 
 const STCacheKey& DeliveryConnection::get_key() const {
-	if (state == State::RASTER_CACHE_REQUEST_READ)
+	if (state == State::RASTER_CACHE_REQUEST_READ ||
+		state == State::RASTER_MOVE_REQUEST_READ ||
+		state == State::AWAITING_MOVE_CONFIRM ||
+		state == State::MOVE_DONE)
 		return cache_key;
 	throw IllegalStateException("Can only return cache-key if in state RASTER_CACHE_REQUEST_READ");
 }
@@ -443,7 +528,8 @@ void DeliveryConnection::send_raster(GenericRaster& raster) {
 }
 
 void DeliveryConnection::send_error(const std::string& msg) {
-	if (state == State::RASTER_CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ) {
+	if (state == State::RASTER_CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ ||
+		state == State::RASTER_MOVE_REQUEST_READ ) {
 		try {
 			stream.write(RESP_ERROR);
 			stream.write(msg);
@@ -458,8 +544,33 @@ void DeliveryConnection::send_error(const std::string& msg) {
 			"Can only send error in state DELIVERY_REQUEST_READ or RASTER_CACHE_REQUEST_READ");
 }
 
+void DeliveryConnection::send_raster_move(GenericRaster& raster) {
+	if ( state == State::RASTER_MOVE_REQUEST_READ ) {
+		try {
+			stream.write(RESP_OK);
+			raster.toStream(stream);
+			state = State::AWAITING_MOVE_CONFIRM;
+		} catch ( NetworkException &ne ) {
+			Log::error("Could not send response to client.");
+			faulty = true;
+		}
+	}
+	else
+		throw IllegalStateException("Can only move raster in state RASTER_MOVE_REQUEST_READ");
+
+}
+
+void DeliveryConnection::release() {
+	if ( state == State::MOVE_DONE )
+		state = State::IDLE;
+	else
+		throw IllegalStateException("Can only release connection in state MOVE_DONE");
+}
+
 const uint32_t DeliveryConnection::MAGIC_NUMBER;
 const uint8_t DeliveryConnection::CMD_GET;
 const uint8_t DeliveryConnection::CMD_GET_CACHED_RASTER;
+const uint8_t DeliveryConnection::CMD_MOVE_RASTER;
+const uint8_t DeliveryConnection::CMD_MOVE_DONE;
 const uint8_t DeliveryConnection::RESP_OK;
 const uint8_t DeliveryConnection::RESP_ERROR;

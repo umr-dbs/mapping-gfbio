@@ -76,18 +76,7 @@ void DeliveryManager::run() {
 			maxfd = std::max(maxfd, fd);
 		}
 
-		// Current connections
-		auto dciter = connections.begin();
-		while (dciter != connections.end()) {
-			DeliveryConnection &dc = **dciter;
-			if ( dc.is_faulty() )
-				dciter = connections.erase(dciter);
-			else {
-				FD_SET(dc.get_read_fd(), &readfds);
-				maxfd = std::max(maxfd, dc.get_read_fd());
-				++dciter;
-			}
-		}
+		maxfd = std::max(maxfd, setup_fdset(&readfds));
 
 		int ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
 		if (ret <= 0)
@@ -95,46 +84,7 @@ void DeliveryManager::run() {
 
 		// Current connections
 		// Action on delivery connections
-		for ( auto &dc : connections ) {
-			if ( FD_ISSET(dc->get_read_fd(), &readfds)) {
-				dc->input();
-				// Skip faulty connections
-				if ( dc->is_faulty() )
-					continue;
-				switch ( dc->get_state() ) {
-					case DeliveryConnection::State::DELIVERY_REQUEST_READ: {
-						uint64_t id = dc->get_delivery_id();
-						try {
-							auto &res = get_delivery(id);
-							Log::debug("Sending delivery: %d", id);
-							res.send( *dc );
-							Log::debug("Finished sending delivery: %d", id);
-							if ( res.count == 0 )
-								remove_delivery(res.id);
-						} catch (std::out_of_range &oor) {
-							Log::info("Received request for unknown delivery-id: %d", id);
-							dc->send_error(concat("Invalid delivery id: ",id));
-						}
-						break;
-					}
-					case DeliveryConnection::State::RASTER_CACHE_REQUEST_READ: {
-						auto &key = dc->get_key();
-						try {
-							Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-							auto res = CacheManager::getInstance().get_raster(key);
-							dc->send_raster(*res);
-							Log::debug("Finished sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-						} catch (NoSuchElementException &nse) {
-							dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
-						}
-						break;
-					}
-					default: {
-						Log::trace("Nothing todo on delivery connection: %d", dc->id);
-					}
-				}
-			}
-		}
+		process_connections(&readfds);
 
 		// Handshake
 		auto fd_it = new_fds.begin();
@@ -175,7 +125,85 @@ void DeliveryManager::run() {
 
 		remove_expired_deliveries();
 	}
+	close(delivery_fd);
 	Log::info("Delivery-Manager done.");
+}
+
+int DeliveryManager::setup_fdset(fd_set* readfds) {
+	int maxfd = -1;
+	auto dciter = connections.begin();
+	while (dciter != connections.end()) {
+		DeliveryConnection &dc = **dciter;
+		if ( dc.is_faulty() )
+			dciter = connections.erase(dciter);
+		else {
+			FD_SET(dc.get_read_fd(), readfds);
+			maxfd = std::max(maxfd, dc.get_read_fd());
+			++dciter;
+		}
+	}
+	return maxfd;
+}
+
+void DeliveryManager::process_connections(fd_set* readfds) {
+	for ( auto &dc : connections ) {
+		if ( FD_ISSET(dc->get_read_fd(), readfds)) {
+			dc->input();
+			// Skip faulty connections
+			if ( dc->is_faulty() )
+				continue;
+			switch ( dc->get_state() ) {
+				case DeliveryConnection::State::DELIVERY_REQUEST_READ: {
+					uint64_t id = dc->get_delivery_id();
+					try {
+						auto &res = get_delivery(id);
+						Log::debug("Sending delivery: %d", id);
+						res.send( *dc );
+						Log::debug("Finished sending delivery: %d", id);
+						if ( res.count == 0 )
+							remove_delivery(res.id);
+					} catch (std::out_of_range &oor) {
+						Log::info("Received request for unknown delivery-id: %d", id);
+						dc->send_error(concat("Invalid delivery id: ",id));
+					}
+					break;
+				}
+				case DeliveryConnection::State::RASTER_CACHE_REQUEST_READ: {
+					auto &key = dc->get_key();
+					try {
+						Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+						auto res = CacheManager::getInstance().get_raster_local(key);
+						dc->send_raster(*res);
+						Log::debug("Finished sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+					} catch (NoSuchElementException &nse) {
+						dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
+					}
+					break;
+				}
+				case DeliveryConnection::State::RASTER_MOVE_REQUEST_READ: {
+					auto &key = dc->get_key();
+					try {
+						Log::debug("Moving cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
+						auto res = CacheManager::getInstance().get_raster_local(key);
+						dc->send_raster_move(*res);
+					} catch (NoSuchElementException &nse) {
+						dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
+					}
+					break;
+				}
+				case DeliveryConnection::State::MOVE_DONE: {
+					auto &key = dc->get_key();
+					Log::debug("Move of entry: %s:%d confirmed. Dropping.", key.semantic_id.c_str(), key.entry_id);
+					CacheManager::getInstance().remove_raster_local(key);
+					dc->release();
+					break;
+				}
+				default: {
+					Log::trace("Nothing todo on delivery connection: %d", dc->id);
+				}
+			}
+		}
+	}
 }
 
 std::unique_ptr<std::thread> DeliveryManager::run_async() {
@@ -190,3 +218,4 @@ void DeliveryManager::stop() {
 DeliveryManager::~DeliveryManager() {
 	stop();
 }
+

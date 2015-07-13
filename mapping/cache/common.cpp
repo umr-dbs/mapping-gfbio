@@ -134,7 +134,7 @@ std::unique_ptr<GenericRaster> CacheCommon::process_raster_puzzle(const PuzzleRe
 		if (cr.host == my_host && cr.port == my_port) {
 			Log::trace("Fetching puzzle-piece from local cache, key: %s:%d", req.semantic_id.c_str(),
 				cr.entry_id);
-			items.push_back(CacheManager::getInstance().get_raster(req.semantic_id, cr.entry_id));
+			items.push_back(CacheManager::getInstance().get_raster_local(req.semantic_id, cr.entry_id));
 		}
 		else {
 			Log::debug("Fetching puzzle-piece from %s:%d, key: %s:%d", cr.host.c_str(), cr.port,

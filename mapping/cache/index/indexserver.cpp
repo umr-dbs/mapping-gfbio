@@ -221,6 +221,43 @@ void IndexServer::process_control_connections(fd_set* readfds) {
 			// Skip faulty connections
 			if (cc.is_faulty())
 				continue;
+
+
+			switch (cc.get_state()) {
+				case ControlConnection::State::REORG_RESULT_READ: {
+					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
+					auto &res = cc.get_result();
+					handle_reorg_result(cc.node->id,res);
+					cc.confirm_reorg();
+					break;
+				}
+				case ControlConnection::State::REORG_FINISHED: {
+					Log::debug("Node %d finished reorganization.", cc.node->id);
+					cc.release();
+					break;
+				}
+				default: {
+					throw std::runtime_error("Unknown state of client-connection.");
+				}
+			}
+
+
+
+		}
+	}
+}
+
+
+void IndexServer::handle_reorg_result(uint32_t new_node, const ReorgResult& res) {
+	switch ( res.type ) {
+		case ReorgResult::Type::RASTER: {
+			auto &ce = raster_cache.get(res.semantic_id,res.idx_cache_id);
+			ce->node_id = new_node;
+			ce->cache_id = res.cache_id;
+			break;
+		}
+		default: {
+			throw ArgumentException(concat("Type: ", (int) res.type, " not supported yet."));
 		}
 	}
 }

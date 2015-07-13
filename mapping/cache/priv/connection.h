@@ -11,6 +11,7 @@
 #include "util/binarystream.h"
 #include "cache/cache.h"
 #include "cache/priv/transfer.h"
+#include "cache/priv/redistribution.h"
 
 #include <map>
 #include <memory>
@@ -95,19 +96,19 @@ public:
 
 	//
 	// Expected data on stream is:
-	// request:RasterBaseRequest
+	// request:BaseRequest
 	//
 	static const uint8_t CMD_CREATE_RASTER = 20;
 
 	//
 	// Expected data on stream is:
-	// request:RasterDeliveryRequest
+	// request:DeliveryRequest
 	//
 	static const uint8_t CMD_DELIVER_RASTER = 21;
 
 	//
 	// Expected data on stream is:
-	// request:RasterPuzzleRequest
+	// request:PuzzleRequest
 	//
 	static const uint8_t CMD_PUZZLE_RASTER = 22;
 
@@ -123,7 +124,9 @@ public:
 	static const uint8_t RESP_RESULT_READY = 30;
 
 	//
-	// Response from worker to signal ready to delivery
+	// Response from worker to signal ready to deliver result
+	// Data on stream is:
+	// DeliveryResponse
 	//
 	static const uint8_t RESP_DELIVERY_READY = 31;
 
@@ -194,7 +197,6 @@ protected:
 
 private:
 	void reset();
-	void process_raster_request(const BaseRequest &req);
 
 	State state;
 	std::unique_ptr<DeliveryResponse> result;
@@ -206,15 +208,50 @@ private:
 class ControlConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE
+		IDLE, REORGANIZING, REORG_RESULT_READ, REORG_FINISHED
 	};
 	static const uint32_t MAGIC_NUMBER = 0x42345678;
+
+	//
+	// Tells the index that the node finished
+	// reorganization of a single item.
+	// Data on stream is:
+	// ReorgResult
+	//
+	static const uint8_t CMD_REORG_ITEM_MOVED = 40;
+
+	//
+	// Response from worker to signal that the reorganization
+	// is finished.
+	//
+	static const uint8_t CMD_REORG_DONE = 41;
 
 	//
 	// Response from index-server after successful
 	// registration of a new node. Data on stream is:
 	// id:uint32_t -- the id assigned to the node
 	static const uint8_t RESP_HELLO = 50;
+
+	//
+	// Tells the node to fetch the attached
+	// items and store them in its local cache
+	// ReorgDescription
+	//
+	static const uint8_t RESP_REORG = 51;
+
+	//
+	// Tells the node that the reorg on index was OK
+	// There is no data on stream
+	//
+	static const uint8_t RESP_REORG_ITEM_OK = 52;
+
+	State get_state() const;
+
+	void send_reorg( const ReorgDescription &desc );
+	void confirm_reorg();
+	void release();
+
+	const ReorgResult& get_result();
 
 	ControlConnection(std::unique_ptr<UnixSocket> &socket, const std::shared_ptr<Node> &node);
 	virtual ~ControlConnection();
@@ -224,7 +261,9 @@ protected:
 	virtual void process_command( uint8_t cmd );
 
 private:
+	void reset();
 	State state;
+	std::unique_ptr<ReorgResult> reorg_result;
 };
 
 ////////////////////////////////////////////////////
@@ -236,7 +275,7 @@ private:
 class DeliveryConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, DELIVERY_REQUEST_READ, RASTER_CACHE_REQUEST_READ
+		IDLE, DELIVERY_REQUEST_READ, RASTER_CACHE_REQUEST_READ, RASTER_MOVE_REQUEST_READ, AWAITING_MOVE_CONFIRM, MOVE_DONE
 	};
 
 	static const uint32_t MAGIC_NUMBER = 0x52345678;
@@ -254,6 +293,20 @@ public:
 	// key:STCacheKey
 	//
 	static const uint8_t CMD_GET_CACHED_RASTER = 61;
+
+	//
+	// Command to pick up a delivery.
+	// Expected data on stream is:
+	// key:STCacheKey
+	//
+	static const uint8_t CMD_MOVE_RASTER = 62;
+
+	//
+	// Command to pick up a delivery.
+	// No expected data on stream.
+	//
+	static const uint8_t CMD_MOVE_DONE = 63;
+
 
 	//
 	// Response if delivery is send. Data:
@@ -278,7 +331,11 @@ public:
 
 	void send_raster( GenericRaster &raster );
 
+	void send_raster_move( GenericRaster &raster );
+
 	void send_error( const std::string &msg );
+
+	void release();
 
 protected:
 	virtual void process_command( uint8_t cmd );

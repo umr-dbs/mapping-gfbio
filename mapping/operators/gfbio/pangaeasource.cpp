@@ -36,7 +36,7 @@ REGISTER_OPERATOR(PangaeaSource, "pangaeasource");
 
 
 std::unique_ptr<PointCollection> PangaeaSource::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
-	std::unique_ptr<PointCollection> points =  std::make_unique<PointCollection>(rect);
+	std::unique_ptr<PointCollection> points = make_unique<PointCollection>(rect);
 
 	std::stringstream data;
 

@@ -36,7 +36,7 @@ struct histogram{
 		T min = (T) raster->dd.min;
 
 		auto range = RasterTypeInfo<T>::getRange(min, max);
-		auto histogram = std::make_unique<Histogram>(range, min, max);
+		auto histogram = make_unique<Histogram>(range, min, max);
 
 		int size = raster->getPixelCount();
 		for (int i=0;i<size;i++) {

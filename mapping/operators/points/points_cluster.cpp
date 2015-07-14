@@ -26,7 +26,7 @@ std::unique_ptr<PointCollection> PointsClusterOperator::getPointCollection(const
 	// TODO: EXPECT EPSG:3857
 
 	auto pointsOld = getPointCollectionFromSource(0, rect, profiler);
-	auto pointsNew = std::make_unique<PointCollection>(pointsOld->stref);
+	auto pointsNew = make_unique<PointCollection>(pointsOld->stref);
 
 	pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(
 													pv::Coordinate((rect.x2 + rect.x1) / (2 * rect.xres), (rect.y2 + rect.y2) / (2 * rect.yres)),

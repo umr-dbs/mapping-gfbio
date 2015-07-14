@@ -127,7 +127,7 @@ std::unique_ptr<PointCollection> ROperator::getPointCollection(const QueryRectan
 	UnixSocket socket(socketpath.c_str());
 	runScript(socket, rect, RSERVER_TYPE_POINTS, profiler);
 
-	auto points = std::make_unique<PointCollection>(socket);
+	auto points = make_unique<PointCollection>(socket);
 	return points;
 }
 

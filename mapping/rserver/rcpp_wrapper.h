@@ -259,7 +259,7 @@ namespace ***REMOVED*** {
 			throw OperatorException("Result has an unknown epsg");
 		epsg_t epsg = (epsg_t) std::stoi(epsg_s.substr(5, std::string::npos));
 
-		auto points = std::make_unique<PointCollection>(SpatioTemporalReference(epsg, TIMETYPE_UNIX));
+		auto points = make_unique<PointCollection>(SpatioTemporalReference(epsg, TIMETYPE_UNIX));
 
 		***REMOVED***::NumericMatrix coords = ***REMOVED***::as<***REMOVED***::NumericMatrix>(SPDF.slot("coords"));
 

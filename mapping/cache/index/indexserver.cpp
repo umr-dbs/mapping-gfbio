@@ -163,14 +163,14 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 	while (it != new_fds.end()) {
 		if (FD_ISSET(*it, readfds)) {
 			try {
-				std::unique_ptr<UnixSocket> us = std::make_unique<UnixSocket>(*it, *it);
+				std::unique_ptr<UnixSocket> us = make_unique<UnixSocket>(*it, *it);
 				BinaryStream &s = *us;
 
 				uint32_t magic;
 				s.read(&magic);
 				switch (magic) {
 					case ClientConnection::MAGIC_NUMBER: {
-						std::unique_ptr<ClientConnection> cc = std::make_unique<ClientConnection>(us);
+						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(us);
 						Log::debug("New client connections established");
 						client_connections.emplace(cc->id, std::move(cc));
 						break;
@@ -179,7 +179,7 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 						uint32_t node_id;
 						s.read(&node_id);
 						Log::info("New worker registered for node: %d", node_id);
-						std::unique_ptr<WorkerConnection> wc = std::make_unique<WorkerConnection>(us,
+						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(us,
 							nodes.at(node_id));
 						worker_connections.emplace(wc->id, std::move(wc));
 						break;
@@ -189,8 +189,8 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 						uint32_t port;
 						s.read(&host);
 						s.read(&port);
-						std::shared_ptr<Node> node = std::make_unique<Node>(next_node_id++, host, port);
-						std::unique_ptr<ControlConnection> cc = std::make_unique<ControlConnection>(us, node);
+						std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, host, port);
+						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(us, node);
 						Log::info("New node registered. ID: %d, control-connected fd: %d", node->id,
 							cc->get_read_fd());
 						control_connections.emplace(cc->id, std::move(cc));
@@ -301,7 +301,7 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 				case WorkerConnection::State::NEW_RASTER_ENTRY: {
 					Log::debug("Worker added new raster-entry");
 					auto &ref = wc.get_new_raster_entry();
-					std::unique_ptr<STRasterRef> entry = std::make_unique<STRasterRef>(ref.node_id,
+					std::unique_ptr<STRasterRef> entry = make_unique<STRasterRef>(ref.node_id,
 						ref.cache_id, ref.bounds);
 					raster_cache.put(ref.semantic_id, entry);
 					wc.raster_cached();

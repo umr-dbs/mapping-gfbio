@@ -103,7 +103,7 @@ std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryR
 		}
 	}
 
-	auto histogram = std::make_unique<Histogram>(numberOfBuckets, rangeMin, rangeMax);
+	auto histogram = make_unique<Histogram>(numberOfBuckets, rangeMin, rangeMax);
 	for (size_t i=0; i < featurecount; i++) {
 		double value = valueVector[i];
 		if (std::isnan(value) /* is NaN */)

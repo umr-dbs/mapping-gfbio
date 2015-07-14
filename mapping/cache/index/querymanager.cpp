@@ -46,9 +46,9 @@ void QueryManager::add_raster_request(uint64_t client_id, const BaseRequest& req
 
 		auto &ref = raster_cache.get(req.semantic_id, res.ids.at(0));
 
-		std::unique_ptr<DeliveryRequest> jreq = std::make_unique<DeliveryRequest>(req.semantic_id,
+		std::unique_ptr<DeliveryRequest> jreq = make_unique<DeliveryRequest>(req.semantic_id,
 			req.query, ref->cache_id);
-		pending_jobs.push_back(std::make_unique<DeliverJob>(client_id, jreq, ref->node_id));
+		pending_jobs.push_back(make_unique<DeliverJob>(client_id, jreq, ref->node_id));
 	}
 	// Puzzle
 	else if (res.has_hit() && res.coverage > 0.1) {
@@ -61,15 +61,15 @@ void QueryManager::add_raster_request(uint64_t client_id, const BaseRequest& req
 			node_ids.push_back(ref->node_id);
 			entries.push_back(CacheRef(node->host, node->port, ref->cache_id));
 		}
-		std::unique_ptr<PuzzleRequest> jreq = std::make_unique<PuzzleRequest>(req.semantic_id, req.query,
+		std::unique_ptr<PuzzleRequest> jreq = make_unique<PuzzleRequest>(req.semantic_id, req.query,
 			res.covered, res.remainder, entries);
-		pending_jobs.push_back(std::make_unique<PuzzleJob>(client_id, jreq, node_ids));
+		pending_jobs.push_back(make_unique<PuzzleJob>(client_id, jreq, node_ids));
 	}
 	// Full miss
 	else {
 		Log::debug("Full MISS.");
-		std::unique_ptr<BaseRequest> jreq = std::make_unique<BaseRequest>(req);
-		pending_jobs.push_back(std::make_unique<CreateJob>(client_id, jreq));
+		std::unique_ptr<BaseRequest> jreq = make_unique<BaseRequest>(req);
+		pending_jobs.push_back(make_unique<CreateJob>(client_id, jreq));
 	}
 }
 

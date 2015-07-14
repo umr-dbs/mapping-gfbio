@@ -50,7 +50,7 @@ void PointsMetadataToGraph::writeSemanticParameters(std::ostringstream& stream) 
 
 template<std::size_t size>
 auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::unique_ptr<GenericPlot> {
-	auto xyGraph = std::make_unique<XYGraph<size>>();
+	auto xyGraph = make_unique<XYGraph<size>>();
 
 	for (size_t featureIndex = 0; featureIndex < points.getFeatureCount(); ++featureIndex) {
 		std::array<double, size> value;

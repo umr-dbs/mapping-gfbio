@@ -71,7 +71,7 @@ bool TestNodeServer::owns_current_thread() {
 TEST(DistributionTest,TestRemoteNodeFetch) {
 
 
-	std::unique_ptr<TestCacheMan> cm = std::make_unique<TestCacheMan>();
+	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346);
 	TestNodeServer    ns1( "localhost", 12347, "localhost", 12346 );
 	TestNodeServer    ns2( "localhost", 12348, "localhost", 12346 );
@@ -84,7 +84,7 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 
 
 	std::vector<TP> ts;
-	ts.push_back( std::make_unique<std::thread>(&IndexServer::run, &is) );
+	ts.push_back( make_unique<std::thread>(&IndexServer::run, &is) );
 	std::this_thread::sleep_for( std::chrono::milliseconds(500));
 	ts.push_back(ns1.run_async());
 	std::this_thread::sleep_for( std::chrono::milliseconds(500));

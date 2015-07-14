@@ -147,7 +147,7 @@ void NodeServer::run() {
 
 			workers_up = true;
 			for (int i = 0; i < num_treads; i++)
-				workers.push_back(std::make_unique<std::thread>(&NodeServer::worker_loop, this));
+				workers.push_back(make_unique<std::thread>(&NodeServer::worker_loop, this));
 
 			// Read on control
 			while (!shutdown) {
@@ -222,7 +222,7 @@ void NodeServer::setup_control_connection() {
 }
 
 std::unique_ptr<std::thread> NodeServer::run_async() {
-	return std::make_unique<std::thread>(&NodeServer::run, this);
+	return make_unique<std::thread>(&NodeServer::run, this);
 }
 
 void NodeServer::stop() {

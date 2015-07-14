@@ -66,7 +66,7 @@ static double parseDate(const std::string &str) {
 }
 
 std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<PointCollection>(rect);
+	auto points_out = make_unique<PointCollection>(rect);
 
 	auto filesize = getFilesize(filename.c_str());
 	if (filesize <= 0)

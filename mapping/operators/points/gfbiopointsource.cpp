@@ -64,7 +64,7 @@ REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
 
 std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<PointCollection>(rect);
+	auto points_out = make_unique<PointCollection>(rect);
 
 	std::stringstream data;
 	getStringFromServer(rect, data, "CSV");

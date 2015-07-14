@@ -140,12 +140,12 @@ void DeliveryManager::run() {
 		auto fd_it = new_fds.begin();
 		while (fd_it != new_fds.end()) {
 			if (FD_ISSET(*fd_it, &readfds)) {
-				std::unique_ptr<UnixSocket> socket = std::make_unique<UnixSocket>(*fd_it, *fd_it);
+				std::unique_ptr<UnixSocket> socket = make_unique<UnixSocket>(*fd_it, *fd_it);
 				BinaryStream &stream = *socket;
 				uint32_t magic;
 				stream.read(&magic);
 				if (magic == DeliveryConnection::MAGIC_NUMBER) {
-					std::unique_ptr<DeliveryConnection> dc = std::make_unique<DeliveryConnection>(socket);
+					std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(socket);
 					Log::info("New delivery-connection created on fd: %d", *fd_it);
 					connections.push_back(std::move(dc));
 				}
@@ -179,7 +179,7 @@ void DeliveryManager::run() {
 }
 
 std::unique_ptr<std::thread> DeliveryManager::run_async() {
-	return std::make_unique<std::thread>(&DeliveryManager::run, this);
+	return make_unique<std::thread>(&DeliveryManager::run, this);
 }
 
 void DeliveryManager::stop() {

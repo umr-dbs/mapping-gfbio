@@ -63,18 +63,18 @@ Colorizer::~Colorizer() {
 
 std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
 	if (name == "hsv")
-		return std::make_unique<HSVColorizer>();
+		return make_unique<HSVColorizer>();
 	if (name == "heatmap")
-		return std::make_unique<HeatmapColorizer>();
+		return make_unique<HeatmapColorizer>();
 	if (name == "temperature")
-		return std::make_unique<TemperatureColorizer>();
+		return make_unique<TemperatureColorizer>();
 	if (name == "height")
-		return std::make_unique<HeightColorizer>();
+		return make_unique<HeightColorizer>();
 	if (name == "cpm")
-		return std::make_unique<CPMColorizer>();
+		return make_unique<CPMColorizer>();
 	if (name == "glc")
-		return std::make_unique<GlobalLandCoverColorizer>();
-	return std::make_unique<GreyscaleColorizer>();
+		return make_unique<GlobalLandCoverColorizer>();
+	return make_unique<GreyscaleColorizer>();
 }
 
 

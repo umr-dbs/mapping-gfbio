@@ -89,7 +89,7 @@ class OperatorRegistration {
 		OperatorRegistration(const char *name, std::unique_ptr<GenericOperator> (*constructor)(int sourcecounts[], GenericOperator *sources[], Json::Value &params));
 };
 
-#define REGISTER_OPERATOR(classname, name) static std::unique_ptr<GenericOperator> create##classname(int sourcecounts[], GenericOperator *sources[], Json::Value &params) { return std::make_unique<classname>(sourcecounts, sources, params); } static OperatorRegistration register_##classname(name, create##classname)
+#define REGISTER_OPERATOR(classname, name) static std::unique_ptr<GenericOperator> create##classname(int sourcecounts[], GenericOperator *sources[], Json::Value &params) { return make_unique<classname>(sourcecounts, sources, params); } static OperatorRegistration register_##classname(name, create##classname)
 
 
 #endif

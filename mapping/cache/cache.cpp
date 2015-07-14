@@ -289,7 +289,7 @@ template<typename EType>
 std::unique_ptr<std::priority_queue<STQueryInfo> > STMapCacheStructure<EType>::get_query_candidates(
 		const QueryRectangle& spec) const {
 	Log::trace("Fetching candidates for query: %s", CacheCommon::qr_to_string(spec).c_str() );
-	std::unique_ptr<std::priority_queue<STQueryInfo>> partials = std::make_unique<std::priority_queue<STQueryInfo>>();
+	std::unique_ptr<std::priority_queue<STQueryInfo>> partials = make_unique<std::priority_queue<STQueryInfo>>();
 	for (auto &e : entries) {
 		STEntryBounds &bounds = *e.second->bounds;
 		double coverage = bounds.get_coverage(spec);
@@ -332,7 +332,7 @@ std::unique_ptr<GenericRaster> STRasterCacheStructure::copy(
 
 std::unique_ptr<STEntryBounds> STRasterCacheStructure::create_bounds(
 		const GenericRaster& content) const {
-	return std::make_unique<STRasterEntryBounds>(content);
+	return make_unique<STRasterEntryBounds>(content);
 }
 
 uint64_t STRasterCacheStructure::get_content_size(const GenericRaster& content) const {
@@ -383,7 +383,7 @@ const std::shared_ptr<STRasterRef> RasterRefStructure::get(const uint64_t id) co
 
 std::unique_ptr<STRasterRef> RasterRefStructure::get_copy(const uint64_t id) const {
 	Log::trace("Returning copy of reference with id: %d", id);
-	return std::make_unique<STRasterRef>( *get(id) );
+	return make_unique<STRasterRef>( *get(id) );
 }
 
 uint64_t RasterRefStructure::get_entry_size(const uint64_t id) const {
@@ -399,7 +399,7 @@ void RasterRefStructure::remove(const uint64_t id) {
 inline std::unique_ptr<std::priority_queue<STQueryInfo> > RasterRefStructure::get_query_candidates(
 		const QueryRectangle& spec) const {
 	Log::trace("Fetching candidates for query: %s", CacheCommon::qr_to_string(spec).c_str() );
-	std::unique_ptr<std::priority_queue<STQueryInfo>> partials = std::make_unique<std::priority_queue<STQueryInfo>>();
+	std::unique_ptr<std::priority_queue<STQueryInfo>> partials = make_unique<std::priority_queue<STQueryInfo>>();
 	for (auto &e : entries) {
 		const STEntryBounds &bounds = e.second->bounds;
 		double coverage = bounds.get_coverage(spec);

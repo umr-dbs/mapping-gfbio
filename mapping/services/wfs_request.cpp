@@ -95,7 +95,7 @@ auto WFSRequest::getFeature() -> std::string {
 	//		</Cluster>
 	// </Filter>
 	if (this->to_bool(parameters["clustered"]) == true) {
-		auto clusteredPoints = std::make_unique<PointCollection>(points->stref);
+		auto clusteredPoints = make_unique<PointCollection>(points->stref);
 
 		auto x1 = bbox[0];
 		auto x2 = bbox[2];

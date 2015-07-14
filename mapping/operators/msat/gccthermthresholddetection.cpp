@@ -190,7 +190,7 @@ int phase2FindMergedPeaksBucket(Histogram *histogram, const int minimum_soft_fal
 
 /**
  * This function detects a dynamic threshold for seperating cloudy pixels from land (or sea) pixels based on IR10.8-IR03.9 and the solar zenith angle of a meteosat scene based on:
- * Cermak, Jan. SOFOS - A New Satellite-based Operational Fog Observation Scheme. http://archiv.ub.uni-marburg.de/diss/z2006/0149. Philipps-Universität Marburg, 2006. [Page 45ff].
+ * Cermak, Jan. SOFOS - A New Satellite-based Operational Fog Observation Scheme. http://archiv.ub.uni-marburg.de/diss/z2006/0149. Philipps-Universitï¿½t Marburg, 2006. [Page 45ff].
  * Please note: The implementation is based on the original FORTRAN sources which includes numerous changes/adaptations not reflected in the publication.
  * Additionally note: SOFOS was developed for a region that resembles the BBOX of Europe. Validation for other regions or region sizes other than 767px*510px is still needed!
  */
@@ -261,14 +261,14 @@ std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster
 	int buckets = static_cast<int>(std::ceil((value_raster_max-value_raster_min)/bucket_size));
 
 	//create the histogram for day mode
-	std::unique_ptr<Histogram> histogram_day_ptr = std::make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
+	std::unique_ptr<Histogram> histogram_day_ptr = make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
 	//fill the histogram
 	callBinaryOperatorFunc<ConditionalFillHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), histogram_day_ptr.get(), cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
 	//get the threshold
 	double temperature_threshold_day = findGccThermThreshold(histogram_day_ptr.get());
 
 	//create the histogram for day mode
-	std::unique_ptr<Histogram> histogram_night_ptr = std::make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
+	std::unique_ptr<Histogram> histogram_night_ptr = make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
 	//fill the histogram
 	callBinaryOperatorFunc<ConditionalFillHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), histogram_night_ptr.get(), cloudclass::solar_zenith_angle_min_night, cloudclass::solar_zenith_angle_max_night);
 	//get the threshold
@@ -325,7 +325,7 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 	int buckets = static_cast<int>(std::ceil((value_raster_max-value_raster_min)/bucket_size));
 
 	//create the histogram
-	std::unique_ptr<Histogram> histogram_ptr = std::make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
+	std::unique_ptr<Histogram> histogram_ptr = make_unique<Histogram>(buckets, value_raster_min, value_raster_max);
 	//fill the histogram
 	callBinaryOperatorFunc<ConditionalFillHistogramFunction>(bt108_minus_bt039_raster.get(), solar_zenith_angle_raster.get(), histogram_ptr.get(), cloudclass::solar_zenith_angle_min_day, cloudclass::solar_zenith_angle_max_day);
 	//find the GccThermalThreshold and annotate the histogram

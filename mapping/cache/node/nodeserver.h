@@ -11,6 +11,7 @@
 #include "cache/common.h"
 #include "cache/node/delivery.h"
 #include "cache/priv/connection.h"
+#include "cache/priv/redistribution.h"
 #include "operators/operator.h"
 
 #include <string>
@@ -68,7 +69,9 @@ private:
 	void process_raster_request(uint8_t cmd, BinaryStream &stream);
 
 	// Process a command received on the control-connection
-	void process_control_command(uint8_t cmd);
+	void process_control_command(uint8_t cmd, BinaryStream &stream);
+
+	void handle_raster_reorg_item( const ReorgItem &item, BinaryStream &index_stream );
 
 	// Indicator telling if the server should shutdown
 	bool shutdown;

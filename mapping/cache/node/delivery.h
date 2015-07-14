@@ -49,6 +49,13 @@ public:
 	// behaviour
 	void stop();
 private:
+	// Adds the fds of all connections to the read-set
+	// and kills faulty connections
+	int setup_fdset( fd_set *readfds);
+
+	void process_connections(fd_set *readfds);
+
+
 	// Fetches the delivery with the given id from the internal
 	// map and sends it. Throws std::out_of_range if no delivery is present
 	// for the given id

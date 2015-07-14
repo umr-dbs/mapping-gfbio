@@ -112,8 +112,8 @@ public:
 class STRasterRef {
 public:
 	STRasterRef( uint32_t node_id, uint64_t cache_id, const STRasterEntryBounds &bounds );
-	const uint32_t node_id;
-	const uint64_t cache_id;
+	uint32_t node_id;
+	uint64_t cache_id;
 	const STRasterEntryBounds bounds;
 };
 

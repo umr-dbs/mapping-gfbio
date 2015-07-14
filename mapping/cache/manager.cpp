@@ -109,8 +109,12 @@ std::unique_ptr<GenericRaster> CacheManager::do_puzzle(const QueryRectangle &que
 }
 
 
-std::unique_ptr<GenericRaster> CacheManager::get_raster(const STCacheKey& key) {
-	return get_raster(key.semantic_id, key.entry_id);
+std::unique_ptr<GenericRaster> CacheManager::get_raster_local(const STCacheKey& key) const {
+	return get_raster_local(key.semantic_id, key.entry_id);
+}
+
+void CacheManager::remove_raster_local(const STCacheKey& key) {
+	remove_raster_local(key.semantic_id, key.entry_id);
 }
 
 //
@@ -158,19 +162,30 @@ std::unique_ptr<GenericRaster> LocalCacheManager::query_raster(const GenericOper
 	}
 }
 
-std::unique_ptr<GenericRaster> LocalCacheManager::get_raster(const std::string& semantic_id,
-	uint64_t entry_id) {
+
+void LocalCacheManager::put_raster(const std::string& semantic_id, const std::unique_ptr<GenericRaster>& raster) {
+	put_raster_local(semantic_id,raster);
+}
+
+
+std::unique_ptr<GenericRaster> LocalCacheManager::get_raster_local(const std::string& semantic_id,
+	uint64_t entry_id) const {
 	Log::debug("Retrieving raster-cache-entry: %s::%d", semantic_id.c_str(), entry_id);
 	return rasterCache.get_copy(semantic_id, entry_id);
 }
 
-void LocalCacheManager::put_raster(const std::string& semantic_id,
+STCacheKey LocalCacheManager::put_raster_local(const std::string& semantic_id,
 	const std::unique_ptr<GenericRaster>& raster) {
 	Log::debug("Adding raster to cache: x: [%f,%f], y[%f,%f], t[%f,%f], size: %dx%d, res: %fx%f",
 		raster->stref.x1,raster->stref.x2,raster->stref.y1,raster->stref.y2,
 		raster->stref.t1,raster->stref.t2, raster->width, raster->height,
 		raster->pixel_scale_x,raster->pixel_scale_y);
-	rasterCache.put(semantic_id, raster);
+	return rasterCache.put(semantic_id, raster);
+}
+
+void LocalCacheManager::remove_raster_local(const std::string& semantic_id, uint64_t entry_id) {
+	Log::debug("Removing raster-cache-entry: %s::%d", semantic_id.c_str(), entry_id);
+	rasterCache.remove(semantic_id,entry_id);
 }
 
 //
@@ -187,17 +202,31 @@ std::unique_ptr<GenericRaster> NopCacheManager::query_raster(const GenericOperat
 	throw NoSuchElementException("Cache Miss");
 }
 
-std::unique_ptr<GenericRaster> NopCacheManager::get_raster(const std::string& semantic_id,
-	uint64_t entry_id) {
+void NopCacheManager::put_raster(const std::string& semantic_id,
+	const std::unique_ptr<GenericRaster>& raster) {
+	(void) semantic_id;
+	(void) raster;
+	// Nothing to-do
+}
+
+std::unique_ptr<GenericRaster> NopCacheManager::get_raster_local(const std::string& semantic_id,
+	uint64_t entry_id) const {
 	(void) semantic_id;
 	(void) entry_id;
 	throw NoSuchElementException("Cache Miss");
 }
 
-void NopCacheManager::put_raster(const std::string& semantic_id,
+STCacheKey NopCacheManager::put_raster_local(const std::string& semantic_id,
 	const std::unique_ptr<GenericRaster>& raster) {
 	(void) semantic_id;
 	(void) raster;
+	return STCacheKey(semantic_id,1);
+	// Nothing to-do
+}
+
+void NopCacheManager::remove_raster_local(const std::string& semantic_id, uint64_t entry_id) {
+	(void) semantic_id;
+	(void) entry_id;
 	// Nothing to-do
 }
 
@@ -284,12 +313,6 @@ std::unique_ptr<GenericRaster> RemoteCacheManager::query_raster(const GenericOpe
 	}
 }
 
-std::unique_ptr<GenericRaster> RemoteCacheManager::get_raster(const std::string& semantic_id,
-	uint64_t entry_id) {
-	Log::debug("Getting raster from local cache. ID: %s::%d", semantic_id.c_str(), entry_id);
-	return local_cache.get_copy(semantic_id, entry_id);
-}
-
 void RemoteCacheManager::put_raster(const std::string& semantic_id,
 	const std::unique_ptr<GenericRaster>& raster) {
 	if (remote_connection == nullptr)
@@ -300,8 +323,8 @@ void RemoteCacheManager::put_raster(const std::string& semantic_id,
 			raster->stref.t1,raster->stref.t2, raster->width, raster->height,
 			raster->pixel_scale_x,raster->pixel_scale_y);
 
-	Log::debug("Adding raster to local cache.");
-	auto id = local_cache.put(semantic_id, raster);
+	auto id = put_raster_local(semantic_id, raster);
+
 	STRasterEntryBounds cube(*raster);
 
 	BinaryStream &stream = *remote_connection;
@@ -312,4 +335,22 @@ void RemoteCacheManager::put_raster(const std::string& semantic_id,
 	cube.toStream(stream);
 	Log::debug("Finished adding raster to cache.");
 	// TODO: Do we need a confirmation?
+}
+
+
+
+std::unique_ptr<GenericRaster> RemoteCacheManager::get_raster_local(const std::string& semantic_id,
+	uint64_t entry_id) const {
+	Log::debug("Getting raster from local cache. ID: %s::%d", semantic_id.c_str(), entry_id);
+	return local_cache.get_copy(semantic_id, entry_id);
+}
+
+STCacheKey RemoteCacheManager::put_raster_local(const std::string& semantic_id,
+	const std::unique_ptr<GenericRaster>& raster) {
+	Log::debug("Adding raster to local cache.");
+	return local_cache.put(semantic_id, raster);
+}
+
+void RemoteCacheManager::remove_raster_local(const std::string& semantic_id, uint64_t entry_id) {
+	local_cache.remove(semantic_id,entry_id);
 }

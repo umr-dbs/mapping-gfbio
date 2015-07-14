@@ -23,25 +23,24 @@ public:
 
 	virtual ~CacheManager();
 
+	virtual STCacheKey put_raster_local(const std::string &semantic_id,
+		const std::unique_ptr<GenericRaster> &raster) = 0;
+	virtual void remove_raster_local(const std::string &semantic_id, uint64_t entry_id) = 0;
+	virtual std::unique_ptr<GenericRaster> get_raster_local(const std::string &semantic_id,
+		uint64_t entry_id) const = 0;
+
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster) = 0;
 	virtual std::unique_ptr<GenericRaster> query_raster(const GenericOperator &op,
 		const QueryRectangle &rect) = 0;
-	virtual std::unique_ptr<GenericRaster> get_raster(const std::string &semantic_id, uint64_t entry_id) = 0;
 
-	std::unique_ptr<GenericRaster> get_raster(const STCacheKey &key);
+	std::unique_ptr<GenericRaster> get_raster_local(const STCacheKey &key) const;
+	void remove_raster_local(const STCacheKey &key);
 
 	static std::unique_ptr<GenericRaster> do_puzzle(const QueryRectangle &query,
 		const geos::geom::Geometry &covered, const std::vector<std::unique_ptr<GenericRaster> >& items);
-protected:
-	//
-	// Fetches a raster directly from the cache, omitting the operator-graph.
-	//
-	static std::unique_ptr<GenericRaster> fetch_raster(const std::string & host, uint32_t port,
-		const STCacheKey &key);
 private:
 	static std::unique_ptr<CacheManager> impl;
 };
-
 
 //
 // Implementation using only the local cache
@@ -52,8 +51,13 @@ public:
 	virtual ~LocalCacheManager();
 	virtual std::unique_ptr<GenericRaster> query_raster(const GenericOperator &op,
 		const QueryRectangle &rect);
-	virtual std::unique_ptr<GenericRaster> get_raster(const std::string &semantic_id, uint64_t entry_id);
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
+
+	virtual std::unique_ptr<GenericRaster> get_raster_local(const std::string &semantic_id,
+		uint64_t entry_id) const;
+	virtual STCacheKey put_raster_local(const std::string &semantic_id,
+		const std::unique_ptr<GenericRaster> &raster);
+	virtual void remove_raster_local(const std::string &semantic_id, uint64_t entry_id);
 private:
 	RasterCache rasterCache;
 };
@@ -66,10 +70,14 @@ public:
 	virtual ~NopCacheManager();
 	virtual std::unique_ptr<GenericRaster> query_raster(const GenericOperator &op,
 		const QueryRectangle &rect);
-	virtual std::unique_ptr<GenericRaster> get_raster(const std::string &semantic_id, uint64_t entry_id);
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
-};
 
+	virtual std::unique_ptr<GenericRaster> get_raster_local(const std::string &semantic_id,
+		uint64_t entry_id) const;
+	virtual STCacheKey put_raster_local(const std::string &semantic_id,
+		const std::unique_ptr<GenericRaster> &raster);
+	virtual void remove_raster_local(const std::string &semantic_id, uint64_t entry_id);
+};
 
 //
 // Hybrid implementation. Always looks up the local-cache
@@ -82,8 +90,13 @@ public:
 	virtual ~RemoteCacheManager();
 	virtual std::unique_ptr<GenericRaster> query_raster(const GenericOperator &op,
 		const QueryRectangle &rect);
-	virtual std::unique_ptr<GenericRaster> get_raster(const std::string &semantic_id, uint64_t entry_id);
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
+
+	virtual std::unique_ptr<GenericRaster> get_raster_local(const std::string &semantic_id,
+		uint64_t entry_id) const;
+	virtual STCacheKey put_raster_local(const std::string &semantic_id,
+		const std::unique_ptr<GenericRaster> &raster);
+	virtual void remove_raster_local(const std::string &semantic_id, uint64_t entry_id);
 private:
 	RasterCache local_cache;
 	std::string my_host;

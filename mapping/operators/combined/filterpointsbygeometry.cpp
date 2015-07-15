@@ -26,7 +26,9 @@ class FilterPointsByGeometry : public GenericOperator {
 		FilterPointsByGeometry(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~FilterPointsByGeometry();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 };
 
 
@@ -40,6 +42,8 @@ FilterPointsByGeometry::~FilterPointsByGeometry() {
 }
 REGISTER_OPERATOR(FilterPointsByGeometry, "filterpointsbygeometry");
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<PointCollection> FilterPointsByGeometry::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	//TODO: check projection
 	const geos::geom::PrecisionModel pm;
@@ -80,3 +84,5 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPointCollection(cons
 
 	return points->filter(keep);
 }
+#endif
+

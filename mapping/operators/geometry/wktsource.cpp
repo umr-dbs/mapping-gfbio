@@ -14,6 +14,7 @@ class WKTSource : public GenericOperator {
 			type = params.get("type", "").asString();
 		}
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 			return WKBUtil::readPointCollection(wkt);
 		}
@@ -25,6 +26,7 @@ class WKTSource : public GenericOperator {
 		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 			return WKBUtil::readPolygonCollection(wkt);
 		}
+#endif
 
 		void writeSemanticParameters(std::ostringstream& stream) {
 			stream << "\"type\":\"" << type << "\","

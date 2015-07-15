@@ -20,10 +20,12 @@ class ProjectionOperator : public GenericOperator {
 		ProjectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ProjectionOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream &stream);
 	private:
@@ -60,6 +62,7 @@ void ProjectionOperator::writeSemanticParameters(std::ostringstream &stream) {
 	stream << "\"src_projection\": \"EPSG:" << (int) src_epsg << "\", \"dest_projection\": \"EPSG:" << (int) dest_epsg << "\"";
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 template<typename T>
 struct raster_projection {
 	static std::unique_ptr<GenericRaster> execute(Raster2D<T> *raster_src, const GDAL::CRSTransformer *transformer, const SpatioTemporalReference &stref_dest, uint32_t width, uint32_t height) {
@@ -382,6 +385,7 @@ std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(cons
 	else
 		return polygons_in->filter(keep);
 }
+#endif
 
 #if 0
 template<typename T>

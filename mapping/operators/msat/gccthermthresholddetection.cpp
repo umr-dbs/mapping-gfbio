@@ -18,11 +18,16 @@ class MSATGccThermThresholdDetectionOperator : public GenericOperator {
 	public:
 		MSATGccThermThresholdDetectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &/*params*/);
 		virtual ~MSATGccThermThresholdDetectionOperator();
+
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 
 	private:
+#ifndef MAPPING_OPERATOR_STUBS
 		double findGccThermThreshold(Histogram *histogram);
+#endif
 		const double bucket_size{1.0/2.0}; //this is the bucket size used for the histogram(s) //default: 1/3 -> this is problematic as the BBT is now calculated using the Eumetsat LUT with steps like .0 .5 .0 .5 .0 .5 ...
 		const int minimum_increasing_buckets_for_rising_trend{3}; //threshold detection phase 1 uses this to determine the minimum between cloud and land peak //default:3
 		const int minimum_soft_falling_buckets{3}; //threshold detection phase 2 uses this to detect a cloud peak merged into the land peak //default:2
@@ -43,6 +48,8 @@ MSATGccThermThresholdDetectionOperator::~MSATGccThermThresholdDetectionOperator(
 }
 REGISTER_OPERATOR(MSATGccThermThresholdDetectionOperator, "msatgccthermthresholddetection");
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 template<typename T1, typename T2>
 struct RasterClassification{
 	static void execute(Raster2D<T1> *sza_raster, Raster2D<T2> *out_raster, std::vector<float> classification_bounds_lower, std::vector<float> classification_bounds_upper, std::vector<float> classification_classes) {
@@ -334,3 +341,4 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 	//return the histogram as plot
 	return (std::unique_ptr<GenericPlot>(std::move(histogram_ptr)));;
 }
+#endif

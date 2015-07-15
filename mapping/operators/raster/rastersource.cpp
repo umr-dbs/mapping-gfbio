@@ -18,11 +18,15 @@ class SourceOperator : public GenericOperator {
 		SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~SourceOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream &stream);
 	private:
+#ifndef MAPPING_OPERATOR_STUBS
 		std::shared_ptr<RasterDB> rasterdb;
+#endif
 		std::string sourcename;
 		int channel;
 		bool transform;
@@ -30,13 +34,15 @@ class SourceOperator : public GenericOperator {
 
 
 // RasterSource Operator
-SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), rasterdb(nullptr) {
+SourceOperator::SourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
 	sourcename = params.get("sourcename", "").asString();
 	if (sourcename.length() == 0)
 		throw OperatorException("SourceOperator: missing sourcename");
 
+#ifndef MAPPING_OPERATOR_STUBS
 	rasterdb = RasterDB::open(sourcename.c_str(), RasterDB::READ_ONLY);
+#endif
 	channel = params.get("channel", 0).asInt();
 	transform = params.get("transform", true).asBool();
 }
@@ -54,10 +60,11 @@ class SourceOperator2 : public SourceOperator {
 REGISTER_OPERATOR(SourceOperator2, "source");
 
 
-
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	return rasterdb->query(rect, profiler, channel, transform);
 }
+#endif
 
 void SourceOperator::writeSemanticParameters(std::ostringstream &stream) {
 	stream << "\"sourcename\": \"" << sourcename << "\"";

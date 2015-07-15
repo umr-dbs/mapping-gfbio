@@ -19,8 +19,9 @@ class HistogramFromFeaturesOperator : public GenericOperator {
 		HistogramFromFeaturesOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~HistogramFromFeaturesOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
@@ -68,6 +69,8 @@ void HistogramFromFeaturesOperator::writeSemanticParameters(std::ostringstream& 
 	}
 }
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 /**
  * Calculates the histogram and returns it.
  */
@@ -115,3 +118,4 @@ std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryR
 
 	return std::unique_ptr<GenericPlot>(std::move(histogram));
 }
+#endif

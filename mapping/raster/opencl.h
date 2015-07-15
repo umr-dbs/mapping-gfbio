@@ -2,6 +2,8 @@
 #define RASTER_OPENCL_H
 
 #ifndef MAPPING_NO_OPENCL
+#ifndef MAPPING_OPERATOR_STUBS // STUB operators may not use OpenCL under any circumstance!
+
 
 //#define __NO_STD_VECTOR // Use cl::vector instead of STL version
 #include <vector>
@@ -103,6 +105,8 @@ namespace RasterOpenCL {
 }
 
 
-#endif
+#endif // MAPPING_OPERATOR_STUBS
 
-#endif
+#endif // MAPPING_NO_OPENCL
+
+#endif // RASTER_OPENCL_H

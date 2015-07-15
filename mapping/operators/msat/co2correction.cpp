@@ -20,7 +20,10 @@ class MSATCo2CorrectionOperator : public GenericOperator {
 	public:
 		MSATCo2CorrectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATCo2CorrectionOperator();
+
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 };
 
 
@@ -35,6 +38,7 @@ MSATCo2CorrectionOperator::~MSATCo2CorrectionOperator() {
 }
 REGISTER_OPERATOR(MSATCo2CorrectionOperator, "msatco2correction");
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<GenericRaster> MSATCo2CorrectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
 	auto raster_bt039 = getRasterFromSource(0, rect, profiler, RasterQM::LOOSE);
@@ -63,3 +67,4 @@ std::unique_ptr<GenericRaster> MSATCo2CorrectionOperator::getRaster(const QueryR
 
 	return raster_out;
 }
+#endif

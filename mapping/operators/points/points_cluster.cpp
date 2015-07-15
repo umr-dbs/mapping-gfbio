@@ -11,7 +11,9 @@ class PointsClusterOperator: public GenericOperator {
 		PointsClusterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 		virtual ~PointsClusterOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 };
 
 PointsClusterOperator::PointsClusterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -22,6 +24,7 @@ PointsClusterOperator::~PointsClusterOperator() {
 }
 REGISTER_OPERATOR(PointsClusterOperator, "points_cluster");
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<PointCollection> PointsClusterOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	// TODO: EXPECT EPSG:3857
 
@@ -47,3 +50,4 @@ std::unique_ptr<PointCollection> PointsClusterOperator::getPointCollection(const
 
 	return pointsNew;
 }
+#endif

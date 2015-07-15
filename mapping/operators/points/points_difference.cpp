@@ -19,8 +19,9 @@ class PointsDifferenceOperator: public GenericOperator {
 		PointsDifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PointsDifferenceOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
@@ -41,6 +42,7 @@ void PointsDifferenceOperator::writeSemanticParameters(std::ostringstream& strea
 	stream << "\"epsilonDistance\":" << epsilonDistance;
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 #include "operators/points/points_difference.cl.h"
 
 static double point_distance(const Coordinate &p1, const Coordinate &p2) {
@@ -101,3 +103,4 @@ std::unique_ptr<PointCollection> PointsDifferenceOperator::getPointCollection(co
 #endif
 	return pointsMinuend->filter(keep);
 }
+#endif

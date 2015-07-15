@@ -16,10 +16,11 @@ class FilterFeaturesByRangeOperator: public GenericOperator {
 		FilterFeaturesByRangeOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 		virtual ~FilterFeaturesByRangeOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
@@ -49,6 +50,8 @@ void FilterFeaturesByRangeOperator::writeSemanticParameters(std::ostringstream& 
 			<< "\"rangeMax\"" << rangeMax;
 }
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 std::vector<bool> filter(const SimpleFeatureCollection &collection, const std::string &name, double min, double max, bool keepNAN) {
 	size_t count = collection.getFeatureCount();
 	std::vector<bool> keep(count, false);
@@ -88,7 +91,7 @@ std::unique_ptr<PolygonCollection> FilterFeaturesByRangeOperator::getPolygonColl
 	auto keep = filter(*polys, name, rangeMin, rangeMax, includeNoData);
 	return polys->filter(keep);
 }
-
+#endif
 
 
 // obsolete, keep for backwards compatibility for a while

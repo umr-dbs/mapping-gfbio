@@ -17,7 +17,9 @@ class PointsToRasterOperator : public GenericOperator {
 		PointsToRasterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PointsToRasterOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
@@ -43,6 +45,8 @@ void PointsToRasterOperator::writeSemanticParameters(std::ostringstream& stream)
 			<< "\"radius\":" << radius;
 }
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 #include "operators/combined/points2raster_frequency.cl.h"
 #include "operators/combined/points2raster_value.cl.h"
 
@@ -139,3 +143,4 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 		return blurred;
 	}
 }
+#endif

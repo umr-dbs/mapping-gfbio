@@ -25,11 +25,13 @@ class ROperator : public GenericOperator {
 		ROperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ROperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
 		void runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
@@ -65,6 +67,7 @@ void ROperator::writeSemanticParameters(std::ostringstream& stream) {
 			<< "\"result_type\":\"" << result_type << "\"";
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char requested_type, QueryProfiler &profiler) {
 	stream.write(RSERVER_MAGIC_NUMBER);
 	stream.write(requested_type);
@@ -148,5 +151,5 @@ std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect, Quer
 		return std::unique_ptr<GenericPlot>(new PNGPlot(result));
 }
 
-
+#endif
 

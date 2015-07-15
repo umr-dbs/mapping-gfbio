@@ -14,7 +14,7 @@ class IsolineExtractor : public GenericOperator {
 	IsolineExtractor(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 			assumeSources(1);
 		}
-
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 			auto points = getPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
 
@@ -38,11 +38,8 @@ class IsolineExtractor : public GenericOperator {
 
 			return lines;
 		}
-
+#endif
 		virtual ~IsolineExtractor(){};
 
-	private:
-		std::string wkt;
-		std::string type;
 };
 REGISTER_OPERATOR(IsolineExtractor, "isolineextractor");

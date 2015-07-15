@@ -15,32 +15,35 @@ class PGPointSourceOperator : public GenericOperator {
 		PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PGPointSourceOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
 		std::string connectionstring;
 		std::string querystring;
-		pqxx::connection *connection;
+#ifndef MAPPING_OPERATOR_STUBS
+		std::unique_ptr<pqxx::connection> connection;
+#endif
 };
 
 
 
 
-PGPointSourceOperator::PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), connection(nullptr) {
+PGPointSourceOperator::PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
 
 	connectionstring = params.get("connection", Configuration::get("operators.pgpointsource.dbcredentials", "")).asString();
 	querystring = params.get("query", "x, y FROM locations").asString();
 
-	connection = new pqxx::connection(connectionstring);
+#ifndef MAPPING_OPERATOR_STUBS
+	connection = make_unique<pqxx::connection>(connectionstring);
+#endif
 }
 
 PGPointSourceOperator::~PGPointSourceOperator() {
-	delete connection;
-	connection = nullptr;
 }
 REGISTER_OPERATOR(PGPointSourceOperator, "pgpointsource");
 
@@ -48,6 +51,7 @@ void PGPointSourceOperator::writeSemanticParameters(std::ostringstream& stream) 
 	stream << "\"querystring\":\"" << querystring << "\"";
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<PointCollection> PGPointSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 
 	if (rect.epsg != EPSG_WEBMERCATOR)
@@ -82,3 +86,4 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPointCollection(const
 
 	return points_out;
 }
+#endif

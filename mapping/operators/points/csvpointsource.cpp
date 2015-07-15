@@ -17,8 +17,9 @@ class CSVPointSource : public GenericOperator {
 		CSVPointSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~CSVPointSource();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
@@ -41,6 +42,7 @@ void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
 	stream << "\"filename\":\"" << filename << "\"";
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 static bool endsWith(const std::string &str, const std::string &suffix) {
 	if (str.length() < suffix.length())
 		return false;
@@ -165,3 +167,4 @@ std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryR
 
 	return points_out;
 }
+#endif

@@ -42,11 +42,17 @@ OBJ_OPERATORS_GEOMETRY=o/operators/geometry/wktsource.o
 OBJ_OPERATORS_COMBINED=o/operators/combined/points2raster.o o/operators/combined/raster_metadata_to_points.o o/operators/combined/points2cluster_raster.o o/operators/combined/filterpointsbygeometry.o
 OBJ_OPERATORS_MSAT=o/operators/msat/temperature.o o/operators/msat/reflectance.o o/operators/msat/solarangle.o o/operators/msat/radiance.o o/operators/msat/pansharpening.o o/operators/msat/gccthermthresholddetection.o
 OBJ_OPERATORS_PLOTS=o/operators/plots/histogram.o o/operators/plots/points2histogram.o o/operators/plots/points_metadata_tograph.o
-OBJ_OPERATORS_TEMPORAL=o/operators/temporal/timeshiftoperator.o
+#OBJ_OPERATORS_TEMPORAL=o/operators/temporal/timeshiftoperator.o
 OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o
-OBJ_CACHE_COMMON=o/cache/common.o o/cache/cache.o o/cache/manager.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/types.o o/cache/priv/redistribution.o
+OBJ_OPERATORS_ALL=$(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) $(OBJ_OPERATORS_GFBIO) # ${OBJ_OPERATORS_TEMPORAL}
+
+OBJ_OPERATORS_ALLSTUBS=${OBJ_OPERATORS_ALL:o/operators/%=o/operators_stub/%}
+
 OBJ_OPERATORS_COMMON=o/operators/operator.o o/operators/queryrectangle.o o/operators/queryprofiler.o
-OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} $(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) ${OBJ_OPERATORS_TEMPORAL} $(OBJ_OPERATORS_GFBIO)
+OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALL}
+OBJ_OPERATORS_STUBS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALLSTUBS}
+
+OBJ_CACHE_COMMON=o/cache/common.o o/cache/cache.o o/cache/manager.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/types.o o/cache/priv/redistribution.o
 OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 
 #
@@ -92,7 +98,7 @@ ${EXEGEOMETRYTESTBED}:	o/geometrytestbed.o ${OBJ_COMMON}
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o 
 	${CPP} ${LDFLAGS} $+ -o $@
 
-${EXECACHEINDEX}:	o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/colors.o o/raster/profiler.o
+${EXECACHEINDEX}:	o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/colors.o o/raster/profiler.o 
 	${CPP} ${LDFLAGS} $+ -o $@
 
 ${EXECACHENODE}:	o/cache/node/nodeserver_main.o o/cache/node/nodeserver.o o/cache/node/delivery.o ${OBJ_COMMON}
@@ -115,6 +121,9 @@ operators/%.cl.h: operators/%.cl
 
 o/rserver/%.o: rserver/%.cpp | $${@D}/.f
 	${CPP} ${CPPFLAGS} ${CPPFLAGS_R} -MMD -MF ${@:.o=.d} -c $< -o $@
+
+o/operators_stub/%.o: operators/%.cpp | $${@D}/.f
+	${CPP} ${CPPFLAGS} -DMAPPING_OPERATOR_STUBS=1 -MMD -MF ${@:.o=.d} -c $< -o $@
 
 o/%.o: %.cpp | $${@D}/.f
 	${CPP} ${CPPFLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@

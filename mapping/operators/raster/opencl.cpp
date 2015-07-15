@@ -1,5 +1,3 @@
-#ifndef MAPPING_NO_OPENCL
-
 #include "datatypes/raster.h"
 #include "datatypes/raster/typejuggling.h"
 #include "raster/profiler.h"
@@ -17,7 +15,9 @@ class OpenCLOperator : public GenericOperator {
 		OpenCLOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~OpenCLOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 };
 
 
@@ -29,7 +29,7 @@ OpenCLOperator::~OpenCLOperator() {
 }
 REGISTER_OPERATOR(OpenCLOperator, "opencl");
 
-
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<GenericRaster> OpenCLOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
 	auto raster_in = getRasterFromSource(0, rect, profiler);
@@ -68,5 +68,4 @@ std::unique_ptr<GenericRaster> OpenCLOperator::getRaster(const QueryRectangle &r
 	event.wait();
 	return raster_out;
 }
-
 #endif

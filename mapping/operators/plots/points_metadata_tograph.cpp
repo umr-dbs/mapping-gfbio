@@ -15,16 +15,19 @@ class PointsMetadataToGraph: public GenericOperator {
 		PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 		virtual ~PointsMetadataToGraph();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
 		std::vector<std::string> names;
 
+#ifndef MAPPING_OPERATOR_STUBS
 		template<std::size_t size>
 			std::unique_ptr<GenericPlot> createXYGraph(PointCollection& points);
+#endif
 };
 
 PointsMetadataToGraph::PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -48,6 +51,8 @@ void PointsMetadataToGraph::writeSemanticParameters(std::ostringstream& stream) 
 	stream << "]";
 }
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 template<std::size_t size>
 auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::unique_ptr<GenericPlot> {
 	auto xyGraph = make_unique<XYGraph<size>>();
@@ -86,3 +91,4 @@ std::unique_ptr<GenericPlot> PointsMetadataToGraph::getPlot(const QueryRectangle
 	}
 
 }
+#endif

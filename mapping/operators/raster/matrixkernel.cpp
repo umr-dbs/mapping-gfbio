@@ -13,7 +13,9 @@ class MatrixKernelOperator : public GenericOperator {
 		MatrixKernelOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MatrixKernelOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
@@ -54,6 +56,7 @@ void MatrixKernelOperator::writeSemanticParameters(std::ostringstream& stream) {
 	stream << "]";
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 template<typename T> T cap(T v, T min, T max) {
 	return std::min(max, std::max(v, min));
 }
@@ -138,4 +141,4 @@ std::unique_ptr<GenericRaster> MatrixKernelOperator::getRaster(const QueryRectan
 	return callUnaryOperatorFunc<matrixkernel>(raster_in.get(), matrixsize, matrix);
 #endif
 }
-
+#endif

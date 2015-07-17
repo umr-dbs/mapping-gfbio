@@ -48,7 +48,7 @@ class GDALCRS {
 		size_t getPixelCount() const;
 		void verify() const;
 
-		SpatioTemporalReference toSpatioTemporalReference(bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2) const;
+		SpatialReference toSpatialReference(bool &flipx, bool &flipy) const;
 
 		epsg_t epsg;
 		uint8_t dimensions; // 1 .. 3

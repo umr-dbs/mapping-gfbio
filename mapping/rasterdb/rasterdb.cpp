@@ -75,13 +75,13 @@ size_t GDALCRS::getPixelCount() const {
 	throw MetadataException("Amount of dimensions not between 1 and 3");
 }
 
-SpatioTemporalReference GDALCRS::toSpatioTemporalReference(bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2) const {
+SpatialReference GDALCRS::toSpatialReference(bool &flipx, bool &flipy) const {
 	double x1 = origin[0];
 	double y1 = origin[1];
 	double x2 = origin[0] + scale[0] * size[0];
 	double y2 = origin[1] + scale[1] * size[1];
 
-	return SpatioTemporalReference(epsg, x1, y1, x2, y2, flipx, flipy, timetype, t1, t2);
+	return SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy);
 }
 
 std::ostream& operator<< (std::ostream &out, const GDALCRS &rm) {
@@ -429,7 +429,10 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 	GDALCRS zoomed_and_cut_crs(crs->epsg, width, height, origin_x, origin_y, scale_x, scale_y);
 
 	bool flipx, flipy;
-	auto resultstref = zoomed_and_cut_crs.toSpatioTemporalReference(flipx, flipy, TIMETYPE_UNIX, rasterdescription.time_start, rasterdescription.time_end);
+	SpatioTemporalReference resultstref(
+		zoomed_and_cut_crs.toSpatialReference(flipx, flipy),
+		TemporalReference(TIMETYPE_UNIX, rasterdescription.time_start, rasterdescription.time_end)
+	);
 
 	/*
 	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom))

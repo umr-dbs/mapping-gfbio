@@ -78,7 +78,11 @@ auto WFSRequest::getFeature() -> std::string {
 
 	QueryProfiler profiler;
 	bool flipx, flipy;
-	QueryRectangle rect(SpatialReference(queryEpsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), output_width, output_height);
+	QueryRectangle rect(
+		SpatialReference(queryEpsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy),
+		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+		QueryResolution::none()
+	);
 	auto points = graph->getCachedPointCollection(rect, profiler);
 
 	// TODO: startIndex + count

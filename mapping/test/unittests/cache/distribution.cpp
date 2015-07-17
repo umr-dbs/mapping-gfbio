@@ -140,7 +140,11 @@ TEST(DistributionTest,TestRedistibution) {
 	CacheClient cc("localhost",12346);
 
 	parseBBOX(bbox, bbox_str, epsg, false);
-	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), width, height);
+	QueryRectangle qr(
+		SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
+		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+		QueryResolution::pixels(width, height)
+	);
 
 	std::string sem_id = GenericOperator::fromJSON(json)->getSemanticId();
 
@@ -221,7 +225,11 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 	CacheClient cc("localhost",12346);
 
 	parseBBOX(bbox, bbox_str, epsg, false);
-	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), width, height);
+	QueryRectangle qr(
+		SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
+		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+		QueryResolution::pixels(width, height)
+	);
 
 	//Should hit 1st node
 	cc.get_raster(json,qr,GenericOperator::RasterQM::EXACT);

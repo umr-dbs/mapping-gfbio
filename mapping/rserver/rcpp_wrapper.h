@@ -33,8 +33,16 @@ namespace ***REMOVED*** {
 		list["y1"] = rect.y1;
 		list["x2"] = rect.x2;
 		list["y2"] = rect.y2;
-		list["xres"] = rect.xres;
-		list["yres"] = rect.xres;
+		if (rect.restype == QueryResolution::Type::PIXELS) {
+			list["xres"] = rect.xres;
+			list["yres"] = rect.xres;
+		}
+		else if (rect.restype == QueryResolution::Type::NONE) {
+			list["xres"] = 0;
+			list["yres"] = 0;
+		}
+		else
+			throw ArgumentException("***REMOVED***::wrap(): cannot convert a QueryRectangle with unknown resolution type");
 		list["epsg"] = (int) rect.epsg;
 
 		return ***REMOVED***::wrap(list);
@@ -43,10 +51,13 @@ namespace ***REMOVED*** {
 		Profiler::Profiler p("***REMOVED***: unwrapping qrect");
 		***REMOVED***::List list = ***REMOVED***::as<***REMOVED***::List>(sexp);
 
+		int xres = list["xres"];
+		int yres = list["yres"];
+
 		return QueryRectangle(
 			SpatialReference((epsg_t) (int) list["epsg"], list["x1"], list["y1"], list["x2"], list["y2"]),
 			TemporalReference(TIMETYPE_UNIX, list["t1"], list["t2"]),
-			list["xres"], list["yres"]
+			(xres > 0 && yres > 0) ? QueryResolution::pixels(xres, yres) : QueryResolution::none()
 		);
 	}
 

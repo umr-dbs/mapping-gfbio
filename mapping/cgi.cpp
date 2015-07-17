@@ -419,9 +419,14 @@ int processWCS(std::map<std::string, std::string> &params) {
 		time_t timestamp = 1295266500; // 2011-1-17 12:15
 		//build the queryRectangle and get the data
 		bool flipx, flipy;
-		QueryRectangle query_rect{SpatialReference(query_crsId, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, flipx, flipy), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), sizeX, sizeY};
+		QueryRectangle query_rect(
+			SpatialReference(query_crsId, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, flipx, flipy),
+			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+			QueryResolution::pixels(sizeX, sizeY)
+		);
 		QueryProfiler profiler;
 		auto result_raster = graph->getCachedRaster(query_rect, profiler, GenericOperator::RasterQM::EXACT);
+		// TODO: Raster flippen?
 
 		//setup the output parameters
 		std::string gdalDriver = "GTiff";
@@ -507,7 +512,11 @@ int main() {
 				colorizer = params["colors"];
 
 			QueryProfiler profiler;
-			QueryRectangle rect(SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, 20037508, -20037508), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), 1024, 1024);
+			QueryRectangle rect(
+				SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, -20037508, 20037508),
+				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+				QueryResolution::pixels(1024, 1024)
+			);
 			auto raster = graph->getCachedRaster(rect, profiler);
 
 			outputImage(raster.get(), false, false, colorizer);
@@ -519,7 +528,11 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 
 			QueryProfiler profiler;
-			QueryRectangle rect(SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, 20037508, -20037508), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), 1024, 1024);
+			QueryRectangle rect(
+				SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, -20037508, 20037508),
+				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+				QueryResolution::none()
+			);
 			auto points = graph->getCachedPointCollection(rect, profiler);
 
 			std::string format("geojson");
@@ -545,7 +558,11 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["linequery"]);
 
 			QueryProfiler profiler;
-			QueryRectangle rect(SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, 20037508, -20037508), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), 1024, 1024);
+			QueryRectangle rect(
+				SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, -20037508, 20037508),
+				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+				QueryResolution::none()
+			);
 			auto geometry = graph->getCachedLineCollection(rect, profiler);
 
 			outputLineCollection(*geometry.get(), false);
@@ -560,7 +577,11 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["polygonquery"]);
 
 			QueryProfiler profiler;
-			QueryRectangle rect(SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, 20037508, -20037508), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), 1024, 1024);
+			QueryRectangle rect(
+				SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, -20037508, 20037508),
+				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+				QueryResolution::none()
+			);
 			auto geometry = graph->getCachedPolygonCollection(rect, profiler);
 
 			outputPolygonCollection(*geometry.get(), false);
@@ -625,7 +646,11 @@ int main() {
 					}
 
 					bool flipx, flipy;
-					QueryRectangle qrect(SpatialReference(query_epsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), output_width, output_height);
+					QueryRectangle qrect(
+						SpatialReference(query_epsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy),
+						TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+						QueryResolution::pixels(output_width, output_height)
+					);
 
 					if (format == "application/json") {
 						auto graph = GenericOperator::fromJSON(params["layers"]);

@@ -153,7 +153,11 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 			*/
 
 			// return a very small source rectangle with minimum resolution
-			return QueryRectangle(SpatialReference(src_epsg, 0, 0, 1, 1), rect, 1, 1);
+			return QueryRectangle(
+				SpatialReference(src_epsg, 0, 0, 1, 1),
+				rect,
+				QueryResolution::pixels(1, 1)
+			);
 		}
 
 		// By default: pick the whole raster
@@ -200,7 +204,11 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 */
 	}
 
-	QueryRectangle result(SpatialReference(src_epsg, src_x1, src_y1, src_x2, src_y2), rect, src_xres, src_yres);
+	QueryRectangle result(
+		SpatialReference(src_epsg, src_x1, src_y1, src_x2, src_y2),
+		rect,
+		QueryResolution::pixels(src_xres, src_yres)
+	);
 	result.enlarge(2);
 	return result;
 }

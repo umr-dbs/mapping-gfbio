@@ -1,28 +1,42 @@
 
 #include "operators/queryrectangle.h"
 #include "util/binarystream.h"
+#include "util/exceptions.h"
 
 #include <algorithm>
 
 
 /*
+ * QueryResolution class
+ */
+
+QueryResolution::QueryResolution(BinaryStream &stream) {
+	stream.read(&restype);
+	stream.read(&xres);
+	stream.read(&yres);
+}
+
+void QueryResolution::toStream(BinaryStream &stream) const {
+	stream.write(restype);
+	stream.write(xres);
+	stream.write(yres);
+}
+
+/*
  * QueryRectangle class
  */
 QueryRectangle::QueryRectangle(const GridSpatioTemporalResult &grid)
-	: QueryRectangle(grid.stref, grid.stref, grid.width, grid.height) {
+	: QueryRectangle(grid.stref, grid.stref, QueryResolution::pixels(grid.width, grid.height)) {
 }
 
 
-QueryRectangle::QueryRectangle(BinaryStream &stream) : SpatialReference(stream), TemporalReference(stream) {
-	stream.read(&xres);
-	stream.read(&yres);
+QueryRectangle::QueryRectangle(BinaryStream &stream) : SpatialReference(stream), TemporalReference(stream), QueryResolution(stream) {
 }
 
 void QueryRectangle::toStream(BinaryStream &stream) const {
 	SpatialReference::toStream(stream);
 	TemporalReference::toStream(stream);
-	stream.write(xres);
-	stream.write(yres);
+	QueryResolution::toStream(stream);
 }
 
 
@@ -33,6 +47,9 @@ double QueryRectangle::maxy() const { return std::max(y1, y2); }
 
 
 void QueryRectangle::enlarge(int pixels) {
+	if (restype != QueryResolution::Type::PIXELS)
+		throw ArgumentException("Cannot enlarge QueryRectangle without a proper pixel size");
+
 	double pixel_size_in_world_coordinates_x = (double) std::abs(x2 - x1) / xres;
 	double pixel_size_in_world_coordinates_y = (double) std::abs(y2 - y1) / yres;
 

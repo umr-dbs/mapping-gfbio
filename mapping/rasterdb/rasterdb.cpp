@@ -413,6 +413,9 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, i
 	zoom = backend->getBestZoom(rasterid, zoom);
 	int zoomfactor = 1 << zoom;
 
+	if (x1 % zoomfactor || y1 % zoomfactor || x2 % zoomfactor || y2 % zoomfactor)
+		throw ArgumentException("RasterDB::load(): cannot load from zoomed version with odd coordinates");
+
 	// Figure out the CRS after cutting and zooming
 	auto width = (x2-x1) >> zoom;
 	auto height = (y2-y1) >> zoom;
@@ -502,6 +505,13 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 		pixel_width >>= 1;
 		pixel_height >>= 1;
 	}
+
+	// Make sure to only load from pixel borders in the zoomed version
+	int zoomfactor = 1 << zoom;
+	pixel_x1 -= (pixel_x1 % zoomfactor);
+	pixel_x2 = (pixel_x2 - 1) - ((pixel_x2 - 1) % zoomfactor) + zoomfactor;
+	pixel_y1 -= (pixel_y1 % zoomfactor);
+	pixel_y2 = (pixel_y2 - 1) - ((pixel_y2 - 1) % zoomfactor) + zoomfactor;
 
 	size_t io_costs = 0;
 	auto result = load(channelid, rect.t1, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);

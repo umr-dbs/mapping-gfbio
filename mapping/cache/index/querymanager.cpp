@@ -125,7 +125,8 @@ bool QueryInfo::matches(const BaseRequest& req) {
 				query.x2 >= req.query.x2 &&
 				query.y1 <= req.query.y1 &&
 				query.y2 >= req.query.y2 &&
-				query.timestamp == req.query.timestamp &&
+				query.t1 <= req.query.t1 &&
+				query.t2 >= req.query.t2 &&
 				std::abs(1.0 - my_xres/q_xres) < 0.01 &&
 				std::abs(1.0 - my_yres/q_yres) < 0.01;
 	}

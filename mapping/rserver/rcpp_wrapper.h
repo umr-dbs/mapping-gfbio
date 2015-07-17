@@ -27,7 +27,8 @@ namespace ***REMOVED*** {
 		Profiler::Profiler p("***REMOVED***: wrapping qrect");
 		***REMOVED***::List list;
 
-		list["timestamp"] = rect.timestamp;
+		list["t1"] = rect.t1;
+		list["t2"] = rect.t2;
 		list["x1"] = rect.x1;
 		list["y1"] = rect.y1;
 		list["x2"] = rect.x2;
@@ -43,14 +44,9 @@ namespace ***REMOVED*** {
 		***REMOVED***::List list = ***REMOVED***::as<***REMOVED***::List>(sexp);
 
 		return QueryRectangle(
-			list["timestamp"],
-			list["x1"],
-			list["y1"],
-			list["x2"],
-			list["y2"],
-			list["xres"],
-			list["yres"],
-			(epsg_t) (int) list["epsg"]
+			SpatialReference((epsg_t) (int) list["epsg"], list["x1"], list["y1"], list["x2"], list["y2"]),
+			TemporalReference(TIMETYPE_UNIX, list["t1"], list["t2"]),
+			list["xres"], list["yres"]
 		);
 	}
 

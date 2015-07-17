@@ -418,7 +418,8 @@ int processWCS(std::map<std::string, std::string> &params) {
 		//TODO: parse datetime!
 		time_t timestamp = 1295266500; // 2011-1-17 12:15
 		//build the queryRectangle and get the data
-		QueryRectangle query_rect{timestamp, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, sizeX, sizeY, query_crsId};
+		bool flipx, flipy;
+		QueryRectangle query_rect{SpatialReference(query_crsId, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, flipx, flipy), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), sizeX, sizeY};
 		QueryProfiler profiler;
 		auto result_raster = graph->getCachedRaster(query_rect, profiler, GenericOperator::RasterQM::EXACT);
 
@@ -506,7 +507,8 @@ int main() {
 				colorizer = params["colors"];
 
 			QueryProfiler profiler;
-			auto raster = graph->getCachedRaster(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+			QueryRectangle rect(SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, 20037508, -20037508), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), 1024, 1024);
+			auto raster = graph->getCachedRaster(rect, profiler);
 
 			outputImage(raster.get(), false, false, colorizer);
 			return 0;
@@ -517,7 +519,8 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 
 			QueryProfiler profiler;
-			auto points = graph->getCachedPointCollection(QueryRectangle(timestamp, /*-180, -90, 180, 90*/-20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+			QueryRectangle rect(SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, 20037508, -20037508), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), 1024, 1024);
+			auto points = graph->getCachedPointCollection(rect, profiler);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
@@ -542,7 +545,8 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["linequery"]);
 
 			QueryProfiler profiler;
-			auto geometry = graph->getCachedLineCollection(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+			QueryRectangle rect(SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, 20037508, -20037508), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), 1024, 1024);
+			auto geometry = graph->getCachedLineCollection(rect, profiler);
 
 			outputLineCollection(*geometry.get(), false);
 			return 0;
@@ -556,7 +560,8 @@ int main() {
 			auto graph = GenericOperator::fromJSON(params["polygonquery"]);
 
 			QueryProfiler profiler;
-			auto geometry = graph->getCachedPolygonCollection(QueryRectangle(timestamp, -20037508, 20037508, 20037508, -20037508, 1024, 1024, query_epsg), profiler);
+			QueryRectangle rect(SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, 20037508, -20037508), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), 1024, 1024);
+			auto geometry = graph->getCachedPolygonCollection(rect, profiler);
 
 			outputPolygonCollection(*geometry.get(), false);
 			return 0;
@@ -619,7 +624,8 @@ int main() {
 						format = params["format"];
 					}
 
-					QueryRectangle qrect(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], output_width, output_height, query_epsg);
+					bool flipx, flipy;
+					QueryRectangle qrect(SpatialReference(query_epsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), output_width, output_height);
 
 					if (format == "application/json") {
 						auto graph = GenericOperator::fromJSON(params["layers"]);

@@ -265,5 +265,5 @@ QueryRectangle PuzzleRequest::get_remainder_query(double xres, double yres) cons
 
 	uint32_t width  = std::floor( (x2-x1) / xres );
 	uint32_t height = std::floor( (y2-y1) / yres );
-	return QueryRectangle( query.timestamp, x1, y1, x2, y2, width, height, query.epsg );
+	return QueryRectangle( SpatialReference(query.epsg, x1, y1, x2, y2), query, width, height );
 }

@@ -5,10 +5,10 @@
 
 class BinaryStream;
 
-class QueryRectangle {
+class QueryRectangle : public SpatialReference, public TemporalReference {
 	public:
 		QueryRectangle();
-		QueryRectangle(time_t timestamp, double x1, double y1, double x2, double y2, uint32_t xres, uint32_t yres, epsg_t epsg) : timestamp(timestamp), x1(std::min(x1,x2)), y1(std::min(y1,y2)), x2(std::max(x1,x2)), y2(std::max(y1,y2)), xres(xres), yres(yres), epsg(epsg) {};
+		QueryRectangle(const SpatialReference &s, const TemporalReference &t, uint32_t xres, uint32_t yres) : SpatialReference(s), TemporalReference(t), xres(xres), yres(yres) {}
 		QueryRectangle(const GridSpatioTemporalResult &grid);
 		QueryRectangle(BinaryStream &stream);
 
@@ -21,10 +21,8 @@ class QueryRectangle {
 
 		void enlarge(int pixels);
 
-		time_t timestamp;
-		double x1, y1, x2, y2;
 		uint32_t xres, yres;
-		epsg_t epsg;
+
 };
 
 #endif

@@ -34,7 +34,7 @@ TEST(STCacheTest,SimpleTest) {
 
 	for ( int i = 0; i < 4; i++ ) {
 		parseBBOX(bbox, bboxes[i], epsg, false);
-		QueryRectangle qr(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], width, height, epsg);
+		QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]), TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), width, height);
 		QueryProfiler qp;
 		STQueryResult qres = cache.query(op->getSemanticId(),qr);
 		printf("%s", qres.to_string().c_str());
@@ -69,7 +69,7 @@ TEST(STCacheTest,TestQuery) {
 	cache.put( sem_id, r2 );
 	cache.put( sem_id, r3 );
 
-	QueryRectangle query( 10, 0, 0, 2, 2, 2, 2, EPSG_LATLON );
+	QueryRectangle query(SpatialReference(EPSG_LATLON, 0, 0, 2, 2), TemporalReference(TIMETYPE_UNIX, 10, 10), 2, 2);
 	STQueryResult qr = cache.query(sem_id, query);
 
 	ASSERT_TRUE( qr.has_remainder() );

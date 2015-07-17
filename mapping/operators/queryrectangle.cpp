@@ -9,32 +9,21 @@
  * QueryRectangle class
  */
 QueryRectangle::QueryRectangle(const GridSpatioTemporalResult &grid)
-	: QueryRectangle(grid.stref.t1, grid.stref.x1, grid.stref.y1, grid.stref.x2, grid.stref.y2, grid.width, grid.height, grid.stref.epsg){
+	: QueryRectangle(grid.stref, grid.stref, grid.width, grid.height) {
 }
 
 
-QueryRectangle::QueryRectangle(BinaryStream &socket) {
-	socket.read(&timestamp);
-	socket.read(&x1);
-	socket.read(&y1);
-	socket.read(&x2);
-	socket.read(&y2);
-	socket.read(&xres);
-	socket.read(&yres);
-	socket.read(&epsg);
+QueryRectangle::QueryRectangle(BinaryStream &stream) : SpatialReference(stream), TemporalReference(stream) {
+	stream.read(&xres);
+	stream.read(&yres);
 }
 
 void QueryRectangle::toStream(BinaryStream &stream) const {
-	stream.write(timestamp);
-	stream.write(x1);
-	stream.write(y1);
-	stream.write(x2);
-	stream.write(y2);
+	SpatialReference::toStream(stream);
+	TemporalReference::toStream(stream);
 	stream.write(xres);
 	stream.write(yres);
-	stream.write(epsg);
 }
-
 
 
 double QueryRectangle::minx() const { return std::min(x1, x2); }

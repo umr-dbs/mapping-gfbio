@@ -56,10 +56,6 @@ class SpatialReference {
 		 */
 		SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy);
 		/*
-		 * Constructs a reference from a QueryRectangle
-		 */
-		SpatialReference(const QueryRectangle &rect);
-		/*
 		 * Read a SpatialReference from a stream
 		 */
 		SpatialReference(BinaryStream &stream);
@@ -101,10 +97,6 @@ class TemporalReference {
 		 * Constructs a reference with all values
 		 */
 		TemporalReference(timetype_t time, double t1, double t2);
-		/*
-		 * Constructs a reference from a QueryRectangle
-		 */
-		TemporalReference(const QueryRectangle &rect);
 		/*
 		 * Read a TemporalReference from a stream
 		 */
@@ -179,8 +171,7 @@ class SpatioTemporalReference : public SpatialReference, public TemporalReferenc
 		/*
 		 * Constructs a reference from a QueryRectangle
 		 */
-		SpatioTemporalReference(const QueryRectangle &rect)
-			: SpatialReference(rect), TemporalReference(rect) {};
+		SpatioTemporalReference(const QueryRectangle &rect);
 		/*
 		 * Read a SpatioTemporalReference from a stream
 		 */

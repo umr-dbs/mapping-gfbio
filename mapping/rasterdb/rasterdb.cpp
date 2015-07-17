@@ -504,7 +504,8 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 	}
 
 	size_t io_costs = 0;
-	auto result = load(channelid, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
+	auto result = load(channelid, rect.t1, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
+	// TODO: automatically fail if rect.t2 is outside of the result's area?
 	profiler.addIOCost(io_costs);
 	return result;
 }

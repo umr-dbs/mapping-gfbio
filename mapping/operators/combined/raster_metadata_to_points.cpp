@@ -133,7 +133,7 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 			size_t current_idx = 0;
 			while (current_idx < featurecount) {
 				QueryRectangle rect2 = rect;
-				rect2.timestamp = temporal_index[current_idx].second;
+				rect2.t1 = rect2.t2 = temporal_index[current_idx].second;
 				try {
 					auto raster = getRasterFromSource(r, rect2, profiler);
 					while (current_idx < featurecount && temporal_index[current_idx].second < raster->stref.t2) {

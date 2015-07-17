@@ -297,7 +297,7 @@ void iteratorBenchmarksPoly(PolygonCollection &pc, int iter) {
 void iteratorBenchmarks() {
 
 	auto op = GenericOperator::fromJSON("{\"type\": \"csvpointsource\", \"params\":{ \"filename\": \"/home/rastersources/safecast/onemillion.csv\" } }");
-	QueryRectangle qrect(42, -180, -90, 180, 90, 1, 1, EPSG_LATLON);
+	QueryRectangle qrect(SpatialReference(EPSG_LATLON, -180, -90, 180, 90), TemporalReference(TIMETYPE_UNIX, 42, 42), 1, 1);
 	QueryProfiler profiler;
 	printf("Loading point data...\n");
 	auto pc = op->getCachedPointCollection(qrect, profiler);

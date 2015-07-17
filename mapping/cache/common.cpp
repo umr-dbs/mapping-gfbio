@@ -27,7 +27,7 @@ geos::geom::GeometryFactory CacheCommon::gf;
 
 std::string CacheCommon::qr_to_string(const QueryRectangle &rect) {
 	std::ostringstream os;
-	os << "QueryRectangle[ epsg: " << (uint16_t) rect.epsg << ", timestamp: " << rect.timestamp << ", x: ["
+	os << "QueryRectangle[ epsg: " << (uint16_t) rect.epsg << ", time: " << rect.t1 << " - " << rect.t2 << ", x: ["
 		<< rect.x1 << "," << rect.x2 << "]" << ", y: [" << rect.y1 << "," << rect.y2 << "]" << ", res: ["
 		<< rect.xres << "," << rect.yres << "] ]";
 	return os.str();

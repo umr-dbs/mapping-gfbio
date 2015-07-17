@@ -41,18 +41,6 @@ SpatialReference::SpatialReference(epsg_t epsg, double x1, double y1, double x2,
 	validate();
 }
 
-SpatialReference::SpatialReference(const QueryRectangle &rect) {
-	x1 = std::min(rect.x1, rect.x2);
-	x2 = std::max(rect.x1, rect.x2);
-
-	y1 = std::min(rect.y1, rect.y2);
-	y2 = std::max(rect.y1, rect.y2);
-
-	epsg = rect.epsg;
-
-	validate();
-};
-
 SpatialReference::SpatialReference(BinaryStream &stream) {
 	uint32_t uint;
 	stream.read(&uint);
@@ -101,13 +89,6 @@ TemporalReference::TemporalReference(timetype_t timetype, double t1, double t2)
 	validate();
 };
 
-TemporalReference::TemporalReference(const QueryRectangle &rect) {
-	t1 = rect.timestamp;
-	t2 = t1;
-	timetype = TIMETYPE_UNIX;
-
-	validate();
-};
 
 TemporalReference::TemporalReference(BinaryStream &stream) {
 	uint32_t uint;
@@ -156,6 +137,9 @@ SpatioTemporalReference::SpatioTemporalReference(BinaryStream &stream) : Spatial
 void SpatioTemporalReference::toStream(BinaryStream &stream) const {
 	SpatialReference::toStream(stream);
 	TemporalReference::toStream(stream);
+}
+
+SpatioTemporalReference::SpatioTemporalReference(const QueryRectangle &rect) : SpatialReference(rect), TemporalReference(rect) {
 }
 
 void SpatioTemporalReference::validate() const {

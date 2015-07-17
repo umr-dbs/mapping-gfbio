@@ -132,10 +132,11 @@ int Connection::input() {
 		case RemoteRasterDBBackend::COMMAND_GETCLOSESTRASTER: {
 			int channelid;
 			stream->read(&channelid);
-			double timestamp;
-			stream->read(&timestamp);
+			double t1, t2;
+			stream->read(&t1);
+			stream->read(&t2);
 			try {
-				auto res = backend->getClosestRaster(channelid, timestamp);
+				auto res = backend->getClosestRaster(channelid, t1, t2);
 				printf("%d: found closest raster with id %ld, time %f->%f\n", id, res.rasterid, res.time_start, res.time_end);
 				stream->write(res);
 			}

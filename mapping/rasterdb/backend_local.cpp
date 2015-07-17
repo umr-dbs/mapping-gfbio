@@ -220,7 +220,7 @@ void LocalRasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint
 }
 
 void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
-	auto rd = getClosestRaster(channelid, time_of_reference);
+	auto rd = getClosestRaster(channelid, time_of_reference, time_of_reference);
 
 	if (time_end > rd.time_start && time_start < rd.time_end)
 		throw SourceException("Cannot link rasters with overlapping time intervals");
@@ -253,15 +253,15 @@ void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, d
 }
 
 
-RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
+RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double t1, double t2) {
 	// find a raster that's valid during the given timestamp
 	SQLiteStatement stmt(db);
-	stmt.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end > ? ORDER BY time_start DESC limit 1");
+	stmt.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end >= ? ORDER BY time_start DESC limit 1");
 	stmt.bind(1, channelid);
-	stmt.bind(2, timestamp);
-	stmt.bind(3, timestamp);
+	stmt.bind(2, t1);
+	stmt.bind(3, t2);
 	if (!stmt.next())
-		throw SourceException( concat("No raster found for the given timestamp (source=", sourcename, ", channel=", channelid, ", time=", timestamp, ")"));
+		throw SourceException( concat("No raster found for the given time (source=", sourcename, ", channel=", channelid, ", time=", t1, "-", t2, ")"));
 
 	auto rasterid = stmt.getInt64(0);
 	double time_start = stmt.getDouble(1);

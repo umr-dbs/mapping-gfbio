@@ -49,11 +49,12 @@ std::string RemoteRasterDBBackend::readJSON() {
 }
 
 
-RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
+RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int channelid, double t1, double t2) {
 	auto c = COMMAND_GETCLOSESTRASTER;
 	stream->write(c);
 	stream->write(channelid);
-	stream->write(timestamp);
+	stream->write(t1);
+	stream->write(t2);
 	RasterDescription res(*stream);
 	if (res.rasterid < 0) {
 		std::string error;

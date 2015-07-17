@@ -20,7 +20,7 @@ class LocalRasterDBBackend : public RasterDBBackend {
 		virtual void linkRaster(int channelid, double time_of_reference, double time_start, double time_end);
 
 
-		virtual RasterDescription getClosestRaster(int channelid, double timestamp);
+		virtual RasterDescription getClosestRaster(int channelid, double t1, double t2);
 		virtual void readAttributes(rasterid rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value);
 		virtual int getBestZoom(rasterid rasterid, int desiredzoom);
 		virtual const std::vector<TileDescription> enumerateTiles(int channelid, rasterid rasterid, int x1, int y1, int x2, int y2, int zoom = 0);

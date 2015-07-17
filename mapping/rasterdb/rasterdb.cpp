@@ -401,14 +401,17 @@ static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, 
 	callBinaryOperatorFunc<raster_transformed_blit>(dest, src, destx, desty, destz, offset, scale);
 }
 
-std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
+std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalReference &t, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
 	if (io_cost)
 		*io_cost = 0;
 
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterDB::load: unknown channel");
 
-	auto rasterdescription = backend->getClosestRaster(channelid, timestamp);
+	if (t.timetype != TIMETYPE_UNIX)
+		throw SourceException("RasterDB::load() with timetype != UNIX");
+
+	auto rasterdescription = backend->getClosestRaster(channelid, t.t1, t.t2);
 	auto rasterid = rasterdescription.rasterid;
 	zoom = backend->getBestZoom(rasterid, zoom);
 	int zoomfactor = 1 << zoom;
@@ -437,7 +440,7 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, i
 	//y2 = y1 + (height << zoom);
 
 	if (x1 > x2 || y1 > y2)
-		throw SourceException(concat("RasterDB::load(", channelid, ", ", timestamp, ", [",x1,",",y1," -> ",x2,",",y2,"]): coords swapped"));
+		throw SourceException(concat("RasterDB::load(", channelid, ", ", t.t1, "-", t.t2, ", [",x1,",",y1," -> ",x2,",",y2,"]): coords swapped"));
 
 	decltype(GenericRaster::md_value) result_md_value;
 	decltype(GenericRaster::md_string) result_md_string;
@@ -514,8 +517,7 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 	pixel_y2 = (pixel_y2 - 1) - ((pixel_y2 - 1) % zoomfactor) + zoomfactor;
 
 	size_t io_costs = 0;
-	auto result = load(channelid, rect.t1, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
-	// TODO: automatically fail if rect.t2 is outside of the result's area?
+	auto result = load(channelid, (TemporalReference &) rect, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
 	profiler.addIOCost(io_costs);
 	return result;
 }

@@ -69,6 +69,12 @@ class SpatialReference {
 		void validate() const;
 
 		/*
+		 * Returns whether the other SpatialReference is contained (smaller or equal) within this.
+		 * Throws an exception if the crs don't match.
+		 */
+		bool contains(const SpatialReference &other) const;
+
+		/*
 		 * Named constructor for returning a reference that returns a valid reference which does not reference any
 		 * point in space.
 		 * This shall be used to instantiate rasters etc without an actual geo-reference.
@@ -114,6 +120,12 @@ class TemporalReference {
 		 * Validate if all invariants are met
 		 */
 		void validate() const;
+
+		/*
+		 * Returns whether the other TemporalReference is contained (smaller or equal) within this.
+		 * Throws an exception if the timetypes don't match.
+		 */
+		bool contains(const TemporalReference &other) const;
 		/*
 		 * Sets this reference to the intersection of the two references.
 		 */

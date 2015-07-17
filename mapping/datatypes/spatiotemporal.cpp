@@ -62,6 +62,17 @@ void SpatialReference::toStream(BinaryStream &stream) const {
 	stream.write(y2);
 }
 
+/*
+ * Returns whether the other SpatialReference is contained (smaller or equal) within this.
+ * Throws an exception if the crs don't match
+ */
+bool SpatialReference::contains(const SpatialReference &other) const {
+	if (epsg != other.epsg)
+		throw ArgumentException("SpatialReference::contains(): epsg don't match");
+
+	return x1 <= other.x1 && y1 <= other.y1 && x2 >= other.x2 && y2 >= other.y2;
+}
+
 
 void SpatialReference::validate() const {
 	if (x1 > x2 || y1 > y2) {
@@ -126,6 +137,13 @@ void TemporalReference::validate() const {
 	}
 }
 
+
+bool TemporalReference::contains(const TemporalReference &other) const {
+	if (timetype != other.timetype)
+		throw ArgumentException("TemporalReference::contains(): timetypes don't match");
+
+	return t1 <= other.t1 && t2 >= other.t2;
+}
 
 void TemporalReference::intersect(const TemporalReference &other) {
 	if (timetype != other.timetype)

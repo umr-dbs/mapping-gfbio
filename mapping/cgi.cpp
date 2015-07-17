@@ -513,7 +513,7 @@ int main() {
 
 			QueryProfiler profiler;
 			QueryRectangle rect(
-				SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, -20037508, 20037508),
+				SpatialReference::extent(EPSG_WEBMERCATOR),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::pixels(1024, 1024)
 			);
@@ -529,7 +529,7 @@ int main() {
 
 			QueryProfiler profiler;
 			QueryRectangle rect(
-				SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, -20037508, 20037508),
+				SpatialReference::extent(EPSG_WEBMERCATOR),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
@@ -559,7 +559,7 @@ int main() {
 
 			QueryProfiler profiler;
 			QueryRectangle rect(
-				SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, -20037508, 20037508),
+				SpatialReference::extent(EPSG_WEBMERCATOR),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
@@ -578,7 +578,7 @@ int main() {
 
 			QueryProfiler profiler;
 			QueryRectangle rect(
-				SpatialReference(EPSG_WEBMERCATOR, -20037508, 20037508, -20037508, 20037508),
+				SpatialReference::extent(EPSG_WEBMERCATOR),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);

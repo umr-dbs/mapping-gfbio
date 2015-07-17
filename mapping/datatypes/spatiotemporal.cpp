@@ -71,6 +71,16 @@ void SpatialReference::validate() const {
 	}
 }
 
+SpatialReference SpatialReference::extent(epsg_t epsg) {
+	if (epsg == EPSG_WEBMERCATOR)
+		return SpatialReference(EPSG_WEBMERCATOR, -20037508.34,-20037508.34,20037508.34,20037508.34);
+	if (epsg == EPSG_LATLON)
+		return SpatialReference(EPSG_LATLON, -180, -90, 180, 90);
+	if (epsg == EPSG_GEOSMSG)
+		return SpatialReference(EPSG_GEOSMSG, -5568748.276, -5568748.276, 5568748.276, 5568748.276);
+
+	throw ArgumentException("Cannot return extent of an unknown CRS");
+}
 
 /**
  * TemporalReference

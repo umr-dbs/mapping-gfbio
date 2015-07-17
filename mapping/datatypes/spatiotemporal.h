@@ -76,6 +76,11 @@ class SpatialReference {
 		static SpatialReference unreferenced() {
 			return SpatialReference(EPSG_UNREFERENCED, 0.0, 0.0, 1.0, 1.0);
 		}
+		/*
+		 * Named constructor for returning a reference that spans the whole earth in the given CRS
+		 */
+		static SpatialReference extent(epsg_t epsg);
+
 		// TODO: split into crs_authority_t / crs_code_t
 		epsg_t epsg;
 		double x1, y1, x2, y2;

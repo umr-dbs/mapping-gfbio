@@ -156,7 +156,7 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 			return QueryRectangle(
 				SpatialReference(src_epsg, 0, 0, 1, 1),
 				rect,
-				QueryResolution::pixels(1, 1)
+				rect.restype == QueryResolution::Type::PIXELS ? QueryResolution::pixels(1, 1) : QueryResolution(rect)
 			);
 		}
 
@@ -207,9 +207,10 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 	QueryRectangle result(
 		SpatialReference(src_epsg, src_x1, src_y1, src_x2, src_y2),
 		rect,
-		QueryResolution::pixels(src_xres, src_yres)
+		rect.restype == QueryResolution::Type::PIXELS ? QueryResolution::pixels(src_xres, src_yres) : QueryResolution(rect)
 	);
-	result.enlarge(2);
+	if (result.restype == QueryResolution::Type::PIXELS)
+		result.enlarge(2);
 	return result;
 }
 

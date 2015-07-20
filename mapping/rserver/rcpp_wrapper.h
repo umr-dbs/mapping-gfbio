@@ -154,7 +154,10 @@ namespace ***REMOVED*** {
 		***REMOVED***::S4 extent = rasterlayer.slot("extent");
 		double xmin = extent.slot("xmin"), ymin = extent.slot("ymin"), xmax = extent.slot("xmax"), ymax = extent.slot("ymax");
 
-		SpatioTemporalReference stref(epsg, xmin, ymin, xmax, ymax, TIMETYPE_UNREFERENCED, 0, 1);
+		SpatioTemporalReference stref(
+			SpatialReference(epsg, xmin, ymin, xmax, ymax),
+			TemporalReference::unreferenced()
+		);
 
 		***REMOVED***::S4 data = rasterlayer.slot("data");
 		if ((bool) data.slot("inmemory") != true)

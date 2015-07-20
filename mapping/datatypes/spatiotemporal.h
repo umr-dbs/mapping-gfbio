@@ -163,23 +163,6 @@ class SpatioTemporalReference : public SpatialReference, public TemporalReferenc
 		 * No default constructor.
 		 */
 		SpatioTemporalReference() = delete;
-		/**
-		 * Construct a reference that spans the known universe, both in time and space.
-		 * The actual endpoints are taken from the epsg_t or timetype_t when known;
-		 * if in doubt they're set to +- Infinity.
-		 */
-		SpatioTemporalReference(epsg_t epsg, timetype_t timetype)
-			: SpatialReference(epsg), TemporalReference(timetype) {};
-		/*
-		 * Constructs a reference with all values
-		 */
-		SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, timetype_t timetype, double t1, double t2)
-			: SpatialReference(epsg, x1, y1, x2, y2), TemporalReference(timetype, t1, t2) {};
-		/*
-		 * Constructs a reference with all values, but flips the endpoints if required
-		 */
-		SpatioTemporalReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2)
-			: SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy), TemporalReference(timetype, t1, t2) {};
 		/*
 		 * Constructs a reference from a SpatialReference and a TemporalReference
 		 */
@@ -208,7 +191,7 @@ class SpatioTemporalReference : public SpatialReference, public TemporalReferenc
 		 * This shall be used to instantiate rasters etc without an actual geo-reference.
 		 */
 		static SpatioTemporalReference unreferenced() {
-			return SpatioTemporalReference(EPSG_UNREFERENCED, 0.0, 0.0, 1.0, 1.0, TIMETYPE_UNREFERENCED, 0.0, 1.0);
+			return SpatioTemporalReference(SpatialReference::unreferenced(), TemporalReference::unreferenced());
 		}
 };
 

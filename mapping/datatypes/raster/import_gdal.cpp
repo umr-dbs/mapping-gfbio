@@ -109,7 +109,10 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *datas
 	double x2 = x1 + scale_x * pixel_width;
 	double y2 = y1 + scale_y * pixel_height;
 
-	SpatioTemporalReference stref(epsg, x1, y1, x2, y2, flipx, flipy, TIMETYPE_UNREFERENCED, 0, 1);
+	SpatioTemporalReference stref(
+		SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy),
+		TemporalReference::unreferenced()
+	);
 	DataDescription dd(type, minvalue, maxvalue, hasnodata, nodata);
 	//printf("loading raster with %g -> %g valuerange\n", adfMinMax[0], adfMinMax[1]);
 

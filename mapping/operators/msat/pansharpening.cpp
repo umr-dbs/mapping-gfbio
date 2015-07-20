@@ -28,8 +28,12 @@ class MSG_Pansharpening_Operator : public GenericOperator {
 		MSG_Pansharpening_Operator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSG_Pansharpening_Operator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
+	private:
 		int local_regression;
 		bool spatial;
 		int distance;
@@ -47,6 +51,14 @@ MSG_Pansharpening_Operator::~MSG_Pansharpening_Operator() {
 }
 REGISTER_OPERATOR(MSG_Pansharpening_Operator, "msatpansharpening");
 
+void MSG_Pansharpening_Operator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "\"local_regression\": " << local_regression << ",";
+	stream << "\"spatial\": " << (spatial ? "true" : "false") << ",";
+	stream << "\"distance\": " << distance;
+}
+
+
+#ifndef MAPPING_OPERATOR_STUBS
 
 #include "operators/msat/pansharpening_degenerate.cl.h"
 #include "operators/msat/pansharpening_regression.cl.h"
@@ -58,7 +70,10 @@ std::unique_ptr<GenericRaster> MSG_Pansharpening_Operator::getRaster(const Query
 	auto raster_lowres = getRasterFromSource(1, rect, profiler, RasterQM::LOOSE);
 
 	// query the HRV canal with triple the resolution
-	QueryRectangle rect2(raster_lowres->stref.t1, raster_lowres->stref.x1, raster_lowres->stref.y1, raster_lowres->stref.x2, raster_lowres->stref.y2, raster_lowres->width*3, raster_lowres->height*3, rect.epsg);
+	QueryRectangle rect2(*raster_lowres);
+	rect2.xres = raster_lowres->width * 3;
+	rect2.yres = raster_lowres->height * 3;
+
 	auto raster_hrv = getRasterFromSource(0, rect2, profiler, RasterQM::EXACT);
 
 	Profiler::Profiler p("CL_PANSHARPENING_OPERATOR");
@@ -143,3 +158,4 @@ std::unique_ptr<GenericRaster> MSG_Pansharpening_Operator::getRaster(const Query
 
 	return raster_out;
 }
+#endif

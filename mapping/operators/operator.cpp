@@ -139,6 +139,8 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 }
 
 std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
+	if (rect.restype == QueryResolution::Type::NONE)
+		throw OperatorException("Cannot query a raster without specifying a desired resolution");
 	QueryProfiler profiler;
 	std::unique_ptr<GenericRaster> result;
 	{
@@ -154,12 +156,18 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	}
 	d_profile(depth, type, "raster", profiler, result->getDataSize());
 
+	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
+		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+
 	// the costs of adjusting the result are assigned to the calling operator
 	if (query_mode == RasterQM::EXACT)
 		result = result->fitToQueryRectangle(rect);
 	return result;
 }
 std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+	if (rect.restype != QueryResolution::Type::NONE)
+		throw OperatorException("Cannot query a point collection when specifying a desired resolution");
+
 	QueryProfiler profiler;
 	std::unique_ptr<PointCollection> result;
 	{
@@ -168,11 +176,17 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 	}
 	d_profile(depth, type, "points", profiler);
 
+	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
+		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+
 	if (query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple())
 		throw OperatorException("Operator did not return Features consisting only of single points");
 	return result;
 }
 std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+	if (rect.restype != QueryResolution::Type::NONE)
+		throw OperatorException("Cannot query a line collection when specifying a desired resolution");
+
 	QueryProfiler profiler;
 	std::unique_ptr<LineCollection> result;
 	{
@@ -181,11 +195,17 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 	}
 	d_profile(depth, type, "lines", profiler);
 
+	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
+		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+
 	if (query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple())
 		throw OperatorException("Operator did not return Features consisting only of single lines");
 	return result;
 }
 std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+	if (rect.restype != QueryResolution::Type::NONE)
+		throw OperatorException("Cannot query a polygon collection when specifying a desired resolution");
+
 	QueryProfiler profiler;
 	std::unique_ptr<PolygonCollection> result;
 	{
@@ -194,11 +214,18 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 	}
 	d_profile(depth, type, "polygons", profiler);
 
+	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
+		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+
 	if (query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple())
 		throw OperatorException("Operator did not return Features consisting only of single polygons");
 	return result;
 }
 std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+//	TODO: do we want this requirement for plots, too?
+//	if (rect.restype != QueryResolution::Type::NONE)
+//		throw OperatorException("Cannot query a histogram when specifying a desired resolution");
+
 	QueryProfiler profiler;
 	std::unique_ptr<GenericPlot> result;
 	{

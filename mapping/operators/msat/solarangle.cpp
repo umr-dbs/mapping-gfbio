@@ -27,7 +27,9 @@ class MSATSolarAngleOperator : public GenericOperator {
 		MSATSolarAngleOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATSolarAngleOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
@@ -46,19 +48,22 @@ MSATSolarAngleOperator::MSATSolarAngleOperator(int sourcecounts[], GenericOperat
 		solarAngle = SolarAngles::AZIMUTH;
 	else if (specifiedAngle == "zenith")
 		solarAngle = SolarAngles::ZENITH;
-		else {
-			solarAngle = SolarAngles::AZIMUTH;
-			throw OperatorException(std::string("MSATSolarAngleOperator:: Invalid SolarAngle specified: ") + specifiedAngle);
-	}
+	else
+		throw OperatorException(std::string("MSATSolarAngleOperator:: Invalid SolarAngle specified: ") + specifiedAngle);
 }
 MSATSolarAngleOperator::~MSATSolarAngleOperator() {
 }
 REGISTER_OPERATOR(MSATSolarAngleOperator, "msatsolarangle");
 
 void MSATSolarAngleOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"solarAngle\":" << static_cast<int>(solarAngle);
+	stream << "\"solarAngle\":";
+	if (solarAngle == SolarAngles::AZIMUTH)
+		stream << "\"azimuth\"";
+	else if (solarAngle == SolarAngles::ZENITH)
+		stream << "\"zenith\"";
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
@@ -137,3 +142,4 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 
 	return raster_out;
 }
+#endif

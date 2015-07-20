@@ -1,5 +1,5 @@
 #include "operators/operator.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/csvparser.h"
 
@@ -17,8 +17,9 @@ class CSVPointSource : public GenericOperator {
 		CSVPointSource(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~CSVPointSource();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
@@ -41,6 +42,7 @@ void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
 	stream << "\"filename\":\"" << filename << "\"";
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 static bool endsWith(const std::string &str, const std::string &suffix) {
 	if (str.length() < suffix.length())
 		return false;
@@ -66,7 +68,7 @@ static double parseDate(const std::string &str) {
 }
 
 std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<PointCollection>(rect);
+	auto points_out = make_unique<PointCollection>(rect);
 
 	auto filesize = getFilesize(filename.c_str());
 	if (filesize <= 0)
@@ -165,3 +167,4 @@ std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryR
 
 	return points_out;
 }
+#endif

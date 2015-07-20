@@ -5,9 +5,8 @@
  *      Author: mika
  */
 
+#include <cache/common.h>
 #include "cache/priv/transfer.h"
-#include "cache/common.h"
-
 #include <geos/io/WKBWriter.h>
 #include <geos/io/WKBReader.h>
 
@@ -79,8 +78,7 @@ std::string CacheRef::to_string() const {
 
 
 BaseRequest::BaseRequest(const std::string& sem_id, const QueryRectangle& rect) :
-	// Make sure we have a unique representation of the operator-graph
-	semantic_id(GenericOperator::fromJSON(sem_id)->getSemanticId()),
+	semantic_id(sem_id),
 	query(rect) {
 }
 
@@ -101,7 +99,7 @@ std::string BaseRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "BaseRequest:" << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
-	ss << "  query: " << Common::qr_to_string(query);
+	ss << "  query: " << CacheCommon::qr_to_string(query);
 	return ss.str();
 }
 
@@ -131,7 +129,7 @@ std::string DeliveryRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "DeliveryRequest:" << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
-	ss << "  query: " << Common::qr_to_string(query) << std::endl;
+	ss << "  query: " << CacheCommon::qr_to_string(query) << std::endl;
 	ss << "  entry_id: " << entry_id;
 	return ss.str();
 }
@@ -231,7 +229,7 @@ std::string PuzzleRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "PuzzleRequest:" << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
-	ss << "  query: " << Common::qr_to_string(query) << std::endl;
+	ss << "  query: " << CacheCommon::qr_to_string(query) << std::endl;
 	ss << "  covered: " << covered->toString() << std::endl;
 	ss << "  remainder: " << remainder->toString() << std::endl;
 	ss << "  parts: [";
@@ -267,153 +265,5 @@ QueryRectangle PuzzleRequest::get_remainder_query(double xres, double yres) cons
 
 	uint32_t width  = std::floor( (x2-x1) / xres );
 	uint32_t height = std::floor( (y2-y1) / yres );
-	return QueryRectangle( query.timestamp, x1, y1, x2, y2, width, height, query.epsg );
-}
-
-//
-// Super with-raster
-//
-
-WithRaster::WithRaster(QM qm) :
-	query_mode(qm) {
-}
-
-WithRaster::WithRaster(BinaryStream& stream) {
-	uint8_t input;
-	stream.read(&input);
-	query_mode = (input==1) ? QM::EXACT : QM::LOOSE;
-}
-
-WithRaster::~WithRaster() {
-	// Nothing to do
-}
-
-void WithRaster::toStream(BinaryStream& stream) const {
-	uint8_t out = (query_mode == QM::EXACT) ? 1 : 0;
-	stream.write(out);
-}
-
-std::string WithRaster::to_string() const {
-	std::ostringstream ss;
-	std::string mode = (query_mode == QM::EXACT) ? "EXACT" : "LOOSE";
-	ss << "  query_mode: " <<  mode << std::endl;
-	return ss.str();
-}
-
-
-//
-// Raster stuff
-//
-
-RasterBaseRequest::RasterBaseRequest(const std::string& sem_id, const QueryRectangle& rect, QM qm) :
-	BaseRequest(sem_id,rect), WithRaster(qm) {
-}
-
-RasterBaseRequest::RasterBaseRequest( BinaryStream &stream ) : BaseRequest(stream), WithRaster(stream) {};
-
-RasterBaseRequest::RasterBaseRequest( const RasterBaseRequest &r ) : BaseRequest(r), WithRaster(r) {};
-RasterBaseRequest::RasterBaseRequest( RasterBaseRequest &&r ) : BaseRequest(r), WithRaster(r) {};
-
-RasterBaseRequest& RasterBaseRequest::operator=( const RasterBaseRequest & r ) {
-	BaseRequest::operator =(r);
-	WithRaster::operator=(r);
-	return *this;
-}
-
-RasterBaseRequest& RasterBaseRequest::operator=( RasterBaseRequest &&r ) {
-	BaseRequest::operator =(r);
-	WithRaster::operator=(r);
-	return *this;
-}
-
-void RasterBaseRequest::toStream( BinaryStream &stream ) const {
-	BaseRequest::toStream(stream);
-	WithRaster::toStream(stream);
-}
-
-std::string RasterBaseRequest::to_string() const {
-	std::ostringstream ss;
-	ss << BaseRequest::to_string() << std::endl << WithRaster::to_string();
-	return ss.str();
-}
-
-
-RasterDeliveryRequest::RasterDeliveryRequest( const std::string &sem_id, const QueryRectangle &rect, uint64_t entry_id, QM qm ) :
-	DeliveryRequest(sem_id,rect,entry_id), WithRaster(qm) {
-};
-
-RasterDeliveryRequest::RasterDeliveryRequest( BinaryStream &stream ) :
-	DeliveryRequest(stream), WithRaster(stream) {
-};
-
-RasterDeliveryRequest::RasterDeliveryRequest( const RasterDeliveryRequest &r ) :
-	DeliveryRequest(r), WithRaster(r) {
-};
-
-RasterDeliveryRequest::RasterDeliveryRequest( RasterDeliveryRequest &&r ) :
-	DeliveryRequest(r), WithRaster(r) {
-};
-
-
-RasterDeliveryRequest& RasterDeliveryRequest::operator=( const RasterDeliveryRequest & r ) {
-	DeliveryRequest::operator =(r);
-	WithRaster::operator=(r);
-	return *this;
-}
-
-RasterDeliveryRequest& RasterDeliveryRequest::operator=( RasterDeliveryRequest &&r ) {
-	DeliveryRequest::operator =(r);
-	WithRaster::operator=(r);
-	return *this;
-}
-
-void RasterDeliveryRequest::toStream( BinaryStream &stream ) const {
-	DeliveryRequest::toStream(stream);
-	WithRaster::toStream(stream);
-}
-
-std::string RasterDeliveryRequest::to_string() const {
-	std::ostringstream ss;
-	ss << DeliveryRequest::to_string() << std::endl << WithRaster::to_string();
-	return ss.str();
-}
-
-
-RasterPuzzleRequest::RasterPuzzleRequest( const std::string &sem_id, const QueryRectangle &rect, const GeomP &covered, const GeomP &remainder, const std::vector<CacheRef> &parts, QM qm ) :
-	PuzzleRequest(sem_id,rect,covered,remainder,parts), WithRaster(qm) {
-};
-
-RasterPuzzleRequest::RasterPuzzleRequest( BinaryStream &stream ) :
-	PuzzleRequest(stream), WithRaster(stream) {
-};
-
-RasterPuzzleRequest::RasterPuzzleRequest( const RasterPuzzleRequest &r ) :
-	PuzzleRequest(r), WithRaster(r) {
-};
-
-RasterPuzzleRequest::RasterPuzzleRequest( RasterPuzzleRequest &&r ) :
-	PuzzleRequest(r), WithRaster(r) {
-};
-
-RasterPuzzleRequest& RasterPuzzleRequest::operator=( const RasterPuzzleRequest & r ) {
-	PuzzleRequest::operator =(r);
-	WithRaster::operator=(r);
-	return *this;
-}
-
-RasterPuzzleRequest& RasterPuzzleRequest::operator=( RasterPuzzleRequest &&r ) {
-	PuzzleRequest::operator =(r);
-	WithRaster::operator=(r);
-	return *this;
-}
-
-void RasterPuzzleRequest::toStream( BinaryStream &stream ) const {
-	PuzzleRequest::toStream(stream);
-	WithRaster::toStream(stream);
-}
-
-std::string RasterPuzzleRequest::to_string() const {
-	std::ostringstream ss;
-	ss << PuzzleRequest::to_string() << std::endl << WithRaster::to_string();
-	return ss.str();
+	return QueryRectangle( SpatialReference(query.epsg, x1, y1, x2, y2), query, QueryResolution::pixels(width, height) );
 }

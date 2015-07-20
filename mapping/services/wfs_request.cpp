@@ -77,9 +77,13 @@ auto WFSRequest::getFeature() -> std::string {
 	// namespace + points or polygons
 
 	QueryProfiler profiler;
-	auto points = graph->getCachedPointCollection(
-			QueryRectangle(timestamp, bbox[0], bbox[1], bbox[2], bbox[3],
-					output_width, output_height, queryEpsg), profiler);
+	bool flipx, flipy;
+	QueryRectangle rect(
+		SpatialReference(queryEpsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy),
+		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+		QueryResolution::none()
+	);
+	auto points = graph->getCachedPointCollection(rect, profiler);
 
 	// TODO: startIndex + count
 	// TODO: sortBy=attribute  +D or +A
@@ -95,7 +99,7 @@ auto WFSRequest::getFeature() -> std::string {
 	//		</Cluster>
 	// </Filter>
 	if (this->to_bool(parameters["clustered"]) == true) {
-		auto clusteredPoints = std::make_unique<PointCollection>(points->stref);
+		auto clusteredPoints = make_unique<PointCollection>(points->stref);
 
 		auto x1 = bbox[0];
 		auto x2 = bbox[2];

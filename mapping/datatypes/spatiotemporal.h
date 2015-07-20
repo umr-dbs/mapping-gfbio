@@ -56,10 +56,6 @@ class SpatialReference {
 		 */
 		SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy);
 		/*
-		 * Constructs a reference from a QueryRectangle
-		 */
-		SpatialReference(const QueryRectangle &rect);
-		/*
 		 * Read a SpatialReference from a stream
 		 */
 		SpatialReference(BinaryStream &stream);
@@ -73,6 +69,12 @@ class SpatialReference {
 		void validate() const;
 
 		/*
+		 * Returns whether the other SpatialReference is contained (smaller or equal) within this.
+		 * Throws an exception if the crs don't match.
+		 */
+		bool contains(const SpatialReference &other) const;
+
+		/*
 		 * Named constructor for returning a reference that returns a valid reference which does not reference any
 		 * point in space.
 		 * This shall be used to instantiate rasters etc without an actual geo-reference.
@@ -80,6 +82,11 @@ class SpatialReference {
 		static SpatialReference unreferenced() {
 			return SpatialReference(EPSG_UNREFERENCED, 0.0, 0.0, 1.0, 1.0);
 		}
+		/*
+		 * Named constructor for returning a reference that spans the whole earth in the given CRS
+		 */
+		static SpatialReference extent(epsg_t epsg);
+
 		// TODO: split into crs_authority_t / crs_code_t
 		epsg_t epsg;
 		double x1, y1, x2, y2;
@@ -102,10 +109,6 @@ class TemporalReference {
 		 */
 		TemporalReference(timetype_t time, double t1, double t2);
 		/*
-		 * Constructs a reference from a QueryRectangle
-		 */
-		TemporalReference(const QueryRectangle &rect);
-		/*
 		 * Read a TemporalReference from a stream
 		 */
 		TemporalReference(BinaryStream &stream);
@@ -117,6 +120,12 @@ class TemporalReference {
 		 * Validate if all invariants are met
 		 */
 		void validate() const;
+
+		/*
+		 * Returns whether the other TemporalReference is contained (smaller or equal) within this.
+		 * Throws an exception if the timetypes don't match.
+		 */
+		bool contains(const TemporalReference &other) const;
 		/*
 		 * Sets this reference to the intersection of the two references.
 		 */
@@ -179,8 +188,7 @@ class SpatioTemporalReference : public SpatialReference, public TemporalReferenc
 		/*
 		 * Constructs a reference from a QueryRectangle
 		 */
-		SpatioTemporalReference(const QueryRectangle &rect)
-			: SpatialReference(rect), TemporalReference(rect) {};
+		SpatioTemporalReference(const QueryRectangle &rect);
 		/*
 		 * Read a SpatioTemporalReference from a stream
 		 */

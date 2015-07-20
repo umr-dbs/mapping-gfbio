@@ -1,6 +1,6 @@
 #include "pointcollection.h"
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/binarystream.h"
 #include "util/hash.h"
 #include "util/make_unique.h"
@@ -25,7 +25,7 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 			kept_count++;
 	}
 
-	auto out = std::make_unique<PointCollection>(in->stref);
+	auto out = make_unique<PointCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
 	// copy global metadata
 	out->global_md_string = in->global_md_string;

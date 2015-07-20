@@ -4,7 +4,7 @@
 #include "datatypes/raster/typejuggling.h"
 #include "operators/operator.h"
 #include "pointvisualization/CircleClusteringQuadTree.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <memory>
 #include <cmath>
@@ -16,7 +16,9 @@ class PointsToClusterRasterOperator : public GenericOperator {
 		PointsToClusterRasterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PointsToClusterRasterOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 };
 
 
@@ -30,6 +32,8 @@ PointsToClusterRasterOperator::~PointsToClusterRasterOperator() {
 }
 REGISTER_OPERATOR(PointsToClusterRasterOperator, "points2cluster_raster");
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 
 	const int MAX = 255;
@@ -68,3 +72,5 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 
 	return raster_out_guard;
 }
+#endif
+

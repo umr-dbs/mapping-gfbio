@@ -17,7 +17,9 @@ class MSATRadianceOperator : public GenericOperator {
 		MSATRadianceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATRadianceOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
@@ -41,9 +43,10 @@ MSATRadianceOperator::~MSATRadianceOperator() {
 REGISTER_OPERATOR(MSATRadianceOperator, "msatradiance");
 
 void MSATRadianceOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"convert\":" << convert;
+	stream << "\"convert\":" << (convert ? "true" : "false");
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
@@ -84,3 +87,4 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 
 	return raster_out;
 }
+#endif

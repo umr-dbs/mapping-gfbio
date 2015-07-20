@@ -1,5 +1,5 @@
 #include "operators/operator.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/configuration.h"
 
@@ -15,32 +15,35 @@ class PGPointSourceOperator : public GenericOperator {
 		PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~PGPointSourceOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
 		std::string connectionstring;
 		std::string querystring;
-		pqxx::connection *connection;
+#ifndef MAPPING_OPERATOR_STUBS
+		std::unique_ptr<pqxx::connection> connection;
+#endif
 };
 
 
 
 
-PGPointSourceOperator::PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), connection(nullptr) {
+PGPointSourceOperator::PGPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
 
 	connectionstring = params.get("connection", Configuration::get("operators.pgpointsource.dbcredentials", "")).asString();
 	querystring = params.get("query", "x, y FROM locations").asString();
 
-	connection = new pqxx::connection(connectionstring);
+#ifndef MAPPING_OPERATOR_STUBS
+	connection = make_unique<pqxx::connection>(connectionstring);
+#endif
 }
 
 PGPointSourceOperator::~PGPointSourceOperator() {
-	delete connection;
-	connection = nullptr;
 }
 REGISTER_OPERATOR(PGPointSourceOperator, "pgpointsource");
 
@@ -48,6 +51,7 @@ void PGPointSourceOperator::writeSemanticParameters(std::ostringstream& stream) 
 	stream << "\"querystring\":\"" << querystring << "\"";
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<PointCollection> PGPointSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 
 	if (rect.epsg != EPSG_WEBMERCATOR)
@@ -59,7 +63,7 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPointCollection(const
 	pqxx::work transaction(*connection, "load_points");
 	pqxx::result points = transaction.exec(sql.str());
 
-	auto points_out = std::make_unique<PointCollection>(rect);
+	auto points_out = make_unique<PointCollection>(rect);
 
 	auto column_count = points.columns();
 	for (pqxx::result::size_type c = 2;c<column_count;c++) {
@@ -82,3 +86,4 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPointCollection(const
 
 	return points_out;
 }
+#endif

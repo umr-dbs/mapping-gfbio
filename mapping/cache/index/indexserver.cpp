@@ -7,8 +7,8 @@
 
 #include "cache/index/indexserver.h"
 #include "util/make_unique.h"
+#include "util/concat.h"
 
-#include <deque>
 #include <unordered_map>
 #include <memory>
 
@@ -22,36 +22,6 @@
 
 #include <unistd.h>
 #include <errno.h>
-#include <cstring>
-
-
-////////////////////////////////////////////////////////////
-//
-// JOB
-//
-////////////////////////////////////////////////////////////
-
-Job::Job(NP &node, CP &frontend_connection, CP &worker_connection) :
-		node(node), frontend_connection(std::move(frontend_connection)), worker_connection(
-				std::move(worker_connection)) {
-}
-
-////////////////////////////////////////////////////////////
-//
-// JOB-DEFINITION
-//
-////////////////////////////////////////////////////////////
-
-JobDefinition::JobDefinition(CP &frontend_connection, uint8_t worker_cmd, std::unique_ptr<BaseRequest> &request ) :
-		worker_cmd(worker_cmd), frontend_connection(std::move(frontend_connection)), request(std::move(request)) {
-}
-
-std::unique_ptr<Job> JobDefinition::create_job(NP &node, CP worker_connection) {
-	// Send request to worker
-	worker_connection->stream->write(worker_cmd);
-	request->toStream(*worker_connection->stream);
-	return std::make_unique<Job>(node, frontend_connection, worker_connection);
-}
 
 ////////////////////////////////////////////////////////////
 //
@@ -59,58 +29,8 @@ std::unique_ptr<Job> JobDefinition::create_job(NP &node, CP worker_connection) {
 //
 ////////////////////////////////////////////////////////////
 
-void Node::add_worker(CP &con) {
-	workers.push_back(std::move(con));
-}
-
-Node::CP Node::get_worker() {
-	if (workers.empty())
-		throw NoSuchElementException("No worker available");
-	CP worker = std::move(workers.front());
-	workers.pop_front();
-	return worker;
-}
-
-bool Node::has_worker() {
-	return !workers.empty();
-}
-
-void Node::add_pending_job(JP& jd) {
-	pending_jobs.push_back(std::move(jd));
-}
-
-Node::JP Node::get_pending_job() {
-	if (pending_jobs.empty())
-		throw NoSuchElementException("No pending job available");
-	JP jd = std::move(pending_jobs.front());
-	pending_jobs.pop_front();
-	return jd;
-}
-
-bool Node::has_pending_job() {
-	return !pending_jobs.empty();
-}
-
-void Node::check_idle_workers(fd_set* readfds) {
-	auto wit = workers.begin();
-	while (wit != workers.end()) {
-		auto &wc = *wit;
-		if (FD_ISSET(wc->fd, readfds)) {
-			Log::error("Idle workers should never send data. Dropping worker.");
-			wit = workers.erase(wit);
-		}
-		else
-			++wit;
-	}
-}
-
-int Node::add_idle_workers(fd_set* readfds) {
-	int maxfd = -1;
-	for (auto &wc : workers) {
-		FD_SET(wc->fd, readfds);
-		maxfd = std::max(maxfd, wc->fd);
-	}
-	return maxfd;
+Node::Node(uint32_t id, const std::string &host, uint32_t port) :
+	id(id), host(host), port(port) {
 }
 
 ////////////////////////////////////////////////////////////
@@ -119,70 +39,11 @@ int Node::add_idle_workers(fd_set* readfds) {
 //
 ////////////////////////////////////////////////////////////
 
-IndexServer::IndexServer(int frontend_port, int node_port) :
-		shutdown(false), frontend_port(frontend_port), node_port(node_port), next_node_id(1) {
+IndexServer::IndexServer(int port) :
+	port(port), shutdown(false), next_node_id(1), raster_cache(), query_manager(raster_cache, nodes) {
 }
 
 IndexServer::~IndexServer() {
-}
-
-void IndexServer::run() {
-	int node_socket = Common::get_listening_socket(node_port);
-	int frontend_socket = Common::get_listening_socket(frontend_port);
-	Log::info("index-server: listening on node-port: %d and frontend-port: %d", node_port, frontend_port);
-
-	while (!shutdown) {
-		struct timeval tv { 2, 0 };
-		fd_set readfds;
-		FD_ZERO(&readfds);
-		// Add listen sockets
-		FD_SET(node_socket, &readfds);
-		FD_SET(frontend_socket, &readfds);
-
-		int maxfd = std::max(node_socket, frontend_socket);
-
-		// Add newly accepted connections
-		for (auto &fd : new_node_fds) {
-			FD_SET(fd, &readfds);
-			maxfd = std::max(maxfd, fd);
-		}
-
-		// Add control-connections and idle workers
-		for (auto &e : nodes) {
-			FD_SET(e.second->control_connection->fd, &readfds);
-			maxfd = std::max(maxfd, e.second->control_connection->fd);
-			maxfd = std::max(maxfd, e.second->add_idle_workers(&readfds));
-		}
-
-		// Add frontend-connections
-		for (auto &fc : client_connections) {
-			FD_SET(fc->fd, &readfds);
-			maxfd = std::max(maxfd, fc->fd);
-		}
-
-		// Add job-connections
-		for (auto &job : jobs) {
-			FD_SET(job->worker_connection->fd, &readfds);
-			maxfd = std::max(maxfd, job->worker_connection->fd);
-		}
-
-		int sel_ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
-		if (sel_ret < 0 && errno != EINTR) {
-			Log::error("Select returned error: %s", strerror(errno));
-		}
-		else if (sel_ret > 0) {
-			check_node_connections(&readfds);
-			check_node_handshake(&readfds, node_socket);
-
-			check_client_handshake(&readfds, frontend_socket);
-			check_client_connections(&readfds);
-
-			handle_jobs(&readfds);
-		}
-	}
-	close(node_socket);
-	close(frontend_socket);
-	Log::info("Index-Server done.");
 }
 
 void IndexServer::stop() {
@@ -190,416 +51,351 @@ void IndexServer::stop() {
 	shutdown = true;
 }
 
-std::unique_ptr<std::thread> IndexServer::run_async() {
-	return std::make_unique<std::thread>(&IndexServer::run, this);
-}
+void IndexServer::run() {
+	int listen_socket = CacheCommon::get_listening_socket(port);
+	Log::info("index-server: listening on node-port: %d", port);
 
-void IndexServer::check_node_connections(fd_set* readfds) {
-	auto nit = nodes.begin();
-	while (nit != nodes.end()) {
-		auto node = (*nit).second;
-		if (FD_ISSET(node->control_connection->fd, readfds)) {
-			try {
-				uint8_t cmd;
-				node->control_connection->stream->read(&cmd);
-				switch (cmd) {
-					default: {
-						std::ostringstream msg;
-						msg << "Received illegal command on control-connection for node: " <<  node->id;
-						throw NetworkException(msg.str());
-					}
+	std::vector<int> new_fds;
+
+	while (!shutdown) {
+		struct timeval tv { 2, 0 };
+		fd_set readfds;
+		FD_ZERO(&readfds);
+		// Add listen sockets
+		FD_SET(listen_socket, &readfds);
+
+		int maxfd = listen_socket;
+
+		for (auto &fd : new_fds) {
+			FD_SET(fd, &readfds);
+			maxfd = std::max(maxfd, fd);
+		}
+
+		maxfd = std::max(maxfd, setup_fdset(&readfds));
+
+		int sel_ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
+		if (sel_ret < 0 && errno != EINTR) {
+			Log::error("Select returned error: %s", strerror(errno));
+		}
+		else if (sel_ret > 0) {
+			process_worker_connections(&readfds);
+			process_control_connections(&readfds);
+			process_client_connections(&readfds);
+
+			process_handshake(new_fds, &readfds);
+
+			// Accept new connections
+			if (FD_ISSET(listen_socket, &readfds)) {
+				struct sockaddr_storage remote_addr;
+				socklen_t sin_size = sizeof(remote_addr);
+				int new_fd = accept(listen_socket, (struct sockaddr *) &remote_addr, &sin_size);
+				if (new_fd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+					Log::error("Accept failed: %d", strerror(errno));
 				}
-				// Check idle workers
-				node->check_idle_workers(readfds);
-				++nit;
-			} catch (NetworkException &ne) {
-				Log::error("Error on control-connection for node: %d. Dropping. Reason: %s", node->id,  ne.what());
-				// TODO: Redistribute queued jobs
-				raster_cache.remove_all_by_node(nit->first);
-				nit = nodes.erase(nit);
+				else if (new_fd > 0) {
+					Log::debug("New connection established on fd: %d", new_fd);
+					new_fds.push_back(new_fd);
+				}
 			}
 		}
-		else
-			++nit;
+		query_manager.schedule_pending_jobs(worker_connections);
 	}
+	close(listen_socket);
+	Log::info("Index-Server done.");
 }
 
-void IndexServer::check_node_handshake(fd_set* readfds, int node_socket) {
-	// Check new node connections
-	auto it = new_node_fds.begin();
-	while (it != new_node_fds.end()) {
-		auto &fd = *it;
-		if (FD_ISSET(fd, readfds)) {
-			try {
-				CP con(new SocketConnection(fd));
-				uint8_t cmd;
-				con->stream->read(&cmd);
+int IndexServer::setup_fdset(fd_set* readfds) {
+	int maxfd = -1;
 
-				switch (cmd) {
-					case Common::CMD_INDEX_NODE_HELLO: {
-						handleNodeHello(con);
+	{
+		auto wit = worker_connections.begin();
+		while (wit != worker_connections.end()) {
+			WorkerConnection &wc = *wit->second;
+			if (wc.is_faulty()) {
+				// TODO: Reschedule
+				worker_connections.erase(wit++);
+			}
+			else {
+				FD_SET(wc.get_read_fd(), readfds);
+				maxfd = std::max(maxfd, wc.get_read_fd());
+				wit++;
+			}
+		}
+	}
+
+	{
+		auto ccit = control_connections.begin();
+		while (ccit != control_connections.end()) {
+			ControlConnection &cc = *ccit->second;
+			if (cc.is_faulty()) {
+				raster_cache.remove_all_by_node(cc.node->id);
+				nodes.erase(cc.node->id);
+				control_connections.erase(ccit++);
+			}
+			else {
+				FD_SET(cc.get_read_fd(), readfds);
+				maxfd = std::max(maxfd, cc.get_read_fd());
+				ccit++;
+			}
+		}
+	}
+
+	{
+		auto clit = client_connections.begin();
+		while (clit != client_connections.end()) {
+			ClientConnection &cc = *clit->second;
+			if (cc.is_faulty()) {
+				client_connections.erase(clit++);
+			}
+			else {
+				FD_SET(cc.get_read_fd(), readfds);
+				maxfd = std::max(maxfd, cc.get_read_fd());
+				clit++;
+			}
+		}
+	}
+
+	return maxfd;
+}
+
+void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) {
+	auto it = new_fds.begin();
+	while (it != new_fds.end()) {
+		if (FD_ISSET(*it, readfds)) {
+			try {
+				std::unique_ptr<UnixSocket> us = make_unique<UnixSocket>(*it, *it);
+				BinaryStream &s = *us;
+
+				uint32_t magic;
+				s.read(&magic);
+				switch (magic) {
+					case ClientConnection::MAGIC_NUMBER: {
+						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(us);
+						Log::debug("New client connections established");
+						client_connections.emplace(cc->id, std::move(cc));
 						break;
 					}
-					case Common::CMD_INDEX_REGISTER_WORKER: {
-						handleWorkerRegistration(con);
+					case WorkerConnection::MAGIC_NUMBER: {
+						uint32_t node_id;
+						s.read(&node_id);
+						Log::info("New worker registered for node: %d", node_id);
+						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(us,
+							nodes.at(node_id));
+						worker_connections.emplace(wc->id, std::move(wc));
+						break;
+					}
+					case ControlConnection::MAGIC_NUMBER: {
+						std::string host;
+						uint32_t port;
+						s.read(&host);
+						s.read(&port);
+						std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, host, port);
+						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(us, node);
+						Log::info("New node registered. ID: %d, control-connected fd: %d", node->id,
+							cc->get_read_fd());
+						control_connections.emplace(cc->id, std::move(cc));
+						nodes.emplace(node->id, node);
 						break;
 					}
 					default: {
-						std::ostringstream msg;
-						msg << "Received illegal command on node-connection with fd: " <<  fd;
-						throw NetworkException(msg.str());
+						Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
 					}
 				}
-			} catch ( NetworkException &ne ) {
-				Log::error("Error on fresh node-connection. Dropping. Reason: %s", ne.what());
+			} catch (std::exception &e) {
+				Log::error("Error on new connection: %s. Dropping.", e.what());
 			}
-			// remove from new fds
-			it = new_node_fds.erase(it);
+			it = new_fds.erase(it);
 		}
-		else
+		else {
 			++it;
-	}
-
-	// Accept new node connection
-	if (FD_ISSET(node_socket, readfds)) {
-		struct sockaddr_storage remote_addr;
-		socklen_t sin_size = sizeof(remote_addr);
-		int new_fd = accept(node_socket, (struct sockaddr *) &remote_addr, &sin_size);
-
-		if (new_fd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-			Log::error("Accept failed: %d", strerror(errno));
-		}
-		else if (new_fd > 0) {
-			Log::debug("New node-connection established on fd: %d", new_fd);
-			new_node_fds.push_back(new_fd);
-		}
-	}
-
-}
-
-void IndexServer::handleNodeHello(CP &connection) {
-	std::string host;
-	uint32_t port;
-	try {
-		connection->stream->read(&host);
-		connection->stream->read(&port);
-
-		uint32_t id = next_node_id++;
-
-		NP node(new Node(id, host, port, connection));
-
-		Log::info("New node registered. ID: %d, control-connected fd: %d", id, node->control_connection->fd);
-		uint8_t code = Common::RESP_INDEX_NODE_HELLO;
-		node->control_connection->stream->write(code);
-		node->control_connection->stream->write(id);
-
-		nodes[id] = node;
-	} catch ( NetworkException &ne ) {
-		Log::error("Could not register new cache-node: %s", ne.what());
-	}
-}
-
-void IndexServer::handleWorkerRegistration(CP &connection) {
-	uint32_t id;
-	try {
-		connection->stream->read(&id);
-		auto n = nodes.at(id);
-		Log::info("New worker-connection for Node: %d", id);
-		// If we have pending jobs for this worker... assing it
-		if (n->has_pending_job())
-			jobs.push_back(n->get_pending_job()->create_job(n, std::move(connection)));
-		// Otherwise simply add this connection
-		else
-			n->add_worker(connection);
-
-	} catch (std::out_of_range &ore_) {
-		Log::error("Worker connection for unknown Node: %d. Discarding.", id);
-	} catch ( NetworkException &ne ) {
-		Log::error("Could not register new worker: %s", ne.what());
-	}
-}
-
-void IndexServer::check_client_handshake(fd_set* readfds, int frontend_socket) {
-	// Accept new client connection
-	if (FD_ISSET(frontend_socket, readfds)) {
-		struct sockaddr_storage remote_addr;
-		socklen_t sin_size = sizeof(remote_addr);
-		int new_fd = accept(frontend_socket, (struct sockaddr *) &remote_addr, &sin_size);
-
-		if (new_fd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
-			Log::error("Accept failed: %d", strerror(errno));
-		}
-		else if (new_fd > 0) {
-			Log::debug("New client-connection established on fd: %d", new_fd);
-			client_connections.push_back(std::make_unique<SocketConnection>(new_fd));
 		}
 	}
 }
 
-void IndexServer::check_client_connections(fd_set* readfds) {
-	auto it = client_connections.begin();
-	while (it != client_connections.end()) {
-		// Remove connection from idle frontend connections?
-		bool remove_connection = true;
-		auto &fc = *it;
-		if (FD_ISSET(fc->fd, readfds)) {
-			try {
-				uint8_t cmd;
-				if (fc->stream->read(&cmd, true)) {
-					switch (cmd) {
-						case Common::CMD_INDEX_GET_RASTER: {
-							RasterBaseRequest req(*fc->stream);
-							try {
-								Log::debug("Processing raster-request from client.");
-								process_raster_request( fc, req );
-							} catch (NoSuchElementException &nse) {
-								Log::error("No node registered for processing this request.");
-								send_error(*fc,"No worker-node available");
-								remove_connection = false;
-							}
+void IndexServer::process_control_connections(fd_set* readfds) {
+	for (auto &e : control_connections) {
+		if (FD_ISSET(e.second->get_read_fd(), readfds)) {
+			// Read from connection
+			ControlConnection &cc = *e.second;
+			cc.input();
+			// Skip faulty connections
+			if (cc.is_faulty())
+				continue;
 
-							break;
+
+			switch (cc.get_state()) {
+				case ControlConnection::State::REORG_RESULT_READ: {
+					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
+					auto &res = cc.get_result();
+					handle_reorg_result(cc.node->id,res);
+					cc.confirm_reorg();
+					break;
+				}
+				case ControlConnection::State::REORG_FINISHED: {
+					Log::debug("Node %d finished reorganization.", cc.node->id);
+					cc.release();
+					break;
+				}
+				default: {
+					throw std::runtime_error("Unknown state of client-connection.");
+				}
+			}
+
+
+
+		}
+	}
+}
+
+
+void IndexServer::handle_reorg_result(uint32_t new_node, const ReorgResult& res) {
+	switch ( res.type ) {
+		case ReorgResult::Type::RASTER: {
+			auto &ce = raster_cache.get(res.semantic_id,res.idx_cache_id);
+			ce->node_id = new_node;
+			ce->cache_id = res.cache_id;
+			break;
+		}
+		default: {
+			throw ArgumentException(concat("Type: ", (int) res.type, " not supported yet."));
+		}
+	}
+}
+
+void IndexServer::process_client_connections(fd_set* readfds) {
+	for (auto &e : client_connections) {
+		if (FD_ISSET(e.second->get_read_fd(), readfds)) {
+			// Read from connection
+			ClientConnection &cc = *e.second;
+			cc.input();
+
+			// Skip faulty connections
+			if (cc.is_faulty())
+				continue;
+			// Handle state-changes
+			switch (cc.get_state()) {
+				case ClientConnection::State::AWAIT_RESPONSE: {
+					process_client_request(cc);
+					break;
+				}
+				case ClientConnection::State::IDLE: {
+					Log::error("Client-connection MUST not be in idle-state after reading from it");
+				}
+				default: {
+					throw std::runtime_error("Unknown state of client-connection.");
+				}
+			}
+		}
+	}
+}
+
+void IndexServer::process_worker_connections(fd_set* readfds) {
+	for (auto &e : worker_connections) {
+		if (FD_ISSET(e.second->get_read_fd(), readfds)) {
+			// Read from connection
+			WorkerConnection &wc = *e.second;
+			wc.input();
+
+			// Skip faulty connections
+			if (wc.is_faulty())
+				continue;
+			// Handle state-changes
+			switch (wc.get_state()) {
+				case WorkerConnection::State::ERROR: {
+					Log::warn("Worker returned error: %s. Forwarding to client.",
+						wc.get_error_message().c_str());
+
+					auto clients = query_manager.release_worker(wc.id);
+					for ( auto &cid : clients ) {
+						try {
+							client_connections.at(cid)->send_error(wc.get_error_message());
+						} catch ( std::out_of_range &oor ) {
+							Log::warn("Client %d does not exist.", cid );
 						}
-						default: {
-							Log::warn("Unknown command on frontend-connection: %d. Dropping connection.",
-									cmd);
-							break;
+					}
+					wc.release();
+					break;
+				}
+				case WorkerConnection::State::DONE: {
+					Log::debug("Worker returned result. Determinig delivery qty.");
+					unsigned int qty = query_manager.get_query_count( wc.id );
+					wc.send_delivery_qty(qty);
+					break;
+				}
+				case WorkerConnection::State::DELIVERY_READY: {
+					Log::debug("Worker returned delivery: %s", wc.get_result().to_string().c_str() );
+					auto clients = query_manager.release_worker(wc.id);
+					for ( auto &cid : clients ) {
+						try {
+							client_connections.at(cid)->send_response(wc.get_result());
+						} catch ( std::out_of_range &oor ) {
+							Log::warn("Client %d does not exist.", cid );
 						}
 					}
+					wc.release();
+					break;
 				}
-				else {
-					Log::debug("Frontend-connection closed on fd: %d", fc->fd);
+				case WorkerConnection::State::NEW_RASTER_ENTRY: {
+					Log::debug("Worker added new raster-entry");
+					auto &ref = wc.get_new_raster_entry();
+					std::unique_ptr<STRasterRef> entry = make_unique<STRasterRef>(ref.node_id,
+						ref.cache_id, ref.bounds);
+					raster_cache.put(ref.semantic_id, entry);
+					wc.raster_cached();
+					break;
 				}
-			} catch (NetworkException &ne) {
-				Log::error("Error on frontend-connection with fd: %d. Dropping. Reason: %s", fc->fd,
-						ne.what());
+				case WorkerConnection::State::RASTER_QUERY_REQUESTED: {
+					Log::debug("Worker issued raster-query: %s", wc.get_raster_query().to_string().c_str());
+					process_worker_raster_query(wc);
+					break;
+				}
+				default: {
+					throw std::runtime_error(
+						concat("Illegal worker-connection state after read: ", (int) wc.get_state()));
+				}
 			}
-			if ( remove_connection )
-				it = client_connections.erase(it);
-			else
-				++it;
 		}
-		else
-			++it;
 	}
 }
 
-void IndexServer::handle_jobs(fd_set* readfds) {
-	// Holds all new jobs
-	std::vector<std::unique_ptr<Job>> new_jobs;
-
-	auto it = jobs.begin();
-	while (it != jobs.end()) {
-		auto &job = (*it);
-		auto &wc = job->worker_connection;
-		auto &fc = job->frontend_connection;
-		if (FD_ISSET(wc->fd, readfds)) {
-			// Job done?
-			bool done = true;
-			// May we reuse the connections
-			bool reuse_worker = true;
-			bool reuse_frontend = true;
-
-			uint8_t resp;
-
-			try {
-				wc->stream->read(&resp);
-				switch (resp) {
-					case Common::RESP_WORKER_RESULT_READY: {
-						// Read delivery id
-						uint64_t delivery_id;
-						wc->stream->read(&delivery_id);
-						Log::debug("Worker returned result, delivery_id: %d", delivery_id);
-
-						// Send delivery-id and node address
-						uint8_t f_resp = Common::RESP_INDEX_GET;
-						DeliveryResponse dr(job->node->host,job->node->port,delivery_id);
-						fc->stream->write(f_resp);
-						dr.toStream(*fc->stream);
-						Log::debug("Finished processing raster-request from client.");
-						break;
-					}
-					case Common::CMD_INDEX_QUERY_RASTER_CACHE: {
-						Log::debug("Processing raster-request from worker.");
-						BaseRequest req(*wc->stream);
-						process_node_raster_request(wc,req);
-						Log::debug("Finished processing raster-request from worker.");
-						done = false;
-						break;
-					}
-					case Common::RESP_WORKER_NEW_RASTER_CACHE_ENTRY: {
-						STCacheKey key(*wc->stream);
-						STRasterEntryBounds cube(*wc->stream);
-						Log::debug("Worker returned new result to raster-cache, key: %s:%d", key.semantic_id.c_str(), key.entry_id);
-						std::unique_ptr<STRasterRef> e = std::make_unique<STRasterRef>(job->node->id, key.entry_id, cube );
-						raster_cache.put(key.semantic_id, e );
-						done = false;
-						break;
-					}
-					case Common::RESP_WORKER_ERROR: {
-						std::string msg;
-						wc->stream->read(&msg);
-						Log::warn("Worker returned error: %s", msg.c_str());
-						send_error(*fc,msg);
-						break;
-					}
-					default: {
-						Log::error("Worker returned unknown code: %d. Terminating worker-connection.", resp);
-						send_error(*fc,"Internal error");
-						reuse_worker = false;
-						break;
-					}
-				}
-			} catch (NetworkException &ne) {
-				reuse_worker = false;
-				reuse_frontend = false;
-				Log::error("Error while processing job. Both connections are dropped.");
-			}
-			// Job done
-			if (done) {
-				// Release frontend connection
-				if (reuse_frontend) {
-					Log::debug("Releasing frontend-connection.");
-					client_connections.push_back(std::move(fc));
-				}
-
-				// Schedule next if available
-				if (reuse_worker && job->node->has_pending_job()) {
-					Log::debug("Directly reusing worker-connection for queued job.");
-					new_jobs.push_back(job->node->get_pending_job()->create_job(job->node, std::move(wc)));
-				}
-				else if (reuse_worker) {
-					Log::debug("Releasing worker-connection.");
-					job->node->add_worker(wc);
-				}
-
-				it = jobs.erase(it);
-			}
-			else
-				++it;
-		}
-		// FD not set
-		else
-			++it;
-	}
-	for ( auto &j : new_jobs) {
-		jobs.push_back( std::move(j) );
+void IndexServer::process_client_request(ClientConnection& con) {
+	switch (con.get_request_type()) {
+		case ClientConnection::RequestType::RASTER:
+			query_manager.add_raster_request( con.id, con.get_request() );
+			break;
+		default:
+			throw std::runtime_error("Request-type not implemented yet.");
 	}
 }
 
-void IndexServer::process_raster_request( CP &client_con, const RasterBaseRequest& req) {
-
-	Log::debug("Querying raster-cache for: %s::%s", req.semantic_id.c_str(), Common::qr_to_string(req.query).c_str());
-
-	STQueryResult res = raster_cache.query( req.semantic_id, req.query );
-
-	Log::debug("QueryResult: %s", res.to_string().c_str() );
-
-	uint8_t j_cmd;
-	std::unique_ptr<BaseRequest> w_req;
-	std::shared_ptr<Node> node;
+void IndexServer::process_worker_raster_query(WorkerConnection& con) {
+	auto &req = con.get_raster_query();
+	STQueryResult res = raster_cache.query(req.semantic_id, req.query);
+	Log::debug("QueryResult: %s", res.to_string().c_str());
 
 	// Full single hit
-	if ( res.ids.size() == 1 && !res.has_remainder() ) {
-		Log::debug("Creating raster-delivery job.");
-		auto ref = raster_cache.get( req.semantic_id, res.ids[0] );
-		j_cmd = Common::CMD_WORKER_DELIVER_RASTER;
-		node = nodes.at( ref->node_id );
-		w_req.reset( new RasterDeliveryRequest(req.semantic_id,req.query,ref->cache_id,req.query_mode) );
-	}
-	// Puzzle -- only if we cover more than 10%
-	else if ( res.has_hit() && res.coverage > 0.1 ) {
-		Log::debug("Creating raster-puzzle job, coverage: %f", res.coverage);
-		j_cmd = Common::CMD_WORKER_PUZZLE_RASTER;
-		std::vector<CacheRef> entries;
-		for ( auto id : res.ids ) {
-			auto ref = raster_cache.get( req.semantic_id, id );
-			auto e_node = nodes.at( ref->node_id );
-			// Assing first free worker-node
-			if ( node == nullptr && e_node->has_worker() )
-				node = e_node;
-			entries.push_back( CacheRef(e_node->host,e_node->port,ref->cache_id) );
-		}
-		// If no node was found...
-		if ( node == nullptr )
-			node = nodes.at(raster_cache.get( req.semantic_id, res.ids[0] )->node_id);
-
-		w_req.reset( new RasterPuzzleRequest( req.semantic_id, req.query, res.covered,
-				res.remainder, entries, req.query_mode ) );
-
-	}
-	// Full miss
-	else {
-		Log::debug("Creating raster-create job.");
-		j_cmd = Common::CMD_WORKER_CREATE_RASTER;
-		node = pick_worker();
-		w_req.reset( new RasterBaseRequest(req) );
-	}
-
-	Log::debug("Sending request to %s:%d: %s", node->host.c_str(), node->port, w_req->to_string().c_str() );
-
-	std::unique_ptr<JobDefinition> jd = std::make_unique<JobDefinition>(client_con,j_cmd,w_req);
-
-	if (node->has_worker())
-		jobs.push_back(jd->create_job(node, node->get_worker()));
-	// Add this job to the node's queue
-	else
-		node->add_pending_job(jd);
-}
-
-void IndexServer::process_node_raster_request( CP &worker_con, const BaseRequest& req) {
-
-	Log::debug("Querying raster-cache for: %s::%s", req.semantic_id.c_str(), Common::qr_to_string(req.query).c_str());
-
-	STQueryResult res = raster_cache.query( req.semantic_id, req.query );
-
-	Log::debug("QueryResult: %s", res.to_string().c_str() );
-
-	uint8_t resp;
-
-	// Full single hit
-	if ( res.ids.size() == 1 && !res.has_remainder() ) {
+	if (res.ids.size() == 1 && !res.has_remainder()) {
 		Log::debug("Full HIT. Sending reference.");
-		auto ref = raster_cache.get( req.semantic_id, res.ids[0] );
-		auto node = nodes.at( ref->node_id );
-		resp = Common::RESP_INDEX_HIT;
-		CacheRef cr(node->host,node->port,ref->cache_id);
-		worker_con->stream->write(resp);
-		cr.toStream(*worker_con->stream);
+		auto ref = raster_cache.get(req.semantic_id, res.ids[0]);
+		auto node = nodes.at(ref->node_id);
+		CacheRef cr(node->host, node->port, ref->cache_id);
+		con.send_hit(cr);
 	}
 	// Puzzle
-	else if ( res.has_hit() && res.coverage > 0.1 ) {
+	else if (res.has_hit() && res.coverage > 0.1) {
 		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f", res.coverage);
 		std::vector<CacheRef> entries;
-		for ( auto id : res.ids ) {
-			auto ref = raster_cache.get( req.semantic_id, id );
-			auto node = nodes.at( ref->node_id );
-			entries.push_back( CacheRef(node->host,node->port,ref->cache_id) );
+		for (auto id : res.ids) {
+			auto &ref = raster_cache.get(req.semantic_id, id);
+			auto &node = nodes.at(ref->node_id);
+			entries.push_back(CacheRef(node->host, node->port, ref->cache_id));
 		}
-		PuzzleRequest pr( req.semantic_id, req.query, res.covered, res.remainder, entries );
-		resp = Common::RESP_INDEX_PARTIAL;
-		worker_con->stream->write(resp);
-		pr.toStream(*worker_con->stream);
+		PuzzleRequest pr(req.semantic_id, req.query, res.covered, res.remainder, entries);
+		con.send_partial_hit(pr);
 	}
 	// Full miss
 	else {
 		Log::debug("Full MISS.");
-		resp = Common::RESP_INDEX_MISS;
-		worker_con->stream->write(resp);
+		con.send_miss();
 	}
 }
-
-void IndexServer::send_error(const SocketConnection& con, std::string msg) {
-	uint8_t code = Common::RESP_INDEX_ERROR;
-	con.stream->write(code);
-	con.stream->write(msg);
-}
-
-IndexServer::NP IndexServer::pick_worker() {
-	if (nodes.empty())
-		throw NoSuchElementException("No nodes available");
-
-	// TODO: Pick node
-	return nodes.begin()->second;
-}
-

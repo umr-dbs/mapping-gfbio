@@ -185,11 +185,13 @@ static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flip
 	double y2 = root.get("query_y2", 20037508).asDouble();
 	int xres = root.get("query_xres", 1000).asInt();
 	int yres = root.get("query_yres", 1000).asInt();
-	int timestamp = root.get("starttime", 0).asInt();
+	double timestamp = root.get("starttime", 0).asDouble();
 
-	QueryRectangle result(timestamp, x1, y1, x2, y2, xres, yres, epsg);
-	flipx = (result.x1 != x1);
-	flipy = (result.y1 != y1);
+	QueryRectangle result(
+		SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy),
+		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+		QueryResolution::pixels(xres, yres)
+	);
 	return result;
 }
 

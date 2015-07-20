@@ -7,7 +7,7 @@
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <sstream>
 #include "util/make_unique.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 
 std::unique_ptr<PointCollection> WKBUtil::readPointCollection(std::stringstream& wkb){

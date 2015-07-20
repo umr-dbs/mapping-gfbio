@@ -25,11 +25,13 @@ class MSATReflectanceOperator : public GenericOperator {
 		MSATReflectanceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~MSATReflectanceOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
-		bool solarCorrection{true};
+		bool solarCorrection;
 };
 
 
@@ -47,9 +49,11 @@ MSATReflectanceOperator::~MSATReflectanceOperator() {
 REGISTER_OPERATOR(MSATReflectanceOperator, "msatreflectance");
 
 void MSATReflectanceOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"solarCorrection\":" << solarCorrection;
+	stream << "\"solarCorrection\":" << (solarCorrection ? "true" : "false");
 }
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 double calculateESD(int dayOfYear){
 	return 1.0 - 0.0167 * cos(2.0 * acos(-1.0) * ((dayOfYear - 3.0) / 365.0));
 }
@@ -139,3 +143,4 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 
 	return raster_out;
 }
+#endif

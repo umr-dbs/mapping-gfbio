@@ -14,7 +14,9 @@ class ClassificationOperator : public GenericOperator {
 		ClassificationOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ClassificationOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
@@ -73,7 +75,7 @@ void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream)
 	if(!(classification_lower_border.size() == classification_upper_border.size() && classification_upper_border.size() == classification_classes.size()))
 		throw OperatorException("ClassificationOperator::writeSemanticParameters: unequal parameter vector sizes!");
 
-	const size_t size =classification_classes.size();
+	const size_t size = classification_classes.size();
 
 	stream << "\"RemapRange:\":[";
 	if(size >= 1){
@@ -85,7 +87,7 @@ void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream)
 	stream << "],\"reclassNoData\":" << reclassNoData <<",\"noDataClass\":" << noDataClass << "]";
 }
 
-
+#ifndef MAPPING_OPERATOR_STUBS
 #include "operators/raster/classification_kernels.cl.h"
 
 std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
@@ -120,4 +122,4 @@ std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRect
 
 	return (raster_out);
 }
-
+#endif

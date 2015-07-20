@@ -18,8 +18,9 @@ class PangaeaSource : public GenericOperator {
 			doi = params.get("doi", "").asString();
 		}
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 		void writeSemanticParameters(std::ostringstream& stream) {
 			stream << "\"doi\":\"" << doi;
 		}
@@ -30,13 +31,16 @@ class PangaeaSource : public GenericOperator {
 		std::string doi;
 		cURL curl;
 
+#ifndef MAPPING_OPERATOR_STUBS
 		void getStringFromServer(std::stringstream& data);
+#endif
 };
 REGISTER_OPERATOR(PangaeaSource, "pangaeasource");
 
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<PointCollection> PangaeaSource::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
-	std::unique_ptr<PointCollection> points =  std::make_unique<PointCollection>(rect);
+	std::unique_ptr<PointCollection> points = make_unique<PointCollection>(rect);
 
 	std::stringstream data;
 
@@ -113,3 +117,4 @@ void PangaeaSource::getStringFromServer(std::stringstream& data) {
 
 	curl.perform();
 }
+#endif

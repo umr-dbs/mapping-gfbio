@@ -25,7 +25,6 @@
 
 #include <iostream>
 #include <fstream>
-#include <sstream>
 #include <memory>
 #include <string>
 
@@ -76,13 +75,13 @@ size_t GDALCRS::getPixelCount() const {
 	throw MetadataException("Amount of dimensions not between 1 and 3");
 }
 
-SpatioTemporalReference GDALCRS::toSpatioTemporalReference(bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2) const {
+SpatialReference GDALCRS::toSpatialReference(bool &flipx, bool &flipy) const {
 	double x1 = origin[0];
 	double y1 = origin[1];
 	double x2 = origin[0] + scale[0] * size[0];
 	double y2 = origin[1] + scale[1] * size[1];
 
-	return SpatioTemporalReference(epsg, x1, y1, x2, y2, flipx, flipy, timetype, t1, t2);
+	return SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy);
 }
 
 std::ostream& operator<< (std::ostream &out, const GDALCRS &rm) {
@@ -379,11 +378,8 @@ struct raster_transformed_blit {
 		int x2 = std::min(raster_dest->width, destx+raster_src->width);
 		int y2 = std::min(raster_dest->height, desty+raster_src->height);
 
-		if (x1 >= x2 || y1 >= y2) {
-			std::ostringstream msg;
-			msg << "transformedBlit without overlapping region: " << raster_src->width << "x" << raster_src->height << " blitted onto " << raster_dest->width << "x" << raster_dest->height << " at (" << destx << "," << desty << "), overlap (" << x1 << "," << y1 << ") -> (" << x2 << "," << y2 << ")";
-			throw ArgumentException(msg.str());
-		}
+		if (x1 >= x2 || y1 >= y2)
+			throw ArgumentException(concat("transformedBlit without overlapping region: ", raster_src->width, "x", raster_src->height, " blitted onto ", raster_dest->width, "x", raster_dest->height, " at (", destx, ",", desty, "), overlap (", x1, ",", y1, ") -> (", x2, ",", y2, ")"));
 
 		for (int y=y1;y<y2;y++) {
 			for (int x=x1;x<x2;x++) {
@@ -405,17 +401,23 @@ static void transformedBlit(GenericRaster *dest, GenericRaster *src, int destx, 
 	callBinaryOperatorFunc<raster_transformed_blit>(dest, src, destx, desty, destz, offset, scale);
 }
 
-std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
+std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalReference &t, int x1, int y1, int x2, int y2, int zoom, bool transform, size_t *io_cost) {
 	if (io_cost)
 		*io_cost = 0;
 
 	if (channelid < 0 || channelid >= channelcount)
 		throw SourceException("RasterDB::load: unknown channel");
 
-	auto rasterdescription = backend->getClosestRaster(channelid, timestamp);
+	if (t.timetype != TIMETYPE_UNIX)
+		throw SourceException("RasterDB::load() with timetype != UNIX");
+
+	auto rasterdescription = backend->getClosestRaster(channelid, t.t1, t.t2);
 	auto rasterid = rasterdescription.rasterid;
 	zoom = backend->getBestZoom(rasterid, zoom);
 	int zoomfactor = 1 << zoom;
+
+	if (x1 % zoomfactor || y1 % zoomfactor || x2 % zoomfactor || y2 % zoomfactor)
+		throw ArgumentException("RasterDB::load(): cannot load from zoomed version with odd coordinates");
 
 	// Figure out the CRS after cutting and zooming
 	auto width = (x2-x1) >> zoom;
@@ -427,24 +429,21 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, i
 	GDALCRS zoomed_and_cut_crs(crs->epsg, width, height, origin_x, origin_y, scale_x, scale_y);
 
 	bool flipx, flipy;
-	auto resultstref = zoomed_and_cut_crs.toSpatioTemporalReference(flipx, flipy, TIMETYPE_UNIX, rasterdescription.time_start, rasterdescription.time_end);
+	SpatioTemporalReference resultstref(
+		zoomed_and_cut_crs.toSpatialReference(flipx, flipy),
+		TemporalReference(TIMETYPE_UNIX, rasterdescription.time_start, rasterdescription.time_end)
+	);
 
 	/*
-	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom)) {
-		std::stringstream ss;
-		ss << "RasterDB::load, fractions of a pixel requested: (x: " << x2 << " <-> " << (x1 + (width<<zoom)) << " y: " << y2 << " <-> " << (y1 + (height<<zoom));
-		throw SourceException(ss.str());
-	}
+	if (x2 != x1 + (width << zoom) || y2 != y1 + (height << zoom))
+		throw SourceException(concat("RasterDB::load, fractions of a pixel requested: (x: ", x2, " <-> ", (x1 + (width<<zoom)), " y: ", y2, " <-> ", (y1 + (height<<zoom))));
 	*/
 	// Make sure no fractional pixels are requested
 	//x2 = x1 + (width << zoom);
 	//y2 = y1 + (height << zoom);
 
-	if (x1 > x2 || y1 > y2) {
-		std::stringstream ss;
-		ss << "RasterDB::load(" << channelid << ", " << timestamp << ", ["<<x1 <<"," << y1 <<" -> " << x2 << "," << y2 << "]): coords swapped";
-		throw SourceException(ss.str());
-	}
+	if (x1 > x2 || y1 > y2)
+		throw SourceException(concat("RasterDB::load(", channelid, ", ", t.t1, "-", t.t2, ", [",x1,",",y1," -> ",x2,",",y2,"]): coords swapped"));
 
 	decltype(GenericRaster::md_value) result_md_value;
 	decltype(GenericRaster::md_string) result_md_string;
@@ -488,11 +487,8 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, double timestamp, i
 
 
 std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
-	if (crs->epsg != rect.epsg) {
-		std::stringstream msg;
-		msg << "SourceOperator: wrong epsg requested. Source is " << (int) crs->epsg << ", requested " << (int) rect.epsg;
-		throw OperatorException(msg.str());
-	}
+	if (crs->epsg != rect.epsg)
+		throw OperatorException(concat("SourceOperator: wrong epsg requested. Source is ", (int) crs->epsg, ", requested ", (int) rect.epsg));
 
 	// Get all pixel coordinates that need to be returned. The endpoints of the QueryRectangle are inclusive.
 	double px1 = crs->WorldToPixelX(rect.x1);
@@ -516,8 +512,15 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 		pixel_height >>= 1;
 	}
 
+	// Make sure to only load from pixel borders in the zoomed version
+	int zoomfactor = 1 << zoom;
+	pixel_x1 -= (pixel_x1 % zoomfactor);
+	pixel_x2 = (pixel_x2 - 1) - ((pixel_x2 - 1) % zoomfactor) + zoomfactor;
+	pixel_y1 -= (pixel_y1 % zoomfactor);
+	pixel_y2 = (pixel_y2 - 1) - ((pixel_y2 - 1) % zoomfactor) + zoomfactor;
+
 	size_t io_costs = 0;
-	auto result = load(channelid, rect.timestamp, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
+	auto result = load(channelid, (TemporalReference &) rect, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
 	profiler.addIOCost(io_costs);
 	return result;
 }

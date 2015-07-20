@@ -1,5 +1,5 @@
 #include "datatypes/spatiotemporal.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "operators/operator.h"
 #include "util/binarystream.h"
 #include "util/debug.h"
@@ -41,18 +41,6 @@ SpatialReference::SpatialReference(epsg_t epsg, double x1, double y1, double x2,
 	validate();
 }
 
-SpatialReference::SpatialReference(const QueryRectangle &rect) {
-	x1 = std::min(rect.x1, rect.x2);
-	x2 = std::max(rect.x1, rect.x2);
-
-	y1 = std::min(rect.y1, rect.y2);
-	y2 = std::max(rect.y1, rect.y2);
-
-	epsg = rect.epsg;
-
-	validate();
-};
-
 SpatialReference::SpatialReference(BinaryStream &stream) {
 	uint32_t uint;
 	stream.read(&uint);
@@ -74,6 +62,17 @@ void SpatialReference::toStream(BinaryStream &stream) const {
 	stream.write(y2);
 }
 
+/*
+ * Returns whether the other SpatialReference is contained (smaller or equal) within this.
+ * Throws an exception if the crs don't match
+ */
+bool SpatialReference::contains(const SpatialReference &other) const {
+	if (epsg != other.epsg)
+		throw ArgumentException("SpatialReference::contains(): epsg don't match");
+
+	return x1 <= other.x1 && y1 <= other.y1 && x2 >= other.x2 && y2 >= other.y2;
+}
+
 
 void SpatialReference::validate() const {
 	if (x1 > x2 || y1 > y2) {
@@ -83,6 +82,16 @@ void SpatialReference::validate() const {
 	}
 }
 
+SpatialReference SpatialReference::extent(epsg_t epsg) {
+	if (epsg == EPSG_WEBMERCATOR)
+		return SpatialReference(EPSG_WEBMERCATOR, -20037508.34,-20037508.34,20037508.34,20037508.34);
+	if (epsg == EPSG_LATLON)
+		return SpatialReference(EPSG_LATLON, -180, -90, 180, 90);
+	if (epsg == EPSG_GEOSMSG)
+		return SpatialReference(EPSG_GEOSMSG, -5568748.276, -5568748.276, 5568748.276, 5568748.276);
+
+	throw ArgumentException("Cannot return extent of an unknown CRS");
+}
 
 /**
  * TemporalReference
@@ -101,13 +110,6 @@ TemporalReference::TemporalReference(timetype_t timetype, double t1, double t2)
 	validate();
 };
 
-TemporalReference::TemporalReference(const QueryRectangle &rect) {
-	t1 = rect.timestamp;
-	t2 = t1;
-	timetype = TIMETYPE_UNIX;
-
-	validate();
-};
 
 TemporalReference::TemporalReference(BinaryStream &stream) {
 	uint32_t uint;
@@ -136,6 +138,13 @@ void TemporalReference::validate() const {
 }
 
 
+bool TemporalReference::contains(const TemporalReference &other) const {
+	if (timetype != other.timetype)
+		throw ArgumentException("TemporalReference::contains(): timetypes don't match");
+
+	return t1 <= other.t1 && t2 >= other.t2;
+}
+
 void TemporalReference::intersect(const TemporalReference &other) {
 	if (timetype != other.timetype)
 		throw ArgumentException("Cannot intersect() TemporalReferences with different timetype");
@@ -156,6 +165,9 @@ SpatioTemporalReference::SpatioTemporalReference(BinaryStream &stream) : Spatial
 void SpatioTemporalReference::toStream(BinaryStream &stream) const {
 	SpatialReference::toStream(stream);
 	TemporalReference::toStream(stream);
+}
+
+SpatioTemporalReference::SpatioTemporalReference(const QueryRectangle &rect) : SpatialReference(rect), TemporalReference(rect) {
 }
 
 void SpatioTemporalReference::validate() const {

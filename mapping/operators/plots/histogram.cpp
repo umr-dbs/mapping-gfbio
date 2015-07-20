@@ -16,7 +16,9 @@ class HistogramOperator : public GenericOperator {
 		HistogramOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~HistogramOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 };
 
 
@@ -27,6 +29,8 @@ HistogramOperator::~HistogramOperator() {
 }
 REGISTER_OPERATOR(HistogramOperator, "histogram");
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 template<typename T>
 struct histogram{
 	static std::unique_ptr<GenericPlot> execute(Raster2D<T> *raster) {
@@ -36,7 +40,7 @@ struct histogram{
 		T min = (T) raster->dd.min;
 
 		auto range = RasterTypeInfo<T>::getRange(min, max);
-		auto histogram = std::make_unique<Histogram>(range, min, max);
+		auto histogram = make_unique<Histogram>(range, min, max);
 
 		int size = raster->getPixelCount();
 		for (int i=0;i<size;i++) {
@@ -59,3 +63,4 @@ std::unique_ptr<GenericPlot> HistogramOperator::getPlot(const QueryRectangle &re
 	Profiler::Profiler p("HISTOGRAM_OPERATOR");
 	return callUnaryOperatorFunc<histogram>(raster.get());
 }
+#endif

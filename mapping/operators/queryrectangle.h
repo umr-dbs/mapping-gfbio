@@ -5,10 +5,37 @@
 
 class BinaryStream;
 
-class QueryRectangle {
+class QueryResolution {
+	public:
+		enum class Type : uint16_t {
+			NONE,
+			PIXELS
+		};
+
+		QueryResolution() = delete;
+		QueryResolution(Type restype, uint32_t xres, uint32_t yres) : restype(restype), xres(xres), yres(yres) {
+		}
+		QueryResolution(BinaryStream &stream);
+		void toStream(BinaryStream &stream) const;
+
+
+		static QueryResolution pixels(uint32_t xres, uint32_t yres) {
+			return QueryResolution(Type::PIXELS, xres, yres);
+		}
+		static QueryResolution none() {
+			return QueryResolution(Type::NONE, 0, 0);
+		}
+
+
+		Type restype;
+		uint32_t xres;
+		uint32_t yres;
+};
+
+class QueryRectangle : public SpatialReference, public TemporalReference, public QueryResolution {
 	public:
 		QueryRectangle();
-		QueryRectangle(time_t timestamp, double x1, double y1, double x2, double y2, uint32_t xres, uint32_t yres, epsg_t epsg) : timestamp(timestamp), x1(std::min(x1,x2)), y1(std::min(y1,y2)), x2(std::max(x1,x2)), y2(std::max(y1,y2)), xres(xres), yres(yres), epsg(epsg) {};
+		QueryRectangle(const SpatialReference &s, const TemporalReference &t, const QueryResolution &r) : SpatialReference(s), TemporalReference(t), QueryResolution(r) {}
 		QueryRectangle(const GridSpatioTemporalResult &grid);
 		QueryRectangle(BinaryStream &stream);
 
@@ -20,11 +47,6 @@ class QueryRectangle {
 		double maxy() const;
 
 		void enlarge(int pixels);
-
-		time_t timestamp;
-		double x1, y1, x2, y2;
-		uint32_t xres, yres;
-		epsg_t epsg;
 };
 
 #endif

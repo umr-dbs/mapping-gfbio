@@ -1,7 +1,7 @@
+#include <cache/common.h>
 #include <gtest/gtest.h>
 #include "test/unittests/cache/util.h"
 #include "cache/cache.h"
-#include "cache/common.h"
 #include "operators/operator.h"
 #include "util/configuration.h"
 #include "util/make_unique.h"
@@ -26,7 +26,7 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
-	std::unique_ptr<CacheManager> impl = std::make_unique<NopCacheManager>();
+	std::unique_ptr<CacheManager> impl = make_unique<NopCacheManager>();
 	CacheManager::init( impl );
 
 	RasterCache cache(114508*2 + 17);
@@ -34,7 +34,11 @@ TEST(STCacheTest,SimpleTest) {
 
 	for ( int i = 0; i < 4; i++ ) {
 		parseBBOX(bbox, bboxes[i], epsg, false);
-		QueryRectangle qr(timestamp, bbox[0], bbox[1], bbox[2], bbox[3], width, height, epsg);
+		QueryRectangle qr(
+			SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
+			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+			QueryResolution::pixels(width, height)
+		);
 		QueryProfiler qp;
 		STQueryResult qres = cache.query(op->getSemanticId(),qr);
 		printf("%s", qres.to_string().c_str());
@@ -69,8 +73,12 @@ TEST(STCacheTest,TestQuery) {
 	cache.put( sem_id, r2 );
 	cache.put( sem_id, r3 );
 
-	QueryRectangle query( 10, 0, 0, 2, 2, 2, 2, EPSG_LATLON );
-	STQueryResult qr = cache.query(sem_id, query);
+	QueryRectangle qrect(
+		SpatialReference(EPSG_LATLON, 0, 0, 2, 2),
+		TemporalReference(TIMETYPE_UNIX, 10, 10),
+		QueryResolution::pixels(2, 2)
+	);
+	STQueryResult qr = cache.query(sem_id, qrect);
 
 	ASSERT_TRUE( qr.has_remainder() );
 
@@ -99,7 +107,7 @@ TEST(STCacheTest,TestQuery) {
 	auto r4 = createRaster(1,2,1,2);
 	cache.put(sem_id,r4);
 
-	qr = cache.query( sem_id, query );
+	qr = cache.query( sem_id, qrect );
 	ASSERT_FALSE(qr.has_remainder());
 	ASSERT_EQ( 4, qr.ids.size() );
 

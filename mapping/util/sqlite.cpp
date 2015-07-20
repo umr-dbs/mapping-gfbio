@@ -1,5 +1,5 @@
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/sqlite.h"
 
 #include <sqlite3.h>
@@ -24,21 +24,17 @@ void SQLite::open(const char *filename, bool readonly) {
 		throw SQLiteException("DB already open");
 
 	int rc = sqlite3_open_v2(filename, &db, readonly ? (SQLITE_OPEN_READONLY) : (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE), nullptr);
-	if (rc != SQLITE_OK) {
-		std::ostringstream msg;
-		msg << "Can't open database " << filename << ": " << sqlite3_errmsg(db);
-		throw SQLiteException(msg.str());
-	}
+	if (rc != SQLITE_OK)
+		throw SQLiteException(concat("Can't open database ", filename, ": ", sqlite3_errmsg(db)));
 }
 
 
 void SQLite::exec(const char *query) {
 	char *error = 0;
 	if (SQLITE_OK != sqlite3_exec(db, query, NULL, NULL, &error)) {
-		std::ostringstream msg;
-		msg << "Error on query " << query << ": " << error;
+		auto msg = concat("Error on query ", query, ": ", error);
 		sqlite3_free(error);
-		throw SQLiteException(msg.str());
+		throw SQLiteException(msg);
 	}
 }
 
@@ -69,11 +65,8 @@ void SQLiteStatement::prepare(const char *query) {
 		&stmt,
 		NULL
 	);
-	if (result != SQLITE_OK) {
-		std::ostringstream msg;
-		msg << "Cannot prepare statement: " << result << ", error='" << sqlite3_errmsg(db->db) << "', query='" << query << "'";
-		throw SourceException(msg.str());
-	}
+	if (result != SQLITE_OK)
+		throw SourceException(concat("Cannot prepare statement: ", result, ", error='", sqlite3_errmsg(db->db), "', query='", query, "'"));
 }
 
 

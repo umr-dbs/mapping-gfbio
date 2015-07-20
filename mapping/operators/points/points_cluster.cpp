@@ -11,7 +11,9 @@ class PointsClusterOperator: public GenericOperator {
 		PointsClusterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);
 		virtual ~PointsClusterOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 };
 
 PointsClusterOperator::PointsClusterOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -22,11 +24,12 @@ PointsClusterOperator::~PointsClusterOperator() {
 }
 REGISTER_OPERATOR(PointsClusterOperator, "points_cluster");
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<PointCollection> PointsClusterOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	// TODO: EXPECT EPSG:3857
 
 	auto pointsOld = getPointCollectionFromSource(0, rect, profiler);
-	auto pointsNew = std::make_unique<PointCollection>(pointsOld->stref);
+	auto pointsNew = make_unique<PointCollection>(pointsOld->stref);
 
 	pv::CircleClusteringQuadTree clusterer(pv::BoundingBox(
 													pv::Coordinate((rect.x2 + rect.x1) / (2 * rect.xres), (rect.y2 + rect.y2) / (2 * rect.yres)),
@@ -47,3 +50,4 @@ std::unique_ptr<PointCollection> PointsClusterOperator::getPointCollection(const
 
 	return pointsNew;
 }
+#endif

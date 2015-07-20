@@ -15,6 +15,26 @@
 #include <gdal_priv.h>
 
 
+class MSATTemperatureOperator : public GenericOperator {
+	public:
+		MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
+		virtual ~MSATTemperatureOperator();
+
+#ifndef MAPPING_OPERATOR_STUBS
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
+	private:
+};
+MSATTemperatureOperator::MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
+	assumeSources(1);
+}
+MSATTemperatureOperator::~MSATTemperatureOperator() {
+}
+REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
+
+
+#ifndef MAPPING_OPERATOR_STUBS
+
 class RadianceTable {
 	public:
 		RadianceTable(int channel, int length, const float *temperatures, const float *radiances)
@@ -96,26 +116,8 @@ static RadianceTable *getRadianceTable(int channel) {
 }
 
 
-class MSATTemperatureOperator : public GenericOperator {
-	public:
-		MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
-		virtual ~MSATTemperatureOperator();
-
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-	private:
-};
-
 
 #include "operators/msat/temperature.cl.h"
-
-
-
-MSATTemperatureOperator::MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
-	assumeSources(1);
-}
-MSATTemperatureOperator::~MSATTemperatureOperator() {
-}
-REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
 
 
 std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
@@ -167,3 +169,4 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 
 	return raster_out;
 }
+#endif

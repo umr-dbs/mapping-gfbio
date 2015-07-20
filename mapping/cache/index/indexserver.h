@@ -8,9 +8,12 @@
 #ifndef INDEX_INDEXSERVER_H_
 #define INDEX_INDEXSERVER_H_
 
-#include "cache/priv/transfer.h"
-#include "cache/cache.h"
 #include "cache/common.h"
+#include "cache/index/querymanager.h"
+#include "cache/priv/connection.h"
+#include "cache/priv/transfer.h"
+#include "cache/priv/redistribution.h"
+#include "cache/cache.h"
 #include "util/log.h"
 
 #include <string>
@@ -19,114 +22,20 @@
 #include <vector>
 #include <deque>
 
-class Job;
-class Node;
-class IndexServer;
-
-//
-// Describes a currently processed job.
-// Basically holds the to participating connections
-// and a reference to the node.
-// When a job is created, the request is completely
-// read from the frontend and passed to the worker.
-// We only read responses from the worker within
-// a job.
-//
-class Job {
-	typedef std::unique_ptr<SocketConnection> CP;
-	typedef std::shared_ptr<Node> NP;
-public:
-	Job( NP &node, CP &frontend_connection, CP &worker_connection );
-	Job( const Job& ) = delete;
-	Job operator=( const Job& ) = delete;
-	// The node, the worker-connection belongs to
-	NP node;
-	// The connection to deliver results to
-	CP frontend_connection;
-	// The used worker connection
-	CP worker_connection;
-};
-
-//
-// Definition of a scheduled job.
-// Implementations must provide a method
-// to transform the definition into a job
-// Means: Send a request to the worker
-//
-
-class JobDefinition {
-	typedef std::unique_ptr<SocketConnection> CP;
-	typedef std::shared_ptr<Node> NP;
-public:
-	JobDefinition(CP &frontend_connection, uint8_t worker_cmd, std::unique_ptr<BaseRequest> &request );
-	std::unique_ptr<Job> create_job( NP &node, CP worker_connection );
-	// The command to be send to the worker
-	uint8_t worker_cmd;
-	// The connection which issued this job
-	CP frontend_connection;
-	// The unerlying request
-	std::unique_ptr<BaseRequest> request;
-};
-
 
 //
 // Represents a cache-node.
-// Each node has a control connection and
-// up to n workers.
-// A worker may be obtained by the get_worker method.
-// The caller then owns the worker connection and is responsible
-// for dropping or returning it via add_worker.
-// Same is with job-definitions. They should only be enqueued here
-// if there is noch worker available on this node.
-// The server must take care, that enqueued jobs are processed asap.
-//
 //
 
 class Node {
-	typedef std::unique_ptr<SocketConnection> CP;
-	typedef std::unique_ptr<JobDefinition> JP;
 public:
-	Node( const Node& ) = delete;
-	Node operator=( const Node& ) = delete;
-	Node(uint32_t id, std::string host, int port, CP &control_connection) :
-			id(id), host(host), port(port), control_connection(std::move(control_connection)) {
-	}
-	;
-	// Adds an idle worker
-	void add_worker(CP &con);
-	// Returns an idle worker -> Must be returned or dropped
-	CP get_worker();
-	// Tells wheter this node has idle workers
-	bool has_worker();
-
-	// Adds a job to schedule (only to be called if there is no worker available)
-	void add_pending_job(JP &jd);
-	// Retrieves a pending job from the queue
-	JP get_pending_job();
-	// Tells wheter this node has pending jobs
-	bool has_pending_job();
-
-	// Adds the FDs of currently idle workers to the given fd_set
-	// and returns the max-fd among them
-	int add_idle_workers( fd_set *readfds );
-
-	// Checks the fds of all idle workers for available data.
-	// Since this should not happen, all workers with data are dropped
-	void check_idle_workers( fd_set *readfds );
-
+	Node(uint32_t id, const std::string &host, uint32_t port);
 	// The unique id of this node
 	const uint32_t id;
 	// The hostname of this node
 	const std::string host;
 	// The port for delivery connections on this node
 	const uint32_t port;
-	// The control-connection
-	CP control_connection;
-private:
-	// All idle workers
-	std::deque<CP> workers;
-	// All jobs to be scheduledd
-	std::deque<JP> pending_jobs;
 };
 
 //
@@ -145,80 +54,52 @@ private:
 
 class IndexServer {
 public:
-	IndexServer( int frontend_port, int node_port );
+	IndexServer( int port );
 	virtual ~IndexServer();
 	// Fires up the index-server and will return after
 	// stop() is invoked by another thread
 	void run();
-	// Fires up the index-server in a separate thread
-	// and returns it.
-	std::unique_ptr<std::thread> run_async();
 	// Triggers the shutdown of the index-server
 	// Subsequent calls to run or run_async have undefined
 	// behaviour
 	virtual void stop();
-
 protected:
-	typedef std::unique_ptr<SocketConnection> CP;
-	typedef std::shared_ptr<Node> NP;
-	virtual NP pick_worker();
-
-	// Cache-request from client
-	virtual void process_raster_request( CP &client_con, const RasterBaseRequest &req );
-
-	// Cache-request from node
-	virtual void process_node_raster_request( CP &worker_con, const BaseRequest& req);
-
 	// The currently known nodes
-	std::map<uint32_t,NP> nodes;
+	std::map<uint32_t,std::shared_ptr<Node>> nodes;
+	// Connections
+	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
+	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
+	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
 private:
-	// Checks if there are new connections from the frontend
-	void check_client_handshake( fd_set *readfds, int frontend_socket );
+	// Adds the fds of all connections to the read-set
+	// and kills faulty connections
+	int setup_fdset( fd_set *readfds);
 
-	// Checks idle frontend-connections for data
-	// and creates the corresponding jobs on requests
-	void check_client_connections( fd_set *readfds );
+	// Processes the handshake on newly established connections
+	void process_handshake( std::vector<int> &new_fds, fd_set *readfds);
 
-	// Checks if there are new connections from node-servers.
-	// Also handles hello requests from nodes and workers.
-	void check_node_handshake( fd_set *readfds, int node_socket );
+	void process_control_connections(fd_set *readfds);
+	void process_worker_connections(fd_set *readfds);
+	void process_client_connections(fd_set *readfds);
 
-	// Checks a node's control-connection as well
-	// as its idle worker-connections for errors resp. commands.
-	void check_node_connections( fd_set *readfds );
+	void process_client_request( ClientConnection &con );
+	void process_worker_raster_query( WorkerConnection &con );
 
-	// Processes the currently running jobs
-	void handle_jobs( fd_set *readfds );
+	// Reorg
+	void handle_reorg_result( uint32_t new_node, const ReorgResult &res );
 
-	// Processes a hello from a cache-node
-	// and registers the node
-	void handleNodeHello( CP &connection );
-
-	// Processes a hello from a node's worker-thread
-	// and attaches the resulting connection to the
-	// corresponding node-instance
-	void handleWorkerRegistration( CP &connection );
-
-	// Sends an error to the given connection, including error-code
-	void send_error( const SocketConnection &con, std::string msg );
+	// The port the index-server is listening on
+	int port;
 
 	// Indicator telling if the server should shutdown
 	bool shutdown;
-	// The port to accept client connections on
-	int frontend_port;
-	// The port to accept connections from cache-nodes on
-	int node_port;
-	// The currently idle frontend-connections
-	std::vector<CP> client_connections;
-	// The currently scheduled jobs
-	std::vector<std::unique_ptr<Job>> jobs;
-	// Holds fds of newly accepted connections from workers
-	std::vector<int> new_node_fds;
+
 	// The next id to assign to a node
 	uint32_t next_node_id;
 	// Cache
 	RasterRefCache raster_cache;
 
+	QueryManager query_manager;
 };
 
 #endif /* INDEX_INDEXSERVER_H_ */

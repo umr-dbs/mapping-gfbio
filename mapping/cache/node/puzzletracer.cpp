@@ -5,8 +5,8 @@
  *      Author: mika
  */
 
+#include <cache/common.h>
 #include "cache/node/puzzletracer.h"
-#include "cache/common.h"
 #include <sstream>
 
 
@@ -21,7 +21,7 @@ RasterWriter::RasterWriter(RasterWriter&& rw) : dir(std::move(dir)), file_no(rw.
 }
 
 void RasterWriter::write_meta(const QueryRectangle& query, const geos::geom::Geometry& covered) {
-	meta << "Query: " << Common::qr_to_string(query) << std::endl;
+	meta << "Query: " << CacheCommon::qr_to_string(query) << std::endl;
 	meta << "Covered: " << covered.toString() << std::endl;
 }
 

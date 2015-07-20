@@ -1,4 +1,4 @@
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/binarystream.h"
 #include "rserver/rserver.h"
 
@@ -125,7 +125,7 @@ std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int c
 	stream.write(rect);
 	is_sending = false;
 
-	auto points = std::make_unique<PointCollection>(stream);
+	auto points = make_unique<PointCollection>(stream);
 	return points;
 }
 

@@ -44,7 +44,7 @@ int main(void) {
 	auto hoststr = Configuration::get("nodeserver.host");
 	auto portnr = atoi(portstr.c_str());
 
-	auto iportstr = Configuration::get("indexserver.port.node");
+	auto iportstr = Configuration::get("indexserver.port");
 	auto ihoststr = Configuration::get("indexserver.host");
 	auto iportnr = atoi(iportstr.c_str());
 

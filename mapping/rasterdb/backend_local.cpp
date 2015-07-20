@@ -10,7 +10,7 @@
 
 #include <iostream>
 #include <fstream>
-#include <sstream>
+
 #include "util/make_unique.h"
 
 
@@ -220,7 +220,7 @@ void LocalRasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint
 }
 
 void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
-	auto rd = getClosestRaster(channelid, time_of_reference);
+	auto rd = getClosestRaster(channelid, time_of_reference, time_of_reference);
 
 	if (time_end > rd.time_start && time_start < rd.time_end)
 		throw SourceException("Cannot link rasters with overlapping time intervals");
@@ -253,18 +253,15 @@ void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, d
 }
 
 
-RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
+RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double t1, double t2) {
 	// find a raster that's valid during the given timestamp
 	SQLiteStatement stmt(db);
-	stmt.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end > ? ORDER BY time_start DESC limit 1");
+	stmt.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end >= ? ORDER BY time_start DESC limit 1");
 	stmt.bind(1, channelid);
-	stmt.bind(2, timestamp);
-	stmt.bind(3, timestamp);
-	if (!stmt.next()) {
-		std::ostringstream msg;
-		msg << "No raster found for the given timestamp (source=" << sourcename << ", channel=" << channelid << ", time=" << timestamp << ")";
-		throw SourceException(msg.str());
-	}
+	stmt.bind(2, t1);
+	stmt.bind(3, t2);
+	if (!stmt.next())
+		throw SourceException( concat("No raster found for the given time (source=", sourcename, ", channel=", channelid, ", time=", t1, "-", t2, ")"));
 
 	auto rasterid = stmt.getInt64(0);
 	double time_start = stmt.getDouble(1);
@@ -378,7 +375,7 @@ std::unique_ptr<ByteBuffer> LocalRasterDBBackend::readTile(const TileDescription
 	if (f < 0)
 		throw SourceException("Could not open data file");
 
-	auto buffer = std::make_unique<ByteBuffer>(tiledesc.size);
+	auto buffer = make_unique<ByteBuffer>(tiledesc.size);
 	if (lseek(f, (off_t) tiledesc.offset, SEEK_SET) != (off_t) tiledesc.offset) {
 		close(f);
 		throw SourceException("seek failed");
@@ -399,7 +396,7 @@ std::unique_ptr<ByteBuffer> LocalRasterDBBackend::readTile(const TileDescription
 		throw SourceException("seek failed");
 	}
 
-	auto buffer = std::make_unique<ByteBuffer>(tiledesc.size);
+	auto buffer = make_unique<ByteBuffer>(tiledesc.size);
 	if (fread(buffer->data, sizeof(unsigned char), tiledesc.size, f) != tiledesc.size) {
 		fclose(f);
 		throw SourceException("read failed");

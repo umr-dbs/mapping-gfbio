@@ -23,27 +23,11 @@
 #include <mutex>
 #include <thread>
 
-class SocketConnection;
 class GenericOperator;
 
 template<typename EType>
 class STCacheStructure;
 
-
-//
-// Unique key generated for an entry in the cache
-//
-class STCacheKey {
-public:
-	STCacheKey( const std::string &semantic_id, uint64_t entry_id );
-	STCacheKey( BinaryStream &stream );
-
-	void toStream( BinaryStream &stream ) const;
-	std::string to_string() const;
-
-	std::string semantic_id;
-	uint64_t entry_id;
-};
 
 //
 // Result of a cache-query.

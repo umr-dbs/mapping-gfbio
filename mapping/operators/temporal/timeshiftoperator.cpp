@@ -11,7 +11,7 @@
 #include "datatypes/linecollection.h"
 #include "datatypes/spatiotemporal.h"
 
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include "util/timemodification.h"
 
@@ -69,11 +69,11 @@ auto TimeShiftOperator::parseShiftValues(const Json::Value& shift_parameter) -> 
 		std::string shift_value = shift_parameter.get("value", "").asString();
 		// TODO: catch errors
 		boost::posix_time::ptime time_value{boost::posix_time::time_from_string(shift_value)};
-		return std::make_unique<AbsoluteShift>(time_value);
+		return make_unique<AbsoluteShift>(time_value);
 	} else {
 		int shift_value = shift_parameter.get("value", "").asInt();
 		RelativeShift::ShiftUnit unit_value = RelativeShift::createUnit(unit);
-		return std::make_unique<RelativeShift>(shift_value, unit_value);
+		return make_unique<RelativeShift>(shift_value, unit_value);
 	}
 }
 
@@ -88,20 +88,20 @@ TimeShiftOperator::TimeShiftOperator(int sourcecounts[], GenericOperator *source
 	if (!shift_parameter.isNull() && shift_parameter.isMember("from")) {
 		from = parseShiftValues(shift_parameter.get("from", Json::nullValue));
 	} else {
-		from = std::make_unique<Identity>();
+		from = make_unique<Identity>();
 	}
 
 	if (!shift_parameter.isNull() && shift_parameter.isMember("to")) {
 		to = parseShiftValues(shift_parameter.get("to", Json::nullValue));
 	} else {
-		to = std::make_unique<Identity>();
+		to = make_unique<Identity>();
 	}
 
 	// TODO: stretch
 
 	// TODO: snap
 
-	time_modification = std::make_unique<TimeModification>(std::move(from), std::move(to));
+	time_modification = make_unique<TimeModification>(std::move(from), std::move(to));
 }
 
 TimeShiftOperator::~TimeShiftOperator() {}

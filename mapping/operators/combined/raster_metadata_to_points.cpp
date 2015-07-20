@@ -19,8 +19,9 @@ class RasterMetaDataToPoints: public GenericOperator {
 		RasterMetaDataToPoints(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~RasterMetaDataToPoints();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
@@ -56,6 +57,8 @@ void RasterMetaDataToPoints::writeSemanticParameters(std::ostringstream& stream)
 	stream << "]";
 }
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 template<typename T>
 struct PointDataEnhancement {
 	static void execute(Raster2D<T>* raster, PointCollection *points, const std::string &name) {
@@ -130,7 +133,7 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 			size_t current_idx = 0;
 			while (current_idx < featurecount) {
 				QueryRectangle rect2 = rect;
-				rect2.timestamp = temporal_index[current_idx].second;
+				rect2.t1 = rect2.t2 = temporal_index[current_idx].second;
 				try {
 					auto raster = getRasterFromSource(r, rect2, profiler);
 					while (current_idx < featurecount && temporal_index[current_idx].second < raster->stref.t2) {
@@ -172,3 +175,4 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 	}
 	return points;
 }
+#endif

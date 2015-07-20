@@ -2,7 +2,7 @@
 
 #include "util/timemodification.h"
 #include "datatypes/spatiotemporal.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <ctime>
 #include <memory>
@@ -54,8 +54,8 @@ TEST_F(TimeShiftTests, AbsoluteShift) {
 }
 
 TEST_F(TimeShiftTests, TimeModification) {
-	auto shift1 = std::make_unique<RelativeShift>(-5, RelativeShift::ShiftUnit::days);
-	auto shift2 = std::make_unique<RelativeShift>(5, RelativeShift::ShiftUnit::minutes);
+	auto shift1 = make_unique<RelativeShift>(-5, RelativeShift::ShiftUnit::days);
+	auto shift2 = make_unique<RelativeShift>(5, RelativeShift::ShiftUnit::minutes);
 	TimeModification time_modification{std::move(shift1), std::move(shift2)};
 
 	TemporalReference temporal_reference{timetype_t::TIMETYPE_UNIX, static_cast<double>(start_time), static_cast<double>(start_time + 1)};
@@ -74,8 +74,8 @@ TEST_F(TimeShiftTests, TimeModification) {
 }
 
 TEST_F(TimeShiftTests, TimeModificationReverseBeforeShift) {
-	auto shift1 = std::make_unique<RelativeShift>(-5, RelativeShift::ShiftUnit::days);
-	auto shift2 = std::make_unique<RelativeShift>(5, RelativeShift::ShiftUnit::minutes);
+	auto shift1 = make_unique<RelativeShift>(-5, RelativeShift::ShiftUnit::days);
+	auto shift2 = make_unique<RelativeShift>(5, RelativeShift::ShiftUnit::minutes);
 	TimeModification time_modification{std::move(shift1), std::move(shift2)};
 
 	TemporalReference temporal_reference{timetype_t::TIMETYPE_UNIX, static_cast<double>(start_time), static_cast<double>(start_time + 1)};

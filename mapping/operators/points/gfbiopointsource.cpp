@@ -1,7 +1,7 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 
 #include "operators/operator.h"
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "util/curl.h"
 #include "util/csvparser.h"
 #include "util/configuration.h"
@@ -22,14 +22,17 @@ class GFBioPointSourceOperator : public GenericOperator {
 		GFBioPointSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~GFBioPointSourceOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
+#ifndef MAPPING_OPERATOR_STUBS
 		void getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format);
+#endif
 		std::string datasource;
 		std::string query;
 		cURL curl;
@@ -62,9 +65,9 @@ class GFBioGeometrySourceOperator : public GFBioPointSourceOperator {
 REGISTER_OPERATOR(GFBioGeometrySourceOperator, "gfbiogeometrysource");
 
 
-
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = std::make_unique<PointCollection>(rect);
+	auto points_out = make_unique<PointCollection>(rect);
 
 	std::stringstream data;
 	getStringFromServer(rect, data, "CSV");
@@ -135,3 +138,4 @@ void GFBioPointSourceOperator::getStringFromServer(const QueryRectangle& rect, s
 
 	curl.perform();
 }
+#endif

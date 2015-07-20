@@ -5,11 +5,41 @@
  *      Author: mika
  */
 
+#include "cache/priv/connection.h"
 #include "cache/priv/types.h"
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/raster.h"
 #include "operators/operator.h"
 #include "util/log.h"
+
+#include <cstdio>
+
+////////////////////////////////////////////////////////
+//
+// Cache-Key
+//
+////////////////////////////////////////////////////////
+
+
+STCacheKey::STCacheKey(const std::string& semantic_id, uint64_t entry_id) :
+		semantic_id(semantic_id), entry_id(entry_id) {
+}
+
+STCacheKey::STCacheKey(BinaryStream& stream) {
+	stream.read(&semantic_id);
+	stream.read(&entry_id);
+}
+
+void STCacheKey::toStream(BinaryStream& stream) const {
+	stream.write(semantic_id);
+	stream.write(entry_id);
+}
+
+std::string STCacheKey::to_string() const {
+	std::ostringstream ss;
+	ss << "STCacheKey: " << semantic_id << ":" << entry_id;
+	return ss.str();
+}
 
 ////////////////////////////////////////////////////////
 //
@@ -38,12 +68,20 @@ double STQueryInfo::get_score() const {
 
 ////////////////////////////////////////////////////////
 //
-// Query-Info
+// Raster-Reference
 //
 ////////////////////////////////////////////////////////
 
 STRasterRef::STRasterRef(uint32_t node_id, uint64_t cache_id, const STRasterEntryBounds& bounds) :
 	node_id(node_id), cache_id(cache_id), bounds(bounds) {
+}
+
+STRasterRefKeyed::STRasterRefKeyed(uint32_t node_id, const std::string& semantic_id, uint64_t cache_id,
+	const STRasterEntryBounds& bounds) : STRasterRef(node_id,cache_id,bounds), semantic_id(semantic_id) {
+}
+
+STRasterRefKeyed::STRasterRefKeyed(uint32_t node_id, const STCacheKey& key,
+	const STRasterEntryBounds& bounds) : STRasterRef(node_id,key.entry_id,bounds), semantic_id(key.semantic_id) {
 }
 
 ////////////////////////////////////////////////////////
@@ -72,7 +110,7 @@ void STEntryBounds::toStream(BinaryStream& stream) const {
 
 bool STEntryBounds::matches(const QueryRectangle& spec) const {
 	return (spec.epsg == epsg && spec.x1 >= x1 && spec.x2 <= x2 && spec.y1 >= y1 && spec.y2 <= y2
-			&& spec.timestamp >= t1 && spec.timestamp <= t2);
+			&& spec.t1 >= t1 && spec.t2 <= t2);
 }
 
 double STEntryBounds::get_coverage( const QueryRectangle &query ) const {
@@ -190,4 +228,26 @@ std::string STRasterEntryBounds::to_string() const {
 	ss << "x_res:[" << x_res_from << "," << x_res_to << "], ";
 	ss << "y_res:[" << y_res_from << "," << y_res_to << "]";
 	return ss.str();
+}
+
+Delivery::Delivery(uint64_t id, unsigned int count, std::unique_ptr<GenericRaster> &raster) :
+	id(id), creation_time(time(0)), count(count), type(Type::RASTER), raster(std::move(raster)) {
+}
+
+void Delivery::send(DeliveryConnection& connection) {
+	count--;
+	switch ( type ) {
+		case Type::RASTER: {
+			connection.send_raster( *raster );
+			break;
+		}
+		default: {
+			Log::error("Currently only raster supported");
+		}
+	}
+}
+
+Delivery::Delivery(Delivery&& d) :
+	id(d.id), creation_time(d.creation_time),
+	count(d.count), type(d.type), raster(std::move(d.raster)) {
 }

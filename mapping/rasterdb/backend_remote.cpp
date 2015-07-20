@@ -49,11 +49,12 @@ std::string RemoteRasterDBBackend::readJSON() {
 }
 
 
-RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int channelid, double timestamp) {
+RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int channelid, double t1, double t2) {
 	auto c = COMMAND_GETCLOSESTRASTER;
 	stream->write(c);
 	stream->write(channelid);
-	stream->write(timestamp);
+	stream->write(t1);
+	stream->write(t2);
 	RasterDescription res(*stream);
 	if (res.rasterid < 0) {
 		std::string error;
@@ -134,7 +135,7 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 			auto filesize = file.tellg();
 			if (filesize == tiledesc.size) {
 				file.seekg(0, std::ios::beg);
-				auto bb = std::make_unique<ByteBuffer>(filesize);
+				auto bb = make_unique<ByteBuffer>(filesize);
 				file.read((char *) bb->data, bb->size);
 				return bb;
 			}
@@ -151,7 +152,7 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 	size_t size;
 	stream->read(&size);
 
-	auto bb = std::make_unique<ByteBuffer>(size);
+	auto bb = make_unique<ByteBuffer>(size);
 	stream->read((char *) bb->data, bb->size);
 
 	if (cache_directory != "") {

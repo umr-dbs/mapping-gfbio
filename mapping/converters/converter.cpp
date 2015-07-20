@@ -23,11 +23,11 @@ std::unique_ptr<GenericRaster> RasterConverter::direct_decode(ByteBuffer &buffer
 std::unique_ptr<RasterConverter> RasterConverter::getConverter(RasterConverter::Compression method) {
 	switch (method) {
 		case RasterConverter::Compression::UNCOMPRESSED:
-			return std::make_unique<RawConverter>();
+			return make_unique<RawConverter>();
 		case RasterConverter::Compression::GZIP:
-			return std::make_unique<GzipConverter>();
+			return make_unique<GzipConverter>();
 		case RasterConverter::Compression::BZIP:
-			return std::make_unique<BzipConverter>();
+			return make_unique<BzipConverter>();
 		default:
 			std::ostringstream msg;
 			msg << "Unsupported converter type: " << method;

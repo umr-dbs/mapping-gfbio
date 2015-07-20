@@ -48,7 +48,7 @@ class GDALCRS {
 		size_t getPixelCount() const;
 		void verify() const;
 
-		SpatioTemporalReference toSpatioTemporalReference(bool &flipx, bool &flipy, timetype_t timetype, double t1, double t2) const;
+		SpatialReference toSpatialReference(bool &flipx, bool &flipy) const;
 
 		epsg_t epsg;
 		uint8_t dimensions; // 1 .. 3
@@ -103,7 +103,7 @@ class RasterDB {
 
 	private:
 		void import(GenericRaster *raster, int channelid, double time_start, double time_end, RasterConverter::Compression compression = RasterConverter::Compression::GZIP);
-		std::unique_ptr<GenericRaster> load(int channelid, double timestamp, int x1, int y1, int x2, int y2, int zoom = 0, bool transform = true, size_t *io_cost = nullptr);
+		std::unique_ptr<GenericRaster> load(int channelid, const TemporalReference &t, int x1, int y1, int x2, int y2, int zoom = 0, bool transform = true, size_t *io_cost = nullptr);
 
 		void init();
 		void cleanup();

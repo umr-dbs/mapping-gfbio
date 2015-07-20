@@ -1,5 +1,3 @@
-#ifndef MAPPING_NO_OPENCL
-
 #include "datatypes/raster.h"
 #include "datatypes/raster/typejuggling.h"
 #include "raster/opencl.h"
@@ -18,7 +16,9 @@ class ExpressionOperator : public GenericOperator {
 		ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~ExpressionOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
@@ -58,6 +58,7 @@ void ExpressionOperator::writeSemanticParameters(std::ostringstream& stream) {
 			<< "\"max\":" << output_max;
 }
 
+#ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	int rastercount = getRasterSourceCount();
 	if (rastercount < 1 || rastercount > 26)
@@ -144,5 +145,4 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 
 	return raster_out;
 }
-
 #endif

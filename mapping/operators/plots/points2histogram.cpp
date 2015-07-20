@@ -1,4 +1,4 @@
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "datatypes/plots/histogram.h"
@@ -19,8 +19,9 @@ class HistogramFromFeaturesOperator : public GenericOperator {
 		HistogramFromFeaturesOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~HistogramFromFeaturesOperator();
 
+#ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
-
+#endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
@@ -68,6 +69,8 @@ void HistogramFromFeaturesOperator::writeSemanticParameters(std::ostringstream& 
 	}
 }
 
+
+#ifndef MAPPING_OPERATOR_STUBS
 /**
  * Calculates the histogram and returns it.
  */
@@ -103,7 +106,7 @@ std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryR
 		}
 	}
 
-	auto histogram = std::make_unique<Histogram>(numberOfBuckets, rangeMin, rangeMax);
+	auto histogram = make_unique<Histogram>(numberOfBuckets, rangeMin, rangeMax);
 	for (size_t i=0; i < featurecount; i++) {
 		double value = valueVector[i];
 		if (std::isnan(value) /* is NaN */)
@@ -115,3 +118,4 @@ std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryR
 
 	return std::unique_ptr<GenericPlot>(std::move(histogram));
 }
+#endif

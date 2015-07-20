@@ -1,4 +1,4 @@
-#include "raster/exceptions.h"
+#include "util/exceptions.h"
 
 #include <sstream>
 #include "polygoncollection.h"
@@ -19,7 +19,7 @@ std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vect
 			kept_count++;
 	}
 
-	auto out = std::make_unique<PolygonCollection>(in->stref);
+	auto out = make_unique<PolygonCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
 	// copy global metadata
 	out->global_md_string = in->global_md_string;

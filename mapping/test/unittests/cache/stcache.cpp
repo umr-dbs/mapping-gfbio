@@ -53,7 +53,10 @@ TEST(STCacheTest,SimpleTest) {
 
 std::unique_ptr<GenericRaster> createRaster( double x1, double x2, double y1, double y2 ) {
 	DataDescription dd(GDT_Byte,0,255);
-	SpatioTemporalReference stref(EPSG_LATLON,x1,y1,x2,y2,TIMETYPE_UNIX,0,100);
+	SpatioTemporalReference stref(
+		SpatialReference(EPSG_LATLON,x1,y1,x2,y2),
+		TemporalReference(TIMETYPE_UNIX,0,100)
+	);
 	return GenericRaster::create(dd,stref,x2-x1,y2-y1,0,GenericRaster::Representation::CPU);
 }
 

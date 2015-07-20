@@ -272,7 +272,10 @@ void RasterDB::import(const char *filename, int sourcechannel, int channelid, do
 	auto raster = GenericRaster::fromGDAL(filename, sourcechannel, raster_flipx, raster_flipy, crs->epsg);
 
 	bool crs_flipx, crs_flipy;
-	SpatioTemporalReference stref(crs->epsg, crs->origin[0], crs->origin[1], crs->origin[0]+crs->scale[0], crs->origin[1]+crs->scale[1], crs_flipx, crs_flipy, TIMETYPE_UNREFERENCED, 0, 1);
+	SpatioTemporalReference stref(
+		SpatialReference(crs->epsg, crs->origin[0], crs->origin[1], crs->origin[0]+crs->scale[0], crs->origin[1]+crs->scale[1], crs_flipx, crs_flipy),
+		TemporalReference::unreferenced()
+	);
 
 	bool need_flipx = raster_flipx != crs_flipx;
 	bool need_flipy = raster_flipy != crs_flipy;

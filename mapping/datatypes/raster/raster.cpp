@@ -464,7 +464,10 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 	double world_y1 = PixelToWorldY(y1) - pixel_scale_y * 0.5;
 	double world_x2 = world_x1 + pixel_scale_x * width;
 	double world_y2 = world_y1 + pixel_scale_y * height;
-	SpatioTemporalReference newstref(stref.epsg, world_x1, world_y1, world_x2, world_y2, stref.timetype, stref.t1, stref.t2);
+	SpatioTemporalReference newstref(
+		SpatialReference(stref.epsg, world_x1, world_y1, world_x2, world_y2),
+		TemporalReference(stref)
+	);
 
 	auto outputraster_guard = GenericRaster::create(dd, newstref, width, height);
 	Raster2D<T> *outputraster = (Raster2D<T> *) outputraster_guard.get();

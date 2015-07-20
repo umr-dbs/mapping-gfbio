@@ -97,7 +97,7 @@ STEntryBounds::STEntryBounds(const SpatioTemporalReference& stref) :
 }
 
 STEntryBounds::STEntryBounds(epsg_t epsg, double x1, double x2, double y1, double y2, double t1, double t2) :
-		SpatioTemporalReference(epsg, x1, x2, y1, y2, TIMETYPE_UNIX, t1, t2) {
+		SpatioTemporalReference(SpatialReference(epsg, x1, x2, y1, y2), TemporalReference(TIMETYPE_UNIX, t1, t2)) {
 }
 
 STEntryBounds::STEntryBounds(BinaryStream& stream) :

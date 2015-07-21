@@ -488,6 +488,20 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 	return result;
 }
 
+static inline int round_down_to_multiple(const int i, const int m) {
+	if (m <= 0)
+		throw ArgumentException("round_down_to_multiple(): m must be positive");
+
+	/*
+	 * C++14 finally has defined semantics for i%m when i is negative.
+	 * For example, -1 % 4 = -1, which means that i - (i % m) always rounds towards zero.
+	 * We want to round towards negative infinity, so we use a different formula for negative i.
+	 */
+	if (i >= 0)
+		return i - (i % m);
+
+	return (i+1) - ((i+1) % m) - m;
+}
 
 std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
 	if (crs->epsg != rect.epsg)
@@ -516,11 +530,11 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 	}
 
 	// Make sure to only load from pixel borders in the zoomed version
-	int zoomfactor = 1 << zoom;
-	pixel_x1 -= (pixel_x1 % zoomfactor);
-	pixel_x2 = (pixel_x2 - 1) - ((pixel_x2 - 1) % zoomfactor) + zoomfactor;
-	pixel_y1 -= (pixel_y1 % zoomfactor);
-	pixel_y2 = (pixel_y2 - 1) - ((pixel_y2 - 1) % zoomfactor) + zoomfactor;
+	const int zoomfactor = 1 << zoom;
+	pixel_x1 = round_down_to_multiple(pixel_x1, zoomfactor);
+	pixel_x2 = round_down_to_multiple(pixel_x2 - 1, zoomfactor) + zoomfactor;
+	pixel_y1 = round_down_to_multiple(pixel_y1, zoomfactor);
+	pixel_y2 = round_down_to_multiple(pixel_y2 - 1, zoomfactor) + zoomfactor;
 
 	size_t io_costs = 0;
 	auto result = load(channelid, (TemporalReference &) rect, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);

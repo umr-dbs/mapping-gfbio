@@ -6,6 +6,7 @@
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
+#include "operators/queryrectangle.h"
 
 #include <cmath>
 #include <json/json.h>
@@ -143,12 +144,10 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 			// iterate over time
 			size_t current_idx = 0;
 			while (current_idx < featurecount) {
-				QueryRectangle rect2 = rect;
 				// TODO: inprecise, the timestamps may not be [t1,t1).
-				rect2.t1 = rect2.t2 = temporal_index[current_idx].second;
-				rect2.restype = QueryResolution::Type::PIXELS;
-				rect2.xres = xResolution;
-				rect2.yres = yResolution;
+				QueryRectangle rect2(rect,
+						TemporalReference(rect.timetype, temporal_index[current_idx].second, temporal_index[current_idx].second),
+						QueryResolution::pixels(xResolution, yResolution));
 				try {
 					auto raster = getRasterFromSource(r, rect2, profiler);
 					while (current_idx < featurecount && temporal_index[current_idx].second < raster->stref.t2) {
@@ -177,10 +176,8 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 	else {
 		auto rasters = getRasterSourceCount();
 		TemporalReference tref = TemporalReference::unreferenced();
-		QueryRectangle rect2 = rect;
-		rect2.restype = QueryResolution::Type::PIXELS;
-		rect2.xres = xResolution;
-		rect2.yres = yResolution;
+		QueryRectangle rect2(rect, tref,
+				QueryResolution::pixels(xResolution, yResolution));
 		for (int r=0;r<rasters;r++) {
 			auto raster = getRasterFromSource(r, rect2, profiler);
 			Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");

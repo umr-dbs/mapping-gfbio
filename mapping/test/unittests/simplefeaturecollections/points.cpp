@@ -125,6 +125,97 @@ TEST(PointCollection, toWKT) {
 	EXPECT_EQ(expected, points.toWKT());
 }
 
+TEST(PointCollection, SimpletoARFF) {
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	points.local_md_value.addEmptyVector("test");
+	points.local_md_string.addEmptyVector("test2");
+
+	points.addCoordinate(1,2);
+	points.finishFeature();
+	points.local_md_value.set(0, "test", 5.1);
+	points.local_md_string.set(0, "test2", "TEST123");
+
+	points.addCoordinate(2,3);
+	points.finishFeature();
+	points.local_md_value.set(1, "test", 2.1);
+	points.local_md_string.set(1, "test2", "TEST1234");
+
+	std::string expected = "@RELATION export\n"
+			"\n"
+			"@ATTRIBUTE longitude NUMERIC\n"
+			"@ATTRIBUTE latitude NUMERIC\n"
+			"@ATTRIBUTE test2 STRING\n"
+			"@ATTRIBUTE test NUMERIC\n"
+			"\n"
+			"@DATA\n"
+			"1,2,\"TEST123\",5.1\n"
+			"2,3,\"TEST1234\",2.1\n";
+	EXPECT_EQ(expected, points.toARFF());
+}
+
+TEST(PointCollection, SimpletoARFFWithTime) {
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	points.local_md_value.addEmptyVector("test");
+	points.local_md_string.addEmptyVector("test2");
+
+	points.addCoordinate(1,2);
+	points.finishFeature();
+	points.local_md_value.set(0, "test", 5.1);
+	points.local_md_string.set(0, "test2", "TEST123");
+
+	points.addCoordinate(2,3);
+	points.finishFeature();
+	points.local_md_value.set(1, "test", 2.1);
+	points.local_md_string.set(1, "test2", "TEST1234");
+
+	points.addDefaultTimestamps();
+
+	std::string expected = "@RELATION export\n"
+			"\n"
+			"@ATTRIBUTE longitude NUMERIC\n"
+			"@ATTRIBUTE latitude NUMERIC\n"
+			"@ATTRIBUTE time_start DATE\n"
+			"@ATTRIBUTE time_end DATE\n"
+			"@ATTRIBUTE test2 STRING\n"
+			"@ATTRIBUTE test NUMERIC\n"
+			"\n"
+			"@DATA\n"
+			"1,2,\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"TEST123\",5.1\n"
+			"2,3,\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"TEST1234\",2.1\n";
+	EXPECT_EQ(expected, points.toARFF());
+}
+
+TEST(PointCollection, NonSimpletoARFF) {
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	points.local_md_value.addEmptyVector("test");
+	points.local_md_string.addEmptyVector("test2");
+
+	points.addCoordinate(1,2);
+	points.addCoordinate(2,2);
+	points.finishFeature();
+	points.local_md_value.set(0, "test", 5.1);
+	points.local_md_string.set(0, "test2", "TEST123");
+
+	points.addCoordinate(2,3);
+	points.finishFeature();
+	points.local_md_value.set(1, "test", 2.1);
+	points.local_md_string.set(1, "test2", "TEST1234");
+
+	std::string expected = "@RELATION export\n"
+			"\n"
+			"@ATTRIBUTE feature NUMERIC\n"
+			"@ATTRIBUTE longitude NUMERIC\n"
+			"@ATTRIBUTE latitude NUMERIC\n"
+			"@ATTRIBUTE test2 STRING\n"
+			"@ATTRIBUTE test NUMERIC\n"
+			"\n"
+			"@DATA\n"
+			"0,1,2,\"TEST123\",5.1\n"
+			"0,2,2,\"TEST123\",5.1\n"
+			"1,2,3,\"TEST1234\",2.1\n";
+	EXPECT_EQ(expected, points.toARFF());
+}
+
 TEST(PointCollection, filter) {
 	PointCollection points(SpatioTemporalReference::unreferenced());
 	points.local_md_value.addEmptyVector("test");

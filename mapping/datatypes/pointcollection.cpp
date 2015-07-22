@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <cmath>
+#include "boost/date_time/posix_time/posix_time.hpp"
 
 template<typename T>
 std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T> &keep) {
@@ -341,6 +342,65 @@ std::string PointCollection::featureToWKT(size_t featureIndex) const {
 		wkt << ")";
 	}
 	return wkt.str();
+}
+
+std::string PointCollection::toARFF() const {
+	std::ostringstream arff;
+
+	//TODO: maybe take name of layer as relation name, but this is not accessible here
+	arff << "@RELATION export" << std::endl << std::endl;
+
+	bool isSimpleCollection = isSimple();
+
+	if(!isSimpleCollection){
+		arff << "@ATTRIBUTE feature NUMERIC" << std::endl;
+	}
+	arff << "@ATTRIBUTE longitude NUMERIC" << std::endl;
+	arff << "@ATTRIBUTE latitude NUMERIC" << std::endl;
+
+	if (hasTime()){
+		arff << "@ATTRIBUTE time_start DATE" << std::endl;
+		arff << "@ATTRIBUTE time_end DATE" << std::endl;
+	}
+
+	auto string_keys = local_md_string.getKeys();
+	auto value_keys = local_md_value.getKeys();
+
+	for(auto &key : string_keys) {
+		arff << "@ATTRIBUTE" << " " << key << " " << "STRING" << std::endl;
+	}
+	for(auto &key : value_keys) {
+		arff << "@ATTRIBUTE" << " " << key << " " << "NUMERIC" << std::endl;
+	}
+
+	if(string_keys.size() + value_keys.size() != 0){
+		arff << std::endl;
+	}
+
+	arff << "@DATA" << std::endl;
+
+	for (auto feature : *this) {
+		for (auto & c : feature) {
+			if(!isSimpleCollection)
+				arff << (size_t) feature << ",";
+			arff << c.x << "," << c.y;
+
+			if (hasTime()){
+				arff << "," << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_start[feature])) << "\"" << ","
+						 << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_end[feature])) << "\"";
+			}
+
+			for(auto &key : string_keys) {
+				arff << ",\"" << local_md_string.get(feature, key) << "\"";
+			}
+			for(auto &key : value_keys) {
+				arff << "," << local_md_value.get(feature, key);
+			}
+			arff << std::endl;
+		}
+	}
+
+	return arff.str();
 }
 
 std::string PointCollection::hash() {

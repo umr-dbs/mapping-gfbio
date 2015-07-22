@@ -173,6 +173,11 @@ std::string PolygonCollection::featureToWKT(size_t featureIndex) const {
 	return wkt.str();
 }
 
+std::string PolygonCollection::toARFF() const {
+	//TODO: implement
+	return "";
+}
+
 bool PolygonCollection::isSimple() const {
 	return getFeatureCount() == (start_polygon.size() - 1);
 }

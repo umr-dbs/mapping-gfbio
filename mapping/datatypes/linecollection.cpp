@@ -179,6 +179,11 @@ std::string LineCollection::featureToWKT(size_t featureIndex) const {
 	return wkt.str();
 }
 
+std::string LineCollection::toARFF() const {
+	//TODO: implement
+	return "";
+}
+
 bool LineCollection::isSimple() const {
 	return getFeatureCount() == (start_line.size() - 1);
 }

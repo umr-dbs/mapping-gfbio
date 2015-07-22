@@ -6,6 +6,7 @@
 #include "raster/opencl.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
+#include "operators/queryrectangle.h"
 
 #include <cmath>
 #include <json/json.h>
@@ -27,6 +28,8 @@ class RasterMetaDataToPoints: public GenericOperator {
 
 	private:
 		std::vector<std::string> names;
+		uint32_t xResolution;
+		uint32_t yResolution;
 };
 
 RasterMetaDataToPoints::RasterMetaDataToPoints(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -42,6 +45,13 @@ RasterMetaDataToPoints::RasterMetaDataToPoints(int sourcecounts[], GenericOperat
 	for (int i=0;i<len;i++) {
 		names.push_back( arr[i].asString() );
 	}
+
+	if(!params["xResolution"].isInt() || !params["yResolution"].isInt()) {
+		throw OperatorException("raster_metadata_to_points: there must be a valid x and y resolution.");
+	} else {
+		xResolution = params["xResolution"].asUInt();
+		yResolution = params["yResolution"].asUInt();
+	}
 }
 
 RasterMetaDataToPoints::~RasterMetaDataToPoints() {
@@ -49,12 +59,14 @@ RasterMetaDataToPoints::~RasterMetaDataToPoints() {
 REGISTER_OPERATOR(RasterMetaDataToPoints, "raster_metadata_to_points");
 
 void RasterMetaDataToPoints::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"parameterNames\":[";
+	stream << "\"names\":[";
 	for(auto& name : names) {
 		stream << "\"" << name << "\",";
 	}
 	stream.seekp(((long) stream.tellp()) - 1); // remove last comma
-	stream << "]";
+	stream << "],";
+	stream << "\"xResolution\": " << xResolution << ",";
+	stream << "\"yResolution\": " << yResolution;
 }
 
 
@@ -132,8 +144,10 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 			// iterate over time
 			size_t current_idx = 0;
 			while (current_idx < featurecount) {
-				QueryRectangle rect2 = rect;
-				rect2.t1 = rect2.t2 = temporal_index[current_idx].second;
+				// TODO: inprecise, the timestamps may not be [t1,t1).
+				QueryRectangle rect2(rect,
+						TemporalReference(rect.timetype, temporal_index[current_idx].second, temporal_index[current_idx].second),
+						QueryResolution::pixels(xResolution, yResolution));
 				try {
 					auto raster = getRasterFromSource(r, rect2, profiler);
 					while (current_idx < featurecount && temporal_index[current_idx].second < raster->stref.t2) {
@@ -162,8 +176,10 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 	else {
 		auto rasters = getRasterSourceCount();
 		TemporalReference tref = TemporalReference::unreferenced();
+		QueryRectangle rect2(rect, tref,
+				QueryResolution::pixels(xResolution, yResolution));
 		for (int r=0;r<rasters;r++) {
-			auto raster = getRasterFromSource(r, rect, profiler);
+			auto raster = getRasterFromSource(r, rect2, profiler);
 			Profiler::Profiler p("RASTER_METADATA_TO_POINTS_OPERATOR");
 			enhance(*points, *raster, names.at(r), profiler);
 			if (r == 0)

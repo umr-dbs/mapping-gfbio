@@ -55,6 +55,8 @@ public:
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 
+	virtual std::string featureToWKT(size_t featureIndex) const;
+
 	virtual bool isSimple() const;
 
 	virtual size_t getFeatureCount() const {
@@ -130,6 +132,15 @@ private:
 			C &lc;
 			const size_t idx;
 	};
+
+public:
+	inline LineFeatureReference<LineCollection> getFeatureReference(size_t featureIndex){
+		return LineFeatureReference<LineCollection>(*this, featureIndex);
+	}
+
+	inline LineFeatureReference<const LineCollection> getFeatureReference(size_t featureIndex) const{
+		return LineFeatureReference<const LineCollection>(*this, featureIndex);
+	}
 };
 
 #endif

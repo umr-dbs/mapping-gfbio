@@ -108,6 +108,23 @@ TEST(PointCollection, toCSV) {
 	EXPECT_EQ(expected, points.toCSV());
 }
 
+TEST(PointCollection, toWKT) {
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	points.local_md_value.addEmptyVector("test");
+
+	points.addCoordinate(1,2);
+	points.finishFeature();
+	points.local_md_value.set(0, "test", 5.1);
+
+	points.addCoordinate(1,2);
+	points.addCoordinate(2,3);
+	points.finishFeature();
+	points.local_md_value.set(1, "test", 2.1);
+
+	std::string expected = "GEOMETRYCOLLECTION(POINT(1 2),MULTIPOINT((1 2),(2 3)))";
+	EXPECT_EQ(expected, points.toWKT());
+}
+
 TEST(PointCollection, filter) {
 	PointCollection points(SpatioTemporalReference::unreferenced());
 	points.local_md_value.addEmptyVector("test");

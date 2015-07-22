@@ -144,6 +144,41 @@ std::string LineCollection::toCSV() const {
 	return "";
 }
 
+std::string LineCollection::featureToWKT(size_t featureIndex) const {
+	if(featureIndex >= getFeatureCount()){
+		throw ArgumentException("featureIndex is greater than featureCount");
+	}
+
+	std::ostringstream wkt;
+
+	auto feature = getFeatureReference(featureIndex);
+
+	if(feature.size() == 1) {
+		wkt << "LINESTRING(";
+		for(auto& coordinate: *feature.begin()){
+			wkt << coordinate.x << " " << coordinate.y << ",";
+		}
+		wkt.seekp(((long)wkt.tellp()) - 1);
+		wkt << ")";
+	}
+	else {
+		wkt << "MULTILINESTRING(";
+
+		for(auto line : feature){
+			wkt << "(";
+			for(auto& coordinate: line){
+				wkt << coordinate.x << " " << coordinate.y << ",";
+			}
+			wkt.seekp(((long)wkt.tellp()) - 1);
+			wkt << "),";
+		}
+		wkt.seekp(((long)wkt.tellp()) - 1);
+		wkt << ")";
+	}
+
+	return wkt.str();
+}
+
 bool LineCollection::isSimple() const {
 	return getFeatureCount() == (start_line.size() - 1);
 }

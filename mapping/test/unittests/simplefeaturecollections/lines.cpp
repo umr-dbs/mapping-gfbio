@@ -122,3 +122,26 @@ TEST(LineCollection, filter) {
 	EXPECT_EQ(2, linesFiltered->local_md_value.getVector("test").size());
 	EXPECT_DOUBLE_EQ(3.1, linesFiltered->local_md_value.get(1, "test"));
 }
+
+TEST(LineCollection, toWKT){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	lines.local_md_value.addEmptyVector("test");
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_value.set(0, "test", 5.1);
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.finishLine();
+	lines.addCoordinate(2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_value.set(1, "test", 4.1);
+
+	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2,1 3),MULTILINESTRING((1 2,2 3),(2 4,5 6)))";
+	EXPECT_EQ(wkt, lines.toWKT());
+}

@@ -84,3 +84,18 @@ void SimpleFeatureCollection::setGlobalMDString(const std::string &key, const st
 void SimpleFeatureCollection::setGlobalMDValue(const std::string &key, double value) {
 	global_md_value.set(key, value);
 }
+
+std::string SimpleFeatureCollection::toWKT() const {
+	std::ostringstream wkt;
+
+	wkt << "GEOMETRYCOLLECTION(";
+
+	for(size_t i = 0; i < getFeatureCount(); ++i){
+		wkt << featureToWKT(i) << ",";
+	}
+	wkt.seekp(((long) wkt.tellp()) - 1); // delete last ,
+
+	wkt << ")";
+
+	return wkt.str();
+}

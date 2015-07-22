@@ -317,6 +317,32 @@ std::string PointCollection::toCSV() const {
 	return csv.str();
 }
 
+std::string PointCollection::featureToWKT(size_t featureIndex) const {
+	if(featureIndex >= getFeatureCount()){
+		throw ArgumentException("featureIndex is greater than featureCount");
+	}
+
+	std::ostringstream wkt;
+
+	auto feature = getFeatureReference(featureIndex);
+
+	if(feature.size() == 1) {
+		const Coordinate& coordinate = *feature.begin();
+		wkt << "POINT(" << coordinate.x << " " << coordinate.y << ")";
+	}
+	else {
+		wkt << "MULTIPOINT(";
+
+		for(auto& coordinate : feature){
+			wkt << "(" << coordinate.x << " " << coordinate.y << "),";
+		}
+		wkt.seekp(((long) wkt.tellp()) - 1); // delete last ,
+
+		wkt << ")";
+	}
+	return wkt.str();
+}
+
 std::string PointCollection::hash() {
 	// certainly not the most stable solution, but it has few lines of code..
 	std::string csv = toCSV();

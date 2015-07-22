@@ -64,6 +64,8 @@ public:
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 
+	virtual std::string featureToWKT(size_t featureIndex) const;
+
 	virtual bool isSimple() const final;
 
 	virtual size_t getFeatureCount() const final {
@@ -171,6 +173,15 @@ private:
 			C &pc;
 			const size_t idx;
 	};
+
+public:
+	inline PolygonFeatureReference<PolygonCollection> getFeatureReference(size_t featureIndex){
+		return PolygonFeatureReference<PolygonCollection>(*this, featureIndex);
+	}
+
+	inline PolygonFeatureReference<const PolygonCollection> getFeatureReference(size_t featureIndex) const{
+		return PolygonFeatureReference<const PolygonCollection>(*this, featureIndex);
+	}
 };
 
 #endif

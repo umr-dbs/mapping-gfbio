@@ -69,6 +69,9 @@ public:
 	// Export
 	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;
 	virtual std::string toCSV() const = 0;
+	virtual std::string toWKT() const;
+
+	virtual std::string featureToWKT(size_t featureIndex) const = 0;
 
 	// return true if all features consist of a single element
 	virtual bool isSimple() const = 0;

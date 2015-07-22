@@ -144,3 +144,49 @@ TEST(PolygonCollection, filter) {
 	EXPECT_EQ(2, polygonsFiltered->local_md_value.getVector("test").size());
 	EXPECT_DOUBLE_EQ(3.1, polygonsFiltered->local_md_value.get(1, "test"));
 }
+
+TEST(PolygonCollection, toWKT) {
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+	polygons.local_md_value.addEmptyVector("test");
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_value.set(0, "test", 5.1);
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_value.set(1, "test", 4.1);
+
+	polygons.addCoordinate(11,21);
+	polygons.addCoordinate(11,31);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(11,21);
+	polygons.finishRing();
+	polygons.addCoordinate(51,81);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(71,61);
+	polygons.addCoordinate(51,81);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_value.set(2, "test", 3.1);
+
+	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((1 2,1 3,2 3,1 2)),MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8))),POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81)))";
+	EXPECT_EQ(wkt, polygons.toWKT());
+}

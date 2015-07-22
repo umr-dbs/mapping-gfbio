@@ -129,6 +129,50 @@ std::string PolygonCollection::toCSV() const {
 	return "";
 }
 
+std::string PolygonCollection::featureToWKT(size_t featureIndex) const {
+	if(featureIndex >= getFeatureCount()){
+		throw ArgumentException("featureIndex is greater than featureCount");
+	}
+
+	std::ostringstream wkt;
+
+	auto feature = getFeatureReference(featureIndex);
+
+	if(feature.size() == 1) {
+		wkt << "POLYGON(";
+		for(auto ring : *feature.begin()){
+			wkt << "(";
+			for(auto& coordinate : ring){
+				wkt << coordinate.x << " " << coordinate.y << ",";
+			}
+			wkt.seekp(((long)wkt.tellp()) - 1);
+			wkt << "),";
+		}
+		wkt.seekp(((long)wkt.tellp()) - 1);
+		wkt << ")";
+	}
+	else {
+		wkt << "MULTIPOLYGON(";
+		for(auto polygon : feature){
+			wkt << "(";
+			for(auto ring : polygon){
+				wkt << "(";
+				for(auto& coordinate : ring){
+					wkt << coordinate.x << " " << coordinate.y << ",";
+				}
+				wkt.seekp(((long)wkt.tellp()) - 1);
+				wkt << "),";
+			}
+			wkt.seekp(((long)wkt.tellp()) - 1);
+			wkt << "),";
+		}
+		wkt.seekp(((long)wkt.tellp()) - 1);
+		wkt << ")";
+	}
+
+	return wkt.str();
+}
+
 bool PolygonCollection::isSimple() const {
 	return getFeatureCount() == (start_polygon.size() - 1);
 }

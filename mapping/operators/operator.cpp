@@ -176,6 +176,8 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 	}
 	d_profile(depth, type, "points", profiler);
 
+	result->validate();
+
 	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
 		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
 
@@ -195,6 +197,8 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 	}
 	d_profile(depth, type, "lines", profiler);
 
+	result->validate();
+
 	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
 		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
 
@@ -213,6 +217,8 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 		result = getPolygonCollection(rect, profiler);
 	}
 	d_profile(depth, type, "polygons", profiler);
+
+	result->validate();
 
 	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
 		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));

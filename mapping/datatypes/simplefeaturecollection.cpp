@@ -86,6 +86,32 @@ void SimpleFeatureCollection::setGlobalMDValue(const std::string &key, double va
 	global_md_value.set(key, value);
 }
 
+
+/*
+ * Validation
+ */
+void SimpleFeatureCollection::validate() const {
+	auto fcount = getFeatureCount();
+	if (hasTime()) {
+		if (time_start.size() != fcount || time_end.size() != fcount)
+			throw ArgumentException("SimpleFeatureCollection: size of the time-arrays doesn't match feature count");
+	}
+
+	for (auto key : local_md_string.getKeys()) {
+		if (local_md_string.getVector(key).size() != fcount)
+			throw ArgumentException(concat("SimpleFeatureCollection: size of string attribute vector \"", key, "\" doesn't match feature count"));
+	}
+
+	for (auto key : local_md_value.getKeys()) {
+		if (local_md_value.getVector(key).size() != fcount)
+			throw ArgumentException(concat("SimpleFeatureCollection: size of value attribute vector \"", key, "\" doesn't match feature count"));
+	}
+}
+
+
+/*
+ * Export
+ */
 std::string SimpleFeatureCollection::toWKT() const {
 	std::ostringstream wkt;
 

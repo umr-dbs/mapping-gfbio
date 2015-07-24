@@ -79,6 +79,8 @@ public:
 
 	virtual size_t getFeatureCount() const = 0;
 
+	void validate() const;
+
 protected:
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const = 0;
 

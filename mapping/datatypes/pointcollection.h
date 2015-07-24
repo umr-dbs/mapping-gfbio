@@ -56,8 +56,6 @@ public:
 	virtual std::string toCSV() const;
 	virtual std::string toARFF() const;
 
-	virtual std::string featureToWKT(size_t featureIndex) const;
-
 	virtual bool isSimple() const final;
 
 	virtual size_t getFeatureCount() const final {
@@ -67,6 +65,10 @@ public:
 	std::string getAsString();
 
 	virtual ~PointCollection(){};
+
+protected:
+	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const;
+
 private:
 	/*
 	 * Finally, implement the helper classes for iteration

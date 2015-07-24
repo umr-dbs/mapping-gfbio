@@ -54,9 +54,6 @@ public:
 
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
-	virtual std::string toARFF() const;
-
-	virtual std::string featureToWKT(size_t featureIndex) const;
 
 	virtual bool isSimple() const;
 
@@ -65,6 +62,10 @@ public:
 	}
 
 	virtual ~LineCollection(){};
+
+protected:
+	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const;
+
 private:
 
 	/*
@@ -100,6 +101,15 @@ private:
 		    operator size_t() const {
 		    	return idx;
 		    }
+
+		    inline LineLineReference<LineCollection> getLineReference(size_t lineIndex){
+		    	return LineLineReference<LineCollection>(lc, lineIndex);
+			}
+
+			inline LineLineReference<const LineCollection> getLineReference(size_t lineIndex) const{
+				return LineLineReference<const LineCollection>(lc, lineIndex);
+			}
+
 		private:
 		    C &lc;
 			const size_t idx;

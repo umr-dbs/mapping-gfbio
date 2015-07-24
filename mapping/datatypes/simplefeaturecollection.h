@@ -70,9 +70,9 @@ public:
 	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;
 	virtual std::string toCSV() const = 0;
 	virtual std::string toWKT() const;
-	virtual std::string toARFF() const = 0;
+	virtual std::string toARFF() const;
 
-	virtual std::string featureToWKT(size_t featureIndex) const = 0;
+	virtual std::string featureToWKT(size_t featureIndex) const;
 
 	// return true if all features consist of a single element
 	virtual bool isSimple() const = 0;
@@ -80,6 +80,8 @@ public:
 	virtual size_t getFeatureCount() const = 0;
 
 protected:
+	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const = 0;
+
 	/*
 	 * Helper classes for iteration over Collections
 	 */

@@ -63,9 +63,6 @@ public:
 
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
-	virtual std::string toARFF() const;
-
-	virtual std::string featureToWKT(size_t featureIndex) const;
 
 	virtual bool isSimple() const final;
 
@@ -76,6 +73,10 @@ public:
 	virtual ~PolygonCollection(){};
 
 	std::string getAsString();
+
+protected:
+	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const;
+
 private:
 
 	/*
@@ -111,6 +112,15 @@ private:
 		    operator size_t() const {
 		    	return idx;
 		    }
+
+		    inline PolygonPolygonReference<PolygonCollection> getPolygonReference(size_t polygonIndex){
+				return PolygonPolygonReference<PolygonCollection>(pc, polygonIndex);
+			}
+
+			inline PolygonPolygonReference<const PolygonCollection> getPolygonReference(size_t polygonIndex) const{
+				return PolygonPolygonReference<const PolygonCollection>(pc, polygonIndex);
+			}
+
 		private:
 		    C &pc;
 			const size_t idx;
@@ -140,6 +150,14 @@ private:
 		    size_t size() const {
 		    	return pc.start_polygon[idx+1] - pc.start_polygon[idx];
 		    }
+
+			inline PolygonRingReference<PolygonCollection> getRingReference(size_t ringIndex){
+				return PolygonRingReference<PolygonCollection>(pc, ringIndex);
+			}
+
+			inline PolygonRingReference<const PolygonCollection> getRingReference(size_t ringIndex) const{
+				return PolygonRingReference<const PolygonCollection>(pc, ringIndex);
+			}
 
 		private:
 		    C &pc;

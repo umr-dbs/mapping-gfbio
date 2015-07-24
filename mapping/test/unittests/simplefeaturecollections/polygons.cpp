@@ -80,6 +80,36 @@ TEST(PolygonCollection, Iterators) {
 	EXPECT_EQ(res_loop, res_citer);
 }
 
+TEST(PolygonCollection, directReferenceAccess){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	EXPECT_EQ(4, polygons.getFeatureReference(0).getPolygonReference(0).getRingReference(0).size());
+	EXPECT_EQ(4, polygons.getFeatureReference(1).getPolygonReference(2).getRingReference(0).size());
+}
+
+
 TEST(PolygonCollection, filter) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
 	polygons.local_md_value.addEmptyVector("test");
@@ -189,4 +219,70 @@ TEST(PolygonCollection, toWKT) {
 
 	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((1 2,1 3,2 3,1 2)),MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8))),POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81)))";
 	EXPECT_EQ(wkt, polygons.toWKT());
+}
+
+TEST(PolygonCollection, toARFF) {
+	//TODO: test missing metadata value
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+	polygons.local_md_string.addEmptyVector("test");
+	polygons.local_md_value.addEmptyVector("test2");
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(0, "test", "test");
+	polygons.local_md_value.set(0, "test2", 5.1);
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(1, "test", "test2");
+	polygons.local_md_value.set(1, "test2", 4.1);
+
+	polygons.addCoordinate(11,21);
+	polygons.addCoordinate(11,31);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(11,21);
+	polygons.finishRing();
+	polygons.addCoordinate(51,81);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(71,61);
+	polygons.addCoordinate(51,81);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(2, "test", "test3");
+	polygons.local_md_value.set(2, "test2", 3.1);
+
+
+	polygons.addDefaultTimestamps();
+
+	std::string expected = "@RELATION export\n"
+			"\n"
+			"@ATTRIBUTE wkt STRING\n"
+			"@ATTRIBUTE time_start DATE\n"
+			"@ATTRIBUTE time_end DATE\n"
+			"@ATTRIBUTE test STRING\n"
+			"@ATTRIBUTE test2 NUMERIC\n"
+			"\n"
+			"@DATA\n"
+			"\"POLYGON((1 2,1 3,2 3,1 2))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test\",5.1\n"
+			"\"MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8)))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test2\",4.1\n"
+			"\"POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test3\",3.1\n";
+
+	EXPECT_EQ(expected, polygons.toARFF());
 }

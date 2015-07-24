@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cmath>
 #include <limits>
+#include "boost/date_time/posix_time/posix_time.hpp"
 
 Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
@@ -98,4 +99,56 @@ std::string SimpleFeatureCollection::toWKT() const {
 	wkt << ")";
 
 	return wkt.str();
+}
+
+std::string SimpleFeatureCollection::featureToWKT(size_t featureIndex) const{
+	std::ostringstream wkt;
+	featureToWKT(featureIndex, wkt);
+	return wkt.str();
+}
+
+std::string SimpleFeatureCollection::toARFF() const {
+	std::ostringstream arff;
+
+	//TODO: maybe take name of layer as relation name, but this is not accessible here
+	arff << "@RELATION export" << std::endl << std::endl;
+
+	arff << "@ATTRIBUTE wkt STRING" << std::endl;
+
+	if (hasTime()){
+		arff << "@ATTRIBUTE time_start DATE" << std::endl;
+		arff << "@ATTRIBUTE time_end DATE" << std::endl;
+	}
+
+	auto string_keys = local_md_string.getKeys();
+	auto value_keys = local_md_value.getKeys();
+
+	for(auto &key : string_keys) {
+		arff << "@ATTRIBUTE" << " " << key << " " << "STRING" << std::endl;
+	}
+	for(auto &key : value_keys) {
+		arff << "@ATTRIBUTE" << " " << key << " " << "NUMERIC" << std::endl;
+	}
+
+	arff << std::endl;
+	arff << "@DATA" << std::endl;
+
+	for (size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex) {
+		arff << "\"" << featureToWKT(featureIndex) << "\"";
+		if (hasTime()){
+			arff << "," << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_start[featureIndex])) << "\"" << ","
+					 << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_end[featureIndex])) << "\"";
+		}
+
+		//TODO: handle missing metadata values
+		for(auto &key : string_keys) {
+			arff << ",\"" << local_md_string.get(featureIndex, key) << "\"";
+		}
+		for(auto &key : value_keys) {
+			arff << "," << local_md_value.get(featureIndex, key);
+		}
+		arff << std::endl;
+	}
+
+	return arff.str();
 }

@@ -75,6 +75,26 @@ TEST(LineCollection, Iterators) {
 	EXPECT_EQ(res_loop, res_citer);
 }
 
+TEST(LineCollection, directReferenceAccess){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.finishLine();
+	lines.addCoordinate(2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.finishFeature();
+
+	EXPECT_EQ(2, lines.getFeatureReference(0).getLineReference(0).size());
+	EXPECT_EQ(2, lines.getFeatureReference(1).getLineReference(1).size());
+}
+
 TEST(LineCollection, filter) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
 	lines.local_md_value.addEmptyVector("test");
@@ -144,4 +164,44 @@ TEST(LineCollection, toWKT){
 
 	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2,1 3),MULTILINESTRING((1 2,2 3),(2 4,5 6)))";
 	EXPECT_EQ(wkt, lines.toWKT());
+}
+
+TEST(LineCollection, toARFF){
+	//TODO: test missing metadata value
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	lines.local_md_string.addEmptyVector("test");
+	lines.local_md_value.addEmptyVector("test2");
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_string.set(0, "test", "test");
+	lines.local_md_value.set(0, "test2", 5.1);
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.finishLine();
+	lines.addCoordinate(2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_string.set(1, "test", "test2");
+	lines.local_md_value.set(1, "test2", 4.1);
+
+	lines.addDefaultTimestamps();
+
+	std::string expected = "@RELATION export\n"
+			"\n"
+			"@ATTRIBUTE wkt STRING\n"
+			"@ATTRIBUTE time_start DATE\n"
+			"@ATTRIBUTE time_end DATE\n"
+			"@ATTRIBUTE test STRING\n"
+			"@ATTRIBUTE test2 NUMERIC\n"
+			"\n"
+			"@DATA\n"
+			"\"LINESTRING(1 2,1 3)\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test\",5.1\n"
+			"\"MULTILINESTRING((1 2,2 3),(2 4,5 6))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test2\",4.1\n";
+
+	EXPECT_EQ(expected, lines.toARFF());
 }

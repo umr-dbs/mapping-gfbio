@@ -154,6 +154,7 @@ TEST(PointCollection, SimpletoARFF) {
 }
 
 TEST(PointCollection, SimpletoARFFWithTime) {
+	//TODO: test missing metadata value
 	PointCollection points(SpatioTemporalReference::unreferenced());
 	points.local_md_value.addEmptyVector("test");
 	points.local_md_string.addEmptyVector("test2");
@@ -287,4 +288,18 @@ TEST(PointCollection, Iterators) {
 
 	EXPECT_EQ(res_loop, res_iter);
 	EXPECT_EQ(res_loop, res_citer);
+}
+
+TEST(PointCollection, directReferenceAccess){
+	PointCollection points(SpatioTemporalReference::unreferenced());
+
+	points.addCoordinate(1,2);
+	points.finishFeature();
+
+	points.addCoordinate(1,2);
+	points.addCoordinate(2,3);
+	points.finishFeature();
+
+	EXPECT_EQ(1, points.getFeatureReference(0).size());
+	EXPECT_EQ(2, points.getFeatureReference(1).size());
 }

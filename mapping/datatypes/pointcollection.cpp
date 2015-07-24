@@ -238,6 +238,7 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || hasTime())){
 			json << ",\"properties\":{";
 
+			//TODO: handle missing metadata values
 			for (auto &key : string_keys) {
 				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
 			}
@@ -305,6 +306,7 @@ std::string PointCollection::toCSV() const {
 			if (hasTime())
 				csv << "," << time_start[feature] << "," << time_end[feature];
 
+			//TODO: handle missing metadata values
 			for(auto &key : string_keys) {
 				csv << ",\"" << local_md_string.get(feature, key) << "\"";
 			}
@@ -318,12 +320,10 @@ std::string PointCollection::toCSV() const {
 	return csv.str();
 }
 
-std::string PointCollection::featureToWKT(size_t featureIndex) const {
+void PointCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) const {
 	if(featureIndex >= getFeatureCount()){
 		throw ArgumentException("featureIndex is greater than featureCount");
 	}
-
-	std::ostringstream wkt;
 
 	auto feature = getFeatureReference(featureIndex);
 
@@ -341,7 +341,7 @@ std::string PointCollection::featureToWKT(size_t featureIndex) const {
 
 		wkt << ")";
 	}
-	return wkt.str();
+	return;
 }
 
 std::string PointCollection::toARFF() const {
@@ -366,6 +366,8 @@ std::string PointCollection::toARFF() const {
 	auto string_keys = local_md_string.getKeys();
 	auto value_keys = local_md_value.getKeys();
 
+
+	//TODO: handle missing metadata values
 	for(auto &key : string_keys) {
 		arff << "@ATTRIBUTE" << " " << key << " " << "STRING" << std::endl;
 	}
@@ -373,9 +375,7 @@ std::string PointCollection::toARFF() const {
 		arff << "@ATTRIBUTE" << " " << key << " " << "NUMERIC" << std::endl;
 	}
 
-	if(string_keys.size() + value_keys.size() != 0){
-		arff << std::endl;
-	}
+	arff << std::endl;
 
 	arff << "@DATA" << std::endl;
 

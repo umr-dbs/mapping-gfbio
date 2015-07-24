@@ -129,12 +129,10 @@ std::string PolygonCollection::toCSV() const {
 	return "";
 }
 
-std::string PolygonCollection::featureToWKT(size_t featureIndex) const {
+void PolygonCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) const {
 	if(featureIndex >= getFeatureCount()){
 		throw ArgumentException("featureIndex is greater than featureCount");
 	}
-
-	std::ostringstream wkt;
 
 	auto feature = getFeatureReference(featureIndex);
 
@@ -170,12 +168,7 @@ std::string PolygonCollection::featureToWKT(size_t featureIndex) const {
 		wkt << ")";
 	}
 
-	return wkt.str();
-}
-
-std::string PolygonCollection::toARFF() const {
-	//TODO: implement
-	return "";
+	return;
 }
 
 bool PolygonCollection::isSimple() const {

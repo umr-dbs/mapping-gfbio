@@ -144,12 +144,10 @@ std::string LineCollection::toCSV() const {
 	return "";
 }
 
-std::string LineCollection::featureToWKT(size_t featureIndex) const {
+void LineCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) const {
 	if(featureIndex >= getFeatureCount()){
 		throw ArgumentException("featureIndex is greater than featureCount");
 	}
-
-	std::ostringstream wkt;
 
 	auto feature = getFeatureReference(featureIndex);
 
@@ -176,12 +174,7 @@ std::string LineCollection::featureToWKT(size_t featureIndex) const {
 		wkt << ")";
 	}
 
-	return wkt.str();
-}
-
-std::string LineCollection::toARFF() const {
-	//TODO: implement
-	return "";
+	return;
 }
 
 bool LineCollection::isSimple() const {

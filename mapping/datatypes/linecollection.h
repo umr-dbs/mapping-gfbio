@@ -52,6 +52,10 @@ public:
 	std::unique_ptr<LineCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<LineCollection> filter(const std::vector<char> &keep);
 
+	virtual SpatialReference mbr() const;
+	virtual SpatialReference featureMBR(size_t featureIndex) const;
+	SpatialReference lineMBR(size_t featureIndex, size_t lineIndex) const;
+
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 

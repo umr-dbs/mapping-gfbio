@@ -61,6 +61,10 @@ public:
 	std::unique_ptr<PolygonCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<PolygonCollection> filter(const std::vector<char> &keep);
 
+	virtual SpatialReference mbr() const;
+	virtual SpatialReference featureMBR(size_t featureIndex) const;
+	SpatialReference polygonMBR(size_t featureIndex, size_t polygonIndex) const;
+
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 

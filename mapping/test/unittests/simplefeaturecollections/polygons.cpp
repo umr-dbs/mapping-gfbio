@@ -286,3 +286,80 @@ TEST(PolygonCollection, toARFF) {
 
 	EXPECT_EQ(expected, polygons.toARFF());
 }
+
+TEST(PolygonCollection, calculateMBR) {
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(35,10);
+	polygons.addCoordinate(45,45);
+	polygons.addCoordinate(15,40);
+	polygons.addCoordinate(10,20);
+	polygons.addCoordinate(35,10);
+	polygons.finishRing();
+	polygons.addCoordinate(20,30);
+	polygons.addCoordinate(35,35);
+	polygons.addCoordinate(30,20);
+	polygons.addCoordinate(20,30);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	auto mbr = polygons.mbr();
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(45, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(45, mbr.y2);
+
+	mbr = polygons.featureMBR(0);
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(2, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(3, mbr.y2);
+
+	mbr = polygons.featureMBR(1);
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(7, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(8, mbr.y2);
+
+	mbr = polygons.featureMBR(2);
+	EXPECT_DOUBLE_EQ(10, mbr.x1);
+	EXPECT_DOUBLE_EQ(45, mbr.x2);
+	EXPECT_DOUBLE_EQ(10, mbr.y1);
+	EXPECT_DOUBLE_EQ(45, mbr.y2);
+
+
+	mbr = polygons.polygonMBR(1,0);
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(2, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(3, mbr.y2);
+
+	mbr = polygons.polygonMBR(1,1);
+	EXPECT_DOUBLE_EQ(2, mbr.x1);
+	EXPECT_DOUBLE_EQ(7, mbr.x2);
+	EXPECT_DOUBLE_EQ(3, mbr.y1);
+	EXPECT_DOUBLE_EQ(8, mbr.y2);
+}

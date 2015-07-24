@@ -66,6 +66,10 @@ public:
 	MetadataArrays<std::string> local_md_string;
 	MetadataArrays<double> local_md_value;
 
+	// geometry
+	virtual SpatialReference mbr() const = 0;
+	virtual SpatialReference featureMBR(size_t featureIndex) const = 0;
+
 	// Export
 	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;
 	virtual std::string toCSV() const = 0;
@@ -83,6 +87,10 @@ public:
 
 protected:
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const = 0;
+
+	//calculate the MBR of the coordinates in range from start to stop (exclusive)
+	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;
+
 
 	/*
 	 * Helper classes for iteration over Collections

@@ -429,3 +429,14 @@ std::string PointCollection::getAsString(){
 
 	return string.str();
 }
+
+SpatialReference PointCollection::mbr() const{
+	return calculateMBR(0, coordinates.size());
+}
+
+SpatialReference PointCollection::featureMBR(size_t featureIndex) const{
+	if(featureIndex >= getFeatureCount())
+		throw ArgumentException("FeatureIndex >= FeatureCount");
+
+	return calculateMBR(start_feature[featureIndex], start_feature[featureIndex+1]);
+}

@@ -303,3 +303,43 @@ TEST(PointCollection, directReferenceAccess){
 	EXPECT_EQ(1, points.getFeatureReference(0).size());
 	EXPECT_EQ(2, points.getFeatureReference(1).size());
 }
+
+TEST(PointCollection, calulcateMBR){
+	PointCollection points(SpatioTemporalReference::unreferenced());
+
+	points.addCoordinate(0,0);
+	points.finishFeature();
+
+	points.addCoordinate(1,1);
+	points.addCoordinate(1,2);
+	points.finishFeature();
+
+	points.addCoordinate(1,1);
+	points.addCoordinate(1,2);
+	points.addCoordinate(0,2);
+	points.finishFeature();
+
+	auto mbr = points.mbr();
+	EXPECT_DOUBLE_EQ(0, mbr.x1);
+	EXPECT_DOUBLE_EQ(1, mbr.x2);
+	EXPECT_DOUBLE_EQ(0, mbr.y1);
+	EXPECT_DOUBLE_EQ(2, mbr.y2);
+
+	mbr = points.featureMBR(0);
+	EXPECT_DOUBLE_EQ(0, mbr.x1);
+	EXPECT_DOUBLE_EQ(0, mbr.x2);
+	EXPECT_DOUBLE_EQ(0, mbr.y1);
+	EXPECT_DOUBLE_EQ(0, mbr.y2);
+
+	mbr = points.featureMBR(1);
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(1, mbr.x2);
+	EXPECT_DOUBLE_EQ(1, mbr.y1);
+	EXPECT_DOUBLE_EQ(2, mbr.y2);
+
+	mbr = points.featureMBR(2);
+	EXPECT_DOUBLE_EQ(0, mbr.x1);
+	EXPECT_DOUBLE_EQ(1, mbr.x2);
+	EXPECT_DOUBLE_EQ(1, mbr.y1);
+	EXPECT_DOUBLE_EQ(2, mbr.y2);
+}

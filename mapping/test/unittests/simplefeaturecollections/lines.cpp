@@ -205,3 +205,63 @@ TEST(LineCollection, toARFF){
 
 	EXPECT_EQ(expected, lines.toARFF());
 }
+
+TEST(LineCollection, calculateMBR){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.addCoordinate(2,5);
+	lines.finishLine();
+	lines.finishFeature();
+
+	lines.addCoordinate(-2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.addCoordinate(1,-4);
+	lines.addCoordinate(3,-6);
+	lines.finishLine();
+	lines.finishFeature();
+
+	auto mbr = lines.mbr();
+	EXPECT_DOUBLE_EQ(-2, mbr.x1);
+	EXPECT_DOUBLE_EQ(5, mbr.x2);
+	EXPECT_DOUBLE_EQ(-6, mbr.y1);
+	EXPECT_DOUBLE_EQ(6, mbr.y2);
+
+	mbr = lines.featureMBR(0);
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(1, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(3, mbr.y2);
+
+	mbr = lines.featureMBR(1);
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(2, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(5, mbr.y2);
+
+	mbr = lines.featureMBR(2);
+	EXPECT_DOUBLE_EQ(-2, mbr.x1);
+	EXPECT_DOUBLE_EQ(5, mbr.x2);
+	EXPECT_DOUBLE_EQ(-6, mbr.y1);
+	EXPECT_DOUBLE_EQ(6, mbr.y2);
+
+
+	mbr = lines.lineMBR(2,0);
+	EXPECT_DOUBLE_EQ(-2, mbr.x1);
+	EXPECT_DOUBLE_EQ(5, mbr.x2);
+	EXPECT_DOUBLE_EQ(4, mbr.y1);
+	EXPECT_DOUBLE_EQ(6, mbr.y2);
+
+	mbr = lines.lineMBR(2,1);
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(3, mbr.x2);
+	EXPECT_DOUBLE_EQ(-6, mbr.y1);
+	EXPECT_DOUBLE_EQ(-4, mbr.y2);
+}

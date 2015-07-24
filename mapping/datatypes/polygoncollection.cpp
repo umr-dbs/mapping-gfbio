@@ -230,3 +230,27 @@ std::string PolygonCollection::getAsString(){
 
 	return string.str();
 }
+
+SpatialReference PolygonCollection::mbr() const{
+	//TODO: compute MBRs of outer rings of all polygons and then the MBR of these MBRs?
+	return calculateMBR(0, coordinates.size());
+}
+
+SpatialReference PolygonCollection::featureMBR(size_t featureIndex) const{
+	if(featureIndex >= getFeatureCount())
+		throw ArgumentException("FeatureIndex >= FeatureCount");
+
+	//TODO: compute MBRs of outer rings of all polygons and then the MBR of these MBRs?
+	return calculateMBR(start_ring[start_polygon[start_feature[featureIndex]]], start_ring[start_polygon[start_feature[featureIndex + 1]]]);
+}
+
+SpatialReference PolygonCollection::polygonMBR(size_t featureIndex, size_t polygonIndex) const{
+	if(featureIndex >= getFeatureCount())
+		throw ArgumentException("FeatureIndex >= FeatureCount");
+
+	if(polygonIndex >= getFeatureReference(featureIndex).size()){
+		throw ArgumentException("PolygonIndex >= FeatureSize");
+	}
+
+	return calculateMBR(start_ring[start_polygon[start_feature[featureIndex] + polygonIndex]], start_ring[start_polygon[start_feature[featureIndex] + polygonIndex] + 1]);
+}

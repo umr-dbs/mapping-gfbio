@@ -341,14 +341,13 @@ void PointCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt)
 
 		wkt << ")";
 	}
-	return;
 }
 
-std::string PointCollection::toARFF() const {
+std::string PointCollection::toARFF(std::string layerName) const {
 	std::ostringstream arff;
 
 	//TODO: maybe take name of layer as relation name, but this is not accessible here
-	arff << "@RELATION export" << std::endl << std::endl;
+	arff << "@RELATION " << layerName << std::endl << std::endl;
 
 	bool isSimpleCollection = isSimple();
 

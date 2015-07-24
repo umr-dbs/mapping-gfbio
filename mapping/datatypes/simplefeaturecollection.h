@@ -70,7 +70,7 @@ public:
 	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;
 	virtual std::string toCSV() const = 0;
 	virtual std::string toWKT() const;
-	virtual std::string toARFF() const;
+	virtual std::string toARFF(std::string layerName = "export") const;
 
 	virtual std::string featureToWKT(size_t featureIndex) const;
 

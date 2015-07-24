@@ -92,7 +92,8 @@ std::string SimpleFeatureCollection::toWKT() const {
 	wkt << "GEOMETRYCOLLECTION(";
 
 	for(size_t i = 0; i < getFeatureCount(); ++i){
-		wkt << featureToWKT(i) << ",";
+		featureToWKT(i, wkt);
+		wkt << ",";
 	}
 	wkt.seekp(((long) wkt.tellp()) - 1); // delete last ,
 
@@ -107,11 +108,11 @@ std::string SimpleFeatureCollection::featureToWKT(size_t featureIndex) const{
 	return wkt.str();
 }
 
-std::string SimpleFeatureCollection::toARFF() const {
+std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 	std::ostringstream arff;
 
 	//TODO: maybe take name of layer as relation name, but this is not accessible here
-	arff << "@RELATION export" << std::endl << std::endl;
+	arff << "@RELATION " << layerName << std::endl << std::endl;
 
 	arff << "@ATTRIBUTE wkt STRING" << std::endl;
 

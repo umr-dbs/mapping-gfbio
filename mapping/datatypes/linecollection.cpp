@@ -173,8 +173,6 @@ void LineCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) 
 		wkt.seekp(((long)wkt.tellp()) - 1);
 		wkt << ")";
 	}
-
-	return;
 }
 
 bool LineCollection::isSimple() const {

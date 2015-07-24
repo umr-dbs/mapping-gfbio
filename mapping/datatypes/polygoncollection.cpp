@@ -167,8 +167,6 @@ void PolygonCollection::featureToWKT(size_t featureIndex, std::ostringstream& wk
 		wkt.seekp(((long)wkt.tellp()) - 1);
 		wkt << ")";
 	}
-
-	return;
 }
 
 bool PolygonCollection::isSimple() const {

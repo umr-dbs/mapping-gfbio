@@ -178,27 +178,21 @@ void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, 
 }
 
 
-void outputPointCollection(PointCollection *points, bool displayMetadata = false) {
+void outputSimpleFeatureCollectionGeoJSON(SimpleFeatureCollection *collection, bool displayMetadata = false) {
 	print_debug_header();
-	printf("Content-type: application/json\r\n\r\n%s", points->toGeoJSON(displayMetadata).c_str());
+	printf("Content-type: application/json\r\n\r\n%s", collection->toGeoJSON(displayMetadata).c_str());
 }
 
-void outputPointCollectionCSV(PointCollection *points) {
+void outputSimpleFeatureCollectionCSV(SimpleFeatureCollection *collection) {
 	print_debug_header();
-	printf("Content-type: text/csv\r\nContent-Disposition: attachment; filename=\"export.csv\"\r\n\r\n%s", points->toCSV().c_str());
+	printf("Content-type: text/csv\r\nContent-Disposition: attachment; filename=\"export.csv\"\r\n\r\n%s", collection->toCSV().c_str());
 }
 
-void outputLineCollection(LineCollection& lineCollection, bool displayMetadata = false){
+void outputSimpleFeatureCollectionARFF(SimpleFeatureCollection* collection){
 	print_debug_header();
-	printf("Content-type: application/json\r\n\r\n%s", lineCollection.toGeoJSON(displayMetadata).c_str());
+	printf("Content-type: text/json\r\nContent-Disposition: attachment; filename=\"export.arff\"\r\n\r\n%s", collection->toARFF().c_str());
 }
 
-void outputPolygonCollection(PolygonCollection& polygonCollection, bool displayMetadata = false){
-	print_debug_header();
-	printf("Content-type: application/json\r\n\r\n%s", polygonCollection.toGeoJSON(displayMetadata).c_str());
-}
-
-//TODO: output for other feature types
 
 bool to_bool(std::string str) {
     std::transform(str.begin(), str.end(), str.begin(), ::tolower);
@@ -529,7 +523,7 @@ int main() {
 
 			QueryProfiler profiler;
 			QueryRectangle rect(
-				SpatialReference::extent(EPSG_WEBMERCATOR),
+				SpatialReference::extent(query_epsg),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
@@ -539,14 +533,15 @@ int main() {
 			if(params.count("format") > 0)
 				format = params["format"];
 			if (format == "csv") {
-				outputPointCollectionCSV(points.get());
+				outputSimpleFeatureCollectionCSV(points.get());
 			}
-			else if (format == "geojsonfull") {
-				outputPointCollection(points.get(), true);
+			else if (format == "geojson") {
+				outputSimpleFeatureCollectionGeoJSON(points.get(), true);
 			}
-			else {
-				outputPointCollection(points.get(), false);
+			else if (format == "arff") {
+				outputSimpleFeatureCollectionARFF(points.get());
 			}
+
 			return 0;
 		}
 
@@ -559,13 +554,24 @@ int main() {
 
 			QueryProfiler profiler;
 			QueryRectangle rect(
-				SpatialReference::extent(EPSG_WEBMERCATOR),
+				SpatialReference::extent(query_epsg),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
-			auto geometry = graph->getCachedLineCollection(rect, profiler);
+			auto lines = graph->getCachedLineCollection(rect, profiler);
 
-			outputLineCollection(*geometry.get(), false);
+			std::string format("geojson");
+			if(params.count("format") > 0)
+				format = params["format"];
+			if (format == "csv") {
+				outputSimpleFeatureCollectionCSV(lines.get());
+			}
+			else if (format == "geojson") {
+				outputSimpleFeatureCollectionGeoJSON(lines.get(), true);
+			}
+			else if (format == "arff") {
+				outputSimpleFeatureCollectionARFF(lines.get());
+			}
 			return 0;
 		}
 
@@ -578,13 +584,24 @@ int main() {
 
 			QueryProfiler profiler;
 			QueryRectangle rect(
-				SpatialReference::extent(EPSG_WEBMERCATOR),
+				SpatialReference::extent(query_epsg),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
-			auto geometry = graph->getCachedPolygonCollection(rect, profiler);
+			auto polygons = graph->getCachedPolygonCollection(rect, profiler);
 
-			outputPolygonCollection(*geometry.get(), false);
+			std::string format("geojson");
+			if(params.count("format") > 0)
+				format = params["format"];
+			if (format == "csv") {
+				outputSimpleFeatureCollectionCSV(polygons.get());
+			}
+			else if (format == "geojson") {
+				outputSimpleFeatureCollectionGeoJSON(polygons.get(), true);
+			}
+			else if (format == "arff") {
+				outputSimpleFeatureCollectionARFF(polygons.get());
+			}
 			return 0;
 		}
 

@@ -54,7 +54,7 @@ public:
 
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
-	virtual std::string toARFF() const;
+	virtual std::string toARFF(std::string layerName = "export") const;
 
 	virtual bool isSimple() const final;
 

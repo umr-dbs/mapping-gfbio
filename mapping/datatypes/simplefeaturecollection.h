@@ -67,7 +67,7 @@ public:
 	MetadataArrays<double> local_md_value;
 
 	// geometry
-	virtual SpatialReference mbr() const = 0;
+	virtual SpatialReference mbr() const;
 	virtual SpatialReference featureMBR(size_t featureIndex) const = 0;
 
 	// Export

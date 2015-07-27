@@ -52,7 +52,6 @@ public:
 
 	std::string hash();
 
-	virtual SpatialReference mbr() const;
 	virtual SpatialReference featureMBR(size_t featureIndex) const;
 
 	virtual std::string toGeoJSON(bool displayMetadata) const;

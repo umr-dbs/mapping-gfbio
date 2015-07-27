@@ -179,10 +179,6 @@ bool LineCollection::isSimple() const {
 	return getFeatureCount() == (start_line.size() - 1);
 }
 
-SpatialReference LineCollection::mbr() const{
-	return calculateMBR(0, coordinates.size());
-}
-
 SpatialReference LineCollection::featureMBR(size_t featureIndex) const{
 	if(featureIndex >= getFeatureCount())
 		throw ArgumentException("FeatureIndex >= FeatureCount");

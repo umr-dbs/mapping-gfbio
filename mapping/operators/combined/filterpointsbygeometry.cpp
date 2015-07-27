@@ -54,32 +54,20 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPointCollection(cons
 
 	auto multiPolygons = getPolygonCollectionFromSource(0, rect, profiler, FeatureCollectionQM::ANY_FEATURE);
 
-	auto geometry = GeosGeomUtil::createGeosPolygonCollection(*multiPolygons);
-	//fprintf(stderr, "getGeom >> %f", geometry->getArea());
 
 	size_t points_count = points->getFeatureCount();
 	std::vector<bool> keep(points_count, false);
 
 	auto prep = geos::geom::prep::PreparedGeometryFactory();
 
-	size_t numgeom = geometry->getNumGeometries();
-	for (size_t i=0; i< numgeom; i++){
-
-		auto preparedGeometry = prep.prepare(geometry->getGeometryN(i));
-		for (size_t idx=0;idx<points_count;idx++) {
-			Coordinate &p = points->coordinates[idx];
-			double x = p.x, y = p.y;
-
-			const geos::geom::Coordinate coordinate(x, y);
-			geos::geom::Point* pointGeom = geometryFactory->createPoint(coordinate);
-
-			if (preparedGeometry->contains(pointGeom))
-				keep[idx] = true;
-
-			geometryFactory->destroyGeometry(pointGeom);
+	//TODO: more efficient batch processing? (http://alienryderflex.com/polygon/)
+	for(auto feature : *points){
+		for(auto& coordinate : feature){
+			if(multiPolygons->pointInCollection(coordinate)){
+				keep[feature] = true;
+				break;
+			}
 		}
-
-		prep.destroy(preparedGeometry);
 	}
 
 	return points->filter(keep);

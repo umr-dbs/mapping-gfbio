@@ -1,6 +1,5 @@
 #include "pointcollection.h"
 
-#include "util/exceptions.h"
 #include "util/binarystream.h"
 #include "util/hash.h"
 #include "util/make_unique.h"
@@ -430,9 +429,6 @@ std::string PointCollection::getAsString(){
 	return string.str();
 }
 
-SpatialReference PointCollection::featureMBR(size_t featureIndex) const{
-	if(featureIndex >= getFeatureCount())
-		throw ArgumentException("FeatureIndex >= FeatureCount");
-
-	return calculateMBR(start_feature[featureIndex], start_feature[featureIndex+1]);
+SpatialReference PointCollection::getFeatureMBR(size_t featureIndex) const{
+	return getFeatureReference(featureIndex).getMBR();
 }

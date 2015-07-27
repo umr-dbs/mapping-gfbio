@@ -209,6 +209,6 @@ SpatialReference SimpleFeatureCollection::calculateMBR(size_t coordinateIndexSta
 	return reference;
 }
 
-SpatialReference SimpleFeatureCollection::mbr() const {
+SpatialReference SimpleFeatureCollection::getCollectionMBR() const {
 	return calculateMBR(0, coordinates.size());
 }

@@ -100,13 +100,14 @@ TEST(PolygonCollection, directReferenceAccess){
 	polygons.addCoordinate(5,8);
 	polygons.addCoordinate(2,3);
 	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(7,7);
 	polygons.addCoordinate(5,8);
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
 
 	EXPECT_EQ(4, polygons.getFeatureReference(0).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(4, polygons.getFeatureReference(1).getPolygonReference(2).getRingReference(0).size());
+	EXPECT_EQ(5, polygons.getFeatureReference(1).getPolygonReference(1).getRingReference(0).size());
 }
 
 
@@ -326,38 +327,38 @@ TEST(PolygonCollection, calculateMBR) {
 	polygons.finishPolygon();
 	polygons.finishFeature();
 
-	auto mbr = polygons.mbr();
+	auto mbr = polygons.getCollectionMBR();
 	EXPECT_DOUBLE_EQ(1, mbr.x1);
 	EXPECT_DOUBLE_EQ(45, mbr.x2);
 	EXPECT_DOUBLE_EQ(2, mbr.y1);
 	EXPECT_DOUBLE_EQ(45, mbr.y2);
 
-	mbr = polygons.featureMBR(0);
+	mbr = polygons.getFeatureReference(0).getMBR();
 	EXPECT_DOUBLE_EQ(1, mbr.x1);
 	EXPECT_DOUBLE_EQ(2, mbr.x2);
 	EXPECT_DOUBLE_EQ(2, mbr.y1);
 	EXPECT_DOUBLE_EQ(3, mbr.y2);
 
-	mbr = polygons.featureMBR(1);
+	mbr = polygons.getFeatureReference(1).getMBR();
 	EXPECT_DOUBLE_EQ(1, mbr.x1);
 	EXPECT_DOUBLE_EQ(7, mbr.x2);
 	EXPECT_DOUBLE_EQ(2, mbr.y1);
 	EXPECT_DOUBLE_EQ(8, mbr.y2);
 
-	mbr = polygons.featureMBR(2);
+	mbr = polygons.getFeatureReference(2).getMBR();
 	EXPECT_DOUBLE_EQ(10, mbr.x1);
 	EXPECT_DOUBLE_EQ(45, mbr.x2);
 	EXPECT_DOUBLE_EQ(10, mbr.y1);
 	EXPECT_DOUBLE_EQ(45, mbr.y2);
 
 
-	mbr = polygons.polygonMBR(1,0);
+	mbr = polygons.getFeatureReference(1).getPolygonReference(0).getMBR();
 	EXPECT_DOUBLE_EQ(1, mbr.x1);
 	EXPECT_DOUBLE_EQ(2, mbr.x2);
 	EXPECT_DOUBLE_EQ(2, mbr.y1);
 	EXPECT_DOUBLE_EQ(3, mbr.y2);
 
-	mbr = polygons.polygonMBR(1,1);
+	mbr = polygons.getFeatureReference(1).getPolygonReference(1).getMBR();
 	EXPECT_DOUBLE_EQ(2, mbr.x1);
 	EXPECT_DOUBLE_EQ(7, mbr.x2);
 	EXPECT_DOUBLE_EQ(3, mbr.y1);

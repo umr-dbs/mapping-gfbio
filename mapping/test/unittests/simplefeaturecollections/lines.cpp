@@ -88,11 +88,12 @@ TEST(LineCollection, directReferenceAccess){
 	lines.finishLine();
 	lines.addCoordinate(2,4);
 	lines.addCoordinate(5,6);
+	lines.addCoordinate(1,6);
 	lines.finishLine();
 	lines.finishFeature();
 
 	EXPECT_EQ(2, lines.getFeatureReference(0).getLineReference(0).size());
-	EXPECT_EQ(2, lines.getFeatureReference(1).getLineReference(1).size());
+	EXPECT_EQ(3, lines.getFeatureReference(1).getLineReference(1).size());
 }
 
 TEST(LineCollection, filter) {
@@ -228,38 +229,38 @@ TEST(LineCollection, calculateMBR){
 	lines.finishLine();
 	lines.finishFeature();
 
-	auto mbr = lines.mbr();
+	auto mbr = lines.getCollectionMBR();
 	EXPECT_DOUBLE_EQ(-2, mbr.x1);
 	EXPECT_DOUBLE_EQ(5, mbr.x2);
 	EXPECT_DOUBLE_EQ(-6, mbr.y1);
 	EXPECT_DOUBLE_EQ(6, mbr.y2);
 
-	mbr = lines.featureMBR(0);
+	mbr = lines.getFeatureReference(0).getMBR();
 	EXPECT_DOUBLE_EQ(1, mbr.x1);
 	EXPECT_DOUBLE_EQ(1, mbr.x2);
 	EXPECT_DOUBLE_EQ(2, mbr.y1);
 	EXPECT_DOUBLE_EQ(3, mbr.y2);
 
-	mbr = lines.featureMBR(1);
+	mbr = lines.getFeatureReference(1).getMBR();
 	EXPECT_DOUBLE_EQ(1, mbr.x1);
 	EXPECT_DOUBLE_EQ(2, mbr.x2);
 	EXPECT_DOUBLE_EQ(2, mbr.y1);
 	EXPECT_DOUBLE_EQ(5, mbr.y2);
 
-	mbr = lines.featureMBR(2);
+	mbr = lines.getFeatureReference(2).getMBR();
 	EXPECT_DOUBLE_EQ(-2, mbr.x1);
 	EXPECT_DOUBLE_EQ(5, mbr.x2);
 	EXPECT_DOUBLE_EQ(-6, mbr.y1);
 	EXPECT_DOUBLE_EQ(6, mbr.y2);
 
 
-	mbr = lines.lineMBR(2,0);
+	mbr = lines.getFeatureReference(2).getLineReference(0).getMBR();
 	EXPECT_DOUBLE_EQ(-2, mbr.x1);
 	EXPECT_DOUBLE_EQ(5, mbr.x2);
 	EXPECT_DOUBLE_EQ(4, mbr.y1);
 	EXPECT_DOUBLE_EQ(6, mbr.y2);
 
-	mbr = lines.lineMBR(2,1);
+	mbr = lines.getFeatureReference(2).getLineReference(1).getMBR();
 	EXPECT_DOUBLE_EQ(1, mbr.x1);
 	EXPECT_DOUBLE_EQ(3, mbr.x2);
 	EXPECT_DOUBLE_EQ(-6, mbr.y1);

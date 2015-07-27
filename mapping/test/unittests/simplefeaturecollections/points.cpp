@@ -319,25 +319,25 @@ TEST(PointCollection, calulcateMBR){
 	points.addCoordinate(0,2);
 	points.finishFeature();
 
-	auto mbr = points.mbr();
+	auto mbr = points.getCollectionMBR();
 	EXPECT_DOUBLE_EQ(0, mbr.x1);
 	EXPECT_DOUBLE_EQ(1, mbr.x2);
 	EXPECT_DOUBLE_EQ(0, mbr.y1);
 	EXPECT_DOUBLE_EQ(2, mbr.y2);
 
-	mbr = points.featureMBR(0);
+	mbr = points.getFeatureReference(0).getMBR();
 	EXPECT_DOUBLE_EQ(0, mbr.x1);
 	EXPECT_DOUBLE_EQ(0, mbr.x2);
 	EXPECT_DOUBLE_EQ(0, mbr.y1);
 	EXPECT_DOUBLE_EQ(0, mbr.y2);
 
-	mbr = points.featureMBR(1);
+	mbr = points.getFeatureReference(1).getMBR();
 	EXPECT_DOUBLE_EQ(1, mbr.x1);
 	EXPECT_DOUBLE_EQ(1, mbr.x2);
 	EXPECT_DOUBLE_EQ(1, mbr.y1);
 	EXPECT_DOUBLE_EQ(2, mbr.y2);
 
-	mbr = points.featureMBR(2);
+	mbr = points.getFeatureReference(2).getMBR();
 	EXPECT_DOUBLE_EQ(0, mbr.x1);
 	EXPECT_DOUBLE_EQ(1, mbr.x2);
 	EXPECT_DOUBLE_EQ(1, mbr.y1);

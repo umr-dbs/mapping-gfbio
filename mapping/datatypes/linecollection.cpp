@@ -1,6 +1,5 @@
 #include "linecollection.h"
 #include <sstream>
-#include "util/exceptions.h"
 #include "util/make_unique.h"
 
 
@@ -179,20 +178,6 @@ bool LineCollection::isSimple() const {
 	return getFeatureCount() == (start_line.size() - 1);
 }
 
-SpatialReference LineCollection::featureMBR(size_t featureIndex) const{
-	if(featureIndex >= getFeatureCount())
-		throw ArgumentException("FeatureIndex >= FeatureCount");
-
-	return calculateMBR(start_line[start_feature[featureIndex]], start_line[start_feature[featureIndex + 1]]);
-}
-
-SpatialReference LineCollection::lineMBR(size_t featureIndex, size_t lineIndex) const{
-	if(featureIndex >= getFeatureCount())
-		throw ArgumentException("FeatureIndex >= FeatureCount");
-
-	if(lineIndex >= getFeatureReference(featureIndex).size()){
-		throw ArgumentException("LineIndex >= FeatureSize");
-	}
-
-	return calculateMBR(start_line[start_feature[featureIndex] + lineIndex], start_line[start_feature[featureIndex] + lineIndex + 1]);
+SpatialReference LineCollection::getFeatureMBR(size_t featureIndex) const {
+	return getFeatureReference(featureIndex).getMBR();
 }

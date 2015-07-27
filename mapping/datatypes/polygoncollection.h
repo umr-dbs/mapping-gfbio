@@ -2,6 +2,7 @@
 #define DATATYPES_POLYGONCOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
+#include "util/exceptions.h"
 #include <memory>
 
 
@@ -61,9 +62,8 @@ public:
 	std::unique_ptr<PolygonCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<PolygonCollection> filter(const std::vector<char> &keep);
 
-	virtual SpatialReference mbr() const;
-	virtual SpatialReference featureMBR(size_t featureIndex) const;
-	SpatialReference polygonMBR(size_t featureIndex, size_t polygonIndex) const;
+	virtual SpatialReference getCollectionMBR() const;
+	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
 	//if point is exactly on edge it may return true or false
 	//coordinateIndexStop is exclusive
@@ -124,11 +124,15 @@ private:
 		    }
 
 		    inline PolygonPolygonReference<PolygonCollection> getPolygonReference(size_t polygonIndex){
-				return PolygonPolygonReference<PolygonCollection>(pc, polygonIndex);
+		    	if(polygonIndex >= size())
+		    		throw ArgumentException("polygonIndex >= Count");
+				return PolygonPolygonReference<PolygonCollection>(pc, pc.start_feature[idx] + polygonIndex);
 			}
 
 			inline PolygonPolygonReference<const PolygonCollection> getPolygonReference(size_t polygonIndex) const{
-				return PolygonPolygonReference<const PolygonCollection>(pc, polygonIndex);
+				if(polygonIndex >= size())
+					throw ArgumentException("polygonIndex >= Count");
+				return PolygonPolygonReference<const PolygonCollection>(pc, pc.start_feature[idx] + polygonIndex);
 			}
 
 			bool contains(Coordinate& coordinate) const {
@@ -137,6 +141,11 @@ private:
 						return true;
 				}
 				return false;
+			}
+
+			SpatialReference getMBR() const {
+				//TODO: compute MBRs of outer rings of all polygons and then the MBR of these MBRs?
+				return pc.calculateMBR(pc.start_ring[pc.start_polygon[pc.start_feature[idx]]], pc.start_ring[pc.start_polygon[pc.start_feature[idx + 1]]]);
 			}
 
 		private:
@@ -170,11 +179,15 @@ private:
 		    }
 
 			inline PolygonRingReference<PolygonCollection> getRingReference(size_t ringIndex){
-				return PolygonRingReference<PolygonCollection>(pc, ringIndex);
+				if(ringIndex >= size())
+					throw ArgumentException("RingIndex >= Count");
+				return PolygonRingReference<PolygonCollection>(pc, pc.start_polygon[idx] + ringIndex);
 			}
 
 			inline PolygonRingReference<const PolygonCollection> getRingReference(size_t ringIndex) const{
-				return PolygonRingReference<const PolygonCollection>(pc, ringIndex);
+				if(ringIndex >= size())
+					throw ArgumentException("RingIndex >= Count");
+				return PolygonRingReference<const PolygonCollection>(pc, pc.start_polygon[idx] + ringIndex);
 			}
 
 			bool contains(Coordinate& coordinate) const {
@@ -191,6 +204,10 @@ private:
 				}
 
 				return true;
+			}
+
+			SpatialReference getMBR() const {
+				return pc.calculateMBR(pc.start_ring[pc.start_polygon[idx]], pc.start_ring[pc.start_polygon[idx] + 1]);
 			}
 
 		private:
@@ -227,6 +244,10 @@ private:
 		    	return pc.pointInRing(coordinate, pc.start_ring[idx], pc.start_ring[idx+1]);
 		    }
 
+			SpatialReference getMBR() const {
+				return pc.calculateMBR(pc.start_ring[idx], pc.start_ring[idx + 1]);
+			}
+
 		private:
 			C &pc;
 			const size_t idx;
@@ -234,10 +255,14 @@ private:
 
 public:
 	inline PolygonFeatureReference<PolygonCollection> getFeatureReference(size_t featureIndex){
+		if(featureIndex >= getFeatureCount())
+			throw ArgumentException("FeatureIndex >= FeatureCount");
 		return PolygonFeatureReference<PolygonCollection>(*this, featureIndex);
 	}
 
 	inline PolygonFeatureReference<const PolygonCollection> getFeatureReference(size_t featureIndex) const{
+		if(featureIndex >= getFeatureCount())
+			throw ArgumentException("FeatureIndex >= FeatureCount");
 		return PolygonFeatureReference<const PolygonCollection>(*this, featureIndex);
 	}
 };

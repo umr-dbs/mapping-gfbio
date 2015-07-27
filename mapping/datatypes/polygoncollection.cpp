@@ -256,7 +256,8 @@ SpatialReference PolygonCollection::polygonMBR(size_t featureIndex, size_t polyg
 }
 
 
-bool PolygonCollection::pointInRing(Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const {
+bool PolygonCollection::pointInRing(const Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const {
+	//Algorithm from http://alienryderflex.com/polygon/
 	size_t numberOfCorners = coordinateIndexStop - coordinateIndexStart - 1;
 	size_t i, j = numberOfCorners - 1;
 	bool oddNodes = false;

@@ -65,10 +65,9 @@ public:
 	virtual SpatialReference featureMBR(size_t featureIndex) const;
 	SpatialReference polygonMBR(size_t featureIndex, size_t polygonIndex) const;
 
-	//Algorithm from http://alienryderflex.com/polygon/
 	//if point is exactly on edge it may return true or false
 	//coordinateIndexStop is exclusive
-	bool pointInRing(Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const;
+	bool pointInRing(const Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const;
 
 	bool pointInCollection(Coordinate& coordinate) const;
 

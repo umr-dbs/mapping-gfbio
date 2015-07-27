@@ -254,3 +254,34 @@ SpatialReference PolygonCollection::polygonMBR(size_t featureIndex, size_t polyg
 
 	return calculateMBR(start_ring[start_polygon[start_feature[featureIndex] + polygonIndex]], start_ring[start_polygon[start_feature[featureIndex] + polygonIndex] + 1]);
 }
+
+
+bool PolygonCollection::pointInRing(Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const {
+	size_t numberOfCorners = coordinateIndexStop - coordinateIndexStart - 1;
+	size_t i, j = numberOfCorners - 1;
+	bool oddNodes = false;
+
+	for (i=0; i < numberOfCorners; ++i) {
+		const Coordinate& c_i = coordinates[coordinateIndexStart + i];
+		const Coordinate& c_j = coordinates[coordinateIndexStart + j];
+
+		if ((c_i.y < coordinate.y && c_j.y >= coordinate.y)
+		||  (c_j.y < coordinate.y && c_i.y >= coordinate.y)) {
+			if (c_i.x + (coordinate.y - c_i.y) / (c_j.y - c_i.y) * (c_j.x - c_i.x) < coordinate.x) {
+				oddNodes=!oddNodes;
+			}
+		}
+		j = i;
+	}
+
+	return oddNodes;
+}
+
+bool PolygonCollection::pointInCollection(Coordinate& coordinate) const {
+	for(auto feature : *this){
+		if(feature.contains(coordinate))
+			return true;
+	}
+
+	return false;
+}

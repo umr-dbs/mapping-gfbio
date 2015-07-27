@@ -65,6 +65,13 @@ public:
 	virtual SpatialReference featureMBR(size_t featureIndex) const;
 	SpatialReference polygonMBR(size_t featureIndex, size_t polygonIndex) const;
 
+	//Algorithm from http://alienryderflex.com/polygon/
+	//if point is exactly on edge it may return true or false
+	//coordinateIndexStop is exclusive
+	bool pointInRing(Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const;
+
+	bool pointInCollection(Coordinate& coordinate) const;
+
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 
@@ -125,6 +132,14 @@ private:
 				return PolygonPolygonReference<const PolygonCollection>(pc, polygonIndex);
 			}
 
+			bool contains(Coordinate& coordinate) const {
+				for(auto polygon : *this){
+					if(polygon.contains(coordinate))
+						return true;
+				}
+				return false;
+			}
+
 		private:
 		    C &pc;
 			const size_t idx;
@@ -163,6 +178,22 @@ private:
 				return PolygonRingReference<const PolygonCollection>(pc, ringIndex);
 			}
 
+			bool contains(Coordinate& coordinate) const {
+				bool outerRing = true;
+				for(auto ring : *this){
+					if(outerRing){
+						if(!ring.contains(coordinate))
+							return false;
+					}
+					else if(ring.contains(coordinate))
+						return false;
+
+					outerRing = false;
+				}
+
+				return true;
+			}
+
 		private:
 		    C &pc;
 			const size_t idx;
@@ -192,6 +223,11 @@ private:
 		    size_t size() const {
 		    	return pc.start_ring[idx+1] - pc.start_ring[idx];
 		    }
+
+		    bool contains(Coordinate& coordinate) const {
+		    	return pc.pointInRing(coordinate, pc.start_ring[idx], pc.start_ring[idx+1]);
+		    }
+
 		private:
 			C &pc;
 			const size_t idx;

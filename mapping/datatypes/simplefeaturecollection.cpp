@@ -181,7 +181,7 @@ std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 }
 
 SpatialReference SimpleFeatureCollection::calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const {
-	if(coordinateIndexStart >= coordinates.size() || coordinateIndexStop > coordinates.size() || coordinateIndexStart > coordinateIndexStop)
+	if(coordinateIndexStart >= coordinates.size() || coordinateIndexStop > coordinates.size() || coordinateIndexStart >= coordinateIndexStop)
 		throw ArgumentException("Invalid start/stop index for coordinates");
 
 	SpatialReference reference(stref.epsg);

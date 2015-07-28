@@ -9,6 +9,7 @@
 #include <thread>
 #include <sstream>
 #include <iomanip>
+#include <chrono>
 
 void Log::setLogFd(FILE *fd) {
 	Log::fd = fd;
@@ -59,14 +60,16 @@ void Log::log(LogLevel level, const char *msg, va_list vargs) {
 		std::ostringstream ss;
 
 		// Time
-		time_t now = time(0);
+		auto tp = std::chrono::system_clock::now();
+		auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count();
+		time_t now = std::chrono::system_clock::to_time_t(tp);
 		struct tm tstruct;
 		char buf[80];
 		tstruct = *localtime(&now);
 		strftime(buf, sizeof(buf), "%F %H:%M:%S.", &tstruct);
 
 
-		ss << "[" << buf << std::setfill('0') << std::setw(3) << (now % 1000) << "] [";
+		ss << "[" << buf << std::setfill('0') << std::setw(3) << (millis % 1000) << "] [";
 
 		// level
 		switch (level) {
@@ -102,5 +105,5 @@ void Log::log(LogLevel level, const char *msg, va_list vargs) {
 void Log::log(LogLevel level, const char *msg, ...) {}
 #endif
 
-Log::LogLevel Log::level = LogLevel::INFO;
+Log::LogLevel Log::level = LogLevel::DEBUG;
 FILE* Log::fd = stderr;

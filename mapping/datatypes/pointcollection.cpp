@@ -8,7 +8,6 @@
 #include <iomanip>
 #include <iostream>
 #include <cmath>
-#include "boost/date_time/posix_time/posix_time.hpp"
 
 template<typename T>
 std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T> &keep) {
@@ -229,7 +228,8 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 			for (auto &c : feature) {
 				json << "[" << c.x << "," << c.y << "],";
 			}
-			json.seekp(((long) json.tellp()) - 1); // delete last ,
+			if(feature.size() > 0)
+				json.seekp(((long) json.tellp()) - 1); // delete last ,
 
 			json << "]}";
 		}
@@ -266,7 +266,8 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 
 	}
 
-	json.seekp(((long) json.tellp()) - 1); // delete last ,
+	if(getFeatureCount() > 0)
+		json.seekp(((long) json.tellp()) - 1); // delete last ,
 	json << "]}";
 
 	return json.str();
@@ -384,8 +385,8 @@ std::string PointCollection::toARFF(std::string layerName) const {
 			arff << c.x << "," << c.y;
 
 			if (hasTime()){
-				arff << "," << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_start[feature])) << "\"" << ","
-						 << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_end[feature])) << "\"";
+				arff << "," << "\"" << stref.toIsoString(time_start[feature]) << "\"" << ","
+						 << "\"" << stref.toIsoString(time_end[feature]) << "\"";
 			}
 
 			for(auto &key : string_keys) {

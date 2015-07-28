@@ -222,9 +222,131 @@ TEST(PolygonCollection, toWKT) {
 	EXPECT_EQ(wkt, polygons.toWKT());
 }
 
-TEST(PolygonCollection, toARFF) {
+TEST(PolygonCollection, toGeoJSON) {
 	//TODO: test missing metadata value
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.local_md_string.addEmptyVector("test");
+	polygons.local_md_value.addEmptyVector("test2");
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(0, "test", "test");
+	polygons.local_md_value.set(0, "test2", 5.1);
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(1, "test", "test2");
+	polygons.local_md_value.set(1, "test2", 4.1);
+
+	polygons.addCoordinate(11,21);
+	polygons.addCoordinate(11,31);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(11,21);
+	polygons.finishRing();
+	polygons.addCoordinate(51,81);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(71,61);
+	polygons.addCoordinate(51,81);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(2, "test", "test3");
+	polygons.local_md_value.set(2, "test2", 3.1);
+
+	polygons.addDefaultTimestamps();
+
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"MultiPolygon","coordinates":[[[[1.000000,2.000000],[1.000000,3.000000],[2.000000,3.000000],[1.000000,2.000000]]]]}},{"type":"Feature","geometry":{"type":"MultiPolygon","coordinates":[[[[1.000000,2.000000],[1.000000,3.000000],[2.000000,3.000000],[1.000000,2.000000]]],[[[5.000000,8.000000],[2.000000,3.000000],[7.000000,6.000000],[5.000000,8.000000]]]]}},{"type":"Feature","geometry":{"type":"MultiPolygon","coordinates":[[[[11.000000,21.000000],[11.000000,31.000000],[21.000000,31.000000],[11.000000,21.000000]],[[51.000000,81.000000],[21.000000,31.000000],[71.000000,61.000000],[51.000000,81.000000]]]]}}]})";
+
+	EXPECT_EQ(expected, polygons.toGeoJSON(false));
+}
+
+TEST(PolygonCollection, toGeoJSONEmptyCollection) {
+	//TODO: test missing metadata value
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	std::string expected = "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:1\"}},\"features\":[]}";
+
+	EXPECT_EQ(expected, polygons.toGeoJSON(false));
+}
+
+TEST(PolygonCollection, toGeoJSONMetadata) {
+	//TODO: test missing metadata value
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.local_md_string.addEmptyVector("test");
+	polygons.local_md_value.addEmptyVector("test2");
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(0, "test", "test");
+	polygons.local_md_value.set(0, "test2", 5.1);
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(1, "test", "test2");
+	polygons.local_md_value.set(1, "test2", 4.1);
+
+	polygons.addCoordinate(11,21);
+	polygons.addCoordinate(11,31);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(11,21);
+	polygons.finishRing();
+	polygons.addCoordinate(51,81);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(71,61);
+	polygons.addCoordinate(51,81);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+	polygons.local_md_string.set(2, "test", "test3");
+	polygons.local_md_value.set(2, "test2", 3.1);
+
+	polygons.addDefaultTimestamps(0,1);
+
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"MultiPolygon","coordinates":[[[[1.000000,2.000000],[1.000000,3.000000],[2.000000,3.000000],[1.000000,2.000000]]]]},"properties":{"test":"test","test2":5.100000,"time_start":0.000000,"time_end":1.000000}},{"type":"Feature","geometry":{"type":"MultiPolygon","coordinates":[[[[1.000000,2.000000],[1.000000,3.000000],[2.000000,3.000000],[1.000000,2.000000]]],[[[5.000000,8.000000],[2.000000,3.000000],[7.000000,6.000000],[5.000000,8.000000]]]]},"properties":{"test":"test2","test2":4.100000,"time_start":0.000000,"time_end":1.000000}},{"type":"Feature","geometry":{"type":"MultiPolygon","coordinates":[[[[11.000000,21.000000],[11.000000,31.000000],[21.000000,31.000000],[11.000000,21.000000]],[[51.000000,81.000000],[21.000000,31.000000],[71.000000,61.000000],[51.000000,81.000000]]]]},"properties":{"test":"test3","test2":3.100000,"time_start":0.000000,"time_end":1.000000}}]})";
+
+	EXPECT_EQ(expected, polygons.toGeoJSON(true));
+}
+
+TEST(PolygonCollection, toARFF) {
+	//TODO: test missing metadata value
+	TemporalReference tref(TIMETYPE_UNIX);
+	SpatioTemporalReference stref(SpatialReference::unreferenced(), tref);
+	PolygonCollection polygons(stref);//is there a better way to initialize?
+
 	polygons.local_md_string.addEmptyVector("test");
 	polygons.local_md_value.addEmptyVector("test2");
 
@@ -447,4 +569,44 @@ TEST(PolygonCollection, pointInPolygonWithHole){
 	EXPECT_EQ(false, polygons.pointInCollection(e));
 	EXPECT_EQ(true, polygons.pointInCollection(f));
 	EXPECT_EQ(false, polygons.pointInCollection(g));
+}
+
+TEST(PolygonCollection, bulkPointInPolygon){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.addCoordinate(20,20);
+	polygons.addCoordinate(20,30);
+	polygons.addCoordinate(30,30);
+	polygons.addCoordinate(30,20);
+	polygons.addCoordinate(20,20);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(0,0);
+	polygons.addCoordinate(10,0);
+	polygons.addCoordinate(10,10);
+	polygons.addCoordinate(0,10);
+	polygons.addCoordinate(0,0);
+	polygons.finishRing();
+	polygons.addCoordinate(1,5);
+	polygons.addCoordinate(3,3);
+	polygons.addCoordinate(5,3);
+	polygons.addCoordinate(6,5);
+	polygons.addCoordinate(7,1.5);
+	polygons.addCoordinate(4,0);
+	polygons.addCoordinate(2,1);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(1,5);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	auto tester = polygons.getPointInCollectionBulkTester();
+
+	Coordinate a(4, 5);
+	Coordinate b(4, 2);
+
+	EXPECT_EQ(true, tester.pointInCollection(a));
+	EXPECT_EQ(false, tester.pointInCollection(b));
 }

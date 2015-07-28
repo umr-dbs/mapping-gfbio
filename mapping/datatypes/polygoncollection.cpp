@@ -89,13 +89,17 @@ std::string PolygonCollection::toGeoJSON(bool displayMetadata) const {
 	//TODO: implement inclusion of metadata
 	//TODO: output MultiPolygon that consists of single polygon as Polygon?
 
+	//TODO: move this method up to simplefeaturecollection and only serialize feature here
+
 	std::ostringstream json;
 	json << std::fixed;
 
-	json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
+	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
+	auto value_keys = local_md_value.getKeys();
+	auto string_keys = local_md_string.getKeys();
 	for (auto feature: *this) {
-		json << "{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiPolygon\", \"coordinates\": [";
+		json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPolygon\",\"coordinates\":[";
 
 		for (auto polygon : feature) {
 			json << "[";
@@ -104,20 +108,51 @@ std::string PolygonCollection::toGeoJSON(bool displayMetadata) const {
 				json << "[";
 
 				for (auto & coordinate : ring) {
-					json << "[" << coordinate.x << ", " << coordinate.y << "],";
+					json << "[" << coordinate.x << "," << coordinate.y << "],";
 				}
-
-				json.seekp(((long)json.tellp()) - 1);
+				if(ring.size() > 0)
+					json.seekp(((long)json.tellp()) - 1);
 				json << "],";
 			}
-
-			json.seekp(((long)json.tellp()) - 1);
+			if(polygon.size() > 0)
+				json.seekp(((long)json.tellp()) - 1);
 			json << "],";
 		}
-		json.seekp(((long)json.tellp()) - 1);
-		json << "]}},";
+		if(feature.size() > 0)
+			json.seekp(((long)json.tellp()) - 1);
+		json << "]}";
+
+		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || hasTime())){
+			json << ",\"properties\":{";
+			//TODO: handle missing metadata values
+			for (auto &key : string_keys) {
+				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
+			}
+
+			for (auto &key : value_keys) {
+				double value = local_md_value.get(feature, key);
+				json << "\"" << key << "\":";
+				if (std::isfinite(value)) {
+					json << value;
+				}
+				else {
+					json << "null";
+				}
+
+				json << ",";
+			}
+
+			if (hasTime()) {
+				json << "\"time_start\":" << time_start[feature] << ",\"time_end\":" << time_end[feature] << ",";
+			}
+
+			json.seekp(((long) json.tellp()) - 1); // delete last ,
+			json << "}";
+		}
+		json << "},";
 	}
-	json.seekp(((long)json.tellp()) - 1);
+	if(getFeatureCount() > 0)
+		json.seekp(((long)json.tellp()) - 1);
 	json << "]}";
 
 	return json.str();
@@ -270,3 +305,97 @@ SpatialReference PolygonCollection::getCollectionMBR() const{
 	//TODO: compute MBRs of outer rings of all polygons and then the MBR of these MBRs?
 	return calculateMBR(0, coordinates.size());
 }
+
+
+/**
+ * PointInCollectionBulkTester
+ */
+
+PolygonCollection::PointInCollectionBulkTester::PointInCollectionBulkTester(const PolygonCollection& polygonCollection) : polygonCollection(polygonCollection){
+	performPrecalculation();
+}
+
+void PolygonCollection::PointInCollectionBulkTester::precalculateRing(size_t coordinateIndexStart, size_t coordinateIndexStop){
+	//precalculate values to avoid redundant computation later on
+	size_t numberOfCorners = coordinateIndexStop - coordinateIndexStart - 1;
+	size_t i, j = numberOfCorners - 1;
+
+	for(i=0; i < numberOfCorners; ++i) {
+		const Coordinate& c_i = polygonCollection.coordinates[coordinateIndexStart + i];
+		const Coordinate& c_j = polygonCollection.coordinates[coordinateIndexStart + j];
+
+		if(c_j.y == c_i.y) {
+			constants[coordinateIndexStart + i] = c_i.x;
+			multiples[coordinateIndexStart + i] = 0;
+		} else {
+			constants[coordinateIndexStart + i] = c_i.x - (c_i.y * c_j.x) / (c_j.y - c_i.y) + (c_i.y * c_i.x) / (c_j.y - c_i.y);
+			multiples[coordinateIndexStart + i] = (c_j.x - c_i.x) / (c_j.y - c_i.y);
+		}
+		j = i;
+	}
+}
+
+void PolygonCollection::PointInCollectionBulkTester::performPrecalculation(){
+	constants.reserve(polygonCollection.coordinates.size());
+	multiples.reserve(polygonCollection.coordinates.size());
+
+	for(auto feature : polygonCollection){
+		for(auto polygon : feature){
+			for(auto ring : polygon){
+				precalculateRing(polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1]);
+			}
+		}
+	}
+}
+
+bool PolygonCollection::PointInCollectionBulkTester::pointInRing(const Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const {
+	//Algorithm from http://alienryderflex.com/polygon/
+	size_t numberOfCorners = coordinateIndexStop - coordinateIndexStart - 1;
+	size_t i, j = numberOfCorners - 1;
+	bool oddNodes = false;
+
+	for (i=0; i < numberOfCorners; ++i) {
+		const Coordinate& c_i = polygonCollection.coordinates[coordinateIndexStart + i];
+		const Coordinate& c_j = polygonCollection.coordinates[coordinateIndexStart + j];
+
+		if ((c_i.y < coordinate.y && c_j.y >= coordinate.y)
+		||  (c_j.y < coordinate.y && c_i.y >= coordinate.y)) {
+			oddNodes ^= (coordinate.y * multiples[coordinateIndexStart + i] + constants[coordinateIndexStart + i] < coordinate.x);
+		}
+		j = i;
+	}
+
+	return oddNodes;
+}
+
+bool PolygonCollection::PointInCollectionBulkTester::pointInCollection(const Coordinate& coordinate) const {
+	for(auto feature : polygonCollection){
+		for(auto polygon : feature){
+			bool contained = true;
+			size_t ringIndex = 0;
+			for(auto ring : polygon){
+				if(ringIndex == 0){
+					if(!pointInRing(coordinate, polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1])){
+						contained = false;
+						break;
+					}
+				}
+				else {
+					if(pointInRing(coordinate, polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1])){
+						contained = false;
+						break;
+					}
+				}
+
+				++ringIndex;
+			}
+			if(contained)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+
+

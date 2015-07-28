@@ -178,6 +178,10 @@ private:
 		    	return pc.start_polygon[idx+1] - pc.start_polygon[idx];
 		    }
 
+		    operator size_t() const {
+				return idx;
+			}
+
 			inline PolygonRingReference<PolygonCollection> getRingReference(size_t ringIndex){
 				if(ringIndex >= size())
 					throw ArgumentException("RingIndex >= Count");
@@ -240,6 +244,10 @@ private:
 		    	return pc.start_ring[idx+1] - pc.start_ring[idx];
 		    }
 
+		    operator size_t() const {
+				return idx;
+			}
+
 		    bool contains(Coordinate& coordinate) const {
 		    	return pc.pointInRing(coordinate, pc.start_ring[idx], pc.start_ring[idx+1]);
 		    }
@@ -253,6 +261,26 @@ private:
 			const size_t idx;
 	};
 
+	/**
+	 * This class should be used to test many points for containment in a PolygonCollection
+	 * on instantiation it performs pre-calculations in order to make tests faster
+	 * if the corresponding PolygonCollection is changed the results will be faulty
+	 */
+	class PointInCollectionBulkTester {
+	public:
+		PointInCollectionBulkTester(const PolygonCollection& polygonCollection);
+
+		bool pointInCollection(const Coordinate& coordinate) const;
+
+	private:
+		const PolygonCollection& polygonCollection;
+		std::vector<double> constants, multiples;
+
+		void performPrecalculation();
+		void precalculateRing(size_t coordinateIndexStart, size_t coordinateIndexStop);
+		bool pointInRing(const Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const;
+	};
+
 public:
 	inline PolygonFeatureReference<PolygonCollection> getFeatureReference(size_t featureIndex){
 		if(featureIndex >= getFeatureCount())
@@ -264,6 +292,10 @@ public:
 		if(featureIndex >= getFeatureCount())
 			throw ArgumentException("FeatureIndex >= FeatureCount");
 		return PolygonFeatureReference<const PolygonCollection>(*this, featureIndex);
+	}
+
+	PointInCollectionBulkTester getPointInCollectionBulkTester(){
+		return PointInCollectionBulkTester(*this);
 	}
 };
 

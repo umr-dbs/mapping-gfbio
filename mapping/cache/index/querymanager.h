@@ -24,29 +24,37 @@ class QueryInfo {
 public:
 	QueryInfo( const BaseRequest &request, uint64_t client );
 	QueryInfo( const QueryRectangle &query, const std::string &semantic_id, uint64_t client );
-	bool matches( const BaseRequest &req );
+	bool satisfies( const BaseRequest &req );
 	void add_client( uint64_t client );
 	const std::vector<uint64_t>& get_clients();
-private:
+protected:
 	QueryRectangle query;
-	std::string semantic_id;
+	const std::string semantic_id;
+private:
 	std::vector<uint64_t> clients;
 };
 
 class JobDescription : public QueryInfo {
 public:
 	virtual ~JobDescription();
+	virtual bool extend( const BaseRequest &req );
 	virtual uint64_t  schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
 protected:
 	JobDescription( uint64_t client_id, std::unique_ptr<BaseRequest> request );
 	const std::unique_ptr<BaseRequest> request;
+
 };
 
 class CreateJob : public JobDescription {
 public:
 	CreateJob( uint64_t client_id, std::unique_ptr<BaseRequest> &request );
 	virtual ~CreateJob();
+	virtual bool extend( const BaseRequest &req );
 	virtual uint64_t  schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+private:
+	const QueryRectangle orig_query;
+	const double orig_area;
+
 };
 
 class DeliverJob : public JobDescription {

@@ -169,7 +169,7 @@ JobDescription::JobDescription( uint64_t client_id, std::unique_ptr<BaseRequest>
 }
 
 CreateJob::CreateJob(uint64_t client_id, std::unique_ptr<BaseRequest>& request) :
-	JobDescription(client_id, std::unique_ptr<BaseRequest>(request.release())), orig_query(request->query),
+	JobDescription(client_id, std::unique_ptr<BaseRequest>(request.release())), orig_query(query),
 	orig_area((query.x2-query.x1)*(query.y2-query.y1)) {
 }
 

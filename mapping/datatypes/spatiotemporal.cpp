@@ -162,8 +162,7 @@ std::string TemporalReference::toIsoString(double time) const {
 	if(timetype == TIMETYPE_UNIX){
 		result << boost::posix_time::to_iso_extended_string(boost::posix_time::from_time_t(time));
 	} else {
-		//TODO: throw Exception?
-		result << time;
+		throw ConverterException("can only convert UNIX timestamps");
 	}
 
 	return result.str();

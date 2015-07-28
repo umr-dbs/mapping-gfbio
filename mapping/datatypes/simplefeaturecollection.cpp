@@ -10,7 +10,6 @@
 #include <iostream>
 #include <cmath>
 #include <limits>
-#include "boost/date_time/posix_time/posix_time.hpp"
 
 Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
@@ -164,8 +163,8 @@ std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 	for (size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex) {
 		arff << "\"" << featureToWKT(featureIndex) << "\"";
 		if (hasTime()){
-			arff << "," << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_start[featureIndex])) << "\"" << ","
-					 << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_end[featureIndex])) << "\"";
+			arff << "," << "\"" << stref.toIsoString(time_start[featureIndex]) << "\"" << ","
+					 << "\"" << stref.toIsoString(time_end[featureIndex]) << "\"";
 		}
 
 		//TODO: handle missing metadata values

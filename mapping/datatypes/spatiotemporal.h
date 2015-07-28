@@ -131,6 +131,11 @@ class TemporalReference {
 		 */
 		void intersect(const TemporalReference &other);
 
+		/**
+		 * serializes given time as ISO String with respect to timetype
+		 */
+		std::string toIsoString(double time) const ;
+
 		/*
 		 * Named constructor for returning a reference that returns a valid reference which does not reference any
 		 * point in time.

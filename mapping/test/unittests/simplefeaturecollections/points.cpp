@@ -163,7 +163,10 @@ TEST(PointCollection, SimpletoARFF) {
 
 TEST(PointCollection, SimpletoARFFWithTime) {
 	//TODO: test missing metadata value
-	PointCollection points(SpatioTemporalReference::unreferenced());
+	TemporalReference tref(TIMETYPE_UNIX);
+	SpatioTemporalReference stref(SpatialReference::unreferenced(), tref);
+	PointCollection points(stref);//is there a better way to initialize?
+
 	points.local_md_value.addEmptyVector("test");
 	points.local_md_string.addEmptyVector("test2");
 

@@ -111,27 +111,62 @@ std::string LineCollection::toGeoJSON(bool displayMetadata) const {
 	std::ostringstream json;
 	json << std::fixed;
 
-	json << "{\"type\":\"FeatureCollection\",\"crs\": {\"type\": \"name\", \"properties\":{\"name\": \"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
+	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
-	for(size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex){
-		json << "{\"type\":\"Feature\",\"geometry\":{\"type\": \"MultiLineString\", \"coordinates\": [";
+	auto value_keys = local_md_value.getKeys();
+	auto string_keys = local_md_string.getKeys();
+	for(auto feature : *this){
+		json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiLineString\",\"coordinates\":[";
 
-		for(size_t lineIndex = start_feature[featureIndex]; lineIndex < start_feature[featureIndex + 1]; ++lineIndex){
+		for(auto line : feature){
 			json << "[";
 
-				for(size_t pointIndex = start_line[lineIndex]; pointIndex < start_line[lineIndex + 1]; ++pointIndex){
-					json << "[" << coordinates[pointIndex].x << ", " << coordinates[pointIndex].y << "],";
-				}
+			for(auto& c : line){
+				json << "[" << c.x << "," << c.y << "],";
+			}
 
-			json.seekp(((long)json.tellp()) - 1);
+			if(line.size() > 0)
+				json.seekp(((long)json.tellp()) - 1);
 
 			json << "],";
 		}
-		json.seekp(((long)json.tellp()) - 1);
+		if(feature.size() > 0)
+			json.seekp(((long)json.tellp()) - 1);
 
-		json << "]}},";
+		json << "]}";
+
+		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || hasTime())){
+			json << ",\"properties\":{";
+			//TODO: handle missing metadata values
+			for (auto &key : string_keys) {
+				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
+			}
+
+			for (auto &key : value_keys) {
+				double value = local_md_value.get(feature, key);
+				json << "\"" << key << "\":";
+				if (std::isfinite(value)) {
+					json << value;
+				}
+				else {
+					json << "null";
+				}
+
+				json << ",";
+			}
+
+			if (hasTime()) {
+				json << "\"time_start\":" << time_start[feature] << ",\"time_end\":" << time_end[feature] << ",";
+			}
+
+			json.seekp(((long) json.tellp()) - 1); // delete last ,
+			json << "}";
+		}
+
+		json << "},";
 	}
-	json.seekp(((long)json.tellp()) - 1);
+	if(getFeatureCount() > 0)
+		json.seekp(((long)json.tellp()) - 1);
 
 	json << "]}";
 

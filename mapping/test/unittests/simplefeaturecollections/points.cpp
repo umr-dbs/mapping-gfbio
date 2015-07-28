@@ -73,6 +73,14 @@ TEST(PointCollection, toGeoJSON) {
 }
 
 //if this test fails, it could just mean the JSON format changed, not that it is invalid/wrong
+TEST(PointCollection, toGeoJSONEmptyCollection) {
+	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
+
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[]})";
+	EXPECT_EQ(expected, points.toGeoJSON(false));
+}
+
+//if this test fails, it could just mean the JSON format changed, not that it is invalid/wrong
 TEST(PointCollection, toGeoJSONWithMetadata) {
 	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
 

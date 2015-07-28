@@ -121,7 +121,8 @@ std::string SimpleFeatureCollection::toWKT() const {
 		featureToWKT(i, wkt);
 		wkt << ",";
 	}
-	wkt.seekp(((long) wkt.tellp()) - 1); // delete last ,
+	if(getFeatureCount() > 0)
+		wkt.seekp(((long) wkt.tellp()) - 1); // delete last ,
 
 	wkt << ")";
 

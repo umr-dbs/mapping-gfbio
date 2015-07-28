@@ -229,7 +229,8 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 			for (auto &c : feature) {
 				json << "[" << c.x << "," << c.y << "],";
 			}
-			json.seekp(((long) json.tellp()) - 1); // delete last ,
+			if(feature.size() > 0)
+				json.seekp(((long) json.tellp()) - 1); // delete last ,
 
 			json << "]}";
 		}
@@ -266,7 +267,8 @@ std::string PointCollection::toGeoJSON(bool displayMetadata) const {
 
 	}
 
-	json.seekp(((long) json.tellp()) - 1); // delete last ,
+	if(getFeatureCount() > 0)
+		json.seekp(((long) json.tellp()) - 1); // delete last ,
 	json << "]}";
 
 	return json.str();

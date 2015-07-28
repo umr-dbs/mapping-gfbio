@@ -92,7 +92,7 @@ void SimpleFeatureCollection::setGlobalMDValue(const std::string &key, double va
  */
 void SimpleFeatureCollection::validate() const {
 	auto fcount = getFeatureCount();
-	if (hasTime()) {
+	if (time_start.size() > 0 || time_end.size() > 0) {
 		if (time_start.size() != fcount || time_end.size() != fcount)
 			throw ArgumentException("SimpleFeatureCollection: size of the time-arrays doesn't match feature count");
 	}

@@ -294,7 +294,7 @@ public:
 		return PolygonFeatureReference<const PolygonCollection>(*this, featureIndex);
 	}
 
-	PointInCollectionBulkTester getPointInCollectionBulkTester(){
+	PointInCollectionBulkTester getPointInCollectionBulkTester() const {
 		return PointInCollectionBulkTester(*this);
 	}
 };

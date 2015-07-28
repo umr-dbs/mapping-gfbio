@@ -1,6 +1,5 @@
 #include "linecollection.h"
 #include <sstream>
-#include "util/exceptions.h"
 #include "util/make_unique.h"
 
 
@@ -173,10 +172,12 @@ void LineCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) 
 		wkt.seekp(((long)wkt.tellp()) - 1);
 		wkt << ")";
 	}
-
-	return;
 }
 
 bool LineCollection::isSimple() const {
 	return getFeatureCount() == (start_line.size() - 1);
+}
+
+SpatialReference LineCollection::getFeatureMBR(size_t featureIndex) const {
+	return getFeatureReference(featureIndex).getMBR();
 }

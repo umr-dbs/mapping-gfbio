@@ -2,6 +2,7 @@
 #define DATATYPES_POINTCOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
+#include "util/exceptions.h"
 #include <memory>
 
 
@@ -52,9 +53,11 @@ public:
 
 	std::string hash();
 
+	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
+
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
-	virtual std::string toARFF() const;
+	virtual std::string toARFF(std::string layerName = "export") const;
 
 	virtual bool isSimple() const final;
 
@@ -102,16 +105,25 @@ private:
 		    operator size_t() const {
 		    	return idx;
 		    }
+
+		    SpatialReference getMBR() const {
+		    	return pc.calculateMBR(pc.start_feature[idx], pc.start_feature[idx+1]);
+		    }
+
 		private:
 			C &pc;
 			const size_t idx;
 	};
 public:
 	inline PointFeatureReference<PointCollection> getFeatureReference(size_t featureIndex){
+		if(featureIndex >= getFeatureCount())
+			throw ArgumentException("FeatureIndex >= FeatureCount");
 		return PointFeatureReference<PointCollection>(*this, featureIndex);
 	}
 
 	inline PointFeatureReference<const PointCollection> getFeatureReference(size_t featureIndex) const{
+		if(featureIndex >= getFeatureCount())
+			throw ArgumentException("FeatureIndex >= FeatureCount");
 		return PointFeatureReference<const PointCollection>(*this, featureIndex);
 	}
 };

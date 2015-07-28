@@ -42,8 +42,8 @@ public:
 	std::vector<Coordinate> coordinates;
 
 	// Timestamps
-	std::vector<time_t> time_start;
-	std::vector<time_t> time_end;
+	std::vector<double> time_start;
+	std::vector<double> time_end;
 	bool hasTime() const;
 	void addDefaultTimestamps();
 	void addDefaultTimestamps(double min, double max);
@@ -66,11 +66,15 @@ public:
 	MetadataArrays<std::string> local_md_string;
 	MetadataArrays<double> local_md_value;
 
+	// geometry
+	virtual SpatialReference getCollectionMBR() const;
+	virtual SpatialReference getFeatureMBR(size_t featureIndex) const = 0;
+
 	// Export
 	virtual std::string toGeoJSON(bool displayMetadata = false) const = 0;
 	virtual std::string toCSV() const = 0;
 	virtual std::string toWKT() const;
-	virtual std::string toARFF() const;
+	virtual std::string toARFF(std::string layerName = "export") const;
 
 	virtual std::string featureToWKT(size_t featureIndex) const;
 
@@ -83,6 +87,10 @@ public:
 
 protected:
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const = 0;
+
+	//calculate the MBR of the coordinates in range from start to stop (exclusive)
+	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;
+
 
 	/*
 	 * Helper classes for iteration over Collections

@@ -1,4 +1,3 @@
-#include "util/exceptions.h"
 
 #include <sstream>
 #include "polygoncollection.h"
@@ -167,8 +166,6 @@ void PolygonCollection::featureToWKT(size_t featureIndex, std::ostringstream& wk
 		wkt.seekp(((long)wkt.tellp()) - 1);
 		wkt << ")";
 	}
-
-	return;
 }
 
 bool PolygonCollection::isSimple() const {
@@ -231,4 +228,45 @@ std::string PolygonCollection::getAsString(){
 	}
 
 	return string.str();
+}
+
+
+bool PolygonCollection::pointInRing(const Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const {
+	//Algorithm from http://alienryderflex.com/polygon/
+	size_t numberOfCorners = coordinateIndexStop - coordinateIndexStart - 1;
+	size_t i, j = numberOfCorners - 1;
+	bool oddNodes = false;
+
+	for (i=0; i < numberOfCorners; ++i) {
+		const Coordinate& c_i = coordinates[coordinateIndexStart + i];
+		const Coordinate& c_j = coordinates[coordinateIndexStart + j];
+
+		if ((c_i.y < coordinate.y && c_j.y >= coordinate.y)
+		||  (c_j.y < coordinate.y && c_i.y >= coordinate.y)) {
+			if (c_i.x + (coordinate.y - c_i.y) / (c_j.y - c_i.y) * (c_j.x - c_i.x) < coordinate.x) {
+				oddNodes=!oddNodes;
+			}
+		}
+		j = i;
+	}
+
+	return oddNodes;
+}
+
+bool PolygonCollection::pointInCollection(Coordinate& coordinate) const {
+	for(auto feature : *this){
+		if(feature.contains(coordinate))
+			return true;
+	}
+
+	return false;
+}
+	
+SpatialReference PolygonCollection::getFeatureMBR(size_t featureIndex) const {
+	return getFeatureReference(featureIndex).getMBR();
+}
+
+SpatialReference PolygonCollection::getCollectionMBR() const{
+	//TODO: compute MBRs of outer rings of all polygons and then the MBR of these MBRs?
+	return calculateMBR(0, coordinates.size());
 }

@@ -2,6 +2,7 @@
 #define DATATYPES_LINECOLLECTION_H_
 
 #include "datatypes/simplefeaturecollection.h"
+#include "util/exceptions.h"
 #include <memory>
 
 
@@ -51,6 +52,8 @@ public:
 
 	std::unique_ptr<LineCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<LineCollection> filter(const std::vector<char> &keep);
+
+	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
@@ -102,12 +105,20 @@ private:
 		    	return idx;
 		    }
 
+		    SpatialReference getMBR() const{
+		    	return lc.calculateMBR(lc.start_line[lc.start_feature[idx]], lc.start_line[lc.start_feature[idx + 1]]);
+		    }
+
 		    inline LineLineReference<LineCollection> getLineReference(size_t lineIndex){
-		    	return LineLineReference<LineCollection>(lc, lineIndex);
+		    	if(lineIndex >= size())
+		    		throw ArgumentException("LineIndex >= Count");
+		    	return LineLineReference<LineCollection>(lc, lc.start_feature[idx] + lineIndex);
 			}
 
 			inline LineLineReference<const LineCollection> getLineReference(size_t lineIndex) const{
-				return LineLineReference<const LineCollection>(lc, lineIndex);
+				if(lineIndex >= size())
+					throw ArgumentException("LineIndex >= Count");
+				return LineLineReference<const LineCollection>(lc, lc.start_feature[idx] + lineIndex);
 			}
 
 		private:
@@ -139,6 +150,11 @@ private:
 		    size_t size() const {
 		    	return lc.start_line[idx+1] - lc.start_line[idx];
 		    }
+
+		    SpatialReference getMBR() const {
+		    	return lc.calculateMBR(lc.start_line[idx], lc.start_line[idx + 1]);
+		    }
+
 		private:
 			C &lc;
 			const size_t idx;
@@ -146,10 +162,14 @@ private:
 
 public:
 	inline LineFeatureReference<LineCollection> getFeatureReference(size_t featureIndex){
+		if(featureIndex >= getFeatureCount())
+			throw ArgumentException("FeatureIndex >= FeatureCount");
 		return LineFeatureReference<LineCollection>(*this, featureIndex);
 	}
 
 	inline LineFeatureReference<const LineCollection> getFeatureReference(size_t featureIndex) const{
+		if(featureIndex >= getFeatureCount())
+			throw ArgumentException("FeatureIndex >= FeatureCount");
 		return LineFeatureReference<const LineCollection>(*this, featureIndex);
 	}
 };

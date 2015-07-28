@@ -100,13 +100,14 @@ TEST(PolygonCollection, directReferenceAccess){
 	polygons.addCoordinate(5,8);
 	polygons.addCoordinate(2,3);
 	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(7,7);
 	polygons.addCoordinate(5,8);
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
 
 	EXPECT_EQ(4, polygons.getFeatureReference(0).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(4, polygons.getFeatureReference(1).getPolygonReference(2).getRingReference(0).size());
+	EXPECT_EQ(5, polygons.getFeatureReference(1).getPolygonReference(1).getRingReference(0).size());
 }
 
 
@@ -285,4 +286,165 @@ TEST(PolygonCollection, toARFF) {
 			"\"POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test3\",3.1\n";
 
 	EXPECT_EQ(expected, polygons.toARFF());
+}
+
+TEST(PolygonCollection, calculateMBR) {
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(35,10);
+	polygons.addCoordinate(45,45);
+	polygons.addCoordinate(15,40);
+	polygons.addCoordinate(10,20);
+	polygons.addCoordinate(35,10);
+	polygons.finishRing();
+	polygons.addCoordinate(20,30);
+	polygons.addCoordinate(35,35);
+	polygons.addCoordinate(30,20);
+	polygons.addCoordinate(20,30);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	auto mbr = polygons.getCollectionMBR();
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(45, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(45, mbr.y2);
+
+	mbr = polygons.getFeatureReference(0).getMBR();
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(2, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(3, mbr.y2);
+
+	mbr = polygons.getFeatureReference(1).getMBR();
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(7, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(8, mbr.y2);
+
+	mbr = polygons.getFeatureReference(2).getMBR();
+	EXPECT_DOUBLE_EQ(10, mbr.x1);
+	EXPECT_DOUBLE_EQ(45, mbr.x2);
+	EXPECT_DOUBLE_EQ(10, mbr.y1);
+	EXPECT_DOUBLE_EQ(45, mbr.y2);
+
+
+	mbr = polygons.getFeatureReference(1).getPolygonReference(0).getMBR();
+	EXPECT_DOUBLE_EQ(1, mbr.x1);
+	EXPECT_DOUBLE_EQ(2, mbr.x2);
+	EXPECT_DOUBLE_EQ(2, mbr.y1);
+	EXPECT_DOUBLE_EQ(3, mbr.y2);
+
+	mbr = polygons.getFeatureReference(1).getPolygonReference(1).getMBR();
+	EXPECT_DOUBLE_EQ(2, mbr.x1);
+	EXPECT_DOUBLE_EQ(7, mbr.x2);
+	EXPECT_DOUBLE_EQ(3, mbr.y1);
+	EXPECT_DOUBLE_EQ(8, mbr.y2);
+}
+
+TEST(PolygonCollection, pointInPolygon){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.addCoordinate(1,5);
+	polygons.addCoordinate(3,3);
+	polygons.addCoordinate(5,3);
+	polygons.addCoordinate(6,5);
+	polygons.addCoordinate(7,1.5);
+	polygons.addCoordinate(4,0);
+	polygons.addCoordinate(2,1);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(1,5);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	Coordinate a(4, 2); //inside
+	Coordinate b(2, 3); //inside, collinear to edge
+	Coordinate c(4, 5); //outside, in line of two vertices
+	Coordinate d(2, 0); //outside
+	Coordinate e(2, 4); //on edge
+	Coordinate f(2.05, 4); //next to edge (out)
+	Coordinate g(1.95, 4); //next to edge (in)
+
+
+	EXPECT_EQ(true, polygons.pointInRing(a, 0, 9));
+	EXPECT_EQ(true, polygons.pointInRing(b, 0, 9));
+	EXPECT_EQ(false, polygons.pointInRing(c, 0, 9));
+	EXPECT_EQ(false, polygons.pointInRing(d, 0, 9));
+	EXPECT_EQ(true, polygons.pointInRing(e, 0, 9));
+	EXPECT_EQ(false, polygons.pointInRing(f, 0, 9));
+	EXPECT_EQ(true, polygons.pointInRing(g, 0, 9));
+}
+
+TEST(PolygonCollection, pointInPolygonWithHole){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.addCoordinate(20,20);
+	polygons.addCoordinate(20,30);
+	polygons.addCoordinate(30,30);
+	polygons.addCoordinate(30,20);
+	polygons.addCoordinate(20,20);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(0,0);
+	polygons.addCoordinate(10,0);
+	polygons.addCoordinate(10,10);
+	polygons.addCoordinate(0,10);
+	polygons.addCoordinate(0,0);
+	polygons.finishRing();
+	polygons.addCoordinate(1,5);
+	polygons.addCoordinate(3,3);
+	polygons.addCoordinate(5,3);
+	polygons.addCoordinate(6,5);
+	polygons.addCoordinate(7,1.5);
+	polygons.addCoordinate(4,0);
+	polygons.addCoordinate(2,1);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(1,5);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	//following points with respect to hole
+	Coordinate a(4, 2); //inside
+	Coordinate b(2, 3); //inside, collinear to edge
+	Coordinate c(4, 5); //outside, in line of two vertices
+	Coordinate d(2, 0); //outside
+	Coordinate e(2, 4); //on edge
+	Coordinate f(2.05, 4); //next to edge (out)
+	Coordinate g(1.95, 4); //next to edge (in)
+
+
+	EXPECT_EQ(false, polygons.pointInCollection(a));
+	EXPECT_EQ(false, polygons.pointInCollection(b));
+	EXPECT_EQ(true, polygons.pointInCollection(c));
+	//EXPECT_EQ(true, polygons.pointInCollection(d)); //algo can't handle this case
+	EXPECT_EQ(false, polygons.pointInCollection(e));
+	EXPECT_EQ(true, polygons.pointInCollection(f));
+	EXPECT_EQ(false, polygons.pointInCollection(g));
 }

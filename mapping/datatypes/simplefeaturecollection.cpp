@@ -92,7 +92,7 @@ void SimpleFeatureCollection::setGlobalMDValue(const std::string &key, double va
  */
 void SimpleFeatureCollection::validate() const {
 	auto fcount = getFeatureCount();
-	if (hasTime()) {
+	if (time_start.size() > 0 || time_end.size() > 0) {
 		if (time_start.size() != fcount || time_end.size() != fcount)
 			throw ArgumentException("SimpleFeatureCollection: size of the time-arrays doesn't match feature count");
 	}
@@ -118,7 +118,8 @@ std::string SimpleFeatureCollection::toWKT() const {
 	wkt << "GEOMETRYCOLLECTION(";
 
 	for(size_t i = 0; i < getFeatureCount(); ++i){
-		wkt << featureToWKT(i) << ",";
+		featureToWKT(i, wkt);
+		wkt << ",";
 	}
 	wkt.seekp(((long) wkt.tellp()) - 1); // delete last ,
 
@@ -133,11 +134,11 @@ std::string SimpleFeatureCollection::featureToWKT(size_t featureIndex) const{
 	return wkt.str();
 }
 
-std::string SimpleFeatureCollection::toARFF() const {
+std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 	std::ostringstream arff;
 
 	//TODO: maybe take name of layer as relation name, but this is not accessible here
-	arff << "@RELATION export" << std::endl << std::endl;
+	arff << "@RELATION " << layerName << std::endl << std::endl;
 
 	arff << "@ATTRIBUTE wkt STRING" << std::endl;
 
@@ -177,4 +178,37 @@ std::string SimpleFeatureCollection::toARFF() const {
 	}
 
 	return arff.str();
+}
+
+SpatialReference SimpleFeatureCollection::calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const {
+	if(coordinateIndexStart >= coordinates.size() || coordinateIndexStop > coordinates.size() || coordinateIndexStart >= coordinateIndexStop)
+		throw ArgumentException("Invalid start/stop index for coordinates");
+
+	SpatialReference reference(stref.epsg);
+
+	const Coordinate& c0 = coordinates[coordinateIndexStart];
+	reference.x1 = c0.x;
+	reference.x2 = c0.x;
+	reference.y1 = c0.y;
+	reference.y2 = c0.y;
+
+	for(size_t i = coordinateIndexStart + 1; i < coordinateIndexStop; ++i){
+		const Coordinate& c = coordinates[i];
+
+		if(c.x < reference.x1)
+			reference.x1 = c.x;
+		else if(c.x > reference.x2)
+			reference.x2 = c.x;
+
+		if(c.y < reference.y1)
+			reference.y1 = c.y;
+		else if(c.y > reference.y2)
+			reference.y2 = c.y;
+	}
+
+	return reference;
+}
+
+SpatialReference SimpleFeatureCollection::getCollectionMBR() const {
+	return calculateMBR(0, coordinates.size());
 }

@@ -42,8 +42,8 @@ public:
 	std::vector<Coordinate> coordinates;
 
 	// Timestamps
-	std::vector<time_t> time_start;
-	std::vector<time_t> time_end;
+	std::vector<double> time_start;
+	std::vector<double> time_end;
 	bool hasTime() const;
 	void addDefaultTimestamps();
 	void addDefaultTimestamps(double min, double max);

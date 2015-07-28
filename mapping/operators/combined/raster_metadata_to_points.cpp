@@ -176,7 +176,7 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 	else {
 		auto rasters = getRasterSourceCount();
 		TemporalReference tref = TemporalReference::unreferenced();
-		QueryRectangle rect2(rect, tref,
+		QueryRectangle rect2(rect, rect,
 				QueryResolution::pixels(xResolution, yResolution));
 		for (int r=0;r<rasters;r++) {
 			auto raster = getRasterFromSource(r, rect2, profiler);

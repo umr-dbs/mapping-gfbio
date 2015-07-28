@@ -77,13 +77,13 @@ void HistogramFromFeaturesOperator::writeSemanticParameters(std::ostringstream& 
 std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
 	std::unique_ptr<SimpleFeatureCollection> features;
 	if (getPointCollectionSourceCount() > 0) {
-		features = getPointCollectionFromSource(0, rect, profiler);
+		features = getPointCollectionFromSource(0, QueryRectangle(rect, rect, QueryResolution::none()), profiler);
 	}
 	else if (getLineCollectionSourceCount() > 0) {
-		features = getLineCollectionFromSource(0, rect, profiler);
+		features = getLineCollectionFromSource(0, QueryRectangle(rect, rect, QueryResolution::none()), profiler);
 	}
 	else if (getPolygonCollectionSourceCount() > 0) {
-		features = getPolygonCollectionFromSource(0, rect, profiler);
+		features = getPolygonCollectionFromSource(0, QueryRectangle(rect, rect, QueryResolution::none()), profiler);
 	}
 	else
 		throw OperatorException("HistogramFromFeaturesOperator: need a source");

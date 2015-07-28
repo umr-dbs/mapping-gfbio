@@ -570,3 +570,43 @@ TEST(PolygonCollection, pointInPolygonWithHole){
 	EXPECT_EQ(true, polygons.pointInCollection(f));
 	EXPECT_EQ(false, polygons.pointInCollection(g));
 }
+
+TEST(PolygonCollection, bulkPointInPolygon){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.addCoordinate(20,20);
+	polygons.addCoordinate(20,30);
+	polygons.addCoordinate(30,30);
+	polygons.addCoordinate(30,20);
+	polygons.addCoordinate(20,20);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(0,0);
+	polygons.addCoordinate(10,0);
+	polygons.addCoordinate(10,10);
+	polygons.addCoordinate(0,10);
+	polygons.addCoordinate(0,0);
+	polygons.finishRing();
+	polygons.addCoordinate(1,5);
+	polygons.addCoordinate(3,3);
+	polygons.addCoordinate(5,3);
+	polygons.addCoordinate(6,5);
+	polygons.addCoordinate(7,1.5);
+	polygons.addCoordinate(4,0);
+	polygons.addCoordinate(2,1);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(1,5);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	auto tester = polygons.getPointInCollectionBulkTester();
+
+	Coordinate a(4, 5);
+	Coordinate b(4, 2);
+
+	EXPECT_EQ(true, tester.pointInCollection(a));
+	EXPECT_EQ(false, tester.pointInCollection(b));
+}

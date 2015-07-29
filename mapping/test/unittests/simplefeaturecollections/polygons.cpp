@@ -343,9 +343,10 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 
 TEST(PolygonCollection, toARFF) {
 	//TODO: test missing metadata value
-	TemporalReference tref(TIMETYPE_UNIX);
-	SpatioTemporalReference stref(SpatialReference::unreferenced(), tref);
-	PolygonCollection polygons(stref);//is there a better way to initialize?
+	PolygonCollection polygons(SpatioTemporalReference(
+		SpatialReference::unreferenced(),
+		TemporalReference(TIMETYPE_UNIX)
+	));
 
 	polygons.local_md_string.addEmptyVector("test");
 	polygons.local_md_value.addEmptyVector("test2");

@@ -22,7 +22,7 @@ class PointsMetadataToGraph: public GenericOperator {
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
-		std::vector<std::string> names;
+		std::vector<std::string> attributeNames;
 
 #ifndef MAPPING_OPERATOR_STUBS
 		template<std::size_t size>
@@ -33,9 +33,16 @@ class PointsMetadataToGraph: public GenericOperator {
 PointsMetadataToGraph::PointsMetadataToGraph(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
-	Json::Value inputNames = params.get("names", Json::Value(Json::arrayValue));
+	Json::Value inputNames = params.get("attributeNames", Json::Value(Json::arrayValue));
 	for (Json::ArrayIndex index = 0; index < inputNames.size(); ++index) {
-		names.push_back(inputNames.get(index, "raster").asString());
+		attributeNames.push_back(inputNames.get(index, "raster").asString());
+	}
+
+	if(attributeNames.size() < 2) {
+		throw ArgumentException("PointsMetadataToGraph: There must not more than 1 argument.");
+	}
+	if(attributeNames.size() > 3) {
+		throw ArgumentException("PointsMetadataToGraph: There must not be more than 3 arguments.");
 	}
 }
 
@@ -43,8 +50,8 @@ PointsMetadataToGraph::~PointsMetadataToGraph() {}
 REGISTER_OPERATOR(PointsMetadataToGraph, "points_metadata_to_graph");
 
 void PointsMetadataToGraph::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"parameterNames\":[";
-	for(auto& name : names) {
+	stream << "\"attributeNames\":[";
+	for(auto& name : attributeNames) {
 		stream << "\"" << name << "\",";
 	}
 	stream.seekp(((long) stream.tellp()) - 1); // remove last comma
@@ -62,7 +69,7 @@ auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::uniqu
 		bool hasData = true;
 
 		for (size_t valueIndex = 0; valueIndex < size; ++valueIndex) {
-			value[valueIndex] = points.local_md_value.get(featureIndex, names[valueIndex]);
+			value[valueIndex] = points.local_md_value.get(featureIndex, attributeNames[valueIndex]);
 
 			if(std::isnan(value[valueIndex])) {
 				hasData = false;
@@ -81,13 +88,13 @@ auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::uniqu
 }
 
 std::unique_ptr<GenericPlot> PointsMetadataToGraph::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointCollectionFromSource(0, rect, profiler);
+	auto points = getPointCollectionFromSource(0, QueryRectangle(rect, rect, QueryResolution::none()), profiler);
 
 	// TODO: GENERALIZE
-	if(names.size() == 3) {
-		return createXYGraph<3>(*points);
-	} else {
+	if (attributeNames.size() == 2) {
 		return createXYGraph<2>(*points);
+	} else  {
+		return createXYGraph<3>(*points);
 	}
 
 }

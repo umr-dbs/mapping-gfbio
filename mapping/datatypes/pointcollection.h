@@ -15,7 +15,7 @@ private:
 public:
 	PointCollection(BinaryStream &stream);
 	PointCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref) {
-		start_feature.push_back(0); //end of first feature
+		start_feature.push_back(0); //start of first feature
 	}
 
 	typedef SimpleFeatureIterator<PointCollection, PointFeatureReference> iterator;
@@ -35,7 +35,7 @@ public:
     	return const_iterator(*this, getFeatureCount());
     }
 
-	//starting index of individual features in the points vector, last entry indicates first index out of bounds of coordinates
+	//starting index of individual features in the coordinates vector, last entry indicates first index out of bounds of coordinates
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
 
@@ -71,6 +71,8 @@ public:
 
 protected:
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const;
+
+	virtual void validateSpecifics() const;
 
 private:
 	/*

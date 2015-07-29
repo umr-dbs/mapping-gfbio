@@ -105,6 +105,8 @@ void SimpleFeatureCollection::validate() const {
 		if (local_md_value.getVector(key).size() != fcount)
 			throw ArgumentException(concat("SimpleFeatureCollection: size of value attribute vector \"", key, "\" doesn't match feature count"));
 	}
+
+	validateSpecifics();
 }
 
 

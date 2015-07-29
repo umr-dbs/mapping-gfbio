@@ -86,18 +86,17 @@ void LineCollection::addCoordinate(double x, double y){
 	coordinates.push_back(Coordinate(x, y));
 }
 
-//TODO: check if line is valid
 size_t LineCollection::finishLine(){
-	if(start_line.back() >= coordinates.size()){
-		throw FeatureException("Tried to finish line with 0 coordinates");
+	if(coordinates.size() - start_line.back() < 2){
+		throw FeatureException("Tried to finish line with less than 2 coordinates");
 	}
 	start_line.push_back(coordinates.size());
 	return start_line.size() -2;
 }
 
 size_t LineCollection::finishFeature(){
-	if(start_feature.back() >= coordinates.size()){
-		throw FeatureException("Tried to finish feature with 0 coordinates");
+	if(start_line.size() == 1 || (start_feature.back() >= start_line.size())){
+		throw FeatureException("Tried to finish feature with 0 lines");
 	}
 
 	start_feature.push_back(start_line.size() - 1);
@@ -215,4 +214,12 @@ bool LineCollection::isSimple() const {
 
 SpatialReference LineCollection::getFeatureMBR(size_t featureIndex) const {
 	return getFeatureReference(featureIndex).getMBR();
+}
+
+void LineCollection::validateSpecifics() const {
+	if(start_line.back() != coordinates.size())
+		throw FeatureException("Line not finished");
+
+	if(start_feature.back() != start_line.size() - 1)
+		throw FeatureException("Feature not finished");
 }

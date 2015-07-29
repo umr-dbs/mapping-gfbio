@@ -433,3 +433,8 @@ std::string PointCollection::getAsString(){
 SpatialReference PointCollection::getFeatureMBR(size_t featureIndex) const{
 	return getFeatureReference(featureIndex).getMBR();
 }
+
+void PointCollection::validateSpecifics() const {
+	if(start_feature.back() != coordinates.size())
+		throw FeatureException("Feature not finished");
+}

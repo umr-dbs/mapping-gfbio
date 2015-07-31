@@ -212,10 +212,10 @@ void PolygonCollection::addCoordinate(double x, double y){
 }
 
 size_t PolygonCollection::finishRing(){
-	if(coordinates.size() - start_ring.back() < 4){
+	if(coordinates.size() < start_ring.back() + 4){
 		throw FeatureException("Tried to finish ring with less than 3 vertices (4 coordinates)");
 	}
-	if(!(coordinates[coordinates.size() - 1] == coordinates[start_ring.back()])){
+	if(!(coordinates[coordinates.size() - 1].almostEquals(coordinates[start_ring.back()]))){
 		throw FeatureException("Last coordinate of ring is not equal to the first one");
 	}
 

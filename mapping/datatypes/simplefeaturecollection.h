@@ -25,7 +25,7 @@ class Coordinate {
 		Coordinate(Coordinate &&p) = default;
 		Coordinate &operator=(Coordinate &&p) = default;
 
-		bool operator==(Coordinate& coordinate) const {
+		bool almostEquals(const Coordinate& coordinate) const {
 			return std::abs(x - coordinate.x) < std::numeric_limits<double>::epsilon() && std::abs(y - coordinate.y) < std::numeric_limits<double>::epsilon();
 		}
 

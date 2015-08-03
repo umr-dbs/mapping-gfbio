@@ -142,21 +142,23 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
 	if (rect.restype == QueryResolution::Type::NONE)
 		throw OperatorException("Cannot query a raster without specifying a desired resolution");
-	QueryProfiler profiler;
 	std::unique_ptr<GenericRaster> result;
 	{
-		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		try {
 			result = CacheManager::getInstance().query_raster(
 					*this,
 					rect);
 		} catch ( NoSuchElementException &nse ) {
-			result = getRaster(rect,profiler);
-			if ( CacheConfig::get_caching_strategy().do_cache(profiler) )
+			QueryProfiler profiler;
+			{
+				QueryProfilerRunningGuard guard(parent_profiler, profiler);
+				result = getRaster(rect,profiler);
+			}
+			if ( CacheConfig::get_caching_strategy().do_cache(profiler,result->getDataSize()) )
 				CacheManager::getInstance().put_raster(semantic_id,result);
 		}
 	}
-	d_profile(depth, type, "raster", profiler, result->getDataSize());
+	//d_profile(depth, type, "raster", profiler, result->getDataSize());
 
 	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
 		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));

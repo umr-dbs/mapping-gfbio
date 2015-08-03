@@ -19,6 +19,8 @@ class QueryProfiler {
 		// TODO: track GPU cost? Separately track things like Postgres queries?
 		// TODO: track cached costs separately?
 
+		unsigned int uncached_depth;
+
 		void startTimer();
 		void stopTimer();
 		void addGPUCost(double seconds);

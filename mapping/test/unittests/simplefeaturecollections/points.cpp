@@ -59,6 +59,17 @@ TEST(PointCollection, EmptyFeature) {
 	EXPECT_THROW(points.finishFeature(), FeatureException);
 }
 
+TEST(PointCollection, UnfinishedFeature){
+	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
+
+	points.addCoordinate(1, 2);
+
+	EXPECT_THROW(points.validate(), FeatureException);
+
+	points.finishFeature();
+	EXPECT_NO_THROW(points.validate());
+}
+
 //if this test fails, it could just mean the JSON format changed, not that it is invalid/wrong
 TEST(PointCollection, toGeoJSON) {
 	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
@@ -69,6 +80,14 @@ TEST(PointCollection, toGeoJSON) {
 	points.finishFeature();
 
 	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[1.000000,2.000000]]}},{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[2.000000,3.000000],[3.000000,4.000000]]}}]})";
+	EXPECT_EQ(expected, points.toGeoJSON(false));
+}
+
+//if this test fails, it could just mean the JSON format changed, not that it is invalid/wrong
+TEST(PointCollection, toGeoJSONEmptyCollection) {
+	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
+
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[]})";
 	EXPECT_EQ(expected, points.toGeoJSON(false));
 }
 
@@ -155,7 +174,10 @@ TEST(PointCollection, SimpletoARFF) {
 
 TEST(PointCollection, SimpletoARFFWithTime) {
 	//TODO: test missing metadata value
-	PointCollection points(SpatioTemporalReference::unreferenced());
+	TemporalReference tref(TIMETYPE_UNIX);
+	SpatioTemporalReference stref(SpatialReference::unreferenced(), tref);
+	PointCollection points(stref);//is there a better way to initialize?
+
 	points.local_md_value.addEmptyVector("test");
 	points.local_md_string.addEmptyVector("test2");
 

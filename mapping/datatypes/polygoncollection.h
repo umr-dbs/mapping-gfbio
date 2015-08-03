@@ -17,9 +17,9 @@ private:
 	template<typename C> class PolygonRingReference;
 public:
 	PolygonCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref){
-		start_feature.push_back(0); //end of first feature
-		start_polygon.push_back(0); //end of first polygon
-		start_ring.push_back(0); //end of first ring
+		start_feature.push_back(0); //start of first feature
+		start_polygon.push_back(0); //start of first polygon
+		start_ring.push_back(0); //start of first ring
 	}
 
 	typedef SimpleFeatureIterator<PolygonCollection, PolygonFeatureReference> iterator;
@@ -38,15 +38,15 @@ public:
     	return const_iterator(*this, getFeatureCount());
     }
 
-	//starting index of individual rings in the points vector, last entry indicates first index out of bounds of coordinates
+	//starting index of individual rings in the coordinates vector, last entry indicates first index out of bounds of coordinates
 	//thus iterating over rings has to stop at start_ring.size() -2
 	std::vector<uint32_t> start_ring;
 
-	//starting index of individual polygons in the startRing vector, last entry indicates first index out of bounds of start_ring
+	//starting index of individual polygons in the start_ring vector, last entry points to start_ring entry that marks the end of the very last ring
 	//thus iterating over polygons has to stop at start_polygon.size() -2
 	std::vector<uint32_t> start_polygon;
 
-	//starting index of individual Features in the startPolygon vector, last entry indicates first index out of bounds of start_polygon
+	//starting index of individual Features in the start_polygon vector, last entry points to start_polygon entry that marks the end of the very last polygon
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
 
@@ -86,6 +86,8 @@ public:
 
 protected:
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const;
+
+	virtual void validateSpecifics() const;
 
 private:
 
@@ -178,6 +180,10 @@ private:
 		    	return pc.start_polygon[idx+1] - pc.start_polygon[idx];
 		    }
 
+		    operator size_t() const {
+				return idx;
+			}
+
 			inline PolygonRingReference<PolygonCollection> getRingReference(size_t ringIndex){
 				if(ringIndex >= size())
 					throw ArgumentException("RingIndex >= Count");
@@ -240,6 +246,10 @@ private:
 		    	return pc.start_ring[idx+1] - pc.start_ring[idx];
 		    }
 
+		    operator size_t() const {
+				return idx;
+			}
+
 		    bool contains(Coordinate& coordinate) const {
 		    	return pc.pointInRing(coordinate, pc.start_ring[idx], pc.start_ring[idx+1]);
 		    }
@@ -253,6 +263,26 @@ private:
 			const size_t idx;
 	};
 
+	/**
+	 * This class should be used to test many points for containment in a PolygonCollection
+	 * on instantiation it performs pre-calculations in order to make tests faster
+	 * if the corresponding PolygonCollection is changed the results will be faulty
+	 */
+	class PointInCollectionBulkTester {
+	public:
+		PointInCollectionBulkTester(const PolygonCollection& polygonCollection);
+
+		bool pointInCollection(const Coordinate& coordinate) const;
+
+	private:
+		const PolygonCollection& polygonCollection;
+		std::vector<double> constants, multiples;
+
+		void performPrecalculation();
+		void precalculateRing(size_t coordinateIndexStart, size_t coordinateIndexStop);
+		bool pointInRing(const Coordinate& coordinate, size_t coordinateIndexStart, size_t coordinateIndexStop) const;
+	};
+
 public:
 	inline PolygonFeatureReference<PolygonCollection> getFeatureReference(size_t featureIndex){
 		if(featureIndex >= getFeatureCount())
@@ -264,6 +294,10 @@ public:
 		if(featureIndex >= getFeatureCount())
 			throw ArgumentException("FeatureIndex >= FeatureCount");
 		return PolygonFeatureReference<const PolygonCollection>(*this, featureIndex);
+	}
+
+	PointInCollectionBulkTester getPointInCollectionBulkTester() const {
+		return PointInCollectionBulkTester(*this);
 	}
 };
 

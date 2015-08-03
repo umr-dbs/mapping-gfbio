@@ -42,10 +42,11 @@ std::unique_ptr<PointCollection> FilterPointsByGeometry::getPointCollection(cons
 	size_t points_count = points->getFeatureCount();
 	std::vector<bool> keep(points_count, false);
 
-	//TODO: more efficient batch processing? (http://alienryderflex.com/polygon/)
+	auto tester = multiPolygons->getPointInCollectionBulkTester();
+
 	for(auto feature : *points){
 		for(auto& coordinate : feature){
-			if(multiPolygons->pointInCollection(coordinate)){
+			if(tester.pointInCollection(coordinate)){
 				keep[feature] = true;
 				break;
 			}

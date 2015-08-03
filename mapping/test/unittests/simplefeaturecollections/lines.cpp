@@ -26,6 +26,23 @@ TEST(LineCollection, GeosGeomConversion) {
 	EXPECT_EQ(2, geometry->getNumGeometries());
 }
 
+TEST(LineCollection, Invalid){
+	LineCollection lines = LineCollection(SpatioTemporalReference::unreferenced());
+
+	EXPECT_THROW(lines.finishLine(), FeatureException);
+	EXPECT_THROW(lines.finishFeature(), FeatureException);
+	EXPECT_NO_THROW(lines.validate());
+
+
+	lines.addCoordinate(1, 2);
+	EXPECT_THROW(lines.finishLine(), FeatureException);
+	lines.addCoordinate(2, 2);
+	lines.finishLine();
+	EXPECT_THROW(lines.validate(), FeatureException);
+	lines.finishFeature();
+	EXPECT_NO_THROW(lines.validate());
+}
+
 
 TEST(LineCollection, Iterators) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
@@ -73,6 +90,18 @@ TEST(LineCollection, Iterators) {
 
 	EXPECT_EQ(res_loop, res_iter);
 	EXPECT_EQ(res_loop, res_citer);
+}
+
+TEST(LineCollection, iterateEmptyCollection){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	size_t foo = 0;
+	for(auto feature : lines){
+		for(auto line : feature){
+			for(auto& coordinate : line){
+				foo += coordinate.x;
+			}
+		}
+	}
 }
 
 TEST(LineCollection, directReferenceAccess){
@@ -144,6 +173,70 @@ TEST(LineCollection, filter) {
 	EXPECT_DOUBLE_EQ(3.1, linesFiltered->local_md_value.get(1, "test"));
 }
 
+TEST(LineCollection, toGeoJSON){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	lines.local_md_value.addEmptyVector("test");
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_value.set(0, "test", 5.1);
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.finishLine();
+	lines.addCoordinate(2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_value.set(1, "test", 4.1);
+
+	lines.addDefaultTimestamps();
+
+	std::string expected = "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:1\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiLineString\",\"coordinates\":[[[1.000000,2.000000],[1.000000,3.000000]]]}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiLineString\",\"coordinates\":[[[1.000000,2.000000],[2.000000,3.000000]],[[2.000000,4.000000],[5.000000,6.000000]]]}}]}";
+
+	EXPECT_EQ(expected, lines.toGeoJSON(false));
+}
+
+TEST(LineCollection, toGeoJSONEmptyCollection){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+
+	std::string expected = "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:1\"}},\"features\":[]}";
+
+	EXPECT_EQ(expected, lines.toGeoJSON(false));
+}
+
+TEST(LineCollection, toGeoJSONMetadata){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	lines.local_md_string.addEmptyVector("test");
+	lines.local_md_value.addEmptyVector("test2");
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_string.set(0, "test", "test");
+	lines.local_md_value.set(0, "test2", 5.1);
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.finishLine();
+	lines.addCoordinate(2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.finishFeature();
+	lines.local_md_string.set(1, "test", "test123");
+	lines.local_md_value.set(1, "test2", 4.1);
+
+	lines.addDefaultTimestamps(0,1);
+
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[[[1.000000,2.000000],[1.000000,3.000000]]]},"properties":{"test":"test","test2":5.100000,"time_start":0.000000,"time_end":1.000000}},{"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[[[1.000000,2.000000],[2.000000,3.000000]],[[2.000000,4.000000],[5.000000,6.000000]]]},"properties":{"test":"test123","test2":4.100000,"time_start":0.000000,"time_end":1.000000}}]})";
+
+	EXPECT_EQ(expected, lines.toGeoJSON(true));
+}
+
+
 TEST(LineCollection, toWKT){
 	LineCollection lines(SpatioTemporalReference::unreferenced());
 	lines.local_md_value.addEmptyVector("test");
@@ -169,7 +262,10 @@ TEST(LineCollection, toWKT){
 
 TEST(LineCollection, toARFF){
 	//TODO: test missing metadata value
-	LineCollection lines(SpatioTemporalReference::unreferenced());
+	TemporalReference tref(TIMETYPE_UNIX);
+	SpatioTemporalReference stref(SpatialReference::unreferenced(), tref);
+	LineCollection lines(stref);//is there a better way to initialize?
+
 	lines.local_md_string.addEmptyVector("test");
 	lines.local_md_value.addEmptyVector("test2");
 

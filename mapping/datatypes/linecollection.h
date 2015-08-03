@@ -15,8 +15,8 @@ private:
 	template<typename C> class LineLineReference;
 public:
 	LineCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref) {
-		start_feature.push_back(0); //end of first feature
-		start_line.push_back(0); //end of first line
+		start_feature.push_back(0); //start of first feature
+		start_line.push_back(0); //start of first line
 	}
 
 	typedef SimpleFeatureIterator<LineCollection, LineFeatureReference> iterator;
@@ -35,11 +35,11 @@ public:
     	return const_iterator(*this, getFeatureCount());
     }
 
-	//starting index of individual lines in the points vector, last entry indicates first index out of bounds of coordinates
+	//starting index of individual lines in the coordinates vector, last entry indicates first index out of bounds of coordinates
 	//thus iterating over lines has to stop at start_line.size() -2
 	std::vector<uint32_t> start_line;
 
-	//starting index of individual features in the startElement vector, last entry indicates first index out of bounds of start_line
+	//starting index of individual features in the start_line vector, last entry points to start_line entry that marks the end of the last line
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
 
@@ -68,6 +68,8 @@ public:
 
 protected:
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const;
+
+	virtual void validateSpecifics() const;
 
 private:
 

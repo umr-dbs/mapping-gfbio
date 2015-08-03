@@ -10,7 +10,6 @@
 #include <iostream>
 #include <cmath>
 #include <limits>
-#include "boost/date_time/posix_time/posix_time.hpp"
 
 Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
@@ -106,6 +105,8 @@ void SimpleFeatureCollection::validate() const {
 		if (local_md_value.getVector(key).size() != fcount)
 			throw ArgumentException(concat("SimpleFeatureCollection: size of value attribute vector \"", key, "\" doesn't match feature count"));
 	}
+
+	validateSpecifics();
 }
 
 
@@ -121,7 +122,8 @@ std::string SimpleFeatureCollection::toWKT() const {
 		featureToWKT(i, wkt);
 		wkt << ",";
 	}
-	wkt.seekp(((long) wkt.tellp()) - 1); // delete last ,
+	if(getFeatureCount() > 0)
+		wkt.seekp(((long) wkt.tellp()) - 1); // delete last ,
 
 	wkt << ")";
 
@@ -163,8 +165,8 @@ std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 	for (size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex) {
 		arff << "\"" << featureToWKT(featureIndex) << "\"";
 		if (hasTime()){
-			arff << "," << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_start[featureIndex])) << "\"" << ","
-					 << "\"" << to_iso_extended_string(boost::posix_time::from_time_t(time_end[featureIndex])) << "\"";
+			arff << "," << "\"" << stref.toIsoString(time_start[featureIndex]) << "\"" << ","
+					 << "\"" << stref.toIsoString(time_end[featureIndex]) << "\"";
 		}
 
 		//TODO: handle missing metadata values

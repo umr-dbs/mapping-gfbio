@@ -3,8 +3,10 @@
 
 #include <vector>
 #include <string>
+#include <limits>
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/attributes.h"
+
 
 class Coordinate {
 	private:
@@ -22,6 +24,10 @@ class Coordinate {
 		// Move
 		Coordinate(Coordinate &&p) = default;
 		Coordinate &operator=(Coordinate &&p) = default;
+
+		bool operator==(Coordinate& coordinate) const {
+			return std::abs(x - coordinate.x) < std::numeric_limits<double>::epsilon() && std::abs(y - coordinate.y) < std::numeric_limits<double>::epsilon();
+		}
 
 		double x, y;
 
@@ -87,6 +93,8 @@ public:
 
 protected:
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const = 0;
+
+	virtual void validateSpecifics() const = 0;
 
 	//calculate the MBR of the coordinates in range from start to stop (exclusive)
 	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;

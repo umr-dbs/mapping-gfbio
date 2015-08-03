@@ -4,6 +4,7 @@
 #include "util/binarystream.h"
 #include "util/debug.h"
 
+#include "boost/date_time/posix_time/posix_time.hpp"
 #include <math.h>
 #include <limits>
 #include <sstream>
@@ -153,6 +154,18 @@ void TemporalReference::intersect(const TemporalReference &other) {
 	t2 = std::min(t2, other.t2);
 	if (t1 > t2)
 		throw ArgumentException("intersect(): both TemporalReferences do not intersect");
+}
+
+std::string TemporalReference::toIsoString(double time) const {
+	std::ostringstream result;
+
+	if(timetype == TIMETYPE_UNIX){
+		result << boost::posix_time::to_iso_extended_string(boost::posix_time::from_time_t(time));
+	} else {
+		throw ConverterException("can only convert UNIX timestamps");
+	}
+
+	return result.str();
 }
 
 

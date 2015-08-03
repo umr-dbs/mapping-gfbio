@@ -7,6 +7,7 @@
 
 #include "cache/index/querymanager.h"
 #include "cache/index/indexserver.h"
+#include "cache/common.h"
 #include "util/make_unique.h"
 
 
@@ -40,8 +41,10 @@ void QueryManager::add_raster_request(uint64_t client_id, const BaseRequest& req
 
 	// Check if a pending query may be extended by the given query
 	for ( auto &j : pending_jobs ) {
-		if ( j->extend(req) )
+		if ( j->extend(req) ) {
+			j->add_client(client_id);
 			return;
+		}
 	}
 
 
@@ -97,13 +100,18 @@ void QueryManager::schedule_pending_jobs(
 	}
 }
 
-unsigned int QueryManager::get_query_count(uint64_t worker_id) {
-	return queries.at(worker_id).get_clients().size();
+
+size_t QueryManager::close_worker(uint64_t worker_id) {
+	finished_queries.emplace(worker_id, queries.at(worker_id));
+	queries.erase(worker_id);
+	return finished_queries.at(worker_id).get_clients().size();
 }
 
+
+
 std::vector<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
-	std::vector<uint64_t> clients = queries.at(worker_id).get_clients();
-	queries.erase(worker_id);
+	std::vector<uint64_t> clients = finished_queries.at(worker_id).get_clients();
+	finished_queries.erase(worker_id);
 	return clients;
 }
 
@@ -196,7 +204,7 @@ bool CreateJob::extend(const BaseRequest& req) {
 			query = QueryRectangle( sref, orig_query, orig_query );
 			return true;
 		}
-		else if ( orig_query.restype == QueryResolution::Type::PIXELS ) {
+		else if ( orig_query.restype == QueryResolution::Type::PIXELS && narea / orig_area <= 4 ) {
 			// Check resolution
 			double my_xres = (orig_query.x2-orig_query.x1) / orig_query.xres;
 			double my_yres = (orig_query.y2-orig_query.y1) / orig_query.yres;
@@ -212,6 +220,7 @@ bool CreateJob::extend(const BaseRequest& req) {
 
 				SpatialReference sref( orig_query.epsg,nx1,ny1,nx2,ny2 );
 				query = QueryRectangle( sref, orig_query, QueryResolution::pixels(nxres,nyres) );
+				request.reset( new BaseRequest(semantic_id,query) );
 				return true;
 			}
 		}

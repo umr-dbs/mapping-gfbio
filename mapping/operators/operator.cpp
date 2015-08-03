@@ -6,6 +6,7 @@
 
 #include "operators/operator.h"
 #include "cache/manager.h"
+#include "cache/config/cache_config.h"
 
 
 #include <unordered_map>
@@ -151,7 +152,8 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 					rect);
 		} catch ( NoSuchElementException &nse ) {
 			result = getRaster(rect,profiler);
-			CacheManager::getInstance().put_raster(semantic_id,result);
+			if ( CacheConfig::get_caching_strategy().do_cache(profiler) )
+				CacheManager::getInstance().put_raster(semantic_id,result);
 		}
 	}
 	d_profile(depth, type, "raster", profiler, result->getDataSize());

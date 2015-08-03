@@ -318,7 +318,7 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 				}
 				case WorkerConnection::State::DONE: {
 					Log::debug("Worker returned result. Determinig delivery qty.");
-					unsigned int qty = query_manager.get_query_count( wc.id );
+					size_t qty = query_manager.close_worker( wc.id );
 					wc.send_delivery_qty(qty);
 					break;
 				}

@@ -52,7 +52,7 @@ OBJ_OPERATORS_COMMON=o/operators/operator.o o/operators/queryrectangle.o o/opera
 OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALL}
 OBJ_OPERATORS_STUBS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALLSTUBS}
 
-OBJ_CACHE_COMMON=o/cache/common.o o/cache/cache.o o/cache/manager.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/types.o o/cache/priv/redistribution.o
+OBJ_CACHE_COMMON=o/cache/common.o o/cache/cache.o o/cache/manager.o o/cache/config/cache_config.o o/cache/config/caching_strategy.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/types.o o/cache/priv/redistribution.o
 OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 
 #

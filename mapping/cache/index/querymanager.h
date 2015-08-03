@@ -41,7 +41,7 @@ public:
 	virtual uint64_t  schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
 protected:
 	JobDescription( uint64_t client_id, std::unique_ptr<BaseRequest> request );
-	const std::unique_ptr<BaseRequest> request;
+	std::unique_ptr<BaseRequest> request;
 
 };
 
@@ -84,14 +84,19 @@ public:
 
 	void schedule_pending_jobs( const std::map<uint64_t, std::unique_ptr<WorkerConnection>> &worker_connections );
 
-	unsigned int get_query_count( uint64_t worker_id );
+	// closes this worker -- no requests will be accepted
+	// Returns the number of clients waiting for its response
+	size_t close_worker( uint64_t worker_id );
 
+	// releases this worker -- returns the clients waiting for its response
+	// worker MUST be closed before
 	std::vector<uint64_t> release_worker( uint64_t worker_id );
 
 private:
 	const RasterRefCache &raster_cache;
 	const std::map<uint32_t,std::shared_ptr<Node>> &nodes;
 	std::unordered_map<uint64_t,QueryInfo> queries;
+	std::unordered_map<uint64_t,QueryInfo> finished_queries;
 	std::vector<std::unique_ptr<JobDescription>> pending_jobs;
 };
 

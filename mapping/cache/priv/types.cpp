@@ -109,8 +109,13 @@ void STEntryBounds::toStream(BinaryStream& stream) const {
 }
 
 bool STEntryBounds::matches(const QueryRectangle& spec) const {
-	return (spec.epsg == epsg && spec.x1 >= x1 && spec.x2 <= x2 && spec.y1 >= y1 && spec.y2 <= y2
-			&& spec.t1 >= t1 && spec.t2 <= t2);
+	return ( spec.epsg == epsg &&
+			 spec.x1 >= x1 &&
+			 spec.x2 <= x2 &&
+			 spec.y1 >= y1 &&
+			 spec.y2 <= y2 &&
+			 spec.t1 >= t1 &&
+			 spec.t2 <= t2);
 }
 
 double STEntryBounds::get_coverage( const QueryRectangle &query ) const {

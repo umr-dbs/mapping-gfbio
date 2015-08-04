@@ -36,6 +36,8 @@ public:
 	const std::string host;
 	// The port for delivery connections on this node
 	const uint32_t port;
+
+	uint64_t control_connection;
 };
 
 //

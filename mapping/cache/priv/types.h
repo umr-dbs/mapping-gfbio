@@ -111,16 +111,17 @@ public:
 // The cache_id is the entry_id part of the corresponding STCacheKey
 class STRasterRef {
 public:
-	STRasterRef( uint32_t node_id, uint64_t cache_id, const STRasterEntryBounds &bounds );
+	STRasterRef( uint32_t node_id, uint64_t cache_id, uint64_t size, const STRasterEntryBounds &bounds );
 	uint32_t node_id;
 	uint64_t cache_id;
+	uint64_t size;
 	const STRasterEntryBounds bounds;
 };
 
 class STRasterRefKeyed : public STRasterRef {
 public:
-	STRasterRefKeyed( uint32_t node_id, const std::string &semantic_id, uint64_t cache_id, const STRasterEntryBounds &bounds );
-	STRasterRefKeyed( uint32_t node_id, const STCacheKey &key, const STRasterEntryBounds &bounds );
+	STRasterRefKeyed( uint32_t node_id, const std::string &semantic_id, uint64_t cache_id, uint64_t size, const STRasterEntryBounds &bounds );
+	STRasterRefKeyed( uint32_t node_id, const STCacheKey &key, uint64_t size, const STRasterEntryBounds &bounds );
 	const std::string semantic_id;
 };
 

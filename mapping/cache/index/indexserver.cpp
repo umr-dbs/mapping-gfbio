@@ -6,6 +6,7 @@
  */
 
 #include "cache/index/indexserver.h"
+#include "cache/config/cache_config.h"
 #include "util/make_unique.h"
 #include "util/concat.h"
 
@@ -30,7 +31,7 @@
 ////////////////////////////////////////////////////////////
 
 Node::Node(uint32_t id, const std::string &host, uint32_t port) :
-	id(id), host(host), port(port) {
+	id(id), host(host), port(port), control_connection(-1) {
 }
 
 ////////////////////////////////////////////////////////////
@@ -98,7 +99,17 @@ void IndexServer::run() {
 				}
 			}
 		}
+		// Schedule Jobs
 		query_manager.schedule_pending_jobs(worker_connections);
+
+		// Reorganize
+		if ( CacheConfig::get_reorg_strategy().requires_reorg( nodes ) ) {
+			auto descs = CacheConfig::get_reorg_strategy().reorganize(nodes, raster_cache);
+			for ( auto &d : descs ) {
+				auto &cc = control_connections.at( nodes.at(d.node_id)->control_connection );
+				cc->send_reorg( d );
+			}
+		}
 	}
 	close(listen_socket);
 	Log::info("Index-Server done.");
@@ -191,6 +202,7 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 						s.read(&port);
 						std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, host, port);
 						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(us, node);
+						node->control_connection = cc->id;
 						Log::info("New node registered. ID: %d, control-connected fd: %d", node->id,
 							cc->get_read_fd());
 						control_connections.emplace(cc->id, std::move(cc));
@@ -339,7 +351,7 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 					Log::debug("Worker added new raster-entry");
 					auto &ref = wc.get_new_raster_entry();
 					std::unique_ptr<STRasterRef> entry = make_unique<STRasterRef>(ref.node_id,
-						ref.cache_id, ref.bounds);
+						ref.cache_id, ref.size, ref.bounds);
 					raster_cache.put(ref.semantic_id, entry);
 					wc.raster_cached();
 					break;

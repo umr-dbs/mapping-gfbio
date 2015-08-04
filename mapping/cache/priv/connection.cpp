@@ -180,11 +180,13 @@ void WorkerConnection::process_command(uint8_t cmd) {
 			break;
 		}
 		case RESP_NEW_RASTER_CACHE_ENTRY: {
+			uint64_t size;
 			STCacheKey key(stream);
 			STRasterEntryBounds cube(stream);
-			Log::debug("Worker returned new result to raster-cache, key: %s:%d", key.semantic_id.c_str(),
+			stream.read(&size);
+			Log::debug("Worker returned new result to raster-cache (%d bytes), key: %s:%d", size, key.semantic_id.c_str(),
 				key.entry_id);
-			new_raster_entry.reset(new STRasterRefKeyed(node->id, key, cube));
+			new_raster_entry.reset(new STRasterRefKeyed(node->id, key, size, cube));
 			state = State::NEW_RASTER_ENTRY;
 			break;
 		}

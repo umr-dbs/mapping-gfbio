@@ -521,6 +521,19 @@ STQueryResult STCache<EType>::query(const std::string& semantic_id, const QueryR
 	}
 }
 
+template<typename EType>
+size_t STCache<EType>::get_entry_size(const STCacheKey& key) const {
+	return get_entry_size(key.semantic_id, key.entry_id);
+}
+
+template<typename EType>
+size_t STCache<EType>::get_entry_size(const std::string& semantic_id, uint64_t id) const {
+	STCacheStructure<EType> *s = get_structure(semantic_id);
+	if ( s != nullptr )
+		return s->get_entry_size(id);
+	throw NoSuchElementException(concat("No entry found for key: ", semantic_id, ":", id));
+}
+
 ///////////////////////////////////////////////////////////////////
 //
 // RASTER CACHE-IMPLEMENTATION

@@ -119,6 +119,10 @@ public:
 	STQueryResult query( const std::string &semantic_id, const QueryRectangle &qr ) const;
 
 
+	size_t get_entry_size( const STCacheKey &key ) const;
+
+	size_t get_entry_size( const std::string &semantic_id, uint64_t id ) const;
+
 	// Returns the maximum size (in bytes) this cache may hold
 	size_t get_max_size() const { return max_size; }
 	// Returns the current size (in bytes) of all entries stored in the cache

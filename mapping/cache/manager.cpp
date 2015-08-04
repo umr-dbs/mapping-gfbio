@@ -329,10 +329,13 @@ void RemoteCacheManager::put_raster(const std::string& semantic_id,
 
 	BinaryStream &stream = *remote_connection;
 
+	uint64_t size = local_cache.get_entry_size(id);
+
 	Log::debug("Adding raster to remote cache.");
 	stream.write(WorkerConnection::RESP_NEW_RASTER_CACHE_ENTRY);
 	id.toStream(stream);
 	cube.toStream(stream);
+	stream.write(size);
 	Log::debug("Finished adding raster to cache.");
 	// TODO: Do we need a confirmation?
 }

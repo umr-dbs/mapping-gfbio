@@ -12,6 +12,7 @@
 
 #include <vector>
 
+
 class ReorgResult {
 public:
 	enum class Type : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT };
@@ -64,6 +65,5 @@ private:
 	std::vector<ReorgItem> items;
 
 };
-
 
 #endif /* REDISTRIBUTION_H_ */

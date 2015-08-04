@@ -73,4 +73,3 @@ void ReorgDescription::toStream(BinaryStream& stream) const {
 	for ( auto &item : items )
 		item.toStream( stream );
 }
-

@@ -96,7 +96,7 @@ void DeliveryManager::run() {
 				stream.read(&magic);
 				if (magic == DeliveryConnection::MAGIC_NUMBER) {
 					std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(socket);
-					Log::info("New delivery-connection created on fd: %d", *fd_it);
+					Log::debug("New delivery-connection created on fd: %d", *fd_it);
 					connections.push_back(std::move(dc));
 				}
 				else {

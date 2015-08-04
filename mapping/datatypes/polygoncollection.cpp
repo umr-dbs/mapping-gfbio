@@ -211,17 +211,20 @@ void PolygonCollection::addCoordinate(double x, double y){
 	coordinates.push_back(Coordinate(x, y));
 }
 
-//TODO: check that ring is closed
 size_t PolygonCollection::finishRing(){
-	if(start_ring.back() >= coordinates.size()){
-		throw FeatureException("Tried to finish ring with 0 coordinates");
+	if(coordinates.size() - start_ring.back() < 4){
+		throw FeatureException("Tried to finish ring with less than 3 vertices (4 coordinates)");
 	}
+	if(!(coordinates[coordinates.size() - 1] == coordinates[start_ring.back()])){
+		throw FeatureException("Last coordinate of ring is not equal to the first one");
+	}
+
 	start_ring.push_back(coordinates.size());
 	return start_ring.size() -2;
 }
 
 size_t PolygonCollection::finishPolygon(){
-	if(start_polygon.back() >= start_ring.size()){
+	if(start_ring.size() == 1 || start_polygon.back() >= start_ring.size()){
 		throw FeatureException("Tried to finish polygon with 0 rings");
 	}
 	start_polygon.push_back(start_ring.size() - 1);
@@ -229,7 +232,7 @@ size_t PolygonCollection::finishPolygon(){
 }
 
 size_t PolygonCollection::finishFeature(){
-	if(start_feature.back() >= start_polygon.size()){
+	if(start_polygon.size() == 1 || start_feature.back() >= start_polygon.size()){
 		throw FeatureException("Tried to finish feature with 0 polygons");
 	}
 	start_feature.push_back(start_polygon.size() - 1);
@@ -397,5 +400,14 @@ bool PolygonCollection::PointInCollectionBulkTester::pointInCollection(const Coo
 	return false;
 }
 
+void PolygonCollection::validateSpecifics() const {
+	if(start_ring.back() != coordinates.size())
+		throw FeatureException("Ring not finished");
 
+	if(start_polygon.back() != start_ring.size() - 1)
+		throw FeatureException("Polygon not finished");
+
+	if(start_feature.back() != start_polygon.size() - 1)
+		throw FeatureException("Feature not finished");
+}
 

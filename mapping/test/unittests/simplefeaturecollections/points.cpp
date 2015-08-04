@@ -59,6 +59,17 @@ TEST(PointCollection, EmptyFeature) {
 	EXPECT_THROW(points.finishFeature(), FeatureException);
 }
 
+TEST(PointCollection, UnfinishedFeature){
+	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
+
+	points.addCoordinate(1, 2);
+
+	EXPECT_THROW(points.validate(), FeatureException);
+
+	points.finishFeature();
+	EXPECT_NO_THROW(points.validate());
+}
+
 //if this test fails, it could just mean the JSON format changed, not that it is invalid/wrong
 TEST(PointCollection, toGeoJSON) {
 	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());

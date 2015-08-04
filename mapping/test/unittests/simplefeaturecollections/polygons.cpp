@@ -16,6 +16,7 @@ TEST(PolygonCollection, AddSinglePolygonFeature) {
 
 	polygons.addCoordinate(1, 2);
 	polygons.addCoordinate(2, 3);
+	polygons.addCoordinate(2, 4);
 	polygons.addCoordinate(1, 2);
 	polygons.finishRing();
 	polygons.finishPolygon();
@@ -24,8 +25,37 @@ TEST(PolygonCollection, AddSinglePolygonFeature) {
 	EXPECT_EQ(1, polygons.getFeatureCount());
 	EXPECT_EQ(2, polygons.start_polygon.size());
 	EXPECT_EQ(2, polygons.start_ring.size());
-	EXPECT_EQ(3, polygons.coordinates.size());
+	EXPECT_EQ(4, polygons.coordinates.size());
 }
+
+TEST(PolygonCollection, Invalid) {
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	EXPECT_THROW(polygons.finishRing(), FeatureException);
+	EXPECT_THROW(polygons.finishPolygon(), FeatureException);
+	EXPECT_THROW(polygons.finishFeature(), FeatureException);
+	EXPECT_NO_THROW(polygons.validate());
+
+	polygons.addCoordinate(1, 2);
+	EXPECT_THROW(polygons.finishRing(), FeatureException);
+	polygons.addCoordinate(1, 3);
+	EXPECT_THROW(polygons.finishRing(), FeatureException);
+	polygons.addCoordinate(2, 3);
+	EXPECT_THROW(polygons.finishRing(), FeatureException);
+	polygons.addCoordinate(2, 4);
+	EXPECT_THROW(polygons.finishRing(), FeatureException);
+	polygons.addCoordinate(1, 2);
+	EXPECT_NO_THROW(polygons.finishRing());
+
+	EXPECT_THROW(polygons.validate(), FeatureException);
+	EXPECT_THROW(polygons.finishFeature(), FeatureException);
+
+	EXPECT_NO_THROW(polygons.finishPolygon());
+	EXPECT_NO_THROW(polygons.finishFeature());
+
+	EXPECT_NO_THROW(polygons.validate());
+}
+
 
 TEST(PolygonCollection, Iterators) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
@@ -34,6 +64,7 @@ TEST(PolygonCollection, Iterators) {
 			for (int r=0;r<=f%4;r++) {
 				for (int c=0;c<10;c++)
 					polygons.addCoordinate(f+p+r, c);
+				polygons.addCoordinate(f+p+r,0);
 				polygons.finishRing();
 			}
 			polygons.finishPolygon();
@@ -343,9 +374,10 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 
 TEST(PolygonCollection, toARFF) {
 	//TODO: test missing metadata value
-	TemporalReference tref(TIMETYPE_UNIX);
-	SpatioTemporalReference stref(SpatialReference::unreferenced(), tref);
-	PolygonCollection polygons(stref);//is there a better way to initialize?
+	PolygonCollection polygons(SpatioTemporalReference(
+		SpatialReference::unreferenced(),
+		TemporalReference(TIMETYPE_UNIX)
+	));
 
 	polygons.local_md_string.addEmptyVector("test");
 	polygons.local_md_value.addEmptyVector("test2");

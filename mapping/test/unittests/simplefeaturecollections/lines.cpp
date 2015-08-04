@@ -26,6 +26,23 @@ TEST(LineCollection, GeosGeomConversion) {
 	EXPECT_EQ(2, geometry->getNumGeometries());
 }
 
+TEST(LineCollection, Invalid){
+	LineCollection lines = LineCollection(SpatioTemporalReference::unreferenced());
+
+	EXPECT_THROW(lines.finishLine(), FeatureException);
+	EXPECT_THROW(lines.finishFeature(), FeatureException);
+	EXPECT_NO_THROW(lines.validate());
+
+
+	lines.addCoordinate(1, 2);
+	EXPECT_THROW(lines.finishLine(), FeatureException);
+	lines.addCoordinate(2, 2);
+	lines.finishLine();
+	EXPECT_THROW(lines.validate(), FeatureException);
+	lines.finishFeature();
+	EXPECT_NO_THROW(lines.validate());
+}
+
 
 TEST(LineCollection, Iterators) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
@@ -73,6 +90,18 @@ TEST(LineCollection, Iterators) {
 
 	EXPECT_EQ(res_loop, res_iter);
 	EXPECT_EQ(res_loop, res_citer);
+}
+
+TEST(LineCollection, iterateEmptyCollection){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	size_t foo = 0;
+	for(auto feature : lines){
+		for(auto line : feature){
+			for(auto& coordinate : line){
+				foo += coordinate.x;
+			}
+		}
+	}
 }
 
 TEST(LineCollection, directReferenceAccess){

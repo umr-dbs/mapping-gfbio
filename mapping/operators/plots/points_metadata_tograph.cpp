@@ -39,7 +39,7 @@ PointsMetadataToGraph::PointsMetadataToGraph(int sourcecounts[], GenericOperator
 	}
 
 	if(attributeNames.size() < 2) {
-		throw ArgumentException("PointsMetadataToGraph: There must not more than 1 argument.");
+		throw ArgumentException("PointsMetadataToGraph: There must be more than 1 argument.");
 	}
 	if(attributeNames.size() > 3) {
 		throw ArgumentException("PointsMetadataToGraph: There must not be more than 3 arguments.");

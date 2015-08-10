@@ -8,7 +8,6 @@
 #ifndef DELIVERY_H_
 #define DELIVERY_H_
 
-#include "cache/priv/types.h"
 #include "cache/priv/connection.h"
 #include "operators/operator.h"
 
@@ -19,12 +18,38 @@
 #include <map>
 
 //
+// Represents to to deliver response
+// Holds the item itself, a counter representing
+// the number of times this may be sent as well
+// as a timestamp representing its expiration-time.
+//
+class Delivery {
+private:
+	enum class Type { RASTER };
+public:
+	Delivery( uint64_t id, unsigned int count, std::unique_ptr<GenericRaster> raster );
+
+	Delivery( const Delivery &d ) = delete;
+	Delivery( Delivery &&d );
+
+	Delivery& operator=(const Delivery &d) = delete;
+	Delivery& operator=(Delivery &&d) = delete;
+
+	const uint64_t id;
+	const time_t creation_time;
+	unsigned int count;
+	void send( DeliveryConnection &connection );
+private:
+	Type type;
+	std::unique_ptr<GenericRaster> raster;
+};
+
+//
 // Outsourced delivery-part of the node server-
 // Currently single threaded. Waits for incomming
 // connections and delivers the requested delivery-id
 // (if valid).
 //
-// TODO: Add timeout to deliveries -- easy peasy
 class DeliveryManager {
 	friend class std::thread;
 	friend class DeliveryConnection;
@@ -37,7 +62,7 @@ public:
 	// The returned id must be used by clients fetching
 	// the stored result.
 	//
-	uint64_t add_raster_delivery(std::unique_ptr<GenericRaster> &result, unsigned int count = 1);
+	uint64_t add_raster_delivery(std::unique_ptr<GenericRaster> result, unsigned int count = 1);
 	// Fires up the delivery-manager and will return after
 	// stop() is invoked by another thread
 	void run();

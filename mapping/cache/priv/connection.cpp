@@ -12,7 +12,7 @@
 #include "util/make_unique.h"
 #include "util/concat.h"
 
-BaseConnection::BaseConnection(std::unique_ptr<UnixSocket>& socket) :
+BaseConnection::BaseConnection(std::unique_ptr<UnixSocket> socket) :
 	id(next_id++), stream(*socket), faulty(false), socket(std::move(socket)) {
 }
 
@@ -51,8 +51,8 @@ uint64_t BaseConnection::next_id = 1;
 //
 /////////////////////////////////////////////////
 
-ClientConnection::ClientConnection(std::unique_ptr<UnixSocket>& socket) :
-	BaseConnection(socket), state(State::IDLE), request_type(RequestType::NONE) {
+ClientConnection::ClientConnection(std::unique_ptr<UnixSocket> socket) :
+	BaseConnection(std::move(socket)), state(State::IDLE), request_type(RequestType::NONE) {
 }
 
 ClientConnection::~ClientConnection() {
@@ -141,8 +141,8 @@ const uint8_t ClientConnection::RESP_ERROR;
 //
 /////////////////////////////////////////////////
 
-WorkerConnection::WorkerConnection(std::unique_ptr<UnixSocket> &socket, const std::shared_ptr<Node> &node) :
-	BaseConnection(socket), node(node), state(State::IDLE) {
+WorkerConnection::WorkerConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node) :
+	BaseConnection(std::move(socket)), node(node), state(State::IDLE) {
 }
 
 WorkerConnection::~WorkerConnection() {
@@ -180,13 +180,8 @@ void WorkerConnection::process_command(uint8_t cmd) {
 			break;
 		}
 		case RESP_NEW_RASTER_CACHE_ENTRY: {
-			uint64_t size;
-			STCacheKey key(stream);
-			STRasterEntryBounds cube(stream);
-			stream.read(&size);
-			Log::debug("Worker returned new result to raster-cache (%d bytes), key: %s:%d", size, key.semantic_id.c_str(),
-				key.entry_id);
-			new_raster_entry.reset(new STRasterRefKeyed(node->id, key, size, cube));
+			new_raster_entry.reset(new NodeCacheRef(stream));
+			Log::debug("Worker returned new result to raster-cache: %s", new_raster_entry->to_string().c_str());
 			state = State::NEW_RASTER_ENTRY;
 			break;
 		}
@@ -296,7 +291,7 @@ void WorkerConnection::release() {
 // GETTER
 //
 
-const STRasterRefKeyed& WorkerConnection::get_new_raster_entry() const {
+const NodeCacheRef& WorkerConnection::get_new_raster_entry() const {
 	if (state == State::NEW_RASTER_ENTRY)
 		return *new_raster_entry;
 	throw IllegalStateException("Can only return new raster entry in state NEW_RASTER_ENTRY");
@@ -348,8 +343,8 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 //
 /////////////////////////////////////////////////
 
-ControlConnection::ControlConnection(std::unique_ptr<UnixSocket>& socket, const std::shared_ptr<Node> &node) :
-	BaseConnection(socket), node(node), state(State::IDLE) {
+ControlConnection::ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node) :
+	BaseConnection(std::move(socket)), node(node), state(State::IDLE) {
 	try {
 		stream.write(RESP_HELLO);
 		stream.write(node->id);
@@ -457,8 +452,8 @@ const uint8_t ControlConnection::CMD_REORG_ITEM_MOVED;
 //
 /////////////////////////////////////////////////
 
-DeliveryConnection::DeliveryConnection(std::unique_ptr<UnixSocket>& socket) :
-	BaseConnection(socket), state(State::IDLE), delivery_id(0), cache_key("", 0) {
+DeliveryConnection::DeliveryConnection(std::unique_ptr<UnixSocket> socket) :
+	BaseConnection(std::move(socket)), state(State::IDLE), delivery_id(0), cache_key("", 0) {
 }
 
 DeliveryConnection::~DeliveryConnection() {
@@ -475,12 +470,12 @@ void DeliveryConnection::process_command(uint8_t cmd) {
 			break;
 		}
 		case CMD_GET_CACHED_RASTER: {
-			cache_key = STCacheKey(stream);
+			cache_key = NodeCacheKey(stream);
 			state = State::RASTER_CACHE_REQUEST_READ;
 			break;
 		}
 		case CMD_MOVE_RASTER: {
-			cache_key = STCacheKey(stream);
+			cache_key = NodeCacheKey(stream);
 			state = State::RASTER_MOVE_REQUEST_READ;
 			break;
 		}
@@ -498,7 +493,7 @@ DeliveryConnection::State DeliveryConnection::get_state() const {
 	return state;
 }
 
-const STCacheKey& DeliveryConnection::get_key() const {
+const NodeCacheKey& DeliveryConnection::get_key() const {
 	if (state == State::RASTER_CACHE_REQUEST_READ ||
 		state == State::RASTER_MOVE_REQUEST_READ ||
 		state == State::AWAITING_MOVE_CONFIRM ||

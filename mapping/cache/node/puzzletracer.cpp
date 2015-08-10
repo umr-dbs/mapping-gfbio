@@ -1,12 +1,6 @@
-/*
- * trace.cpp
- *
- *  Created on: 16.06.2015
- *      Author: mika
- */
-
-#include <cache/common.h>
+#include "cache/common.h"
 #include "cache/node/puzzletracer.h"
+
 #include <sstream>
 
 

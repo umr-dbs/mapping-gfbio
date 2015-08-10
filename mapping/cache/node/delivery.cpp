@@ -13,6 +13,28 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 
+Delivery::Delivery(uint64_t id, unsigned int count, std::unique_ptr<GenericRaster> raster) :
+	id(id), creation_time(time(0)), count(count), type(Type::RASTER), raster(std::move(raster)) {
+}
+
+void Delivery::send(DeliveryConnection& connection) {
+	count--;
+	switch ( type ) {
+		case Type::RASTER: {
+			connection.send_raster( *raster );
+			break;
+		}
+		default: {
+			Log::error("Currently only raster supported");
+		}
+	}
+}
+
+Delivery::Delivery(Delivery&& d) :
+	id(d.id), creation_time(d.creation_time),
+	count(d.count), type(d.type), raster(std::move(d.raster)) {
+}
+
 ////////////////////////////////////////////////////////////
 //
 // DELIVERY MANAGER
@@ -23,10 +45,10 @@ DeliveryManager::DeliveryManager(uint32_t listen_port) :
 	shutdown(false), listen_port(listen_port), delivery_id(1) {
 }
 
-uint64_t DeliveryManager::add_raster_delivery(std::unique_ptr<GenericRaster>& result, unsigned int count) {
+uint64_t DeliveryManager::add_raster_delivery(std::unique_ptr<GenericRaster> result, unsigned int count) {
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
 	uint64_t res = delivery_id++;
-	deliveries.emplace(res, Delivery(res,count,result) );
+	deliveries.emplace(res, Delivery(res,count,std::move(result)) );
 	Log::trace("Added delivery with id: %d", res);
 	return res;
 }
@@ -95,7 +117,7 @@ void DeliveryManager::run() {
 				uint32_t magic;
 				stream.read(&magic);
 				if (magic == DeliveryConnection::MAGIC_NUMBER) {
-					std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(socket);
+					std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(std::move(socket));
 					Log::debug("New delivery-connection created on fd: %d", *fd_it);
 					connections.push_back(std::move(dc));
 				}

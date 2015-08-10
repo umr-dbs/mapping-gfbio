@@ -9,7 +9,7 @@
 #define CONNECTION_H_
 
 #include "util/binarystream.h"
-#include "cache/cache.h"
+#include "cache/node/node_cache.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
 
@@ -20,7 +20,7 @@ class Node;
 
 class BaseConnection {
 public:
-	BaseConnection(std::unique_ptr<UnixSocket> &socket);
+	BaseConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~BaseConnection();
 	int get_read_fd();
 	const uint64_t id;
@@ -64,7 +64,7 @@ public:
 	// message:string -- a description of the error
 	static const uint8_t RESP_ERROR = 19;
 
-	ClientConnection(std::unique_ptr<UnixSocket> &socket);
+	ClientConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~ClientConnection();
 
 	State get_state() const;
@@ -171,7 +171,7 @@ public:
 	// message:string -- a description of the error
 	static const uint8_t RESP_ERROR = 39;
 
-	WorkerConnection(std::unique_ptr<UnixSocket> &socket, const std::shared_ptr<Node> &node);
+	WorkerConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
 	virtual ~WorkerConnection();
 
 	State get_state() const;
@@ -184,7 +184,7 @@ public:
 	void send_delivery_qty(uint32_t qty);
 	void release();
 
-	const STRasterRefKeyed& get_new_raster_entry() const;
+	const NodeCacheRef& get_new_raster_entry() const;
 	const BaseRequest& get_raster_query() const;
 
 	const DeliveryResponse &get_result() const;
@@ -200,7 +200,7 @@ private:
 
 	State state;
 	std::unique_ptr<DeliveryResponse> result;
-	std::unique_ptr<STRasterRefKeyed> new_raster_entry;
+	std::unique_ptr<NodeCacheRef> new_raster_entry;
 	std::unique_ptr<BaseRequest> raster_query;
 	std::string error_msg;
 };
@@ -253,7 +253,7 @@ public:
 
 	const ReorgResult& get_result();
 
-	ControlConnection(std::unique_ptr<UnixSocket> &socket, const std::shared_ptr<Node> &node);
+	ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
 	virtual ~ControlConnection();
 	const std::shared_ptr<Node> node;
 
@@ -320,12 +320,12 @@ public:
 	//
 	static const uint8_t RESP_ERROR = 80;
 
-	DeliveryConnection(std::unique_ptr<UnixSocket> &socket);
+	DeliveryConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~DeliveryConnection();
 
 	State get_state() const;
 
-	const STCacheKey& get_key() const;
+	const NodeCacheKey& get_key() const;
 
 	uint64_t get_delivery_id() const;
 
@@ -343,7 +343,7 @@ protected:
 private:
 	State state;
 	uint64_t delivery_id;
-	STCacheKey cache_key;
+	NodeCacheKey cache_key;
 };
 
 #endif /* CONNECTION_H_ */

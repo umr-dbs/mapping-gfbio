@@ -105,5 +105,5 @@ void Log::log(LogLevel level, const char *msg, va_list vargs) {
 void Log::log(LogLevel level, const char *msg, ...) {}
 #endif
 
-Log::LogLevel Log::level = LogLevel::DEBUG;
+Log::LogLevel Log::level = LogLevel::INFO;
 FILE* Log::fd = stderr;

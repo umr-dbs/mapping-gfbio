@@ -52,7 +52,7 @@ OBJ_OPERATORS_COMMON=o/operators/operator.o o/operators/queryrectangle.o o/opera
 OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALL}
 OBJ_OPERATORS_STUBS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALLSTUBS}
 
-OBJ_CACHE_COMMON=o/cache/common.o o/cache/cache.o o/cache/manager.o o/cache/config/cache_config.o o/cache/config/caching_strategy.o o/cache/config/reorg_strategy.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/types.o o/cache/priv/redistribution.o
+OBJ_CACHE_COMMON=o/cache/common.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/redistribution.o o/cache/priv/cache_stats.o o/cache/priv/cache_structure.o o/cache/node/node_cache.o o/cache/manager.o o/cache/priv/caching_strategy.o
 OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 
 #
@@ -89,7 +89,7 @@ ${EXECGI}:	o/cgi.o o/cache/client.o ${OBJ_COMMON}
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/colors.o o/raster/profiler.o
 	${CPP} ${LDFLAGS} ${LDFLAGS_R} $+ -o $@
 	
-${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/client.o o/test/unittests/init.o o/test/unittests/example.o o/test/unittests/simplefeaturecollections/points.o o/test/unittests/simplefeaturecollections/lines.o o/test/unittests/simplefeaturecollections/polygons.o o/test/unittests/temporal/timeshift.o o/test/unittests/cache/util.o o/test/unittests/cache/stcache.o o/test/unittests/cache/distribution.o
+${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/client.o o/test/unittests/init.o o/test/unittests/example.o o/test/unittests/simplefeaturecollections/points.o o/test/unittests/simplefeaturecollections/lines.o o/test/unittests/simplefeaturecollections/polygons.o o/test/unittests/temporal/timeshift.o o/test/unittests/cache/util.o o/test/unittests/cache/stcache.o o/test/unittests/cache/distribution.o
 	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST} -o $@
 
 ${EXEGEOMETRYTESTBED}:	o/geometrytestbed.o ${OBJ_COMMON}
@@ -98,7 +98,7 @@ ${EXEGEOMETRYTESTBED}:	o/geometrytestbed.o ${OBJ_COMMON}
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o 
 	${CPP} ${LDFLAGS} $+ -o $@
 
-${EXECACHEINDEX}:	o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/colors.o o/raster/profiler.o 
+${EXECACHEINDEX}:	o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/colors.o o/raster/profiler.o 
 	${CPP} ${LDFLAGS} $+ -o $@
 
 ${EXECACHENODE}:	o/cache/node/nodeserver_main.o o/cache/node/nodeserver.o o/cache/node/delivery.o ${OBJ_COMMON}

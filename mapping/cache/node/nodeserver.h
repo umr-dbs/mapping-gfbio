@@ -66,6 +66,7 @@ private:
 	// Separation of command-processing for the workers
 	void process_worker_command(uint8_t cmd, BinaryStream &stream);
 
+	// Handles a raster-request received from the index
 	void process_raster_request(uint8_t cmd, BinaryStream &stream);
 
 	// Process a command received on the control-connection

@@ -5,7 +5,7 @@
  *      Author: mika
  */
 
-#include "caching_strategy.h"
+#include "cache/priv/caching_strategy.h"
 
 CachingStrategy::CachingStrategy() {
 }

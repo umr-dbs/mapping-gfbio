@@ -11,7 +11,6 @@
 #include "cache/index/indexserver.h"
 #include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
-#include "cache/cache.h"
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/log.h"
@@ -107,7 +106,7 @@ void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
 		case WorkerConnection::CMD_PUZZLE_RASTER: {
 			PuzzleRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			result = CacheCommon::process_raster_puzzle(rr, my_host, my_port);
+			result = CacheManager::process_raster_puzzle(rr, my_host, my_port);
 			Log::debug("Adding puzzled raster to cache.");
 			CacheManager::getInstance().put_raster(rr.semantic_id, result);
 			break;
@@ -116,7 +115,8 @@ void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
 		case WorkerConnection::CMD_DELIVER_RASTER: {
 			DeliveryRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			result = CacheManager::getInstance().get_raster_local(rr.semantic_id, rr.entry_id);
+			NodeCacheKey key(rr.semantic_id,rr.entry_id);
+			result = CacheManager::getInstance().get_raster_local(key);
 			break;
 		}
 	}
@@ -130,7 +130,7 @@ void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
 		throw ArgumentException(
 			concat("Expected command ", WorkerConnection::RESP_DELIVERY_QTY, " but received ", cmd_qty));
 
-	uint64_t delivery_id = delivery_manager.add_raster_delivery(result, qty);
+	uint64_t delivery_id = delivery_manager.add_raster_delivery(std::move(result), qty);
 	Log::debug("Sending delivery_id.");
 	stream.write(WorkerConnection::RESP_DELIVERY_READY);
 	stream.write(delivery_id);
@@ -210,13 +210,14 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 
 void NodeServer::handle_raster_reorg_item(const ReorgItem& item, BinaryStream &index_stream) {
 	std::unique_ptr<BinaryStream> del_stream;
-	STCacheKey my_id("",0);
+
+	uint32_t new_cache_id;
 
 	// Send move request
 	try {
 		uint8_t nresp;
 		del_stream.reset(new UnixSocket(item.from_host.c_str(), item.from_port));
-		STCacheKey key(item.semantic_id, item.cache_id);
+		NodeCacheKey key(item.semantic_id, item.from_cache_id);
 		del_stream->write(DeliveryConnection::MAGIC_NUMBER);
 		del_stream->write(DeliveryConnection::CMD_MOVE_RASTER);
 		key.toStream(*del_stream);
@@ -226,14 +227,15 @@ void NodeServer::handle_raster_reorg_item(const ReorgItem& item, BinaryStream &i
 			case DeliveryConnection::RESP_OK: {
 				auto res = GenericRaster::fromStream(*del_stream);
 				// Store item
-				my_id = CacheManager::getInstance().put_raster_local(item.semantic_id, res);
+				NodeCacheRef ref = CacheManager::getInstance().put_raster_local(item.semantic_id, res);
+				new_cache_id = ref.entry_id;
 				break;
 			}
 			case DeliveryConnection::RESP_ERROR: {
 				std::string msg;
 				del_stream->read(&msg);
 				throw NetworkException(
-					concat("Could not move raster", item.semantic_id, ":", item.cache_id, " from ",
+					concat("Could not move raster", item.semantic_id, ":", item.from_cache_id, " from ",
 						item.from_host, ":", item.from_port, ": ", msg));
 			}
 			default:
@@ -246,7 +248,7 @@ void NodeServer::handle_raster_reorg_item(const ReorgItem& item, BinaryStream &i
 
 	// Notify index
 	uint8_t iresp;
-	ReorgResult rr(ReorgResult::Type::RASTER, my_id.semantic_id, my_id.entry_id, item.idx_cache_id);
+	ReorgResult rr(ReorgResult::Type::RASTER, item.semantic_id, item.from_node_id, item.from_cache_id, my_id, new_cache_id);
 	index_stream.write(ControlConnection::CMD_REORG_ITEM_MOVED);
 	rr.toStream(index_stream);
 	index_stream.read(&iresp);
@@ -259,7 +261,7 @@ void NodeServer::handle_raster_reorg_item(const ReorgItem& item, BinaryStream &i
 				break;
 			}
 			default: {
-				Log::warn("Index could not handle reorg of: %s:%d", item.semantic_id.c_str(), item.cache_id);
+				Log::warn("Index could not handle reorg of: %s:%d", item.semantic_id.c_str(), item.from_cache_id);
 				break;
 			}
 		}
@@ -275,12 +277,15 @@ void NodeServer::setup_control_connection() {
 	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
 	BinaryStream &stream = *this->control_connection;
 
+	Capacity c = CacheManager::getInstance().get_local_capacity();
+
+	NodeHandshake hs( my_host,my_port, NodeStats(c) );
+
 	Log::debug("Sending hello to index-server");
 	// Say hello
 	uint32_t magic = ControlConnection::MAGIC_NUMBER;
 	stream.write(magic);
-	stream.write(my_host);
-	stream.write(my_port);
+	hs.toStream(stream);
 
 	Log::debug("Waiting for response from index-server");
 	// Read node-id

@@ -18,7 +18,7 @@
 QueryManager::~QueryManager() {
 }
 
-QueryManager::QueryManager(const RasterRefCache& raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes) :
+QueryManager::QueryManager(const IndexCache& raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes) :
 	raster_cache(raster_cache), nodes(nodes) {
 }
 
@@ -49,29 +49,30 @@ void QueryManager::add_raster_request(uint64_t client_id, const BaseRequest& req
 
 
 
-	STQueryResult res = raster_cache.query(req.semantic_id, req.query);
+	auto res = raster_cache.query(req.semantic_id, req.query);
 	Log::debug("QueryResult: %s", res.to_string().c_str());
 
 	// Full single hit
-	if (res.ids.size() == 1 && !res.has_remainder()) {
+	if (res.keys.size() == 1 && !res.has_remainder()) {
 		Log::debug("Full HIT. Sending reference.");
 
-		auto &ref = raster_cache.get(req.semantic_id, res.ids.at(0));
-
+		IndexCacheKey key(req.semantic_id,res.keys.at(0));
+		auto ref = raster_cache.get(key);
 		std::unique_ptr<DeliveryRequest> jreq = make_unique<DeliveryRequest>(req.semantic_id,
-			req.query, ref->cache_id);
-		pending_jobs.push_back(make_unique<DeliverJob>(client_id, jreq, ref->node_id));
+			req.query, ref.entry_id);
+		pending_jobs.push_back(make_unique<DeliverJob>(client_id, jreq, ref.node_id));
 	}
 	// Puzzle
 	else if (res.has_hit() && res.coverage > 0.1) {
 		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f", res.coverage);
 		std::vector<uint32_t> node_ids;
 		std::vector<CacheRef> entries;
-		for (auto id : res.ids) {
-			auto &ref = raster_cache.get(req.semantic_id, id);
-			auto &node = nodes.at(ref->node_id);
-			node_ids.push_back(ref->node_id);
-			entries.push_back(CacheRef(node->host, node->port, ref->cache_id));
+		for (auto id : res.keys) {
+			IndexCacheKey key(req.semantic_id,id);
+			auto ref = raster_cache.get(key);
+			auto &node = nodes.at(ref.node_id);
+			node_ids.push_back(ref.node_id);
+			entries.push_back(CacheRef(node->host, node->port, ref.entry_id));
 		}
 		std::unique_ptr<PuzzleRequest> jreq = make_unique<PuzzleRequest>(req.semantic_id, req.query,
 			res.covered, res.remainder, entries);

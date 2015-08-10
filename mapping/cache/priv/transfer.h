@@ -100,12 +100,7 @@ public:
 	BaseRequest( const std::string &sem_id, const QueryRectangle &rect );
 	BaseRequest( BinaryStream &stream );
 
-	BaseRequest( const BaseRequest &r ) = default;
-	BaseRequest( BaseRequest &&r ) = default;
 	virtual ~BaseRequest();
-
-	BaseRequest& operator=( const BaseRequest & r ) = default;
-	BaseRequest& operator=( BaseRequest &&r ) = default;
 
 	virtual void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
@@ -124,12 +119,7 @@ public:
 	DeliveryRequest( const std::string &sem_id, const QueryRectangle &rect, uint64_t entry_id );
 	DeliveryRequest( BinaryStream &stream );
 
-	DeliveryRequest( const DeliveryRequest &r ) = default;
-	DeliveryRequest( DeliveryRequest &&r ) = default;
 	virtual ~DeliveryRequest();
-
-	DeliveryRequest& operator=( const DeliveryRequest & r ) = default;
-	DeliveryRequest& operator=( DeliveryRequest &&r ) = default;
 
 	virtual void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;

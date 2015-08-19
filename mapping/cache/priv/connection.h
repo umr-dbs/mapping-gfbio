@@ -208,9 +208,35 @@ private:
 class ControlConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, REORGANIZING, REORG_RESULT_READ, REORG_FINISHED
+		IDLE, REORGANIZING, REORG_RESULT_READ, REORG_FINISHED,
+		STATS_REQUESTED, STATS_RECEIVED
 	};
 	static const uint32_t MAGIC_NUMBER = 0x42345678;
+
+	//
+	// Tells the node to fetch the attached
+	// items and store them in its local cache
+	// ReorgDescription
+	//
+	static const uint8_t CMD_REORG = 40;
+
+	//
+	// Tells the node to send an update
+	// of the local cache stats
+	//
+	static const uint8_t CMD_GET_STATS = 41;
+
+	//
+	// Tells the node that the reorg on index was OK
+	// There is no data on stream
+	//
+	static const uint8_t CMD_REORG_ITEM_OK = 42;
+
+	//
+	// Response from index-server after successful
+	// registration of a new node. Data on stream is:
+	// id:uint32_t -- the id assigned to the node
+	static const uint8_t CMD_HELLO = 43;
 
 	//
 	// Tells the index that the node finished
@@ -218,32 +244,18 @@ public:
 	// Data on stream is:
 	// ReorgResult
 	//
-	static const uint8_t CMD_REORG_ITEM_MOVED = 40;
+	static const uint8_t RESP_REORG_ITEM_MOVED = 51;
 
 	//
 	// Response from worker to signal that the reorganization
 	// is finished.
 	//
-	static const uint8_t CMD_REORG_DONE = 41;
+	static const uint8_t RESP_REORG_DONE = 52;
 
 	//
-	// Response from index-server after successful
-	// registration of a new node. Data on stream is:
-	// id:uint32_t -- the id assigned to the node
-	static const uint8_t RESP_HELLO = 50;
-
+	// Response from worker including stats update
 	//
-	// Tells the node to fetch the attached
-	// items and store them in its local cache
-	// ReorgDescription
-	//
-	static const uint8_t RESP_REORG = 51;
-
-	//
-	// Tells the node that the reorg on index was OK
-	// There is no data on stream
-	//
-	static const uint8_t RESP_REORG_ITEM_OK = 52;
+	static const uint8_t RESP_STATS = 53;
 
 	State get_state() const;
 
@@ -251,19 +263,26 @@ public:
 	void confirm_reorg();
 	void release();
 
+	void send_get_stats();
+
+
+
 	const ReorgResult& get_result();
+	const NodeStats& get_stats();
 
 	ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
 	virtual ~ControlConnection();
-	const std::shared_ptr<Node> node;
+	std::shared_ptr<Node> node;
 
 protected:
 	virtual void process_command( uint8_t cmd );
+	virtual void write_finished();
 
 private:
 	void reset();
 	State state;
 	std::unique_ptr<ReorgResult> reorg_result;
+	std::unique_ptr<NodeStats> stats;
 };
 
 ////////////////////////////////////////////////////
@@ -339,6 +358,7 @@ public:
 
 protected:
 	virtual void process_command( uint8_t cmd );
+	virtual void write_finished();
 
 private:
 	State state;

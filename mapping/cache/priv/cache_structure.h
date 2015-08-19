@@ -159,6 +159,8 @@ public:
 	// Removes the entry with the given id
 	std::shared_ptr<EType> remove( const KType &key );
 
+	std::vector<std::shared_ptr<EType>> get_all() const;
+
 private:
 	std::map<KType, std::shared_ptr<EType>> entries;
 	std::priority_queue<CacheQueryInfo<KType>> get_query_candidates( const QueryRectangle &spec ) const;

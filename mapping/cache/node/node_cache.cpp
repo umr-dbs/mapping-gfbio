@@ -52,6 +52,17 @@ std::shared_ptr<NodeCacheEntry<EType> > NodeCache<EType>::create_entry(uint64_t 
 }
 
 template<typename EType>
+std::vector<NodeCacheRef> NodeCache<EType>::get_all() const {
+	std::lock_guard<std::mutex> guard(mtx);
+
+	std::vector<NodeCacheRef> result;
+	for ( auto &ce : caches )
+		for ( auto &ne : ce.second->get_all() )
+			result.push_back( NodeCacheRef(ce.first, ne->entry_id, *ne) );
+	return result;
+}
+
+template<typename EType>
 CacheStructure<uint64_t,NodeCacheEntry<EType>>* NodeCache<EType>::get_structure(const std::string &key, bool create) const {
 	std::lock_guard<std::mutex> guard(mtx);
 	Log::trace("Retrieving cache-structure for semantic_id: %s", key.c_str() );
@@ -92,24 +103,21 @@ const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const s
 }
 
 template<typename EType>
-const std::shared_ptr<EType> NodeCache<EType>::get(const NodeCacheKey& key) {
+const std::shared_ptr<EType> NodeCache<EType>::get(const NodeCacheKey& key) const {
 	auto cache = get_structure(key.semantic_id);
-	if (cache != nullptr)
-		return cache->get(key.entry_id)->data;
+	if (cache != nullptr) {
+		auto e = cache->get(key.entry_id);
+		track_access( key, *e );
+		return e->data;
+	}
 	else
 		throw NoSuchElementException("Entry not found");
 }
 
 
 template<typename EType>
-std::unique_ptr<EType> NodeCache<EType>::get_copy(const NodeCacheKey& key) {
-	auto cache = get_structure(key.semantic_id);
-	if (cache != nullptr) {
-		auto entry = cache->get(key.entry_id);
-		return copy( *entry->data );
-	}
-	else
-		throw NoSuchElementException("Entry not found");
+std::unique_ptr<EType> NodeCache<EType>::get_copy(const NodeCacheKey& key) const {
+	return copy( *get(key) );
 }
 
 template<typename EType>
@@ -131,6 +139,38 @@ const NodeCacheRef NodeCache<EType>::get_entry_metadata(const NodeCacheKey& key)
 	}
 	else
 		throw NoSuchElementException("Entry not found");
+}
+
+template<typename EType>
+CacheStats NodeCache<EType>::get_stats() const {
+	std::lock_guard<std::mutex> g(access_mtx);
+	CacheStats result;
+	for ( auto &kv : access_tracker ) {
+		auto cache = get_structure( kv.first );
+		if ( cache == nullptr )
+			continue;
+
+		for ( auto &id : kv.second ) {
+			auto e = cache->get( id );
+			result.add_stats( kv.first, NodeEntryStats( id, e->last_access, e->access_count ) );
+		}
+	}
+	access_tracker.clear();
+	return result;
+}
+
+template<typename EType>
+void NodeCache<EType>::track_access(const NodeCacheKey& key, NodeCacheEntry<EType> &e) const {
+	std::lock_guard<std::mutex> g(access_mtx);
+	e.access_count++;
+	time(&(e.last_access));
+	try {
+		access_tracker.at(key.semantic_id).emplace(key.entry_id);
+	} catch ( std::out_of_range &oor ) {
+		std::set<uint64_t> ids;
+		ids.emplace(key.entry_id);
+		access_tracker.emplace( key.semantic_id, ids );
+	}
 }
 
 ///////////////////////////////////////////////////////////////////

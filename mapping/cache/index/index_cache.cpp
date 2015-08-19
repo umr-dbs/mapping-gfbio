@@ -93,7 +93,8 @@ void IndexCache::move(const IndexCacheKey& old_key, const IndexCacheKey& new_key
 		get_node_entries(new_key.node_id).push_back(entry);
 
 	}
-	throw NoSuchElementException("Entry not found");
+	else
+		throw NoSuchElementException("Entry not found");
 }
 
 void IndexCache::remove_all_by_node(uint32_t node_id) {
@@ -149,4 +150,19 @@ bool IndexCache::requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> 
 std::vector<NodeReorgDescription> IndexCache::reorganize(
 	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) {
 	return reorg_strategy.reorganize(*this,nodes);
+}
+
+void IndexCache::update_stats(uint32_t node_id, const CacheStats &stats) {
+	for ( auto &kv : stats.get_stats() ) {
+		auto cache = get_structure(kv.first);
+		if ( cache == nullptr )
+			continue;
+		std::pair<uint32_t,uint64_t> id(node_id,0);
+		for ( auto &s : kv.second ) {
+			id.second = s.entry_id;
+			auto e = cache->get(id);
+			e->access_count = s.access_count;
+			e->last_access = s.last_access;
+		}
+	}
 }

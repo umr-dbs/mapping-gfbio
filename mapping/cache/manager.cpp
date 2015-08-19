@@ -227,7 +227,6 @@ std::unique_ptr<GenericRaster> LocalCacheManager::query_raster(const GenericOper
 	const QueryRectangle &rect) {
 
 	typedef std::unique_ptr<GenericRaster> RP;
-	typedef std::unique_ptr<geos::geom::Geometry> GP;
 
 	Log::debug("Querying raster: %s on %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str() );
 
@@ -284,10 +283,20 @@ void LocalCacheManager::remove_raster_local(const NodeCacheKey &key) {
 	rasterCache.remove(key);
 }
 
-Capacity LocalCacheManager::get_local_capacity() {
-	Capacity cap( rasterCache.get_max_size() );
-	cap.add_raster(rasterCache.get_current_size());
-	return cap;
+NodeHandshake LocalCacheManager::get_handshake(const std::string& my_host, uint32_t my_port) const {
+	return NodeHandshake(
+		my_host,
+		my_port,
+		Capacity( rasterCache.get_max_size(), rasterCache.get_current_size() ),
+		rasterCache.get_all()
+	);
+}
+
+NodeStats LocalCacheManager::get_stats() const {
+	return NodeStats(
+		Capacity( rasterCache.get_max_size(), rasterCache.get_current_size() ),
+		rasterCache.get_stats()
+	);
 }
 
 //
@@ -330,8 +339,20 @@ void NopCacheManager::remove_raster_local(const NodeCacheKey &key) {
 	// Nothing to-do
 }
 
-Capacity NopCacheManager::get_local_capacity() {
-	return Capacity(0);
+NodeHandshake NopCacheManager::get_handshake(const std::string& my_host, uint32_t my_port) const {
+	return NodeHandshake(
+		my_host,
+		my_port,
+		Capacity( 0,0 ),
+		std::vector<NodeCacheRef>()
+	);
+}
+
+NodeStats NopCacheManager::get_stats() const {
+	return NodeStats(
+		Capacity( 0,0 ),
+		CacheStats()
+	);
 }
 
 //
@@ -457,8 +478,18 @@ void RemoteCacheManager::remove_raster_local(const NodeCacheKey &key) {
 	local_cache.remove(key);
 }
 
-Capacity RemoteCacheManager::get_local_capacity() {
-	Capacity cap( local_cache.get_max_size() );
-	cap.add_raster(local_cache.get_current_size());
-	return cap;
+NodeHandshake RemoteCacheManager::get_handshake(const std::string& my_host, uint32_t my_port) const {
+	return NodeHandshake(
+		my_host,
+		my_port,
+		Capacity( local_cache.get_max_size(), local_cache.get_current_size() ),
+		local_cache.get_all()
+	);
+}
+
+NodeStats RemoteCacheManager::get_stats() const {
+	return NodeStats(
+		Capacity( local_cache.get_max_size(), local_cache.get_current_size() ),
+		local_cache.get_stats()
+	);
 }

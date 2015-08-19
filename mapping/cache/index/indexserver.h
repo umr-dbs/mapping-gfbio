@@ -29,7 +29,7 @@
 
 class Node {
 public:
-	Node(uint32_t id, const std::string &host, uint32_t port, NodeStats stats);
+	Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &capacity);
 	// The unique id of this node
 	const uint32_t id;
 	// The hostname of this node
@@ -37,7 +37,9 @@ public:
 	// The port for delivery connections on this node
 	const uint32_t port;
 	// The stats
-	NodeStats stats;
+	Capacity capacity;
+	// The timestamp of the last stats update
+	time_t last_stat_update;
 	// The id of the control-connection
 	uint64_t control_connection;
 };
@@ -74,6 +76,9 @@ protected:
 	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
 	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
+
+	// Cache
+	IndexCache raster_cache;
 private:
 	// Adds the fds of all connections to the read-set
 	// and kills faulty connections
@@ -108,11 +113,11 @@ private:
 
 	// The next id to assign to a node
 	uint32_t next_node_id;
-	// Cache
-	IndexCache raster_cache;
 
 	// The query-manager handling request-scheduling
 	QueryManager query_manager;
+
+	time_t last_reorg;
 };
 
 #endif /* INDEX_INDEXSERVER_H_ */

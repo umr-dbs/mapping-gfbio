@@ -430,6 +430,15 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 	return partials;
 }
 
+template<typename KType, typename EType>
+std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() const {
+	std::vector<std::shared_ptr<EType> > result;
+	for (auto &e : entries) {
+		result.push_back(e.second);
+	}
+	return result;
+}
+
 template class CacheQueryResult<uint64_t>;
 template class CacheStructure<uint64_t, NodeCacheEntry<GenericRaster>>;
 

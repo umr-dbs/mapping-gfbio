@@ -31,8 +31,8 @@ bool ReorgStrategy::requires_reorg(const std::map<uint32_t, std::shared_ptr<Node
 
 	// TODO: Think about this
 	for (auto &e : nodes) {
-		maxru = std::max(maxru, e.second->stats.get_raster_usage());
-		minru = std::min(minru, e.second->stats.get_raster_usage());
+		maxru = std::max(maxru, e.second->capacity.get_raster_usage());
+		minru = std::min(minru, e.second->capacity.get_raster_usage());
 	}
 	return maxru - minru > 0.15;
 }
@@ -81,7 +81,7 @@ std::vector<NodeReorgDescription> CapacityReorgStrategy::reorganize(
 	// Calculate mean usage
 	double raster_accum(0);
 	for (auto &e : nodes) {
-		raster_accum += e.second->stats.get_raster_usage();
+		raster_accum += e.second->capacity.get_raster_usage();
 
 		auto &node_entries = raster_cache.get_node_entries(e.second->id);
 
@@ -96,8 +96,8 @@ std::vector<NodeReorgDescription> CapacityReorgStrategy::reorganize(
 	std::vector<std::shared_ptr<Node>> underflow_nodes;
 
 	for (auto &e : nodes) {
-		size_t target_bytes = e.second->stats.get_raster_cache_total() * target_mean;
-		size_t bytes_used = e.second->stats.get_raster_cache_used();
+		size_t target_bytes = e.second->capacity.raster_cache_total * target_mean;
+		size_t bytes_used = e.second->capacity.raster_cache_used;
 
 		if ( bytes_used < target_bytes ) {
 			underflow_nodes.push_back(e.second);
@@ -120,8 +120,8 @@ std::vector<NodeReorgDescription> CapacityReorgStrategy::reorganize(
 
 	for (auto &node : underflow_nodes) {
 		NodeReorgDescription desc(node->id);
-		size_t target_bytes = node->stats.get_raster_cache_total() * target_mean;
-		size_t bytes_used = node->stats.get_raster_cache_used();
+		size_t target_bytes = node->capacity.raster_cache_total * target_mean;
+		size_t bytes_used = node->capacity.raster_cache_used;
 		auto iter = overflow.begin();
 
 		while ( iter != overflow.end() && bytes_used < target_bytes ) {

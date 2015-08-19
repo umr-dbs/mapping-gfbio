@@ -6,6 +6,7 @@
  */
 
 #include "cache/index/indexserver.h"
+#include "cache/index/reorg_strategy.h"
 #include "util/make_unique.h"
 #include "util/concat.h"
 
@@ -29,8 +30,8 @@
 //
 ////////////////////////////////////////////////////////////
 
-Node::Node(uint32_t id, const std::string &host, uint32_t port, NodeStats stats) :
-	id(id), host(host), port(port), stats(stats), control_connection(-1) {
+Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &capacity) :
+	id(id), host(host), port(port), capacity(capacity), last_stat_update(time(nullptr)), control_connection(-1) {
 }
 
 ////////////////////////////////////////////////////////////
@@ -40,7 +41,8 @@ Node::Node(uint32_t id, const std::string &host, uint32_t port, NodeStats stats)
 ////////////////////////////////////////////////////////////
 
 IndexServer::IndexServer(int port, ReorgStrategy &reorg_strategy) :
-	port(port), shutdown(false), next_node_id(1), raster_cache(reorg_strategy), query_manager(raster_cache, nodes) {
+	raster_cache(reorg_strategy), port(port), shutdown(false), next_node_id(1),
+	query_manager(raster_cache, nodes), last_reorg(time(nullptr)) {
 }
 
 IndexServer::~IndexServer() {
@@ -101,14 +103,33 @@ void IndexServer::run() {
 		// Schedule Jobs
 		query_manager.schedule_pending_jobs(worker_connections);
 
+
+
+		time_t now = time(nullptr);
+		time_t oldest_stats = now;
+		bool all_idle = true;
+		for ( auto &kv : nodes ) {
+			Node& node = *kv.second;
+			oldest_stats = std::min(oldest_stats,node.last_stat_update);
+			ControlConnection &cc = *control_connections.at(node.control_connection);
+			// Fetch stats
+			if ( cc.get_state() == ControlConnection::State::IDLE &&
+				 (now - node.last_stat_update) > 10 ) {
+				cc.send_get_stats();
+			}
+			// Remeber if all connections are idle -> Allows reorg
+			all_idle &= ( cc.get_state() == ControlConnection::State::IDLE );
+		}
+
 		// Reorganize
-//		if ( CacheConfig::get_reorg_strategy().requires_reorg( nodes ) ) {
-//			auto descs = CacheConfig::get_reorg_strategy().reorganize(nodes);
-//			for ( auto &d : descs ) {
-//				auto &cc = control_connections.at( nodes.at(d.node_id)->control_connection );
-//				cc->send_reorg( d );
-//			}
-//		}
+		if ( oldest_stats > last_reorg && all_idle && raster_cache.requires_reorg( nodes) ) {
+			// Remember time of this reorg
+			time(&last_reorg);
+			for ( auto &d : raster_cache.reorganize(nodes) ) {
+				auto &cc = control_connections.at( nodes.at(d.node_id)->control_connection );
+				cc->send_reorg( d );
+			}
+		}
 	}
 	close(listen_socket);
 	Log::info("Index-Server done.");
@@ -196,14 +217,16 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 					}
 					case ControlConnection::MAGIC_NUMBER: {
 						NodeHandshake hs(s);
-						NodeStats stats(hs);
-						std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, hs.host, hs.port, stats);
+						std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, hs.host, hs.port, hs);
 						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us), node);
 						node->control_connection = cc->id;
 						Log::info("New node registered. ID: %d, control-connected fd: %d", node->id,
 							cc->get_read_fd());
 						control_connections.emplace(cc->id, std::move(cc));
 						nodes.emplace(node->id, node);
+
+						for ( auto &raster : hs.get_raster_entries() )
+							raster_cache.put( IndexCacheEntry(node->id, raster) );
 						break;
 					}
 					default: {
@@ -231,7 +254,6 @@ void IndexServer::process_control_connections(fd_set* readfds) {
 			if (cc.is_faulty())
 				continue;
 
-
 			switch (cc.get_state()) {
 				case ControlConnection::State::REORG_RESULT_READ: {
 					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
@@ -245,8 +267,17 @@ void IndexServer::process_control_connections(fd_set* readfds) {
 					cc.release();
 					break;
 				}
+				case ControlConnection::State::STATS_RECEIVED: {
+					Log::debug("Node %d delivered fresh statistics.", cc.node->id);
+					auto &stats = cc.get_stats();
+					cc.node->capacity = stats;
+					time(&cc.node->last_stat_update);
+					raster_cache.update_stats(cc.node->id,stats.raster_stats);
+					cc.release();
+					break;
+				}
 				default: {
-					throw std::runtime_error("Unknown state of client-connection.");
+					throw std::runtime_error("Unknown state of control-connection.");
 				}
 			}
 

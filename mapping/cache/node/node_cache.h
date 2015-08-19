@@ -9,6 +9,7 @@
 #define NODE_CACHE_H_
 
 #include "cache/priv/cache_structure.h"
+#include "cache/priv/cache_stats.h"
 #include "operators/queryrectangle.h"
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/raster.h"
@@ -19,6 +20,7 @@
 #include <atomic>
 #include <vector>
 #include <unordered_map>
+#include <set>
 #include <memory>
 #include <mutex>
 
@@ -49,20 +51,27 @@ public:
 	// Adds an entry for the given semantic_id to the cache.
 	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item);
 
-	// Returns meta-information of an entry
-	const NodeCacheRef get_entry_metadata( const NodeCacheKey &key ) const;
-
 	// Removes the entry with the given key from the cache
 	void remove( const NodeCacheKey &key );
 
 	// Retrieves the entry with the given key. A copy is returned which may be modified
-	std::unique_ptr<EType> get_copy( const NodeCacheKey &key );
+	std::unique_ptr<EType> get_copy( const NodeCacheKey &key ) const;
 
 	// Retrieves the entry with the given key. Cannot be modified.
-	const std::shared_ptr<EType> get( const NodeCacheKey &key );
+	const std::shared_ptr<EType> get( const NodeCacheKey &key ) const;
+
+	// returns meta-information about the entry for the given key
+	const NodeCacheRef get_entry_metadata(const NodeCacheKey& key) const;
 
 	// Queries the cache with the given query-rectangle
 	CacheQueryResult<uint64_t> query( const std::string &semantic_id, const QueryRectangle &qr ) const;
+
+	// Returns references to all entries
+	std::vector<NodeCacheRef> get_all() const;
+
+	// Returns stats for entries accessed since the last
+	// call to this method;
+	CacheStats get_stats() const;
 
 	// Returns the maximum size (in bytes) this cache may hold
 	size_t get_max_size() const { return max_size; }
@@ -79,6 +88,9 @@ private:
 
 	// Retrieves the cache-structure for the given semantic_id.
 	Struct* get_structure( const std::string &semantic_id, bool create = false) const;
+
+	void track_access( const NodeCacheKey &key, NodeCacheEntry<EType> &e ) const;
+
 	// Holds the maximum size (in bytes) this cache may hold
 	size_t max_size;
 	// Holds the current size (in bytes) of all entries stored in the cache
@@ -89,6 +101,8 @@ private:
 	// Holds all cache-structures accessable by the semantic_id
 	mutable std::unordered_map<std::string,Struct*> caches;
 	mutable std::mutex mtx;
+	mutable std::mutex access_mtx;
+	mutable std::unordered_map<std::string,std::set<uint64_t>> access_tracker;
 };
 
 //

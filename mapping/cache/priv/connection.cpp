@@ -34,7 +34,7 @@ void BaseConnection::input() {
 			faulty = true;
 		}
 	} catch (std::exception &e) {
-		Log::error("Unexpected error on connection %d. Setting faulty.", id);
+		Log::error("Unexpected error on connection %d, setting faulty. Reason: %s", id, e.what());
 		faulty = true;
 	}
 }
@@ -125,7 +125,7 @@ const BaseRequest& ClientConnection::get_request() const {
 }
 
 void ClientConnection::reset() {
-	request.release();
+	request.reset();
 	request_type = RequestType::NONE;
 	state = State::IDLE;
 }
@@ -317,9 +317,9 @@ const std::string& WorkerConnection::get_error_message() const {
 
 void WorkerConnection::reset() {
 	error_msg = "";
-	result.release();
-	new_raster_entry.release();
-	raster_query.release();
+	result.reset();
+	new_raster_entry.reset();
+	raster_query.reset();
 	state = State::IDLE;
 }
 
@@ -346,7 +346,7 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 ControlConnection::ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node) :
 	BaseConnection(std::move(socket)), node(node), state(State::IDLE) {
 	try {
-		stream.write(RESP_HELLO);
+		stream.write(CMD_HELLO);
 		stream.write(node->id);
 	} catch (NetworkException &ne) {
 		Log::error("Could not send response to control-connection.");
@@ -362,19 +362,25 @@ ControlConnection::State ControlConnection::get_state() const {
 }
 
 void ControlConnection::process_command(uint8_t cmd) {
-	if (state != State::IDLE && state != State::REORGANIZING)
-		throw IllegalStateException("Can only accept input in state IDLE or REORGANIZING");
+	if (state != State::IDLE && state != State::REORGANIZING && state != State::STATS_REQUESTED)
+		throw IllegalStateException("Can only accept input in state IDLE, REORGANIZING or STATS_REQUESTED");
 
 	switch (cmd) {
-		case CMD_REORG_ITEM_MOVED: {
+		case RESP_REORG_ITEM_MOVED: {
 			Log::debug("Received notification about reorganized entry.");
 			reorg_result.reset(new ReorgResult(stream));
 			state = State::REORG_RESULT_READ;
 			break;
 		}
-		case CMD_REORG_DONE: {
+		case RESP_REORG_DONE: {
 			Log::debug("Node %d finished reorganization.", node->id);
 			state = State::REORG_FINISHED;
+			break;
+		}
+		case RESP_STATS: {
+			Log::debug("Node %d delivered fresh stats.", node->id);
+			stats.reset( new NodeStats(stream) );
+			state = State::STATS_RECEIVED;
 			break;
 		}
 		default: {
@@ -389,7 +395,7 @@ void ControlConnection::process_command(uint8_t cmd) {
 void ControlConnection::send_reorg(const ReorgDescription& desc) {
 	if ( state == State::IDLE ) {
 		try {
-			stream.write(RESP_REORG);
+			stream.write(CMD_REORG);
 			desc.toStream(stream);
 			state = State::REORGANIZING;
 		} catch ( NetworkException &ne ) {
@@ -404,7 +410,7 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 void ControlConnection::confirm_reorg() {
 	if (state == State::REORG_RESULT_READ) {
 		try {
-			stream.write(RESP_REORG_ITEM_OK);
+			stream.write(CMD_REORG_ITEM_OK);
 			state = State::REORGANIZING;
 		} catch (NetworkException &ne) {
 			Log::error("Could not send MISS-response to worker: %d", id);
@@ -416,11 +422,26 @@ void ControlConnection::confirm_reorg() {
 
 }
 
+void ControlConnection::send_get_stats() {
+	if ( state == State::IDLE ) {
+		try {
+			stream.write(CMD_GET_STATS);
+			state = State::STATS_REQUESTED;
+		} catch ( NetworkException &ne ) {
+			Log::error("Could not send stats-request to node: %d", node->id);
+			faulty = true;
+		}
+	}
+	else
+		throw IllegalStateException("Can only request statistics in state IDLE");
+}
+
+
 void ControlConnection::release() {
-	if (state == State::REORG_FINISHED)
+	if (state == State::REORG_FINISHED || state == State::STATS_RECEIVED )
 		reset();
 	else
-		throw IllegalStateException("Can only release control-connection in state REORG_FINISHED or ERROR");
+		throw IllegalStateException("Can only release control-connection in state REORG_FINISHED, STATS_RECEIVED or ERROR");
 }
 
 //
@@ -434,17 +455,29 @@ const ReorgResult& ControlConnection::get_result() {
 		throw IllegalStateException("Can only return ReorgResult in state REORG_RESULT_READ");
 }
 
+const NodeStats& ControlConnection::get_stats() {
+	if ( state == State::STATS_RECEIVED )
+		return * stats;
+	else
+		throw IllegalStateException("Can only return ReorgResult in state REORG_RESULT_READ");
+}
+
+// Private stuff
+
 void ControlConnection::reset() {
-	reorg_result.release();
+	reorg_result.reset();
+	stats.reset();
 	state = State::IDLE;
 }
 
 const uint32_t ControlConnection::MAGIC_NUMBER;
-const uint8_t ControlConnection::RESP_HELLO;
-const uint8_t ControlConnection::RESP_REORG;
-const uint8_t ControlConnection::RESP_REORG_ITEM_OK;
-const uint8_t ControlConnection::CMD_REORG_DONE;
-const uint8_t ControlConnection::CMD_REORG_ITEM_MOVED;
+const uint8_t ControlConnection::CMD_REORG;
+const uint8_t ControlConnection::CMD_GET_STATS;
+const uint8_t ControlConnection::CMD_REORG_ITEM_OK;
+const uint8_t ControlConnection::CMD_HELLO;
+const uint8_t ControlConnection::RESP_REORG_ITEM_MOVED;
+const uint8_t ControlConnection::RESP_REORG_DONE;
+const uint8_t ControlConnection::RESP_STATS;
 
 /////////////////////////////////////////////////
 //

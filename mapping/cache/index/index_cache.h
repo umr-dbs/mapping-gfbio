@@ -9,7 +9,7 @@
 #define INDEX_CACHE_H_
 
 #include "cache/priv/cache_structure.h"
-
+#include "cache/priv/cache_stats.h"
 #include <utility>
 #include <map>
 #include <unordered_map>
@@ -73,6 +73,9 @@ public:
 
 	// Tells if a global reorganization is required
 	bool requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> > &nodes );
+
+	// Updates statistics of the entries
+	void update_stats( uint32_t node_id, const CacheStats &stats );
 
 	// Calculates an appropriate reorganization
 	std::vector<NodeReorgDescription> reorganize(const std::map<uint32_t,std::shared_ptr<Node>> &nodes );

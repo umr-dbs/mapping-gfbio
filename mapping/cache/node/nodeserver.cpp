@@ -190,7 +190,7 @@ void NodeServer::run() {
 
 void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 	switch (cmd) {
-		case ControlConnection::RESP_REORG: {
+		case ControlConnection::CMD_REORG: {
 			Log::debug("Received reorg command.");
 			ReorgDescription d(stream);
 			Log::debug("Read reorg description from stream.");
@@ -203,7 +203,19 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 						throw ArgumentException(concat("Type ", (int) ri.type, " not supported yet"));
 				}
 			}
-			stream.write(ControlConnection::CMD_REORG_DONE);
+			stream.write(ControlConnection::RESP_REORG_DONE);
+			break;
+		}
+		case ControlConnection::CMD_GET_STATS: {
+			Log::debug("Received stats-request.");
+			NodeStats stats = CacheManager::getInstance().get_stats();
+			stream.write(ControlConnection::RESP_STATS);
+			stats.toStream( stream );
+			break;
+		}
+		default: {
+			Log::error("Unknown control-command from index-server: %d. Dropping control-connection.", cmd);
+			throw NetworkException("Unknown control-command from index-server");
 		}
 	}
 }
@@ -249,13 +261,13 @@ void NodeServer::handle_raster_reorg_item(const ReorgItem& item, BinaryStream &i
 	// Notify index
 	uint8_t iresp;
 	ReorgResult rr(ReorgResult::Type::RASTER, item.semantic_id, item.from_node_id, item.from_cache_id, my_id, new_cache_id);
-	index_stream.write(ControlConnection::CMD_REORG_ITEM_MOVED);
+	index_stream.write(ControlConnection::RESP_REORG_ITEM_MOVED);
 	rr.toStream(index_stream);
 	index_stream.read(&iresp);
 
 	try {
 		switch (iresp) {
-			case ControlConnection::RESP_REORG_ITEM_OK: {
+			case ControlConnection::CMD_REORG_ITEM_OK: {
 				Log::debug("Reorg of item finished. Notifying delivery instance.");
 				del_stream->write(DeliveryConnection::CMD_MOVE_DONE);
 				break;
@@ -277,9 +289,8 @@ void NodeServer::setup_control_connection() {
 	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
 	BinaryStream &stream = *this->control_connection;
 
-	Capacity c = CacheManager::getInstance().get_local_capacity();
 
-	NodeHandshake hs( my_host,my_port, NodeStats(c) );
+	NodeHandshake hs = CacheManager::getInstance().get_handshake(my_host,my_port);
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
@@ -291,7 +302,7 @@ void NodeServer::setup_control_connection() {
 	// Read node-id
 	uint8_t resp;
 	stream.read(&resp);
-	if (resp == ControlConnection::RESP_HELLO) {
+	if (resp == ControlConnection::CMD_HELLO) {
 		stream.read(&my_id);
 		Log::info("Successfuly connected to index-server. My Id is: %d", my_id);
 	}

@@ -132,27 +132,26 @@ QueryInfo::QueryInfo(const QueryRectangle& query, const std::string& semantic_id
 }
 
 bool QueryInfo::satisfies(const BaseRequest& req) {
-	if ( req.semantic_id == semantic_id  &&
-		 query.x1 <= req.query.x1 &&
-		 query.x2 >= req.query.x2 &&
-		 query.y1 <= req.query.y1 &&
-		 query.y2 >= req.query.y2 &&
-		 query.t1 <= req.query.t1 &&
-		 query.t2 >= req.query.t2 &&
-		 query.restype == req.query.restype ) {
+	try {
+		if ( req.semantic_id == semantic_id  &&
+			 query.SpatialReference::contains(req.query) &&
+			 query.TemporalReference::contains(req.query) &&
+			 query.restype == req.query.restype ) {
 
-		if ( query.restype == QueryResolution::Type::NONE )
-			return true;
+			if ( query.restype == QueryResolution::Type::NONE )
+				return true;
 
-		// Check resolution
-		double my_xres = (query.x2-query.x1) / query.xres;
-		double my_yres = (query.y2-query.y1) / query.yres;
+			// Check resolution
+			double my_xres = (query.x2-query.x1) / query.xres;
+			double my_yres = (query.y2-query.y1) / query.yres;
 
-		double q_xres = (req.query.x2-req.query.x1) / req.query.xres;
-		double q_yres = (req.query.y2-req.query.y1) / req.query.yres;
+			double q_xres = (req.query.x2-req.query.x1) / req.query.xres;
+			double q_yres = (req.query.y2-req.query.y1) / req.query.yres;
 
-		return std::abs(1.0 - my_xres/q_xres) < 0.01 &&
-			   std::abs(1.0 - my_yres/q_yres) < 0.01;
+			return std::abs(1.0 - my_xres/q_xres) < 0.01 &&
+				   std::abs(1.0 - my_yres/q_yres) < 0.01;
+		}
+	} catch ( ArgumentException &ae ) {
 	}
 	return false;
 }
@@ -187,8 +186,7 @@ CreateJob::~CreateJob() {
 
 bool CreateJob::extend(const BaseRequest& req) {
 	if ( req.semantic_id == semantic_id  &&
-		 orig_query.t1 <= req.query.t1 &&
-		 orig_query.t2 >= req.query.t2 &&
+		 orig_query.TemporalReference::contains(req.query) &&
 		 orig_query.restype == req.query.restype ) {
 
 		double nx1,nx2,ny1,ny2, narea;

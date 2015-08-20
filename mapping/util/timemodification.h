@@ -177,13 +177,13 @@ class Snap : public TimeShift {
 		 * @param unit A definition of where to snap to.
 		 * @param value The modification value for the snap unit.
 		 */
-		Snap(SnapUnit unit, int value, bool allow_reset) : unit(unit), value(value), allow_reset(allow_reset) {}
+		Snap(SnapUnit unit, short unsigned int value, bool allow_reset) : unit(unit), value(value), allow_reset(allow_reset) {}
 
 		auto apply(const time_t& input) -> time_t;
 		auto reverse(const time_t& input) -> time_t;
 	private:
 		SnapUnit unit;
-		int value;
+		short unsigned int value;
 		bool allow_reset;
 
 		static const std::map<std::string, SnapUnit> string_to_enum;

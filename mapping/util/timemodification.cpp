@@ -131,7 +131,7 @@ auto Snap::apply(const time_t& input) -> time_t {
 		case SnapUnit::seasonInYear:
 			{
 				Date date = time.date();
-				int month;
+				short unsigned int month;
 
 				switch (value) {
 					case 1:

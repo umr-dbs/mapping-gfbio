@@ -12,6 +12,7 @@
 #include "cache/node/node_cache.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
+#include "util/nio.h"
 
 #include <map>
 #include <memory>
@@ -22,15 +23,43 @@ class BaseConnection {
 public:
 	BaseConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~BaseConnection();
-	int get_read_fd();
-	const uint64_t id;
+	// Called if data is available on the unerlying socket and this connection is not in writing mode
 	void input();
+	// Called if data can be written to the unerlying socket and this connection is in writing-mode
+	void do_write();
+
+	// Returns the fd used for writes by this connection
+	int get_write_fd();
+	// Returns the fd used for reads by this connection
+	int get_read_fd();
+	// Tells whether an error occured on this connection
 	bool is_faulty();
+	// Tells whether this connection is currently reading data
+	bool is_reading();
+	// Tells whether this connection is currently writing data
+	bool is_writing();
+
+	// This connection's id
+	const uint64_t id;
 protected:
+	// Callback for commands read from the socket
 	virtual void process_command( uint8_t cmd ) = 0;
+	// Callback for finished non-blocking writes
+	virtual void write_finished() = 0;
+	// Callback for finished non-blocking reads
+	virtual void read_finished( NBReader& reader) = 0;
+	// Called by implementing classes to trigger a non-blocking write
+	void write( std::unique_ptr<NBWriter> writer );
+	// Called by implementing classes to trigger a non-blocking read
+	void read( std::unique_ptr<NBReader> reader );
+
 	BinaryStream &stream;
 	bool faulty;
 private:
+	bool writing;
+	bool reading;
+	std::unique_ptr<NBWriter> writer;
+	std::unique_ptr<NBReader> reader;
 	std::unique_ptr<UnixSocket> socket;
 	static uint64_t next_id;
 };
@@ -79,7 +108,8 @@ public:
 
 protected:
 	virtual void process_command( uint8_t cmd );
-
+	virtual void write_finished();
+	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
 	State state;
@@ -194,7 +224,8 @@ public:
 
 protected:
 	virtual void process_command( uint8_t cmd );
-
+	virtual void write_finished();
+	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
 
@@ -277,7 +308,7 @@ public:
 protected:
 	virtual void process_command( uint8_t cmd );
 	virtual void write_finished();
-
+	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
 	State state;
@@ -294,7 +325,12 @@ private:
 class DeliveryConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, DELIVERY_REQUEST_READ, RASTER_CACHE_REQUEST_READ, RASTER_MOVE_REQUEST_READ, AWAITING_MOVE_CONFIRM, MOVE_DONE
+		IDLE,
+		READING_DELIVERY_REQUEST, DELIVERY_REQUEST_READ,
+		READING_RASTER_CACHE_REQUEST, RASTER_CACHE_REQUEST_READ,
+		READING_RASTER_MOVE_REQUEST, RASTER_MOVE_REQUEST_READ,
+		AWAITING_MOVE_CONFIRM, MOVE_DONE,
+		SENDING_RASTER, SENDING_RASTER_MOVE, SENDING_ERROR
 	};
 
 	static const uint32_t MAGIC_NUMBER = 0x52345678;
@@ -348,9 +384,9 @@ public:
 
 	uint64_t get_delivery_id() const;
 
-	void send_raster( GenericRaster &raster );
+	void send_raster( std::shared_ptr<GenericRaster> raster );
 
-	void send_raster_move( GenericRaster &raster );
+	void send_raster_move( std::shared_ptr<GenericRaster> raster );
 
 	void send_error( const std::string &msg );
 
@@ -359,7 +395,7 @@ public:
 protected:
 	virtual void process_command( uint8_t cmd );
 	virtual void write_finished();
-
+	virtual void read_finished( NBReader& reader);
 private:
 	State state;
 	uint64_t delivery_id;

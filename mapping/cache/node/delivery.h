@@ -27,7 +27,7 @@ class Delivery {
 private:
 	enum class Type { RASTER };
 public:
-	Delivery( uint64_t id, unsigned int count, std::unique_ptr<GenericRaster> raster );
+	Delivery( uint64_t id, unsigned int count, std::shared_ptr<GenericRaster> raster );
 
 	Delivery( const Delivery &d ) = delete;
 	Delivery( Delivery &&d );
@@ -41,7 +41,7 @@ public:
 	void send( DeliveryConnection &connection );
 private:
 	Type type;
-	std::unique_ptr<GenericRaster> raster;
+	std::shared_ptr<GenericRaster> raster;
 };
 
 //
@@ -76,9 +76,10 @@ public:
 private:
 	// Adds the fds of all connections to the read-set
 	// and kills faulty connections
-	int setup_fdset( fd_set *readfds);
+	int setup_fdset( fd_set *readfds, fd_set* write_fds);
 
-	void process_connections(fd_set *readfds);
+	void process_connections(fd_set *readfds, fd_set* write_fds);
+
 
 
 	// Fetches the delivery with the given id from the internal
@@ -103,6 +104,5 @@ private:
 	// the currently open connections
 	std::vector<std::unique_ptr<DeliveryConnection>> connections;
 };
-
 
 #endif /* DELIVERY_H_ */

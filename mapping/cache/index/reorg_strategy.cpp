@@ -37,6 +37,21 @@ bool ReorgStrategy::requires_reorg(const std::map<uint32_t, std::shared_ptr<Node
 	return maxru - minru > 0.15;
 }
 
+bool ReorgStrategy::entry_less( const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b ) {
+	return get_score(*a) < get_score(*b);
+}
+
+bool ReorgStrategy::entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b) {
+	return get_score(*a) > get_score(*b);
+}
+
+double ReorgStrategy::get_score(const IndexCacheEntry& entry) {
+	double hit_factor = 1.0 + std::min( entry.access_count / 1000.0, 1.0);
+	return
+	// Treat all the same within 10 seconds
+	(entry.last_access / 10) * hit_factor;
+}
+
 //
 // Never reorg
 //
@@ -149,17 +164,162 @@ std::vector<NodeReorgDescription> CapacityReorgStrategy::reorganize(
 	return result;
 }
 
-bool CapacityReorgStrategy::entry_less( const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b ) {
-	return get_score(*a) < get_score(*b);
+//
+// Geographic reorg
+//
+
+class NodePos {
+public:
+	NodePos( uint32_t node_id, double x, double y );
+	uint32_t node_id;
+	double x;
+	double y;
+	std::vector<std::shared_ptr<IndexCacheEntry>> entries;
+	double dist_to( const IndexCacheEntry& entry );
+};
+
+NodePos::NodePos(uint32_t node_id, double x, double y) :
+	node_id(node_id), x(x), y(y) {
 }
 
-bool CapacityReorgStrategy::entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b) {
-	return get_score(*a) > get_score(*b);
+double NodePos::dist_to(const IndexCacheEntry& entry) {
+	double ex = entry.bounds.x1 + (entry.bounds.x2-entry.bounds.x1)/2;
+	double ey = entry.bounds.y1 + (entry.bounds.y2-entry.bounds.y1)/2;
+
+	if ( entry.bounds.epsg == EPSG_GEOSMSG ) {
+		GeographicReorgStrategy::geosmsg_trans.transform(ex,ey);
+	}
+	else if ( entry.bounds.epsg == EPSG_WEBMERCATOR ) {
+		GeographicReorgStrategy::webmercator_trans.transform(ex,ey);
+	}
+
+	return sqrt( (ex-x)*(ex-x) + (ey-y)*(ey-y) );
 }
 
-double CapacityReorgStrategy::get_score(const IndexCacheEntry& entry) {
-	double hit_factor = 1.0 + std::min( entry.access_count / 1000.0, 1.0);
-	return
-	// Treat all the same within 10 seconds
-	(entry.last_access / 10) * hit_factor;
+GDAL::CRSTransformer GeographicReorgStrategy::geosmsg_trans(EPSG_GEOSMSG,EPSG_LATLON);
+GDAL::CRSTransformer GeographicReorgStrategy::webmercator_trans(EPSG_WEBMERCATOR,EPSG_LATLON);
+
+GeographicReorgStrategy::GeographicReorgStrategy() {
+}
+
+GeographicReorgStrategy::~GeographicReorgStrategy() {
+}
+
+std::vector<NodeReorgDescription> GeographicReorgStrategy::reorganize(const IndexCache& raster_cache,
+	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) {
+	// Calculate center of mass
+
+	double weighted_x = 0, weighted_y = 0, mass = 0;
+
+	for ( auto &kv : nodes ) {
+		auto &node = *kv.second;
+
+		for ( auto &e : raster_cache.get_node_entries(node.id) ) {
+			auto &b = e->bounds;
+
+			double x1 = b.x1;
+			double x2 = b.x2;
+			double y1 = b.y1;
+			double y2 = b.y2;
+
+			if ( b.epsg == EPSG_GEOSMSG ) {
+				geosmsg_trans.transform(x1,y1);
+				geosmsg_trans.transform(x2,y2);
+			}
+			else if ( b.epsg == EPSG_WEBMERCATOR ) {
+				webmercator_trans.transform(x1,y1);
+				webmercator_trans.transform(x2,y2);
+			}
+			else if ( b.epsg != EPSG_LATLON ) {
+				Log::error("Unknown CRS: %d, ignoring in calculation.", b.epsg );
+				continue;
+			}
+
+			double e_mass = (x2-x1)*(y2-y1);
+			double e_x = x1 + (x2-x1)/2;
+			double e_y = y1 + (y2-y1)/2;
+
+			weighted_x += (e_x*e_mass);
+			weighted_y += (e_y*e_mass);
+			mass += e_mass;
+		}
+	}
+
+	double cx = weighted_x / mass;
+	double cy = weighted_y / mass;
+
+
+	// Assign each node a point around center
+	std::vector<NodePos> n_pos;
+
+	double step = M_PI*2 / nodes.size();
+	double angle = 0;
+
+	Log::info("Center at: %f,%f, step: %f, nodes: %d", cx,cy, step, nodes.size());
+	for ( auto & e : nodes ) {
+		double x = std::cos(angle) + cx;
+		double y = std::sin(angle) + cy;
+		n_pos.push_back( NodePos( e.first, x, y) );
+		Log::info("Node at: %f,%f", x,y);
+		angle += step;
+	}
+
+	// Redistribute entries;
+	for ( auto & kv : nodes ) {
+		auto &node = *kv.second;
+		for ( auto &e : raster_cache.get_node_entries(node.id) ) {
+			size_t min_idx = 0;
+			size_t current_idx = 0;
+			double min_dist = DoubleInfinity;
+			for ( auto &np : n_pos ) {
+				double d = np.dist_to( *e);
+				if ( d < min_dist ) {
+					min_dist = d;
+					min_idx = current_idx;
+				}
+				current_idx++;
+			}
+			n_pos.at(min_idx).entries.push_back(e);
+		}
+	}
+
+	std::vector<std::shared_ptr<IndexCacheEntry>> overflow;
+	std::vector<NodeReorgDescription> res;
+
+	// Find overflowing nodes and create result
+	for ( auto &np : n_pos ) {
+		NodeReorgDescription desc(np.node_id);
+		auto &node = *(nodes.at(np.node_id));
+		size_t target = 0.8 * node.capacity.raster_cache_total;
+		size_t used = 0;
+		std::sort(np.entries.begin(), np.entries.end(), entry_greater);
+
+		for ( auto & e : np.entries ) {
+			if ( used + e->size < target ) {
+				used += e->size;
+				if ( e->node_id == np.node_id )
+					continue;
+				auto &remote_node = nodes.at(e->node_id);
+				desc.add_item( ReorgItem( ReorgItem::Type::RASTER,
+										  e->semantic_id,
+										  remote_node->id,
+										  e->entry_id,
+										  remote_node->host,
+										  remote_node->port ) );
+
+
+
+			}
+			else
+				overflow.push_back( e );
+		}
+		if ( !desc.get_items().empty() )
+			res.push_back(desc);
+	}
+
+	if ( !overflow.empty() ) {
+		// TODO: Add removals
+	}
+
+	return res;
 }

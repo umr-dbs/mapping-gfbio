@@ -10,6 +10,7 @@
 
 #include "cache/index/index_cache.h"
 #include "cache/priv/redistribution.h"
+#include "util/gdal.h"
 #include <map>
 #include <unordered_map>
 #include <memory>
@@ -37,6 +38,10 @@ public:
 	virtual ~ReorgStrategy();
 	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 	virtual std::vector<NodeReorgDescription> reorganize(const IndexCache &raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) = 0;
+
+	static bool entry_less(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
+	static bool entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
+	static double get_score( const IndexCacheEntry &entry );
 };
 
 //
@@ -59,9 +64,22 @@ public:
 	CapacityReorgStrategy();
 	virtual ~CapacityReorgStrategy();
 	virtual std::vector<NodeReorgDescription> reorganize( const IndexCache &raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes );
-	static bool entry_less(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
-	static bool entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
-	static double get_score( const IndexCacheEntry &entry );
+};
+
+
+//
+// This strategy calculates the center of mass of over all entries
+// and clusters nearby entries at a single node
+//
+class GeographicReorgStrategy : public ReorgStrategy {
+	friend class NodePos;
+public:
+	GeographicReorgStrategy();
+	virtual ~GeographicReorgStrategy();
+	virtual std::vector<NodeReorgDescription> reorganize( const IndexCache &raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes );
+private:
+	static GDAL::CRSTransformer geosmsg_trans;
+	static GDAL::CRSTransformer webmercator_trans;
 };
 
 #endif /* REORG_STRATEGY_H_ */

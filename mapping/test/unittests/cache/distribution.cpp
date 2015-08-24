@@ -196,6 +196,54 @@ TEST(DistributionTest,TestCapacityReorg) {
 	ASSERT_TRUE(res.at(0).get_items().at(0).from_cache_id == 1);
 }
 
+
+TEST(DistributionTest,TestGeographicReorg) {
+
+	GeographicReorgStrategy reorg;
+
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 0)));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0)));
+
+	std::map<uint32_t, std::shared_ptr<Node>> nodes;
+	nodes.emplace(1, n1);
+	nodes.emplace(2, n2);
+
+	IndexCache cache(reorg);
+
+	// Entry 1
+	NodeCacheKey k1("key", 1);
+	CacheEntryBounds b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheEntry c1(b1, 10);
+	NodeCacheRef r1(k1, c1);
+	IndexCacheEntry e1(1, r1);
+
+	// Entry 2
+	NodeCacheKey k2("key", 2);
+	CacheEntryBounds b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45),
+		TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheEntry c2(b2, 10);
+	NodeCacheRef r2(k2, c2);
+	IndexCacheEntry e2(1, r2);
+
+	// Increase count
+	n1->capacity.raster_cache_used = 20;
+	e2.access_count = 2;
+
+	cache.put(e1);
+	cache.put(e2);
+
+	ASSERT_TRUE(cache.requires_reorg(nodes));
+	auto res = cache.reorganize(nodes);
+
+	ASSERT_TRUE(res.size() == 1);
+	ASSERT_TRUE(res.at(0).node_id == 2);
+	ASSERT_TRUE(res.at(0).get_items().size() == 1);
+	ASSERT_TRUE(res.at(0).get_items().at(0).from_cache_id == 1);
+}
+
+
+
+
 TEST(DistributionTest,TestStatsAndReorg) {
 	CapacityReorgStrategy reorg;
 

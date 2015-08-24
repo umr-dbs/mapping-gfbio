@@ -132,15 +132,14 @@ QueryInfo::QueryInfo(const QueryRectangle& query, const std::string& semantic_id
 }
 
 bool QueryInfo::satisfies(const BaseRequest& req) {
-	try {
-		if ( req.semantic_id == semantic_id  &&
-			 query.SpatialReference::contains(req.query) &&
-			 query.TemporalReference::contains(req.query) &&
-			 query.restype == req.query.restype ) {
+	if ( req.semantic_id == semantic_id  &&
+		 query.SpatialReference::contains(req.query) &&
+		 query.TemporalReference::contains(req.query) &&
+		 query.restype == req.query.restype ) {
 
-			if ( query.restype == QueryResolution::Type::NONE )
-				return true;
-
+		if ( query.restype == QueryResolution::Type::NONE )
+			return true;
+		else if (query.restype == QueryResolution::Type::PIXELS) {
 			// Check resolution
 			double my_xres = (query.x2-query.x1) / query.xres;
 			double my_yres = (query.y2-query.y1) / query.yres;
@@ -151,7 +150,8 @@ bool QueryInfo::satisfies(const BaseRequest& req) {
 			return std::abs(1.0 - my_xres/q_xres) < 0.01 &&
 				   std::abs(1.0 - my_yres/q_yres) < 0.01;
 		}
-	} catch ( ArgumentException &ae ) {
+		else
+			throw ArgumentException("Unknown QueryResolution::Type in QueryRectangle");
 	}
 	return false;
 }

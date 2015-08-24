@@ -105,14 +105,18 @@ bool CacheEntryBounds::matches(const QueryRectangle& query) const {
 
 		if ( res_type == QueryResolution::Type::NONE )
 			return true;
+		else if ( res_type == QueryResolution::Type::PIXELS ) {
 
-		double q_x_res = (double) query.xres / (query.x2 - query.x1);
-		double q_y_res = (double) query.yres / (query.y2 - query.y1);
+			double q_x_res = (double) query.xres / (query.x2 - query.x1);
+			double q_y_res = (double) query.yres / (query.y2 - query.y1);
 
-		return x_res_from <  q_x_res &&
-			   x_res_to   >= q_x_res &&
-			   y_res_from <  q_y_res &&
-			   y_res_to   >= q_y_res;
+			return x_res_from <  q_x_res &&
+				   x_res_to   >= q_x_res &&
+				   y_res_from <  q_y_res &&
+				   y_res_to   >= q_y_res;
+		}
+		else
+			throw ArgumentException("Unknown QueryResolution::Type in QueryRectangle");
 	}
 	return false;
 }

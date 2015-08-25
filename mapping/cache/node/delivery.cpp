@@ -46,10 +46,10 @@ DeliveryManager::DeliveryManager(uint32_t listen_port) :
 	shutdown(false), listen_port(listen_port), delivery_id(1) {
 }
 
-uint64_t DeliveryManager::add_raster_delivery(std::unique_ptr<GenericRaster> result, unsigned int count) {
+uint64_t DeliveryManager::add_raster_delivery(std::shared_ptr<GenericRaster> result, unsigned int count) {
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
 	uint64_t res = delivery_id++;
-	deliveries.emplace(res, Delivery(res,count, std::shared_ptr<GenericRaster>(result.release()) ) );
+	deliveries.emplace(res, Delivery(res,count,result) );
 	Log::trace("Added delivery with id: %d", res);
 	return res;
 }
@@ -205,8 +205,7 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 					auto &key = dc->get_key();
 					try {
 						Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-						auto res = CacheManager::getInstance().get_raster_local(key);
-						dc->send_raster( std::shared_ptr<GenericRaster>(res.release()) );
+						dc->send_raster( CacheManager::getInstance().get_raster_ref(key) );
 					} catch (NoSuchElementException &nse) {
 						dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
 					}
@@ -216,8 +215,7 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 					auto &key = dc->get_key();
 					try {
 						Log::debug("Moving cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-						auto res = CacheManager::getInstance().get_raster_local(key);
-						dc->send_raster_move(std::shared_ptr<GenericRaster>(res.release()) );
+						dc->send_raster_move( CacheManager::getInstance().get_raster_ref(key) );
 					} catch (NoSuchElementException &nse) {
 						dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
 					}

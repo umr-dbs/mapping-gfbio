@@ -62,7 +62,7 @@ public:
 	// The returned id must be used by clients fetching
 	// the stored result.
 	//
-	uint64_t add_raster_delivery(std::unique_ptr<GenericRaster> result, unsigned int count = 1);
+	uint64_t add_raster_delivery(std::shared_ptr<GenericRaster> result, unsigned int count = 1);
 	// Fires up the delivery-manager and will return after
 	// stop() is invoked by another thread
 	void run();

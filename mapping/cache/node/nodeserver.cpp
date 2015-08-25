@@ -93,22 +93,23 @@ void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
 }
 
 void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
-	std::unique_ptr<GenericRaster> result;
+	std::shared_ptr<GenericRaster> result;
 	switch (cmd) {
 		case WorkerConnection::CMD_CREATE_RASTER: {
 			BaseRequest rr(stream);
 			QueryProfiler profiler;
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			result = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(rr.query, profiler,
-				GenericOperator::RasterQM::LOOSE);
+			auto tmp = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(rr.query, profiler, GenericOperator::RasterQM::LOOSE);
+			result = std::shared_ptr<GenericRaster>( tmp.release() );
 			break;
 		}
 		case WorkerConnection::CMD_PUZZLE_RASTER: {
 			PuzzleRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			result = CacheManager::process_raster_puzzle(rr, my_host, my_port);
+			auto tmp = CacheManager::process_raster_puzzle(rr, my_host, my_port);
 			Log::debug("Adding puzzled raster to cache.");
-			CacheManager::getInstance().put_raster(rr.semantic_id, result);
+			CacheManager::getInstance().put_raster(rr.semantic_id, tmp);
+			result = std::shared_ptr<GenericRaster>( tmp.release() );
 			break;
 		}
 
@@ -116,7 +117,7 @@ void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
 			DeliveryRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
 			NodeCacheKey key(rr.semantic_id,rr.entry_id);
-			result = CacheManager::getInstance().get_raster_local(key);
+			result = CacheManager::getInstance().get_raster_ref(key);
 			break;
 		}
 	}
@@ -130,7 +131,7 @@ void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
 		throw ArgumentException(
 			concat("Expected command ", WorkerConnection::RESP_DELIVERY_QTY, " but received ", cmd_qty));
 
-	uint64_t delivery_id = delivery_manager.add_raster_delivery(std::move(result), qty);
+	uint64_t delivery_id = delivery_manager.add_raster_delivery(result, qty);
 	Log::debug("Sending delivery_id.");
 	stream.write(WorkerConnection::RESP_DELIVERY_READY);
 	stream.write(delivery_id);

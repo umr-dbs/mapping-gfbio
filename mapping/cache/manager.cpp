@@ -75,7 +75,7 @@ std::unique_ptr<GenericRaster> CacheManager::fetch_raster(const std::string & ho
 
 std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleRequest& req, std::string my_host,
 	uint32_t my_port) {
-	typedef std::unique_ptr<GenericRaster> RP;
+	typedef std::shared_ptr<GenericRaster> RP;
 	typedef std::unique_ptr<geos::geom::Geometry> GP;
 
 	Log::trace("Processing puzzle-request: %s", req.to_string().c_str());
@@ -90,12 +90,13 @@ std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleR
 		if (cr.host == my_host && cr.port == my_port) {
 			Log::trace("Fetching puzzle-piece from local cache, key: %s:%d", req.semantic_id.c_str(),
 				cr.entry_id);
-			items.push_back(CacheManager::getInstance().get_raster_local( NodeCacheKey(req.semantic_id, cr.entry_id) ));
+			items.push_back(CacheManager::getInstance().get_raster_ref( NodeCacheKey(req.semantic_id, cr.entry_id) ));
 		}
 		else {
 			Log::debug("Fetching puzzle-piece from %s:%d, key: %s:%d", cr.host.c_str(), cr.port,
 				req.semantic_id.c_str(), cr.entry_id);
-			items.push_back(fetch_raster(cr.host, cr.port, NodeCacheKey(req.semantic_id, cr.entry_id)));
+			auto raster = fetch_raster(cr.host, cr.port, NodeCacheKey(req.semantic_id, cr.entry_id));
+			items.push_back( std::shared_ptr<GenericRaster>(raster.release()) );
 		}
 	}
 
@@ -109,7 +110,7 @@ std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleR
 		QueryRectangle rqr = req.get_remainder_query(f->pixel_scale_x, f->pixel_scale_y);
 
 		try {
-			RP rem = graph->getCachedRaster(rqr, qp, GenericOperator::RasterQM::LOOSE);
+			auto rem = graph->getCachedRaster(rqr, qp, GenericOperator::RasterQM::LOOSE);
 
 			if (std::abs(1.0 - f->pixel_scale_x / rem->pixel_scale_x) > 0.01
 				|| std::abs(1.0 - f->pixel_scale_y / rem->pixel_scale_y) > 0.01) {
@@ -125,21 +126,21 @@ std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleR
 			CacheEntryBounds bounds(*rem);
 			GP cube_square = CacheCommon::create_square(bounds.x1, bounds.y1, bounds.x2, bounds.y2);
 			covered = GP(covered->Union(cube_square.get()));
-			items.push_back(std::move(rem));
+			items.push_back( std::shared_ptr<GenericRaster>(rem.release()) );
 		} catch (MetadataException &me) {
 			Log::error("Error fetching remainder: %s. Query: %s", me.what(), CacheCommon::qr_to_string(rqr).c_str());
 			throw;
 		}
 	}
 
-	RP result = CacheManager::do_puzzle(req.query, *covered, items);
+	auto result = CacheManager::do_puzzle(req.query, *covered, items);
 	Log::trace("Finished processing puzzle-request: %s", req.to_string().c_str());
 	return result;
 }
 
 std::unique_ptr<GenericRaster> CacheManager::do_puzzle(const QueryRectangle &query,
 	const geos::geom::Geometry &covered,
-	const std::vector<std::unique_ptr<GenericRaster> >& items) {
+	const std::vector<std::shared_ptr<GenericRaster> >& items) {
 
 	Log::trace("Puzzling raster with %d pieces", items.size() );
 
@@ -263,10 +264,9 @@ void LocalCacheManager::put_raster(const std::string& semantic_id, const std::un
 	put_raster_local(semantic_id,raster);
 }
 
-
-std::unique_ptr<GenericRaster> LocalCacheManager::get_raster_local(const NodeCacheKey &key) {
+const std::shared_ptr<GenericRaster> LocalCacheManager::get_raster_ref(const NodeCacheKey& key) {
 	Log::debug("Retrieving raster-cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-	return rasterCache.get_copy(key);
+	return rasterCache.get(key);
 }
 
 NodeCacheRef LocalCacheManager::put_raster_local(const std::string& semantic_id,
@@ -320,7 +320,7 @@ void NopCacheManager::put_raster(const std::string& semantic_id,
 	// Nothing to-do
 }
 
-std::unique_ptr<GenericRaster> NopCacheManager::get_raster_local(const NodeCacheKey &key) {
+const std::shared_ptr<GenericRaster> NopCacheManager::get_raster_ref(const NodeCacheKey& key) {
 	(void) key;
 	throw NoSuchElementException("Cache Miss");
 }
@@ -461,11 +461,9 @@ void RemoteCacheManager::put_raster(const std::string& semantic_id,
 	// TODO: Do we need a confirmation?
 }
 
-
-
-std::unique_ptr<GenericRaster> RemoteCacheManager::get_raster_local(const NodeCacheKey &key) {
+const std::shared_ptr<GenericRaster> RemoteCacheManager::get_raster_ref(const NodeCacheKey& key) {
 	Log::debug("Getting raster from local cache. ID: %s::%d", key.semantic_id.c_str(), key.entry_id);
-	return local_cache.get_copy(key);
+	return local_cache.get(key);
 }
 
 NodeCacheRef RemoteCacheManager::put_raster_local(const std::string& semantic_id,

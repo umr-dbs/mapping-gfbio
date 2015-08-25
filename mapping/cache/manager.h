@@ -45,7 +45,7 @@ public:
 		const std::unique_ptr<GenericRaster> &raster) = 0;
 
 	virtual void remove_raster_local(const NodeCacheKey &key) = 0;
-	virtual std::unique_ptr<GenericRaster> get_raster_local(const NodeCacheKey &key) = 0;
+	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key) = 0;
 
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster) = 0;
 
@@ -58,7 +58,7 @@ protected:
 		const NodeCacheKey &key);
 
 	static std::unique_ptr<GenericRaster> do_puzzle(const QueryRectangle &query,
-			const geos::geom::Geometry &covered, const std::vector<std::unique_ptr<GenericRaster> >& items);
+			const geos::geom::Geometry &covered, const std::vector<std::shared_ptr<GenericRaster> >& items);
 private:
 	static std::unique_ptr<CacheManager> impl;
 	static std::unique_ptr<CachingStrategy> strategy;
@@ -75,7 +75,7 @@ public:
 		const QueryRectangle &rect);
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
 
-	virtual std::unique_ptr<GenericRaster> get_raster_local(const NodeCacheKey &key);
+	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
 	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
 		const std::unique_ptr<GenericRaster> &raster);
 	virtual void remove_raster_local(const NodeCacheKey &key);
@@ -96,7 +96,7 @@ public:
 		const QueryRectangle &rect);
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
 
-	virtual std::unique_ptr<GenericRaster> get_raster_local(const NodeCacheKey &key);
+	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
 	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
 		const std::unique_ptr<GenericRaster> &raster);
 	virtual void remove_raster_local(const NodeCacheKey &key);
@@ -118,7 +118,7 @@ public:
 		const QueryRectangle &rect);
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
 
-	virtual std::unique_ptr<GenericRaster> get_raster_local(const NodeCacheKey &key);
+	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
 	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
 		const std::unique_ptr<GenericRaster> &raster);
 	virtual void remove_raster_local(const NodeCacheKey &key);

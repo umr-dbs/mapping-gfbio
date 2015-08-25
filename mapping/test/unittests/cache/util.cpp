@@ -165,8 +165,8 @@ std::unique_ptr<GenericRaster> TestCacheMan::query_raster(const GenericOperator 
 	return get_current_instance().query_raster(op, rect);
 }
 
-std::unique_ptr<GenericRaster> TestCacheMan::get_raster_local(const NodeCacheKey &key) {
-	return get_current_instance().get_raster_local(key);
+const std::shared_ptr<GenericRaster> TestCacheMan::get_raster_ref(const NodeCacheKey& key) {
+	return get_current_instance().get_raster_ref(key);
 }
 
 void TestCacheMan::put_raster(const std::string &semantic_id,

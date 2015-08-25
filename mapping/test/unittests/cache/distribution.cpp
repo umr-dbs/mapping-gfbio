@@ -63,7 +63,7 @@ TEST(DistributionTest,TestRedistibution) {
 	NodeCacheKey key1(sem_id, 2);
 
 	try {
-		tcm.get_instance_mgr(0).get_raster_local(key1);
+		tcm.get_instance_mgr(0).get_raster_ref(key1);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
@@ -78,14 +78,14 @@ TEST(DistributionTest,TestRedistibution) {
 
 	// Assert moved
 	try {
-		tcm.get_instance_mgr(0).get_raster_local(key1);
+		tcm.get_instance_mgr(0).get_raster_ref(key1);
 		FAIL();
 	} catch (NoSuchElementException &nse) {
 	}
 
 	NodeCacheKey key_new(sem_id, 1);
 	try {
-		tcm.get_instance_mgr(1).get_raster_local(key_new);
+		tcm.get_instance_mgr(1).get_raster_ref(key_new);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
@@ -313,7 +313,7 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	// Assert moved
 	try {
 		NodeCacheKey k(op->getSemanticId(),1);
-		tcm.get_instance_mgr(0).get_raster_local(k);
+		tcm.get_instance_mgr(0).get_raster_ref(k);
 		Log::debug("FAILED on get 1");
 		FAIL();
 	} catch (NoSuchElementException &nse) {
@@ -321,14 +321,14 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	try {
 		NodeCacheKey k(op->getSemanticId(),2);
-		tcm.get_instance_mgr(0).get_raster_local(k);
+		tcm.get_instance_mgr(0).get_raster_ref(k);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
 
 	try {
 		NodeCacheKey k(op->getSemanticId(),1);
-		tcm.get_instance_mgr(1).get_raster_local(k);
+		tcm.get_instance_mgr(1).get_raster_ref(k);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}

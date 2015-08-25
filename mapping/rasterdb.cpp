@@ -1,6 +1,8 @@
 #include "datatypes/raster.h"
 #include "rasterdb/rasterdb.h"
 #include "raster/colors.h"
+#include "raster/opencl.h"
+#include "cache/manager.h"
 
 #include "operators/operator.h"
 #include "converters/converter.h"
@@ -254,7 +256,9 @@ static void runquery(int argc, char *argv[]) {
 	}
 	else if (result == "points") {
 		QueryProfiler profiler;
-		auto points = graph->getCachedPointCollection(qrect_from_json(root), profiler);
+		auto qrect1 = qrect_from_json(root);
+		QueryRectangle qrect(qrect1, qrect1, QueryResolution::none());
+		auto points = graph->getCachedPointCollection(qrect, profiler);
 		auto csv = points->toCSV();
 		if (out_filename) {
 			FILE *f = fopen(out_filename, "w");
@@ -366,6 +370,8 @@ int main(int argc, char *argv[]) {
 
 	Configuration::loadFromDefaultPaths();
 
+	CacheManager::init(make_unique<NopCacheManager>());
+
 	const char *command = argv[1];
 
 	if (strcmp(command, "convert") == 0) {
@@ -402,6 +408,11 @@ int main(int argc, char *argv[]) {
 		f(36, -36);
 		f(11, -36);
 		f(36, -16);
+	}
+	else if (strcmp(command, "clinfo") == 0) {
+		RasterOpenCL::init();
+		auto mbs = RasterOpenCL::getMaxAllocSize();
+		printf("maximum buffer size is %ud (%d MB)\n", mbs, mbs/1024/1024);
 	}
 	else {
 		usage();

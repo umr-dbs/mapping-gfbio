@@ -114,7 +114,7 @@ TEST(DistributionTest,TestRedistibution) {
 	cm->add_instance(&ns2);
 
 	std::unique_ptr<CacheManager> impl = std::move(cm);
-	CacheManager::init( impl );
+	CacheManager::init( std::move(impl) );
 
 	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::getInstance());
 
@@ -200,7 +200,7 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 	cm->add_instance(&ns2);
 
 	std::unique_ptr<CacheManager> impl = std::move(cm);
-	CacheManager::init( impl );
+	CacheManager::init( std::move(impl) );
 
 
 	std::vector<TP> ts;

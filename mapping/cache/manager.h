@@ -18,7 +18,7 @@
 class CacheManager {
 public:
 	static CacheManager& getInstance();
-	static void init(std::unique_ptr<CacheManager> &impl);
+	static void init(std::unique_ptr<CacheManager> impl);
 	static thread_local UnixSocket *remote_connection;
 
 	virtual ~CacheManager();

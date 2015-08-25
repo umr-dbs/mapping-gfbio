@@ -62,7 +62,7 @@ int main(void) {
 	} else {
 		cache_impl.reset(new NopCacheManager());
 	}
-	CacheManager::init(cache_impl);
+	CacheManager::init(std::move(cache_impl));
 
 
 	instance = new NodeServer(hoststr,portnr,ihoststr,iportnr,num_threads);

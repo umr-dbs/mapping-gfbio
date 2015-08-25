@@ -24,7 +24,7 @@ CacheManager& CacheManager::getInstance() {
 			"CacheManager was not initialized. Please use CacheManager::init first.");
 }
 
-void CacheManager::init(std::unique_ptr<CacheManager>& impl) {
+void CacheManager::init(std::unique_ptr<CacheManager> impl) {
 	CacheManager::impl.reset(impl.release());
 }
 

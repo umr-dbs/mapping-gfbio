@@ -26,8 +26,7 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
-	std::unique_ptr<CacheManager> impl = make_unique<NopCacheManager>();
-	CacheManager::init( impl );
+	CacheManager::init( make_unique<NopCacheManager>() );
 
 	RasterCache cache(114508*2 + 17);
 

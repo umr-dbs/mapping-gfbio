@@ -6,6 +6,7 @@
  */
 
 #include "cache/index/indexserver.h"
+#include "cache/index/reorg_strategy.h"
 #include "util/configuration.h"
 #include <signal.h>
 
@@ -42,7 +43,9 @@ int main(void) {
 
 	auto portnr = atoi(portstr.c_str());
 
-	instance = new IndexServer(portnr);
+	CapacityReorgStrategy cap_reorg;
+
+	instance = new IndexServer(portnr, cap_reorg);
 	instance->run();
 	return 0;
 }

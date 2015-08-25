@@ -12,32 +12,49 @@
 
 #include <vector>
 
-class ReorgResult {
+
+class ReorgBase {
 public:
 	enum class Type : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT };
 
-	ReorgResult( Type type, const std::string &semantic_id,
-		uint64_t cache_id, uint64_t idx_cache_id );
-
-	ReorgResult( BinaryStream &stream );
-	virtual ~ReorgResult();
+	virtual ~ReorgBase();
 
 	virtual void toStream( BinaryStream &stream ) const;
 
 	Type type;
 	// The semantic id of the entry
 	std::string semantic_id;
-	// The cache-id on the node of the entry
-	uint64_t cache_id;
-	// The cache-id on the index of the entry
-	uint64_t idx_cache_id;
 
+	// The cache-id on the node of the entry
+	uint64_t from_cache_id;
+
+	// The id of the node to retrieve the entry from
+	uint32_t from_node_id;
+
+protected:
+	ReorgBase( Type type, const std::string &semantic_id, uint32_t from_node_id, uint64_t from_cache_id);
+	ReorgBase( BinaryStream &stream );
 };
 
-class ReorgItem : public ReorgResult {
+class ReorgResult : public ReorgBase {
 public:
-	ReorgItem( Type type, const std::string &host, uint32_t port, const std::string &semantic_id,
-		uint64_t cache_id, uint64_t idx_cache_id );
+	ReorgResult( Type type, const std::string &semantic_id,
+		uint32_t from_node_id, uint64_t from_cache_id, uint32_t to_node_id, uint64_t to_cache_id );
+
+	ReorgResult( BinaryStream &stream );
+	virtual ~ReorgResult();
+
+	virtual void toStream( BinaryStream &stream ) const;
+
+	uint32_t to_node_id;
+
+	uint32_t to_cache_id;
+};
+
+class ReorgItem : public ReorgBase {
+public:
+	ReorgItem( Type type, const std::string &semantic_id, uint32_t from_node_id, uint64_t from_cache_id,
+		const std::string &from_host, uint32_t from_port );
 
 	ReorgItem( BinaryStream &stream );
 	virtual ~ReorgItem();
@@ -56,7 +73,6 @@ public:
 	ReorgDescription( BinaryStream &stream );
 
 	void add_item( ReorgItem item );
-	void add_item( ReorgItem &&item );
 	const std::vector<ReorgItem>& get_items() const;
 
 	void toStream( BinaryStream &stream ) const;
@@ -64,6 +80,5 @@ private:
 	std::vector<ReorgItem> items;
 
 };
-
 
 #endif /* REDISTRIBUTION_H_ */

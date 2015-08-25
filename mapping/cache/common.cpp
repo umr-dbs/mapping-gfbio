@@ -7,7 +7,6 @@
 
 #include "cache/common.h"
 #include "cache/priv/connection.h"
-#include "cache/priv/types.h"
 #include "util/log.h"
 #include "util/exceptions.h"
 
@@ -86,99 +85,6 @@ int CacheCommon::get_listening_socket(int port, bool nonblock, int backlog) {
 		throw NetworkException("listen() failed");
 
 	return sock;
-}
-
-std::unique_ptr<GenericRaster> CacheCommon::fetch_raster(const std::string & host, uint32_t port,
-	const STCacheKey &key) {
-	Log::debug("Fetching cache-entry from: %s:%d, key: %s", host.c_str(), port, key.to_string().c_str());
-	UnixSocket sock(host.c_str(), port);
-	BinaryStream &stream = sock;
-
-	stream.write(DeliveryConnection::MAGIC_NUMBER);
-	stream.write(DeliveryConnection::CMD_GET_CACHED_RASTER);
-	key.toStream(stream);
-
-	uint8_t resp;
-	stream.read(&resp);
-	switch (resp) {
-		case DeliveryConnection::RESP_OK: {
-			return GenericRaster::fromStream(stream);
-		}
-		case DeliveryConnection::RESP_ERROR: {
-			std::string err_msg;
-			stream.read(&err_msg);
-			Log::error("Delivery returned error: %s", err_msg.c_str());
-			throw DeliveryException(err_msg);
-		}
-		default: {
-			Log::error("Delivery returned unknown code: %d", resp);
-			throw DeliveryException("Delivery returned unknown code");
-		}
-	}
-}
-
-std::unique_ptr<GenericRaster> CacheCommon::process_raster_puzzle(const PuzzleRequest& req, std::string my_host,
-	uint32_t my_port) {
-	typedef std::unique_ptr<GenericRaster> RP;
-	typedef std::unique_ptr<geos::geom::Geometry> GP;
-
-	Log::trace("Processing puzzle-request: %s", req.to_string().c_str());
-
-	std::vector<RP> items;
-
-	GP covered(req.covered->clone());
-
-	// Fetch puzzle parts
-	Log::trace("Fetching all puzzle-parts");
-	for (const CacheRef &cr : req.parts) {
-		if (cr.host == my_host && cr.port == my_port) {
-			Log::trace("Fetching puzzle-piece from local cache, key: %s:%d", req.semantic_id.c_str(),
-				cr.entry_id);
-			items.push_back(CacheManager::getInstance().get_raster_local(req.semantic_id, cr.entry_id));
-		}
-		else {
-			Log::debug("Fetching puzzle-piece from %s:%d, key: %s:%d", cr.host.c_str(), cr.port,
-				req.semantic_id.c_str(), cr.entry_id);
-			items.push_back(fetch_raster(cr.host, cr.port, STCacheKey(req.semantic_id, cr.entry_id)));
-		}
-	}
-
-	// Create remainder
-	if (!req.remainder->isEmpty()) {
-		Log::trace("Creating remainder: %s", req.remainder->toString().c_str());
-		auto graph = GenericOperator::fromJSON(req.semantic_id);
-		QueryProfiler qp;
-		auto &f = items.at(0);
-
-		QueryRectangle rqr = req.get_remainder_query(f->pixel_scale_x, f->pixel_scale_y);
-
-		try {
-			RP rem = graph->getCachedRaster(rqr, qp, GenericOperator::RasterQM::LOOSE);
-
-			if (std::abs(1.0 - f->pixel_scale_x / rem->pixel_scale_x) > 0.01
-				|| std::abs(1.0 - f->pixel_scale_y / rem->pixel_scale_y) > 0.01) {
-				Log::error(
-					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s",
-					f->pixel_scale_x, f->pixel_scale_y, rem->pixel_scale_x, rem->pixel_scale_y,
-					((rqr.x2 - rqr.x1) / rqr.xres), ((rqr.y2 - rqr.y1) / rqr.yres),
-					qr_to_string(rqr).c_str());
-
-				throw OperatorException("Incompatible resolution on remainder");
-			}
-
-			STRasterEntryBounds rcc(*rem);
-			GP cube_square = CacheCommon::create_square(rcc.x1, rcc.y1, rcc.x2, rcc.y2);
-			covered = GP(covered->Union(cube_square.get()));
-			items.push_back(std::move(rem));
-		} catch (MetadataException &me) {
-			Log::error("Error fetching remainder: %s. Query: %s", me.what(), qr_to_string(rqr).c_str());
-			throw;
-		}
-	}
-
-	RP result = CacheManager::do_puzzle(req.query, *covered, items);
-	Log::trace("Finished processing puzzle-request: %s", req.to_string().c_str());
-	return result;
 }
 
 std::unique_ptr<geos::geom::Polygon> CacheCommon::create_square(double lx, double ly, double ux, double uy) {

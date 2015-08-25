@@ -12,31 +12,100 @@
 #include "util/make_unique.h"
 #include "util/concat.h"
 
-BaseConnection::BaseConnection(std::unique_ptr<UnixSocket>& socket) :
-	id(next_id++), stream(*socket), faulty(false), socket(std::move(socket)) {
+#include <fcntl.h>
+
+BaseConnection::BaseConnection(std::unique_ptr<UnixSocket> socket) :
+	id(next_id++), stream(*socket), faulty(false), writing(false), reading(false), socket(std::move(socket)) {
 }
 
 BaseConnection::~BaseConnection() {
+}
+
+void BaseConnection::input() {
+	if (reading) {
+		reader->read();
+		if (reader->is_finished()) {
+			reading = false;
+			read_finished(*reader);
+			reader.reset(nullptr);
+		}
+		else if (writer->has_error()) {
+			Log::warn("An error occured during read on connection: %d", id);
+			reading = false;
+			faulty = true;
+			reader.reset(nullptr);
+		}
+		else
+			Log::info("Read-buffer full. Continuing on next call.");
+	}
+	else {
+		uint8_t cmd;
+		try {
+			if (stream.read(&cmd, true)) {
+				process_command(cmd);
+			}
+			else {
+				Log::debug("Connection closed %d.", id);
+				faulty = true;
+			}
+		} catch (std::exception &e) {
+			Log::error("Unexpected error on connection %d, setting faulty. Reason: %s", id, e.what());
+			faulty = true;
+		}
+	}
+}
+
+void BaseConnection::do_write() {
+	if (writing) {
+		writer->write();
+		if (writer->is_finished()) {
+			writing = false;
+			write_finished();
+			writer.reset(nullptr);
+		}
+		else if (writer->has_error()) {
+			Log::warn("An error occured during write on connection: %d", id);
+			writing = false;
+			faulty = true;
+			writer.reset(nullptr);
+		}
+		else
+			Log::info("Write-buffer full. Continuing on next call.");
+	}
+	else
+		throw IllegalStateException("Cannot trigger write while not in writing state.");
+}
+
+void BaseConnection::write(std::unique_ptr<NBWriter> writer) {
+	if (!writing && !reading) {
+		this->writer = std::move(writer);
+		this->writing = true;
+	}
+	else
+		throw IllegalStateException("Another write is in progress.");
+}
+
+void BaseConnection::read(std::unique_ptr<NBReader> reader) {
+	if (!writing && !reading) {
+		this->reader = std::move(reader);
+		this->reading = true;
+	}
 }
 
 int BaseConnection::get_read_fd() {
 	return socket->getReadFD();
 }
 
-void BaseConnection::input() {
-	uint8_t cmd;
-	try {
-		if (stream.read(&cmd, true)) {
-			process_command(cmd);
-		}
-		else {
-			Log::debug("Connection closed %d.", id);
-			faulty = true;
-		}
-	} catch (std::exception &e) {
-		Log::error("Unexpected error on connection %d. Setting faulty.", id);
-		faulty = true;
-	}
+int BaseConnection::get_write_fd() {
+	return socket->getWriteFD();
+}
+
+bool BaseConnection::is_reading() {
+	return reading;
+}
+
+bool BaseConnection::is_writing() {
+	return writing;
 }
 
 bool BaseConnection::is_faulty() {
@@ -51,8 +120,8 @@ uint64_t BaseConnection::next_id = 1;
 //
 /////////////////////////////////////////////////
 
-ClientConnection::ClientConnection(std::unique_ptr<UnixSocket>& socket) :
-	BaseConnection(socket), state(State::IDLE), request_type(RequestType::NONE) {
+ClientConnection::ClientConnection(std::unique_ptr<UnixSocket> socket) :
+	BaseConnection(std::move(socket)), state(State::IDLE), request_type(RequestType::NONE) {
 }
 
 ClientConnection::~ClientConnection() {
@@ -76,6 +145,13 @@ void ClientConnection::process_command(uint8_t cmd) {
 			throw NetworkException(ss.str());
 		}
 	}
+}
+
+void ClientConnection::read_finished(NBReader& reader) {
+	(void) reader;
+}
+
+void ClientConnection::write_finished() {
 }
 
 ClientConnection::State ClientConnection::get_state() const {
@@ -125,7 +201,7 @@ const BaseRequest& ClientConnection::get_request() const {
 }
 
 void ClientConnection::reset() {
-	request.release();
+	request.reset();
 	request_type = RequestType::NONE;
 	state = State::IDLE;
 }
@@ -141,8 +217,8 @@ const uint8_t ClientConnection::RESP_ERROR;
 //
 /////////////////////////////////////////////////
 
-WorkerConnection::WorkerConnection(std::unique_ptr<UnixSocket> &socket, const std::shared_ptr<Node> &node) :
-	BaseConnection(socket), node(node), state(State::IDLE) {
+WorkerConnection::WorkerConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node) :
+	BaseConnection(std::move(socket)), node(node), state(State::IDLE) {
 }
 
 WorkerConnection::~WorkerConnection() {
@@ -180,11 +256,9 @@ void WorkerConnection::process_command(uint8_t cmd) {
 			break;
 		}
 		case RESP_NEW_RASTER_CACHE_ENTRY: {
-			STCacheKey key(stream);
-			STRasterEntryBounds cube(stream);
-			Log::debug("Worker returned new result to raster-cache, key: %s:%d", key.semantic_id.c_str(),
-				key.entry_id);
-			new_raster_entry.reset(new STRasterRefKeyed(node->id, key, cube));
+			new_raster_entry.reset(new NodeCacheRef(stream));
+			Log::debug("Worker returned new result to raster-cache: %s",
+				new_raster_entry->to_string().c_str());
 			state = State::NEW_RASTER_ENTRY;
 			break;
 		}
@@ -199,7 +273,13 @@ void WorkerConnection::process_command(uint8_t cmd) {
 			throw NetworkException(concat("Unknown response from worker: ", cmd));
 		}
 	}
+}
 
+void WorkerConnection::read_finished(NBReader& reader) {
+	(void) reader;
+}
+
+void WorkerConnection::write_finished() {
 }
 
 // ACTIONS
@@ -294,7 +374,7 @@ void WorkerConnection::release() {
 // GETTER
 //
 
-const STRasterRefKeyed& WorkerConnection::get_new_raster_entry() const {
+const NodeCacheRef& WorkerConnection::get_new_raster_entry() const {
 	if (state == State::NEW_RASTER_ENTRY)
 		return *new_raster_entry;
 	throw IllegalStateException("Can only return new raster entry in state NEW_RASTER_ENTRY");
@@ -320,9 +400,9 @@ const std::string& WorkerConnection::get_error_message() const {
 
 void WorkerConnection::reset() {
 	error_msg = "";
-	result.release();
-	new_raster_entry.release();
-	raster_query.release();
+	result.reset();
+	new_raster_entry.reset();
+	raster_query.reset();
 	state = State::IDLE;
 }
 
@@ -346,10 +426,10 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 //
 /////////////////////////////////////////////////
 
-ControlConnection::ControlConnection(std::unique_ptr<UnixSocket>& socket, const std::shared_ptr<Node> &node) :
-	BaseConnection(socket), node(node), state(State::IDLE) {
+ControlConnection::ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node) :
+	BaseConnection(std::move(socket)), node(node), state(State::IDLE) {
 	try {
-		stream.write(RESP_HELLO);
+		stream.write(CMD_HELLO);
 		stream.write(node->id);
 	} catch (NetworkException &ne) {
 		Log::error("Could not send response to control-connection.");
@@ -365,19 +445,25 @@ ControlConnection::State ControlConnection::get_state() const {
 }
 
 void ControlConnection::process_command(uint8_t cmd) {
-	if (state != State::IDLE && state != State::REORGANIZING)
-		throw IllegalStateException("Can only accept input in state IDLE or REORGANIZING");
+	if (state != State::IDLE && state != State::REORGANIZING && state != State::STATS_REQUESTED)
+		throw IllegalStateException("Can only accept input in state IDLE, REORGANIZING or STATS_REQUESTED");
 
 	switch (cmd) {
-		case CMD_REORG_ITEM_MOVED: {
+		case RESP_REORG_ITEM_MOVED: {
 			Log::debug("Received notification about reorganized entry.");
 			reorg_result.reset(new ReorgResult(stream));
 			state = State::REORG_RESULT_READ;
 			break;
 		}
-		case CMD_REORG_DONE: {
+		case RESP_REORG_DONE: {
 			Log::debug("Node %d finished reorganization.", node->id);
 			state = State::REORG_FINISHED;
+			break;
+		}
+		case RESP_STATS: {
+			Log::debug("Node %d delivered fresh stats.", node->id);
+			stats.reset(new NodeStats(stream));
+			state = State::STATS_RECEIVED;
 			break;
 		}
 		default: {
@@ -387,15 +473,23 @@ void ControlConnection::process_command(uint8_t cmd) {
 	}
 }
 
+
+void ControlConnection::read_finished(NBReader& reader) {
+	(void) reader;
+}
+
+void ControlConnection::write_finished() {
+}
+
 // ACTIONS
 
 void ControlConnection::send_reorg(const ReorgDescription& desc) {
-	if ( state == State::IDLE ) {
+	if (state == State::IDLE) {
 		try {
-			stream.write(RESP_REORG);
+			stream.write(CMD_REORG);
 			desc.toStream(stream);
 			state = State::REORGANIZING;
-		} catch ( NetworkException &ne ) {
+		} catch (NetworkException &ne) {
 			Log::error("Could not send Reorg-request to node: %d", node->id);
 			faulty = true;
 		}
@@ -407,7 +501,7 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 void ControlConnection::confirm_reorg() {
 	if (state == State::REORG_RESULT_READ) {
 		try {
-			stream.write(RESP_REORG_ITEM_OK);
+			stream.write(CMD_REORG_ITEM_OK);
 			state = State::REORGANIZING;
 		} catch (NetworkException &ne) {
 			Log::error("Could not send MISS-response to worker: %d", id);
@@ -419,11 +513,26 @@ void ControlConnection::confirm_reorg() {
 
 }
 
+void ControlConnection::send_get_stats() {
+	if (state == State::IDLE) {
+		try {
+			stream.write(CMD_GET_STATS);
+			state = State::STATS_REQUESTED;
+		} catch (NetworkException &ne) {
+			Log::error("Could not send stats-request to node: %d", node->id);
+			faulty = true;
+		}
+	}
+	else
+		throw IllegalStateException("Can only request statistics in state IDLE");
+}
+
 void ControlConnection::release() {
-	if (state == State::REORG_FINISHED)
+	if (state == State::REORG_FINISHED || state == State::STATS_RECEIVED)
 		reset();
 	else
-		throw IllegalStateException("Can only release control-connection in state REORG_FINISHED or ERROR");
+		throw IllegalStateException(
+			"Can only release control-connection in state REORG_FINISHED, STATS_RECEIVED or ERROR");
 }
 
 //
@@ -431,23 +540,35 @@ void ControlConnection::release() {
 //
 
 const ReorgResult& ControlConnection::get_result() {
-	if ( state == State::REORG_RESULT_READ )
-		return * reorg_result;
+	if (state == State::REORG_RESULT_READ)
+		return *reorg_result;
 	else
 		throw IllegalStateException("Can only return ReorgResult in state REORG_RESULT_READ");
 }
 
+const NodeStats& ControlConnection::get_stats() {
+	if (state == State::STATS_RECEIVED)
+		return *stats;
+	else
+		throw IllegalStateException("Can only return ReorgResult in state REORG_RESULT_READ");
+}
+
+// Private stuff
+
 void ControlConnection::reset() {
-	reorg_result.release();
+	reorg_result.reset();
+	stats.reset();
 	state = State::IDLE;
 }
 
 const uint32_t ControlConnection::MAGIC_NUMBER;
-const uint8_t ControlConnection::RESP_HELLO;
-const uint8_t ControlConnection::RESP_REORG;
-const uint8_t ControlConnection::RESP_REORG_ITEM_OK;
-const uint8_t ControlConnection::CMD_REORG_DONE;
-const uint8_t ControlConnection::CMD_REORG_ITEM_MOVED;
+const uint8_t ControlConnection::CMD_REORG;
+const uint8_t ControlConnection::CMD_GET_STATS;
+const uint8_t ControlConnection::CMD_REORG_ITEM_OK;
+const uint8_t ControlConnection::CMD_HELLO;
+const uint8_t ControlConnection::RESP_REORG_ITEM_MOVED;
+const uint8_t ControlConnection::RESP_REORG_DONE;
+const uint8_t ControlConnection::RESP_STATS;
 
 /////////////////////////////////////////////////
 //
@@ -455,8 +576,8 @@ const uint8_t ControlConnection::CMD_REORG_ITEM_MOVED;
 //
 /////////////////////////////////////////////////
 
-DeliveryConnection::DeliveryConnection(std::unique_ptr<UnixSocket>& socket) :
-	BaseConnection(socket), state(State::IDLE), delivery_id(0), cache_key("", 0) {
+DeliveryConnection::DeliveryConnection(std::unique_ptr<UnixSocket> socket) :
+	BaseConnection(std::move(socket)), state(State::IDLE), delivery_id(0), cache_key("", 0) {
 }
 
 DeliveryConnection::~DeliveryConnection() {
@@ -468,18 +589,18 @@ void DeliveryConnection::process_command(uint8_t cmd) {
 
 	switch (cmd) {
 		case CMD_GET: {
-			stream.read(&delivery_id);
-			state = State::DELIVERY_REQUEST_READ;
+			state = State::READING_DELIVERY_REQUEST;
+			read(make_unique<FixedSizeReader>(get_read_fd(), sizeof(delivery_id)));
 			break;
 		}
 		case CMD_GET_CACHED_RASTER: {
-			cache_key = STCacheKey(stream);
-			state = State::RASTER_CACHE_REQUEST_READ;
+			state = State::READING_RASTER_CACHE_REQUEST;
+			read(make_unique<NodeCacheKeyReader>(get_read_fd()));
 			break;
 		}
 		case CMD_MOVE_RASTER: {
-			cache_key = STCacheKey(stream);
-			state = State::RASTER_MOVE_REQUEST_READ;
+			state = State::READING_RASTER_MOVE_REQUEST;
+			read(make_unique<NodeCacheKeyReader>(get_read_fd()));
 			break;
 		}
 		case CMD_MOVE_DONE: {
@@ -492,79 +613,113 @@ void DeliveryConnection::process_command(uint8_t cmd) {
 	}
 }
 
-DeliveryConnection::State DeliveryConnection::get_state() const {
+void DeliveryConnection::read_finished(NBReader& reader) {
+	switch (state) {
+		case State::READING_DELIVERY_REQUEST: {
+			reader.get_stream()->read(&delivery_id);
+			state = State::DELIVERY_REQUEST_READ;
+			break;
+		}
+		case State::READING_RASTER_CACHE_REQUEST: {
+			cache_key = NodeCacheKey(*reader.get_stream());
+			state = State::RASTER_CACHE_REQUEST_READ;
+			break;
+		}
+		case State::READING_RASTER_MOVE_REQUEST: {
+			cache_key = NodeCacheKey(*reader.get_stream());
+			state = State::RASTER_MOVE_REQUEST_READ;
+			break;
+		}
+		default:
+			throw IllegalStateException("Unexpected end of reading in DeliveryConnection");
+	}
+}
+
+void DeliveryConnection::write_finished() {
+	switch (state) {
+		case State::SENDING_RASTER: {
+			state = State::IDLE;
+			break;
+		}
+
+		case State::SENDING_RASTER_MOVE: {
+			state = State::AWAITING_MOVE_CONFIRM;
+			break;
+		}
+		case State::SENDING_ERROR: {
+			state = State::IDLE;
+			break;
+		}
+		default:
+			throw IllegalStateException("Unexpected end of writing in DeliveryConnection");
+	}
+}
+
+DeliveryConnection::State
+DeliveryConnection::get_state()
+const {
 	return state;
 }
 
-const STCacheKey& DeliveryConnection::get_key() const {
+const NodeCacheKey& DeliveryConnection::get_key() const {
 	if (state == State::RASTER_CACHE_REQUEST_READ ||
 		state == State::RASTER_MOVE_REQUEST_READ ||
 		state == State::AWAITING_MOVE_CONFIRM ||
 		state == State::MOVE_DONE)
-		return cache_key;
+	return cache_key;
 	throw IllegalStateException("Can only return cache-key if in state RASTER_CACHE_REQUEST_READ");
 }
 
-uint64_t DeliveryConnection::get_delivery_id() const {
+uint64_t
+DeliveryConnection::get_delivery_id()
+const {
 	if (state == State::DELIVERY_REQUEST_READ)
-		return delivery_id;
+	return delivery_id;
 	throw IllegalStateException("Can only return cache-key if in state DELIVERY_REQUEST_READ");
 }
 
-void DeliveryConnection::send_raster(GenericRaster& raster) {
+void DeliveryConnection::send_raster(std::shared_ptr<GenericRaster> raster) {
 	if (state == State::RASTER_CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ) {
-		try {
-			stream.write(RESP_OK);
-			raster.toStream(stream);
-			state = State::IDLE;
-		} catch (NetworkException &ne) {
-			Log::error("Could not send response to client.");
-			faulty = true;
-		}
+		state = State::SENDING_RASTER;
+		write( make_unique<NBMessageWriter>(RESP_OK,
+				make_unique<NBRasterWriter>( raster, get_write_fd() ),
+				get_write_fd() ) );
 	}
 	else
-		throw IllegalStateException(
-			"Can only send raster in state DELIVERY_REQUEST_READ or RASTER_CACHE_REQUEST_READ");
+	throw IllegalStateException(
+		"Can only send raster in state DELIVERY_REQUEST_READ or RASTER_CACHE_REQUEST_READ");
 }
 
 void DeliveryConnection::send_error(const std::string& msg) {
 	if (state == State::RASTER_CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ ||
-		state == State::RASTER_MOVE_REQUEST_READ ) {
-		try {
-			stream.write(RESP_ERROR);
-			stream.write(msg);
-			state = State::IDLE;
-		} catch (NetworkException &ne) {
-			Log::error("Could not send response to client.");
-			faulty = true;
-		}
+		state == State::RASTER_MOVE_REQUEST_READ || state == State::SENDING_RASTER ||
+		state == State::SENDING_RASTER_MOVE ) {
+
+		state = State::SENDING_ERROR;
+		write( make_unique<NBErrorWriter>(RESP_ERROR,msg,get_write_fd()) );
 	}
 	else
-		throw IllegalStateException(
-			"Can only send error in state DELIVERY_REQUEST_READ or RASTER_CACHE_REQUEST_READ");
+	throw IllegalStateException(
+		"Can only send error in state DELIVERY_REQUEST_READ or RASTER_CACHE_REQUEST_READ");
 }
 
-void DeliveryConnection::send_raster_move(GenericRaster& raster) {
+void DeliveryConnection::send_raster_move(std::shared_ptr<GenericRaster> raster) {
 	if ( state == State::RASTER_MOVE_REQUEST_READ ) {
-		try {
-			stream.write(RESP_OK);
-			raster.toStream(stream);
-			state = State::AWAITING_MOVE_CONFIRM;
-		} catch ( NetworkException &ne ) {
-			Log::error("Could not send response to client.");
-			faulty = true;
-		}
+		state = State::SENDING_RASTER_MOVE;
+		write( make_unique<NBMessageWriter>(RESP_OK,
+				make_unique<NBRasterWriter>( raster, get_write_fd() ),
+				get_write_fd() ) );
 	}
 	else
-		throw IllegalStateException("Can only move raster in state RASTER_MOVE_REQUEST_READ");
+	throw IllegalStateException("Can only move raster in state RASTER_MOVE_REQUEST_READ");
 
 }
 
 void DeliveryConnection::release() {
 	if ( state == State::MOVE_DONE )
-		state = State::IDLE;
+	state = State::IDLE;
 	else
-		throw IllegalStateException("Can only release connection in state MOVE_DONE");
+	throw IllegalStateException("Can only release connection in state MOVE_DONE");
 }
 
 const uint32_t DeliveryConnection::MAGIC_NUMBER;
@@ -574,3 +729,4 @@ const uint8_t DeliveryConnection::CMD_MOVE_RASTER;
 const uint8_t DeliveryConnection::CMD_MOVE_DONE;
 const uint8_t DeliveryConnection::RESP_OK;
 const uint8_t DeliveryConnection::RESP_ERROR;
+

@@ -149,7 +149,7 @@ int Connection::input() {
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_READATTRIBUTES: {
-			RasterDBBackend::rasterid rasterid;
+			RasterDBBackend::rasterid_t rasterid;
 			stream->read(&rasterid);
 			DirectMetadata<std::string> md_string;
 			DirectMetadata<double> md_value;
@@ -168,7 +168,7 @@ int Connection::input() {
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_GETBESTZOOM: {
-			RasterDBBackend::rasterid rasterid;
+			RasterDBBackend::rasterid_t rasterid;
 			stream->read(&rasterid);
 			int desiredzoom;
 			stream->read(&desiredzoom);
@@ -179,7 +179,7 @@ int Connection::input() {
 		case RemoteRasterDBBackend::COMMAND_ENUMERATETILES: {
 			int channelid;
 			stream->read(&channelid);
-			RemoteRasterDBBackend::rasterid rasterid;
+			RemoteRasterDBBackend::rasterid_t rasterid;
 			stream->read(&rasterid);
 			int x1, y1, x2, y2, zoom;
 			stream->read(&x1);

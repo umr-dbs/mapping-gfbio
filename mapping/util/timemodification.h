@@ -126,11 +126,89 @@ class AbsoluteShift : public TimeShift {
 };
 
 /**
+ * Stretch the time interval.
+ */
+class Stretch : public TimeShift {
+	public:
+		/**
+		 * Create an instance using a fixed point and a factor.
+		 *
+		 * @param fixedPoint A starting point on which to determine the stretch interval.
+		 * @param factor The stretching factor.
+		 */
+		Stretch(PTime fixedPoint, int factor) : fixedPoint(fixedPoint), factor(factor) {}
+
+		auto apply(const time_t& input) -> time_t;
+		auto reverse(const time_t& input) -> time_t;
+	private:
+		PTime fixedPoint;
+		int factor;
+
+		time_t time_difference = 0;
+};
+
+/**
+ * Snap to a time variant.
+ */
+class Snap : public TimeShift {
+	public:
+		/**
+		 * Units for time shifting.
+		 */
+		enum class SnapUnit {
+		    dayInMonth,
+		    dayInYear,
+		    seasonInYear,
+		    dayInWeek,
+			monthInYear,
+		    hourOfDay
+		};
+
+		/**
+		 * Creates a unit out of a string.
+		 *
+		 * @param value
+		 */
+		static auto createUnit(std::string value) -> SnapUnit;
+
+		/**
+		 * Create an instance using a SnapUnit and a value.
+		 *
+		 * @param unit A definition of where to snap to.
+		 * @param value The modification value for the snap unit.
+		 */
+		Snap(SnapUnit unit, short unsigned int value, bool allow_reset) : unit(unit), value(value), allow_reset(allow_reset) {}
+
+		auto apply(const time_t& input) -> time_t;
+		auto reverse(const time_t& input) -> time_t;
+	private:
+		SnapUnit unit;
+		short unsigned int value;
+		bool allow_reset;
+
+		static const std::map<std::string, SnapUnit> string_to_enum;
+
+		time_t time_difference = 0;
+};
+
+/**
  * A common virtual class for time modifications.
  */
 class TimeModification {
 	public:
-		TimeModification(std::unique_ptr<TimeShift> from_shift, std::unique_ptr<TimeShift> to_shift) : from_shift(std::move(from_shift)), to_shift(std::move(to_shift)) {}
+		TimeModification(std::unique_ptr<TimeShift> from_shift,	std::unique_ptr<TimeShift> to_shift,
+						std::unique_ptr<TimeShift> stretch,
+						std::unique_ptr<TimeShift> from_snap,	std::unique_ptr<TimeShift> to_snap) :
+				from_shift(std::move(from_shift)), to_shift(std::move(to_shift)),
+				stretch(std::move(stretch)),
+				from_snap(std::move(from_snap)), to_snap(std::move(to_snap)) {}
+
+		TimeModification(TimeModification&& time_modification) :
+			from_shift(std::move(time_modification.from_shift)), to_shift(std::move(time_modification.to_shift)),
+			stretch(std::move(time_modification.stretch)),
+			from_snap(std::move(time_modification.from_snap)), to_snap(std::move(time_modification.to_snap)),
+			isApplyCalled(time_modification.isApplyCalled) {}
+
 		~TimeModification() = default;
 
 		/**
@@ -153,6 +231,9 @@ class TimeModification {
 	private:
 		std::unique_ptr<TimeShift> from_shift;
 		std::unique_ptr<TimeShift> to_shift;
+		std::unique_ptr<TimeShift> stretch;
+		std::unique_ptr<TimeShift> from_snap;
+		std::unique_ptr<TimeShift> to_snap;
 
 		bool isApplyCalled = false;
 };

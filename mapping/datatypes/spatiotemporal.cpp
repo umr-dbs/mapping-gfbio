@@ -21,12 +21,12 @@ SpatialReference::SpatialReference(epsg_t epsg) : epsg(epsg) {
 	y2 = std::numeric_limits<double>::infinity();
 
 	validate();
-};
+}
 
 SpatialReference::SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2)
 	: epsg(epsg), x1(x1), y1(y1), x2(x2), y2(y2) {
 	validate();
-};
+}
 
 SpatialReference::SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy)
 	: epsg(epsg), x1(x1), y1(y1), x2(x2), y2(y2) {
@@ -103,13 +103,13 @@ TemporalReference::TemporalReference(timetype_t timetype) : timetype(timetype) {
 	t2 = std::numeric_limits<double>::infinity();
 
 	validate();
-};
+}
 
 
 TemporalReference::TemporalReference(timetype_t timetype, double t1, double t2)
 	: timetype(timetype), t1(t1), t2(t2) {
 	validate();
-};
+}
 
 
 TemporalReference::TemporalReference(BinaryStream &stream) {

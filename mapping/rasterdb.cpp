@@ -370,7 +370,7 @@ int main(int argc, char *argv[]) {
 
 	Configuration::loadFromDefaultPaths();
 
-	CacheManager::init(make_unique<NopCacheManager>());
+	CacheManager::init(make_unique<NopCacheManager>(), make_unique<CacheAll>());
 
 	const char *command = argv[1];
 

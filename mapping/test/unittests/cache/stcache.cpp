@@ -1,7 +1,8 @@
-#include <cache/common.h>
+
 #include <gtest/gtest.h>
+#include "cache/common.h"
+#include "cache/node/node_cache.h"
 #include "test/unittests/cache/util.h"
-#include "cache/cache.h"
 #include "operators/operator.h"
 #include "util/configuration.h"
 #include "util/make_unique.h"
@@ -26,9 +27,9 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
-	CacheManager::init( make_unique<NopCacheManager>() );
+	CacheManager::init( make_unique<NopCacheManager>(), make_unique<CacheAll>() );
 
-	RasterCache cache(114508*2 + 17);
+	NodeRasterCache cache(114508*2 + 17);
 
 
 	for ( int i = 0; i < 4; i++ ) {
@@ -39,7 +40,7 @@ TEST(STCacheTest,SimpleTest) {
 			QueryResolution::pixels(width, height)
 		);
 		QueryProfiler qp;
-		STQueryResult qres = cache.query(op->getSemanticId(),qr);
+		CacheQueryResult<uint64_t> qres = cache.query(op->getSemanticId(),qr);
 		printf("%s", qres.to_string().c_str());
 		ASSERT_TRUE( qres.has_remainder() );
 		auto res = op->getCachedRaster(qr,qp);
@@ -61,7 +62,7 @@ std::unique_ptr<GenericRaster> createRaster( double x1, double x2, double y1, do
 
 
 TEST(STCacheTest,TestQuery) {
-	RasterCache cache(5 * 1024 * 1024);
+	NodeRasterCache cache(5 * 1024 * 1024);
 	std::string sem_id = "a";
 
 	DataDescription dd(GDT_Byte,0,255);
@@ -80,7 +81,7 @@ TEST(STCacheTest,TestQuery) {
 		TemporalReference(TIMETYPE_UNIX, 10, 10),
 		QueryResolution::pixels(2, 2)
 	);
-	STQueryResult qr = cache.query(sem_id, qrect);
+	CacheQueryResult<uint64_t> qr = cache.query(sem_id, qrect);
 
 	ASSERT_TRUE( qr.has_remainder() );
 
@@ -111,7 +112,7 @@ TEST(STCacheTest,TestQuery) {
 
 	qr = cache.query( sem_id, qrect );
 	ASSERT_FALSE(qr.has_remainder());
-	ASSERT_EQ( 4, qr.ids.size() );
+	ASSERT_EQ( 4, qr.keys.size() );
 
 
 }

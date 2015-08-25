@@ -467,7 +467,7 @@ int main() {
 
 		// Plug in Cache-Dummy if cache is disabled
 		if ( !cache_enabled ) {
-			CacheManager::init( make_unique<NopCacheManager>() );
+			CacheManager::init( make_unique<NopCacheManager>(), make_unique<CacheAll>() );
 		}
 
 		const char *query_string = getenv("QUERY_STRING");

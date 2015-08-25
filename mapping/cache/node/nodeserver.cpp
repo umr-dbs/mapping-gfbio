@@ -194,14 +194,11 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 			Log::debug("Received reorg command.");
 			ReorgDescription d(stream);
 			Log::debug("Read reorg description from stream.");
-			for (auto &ri : d.get_items()) {
-				switch (ri.type) {
-					case ReorgItem::Type::RASTER:
-						handle_raster_reorg_item(ri, stream);
-						break;
-					default:
-						throw ArgumentException(concat("Type ", (int) ri.type, " not supported yet"));
-				}
+			for (auto &move_item : d.get_moves()) {
+				handle_reorg_move_item(move_item,stream);
+			}
+			for ( auto &rem_item : d.get_removals() ) {
+				handle_reorg_remove_item(rem_item);
 			}
 			stream.write(ControlConnection::RESP_REORG_DONE);
 			break;
@@ -220,47 +217,81 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 	}
 }
 
-void NodeServer::handle_raster_reorg_item(const ReorgItem& item, BinaryStream &index_stream) {
-	std::unique_ptr<BinaryStream> del_stream;
+void NodeServer::handle_reorg_remove_item( const ReorgRemoveItem &item ) {
+	Log::debug("Removing item from cache. Key: %s:%d",item.semantic_id.c_str(), item.entry_id);
+	switch (item.type) {
+		case ReorgMoveItem::Type::RASTER:
+			CacheManager::getInstance().remove_raster_local(item);
+			break;
+		default:
+			throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+	}
 
+}
+
+void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream &index_stream) {
 	uint32_t new_cache_id;
+
+	Log::debug("Moving item from node %d to node %d. Key: %s:%d ", item.from_node_id, my_id, item.semantic_id.c_str(), item.entry_id );
+
+	std::unique_ptr<BinaryStream> del_stream;
 
 	// Send move request
 	try {
-		uint8_t nresp;
-		del_stream.reset(new UnixSocket(item.from_host.c_str(), item.from_port));
-		NodeCacheKey key(item.semantic_id, item.from_cache_id);
-		del_stream->write(DeliveryConnection::MAGIC_NUMBER);
-		del_stream->write(DeliveryConnection::CMD_MOVE_RASTER);
-		key.toStream(*del_stream);
+		uint8_t del_resp;
+		del_stream = initiate_move(item);
+		del_stream->read(&del_resp);
 
-		del_stream->read(&nresp);
-		switch (nresp) {
-			case DeliveryConnection::RESP_OK: {
-				auto res = GenericRaster::fromStream(*del_stream);
-				// Store item
-				NodeCacheRef ref = CacheManager::getInstance().put_raster_local(item.semantic_id, res);
-				new_cache_id = ref.entry_id;
+		switch (del_resp) {
+			case DeliveryConnection::RESP_OK:
+				switch ( item.type ) {
+					case ReorgMoveItem::Type::RASTER:
+						new_cache_id = CacheManager::getInstance().put_raster_local(item.semantic_id, GenericRaster::fromStream(*del_stream)).entry_id;
+						break;
+					default:
+						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+				}
 				break;
-			}
 			case DeliveryConnection::RESP_ERROR: {
 				std::string msg;
 				del_stream->read(&msg);
 				throw NetworkException(
-					concat("Could not move raster", item.semantic_id, ":", item.from_cache_id, " from ",
+					concat("Could not move item", item.semantic_id, ":", item.entry_id, " from ",
 						item.from_host, ":", item.from_port, ": ", msg));
 			}
 			default:
-				throw NetworkException(concat("Received illegal response from delivery-node: ", nresp));
+				throw NetworkException(concat("Received illegal response from delivery-node: ", del_resp));
 		}
 	} catch (NetworkException &ne) {
-		Log::error("Could not initiate raster move: %s", ne.what());
+		Log::error("Could not initiate move: %s", ne.what());
 		return;
 	}
+	confirm_move( item, new_cache_id, index_stream, *del_stream );
+}
 
+std::unique_ptr<BinaryStream> NodeServer::initiate_move( const ReorgMoveItem &item ) {
+	std::unique_ptr<BinaryStream> result = make_unique<UnixSocket>( item.from_host.c_str(), item.from_port );
+	result->write(DeliveryConnection::MAGIC_NUMBER);
+
+	uint8_t cmd;
+	switch (item.type) {
+		case ReorgMoveItem::Type::RASTER:
+			cmd = DeliveryConnection::CMD_MOVE_RASTER;
+			break;
+		default:
+			throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+	}
+
+	result->write(cmd);
+	item.NodeCacheKey::toStream(*result);
+	return result;
+}
+
+
+void NodeServer::confirm_move( const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream, BinaryStream &del_stream ) {
 	// Notify index
 	uint8_t iresp;
-	ReorgResult rr(ReorgResult::Type::RASTER, item.semantic_id, item.from_node_id, item.from_cache_id, my_id, new_cache_id);
+	ReorgMoveResult rr(item.type, item.semantic_id, item.entry_id, item.from_node_id, my_id, new_id);
 	index_stream.write(ControlConnection::RESP_REORG_ITEM_MOVED);
 	rr.toStream(index_stream);
 	index_stream.read(&iresp);
@@ -269,11 +300,11 @@ void NodeServer::handle_raster_reorg_item(const ReorgItem& item, BinaryStream &i
 		switch (iresp) {
 			case ControlConnection::CMD_REORG_ITEM_OK: {
 				Log::debug("Reorg of item finished. Notifying delivery instance.");
-				del_stream->write(DeliveryConnection::CMD_MOVE_DONE);
+				del_stream.write(DeliveryConnection::CMD_MOVE_DONE);
 				break;
 			}
 			default: {
-				Log::warn("Index could not handle reorg of: %s:%d", item.semantic_id.c_str(), item.from_cache_id);
+				Log::warn("Index could not handle reorg of: %s:%d", item.semantic_id.c_str(), item.entry_id);
 				break;
 			}
 		}

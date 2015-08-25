@@ -69,8 +69,8 @@ TEST(DistributionTest,TestRedistibution) {
 	}
 
 	ReorgDescription rod;
-	ReorgItem ri(ReorgResult::Type::RASTER, sem_id, 1, 2, "localhost", 12347);
-	rod.add_item(ri);
+	ReorgMoveItem ri(ReorgMoveItem::Type::RASTER, sem_id, 2, 1, "localhost", 12347);
+	rod.add_move(ri);
 
 	is.trigger_reorg(2, rod);
 
@@ -163,7 +163,7 @@ TEST(DistributionTest,TestCapacityReorg) {
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexCache cache(reorg);
+	IndexRasterCache cache(reorg);
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
@@ -187,13 +187,21 @@ TEST(DistributionTest,TestCapacityReorg) {
 	cache.put(e1);
 	cache.put(e2);
 
-	ASSERT_TRUE(cache.requires_reorg(nodes));
-	auto res = cache.reorganize(nodes);
+	std::map<uint32_t, NodeReorgDescription> res;
+	for ( auto &kv : nodes ) {
+		res.emplace(kv.first, NodeReorgDescription(kv.second));
+	}
 
-	ASSERT_TRUE(res.size() == 1);
-	ASSERT_TRUE(res.at(0).node_id == 2);
-	ASSERT_TRUE(res.at(0).get_items().size() == 1);
-	ASSERT_TRUE(res.at(0).get_items().at(0).from_cache_id == 1);
+	ASSERT_TRUE(cache.requires_reorg(nodes));
+	cache.reorganize(res);
+
+	ASSERT_TRUE(res.at(2).node->id == 2);
+	ASSERT_TRUE(res.at(2).get_moves().size() == 1);
+	ASSERT_TRUE(res.at(2).get_moves().at(0).entry_id == 1);
+	ASSERT_TRUE(res.at(2).get_removals().empty());
+
+	ASSERT_TRUE(res.at(1).node->id == 1);
+	ASSERT_TRUE(res.at(1).is_empty());
 }
 
 
@@ -208,7 +216,7 @@ TEST(DistributionTest,TestGeographicReorg) {
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexCache cache(reorg);
+	IndexRasterCache cache(reorg);
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
@@ -232,13 +240,21 @@ TEST(DistributionTest,TestGeographicReorg) {
 	cache.put(e1);
 	cache.put(e2);
 
-	ASSERT_TRUE(cache.requires_reorg(nodes));
-	auto res = cache.reorganize(nodes);
+	std::map<uint32_t, NodeReorgDescription> res;
+	for ( auto &kv : nodes ) {
+		res.emplace(kv.first, NodeReorgDescription(kv.second));
+	}
 
-	ASSERT_TRUE(res.size() == 1);
-	ASSERT_TRUE(res.at(0).node_id == 2);
-	ASSERT_TRUE(res.at(0).get_items().size() == 1);
-	ASSERT_TRUE(res.at(0).get_items().at(0).from_cache_id == 1);
+	ASSERT_TRUE(cache.requires_reorg(nodes));
+	cache.reorganize(res);
+
+	ASSERT_TRUE(res.at(2).node->id == 2);
+	ASSERT_TRUE(res.at(2).get_moves().size() == 1);
+	ASSERT_TRUE(res.at(2).get_moves().at(0).entry_id == 1);
+	ASSERT_TRUE(res.at(2).get_removals().empty());
+
+	ASSERT_TRUE(res.at(1).node->id == 1);
+	ASSERT_TRUE(res.at(1).is_empty());
 }
 
 
@@ -292,25 +308,23 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 	// Reorg should be finished at this point
 
-
-
 	auto op = GenericOperator::fromJSON(json);
 
 	// Assert moved
 	try {
 		NodeCacheKey k(op->getSemanticId(),1);
 		tcm.get_instance_mgr(0).get_raster_local(k);
+		Log::debug("FAILED on get 1");
 		FAIL();
 	} catch (NoSuchElementException &nse) {
-
 	}
+
 	try {
 		NodeCacheKey k(op->getSemanticId(),2);
 		tcm.get_instance_mgr(0).get_raster_local(k);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
-
 
 	try {
 		NodeCacheKey k(op->getSemanticId(),1);

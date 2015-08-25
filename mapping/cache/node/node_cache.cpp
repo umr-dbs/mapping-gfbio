@@ -106,7 +106,7 @@ template<typename EType>
 const std::shared_ptr<EType> NodeCache<EType>::get(const NodeCacheKey& key) const {
 	auto cache = get_structure(key.semantic_id);
 	if (cache != nullptr) {
-		auto e = cache->get(key.entry_id);
+		std::shared_ptr<NodeCacheEntry<EType>> e = cache->get(key.entry_id);
 		track_access( key, *e );
 		return e->data;
 	}
@@ -165,10 +165,10 @@ void NodeCache<EType>::track_access(const NodeCacheKey& key, NodeCacheEntry<ETyp
 	e.access_count++;
 	time(&(e.last_access));
 	try {
-		access_tracker.at(key.semantic_id).emplace(key.entry_id);
+		access_tracker.at(key.semantic_id).insert(key.entry_id);
 	} catch ( std::out_of_range &oor ) {
 		std::set<uint64_t> ids;
-		ids.emplace(key.entry_id);
+		ids.insert(key.entry_id);
 		access_tracker.emplace( key.semantic_id, ids );
 	}
 }

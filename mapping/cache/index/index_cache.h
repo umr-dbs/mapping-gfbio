@@ -10,6 +10,7 @@
 
 #include "cache/priv/cache_structure.h"
 #include "cache/priv/cache_stats.h"
+#include "cache/priv/redistribution.h"
 #include <utility>
 #include <map>
 #include <unordered_map>
@@ -49,6 +50,7 @@ class IndexCache {
 public:
 	// Constructs a new instance with the given reorg-strategy
 	IndexCache( ReorgStrategy &strategy );
+	virtual ~IndexCache();
 
 	// Adds an entry for the given semantic_id to the cache.
 	void put( const IndexCacheEntry &entry );
@@ -78,7 +80,12 @@ public:
 	void update_stats( uint32_t node_id, const CacheStats &stats );
 
 	// Calculates an appropriate reorganization
-	std::vector<NodeReorgDescription> reorganize(const std::map<uint32_t,std::shared_ptr<Node>> &nodes );
+	void reorganize(std::map<uint32_t, NodeReorgDescription>& result );
+
+	virtual size_t get_total_capacity( const Capacity& capacity ) const = 0;
+	virtual size_t get_used_capacity( const Capacity& capacity ) const = 0;
+	virtual double get_capacity_usage( const Capacity& capacity ) const = 0;
+	virtual ReorgRemoveItem::Type get_reorg_type() const = 0;
 
 private:
 	typedef CacheStructure<std::pair<uint32_t,uint64_t>,IndexCacheEntry> Struct;
@@ -98,4 +105,15 @@ private:
 	// The reorganization strategy
 	ReorgStrategy& reorg_strategy;
 };
+
+class IndexRasterCache : public IndexCache {
+public:
+	IndexRasterCache(ReorgStrategy &strategy);
+	virtual ~IndexRasterCache();
+	virtual size_t get_total_capacity( const Capacity& capacity ) const;
+	virtual size_t get_used_capacity( const Capacity& capacity ) const;
+	virtual double get_capacity_usage( const Capacity& capacity ) const;
+	virtual ReorgRemoveItem::Type get_reorg_type() const;
+};
+
 #endif /* INDEX_CACHE_H_ */

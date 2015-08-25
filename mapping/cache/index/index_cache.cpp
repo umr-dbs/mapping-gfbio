@@ -38,6 +38,10 @@ IndexCacheEntry::IndexCacheEntry(uint32_t node_id, NodeCacheRef ref) :
 IndexCache::IndexCache(ReorgStrategy& strategy) : reorg_strategy(strategy) {
 }
 
+
+IndexCache::~IndexCache() {
+}
+
 void IndexCache::put( const IndexCacheEntry& entry) {
 	auto cache = get_structure(entry.semantic_id,true);
 	std::shared_ptr<IndexCacheEntry> e( new IndexCacheEntry(entry) );
@@ -144,12 +148,12 @@ void IndexCache::remove_from_node(const IndexCacheKey& key) {
 }
 
 bool IndexCache::requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> > &nodes ) {
-	return reorg_strategy.requires_reorg(nodes);
+	return reorg_strategy.requires_reorg(*this,nodes);
 }
 
-std::vector<NodeReorgDescription> IndexCache::reorganize(
-	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) {
-	return reorg_strategy.reorganize(*this,nodes);
+void IndexCache::reorganize(
+	std::map<uint32_t, NodeReorgDescription>& result) {
+	reorg_strategy.reorganize(*this,result);
 }
 
 void IndexCache::update_stats(uint32_t node_id, const CacheStats &stats) {
@@ -165,4 +169,30 @@ void IndexCache::update_stats(uint32_t node_id, const CacheStats &stats) {
 			e->last_access = s.last_access;
 		}
 	}
+}
+
+//
+// Raster-Cache
+//
+
+IndexRasterCache::IndexRasterCache(ReorgStrategy& strategy) : IndexCache(strategy) {
+}
+
+IndexRasterCache::~IndexRasterCache() {
+}
+
+size_t IndexRasterCache::get_total_capacity(const Capacity& capacity) const {
+	return capacity.raster_cache_total;
+}
+
+size_t IndexRasterCache::get_used_capacity(const Capacity& capacity) const {
+	return capacity.raster_cache_used;
+}
+
+double IndexRasterCache::get_capacity_usage(const Capacity& capacity) const {
+	return capacity.get_raster_usage();
+}
+
+ReorgRemoveItem::Type IndexRasterCache::get_reorg_type() const {
+	return ReorgRemoveItem::Type::RASTER;
 }

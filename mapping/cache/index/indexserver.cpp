@@ -124,10 +124,19 @@ void IndexServer::run() {
 		// Reorganize
 		if ( oldest_stats > last_reorg && all_idle && raster_cache.requires_reorg( nodes) ) {
 			// Remember time of this reorg
+			std::map<uint32_t,NodeReorgDescription> reorgs;
+			for ( auto &kv : nodes ) {
+				reorgs.emplace( kv.first, NodeReorgDescription(kv.second) );
+			}
 			time(&last_reorg);
-			for ( auto &d : raster_cache.reorganize(nodes) ) {
-				auto &cc = control_connections.at( nodes.at(d.node_id)->control_connection );
-				cc->send_reorg( d );
+
+			if ( raster_cache.requires_reorg(nodes) )
+				raster_cache.reorganize( reorgs );
+
+			for ( auto &d : reorgs ) {
+				auto &cc = control_connections.at( d.second.node->control_connection );
+				if ( !d.second.is_empty() )
+					cc->send_reorg( d.second );
 			}
 		}
 	}
@@ -288,10 +297,10 @@ void IndexServer::process_control_connections(fd_set* readfds) {
 }
 
 
-void IndexServer::handle_reorg_result(const ReorgResult& res) {
+void IndexServer::handle_reorg_result(const ReorgMoveResult& res) {
 	switch ( res.type ) {
-		case ReorgResult::Type::RASTER: {
-			IndexCacheKey old( res.from_node_id, res.semantic_id, res.from_cache_id );
+		case ReorgMoveResult::Type::RASTER: {
+			IndexCacheKey old( res.from_node_id, res.semantic_id, res.entry_id );
 			IndexCacheKey new_key( res.to_node_id, res.semantic_id, res.to_cache_id );
 			raster_cache.move(old,new_key);
 			break;

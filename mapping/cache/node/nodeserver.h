@@ -72,7 +72,13 @@ private:
 	// Process a command received on the control-connection
 	void process_control_command(uint8_t cmd, BinaryStream &stream);
 
-	void handle_raster_reorg_item( const ReorgItem &item, BinaryStream &index_stream );
+	void handle_reorg_move_item( const ReorgMoveItem &item, BinaryStream &index_stream );
+
+	void handle_reorg_remove_item( const ReorgRemoveItem &item );
+
+	std::unique_ptr<BinaryStream> initiate_move( const ReorgMoveItem &item );
+
+	void confirm_move( const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream, BinaryStream &del_stream );
 
 	// Indicator telling if the server should shutdown
 	bool shutdown;

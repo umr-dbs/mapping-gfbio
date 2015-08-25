@@ -298,7 +298,7 @@ public:
 
 
 
-	const ReorgResult& get_result();
+	const ReorgMoveResult& get_result();
 	const NodeStats& get_stats();
 
 	ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
@@ -312,7 +312,7 @@ protected:
 private:
 	void reset();
 	State state;
-	std::unique_ptr<ReorgResult> reorg_result;
+	std::unique_ptr<ReorgMoveResult> reorg_result;
 	std::unique_ptr<NodeStats> stats;
 };
 

@@ -450,18 +450,15 @@ void ControlConnection::process_command(uint8_t cmd) {
 
 	switch (cmd) {
 		case RESP_REORG_ITEM_MOVED: {
-			Log::debug("Received notification about reorganized entry.");
-			reorg_result.reset(new ReorgResult(stream));
+			reorg_result.reset(new ReorgMoveResult(stream));
 			state = State::REORG_RESULT_READ;
 			break;
 		}
 		case RESP_REORG_DONE: {
-			Log::debug("Node %d finished reorganization.", node->id);
 			state = State::REORG_FINISHED;
 			break;
 		}
 		case RESP_STATS: {
-			Log::debug("Node %d delivered fresh stats.", node->id);
 			stats.reset(new NodeStats(stream));
 			state = State::STATS_RECEIVED;
 			break;
@@ -539,7 +536,7 @@ void ControlConnection::release() {
 // GETTER
 //
 
-const ReorgResult& ControlConnection::get_result() {
+const ReorgMoveResult& ControlConnection::get_result() {
 	if (state == State::REORG_RESULT_READ)
 		return *reorg_result;
 	else

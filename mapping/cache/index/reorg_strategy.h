@@ -23,8 +23,8 @@ class Node;
 //
 class NodeReorgDescription : public ReorgDescription {
 public:
-	NodeReorgDescription( uint32_t node_id );
-	const uint32_t node_id;
+	NodeReorgDescription( std::shared_ptr<Node> node );
+	const std::shared_ptr<Node> node;
 };
 
 //
@@ -36,8 +36,8 @@ class ReorgStrategy {
 public:
 	ReorgStrategy();
 	virtual ~ReorgStrategy();
-	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual std::vector<NodeReorgDescription> reorganize(const IndexCache &raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) = 0;
+	virtual bool requires_reorg(const IndexCache &cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	virtual void reorganize(const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) = 0;
 
 	static bool entry_less(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
 	static bool entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
@@ -50,8 +50,8 @@ public:
 class NeverReorgStrategy : public ReorgStrategy {
 	NeverReorgStrategy();
 	virtual ~NeverReorgStrategy();
-	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual std::vector<NodeReorgDescription> reorganize( const IndexCache &raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes );
+	virtual bool requires_reorg( const IndexCache &cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result );
 };
 
 //
@@ -63,7 +63,7 @@ class CapacityReorgStrategy : public ReorgStrategy {
 public:
 	CapacityReorgStrategy();
 	virtual ~CapacityReorgStrategy();
-	virtual std::vector<NodeReorgDescription> reorganize( const IndexCache &raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes );
+	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result );
 };
 
 
@@ -76,7 +76,7 @@ class GeographicReorgStrategy : public ReorgStrategy {
 public:
 	GeographicReorgStrategy();
 	virtual ~GeographicReorgStrategy();
-	virtual std::vector<NodeReorgDescription> reorganize( const IndexCache &raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes );
+	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result );
 private:
 	static GDAL::CRSTransformer geosmsg_trans;
 	static GDAL::CRSTransformer webmercator_trans;

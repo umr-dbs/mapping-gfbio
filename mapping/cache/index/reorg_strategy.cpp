@@ -10,10 +10,9 @@
 #include <ctime>
 #include <algorithm>
 
-NodeReorgDescription::NodeReorgDescription(uint32_t node_id) :
-	node_id(node_id) {
+NodeReorgDescription::NodeReorgDescription( std::shared_ptr<Node> node ) :
+	node(node) {
 }
-
 
 //
 // ReorgStrategy
@@ -25,14 +24,14 @@ ReorgStrategy::ReorgStrategy() {
 ReorgStrategy::~ReorgStrategy() {
 }
 
-bool ReorgStrategy::requires_reorg(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
+bool ReorgStrategy::requires_reorg(const IndexCache &cache, const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
 	double maxru(0);
 	double minru(1);
 
 	// TODO: Think about this
 	for (auto &e : nodes) {
-		maxru = std::max(maxru, e.second->capacity.get_raster_usage());
-		minru = std::min(minru, e.second->capacity.get_raster_usage());
+		maxru = std::max(maxru, cache.get_capacity_usage(e.second->capacity));
+		minru = std::min(minru, cache.get_capacity_usage(e.second->capacity));
 	}
 	return maxru - minru > 0.15;
 }
@@ -62,16 +61,16 @@ NeverReorgStrategy::NeverReorgStrategy() {
 NeverReorgStrategy::~NeverReorgStrategy() {
 }
 
-bool NeverReorgStrategy::requires_reorg(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
+bool NeverReorgStrategy::requires_reorg(const IndexCache &cache, const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
+	(void) cache;
 	(void) nodes;
 	return false;
 }
 
-std::vector<NodeReorgDescription> NeverReorgStrategy::reorganize(const IndexCache& raster_cache,
-	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) {
-	(void) raster_cache;
-	(void) nodes;
-	return std::vector<NodeReorgDescription>();
+void NeverReorgStrategy::reorganize(const IndexCache& cache,
+	std::map<uint32_t,NodeReorgDescription> &result) {
+	(void) cache;
+	(void) result;
 }
 
 
@@ -86,41 +85,44 @@ CapacityReorgStrategy::CapacityReorgStrategy() {
 CapacityReorgStrategy::~CapacityReorgStrategy() {
 }
 
-std::vector<NodeReorgDescription> CapacityReorgStrategy::reorganize(
-	const IndexCache &raster_cache,
-	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) {
+void CapacityReorgStrategy::reorganize(
+	const IndexCache &cache,
+	std::map<uint32_t,NodeReorgDescription> &result) {
 
 
 	std::unordered_map<uint32_t,std::vector<std::shared_ptr<IndexCacheEntry>>&> per_node;
 
 	// Calculate mean usage
 	double raster_accum(0);
-	for (auto &e : nodes) {
-		raster_accum += e.second->capacity.get_raster_usage();
+	for (auto &e : result) {
+		raster_accum += cache.get_capacity_usage(e.second.node->capacity);
 
-		auto &node_entries = raster_cache.get_node_entries(e.second->id);
+		auto &node_entries = cache.get_node_entries(e.second.node->id);
 
-		// Sort according to score
+		// Sort according to score (ascending) -- for easy removal of least relevant entries
 		std::sort(node_entries.begin(), node_entries.end(), entry_less);
-		per_node.emplace( e.second->id, node_entries );
+		per_node.emplace( e.second.node->id, node_entries );
 	}
-	double target_mean = std::min( 0.8, raster_accum / nodes.size());
+
+	// Calculate target memory usage after reorg
+	double target_mean = std::min( 0.8, raster_accum / result.size() * 1.05);
 
 	// Find overflowing nodes
 	std::vector<std::shared_ptr<IndexCacheEntry>> overflow;
-	std::vector<std::shared_ptr<Node>> underflow_nodes;
+	std::vector<uint32_t> underflow_nodes;
 
-	for (auto &e : nodes) {
-		size_t target_bytes = e.second->capacity.raster_cache_total * target_mean;
-		size_t bytes_used = e.second->capacity.raster_cache_used;
+	for (auto &e : result) {
+		size_t target_bytes = cache.get_total_capacity(e.second.node->capacity) * target_mean;
+		size_t bytes_used = cache.get_used_capacity(e.second.node->capacity);
 
 		if ( bytes_used < target_bytes ) {
-			underflow_nodes.push_back(e.second);
+			underflow_nodes.push_back(e.second.node->id);
 		}
 		else  {
 			auto &node_entries = per_node.at(e.first);
 			auto iter = node_entries.begin();
-			while ( iter != node_entries.end() && bytes_used > target_bytes ) {
+			while ( iter != node_entries.end() &&
+				bytes_used > target_bytes ) {
 				overflow.push_back(*iter);
 				bytes_used -= (*iter)->size;
 				iter++;
@@ -128,25 +130,26 @@ std::vector<NodeReorgDescription> CapacityReorgStrategy::reorganize(
 		}
 	}
 
-	// Distribute overflow items
-	std::vector<NodeReorgDescription> result;
+	Log::debug("Items to redistribute: %d", overflow.size());
 
+	// Redestribute overflow
+	// Order by score descending to keep most relevant entries
 	std::sort(overflow.begin(),overflow.end(), entry_greater);
 
-	for (auto &node : underflow_nodes) {
-		NodeReorgDescription desc(node->id);
-		size_t target_bytes = node->capacity.raster_cache_total * target_mean;
-		size_t bytes_used = node->capacity.raster_cache_used;
+	for (auto &node_id : underflow_nodes) {
+		auto &desc = result.at(node_id);
+		size_t target_bytes = cache.get_total_capacity(desc.node->capacity) * target_mean;
+		size_t bytes_used = cache.get_used_capacity(desc.node->capacity);
 		auto iter = overflow.begin();
 
 		while ( iter != overflow.end() && bytes_used < target_bytes ) {
 
 			if ( bytes_used + (*iter)->size <= target_bytes ) {
-				auto &remote_node = nodes.at((*iter)->node_id);
-				desc.add_item( ReorgItem( ReorgItem::Type::RASTER,
+				auto &remote_node = result.at((*iter)->node_id).node;
+				desc.add_move( ReorgMoveItem( cache.get_reorg_type(),
 										  (*iter)->semantic_id,
-										  remote_node->id,
 										  (*iter)->entry_id,
+										  remote_node->id,
 										  remote_node->host,
 										  remote_node->port) );
 				iter = overflow.erase(iter);
@@ -154,14 +157,13 @@ std::vector<NodeReorgDescription> CapacityReorgStrategy::reorganize(
 			else
 				iter++;
 		}
-		if ( !desc.get_items().empty() )
-			result.push_back(desc);
 	}
 
-	if ( !overflow.empty() ) {
-		// TODO: Add removals
+	for ( auto &e : overflow ) {
+		result.at(e->node_id).add_removal(
+			ReorgRemoveItem( cache.get_reorg_type(), e->semantic_id, e->entry_id )
+		);
 	}
-	return result;
 }
 
 //
@@ -193,7 +195,9 @@ double NodePos::dist_to(const IndexCacheEntry& entry) {
 		GeographicReorgStrategy::webmercator_trans.transform(ex,ey);
 	}
 
-	return sqrt( (ex-x)*(ex-x) + (ey-y)*(ey-y) );
+	// Exact distance not required here
+	return (ex-x)*(ex-x) + (ey-y)*(ey-y);
+//	return sqrt( (ex-x)*(ex-x) + (ey-y)*(ey-y) );
 }
 
 GDAL::CRSTransformer GeographicReorgStrategy::geosmsg_trans(EPSG_GEOSMSG,EPSG_LATLON);
@@ -205,16 +209,16 @@ GeographicReorgStrategy::GeographicReorgStrategy() {
 GeographicReorgStrategy::~GeographicReorgStrategy() {
 }
 
-std::vector<NodeReorgDescription> GeographicReorgStrategy::reorganize(const IndexCache& raster_cache,
-	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) {
-	// Calculate center of mass
+void GeographicReorgStrategy::reorganize(const IndexCache& cache,
+	std::map<uint32_t,NodeReorgDescription> &result) {
 
+	// Calculate center of mass
 	double weighted_x = 0, weighted_y = 0, mass = 0;
 
-	for ( auto &kv : nodes ) {
-		auto &node = *kv.second;
+	for ( auto &kv : result ) {
+		auto &node = *kv.second.node;
 
-		for ( auto &e : raster_cache.get_node_entries(node.id) ) {
+		for ( auto &e : cache.get_node_entries(node.id) ) {
 			auto &b = e->bounds;
 
 			double x1 = b.x1;
@@ -222,6 +226,7 @@ std::vector<NodeReorgDescription> GeographicReorgStrategy::reorganize(const Inde
 			double y1 = b.y1;
 			double y2 = b.y2;
 
+			// Transform dimension if required
 			if ( b.epsg == EPSG_GEOSMSG ) {
 				geosmsg_trans.transform(x1,y1);
 				geosmsg_trans.transform(x2,y2);
@@ -252,11 +257,11 @@ std::vector<NodeReorgDescription> GeographicReorgStrategy::reorganize(const Inde
 	// Assign each node a point around center
 	std::vector<NodePos> n_pos;
 
-	double step = M_PI*2 / nodes.size();
+	double step = M_PI*2 / result.size();
 	double angle = 0;
 
-	Log::info("Center at: %f,%f, step: %f, nodes: %d", cx,cy, step, nodes.size());
-	for ( auto & e : nodes ) {
+	Log::info("Center at: %f,%f, step: %f, nodes: %d", cx,cy, step, result.size());
+	for ( auto & e : result ) {
 		double x = std::cos(angle) + cx;
 		double y = std::sin(angle) + cy;
 		n_pos.push_back( NodePos( e.first, x, y) );
@@ -265,9 +270,8 @@ std::vector<NodeReorgDescription> GeographicReorgStrategy::reorganize(const Inde
 	}
 
 	// Redistribute entries;
-	for ( auto & kv : nodes ) {
-		auto &node = *kv.second;
-		for ( auto &e : raster_cache.get_node_entries(node.id) ) {
+	for ( auto & kv : result ) {
+		for ( auto &e : cache.get_node_entries(kv.first) ) {
 			size_t min_idx = 0;
 			size_t current_idx = 0;
 			double min_dist = DoubleInfinity;
@@ -284,26 +288,25 @@ std::vector<NodeReorgDescription> GeographicReorgStrategy::reorganize(const Inde
 	}
 
 	std::vector<std::shared_ptr<IndexCacheEntry>> overflow;
-	std::vector<NodeReorgDescription> res;
 
 	// Find overflowing nodes and create result
 	for ( auto &np : n_pos ) {
-		NodeReorgDescription desc(np.node_id);
-		auto &node = *(nodes.at(np.node_id));
-		size_t target = 0.8 * node.capacity.raster_cache_total;
+		auto &desc = result.at(np.node_id);
+		size_t target = 0.8 * cache.get_total_capacity(desc.node->capacity);
 		size_t used = 0;
 		std::sort(np.entries.begin(), np.entries.end(), entry_greater);
 
 		for ( auto & e : np.entries ) {
 			if ( used + e->size < target ) {
 				used += e->size;
+				// Do not create move-item for items already at current node
 				if ( e->node_id == np.node_id )
 					continue;
-				auto &remote_node = nodes.at(e->node_id);
-				desc.add_item( ReorgItem( ReorgItem::Type::RASTER,
+				auto &remote_node = result.at(e->node_id).node;
+				desc.add_move( ReorgMoveItem( cache.get_reorg_type(),
 										  e->semantic_id,
-										  remote_node->id,
 										  e->entry_id,
+										  remote_node->id,
 										  remote_node->host,
 										  remote_node->port ) );
 
@@ -313,13 +316,11 @@ std::vector<NodeReorgDescription> GeographicReorgStrategy::reorganize(const Inde
 			else
 				overflow.push_back( e );
 		}
-		if ( !desc.get_items().empty() )
-			res.push_back(desc);
 	}
 
-	if ( !overflow.empty() ) {
-		// TODO: Add removals
+	for ( auto &e : overflow ) {
+		result.at(e->node_id).add_removal(
+			ReorgRemoveItem( cache.get_reorg_type(), e->semantic_id, e->entry_id )
+		);
 	}
-
-	return res;
 }

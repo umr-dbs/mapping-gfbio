@@ -8,59 +8,51 @@
 #ifndef REDISTRIBUTION_H_
 #define REDISTRIBUTION_H_
 
+#include "cache/priv/cache_structure.h"
 #include "util/binarystream.h"
 
 #include <vector>
 
 
-class ReorgBase {
+class ReorgRemoveItem : public NodeCacheKey {
 public:
 	enum class Type : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT };
 
-	virtual ~ReorgBase();
+	ReorgRemoveItem( Type type, const std::string &semantic_id, uint64_t cache_id);
+	ReorgRemoveItem( BinaryStream &stream );
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 
+	// The type
 	Type type;
-	// The semantic id of the entry
-	std::string semantic_id;
-
-	// The cache-id on the node of the entry
-	uint64_t from_cache_id;
-
-	// The id of the node to retrieve the entry from
-	uint32_t from_node_id;
-
-protected:
-	ReorgBase( Type type, const std::string &semantic_id, uint32_t from_node_id, uint64_t from_cache_id);
-	ReorgBase( BinaryStream &stream );
 };
 
-class ReorgResult : public ReorgBase {
+class ReorgMoveResult : public ReorgRemoveItem {
 public:
-	ReorgResult( Type type, const std::string &semantic_id,
-		uint32_t from_node_id, uint64_t from_cache_id, uint32_t to_node_id, uint64_t to_cache_id );
+	ReorgMoveResult( Type type, const std::string &semantic_id,
+		uint64_t from_cache_id, uint32_t from_node_id, uint32_t to_node_id, uint64_t to_cache_id );
 
-	ReorgResult( BinaryStream &stream );
-	virtual ~ReorgResult();
+	ReorgMoveResult( BinaryStream &stream );
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
+
+	uint32_t from_node_id;
 
 	uint32_t to_node_id;
 
-	uint32_t to_cache_id;
+	uint64_t to_cache_id;
 };
 
-class ReorgItem : public ReorgBase {
+class ReorgMoveItem : public ReorgRemoveItem {
 public:
-	ReorgItem( Type type, const std::string &semantic_id, uint32_t from_node_id, uint64_t from_cache_id,
-		const std::string &from_host, uint32_t from_port );
+	ReorgMoveItem( Type type, const std::string &semantic_id, uint64_t from_cache_id,
+		uint32_t from_node_id, const std::string &from_host, uint32_t from_port );
 
-	ReorgItem( BinaryStream &stream );
-	virtual ~ReorgItem();
+	ReorgMoveItem( BinaryStream &stream );
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 
+	uint32_t from_node_id;
 	// The host to retrieve the item from
 	std::string from_host;
 	// The port of the node to retrieve the item from
@@ -72,12 +64,17 @@ public:
 	ReorgDescription();
 	ReorgDescription( BinaryStream &stream );
 
-	void add_item( ReorgItem item );
-	const std::vector<ReorgItem>& get_items() const;
+	void add_move( ReorgMoveItem item );
+	void add_removal( ReorgRemoveItem item );
+	const std::vector<ReorgMoveItem>& get_moves() const;
+	const std::vector<ReorgRemoveItem>& get_removals() const;
+
+	bool is_empty() const;
 
 	void toStream( BinaryStream &stream ) const;
 private:
-	std::vector<ReorgItem> items;
+	std::vector<ReorgMoveItem> moves;
+	std::vector<ReorgRemoveItem> removals;
 
 };
 

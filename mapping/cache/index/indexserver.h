@@ -78,7 +78,7 @@ protected:
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
 
 	// Cache
-	IndexCache raster_cache;
+	IndexRasterCache raster_cache;
 private:
 	// Adds the fds of all connections to the read-set
 	// and kills faulty connections
@@ -103,7 +103,7 @@ private:
 	void process_worker_raster_query( WorkerConnection &con );
 
 	// Adjusts the cache according to the given reorg
-	void handle_reorg_result( const ReorgResult &res );
+	void handle_reorg_result( const ReorgMoveResult &res );
 
 	// The port the index-server is listening on
 	int port;

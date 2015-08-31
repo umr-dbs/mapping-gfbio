@@ -169,7 +169,7 @@ int IndexServer::setup_fdset(fd_set* readfds) {
 	while (wit != worker_connections.end()) {
 		WorkerConnection &wc = *wit->second;
 		if (wc.is_faulty()) {
-			// TODO: Reschedule
+			query_manager.worker_failed( wc.id );
 			worker_connections.erase(wit++);
 		}
 		else {
@@ -185,6 +185,7 @@ int IndexServer::setup_fdset(fd_set* readfds) {
 		if (cc.is_faulty()) {
 			raster_cache.remove_all_by_node(cc.node->id);
 			nodes.erase(cc.node->id);
+			query_manager.node_failed(cc.node->id);
 			control_connections.erase(ccit++);
 		}
 		else {
@@ -417,7 +418,7 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 void IndexServer::process_client_request(ClientConnection& con) {
 	switch (con.get_request_type()) {
 		case ClientConnection::RequestType::RASTER:
-			query_manager.add_raster_request( con.id, con.get_request() );
+			query_manager.add_request( QueryInfo::Type::RASTER, con.id, con.get_request() );
 			break;
 		default:
 			throw std::runtime_error("Request-type not implemented yet.");

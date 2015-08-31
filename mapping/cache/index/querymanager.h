@@ -25,12 +25,15 @@
 
 class QueryInfo {
 public:
-	QueryInfo( const BaseRequest &request, uint64_t client );
-	QueryInfo( const QueryRectangle &query, const std::string &semantic_id, uint64_t client );
-	bool satisfies( const BaseRequest &req );
+	enum class Type : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT };
+
+	QueryInfo( Type type, const BaseRequest &request );
+	QueryInfo( Type type, const QueryRectangle &query, const std::string &semantic_id );
+	bool satisfies( Type type, const BaseRequest &req ) const;
 	void add_client( uint64_t client );
-	const std::vector<uint64_t>& get_clients();
-protected:
+	void add_clients( const std::vector<uint64_t> &clients );
+	const std::vector<uint64_t>& get_clients() const;
+	const Type type;
 	QueryRectangle query;
 	const std::string semantic_id;
 private:
@@ -47,11 +50,12 @@ public:
 	virtual ~JobDescription();
 	// Extends this job by the given request
 	// -> Enlarges the result to satisfy more than the original query
-	virtual bool extend( const BaseRequest &req );
+	virtual bool extend( Type type, const BaseRequest &req );
 	// Schedules this job on one of the given worker-connections
 	virtual uint64_t  schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
+	virtual bool is_affected_by_node( uint32_t node_id ) = 0;
 protected:
-	JobDescription( uint64_t client_id, std::unique_ptr<BaseRequest> request );
+	JobDescription( Type type, std::unique_ptr<BaseRequest> request );
 	std::unique_ptr<BaseRequest> request;
 
 };
@@ -61,10 +65,11 @@ protected:
 //
 class CreateJob : public JobDescription {
 public:
-	CreateJob( uint64_t client_id, std::unique_ptr<BaseRequest> &request );
+	CreateJob( Type type, std::unique_ptr<BaseRequest> &request );
 	virtual ~CreateJob();
-	virtual bool extend( const BaseRequest &req );
+	virtual bool extend( Type type, const BaseRequest &req );
 	virtual uint64_t  schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+	virtual bool is_affected_by_node( uint32_t node_id );
 private:
 	// The original query (before any calls to extends
 	const QueryRectangle orig_query;
@@ -77,9 +82,10 @@ private:
 //
 class DeliverJob : public JobDescription {
 public:
-	DeliverJob( uint64_t client_id, std::unique_ptr<DeliveryRequest> &request, uint32_t node );
+	DeliverJob( Type type, std::unique_ptr<DeliveryRequest> &request, uint32_t node );
 	virtual ~DeliverJob();
 	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+	virtual bool is_affected_by_node( uint32_t node_id );
 private:
 	uint32_t node;
 };
@@ -89,9 +95,10 @@ private:
 //
 class PuzzleJob : public JobDescription {
 public:
-	PuzzleJob( uint64_t client_id, std::unique_ptr<PuzzleRequest> &request, std::vector<uint32_t> &nodes );
+	PuzzleJob( Type type, std::unique_ptr<PuzzleRequest> &request, std::vector<uint32_t> &nodes );
 	virtual ~PuzzleJob();
 	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+	virtual bool is_affected_by_node( uint32_t node_id );
 private:
 	std::vector<uint32_t> nodes;
 };
@@ -109,12 +116,16 @@ public:
 	// Adds a new raster-request to the job queue
 	// Might extend a pending request or consume the result
 	// of an already running job.
-	void add_raster_request( uint64_t client_id, const BaseRequest &req );
+	void add_request( QueryInfo::Type type, uint64_t client_id, const BaseRequest &req );
 
 	// Schedules pending jobs on the given worker-connections
 	// It is not promised that all pending jobs are scheduled.
 	// This depends on the available workers
 	void schedule_pending_jobs( const std::map<uint64_t, std::unique_ptr<WorkerConnection>> &worker_connections );
+
+	void worker_failed( uint64_t worker_id );
+
+	void node_failed( uint32_t node_id );
 
 	// closes this worker -- no requests will be accepted
 	// Returns the number of clients waiting for its response
@@ -125,6 +136,10 @@ public:
 	std::vector<uint64_t> release_worker( uint64_t worker_id );
 
 private:
+	std::unique_ptr<JobDescription> create_raster_job( const BaseRequest &req );
+
+	std::unique_ptr<JobDescription> recreate_job( const QueryInfo &query );
+
 	const IndexCache &raster_cache;
 	const std::map<uint32_t,std::shared_ptr<Node>> &nodes;
 	std::unordered_map<uint64_t,QueryInfo> queries;

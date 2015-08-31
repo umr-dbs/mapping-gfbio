@@ -57,7 +57,7 @@ protected:
 };
 
 //
-// Job describing the creation of a result
+// Job describing the creation of a not yet cached result
 //
 class CreateJob : public JobDescription {
 public:

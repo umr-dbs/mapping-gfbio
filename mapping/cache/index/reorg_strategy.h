@@ -15,6 +15,8 @@
 #include <unordered_map>
 #include <memory>
 
+// Reorg-strategies manage the reconfiguration of the cache
+// on imbalance
 
 class Node;
 
@@ -57,7 +59,7 @@ class NeverReorgStrategy : public ReorgStrategy {
 //
 // This strategy simply redistributes entries
 // to achieve approx. the same memory usage across
-// all clients
+// all nodes
 //
 class CapacityReorgStrategy : public ReorgStrategy {
 public:

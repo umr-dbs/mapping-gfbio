@@ -59,7 +59,8 @@ TwoStepStrategy::~TwoStepStrategy() {
 
 bool TwoStepStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	double v = profiler.self_cpu + profiler.self_gpu + profiler.self_io * 0.0000001 + 0.000000005 * bytes;
+	double av = profiler.all_cpu + profiler.all_gpu + profiler.all_io * 0.0000001 + 0.000000005 * bytes;
 	return v >= immediate_threshold ||
-		   (profiler.uncached_depth >= stack_depth && v >= stacked_threshold);
+		   (profiler.uncached_depth >= stack_depth && av >= stacked_threshold);
 }
 

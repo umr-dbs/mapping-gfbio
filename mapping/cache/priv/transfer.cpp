@@ -10,6 +10,10 @@
 #include <geos/io/WKBWriter.h>
 #include <geos/io/WKBReader.h>
 
+//
+// Foreign reference
+//
+
 ForeignRef::ForeignRef(const std::string& host, uint32_t port) :
 	host(host), port(port) {
 }
@@ -26,6 +30,10 @@ void ForeignRef::toStream(BinaryStream& stream) const {
 	stream.write(host);
 	stream.write(port);
 }
+
+//
+// Delivery response
+//
 
 DeliveryResponse::DeliveryResponse(std::string host, uint32_t port, uint64_t delivery_id) :
 			ForeignRef(host,port), delivery_id(delivery_id) {
@@ -48,6 +56,10 @@ std::string DeliveryResponse::to_string() const {
 	ss << "DeliveryResponse[" << host << ":" << port << ", delivery_id: " << delivery_id << "]";
 	return ss.str();
 }
+
+//
+// Cache-entry reference
+//
 
 
 CacheRef::CacheRef(const std::string& host, uint32_t port, uint64_t entry_id) :

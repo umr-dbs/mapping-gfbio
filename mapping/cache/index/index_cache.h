@@ -31,6 +31,9 @@ class IndexCacheKey : public NodeCacheKey {
 public:
 	IndexCacheKey( const std::string &semantic_id, std::pair<uint32_t,uint64_t> id );
 	IndexCacheKey( uint32_t node_id, const std::string &semantic_id, uint64_t entry_id );
+
+	std::string to_string() const;
+
 	uint32_t node_id;
 };
 
@@ -82,9 +85,13 @@ public:
 	// Calculates an appropriate reorganization
 	void reorganize(std::map<uint32_t, NodeReorgDescription>& result );
 
+	// Tells the total capacity of the implementing cache
 	virtual size_t get_total_capacity( const Capacity& capacity ) const = 0;
+	// Tells the used capacity of the implementing cache
 	virtual size_t get_used_capacity( const Capacity& capacity ) const = 0;
+	// Tells the usage of the implementing cache
 	virtual double get_capacity_usage( const Capacity& capacity ) const = 0;
+	// Tells the type of item cached here
 	virtual ReorgRemoveItem::Type get_reorg_type() const = 0;
 
 private:

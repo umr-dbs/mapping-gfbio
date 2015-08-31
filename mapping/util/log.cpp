@@ -18,6 +18,8 @@ void Log::setLevel(LogLevel level) {
 	Log::level = level;
 }
 
+#ifndef DISABLE_LOGGING
+
 void Log::error(const char* msg, ...) {
 	va_list arglist;
 	va_start(arglist, msg);
@@ -52,8 +54,6 @@ void Log::trace(const char* msg, ...) {
 	Log::log(LogLevel::TRACE, msg, arglist);
 	va_end(arglist);
 }
-
-#ifndef DISABLE_LOGGING
 
 void Log::log(LogLevel level, const char *msg, va_list vargs) {
 	if (level <= Log::level) {
@@ -102,7 +102,12 @@ void Log::log(LogLevel level, const char *msg, va_list vargs) {
 }
 #endif
 #ifdef DISABLE_LOGGING
-void Log::log(LogLevel level, const char *msg, ...) {}
+void Log::error(const char* msg, ...) {}
+void Log::warn(const char* msg, ...) {}
+void Log::info(const char* msg, ...) {}
+void Log::debug(const char* msg, ...) {}
+void Log::trace(const char* msg, ...) {}
+void Log::log(LogLevel level, const char *msg, va_list vargs) {}
 #endif
 
 Log::LogLevel Log::level = LogLevel::INFO;

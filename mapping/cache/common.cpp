@@ -40,6 +40,15 @@ std::string CacheCommon::stref_to_string(const SpatioTemporalReference &ref) {
 	return os.str();
 }
 
+
+std::string CacheCommon::raster_to_string(const GenericRaster& raster) {
+
+	return concat( "GenericRaster: ", stref_to_string(raster.stref),
+		", size: ", raster.width, "x", raster.height,
+		", res: ", raster.pixel_scale_x, "x", raster.pixel_scale_y, "]");
+}
+
+
 int CacheCommon::get_listening_socket(int port, bool nonblock, int backlog) {
 	int sock;
 	struct addrinfo hints, *servinfo, *p;

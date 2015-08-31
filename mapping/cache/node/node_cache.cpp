@@ -87,7 +87,8 @@ void NodeCache<EType>::remove(const NodeCacheKey& key) {
 		try {
 			auto entry = cache->remove(key.entry_id);
 			current_size -= entry->size;
-		} catch ( NoSuchElementException &nse ) {
+		} catch ( const NoSuchElementException &nse ) {
+			Log::warn("Item could not be removed: %s", key.to_string().c_str());
 		}
 	}
 }
@@ -166,7 +167,7 @@ void NodeCache<EType>::track_access(const NodeCacheKey& key, NodeCacheEntry<ETyp
 	time(&(e.last_access));
 	try {
 		access_tracker.at(key.semantic_id).insert(key.entry_id);
-	} catch ( std::out_of_range &oor ) {
+	} catch ( const std::out_of_range &oor ) {
 		std::set<uint64_t> ids;
 		ids.insert(key.entry_id);
 		access_tracker.emplace( key.semantic_id, ids );

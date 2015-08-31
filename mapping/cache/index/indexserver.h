@@ -117,6 +117,7 @@ private:
 	// The query-manager handling request-scheduling
 	QueryManager query_manager;
 
+	// timestamp of the last reorganization
 	time_t last_reorg;
 };
 

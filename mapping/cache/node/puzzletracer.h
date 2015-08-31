@@ -17,6 +17,10 @@
 #include <fstream>
 #include <geos/geom/Geometry.h>
 
+//
+// Helper to trace the process of puzzling raster-requests
+//
+
 class RasterWriter {
 public:
 	RasterWriter( std::string dir );

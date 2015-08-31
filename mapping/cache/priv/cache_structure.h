@@ -48,6 +48,9 @@ public:
 	double x_res_from, x_res_to, y_res_from, y_res_to;
 };
 
+//
+// Basic information about cached data
+//
 class CacheEntry {
 public:
 	CacheEntry(CacheEntryBounds bounds, uint64_t size);
@@ -63,6 +66,9 @@ public:
 	uint32_t access_count;
 };
 
+//
+// Info about the coverage of a single entry in a cache-query
+//
 template<typename KType>
 class CacheQueryInfo {
 public:
@@ -143,6 +149,9 @@ public:
 	std::string to_string() const;
 };
 
+//
+// The basic structure used for caching
+//
 template<typename KType, typename EType>
 class CacheStructure {
 public:

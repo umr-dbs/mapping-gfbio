@@ -51,6 +51,11 @@ public:
 	static std::string stref_to_string( const SpatioTemporalReference &ref );
 
 	//
+	// Returns a string-representation of the given raster
+	//
+	static std::string raster_to_string( const GenericRaster &raster );
+
+	//
 	// Helper to read from a stream with a given timeout. Basically wraps
 	// BinaryStream::read(T*,bool).
 	// If the timeout is reached, a TimeoutException is thrown. If select()
@@ -74,9 +79,7 @@ public:
 		else if ( errno == EINTR )
 			throw InterruptedException("Select interrupted");
 		else {
-			std::ostringstream msg;
-			msg << "UnixSocket: read() failed: " << strerror(errno);
-			throw NetworkException(msg.str());
+			throw NetworkException(concat("UnixSocket: read() failed: ", strerror(errno)));
 		}
 	}
 

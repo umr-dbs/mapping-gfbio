@@ -26,7 +26,7 @@ public:
 	// Called if data is available on the unerlying socket and this connection is not in writing mode
 	void input();
 	// Called if data can be written to the unerlying socket and this connection is in writing-mode
-	void do_write();
+	void output();
 
 	// Returns the fd used for writes by this connection
 	int get_write_fd();
@@ -49,9 +49,9 @@ protected:
 	// Callback for finished non-blocking reads
 	virtual void read_finished( NBReader& reader) = 0;
 	// Called by implementing classes to trigger a non-blocking write
-	void write( std::unique_ptr<NBWriter> writer );
+	void begin_write( std::unique_ptr<NBWriter> writer );
 	// Called by implementing classes to trigger a non-blocking read
-	void read( std::unique_ptr<NBReader> reader );
+	void begin_read( std::unique_ptr<NBReader> reader );
 
 	BinaryStream &stream;
 	bool faulty;

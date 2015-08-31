@@ -72,12 +72,18 @@ private:
 	// Process a command received on the control-connection
 	void process_control_command(uint8_t cmd, BinaryStream &stream);
 
+	// Manages the migration of the given item to this node
 	void handle_reorg_move_item( const ReorgMoveItem &item, BinaryStream &index_stream );
 
+	// Removes the given item from the local cache of this node
 	void handle_reorg_remove_item( const ReorgRemoveItem &item );
 
+	// Creates a connection to the appropriate delivery-process
+	// of the target node and requests the delivery of the given item
 	std::unique_ptr<BinaryStream> initiate_move( const ReorgMoveItem &item );
 
+	// Confirms the movement of the given item to the index as well
+	// as to the Node it was requested from
 	void confirm_move( const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream, BinaryStream &del_stream );
 
 	// Indicator telling if the server should shutdown

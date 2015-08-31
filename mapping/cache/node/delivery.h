@@ -78,17 +78,16 @@ private:
 	// and kills faulty connections
 	int setup_fdset( fd_set *readfds, fd_set* write_fds);
 
+	// Processes the active connections:
+	// Checks for data to read/write and takes the corresponding actions
 	void process_connections(fd_set *readfds, fd_set* write_fds);
-
-
 
 	// Fetches the delivery with the given id from the internal
 	// map and sends it. Throws std::out_of_range if no delivery is present
 	// for the given id
 	Delivery& get_delivery(uint64_t id);
 
-	void remove_delivery(uint64_t id);
-
+	// Removes expired deliveries
 	void remove_expired_deliveries();
 
 	// Indicator telling if the manager should shutdown

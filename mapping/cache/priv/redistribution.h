@@ -13,7 +13,14 @@
 
 #include <vector>
 
+//
+// Classes used to organize the redistribution of entries among the cache-nodes
+//
 
+
+//
+// Describes an item to remove from the cache
+//
 class ReorgRemoveItem : public NodeCacheKey {
 public:
 	enum class Type : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT };
@@ -27,6 +34,10 @@ public:
 	Type type;
 };
 
+//
+// Notification about successful movement of an item
+// for the index
+//
 class ReorgMoveResult : public ReorgRemoveItem {
 public:
 	ReorgMoveResult( Type type, const std::string &semantic_id,
@@ -43,6 +54,10 @@ public:
 	uint64_t to_cache_id;
 };
 
+//
+// Describes an item which should be moved from the given to_node
+// to the executing node
+//
 class ReorgMoveItem : public ReorgRemoveItem {
 public:
 	ReorgMoveItem( Type type, const std::string &semantic_id, uint64_t from_cache_id,
@@ -59,6 +74,10 @@ public:
 	uint32_t from_port;
 };
 
+//
+// Bundles a set of move and remove operations
+// for one reorganization
+//
 class ReorgDescription {
 public:
 	ReorgDescription();

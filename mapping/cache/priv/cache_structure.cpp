@@ -35,7 +35,7 @@ void NodeCacheKey::toStream(BinaryStream& stream) const {
 }
 
 std::string NodeCacheKey::to_string() const {
-	return concat( "NodeCacheKey[ semantic_id: ", semantic_id, ", id: ", entry_id);
+	return concat( "NodeCacheKey[ semantic_id: ", semantic_id, ", id: ", entry_id, "]");
 }
 
 //
@@ -58,7 +58,7 @@ CacheEntryBounds::CacheEntryBounds(const GridSpatioTemporalResult& result) :
 	double ohspan = x2 - x1;
 	double ovspan = y2 - y1;
 
-	// Enlarge result by degrees of half a pixel in each direction
+	// Enlarge result by degrees of 1/100 a pixel in each direction
 	double h_spacing = ohspan / result.width / 100.0;
 	double v_spacing = ovspan / result.height / 100.0;
 
@@ -98,10 +98,8 @@ void CacheEntryBounds::toStream(BinaryStream& stream) const {
 }
 
 bool CacheEntryBounds::matches(const QueryRectangle& query) const {
-	if ( query.epsg == epsg &&
-		 query.x1 >= x1 && query.x2 <= x2 &&
-		 query.y1 >= y1 && query.y2 <= y2 &&
-		 query.t1 >= t1 && query.t2 <= t2) {
+	if ( SpatialReference::contains(query) &&
+		 TemporalReference::contains(query) ) {
 
 		if ( res_type == QueryResolution::Type::NONE )
 			return true;
@@ -137,17 +135,19 @@ double CacheEntryBounds::get_coverage(const QueryRectangle& query) const {
 
 	if ( res_type == QueryResolution::Type::NONE )
 		return coverage;
+	else if ( res_type == QueryResolution::Type::PIXELS ) {
+		double q_x_res = (double) query.xres / (query.x2 - query.x1);
+		double q_y_res = (double) query.yres / (query.y2 - query.y1);
 
-	double q_x_res = (double) query.xres / (query.x2 - query.x1);
-	double q_y_res = (double) query.yres / (query.y2 - query.y1);
-
-	if ( x_res_from <  q_x_res &&
-		 x_res_to   >= q_x_res &&
-		 y_res_from <  q_y_res &&
-		 y_res_to   >= q_y_res )
-		return coverage;
-	else
-		return 0.0;
+		if ( x_res_from <  q_x_res &&
+			 x_res_to   >= q_x_res &&
+			 y_res_from <  q_y_res &&
+			 y_res_to   >= q_y_res )
+			return coverage;
+		else
+			return 0.0;
+	}
+	throw ArgumentException("Unknown QueryResolution::Type in QueryRectangle");
 }
 
 std::string CacheEntryBounds::to_string() const {
@@ -334,22 +334,23 @@ void CacheStructure<KType, EType>::put(const KType& key, const std::shared_ptr<E
 template<typename KType, typename EType>
 std::shared_ptr<EType> CacheStructure<KType, EType>::get(const KType& key) const {
 	std::lock_guard<std::mutex> guard(mtx);
-//	Log::trace("Retrieving cache-entry with id: %d", key);
 	try {
 		return entries.at(key);
-	} catch (std::out_of_range &oor) {
-//		Log::trace("No entry found for id: %d", key);
-		throw NoSuchElementException(concat("No cache-entry found"));// with id: ", key));
+	} catch (const std::out_of_range &oor) {
+		throw NoSuchElementException("No cache-entry found");
 	}
 }
 
 template<typename KType, typename EType>
 std::shared_ptr<EType> CacheStructure<KType, EType>::remove(const KType& key) {
 	std::lock_guard<std::mutex> guard(mtx);
-//	Log::trace("Removing cache-entry with id: %d", key);
-	auto result = entries.at(key);
-	entries.erase(key);
-	return result;
+	auto iter = entries.find(key);
+	if ( iter != entries.end() ) {
+		auto result = iter->second;
+		entries.erase(iter);
+		return result;
+	}
+	throw NoSuchElementException("No cache-entry found");
 }
 
 template<typename KType, typename EType>

@@ -33,7 +33,7 @@ bool ReorgStrategy::requires_reorg(const IndexCache &cache, const std::map<uint3
 		maxru = std::max(maxru, cache.get_capacity_usage(e.second->capacity));
 		minru = std::min(minru, cache.get_capacity_usage(e.second->capacity));
 	}
-	return maxru - minru > 0.15;
+	return maxru - minru > 0.15 || maxru >= 1.0;
 }
 
 bool ReorgStrategy::entry_less( const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b ) {
@@ -107,13 +107,19 @@ void CapacityReorgStrategy::reorganize(
 	// Calculate target memory usage after reorg
 	double target_mean = std::min( 0.8, raster_accum / result.size() * 1.05);
 
+	Log::debug("CapReorg: Target-Mean: %f", target_mean);
+
 	// Find overflowing nodes
 	std::vector<std::shared_ptr<IndexCacheEntry>> overflow;
 	std::vector<uint32_t> underflow_nodes;
 
 	for (auto &e : result) {
+		Log::debug("CapReorg: Capacity for node %d: %s", e.first, e.second.node->capacity.to_string().c_str());
+
 		size_t target_bytes = cache.get_total_capacity(e.second.node->capacity) * target_mean;
 		size_t bytes_used = cache.get_used_capacity(e.second.node->capacity);
+
+		Log::debug("CapReorg: Target for node %d: %d/%d bytes", e.first, target_bytes, cache.get_total_capacity(e.second.node->capacity));
 
 		if ( bytes_used < target_bytes ) {
 			underflow_nodes.push_back(e.second.node->id);
@@ -128,6 +134,8 @@ void CapacityReorgStrategy::reorganize(
 				iter++;
 			}
 		}
+
+		Log::debug("CapReorg: Real usage after reorg for node %d: %d/%d bytes", e.first, bytes_used, cache.get_total_capacity(e.second.node->capacity) );
 	}
 
 	Log::debug("Items to redistribute: %d", overflow.size());

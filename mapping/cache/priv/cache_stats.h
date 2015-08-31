@@ -62,8 +62,6 @@ private:
 //
 // Stats
 //
-
-
 class NodeEntryStats {
 public:
 	NodeEntryStats( uint64_t id, time_t last_access, uint32_t access_count );
@@ -76,7 +74,9 @@ public:
 	uint32_t access_count;
 };
 
-
+//
+// Holds statistics about a single cache - e.g. raster
+//
 class CacheStats {
 public:
 	CacheStats();

@@ -80,15 +80,18 @@ public:
 protected:
 	// Copies the content of the entry
 	virtual std::unique_ptr<EType> copy(const EType &content) const = 0;
+	// Retrieves the size of content in bytes
 	virtual size_t get_data_size(const EType &content) const = 0;
 private:
 	typedef CacheStructure<uint64_t,NodeCacheEntry<EType>> Struct;
 
+	// Creates an entry for the given data
 	std::shared_ptr<NodeCacheEntry<EType>> create_entry( uint64_t id, const EType &data );
 
 	// Retrieves the cache-structure for the given semantic_id.
 	Struct* get_structure( const std::string &semantic_id, bool create = false) const;
 
+	// Tracks the access to the given item
 	void track_access( const NodeCacheKey &key, NodeCacheEntry<EType> &e ) const;
 
 	// Holds the maximum size (in bytes) this cache may hold
@@ -100,8 +103,11 @@ private:
 	//std::unique_ptr<ReplacementPolicy<EType>> policy;
 	// Holds all cache-structures accessable by the semantic_id
 	mutable std::unordered_map<std::string,Struct*> caches;
+	// Mutex used when accessing the cache-structures
 	mutable std::mutex mtx;
+	// Mutex used during access-tracking
 	mutable std::mutex access_mtx;
+	// Collects the ids of all accessed entries
 	mutable std::unordered_map<std::string,std::set<uint64_t>> access_tracker;
 };
 

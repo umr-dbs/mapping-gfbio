@@ -22,6 +22,10 @@ IndexCacheKey::IndexCacheKey(uint32_t node_id, const std::string &semantic_id, u
 	NodeCacheKey(semantic_id,entry_id), node_id(node_id) {
 }
 
+std::string IndexCacheKey::to_string() const {
+	return concat( "NodeCacheKey[ semantic_id: ", semantic_id, ", id: ", entry_id, ", node: ", node_id, "]");
+}
+
 //
 // Index entry
 //
@@ -44,6 +48,7 @@ IndexCache::~IndexCache() {
 
 void IndexCache::put( const IndexCacheEntry& entry) {
 	auto cache = get_structure(entry.semantic_id,true);
+	//FIXME: This sucks -- extra copy
 	std::shared_ptr<IndexCacheEntry> e( new IndexCacheEntry(entry) );
 	std::pair<uint32_t,uint64_t> id(entry.node_id,entry.entry_id);
 	cache->put(id, e);
@@ -75,17 +80,19 @@ void IndexCache::remove(const IndexCacheKey& key) {
 			std::pair<uint32_t,uint64_t> id(key.node_id,key.entry_id);
 			auto entry = cache->remove(id);
 			remove_from_node(key);
-		} catch ( NoSuchElementException &nse ) {
+		} catch ( const NoSuchElementException &nse ) {
+			Log::warn("Removal of index-entry failed: %s", nse.what());
 		}
 	}
+	else
+		Log::warn("Removal of index-entry failed. No structure for semantic_id: %s", key.semantic_id);
 }
 
 void IndexCache::move(const IndexCacheKey& old_key, const IndexCacheKey& new_key) {
 	auto cache = get_structure(old_key.semantic_id);
 	if (cache != nullptr) {
 		std::pair<uint32_t,uint64_t> id(old_key.node_id,old_key.entry_id);
-		auto entry = cache->get(id);
-		cache->remove(id);
+		auto entry = cache->remove(id);
 
 		id.first = new_key.node_id;
 		id.second = new_key.entry_id;
@@ -128,23 +135,24 @@ CacheStructure<std::pair<uint32_t,uint64_t>,IndexCacheEntry>* IndexCache::get_st
 std::vector<std::shared_ptr<IndexCacheEntry>>& IndexCache::get_node_entries(uint32_t node_id) const {
 	try {
 		return entries_by_node.at(node_id);
-	} catch ( std::out_of_range &oor ) {
+	} catch ( const std::out_of_range &oor ) {
 		entries_by_node.emplace( node_id, std::vector<std::shared_ptr<IndexCacheEntry>>() );
 		return entries_by_node.at(node_id);
 	}
 }
 
 void IndexCache::remove_from_node(const IndexCacheKey& key) {
-	auto entries = get_node_entries(key.node_id);
+	auto &entries = get_node_entries(key.node_id);
 	auto iter = entries.begin();
 	while ( iter != entries.end() ) {
 		if ( (*iter)->semantic_id == key.semantic_id &&
 			 (*iter)->entry_id == key.entry_id ) {
 			iter = entries.erase(iter);
-			break;
+			return;
 		}
 		iter++;
 	}
+	throw NoSuchElementException("Entry not found in node-list.");
 }
 
 bool IndexCache::requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> > &nodes ) {

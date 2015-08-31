@@ -135,7 +135,7 @@ void CacheStats::toStream(BinaryStream& stream) const {
 void CacheStats::add_stats(const std::string &semantic_id, NodeEntryStats stats) {
 	try {
 		this->stats.at( semantic_id ).push_back(stats);
-	} catch ( std::out_of_range &oor ) {
+	} catch ( const std::out_of_range &oor ) {
 		std::vector<NodeEntryStats> sv;
 		sv.push_back(stats);
 		this->stats.emplace( semantic_id, sv );

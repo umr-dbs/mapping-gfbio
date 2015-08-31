@@ -63,16 +63,18 @@ void IndexServer::run() {
 		struct timeval tv { 2, 0 };
 		fd_set readfds;
 		FD_ZERO(&readfds);
-		// Add listen sockets
+		// Add listen socket
 		FD_SET(listen_socket, &readfds);
 
 		int maxfd = listen_socket;
 
+		// Add newly accepted sockets
 		for (auto &fd : new_fds) {
 			FD_SET(fd, &readfds);
 			maxfd = std::max(maxfd, fd);
 		}
 
+		// Setup existing connections
 		maxfd = std::max(maxfd, setup_fdset(&readfds));
 
 		int sel_ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
@@ -83,6 +85,7 @@ void IndexServer::run() {
 			process_worker_connections(&readfds);
 			process_control_connections(&readfds);
 			process_client_connections(&readfds);
+
 
 			process_handshake(new_fds, &readfds);
 
@@ -103,8 +106,7 @@ void IndexServer::run() {
 		// Schedule Jobs
 		query_manager.schedule_pending_jobs(worker_connections);
 
-
-
+		// Update stats
 		time_t now = time(nullptr);
 		time_t oldest_stats = now;
 		bool all_idle = true;
@@ -123,23 +125,39 @@ void IndexServer::run() {
 
 		// Reorganize
 		if ( oldest_stats > last_reorg && all_idle && raster_cache.requires_reorg( nodes) ) {
-			// Remember time of this reorg
 			std::map<uint32_t,NodeReorgDescription> reorgs;
 			for ( auto &kv : nodes ) {
 				reorgs.emplace( kv.first, NodeReorgDescription(kv.second) );
 			}
+
+			// Remember time of this reorg
 			time(&last_reorg);
 
-			if ( raster_cache.requires_reorg(nodes) )
+			if ( raster_cache.requires_reorg(nodes) ) {
+				Log::info("Calculating reorganization of raster cache.");
 				raster_cache.reorganize( reorgs );
+				Log::info("Finished calculating reorganization of raster cache.");
+			}
 
 			for ( auto &d : reorgs ) {
+				Log::debug("Processing removals locally and sending reorg-commands to nodes.");
+				for ( auto &rm : d.second.get_removals() ) {
+					switch ( rm.type ) {
+						case ReorgRemoveItem::Type::RASTER:
+							raster_cache.remove( IndexCacheKey(d.first,rm.semantic_id,rm.entry_id) );
+							break;
+						default:
+							Log::error("Not implemented yet.");
+					}
+				}
+
 				auto &cc = control_connections.at( d.second.node->control_connection );
 				if ( !d.second.is_empty() )
 					cc->send_reorg( d.second );
 			}
 		}
 	}
+
 	close(listen_socket);
 	Log::info("Index-Server done.");
 }
@@ -147,54 +165,47 @@ void IndexServer::run() {
 int IndexServer::setup_fdset(fd_set* readfds) {
 	int maxfd = -1;
 
-	{
-		auto wit = worker_connections.begin();
-		while (wit != worker_connections.end()) {
-			WorkerConnection &wc = *wit->second;
-			if (wc.is_faulty()) {
-				// TODO: Reschedule
-				worker_connections.erase(wit++);
-			}
-			else {
-				FD_SET(wc.get_read_fd(), readfds);
-				maxfd = std::max(maxfd, wc.get_read_fd());
-				wit++;
-			}
+	auto wit = worker_connections.begin();
+	while (wit != worker_connections.end()) {
+		WorkerConnection &wc = *wit->second;
+		if (wc.is_faulty()) {
+			// TODO: Reschedule
+			worker_connections.erase(wit++);
+		}
+		else {
+			FD_SET(wc.get_read_fd(), readfds);
+			maxfd = std::max(maxfd, wc.get_read_fd());
+			wit++;
 		}
 	}
 
-	{
-		auto ccit = control_connections.begin();
-		while (ccit != control_connections.end()) {
-			ControlConnection &cc = *ccit->second;
-			if (cc.is_faulty()) {
-				raster_cache.remove_all_by_node(cc.node->id);
-				nodes.erase(cc.node->id);
-				control_connections.erase(ccit++);
-			}
-			else {
-				FD_SET(cc.get_read_fd(), readfds);
-				maxfd = std::max(maxfd, cc.get_read_fd());
-				ccit++;
-			}
+	auto ccit = control_connections.begin();
+	while (ccit != control_connections.end()) {
+		ControlConnection &cc = *ccit->second;
+		if (cc.is_faulty()) {
+			raster_cache.remove_all_by_node(cc.node->id);
+			nodes.erase(cc.node->id);
+			control_connections.erase(ccit++);
+		}
+		else {
+			FD_SET(cc.get_read_fd(), readfds);
+			maxfd = std::max(maxfd, cc.get_read_fd());
+			ccit++;
 		}
 	}
 
-	{
-		auto clit = client_connections.begin();
-		while (clit != client_connections.end()) {
-			ClientConnection &cc = *clit->second;
-			if (cc.is_faulty()) {
-				client_connections.erase(clit++);
-			}
-			else {
-				FD_SET(cc.get_read_fd(), readfds);
-				maxfd = std::max(maxfd, cc.get_read_fd());
-				clit++;
-			}
+	auto clit = client_connections.begin();
+	while (clit != client_connections.end()) {
+		ClientConnection &cc = *clit->second;
+		if (cc.is_faulty()) {
+			client_connections.erase(clit++);
+		}
+		else {
+			FD_SET(cc.get_read_fd(), readfds);
+			maxfd = std::max(maxfd, cc.get_read_fd());
+			clit++;
 		}
 	}
-
 	return maxfd;
 }
 
@@ -238,11 +249,10 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 							raster_cache.put( IndexCacheEntry(node->id, raster) );
 						break;
 					}
-					default: {
+					default:
 						Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
-					}
 				}
-			} catch (std::exception &e) {
+			} catch (const std::exception &e) {
 				Log::error("Error on new connection: %s. Dropping.", e.what());
 			}
 			it = new_fds.erase(it);
@@ -286,7 +296,7 @@ void IndexServer::process_control_connections(fd_set* readfds) {
 					break;
 				}
 				default: {
-					throw std::runtime_error("Unknown state of control-connection.");
+					throw IllegalStateException("Unknown state of control-connection.");
 				}
 			}
 
@@ -331,7 +341,7 @@ void IndexServer::process_client_connections(fd_set* readfds) {
 					Log::error("Client-connection MUST not be in idle-state after reading from it");
 				}
 				default: {
-					throw std::runtime_error("Unknown state of client-connection.");
+					throw IllegalStateException("Unknown state of client-connection.");
 				}
 			}
 		}
@@ -353,12 +363,12 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 				case WorkerConnection::State::ERROR: {
 					Log::warn("Worker returned error: %s. Forwarding to client.",
 						wc.get_error_message().c_str());
-
+					query_manager.close_worker(wc.id);
 					auto clients = query_manager.release_worker(wc.id);
 					for ( auto &cid : clients ) {
 						try {
 							client_connections.at(cid)->send_error(wc.get_error_message());
-						} catch ( std::out_of_range &oor ) {
+						} catch ( const std::out_of_range &oor ) {
 							Log::warn("Client %d does not exist.", cid );
 						}
 					}
@@ -377,7 +387,7 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 					for ( auto &cid : clients ) {
 						try {
 							client_connections.at(cid)->send_response(wc.get_result());
-						} catch ( std::out_of_range &oor ) {
+						} catch ( const std::out_of_range &oor ) {
 							Log::warn("Client %d does not exist.", cid );
 						}
 					}
@@ -386,9 +396,7 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 				}
 				case WorkerConnection::State::NEW_RASTER_ENTRY: {
 					Log::debug("Worker added new raster-entry");
-					auto &ref  = wc.get_new_raster_entry();
-					IndexCacheEntry entry(wc.node->id, ref);
-					raster_cache.put(entry);
+					raster_cache.put(IndexCacheEntry(wc.node->id, wc.get_new_raster_entry()));
 					wc.raster_cached();
 					break;
 				}
@@ -398,7 +406,7 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 					break;
 				}
 				default: {
-					throw std::runtime_error(
+					throw IllegalStateException(
 						concat("Illegal worker-connection state after read: ", (int) wc.get_state()));
 				}
 			}

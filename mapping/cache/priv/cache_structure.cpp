@@ -67,15 +67,15 @@ CacheEntryBounds::CacheEntryBounds(const GridSpatioTemporalResult& result) :
 	y1 = y1 - v_spacing;
 	y2 = y2 + v_spacing;
 
-	// Calc resolution bounds: (res*.75, res*1.5]
+	// Calc resolution bounds: (res*.5, res]
 	double h_pixel_per_deg = result.width / ohspan;
 	double v_pixel_per_deg = result.height / ovspan;
 
-	x_res_from = h_pixel_per_deg * 0.75;
-	x_res_to = h_pixel_per_deg * 1.5;
+	x_res_from = h_pixel_per_deg * 0.5;
+	x_res_to = h_pixel_per_deg;
 
-	y_res_from = v_pixel_per_deg * 0.75;
-	y_res_to = v_pixel_per_deg * 1.5;
+	y_res_from = v_pixel_per_deg * 0.5;
+	y_res_to = v_pixel_per_deg;
 }
 
 CacheEntryBounds::CacheEntryBounds(BinaryStream& stream) :

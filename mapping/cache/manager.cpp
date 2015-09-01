@@ -115,10 +115,10 @@ std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleR
 			if (std::abs(1.0 - f->pixel_scale_x / rem->pixel_scale_x) > 0.01
 				|| std::abs(1.0 - f->pixel_scale_y / rem->pixel_scale_y) > 0.01) {
 				Log::error(
-					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s",
+					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s, result-dimension: %dx%d",
 					f->pixel_scale_x, f->pixel_scale_y, rem->pixel_scale_x, rem->pixel_scale_y,
 					((rqr.x2 - rqr.x1) / rqr.xres), ((rqr.y2 - rqr.y1) / rqr.yres),
-					CacheCommon::qr_to_string(rqr).c_str());
+					CacheCommon::qr_to_string(rqr).c_str(), rem->width, rem->height);
 
 				throw OperatorException("Incompatible resolution on remainder");
 			}
@@ -129,6 +129,9 @@ std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleR
 			items.push_back( std::shared_ptr<GenericRaster>(rem.release()) );
 		} catch ( const MetadataException &me) {
 			Log::error("Error fetching remainder: %s. Query: %s", me.what(), CacheCommon::qr_to_string(rqr).c_str());
+			throw;
+		} catch ( const SourceException &se ) {
+			Log::error("Error fetching remainder: %s. Query: %s", se.what(), CacheCommon::qr_to_string(rqr).c_str());
 			throw;
 		}
 	}

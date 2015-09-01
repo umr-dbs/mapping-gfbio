@@ -260,6 +260,11 @@ QueryRectangle PuzzleRequest::get_remainder_query(double xres, double yres) cons
 	double x1 = DoubleInfinity, x2 = DoubleNegInfinity, y1 = DoubleInfinity, y2 = DoubleNegInfinity;
 	auto cos = remainder->getCoordinates();
 
+	// Adjust resolution a little --> Omits clashes when trying to get exact resolution
+	// Value picked from difference between queried and real resolution used by openlayers
+	xres *= 1.25;
+	yres *= 1.25;
+
 	for ( size_t i = 0; i < cos->getSize(); i++ ) {
 		auto &c = cos->getAt(i);
 		x1 = std::min(x1,c.x);

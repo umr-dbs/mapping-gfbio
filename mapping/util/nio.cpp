@@ -11,6 +11,8 @@
 #include "util/make_unique.h"
 #include "util/log.h"
 #include "cache/priv/cache_structure.h"
+#include "cache/priv/transfer.h"
+#include "cache/priv/redistribution.h"
 
 #include <errno.h>
 #include <unistd.h>
@@ -38,7 +40,7 @@ void StreamBuffer::reset() {
 	stream.str("");
 }
 
-std::string StreamBuffer::get_content() {
+std::string StreamBuffer::get_content() const {
 	return stream.str();
 }
 
@@ -46,7 +48,7 @@ std::string StreamBuffer::get_content() {
 // Writer interface
 //
 
-NBWriter::NBWriter(int fd) : fd(fd) {
+NBWriter::NBWriter() {
 }
 
 NBWriter::~NBWriter() {
@@ -56,14 +58,14 @@ NBWriter::~NBWriter() {
 //
 // Simple Writer
 //
-SimpleNBWriter::SimpleNBWriter(int fd) :
-	NBWriter(fd), bytes_written(0), error(false), finished(false) {
+NBSimpleWriter::NBSimpleWriter() :
+	bytes_written(0), error(false), finished(false) {
 }
 
-SimpleNBWriter::~SimpleNBWriter() {
+NBSimpleWriter::~NBSimpleWriter() {
 }
 
-void SimpleNBWriter::write() {
+void NBSimpleWriter::write(int fd) {
 	if ( error || finished )
 			throw IllegalStateException(concat("Illegal state for writing. Error: ", error, ", Finished: ", finished));
 
@@ -85,19 +87,19 @@ void SimpleNBWriter::write() {
 	finished = true;
 }
 
-bool SimpleNBWriter::has_error() const {
+bool NBSimpleWriter::has_error() const {
 	return error;
 }
 
-bool SimpleNBWriter::is_finished() const {
+bool NBSimpleWriter::is_finished() const {
 	return finished;
 }
 
-ssize_t SimpleNBWriter::get_total_written() const {
+ssize_t NBSimpleWriter::get_total_written() const {
 	return bytes_written;
 }
 
-std::string SimpleNBWriter::to_string() const {
+std::string NBSimpleWriter::to_string() const {
 	return concat("SimpleNBWriter[ written: ", bytes_written, ", total: ", get_total_bytes(), ", finished: ", finished, ", error: ", error ,"]");
 }
 
@@ -106,21 +108,20 @@ std::string SimpleNBWriter::to_string() const {
 // Primitive Writer
 //
 template<typename T>
-PrimitiveNBWriter<T>::PrimitiveNBWriter(T data, int fd) :
-	SimpleNBWriter(fd), data(data) {
+NBPrimitiveWriter<T>::NBPrimitiveWriter(T data) : data(data) {
 }
 
 template<typename T>
-PrimitiveNBWriter<T>::~PrimitiveNBWriter() {
+NBPrimitiveWriter<T>::~NBPrimitiveWriter() {
 }
 
 template<typename T>
-ssize_t PrimitiveNBWriter<T>::get_total_bytes() const {
+ssize_t NBPrimitiveWriter<T>::get_total_bytes() const {
 	return sizeof(data);
 }
 
 template<typename T>
-const unsigned char* PrimitiveNBWriter<T>::get_data() const {
+const unsigned char* NBPrimitiveWriter<T>::get_data() const {
 	return (const unsigned char*) &data;
 }
 
@@ -129,8 +130,7 @@ const unsigned char* PrimitiveNBWriter<T>::get_data() const {
 //
 
 template<typename T>
-StreamableNBWriter<T>::StreamableNBWriter(const T& item, int fd) :
-	SimpleNBWriter(fd) {
+NBStreamableWriter<T>::NBStreamableWriter(const T& item) {
 	StreamBuffer ss;
 	BinaryStream &stream = ss;
 	stream.write(item);
@@ -138,16 +138,16 @@ StreamableNBWriter<T>::StreamableNBWriter(const T& item, int fd) :
 }
 
 template<typename T>
-StreamableNBWriter<T>::~StreamableNBWriter() {
+NBStreamableWriter<T>::~NBStreamableWriter() {
 }
 
 template<typename T>
-ssize_t StreamableNBWriter<T>::get_total_bytes() const {
+ssize_t NBStreamableWriter<T>::get_total_bytes() const {
 	return data.size();
 }
 
 template<typename T>
-const unsigned char* StreamableNBWriter<T>::get_data() const {
+const unsigned char* NBStreamableWriter<T>::get_data() const {
 	return (const unsigned char*) data.data();
 }
 
@@ -155,41 +155,39 @@ const unsigned char* StreamableNBWriter<T>::get_data() const {
 // Multi Writer
 //
 
-MultiNBWriter::MultiNBWriter(std::vector<std::unique_ptr<NBWriter> > writers, int fd) :
-	NBWriter(fd), current_index(0), total_bytes(0), writers(std::move(writers)) {
+NBMultiWriter::NBMultiWriter(std::vector<std::unique_ptr<NBWriter> > writers) :
+	current_index(0), total_bytes(0), writers(std::move(writers)) {
 	for ( auto &w : this->writers ) {
 		check_writer(*w);
 		total_bytes += w->get_total_bytes();
 	}
 }
 
-MultiNBWriter::MultiNBWriter(int fd) :
-	NBWriter(fd), current_index(0), total_bytes(0) {
+NBMultiWriter::NBMultiWriter() :
+	current_index(0), total_bytes(0) {
 }
 
-void MultiNBWriter::add_writer(std::unique_ptr<NBWriter> w) {
+void NBMultiWriter::add_writer(std::unique_ptr<NBWriter> w) {
 	check_writer(*w);
 	total_bytes += w->get_total_bytes();
 	writers.push_back( std::move(w) );
 }
 
-void MultiNBWriter::check_writer(const NBWriter& w) {
+void NBMultiWriter::check_writer(const NBWriter& w) {
 	if ( get_total_written() > 0 || (writers.size() > 0 && (has_error() || is_finished())) )
 		throw IllegalStateException("Can only add writer on fresh instance.");
 	if ( w.get_total_written() > 0 ||
 		 w.has_error() || w.is_finished() )
 		throw ArgumentException("Can only build multi-writer with fresh writers.");
-	if ( w.fd != fd )
-		throw ArgumentException("All contained writers must use the same fd.");
 }
 
-void MultiNBWriter::write() {
+void NBMultiWriter::write(int fd) {
 	if ( has_error() || is_finished() )
 		throw IllegalStateException(concat("Illegal state for writing. Error: ", has_error(), ", Finished: ", is_finished()));
 
 	while ( current_index < writers.size()  ) {
 		auto &w = writers.at(current_index);
-		w->write();
+		w->write(fd);
 		if ( w->is_finished() )
 			current_index++;
 		else
@@ -197,15 +195,15 @@ void MultiNBWriter::write() {
 	}
 }
 
-bool MultiNBWriter::has_error() const {
+bool NBMultiWriter::has_error() const {
 	return current_index < writers.size() && writers.at(current_index)->has_error();
 }
 
-bool MultiNBWriter::is_finished() const {
+bool NBMultiWriter::is_finished() const {
 	return current_index == writers.size();
 }
 
-ssize_t MultiNBWriter::get_total_written() const {
+ssize_t NBMultiWriter::get_total_written() const {
 	ssize_t res(0);
 	for ( auto &w : writers ) {
 		res += w->get_total_written();
@@ -213,11 +211,11 @@ ssize_t MultiNBWriter::get_total_written() const {
 	return res;
 }
 
-ssize_t MultiNBWriter::get_total_bytes() const {
+ssize_t NBMultiWriter::get_total_bytes() const {
 	return total_bytes;
 }
 
-std::string MultiNBWriter::to_string() const {
+std::string NBMultiWriter::to_string() const {
 	return concat("MultiNBWriter[ #writer: ", writers.size(), ", written: ", get_total_written(), ", total: ", get_total_bytes(), ", finished: ", is_finished(), ", error: ", has_error() ,"]");
 }
 
@@ -225,9 +223,9 @@ std::string MultiNBWriter::to_string() const {
 // Raster-Writer
 //
 
-class RasterDataWriter : public SimpleNBWriter {
+class NBRasterDataWriter : public NBSimpleWriter {
 public:
-	RasterDataWriter( std::shared_ptr<GenericRaster> raster, int fd);
+	NBRasterDataWriter( std::shared_ptr<GenericRaster> raster);
 	virtual ssize_t get_total_bytes() const;
 protected:
 	virtual const unsigned char *get_data() const;
@@ -235,27 +233,26 @@ private:
 	std::shared_ptr<GenericRaster> raster;
 };
 
-RasterDataWriter::RasterDataWriter(std::shared_ptr<GenericRaster>  raster, int fd) :
-  SimpleNBWriter(fd), raster(raster) {
+NBRasterDataWriter::NBRasterDataWriter(std::shared_ptr<GenericRaster>  raster) :
+  raster(raster) {
 }
 
-ssize_t RasterDataWriter::get_total_bytes() const {
+ssize_t NBRasterDataWriter::get_total_bytes() const {
 	return raster->getDataSize();
 }
 
-const unsigned char* RasterDataWriter::get_data() const {
+const unsigned char* NBRasterDataWriter::get_data() const {
 	return (unsigned char*) raster->getData();
 }
 
-NBRasterWriter::NBRasterWriter( std::shared_ptr<GenericRaster> raster, int fd ) :
-	MultiNBWriter( fd ) {
-	add_writer(make_unique<StreamableNBWriter<DataDescription>>( raster->dd, fd ));
-	add_writer(make_unique<StreamableNBWriter<SpatioTemporalReference>>( raster->stref, fd ));
-	add_writer(make_unique<PrimitiveNBWriter<uint32_t>>( raster->width, fd ));
-	add_writer(make_unique<PrimitiveNBWriter<uint32_t>>( raster->height, fd ));
-	add_writer(make_unique<RasterDataWriter>( raster, fd ));
-	add_writer(make_unique<StreamableNBWriter<DirectMetadata<std::string>>>( raster->md_string, fd ));
-	add_writer(make_unique<StreamableNBWriter<DirectMetadata<double>>>( raster->md_value, fd ));
+NBRasterWriter::NBRasterWriter( std::shared_ptr<GenericRaster> raster ) {
+	add_writer(make_unique<NBStreamableWriter<DataDescription>>( raster->dd ));
+	add_writer(make_unique<NBStreamableWriter<SpatioTemporalReference>>( raster->stref ));
+	add_writer(make_unique<NBPrimitiveWriter<uint32_t>>( raster->width ));
+	add_writer(make_unique<NBPrimitiveWriter<uint32_t>>( raster->height ));
+	add_writer(make_unique<NBRasterDataWriter>( raster ));
+	add_writer(make_unique<NBStreamableWriter<DirectMetadata<std::string>>>( raster->md_string ));
+	add_writer(make_unique<NBStreamableWriter<DirectMetadata<double>>>( raster->md_value ));
 }
 
 
@@ -263,28 +260,33 @@ NBRasterWriter::NBRasterWriter( std::shared_ptr<GenericRaster> raster, int fd ) 
 // Message writer
 //
 
-NBMessageWriter::NBMessageWriter(uint8_t code, std::unique_ptr<NBWriter> payload, int fd) :
-	MultiNBWriter(fd) {
-	add_writer(make_unique<PrimitiveNBWriter<uint8_t>>(code,fd));
+NBMessageWriter::NBMessageWriter(uint8_t code, std::unique_ptr<NBWriter> payload) {
+	add_writer(make_unique<NBPrimitiveWriter<uint8_t>>(code));
 	add_writer(std::move(payload));
 }
 
-template class PrimitiveNBWriter<uint8_t> ;
-
-NBErrorWriter::NBErrorWriter(uint8_t code, const std::string& msg, int fd) :
-	NBMessageWriter(code, make_unique<StreamableNBWriter<std::string>>(msg,fd), fd) {
+NBErrorWriter::NBErrorWriter(uint8_t code, const std::string& msg) :
+	NBMessageWriter(code, make_unique<NBStreamableWriter<std::string>>(msg)) {
 }
 
-//
+template class NBPrimitiveWriter<uint8_t> ;
+template class NBPrimitiveWriter<uint32_t> ;
+template class NBStreamableWriter<DeliveryResponse> ;
+template class NBStreamableWriter<ReorgDescription> ;
+template class NBStreamableWriter<CacheRef> ;
+template class NBStreamableWriter<BaseRequest> ;
+template class NBStreamableWriter<PuzzleRequest> ;
+
+///////////////////////////////////////////////////////////////////
 //
 //  READER
 //
-//
+///////////////////////////////////////////////////////////////////
 
 NBReader::~NBReader() {
 }
 
-NBReader::NBReader(int fd) : fd(fd) {
+NBReader::NBReader() {
 }
 
 std::unique_ptr<BinaryStream> NBReader::get_stream() const {
@@ -300,19 +302,19 @@ std::unique_ptr<BinaryStream> NBReader::get_stream() const {
 // Fixed size reader
 //
 
-FixedSizeReader::FixedSizeReader(int fd, size_t len) :
-	NBReader(fd), finished(false), error(false), bytes_read(0), bytes_total(len) {
+NBFixedSizeReader::NBFixedSizeReader(size_t len) :
+	finished(false), error(false), bytes_read(0), bytes_total(len) {
 	data = (unsigned char*) malloc( bytes_total );
 	if ( data == nullptr )
 		throw OperatorException("Could not malloc buffer-space");
 }
 
-FixedSizeReader::~FixedSizeReader() {
+NBFixedSizeReader::~NBFixedSizeReader() {
 	if ( data != nullptr )
 		free(data);
 }
 
-void FixedSizeReader::read() {
+void NBFixedSizeReader::read(int fd) {
 	if ( error || finished )
 			throw IllegalStateException(concat("Illegal state for reading. Error: ", error, ", Finished: ", finished));
 
@@ -332,41 +334,47 @@ void FixedSizeReader::read() {
 	finished = true;
 }
 
-bool FixedSizeReader::has_error() const {
+bool NBFixedSizeReader::has_error() const {
 	return error;
 }
 
-bool FixedSizeReader::is_finished() const {
+bool NBFixedSizeReader::is_finished() const {
 	return finished;
 }
 
-ssize_t FixedSizeReader::get_total_read() const {
+ssize_t NBFixedSizeReader::get_total_read() const {
 	return bytes_read;
 }
 
-std::string FixedSizeReader::to_string() const {
+std::string NBFixedSizeReader::to_string() const {
 	return concat("FixedSizeReader[bytes_read: ", bytes_read, ", bytes_total: ", bytes_total, ", error: ", error, ", finished: ", finished, "]");
 }
 
-void FixedSizeReader::write_data(BinaryStream& stream) const {
+void NBFixedSizeReader::write_data(BinaryStream& stream) const {
 	if ( !finished )
 			throw IllegalStateException("Can only write data when finished reading.");
 		stream.write((char*)data,bytes_read);
+}
+
+void NBFixedSizeReader::reset() {
+	bytes_read = 0;
+	finished = false;
+	error = false;
 }
 
 //
 // String reader
 //
 
-StringReader::StringReader(int fd) : NBReader(fd), finished(false), error(false), len(0), len_read(0), data_read(0), data(nullptr) {
+NBStringReader::NBStringReader() : finished(false), error(false), len(0), len_read(0), data_read(0), data(nullptr) {
 }
 
-StringReader::~StringReader() {
+NBStringReader::~NBStringReader() {
 	if ( data != nullptr )
 		free(data);
 }
 
-void StringReader::read() {
+void NBStringReader::read(int fd) {
 	if ( error || finished )
 			throw IllegalStateException(concat("Illegal state for reading. Error: ", error, ", Finished: ", finished));
 
@@ -389,7 +397,7 @@ void StringReader::read() {
 	if ( data == nullptr ) {
 		data = (unsigned char*) malloc(len);
 		if ( data == nullptr) {
-			Log::error("Could not alloc space for string to read");
+			Log::error("Could not alloc space for string to read, required: %ld", len);
 			error = true;
 			return;
 		}
@@ -411,48 +419,60 @@ void StringReader::read() {
 	finished = true;
 }
 
-bool StringReader::has_error() const {
+bool NBStringReader::has_error() const {
 	return error;
 }
 
-bool StringReader::is_finished() const {
+bool NBStringReader::is_finished() const {
 	return finished;
 }
 
-ssize_t StringReader::get_total_read() const {
+ssize_t NBStringReader::get_total_read() const {
 	return len_read + data_read;
 }
 
-std::string StringReader::to_string() const {
+std::string NBStringReader::to_string() const {
 	return concat("StringReader[bytes_read: ", get_total_read(), ", error: ", error, ", finished: ", finished, "]");
 }
 
-void StringReader::write_data(BinaryStream& stream) const {
+void NBStringReader::write_data(BinaryStream& stream) const {
 	if ( !finished )
 		throw IllegalStateException("Can only write data when finished reading.");
 	stream.write((char*)&len,sizeof(len));
 	stream.write((char*)data,data_read);
 }
 
+void NBStringReader::reset() {
+	finished = false;
+	error = false;
+	if ( data != nullptr ) {
+		free(data);
+		data = nullptr;
+	}
+	len = 0;
+	len_read = 0;
+	data_read = 0;
+}
+
 //
 // Multi-Reader
 //
-MultiReader::MultiReader(std::vector<std::unique_ptr<NBReader> > readers, int fd) :
-	NBReader(fd), current_index(0), readers(std::move(readers)) {
+NBMultiReader::NBMultiReader(std::vector<std::unique_ptr<NBReader> > readers) :
+	current_index(0), readers(std::move(readers)) {
 	for ( auto &r : this->readers )
 		check_reader(*r);
 }
 
-MultiReader::MultiReader(int fd) : NBReader(fd), current_index(0) {
+NBMultiReader::NBMultiReader() : current_index(0) {
 }
 
-void MultiReader::read() {
+void NBMultiReader::read(int fd) {
 	if ( has_error() || is_finished() )
 		throw IllegalStateException(concat("Illegal state for reading. Error: ", has_error(), ", Finished: ", is_finished()));
 
 	while ( current_index < readers.size()  ) {
 		auto &r = readers.at(current_index);
-		r->read();
+		r->read(fd);
 		if ( r->is_finished() )
 			current_index++;
 		else
@@ -460,15 +480,15 @@ void MultiReader::read() {
 	}
 }
 
-bool MultiReader::has_error() const {
+bool NBMultiReader::has_error() const {
 	return current_index < readers.size() && readers.at(current_index)->has_error();
 }
 
-bool MultiReader::is_finished() const {
+bool NBMultiReader::is_finished() const {
 	return current_index == readers.size();
 }
 
-ssize_t MultiReader::get_total_read() const {
+ssize_t NBMultiReader::get_total_read() const {
 	ssize_t res(0);
 	for ( auto &w : readers ) {
 		res += w->get_total_read();
@@ -476,40 +496,187 @@ ssize_t MultiReader::get_total_read() const {
 	return res;
 }
 
-std::string MultiReader::to_string() const {
+std::string NBMultiReader::to_string() const {
 	return concat("MultiReader[ #readers: ", readers.size(), ", read: ", get_total_read(), ", finished: ", is_finished(), ", error: ", has_error() ,"]");
 }
 
 
-void MultiReader::add_reader(std::unique_ptr<NBReader> r) {
+void NBMultiReader::add_reader(std::unique_ptr<NBReader> r) {
 	check_reader(*r);
 	readers.push_back(std::move(r));
 }
 
-void MultiReader::check_reader(const NBReader& r) {
+void NBMultiReader::check_reader(const NBReader& r) {
 	if ( get_total_read() > 0 || (readers.size() > 0 && (has_error() || is_finished())) )
-		throw IllegalStateException("Can only add writer on fresh instance.");
+		throw IllegalStateException("Can only add reader on fresh instance.");
 	if ( r.get_total_read() > 0 ||
 		 r.has_error() || r.is_finished() )
-		throw ArgumentException("Can only build multi-writer with fresh writers.");
-	if ( r.fd != fd )
-		throw ArgumentException("All contained writers must use the same fd.");
+		throw ArgumentException("Can only build multi-reader with fresh readers.");
 }
 
-void MultiReader::write_data(BinaryStream& stream) const {
+void NBMultiReader::write_data(BinaryStream& stream) const {
 	if ( !is_finished() )
 		throw IllegalStateException("Can only write data when finished reading.");
 	for ( unsigned int i = 0; i < readers.size(); i++ )
 		readers.at(i)->write_data(stream);
 }
 
+void NBMultiReader::reset() {
+	current_index = 0;
+	for ( auto &r : readers )
+		r->reset();
+}
+
+//
+// Container Reader
+//
+NBContainerReader::NBContainerReader(std::unique_ptr<NBReader> element_reader)
+	: element_reader(std::move(element_reader)), size(0), current_index(0), size_read(0),
+	  element_read_accum(0), error(false) {
+}
+
+void NBContainerReader::read(int fd) {
+	if ( has_error() || is_finished() )
+		throw IllegalStateException(concat("Illegal state for reading. Error: ", has_error(), ", Finished: ", is_finished()));
+
+	unsigned char* lp = (unsigned char*) &size;
+
+	ssize_t currently_read = 0;
+	while ( currently_read >= 0 && size_read < sizeof(size) ) {
+		currently_read= ::read(fd, lp+size_read, sizeof(size) - size_read );
+		if ( currently_read >= 0 )
+			size_read += currently_read;
+		else if ( errno == EAGAIN || errno == EWOULDBLOCK )
+			return;
+		else {
+			Log::debug("ERROR after %d bytes: %s", size_read, strerror(errno));
+			error = true;
+			return;
+		}
+		if ( size_read == sizeof(size) )
+			buffer.write((char*) &size, sizeof(size) );
+	}
+
+	while ( current_index < size  ) {
+		element_reader->read(fd);
+		if ( element_reader->is_finished() ) {
+			element_read_accum += element_reader->get_total_read();
+			element_reader->write_data(buffer);
+			element_reader->reset();
+			current_index++;
+
+		}
+		else
+			break;
+	}
+}
+
+bool NBContainerReader::has_error() const {
+	return error || element_reader->has_error();
+}
+
+bool NBContainerReader::is_finished() const {
+	return size_read == sizeof(uint64_t) && current_index == size;
+}
+
+ssize_t NBContainerReader::get_total_read() const {
+	ssize_t res = size_read + element_read_accum;
+	if ( current_index < size )
+		res += element_reader->get_total_read();
+	return res;
+}
+
+std::string NBContainerReader::to_string() const {
+	return concat("ContainerReader");
+}
+
+void NBContainerReader::write_data(BinaryStream& stream) const {
+	if ( !is_finished() )
+		throw IllegalStateException("Can only write data when finished reading.");
+	//FIXME: Change to stringstream
+	std::string content = buffer.get_content();
+	stream.write( content.c_str(), content.length() );
+}
+
+void NBContainerReader::reset() {
+	buffer.reset();
+	element_reader.reset();
+	error = false;
+	element_read_accum = 0;
+	size_read = 0;
+	current_index = 0;
+	size = 0;
+}
+
+NBKVReader::NBKVReader(std::unique_ptr<NBReader> kreader, std::unique_ptr<NBReader> vreader) {
+	add_reader( std::move(kreader) );
+	add_reader( std::move(vreader) );
+}
+
 //
 // Node Cache Key
 //
 
-NodeCacheKeyReader::NodeCacheKeyReader(int fd) : MultiReader(fd) {
-	add_reader( make_unique<StringReader>(fd) );
-	add_reader( make_unique<FixedSizeReader>(fd, sizeof(uint64_t)) );
+NBNodeCacheKeyReader::NBNodeCacheKeyReader() {
+	add_reader( make_unique<NBStringReader>() );
+	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t)) );
 }
 
+//
+// QueryRectangle
+//
 
+NBQueryRectangleReader::NBQueryRectangleReader() :
+	NBFixedSizeReader(sizeof(uint16_t) + 4*sizeof(uint32_t) + 6*sizeof(double)) {
+}
+
+//
+// BaseRequest
+//
+NBBaseRequestReader::NBBaseRequestReader() {
+	add_reader( make_unique<NBQueryRectangleReader>() );
+	add_reader( make_unique<NBStringReader>() );
+}
+
+//
+// ReorgMoveResultReader
+//
+NBReorgMoveResultReader::NBReorgMoveResultReader() {
+	add_reader( make_unique<NBNodeCacheKeyReader>() );
+	add_reader( make_unique<NBFixedSizeReader>(sizeof(ReorgMoveResult::Type) + 2*sizeof(uint32_t) + sizeof(uint64_t)) );
+}
+
+NBCapacityReader::NBCapacityReader() : NBFixedSizeReader(2*sizeof(uint64_t)){
+}
+
+NBNodeEntryStatsReader::NBNodeEntryStatsReader()
+	: NBFixedSizeReader(sizeof(uint64_t) + sizeof(time_t) + sizeof(uint32_t) ){
+}
+
+NBCacheStatsReader::NBCacheStatsReader() :
+	NBContainerReader( make_unique<NBKVReader>(
+		make_unique<NBStringReader>(),
+		make_unique<NBContainerReader>(make_unique<NBNodeEntryStatsReader>()) ) ) {
+}
+
+NBNodeStatsReader::NBNodeStatsReader() {
+	add_reader( make_unique<NBCapacityReader>() );
+	add_reader( make_unique<NBCacheStatsReader>() );
+}
+
+NBCacheBoundsReader::NBCacheBoundsReader() :
+	NBFixedSizeReader(
+		//SREF:
+		sizeof( uint32_t ) + 4*sizeof(double) +
+		//TREF:
+		sizeof( uint32_t ) + 2*sizeof(double) +
+		//RES:
+		sizeof( QueryResolution::Type ) + 4*sizeof(double)
+	) {
+}
+
+NBNodeCacheRefReader::NBNodeCacheRefReader() {
+	add_reader( make_unique<NBNodeCacheKeyReader>() );
+	add_reader( make_unique<NBCacheBoundsReader>() );
+	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t) + sizeof(time_t) + sizeof(uint32_t)) );
+}

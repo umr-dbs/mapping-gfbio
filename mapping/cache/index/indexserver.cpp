@@ -31,7 +31,8 @@
 ////////////////////////////////////////////////////////////
 
 Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &capacity) :
-	id(id), host(host), port(port), capacity(capacity), last_stat_update(time(nullptr)), control_connection(-1) {
+	id(id), host(host), port(port), capacity(capacity), last_stat_update(time(nullptr)), control_connection(
+		-1) {
 }
 
 ////////////////////////////////////////////////////////////
@@ -41,8 +42,8 @@ Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &
 ////////////////////////////////////////////////////////////
 
 IndexServer::IndexServer(int port, ReorgStrategy &reorg_strategy) :
-	raster_cache(reorg_strategy), port(port), shutdown(false), next_node_id(1),
-	query_manager(raster_cache, nodes), last_reorg(time(nullptr)) {
+	raster_cache(reorg_strategy), port(port), shutdown(false), next_node_id(1), query_manager(raster_cache,
+		nodes), last_reorg(time(nullptr)) {
 }
 
 IndexServer::~IndexServer() {
@@ -61,8 +62,10 @@ void IndexServer::run() {
 
 	while (!shutdown) {
 		struct timeval tv { 2, 0 };
-		fd_set readfds;
+		fd_set readfds, writefds;
 		FD_ZERO(&readfds);
+		FD_ZERO(&writefds);
+
 		// Add listen socket
 		FD_SET(listen_socket, &readfds);
 
@@ -75,17 +78,16 @@ void IndexServer::run() {
 		}
 
 		// Setup existing connections
-		maxfd = std::max(maxfd, setup_fdset(&readfds));
+		maxfd = std::max(maxfd, setup_fdset(&readfds, &writefds));
 
-		int sel_ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
+		int sel_ret = select(maxfd + 1, &readfds, &writefds, nullptr, &tv);
 		if (sel_ret < 0 && errno != EINTR) {
 			Log::error("Select returned error: %s", strerror(errno));
 		}
 		else if (sel_ret > 0) {
-			process_worker_connections(&readfds);
-			process_control_connections(&readfds);
-			process_client_connections(&readfds);
-
+			process_worker_connections(&readfds,&writefds);
+			process_control_connections(&readfds, &writefds);
+			process_client_connections(&readfds, &writefds);
 
 			process_handshake(new_fds, &readfds);
 
@@ -110,50 +112,49 @@ void IndexServer::run() {
 		time_t now = time(nullptr);
 		time_t oldest_stats = now;
 		bool all_idle = true;
-		for ( auto &kv : nodes ) {
+		for (auto &kv : nodes) {
 			Node& node = *kv.second;
-			oldest_stats = std::min(oldest_stats,node.last_stat_update);
+			oldest_stats = std::min(oldest_stats, node.last_stat_update);
 			ControlConnection &cc = *control_connections.at(node.control_connection);
 			// Fetch stats
-			if ( cc.get_state() == ControlConnection::State::IDLE &&
-				 (now - node.last_stat_update) > 10 ) {
+			if (cc.get_state() == ControlConnection::State::IDLE && (now - node.last_stat_update) > 10) {
 				cc.send_get_stats();
 			}
 			// Remeber if all connections are idle -> Allows reorg
-			all_idle &= ( cc.get_state() == ControlConnection::State::IDLE );
+			all_idle &= (cc.get_state() == ControlConnection::State::IDLE);
 		}
 
 		// Reorganize
-		if ( oldest_stats > last_reorg && all_idle && raster_cache.requires_reorg( nodes) ) {
-			std::map<uint32_t,NodeReorgDescription> reorgs;
-			for ( auto &kv : nodes ) {
-				reorgs.emplace( kv.first, NodeReorgDescription(kv.second) );
+		if (oldest_stats > last_reorg && all_idle && raster_cache.requires_reorg(nodes)) {
+			std::map<uint32_t, NodeReorgDescription> reorgs;
+			for (auto &kv : nodes) {
+				reorgs.emplace(kv.first, NodeReorgDescription(kv.second));
 			}
 
 			// Remember time of this reorg
 			time(&last_reorg);
 
-			if ( raster_cache.requires_reorg(nodes) ) {
+			if (raster_cache.requires_reorg(nodes)) {
 				Log::info("Calculating reorganization of raster cache.");
-				raster_cache.reorganize( reorgs );
+				raster_cache.reorganize(reorgs);
 				Log::info("Finished calculating reorganization of raster cache.");
 			}
 
-			for ( auto &d : reorgs ) {
+			for (auto &d : reorgs) {
 				Log::debug("Processing removals locally and sending reorg-commands to nodes.");
-				for ( auto &rm : d.second.get_removals() ) {
-					switch ( rm.type ) {
+				for (auto &rm : d.second.get_removals()) {
+					switch (rm.type) {
 						case ReorgRemoveItem::Type::RASTER:
-							raster_cache.remove( IndexCacheKey(d.first,rm.semantic_id,rm.entry_id) );
+							raster_cache.remove(IndexCacheKey(d.first, rm.semantic_id, rm.entry_id));
 							break;
 						default:
 							Log::error("Not implemented yet.");
 					}
 				}
 
-				auto &cc = control_connections.at( d.second.node->control_connection );
-				if ( !d.second.is_empty() )
-					cc->send_reorg( d.second );
+				auto &cc = control_connections.at(d.second.node->control_connection);
+				if (!d.second.is_empty())
+					cc->send_reorg(d.second);
 			}
 		}
 	}
@@ -162,15 +163,20 @@ void IndexServer::run() {
 	Log::info("Index-Server done.");
 }
 
-int IndexServer::setup_fdset(fd_set* readfds) {
+int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	int maxfd = -1;
 
 	auto wit = worker_connections.begin();
 	while (wit != worker_connections.end()) {
 		WorkerConnection &wc = *wit->second;
 		if (wc.is_faulty()) {
-			query_manager.worker_failed( wc.id );
+			query_manager.worker_failed(wc.id);
 			worker_connections.erase(wit++);
+		}
+		else if (wc.is_writing()) {
+			FD_SET(wc.get_write_fd(), writefds);
+			maxfd = std::max(maxfd, wc.get_write_fd());
+			wit++;
 		}
 		else {
 			FD_SET(wc.get_read_fd(), readfds);
@@ -188,6 +194,11 @@ int IndexServer::setup_fdset(fd_set* readfds) {
 			query_manager.node_failed(cc.node->id);
 			control_connections.erase(ccit++);
 		}
+		else if (cc.is_writing()) {
+			FD_SET(cc.get_write_fd(), writefds);
+			maxfd = std::max(maxfd, cc.get_write_fd());
+			ccit++;
+		}
 		else {
 			FD_SET(cc.get_read_fd(), readfds);
 			maxfd = std::max(maxfd, cc.get_read_fd());
@@ -200,6 +211,11 @@ int IndexServer::setup_fdset(fd_set* readfds) {
 		ClientConnection &cc = *clit->second;
 		if (cc.is_faulty()) {
 			client_connections.erase(clit++);
+		}
+		else if (cc.is_writing()) {
+			FD_SET(cc.get_write_fd(), writefds);
+			maxfd = std::max(maxfd, cc.get_write_fd());
+			clit++;
 		}
 		else {
 			FD_SET(cc.get_read_fd(), readfds);
@@ -239,15 +255,19 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 					case ControlConnection::MAGIC_NUMBER: {
 						NodeHandshake hs(s);
 						std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, hs.host, hs.port, hs);
-						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us), node);
+						s.write(ControlConnection::CMD_HELLO);
+						s.write(node->id);
+
+						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us),
+							node);
 						node->control_connection = cc->id;
 						Log::info("New node registered. ID: %d, control-connected fd: %d", node->id,
 							cc->get_read_fd());
 						control_connections.emplace(cc->id, std::move(cc));
 						nodes.emplace(node->id, node);
 
-						for ( auto &raster : hs.get_raster_entries() )
-							raster_cache.put( IndexCacheEntry(node->id, raster) );
+						for (auto &raster : hs.get_raster_entries())
+							raster_cache.put(IndexCacheEntry(node->id, raster));
 						break;
 					}
 					default:
@@ -264,100 +284,97 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 	}
 }
 
-void IndexServer::process_control_connections(fd_set* readfds) {
+void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds) {
 	for (auto &e : control_connections) {
-		if (FD_ISSET(e.second->get_read_fd(), readfds)) {
+		ControlConnection &cc = *e.second;
+		if (cc.is_writing() && FD_ISSET(cc.get_write_fd(), writefds)) {
+			cc.output();
+		}
+		else if (!cc.is_writing() && FD_ISSET(cc.get_read_fd(), readfds)) {
 			// Read from connection
-			ControlConnection &cc = *e.second;
 			cc.input();
 			// Skip faulty connections
-			if (cc.is_faulty())
+			if (cc.is_faulty() || cc.is_reading())
 				continue;
 
 			switch (cc.get_state()) {
-				case ControlConnection::State::REORG_RESULT_READ: {
+				case ControlConnection::State::REORG_RESULT_READ:
 					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
-					auto &res = cc.get_result();
-					handle_reorg_result(res);
+					handle_reorg_result(cc.get_result());
 					cc.confirm_reorg();
 					break;
-				}
-				case ControlConnection::State::REORG_FINISHED: {
+				case ControlConnection::State::REORG_FINISHED:
 					Log::debug("Node %d finished reorganization.", cc.node->id);
 					cc.release();
 					break;
-				}
 				case ControlConnection::State::STATS_RECEIVED: {
 					Log::debug("Node %d delivered fresh statistics.", cc.node->id);
 					auto &stats = cc.get_stats();
 					cc.node->capacity = stats;
 					time(&cc.node->last_stat_update);
-					raster_cache.update_stats(cc.node->id,stats.raster_stats);
+					raster_cache.update_stats(cc.node->id, stats.raster_stats);
 					cc.release();
 					break;
 				}
-				default: {
-					throw IllegalStateException("Unknown state of control-connection.");
-				}
+				default:
+					throw IllegalStateException(
+						concat("Illegal control-connection state after read: ", (int) cc.get_state()));
 			}
-
-
-
 		}
 	}
 }
-
 
 void IndexServer::handle_reorg_result(const ReorgMoveResult& res) {
-	switch ( res.type ) {
+	switch (res.type) {
 		case ReorgMoveResult::Type::RASTER: {
-			IndexCacheKey old( res.from_node_id, res.semantic_id, res.entry_id );
-			IndexCacheKey new_key( res.to_node_id, res.semantic_id, res.to_cache_id );
-			raster_cache.move(old,new_key);
+			IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
+			IndexCacheKey new_key(res.to_node_id, res.semantic_id, res.to_cache_id);
+			raster_cache.move(old, new_key);
 			break;
 		}
-		default: {
+		default:
 			throw ArgumentException(concat("Type: ", (int) res.type, " not supported yet."));
-		}
 	}
 }
 
-void IndexServer::process_client_connections(fd_set* readfds) {
+void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) {
 	for (auto &e : client_connections) {
-		if (FD_ISSET(e.second->get_read_fd(), readfds)) {
+		ClientConnection &cc = *e.second;
+		if (cc.is_writing() && FD_ISSET(cc.get_write_fd(), writefds)) {
+			cc.output();
+		}
+		else if (!cc.is_writing() && FD_ISSET(cc.get_read_fd(), readfds)) {
 			// Read from connection
-			ClientConnection &cc = *e.second;
 			cc.input();
 
 			// Skip faulty connections
-			if (cc.is_faulty())
+			if (cc.is_faulty() || cc.is_reading())
 				continue;
 			// Handle state-changes
 			switch (cc.get_state()) {
-				case ClientConnection::State::AWAIT_RESPONSE: {
+				case ClientConnection::State::AWAIT_RESPONSE:
 					process_client_request(cc);
 					break;
-				}
-				case ClientConnection::State::IDLE: {
-					Log::error("Client-connection MUST not be in idle-state after reading from it");
-				}
-				default: {
-					throw IllegalStateException("Unknown state of client-connection.");
-				}
+				default:
+					throw IllegalStateException(
+						concat("Illegal client-connection state after read: ", (int) cc.get_state()));
 			}
 		}
 	}
 }
 
-void IndexServer::process_worker_connections(fd_set* readfds) {
+void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) {
 	for (auto &e : worker_connections) {
-		if (FD_ISSET(e.second->get_read_fd(), readfds)) {
+		WorkerConnection &wc = *e.second;
+		if (wc.is_writing() && FD_ISSET(wc.get_write_fd(), writefds)) {
+			wc.output();
+		}
+		else if (!wc.is_writing() && FD_ISSET(wc.get_read_fd(), readfds)) {
 			// Read from connection
-			WorkerConnection &wc = *e.second;
 			wc.input();
 
 			// Skip faulty connections
-			if (wc.is_faulty())
+			if (wc.is_faulty() || wc.is_reading())
 				continue;
 			// Handle state-changes
 			switch (wc.get_state()) {
@@ -366,11 +383,11 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 						wc.get_error_message().c_str());
 					query_manager.close_worker(wc.id);
 					auto clients = query_manager.release_worker(wc.id);
-					for ( auto &cid : clients ) {
+					for (auto &cid : clients) {
 						try {
 							client_connections.at(cid)->send_error(wc.get_error_message());
-						} catch ( const std::out_of_range &oor ) {
-							Log::warn("Client %d does not exist.", cid );
+						} catch (const std::out_of_range &oor) {
+							Log::warn("Client %d does not exist.", cid);
 						}
 					}
 					wc.release();
@@ -378,18 +395,18 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 				}
 				case WorkerConnection::State::DONE: {
 					Log::debug("Worker returned result. Determinig delivery qty.");
-					size_t qty = query_manager.close_worker( wc.id );
+					size_t qty = query_manager.close_worker(wc.id);
 					wc.send_delivery_qty(qty);
 					break;
 				}
 				case WorkerConnection::State::DELIVERY_READY: {
-					Log::debug("Worker returned delivery: %s", wc.get_result().to_string().c_str() );
+					Log::debug("Worker returned delivery: %s", wc.get_result().to_string().c_str());
 					auto clients = query_manager.release_worker(wc.id);
-					for ( auto &cid : clients ) {
+					for (auto &cid : clients) {
 						try {
 							client_connections.at(cid)->send_response(wc.get_result());
-						} catch ( const std::out_of_range &oor ) {
-							Log::warn("Client %d does not exist.", cid );
+						} catch (const std::out_of_range &oor) {
+							Log::warn("Client %d does not exist.", cid);
 						}
 					}
 					wc.release();
@@ -418,7 +435,7 @@ void IndexServer::process_worker_connections(fd_set* readfds) {
 void IndexServer::process_client_request(ClientConnection& con) {
 	switch (con.get_request_type()) {
 		case ClientConnection::RequestType::RASTER:
-			query_manager.add_request( QueryInfo::Type::RASTER, con.id, con.get_request() );
+			query_manager.add_request(QueryInfo::Type::RASTER, con.id, con.get_request());
 			break;
 		default:
 			throw std::runtime_error("Request-type not implemented yet.");
@@ -433,7 +450,7 @@ void IndexServer::process_worker_raster_query(WorkerConnection& con) {
 	// Full single hit
 	if (res.keys.size() == 1 && !res.has_remainder()) {
 		Log::debug("Full HIT. Sending reference.");
-		IndexCacheKey key( req.semantic_id, res.keys.at(0) );
+		IndexCacheKey key(req.semantic_id, res.keys.at(0));
 		auto ref = raster_cache.get(key);
 		auto node = nodes.at(ref.node_id);
 		CacheRef cr(node->host, node->port, ref.entry_id);

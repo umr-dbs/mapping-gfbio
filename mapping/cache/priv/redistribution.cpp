@@ -84,6 +84,9 @@ ReorgDescription::ReorgDescription(BinaryStream& stream) {
 
 }
 
+ReorgDescription::~ReorgDescription() {
+}
+
 void ReorgDescription::add_move(ReorgMoveItem item) {
 	moves.push_back(item);
 }
@@ -115,4 +118,3 @@ void ReorgDescription::toStream(BinaryStream& stream) const {
 	for (auto &item : removals)
 		item.toStream(stream);
 }
-

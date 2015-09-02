@@ -52,12 +52,11 @@ protected:
 	void begin_write( std::unique_ptr<NBWriter> writer );
 	// Called by implementing classes to trigger a non-blocking read
 	void begin_read( std::unique_ptr<NBReader> reader );
-
-	BinaryStream &stream;
-	bool faulty;
 private:
 	bool writing;
 	bool reading;
+	bool faulty;
+	BinaryStream &stream;
 	std::unique_ptr<NBWriter> writer;
 	std::unique_ptr<NBReader> reader;
 	std::unique_ptr<UnixSocket> socket;
@@ -67,7 +66,7 @@ private:
 class ClientConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, AWAIT_RESPONSE
+		IDLE, READING_REQUEST, AWAIT_RESPONSE, WRITING_RESPONSE
 	};
 	enum class RequestType {
 		NONE, RASTER, POINT, LINE, POLY, PLOT
@@ -120,7 +119,12 @@ private:
 class WorkerConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, PROCESSING, NEW_RASTER_ENTRY, RASTER_QUERY_REQUESTED, DONE, WAITING_DELIVERY, DELIVERY_READY, ERROR
+		IDLE,
+		SENDING_REQUEST, PROCESSING, READING_RASTER_ENTRY, NEW_RASTER_ENTRY,
+		READING_RASTER_QUERY, RASTER_QUERY_REQUESTED, SENDING_QUERY_RESPONSE,
+		DONE,
+		SENDING_DELIVERY_QTY, WAITING_DELIVERY, READING_DELIVERY_ID, DELIVERY_READY,
+		READING_ERROR, ERROR
 	};
 	static const uint32_t MAGIC_NUMBER = 0x32345678;
 
@@ -239,8 +243,9 @@ private:
 class ControlConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, REORGANIZING, REORG_RESULT_READ, REORG_FINISHED,
-		STATS_REQUESTED, STATS_RECEIVED
+		IDLE,
+		SENDING_REORG, REORGANIZING, READING_REORG_RESULT, REORG_RESULT_READ, SENDING_REORG_CONFIRM, REORG_FINISHED,
+		SENDING_STATS_REQUEST, STATS_REQUESTED, READING_STATS, STATS_RECEIVED
 	};
 	static const uint32_t MAGIC_NUMBER = 0x42345678;
 
@@ -292,11 +297,9 @@ public:
 
 	void send_reorg( const ReorgDescription &desc );
 	void confirm_reorg();
-	void release();
-
 	void send_get_stats();
 
-
+	void release();
 
 	const ReorgMoveResult& get_result();
 	const NodeStats& get_stats();
@@ -304,7 +307,6 @@ public:
 	ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
 	virtual ~ControlConnection();
 	std::shared_ptr<Node> node;
-
 protected:
 	virtual void process_command( uint8_t cmd );
 	virtual void write_finished();

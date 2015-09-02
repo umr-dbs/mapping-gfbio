@@ -93,16 +93,15 @@ void IndexCache::move(const IndexCacheKey& old_key, const IndexCacheKey& new_key
 	if (cache != nullptr) {
 		std::pair<uint32_t,uint64_t> id(old_key.node_id,old_key.entry_id);
 		auto entry = cache->remove(id);
+		remove_from_node(old_key);
 
 		id.first = new_key.node_id;
 		id.second = new_key.entry_id;
 		entry->node_id = new_key.node_id;
 		entry->entry_id = new_key.entry_id;
+
 		cache->put(id,entry);
-
-		remove_from_node(old_key);
 		get_node_entries(new_key.node_id).push_back(entry);
-
 	}
 	else
 		throw NoSuchElementException("Entry not found");

@@ -102,8 +102,8 @@ CacheStats::CacheStats() {
 }
 
 CacheStats::CacheStats(BinaryStream& stream) {
-	std::unordered_map<std::string,std::vector<NodeEntryStats>>::size_type size;
-	std::vector<NodeEntryStats>::size_type v_size;
+	uint64_t size;
+	uint64_t v_size;
 	stream.read(&size);
 
 	stats.reserve(size);
@@ -123,10 +123,10 @@ CacheStats::CacheStats(BinaryStream& stream) {
 }
 
 void CacheStats::toStream(BinaryStream& stream) const {
-	stream.write(stats.size());
+	stream.write(static_cast<uint64_t>(stats.size()));
 	for ( auto &e : stats ) {
 		stream.write(e.first);
-		stream.write(e.second.size());
+		stream.write(static_cast<uint64_t>(e.second.size()));
 		for ( auto &s : e.second )
 			s.toStream(stream);
 	}

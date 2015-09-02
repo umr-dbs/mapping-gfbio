@@ -82,6 +82,7 @@ class ReorgDescription {
 public:
 	ReorgDescription();
 	ReorgDescription( BinaryStream &stream );
+	virtual ~ReorgDescription();
 
 	void add_move( ReorgMoveItem item );
 	void add_removal( ReorgRemoveItem item );
@@ -90,7 +91,7 @@ public:
 
 	bool is_empty() const;
 
-	void toStream( BinaryStream &stream ) const;
+	virtual void toStream( BinaryStream &stream ) const;
 private:
 	std::vector<ReorgMoveItem> moves;
 	std::vector<ReorgRemoveItem> removals;

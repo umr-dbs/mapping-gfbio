@@ -31,7 +31,7 @@ public:
 	virtual void write(const char *buffer, size_t len);
 	virtual size_t read(char *buffer, size_t len, bool allow_eof = false);
 	void reset();
-	std::string get_content();
+	std::string get_content() const;
 private:
 	std::stringstream stream;
 };
@@ -44,7 +44,7 @@ class NBWriter {
 public:
 	virtual ~NBWriter();
 	// Writes data to the given fd, setting the error or finished flag
-	virtual void write() = 0;
+	virtual void write(int fd) = 0;
 	// Tells if an error occured during write
 	virtual bool has_error() const = 0;
 	// Tells whether this writer finished writing
@@ -55,9 +55,8 @@ public:
 	virtual ssize_t get_total_bytes() const = 0;
 	// Returns a string-representation of this writer -- logging purposes
 	virtual std::string to_string() const = 0;
-	const int fd;
 protected:
-	NBWriter( int fd );
+	NBWriter();
 };
 
 //
@@ -67,11 +66,11 @@ protected:
 // and serve a pointer to the data to write
 //
 
-class SimpleNBWriter : public NBWriter {
+class NBSimpleWriter : public NBWriter {
 public:
-	SimpleNBWriter( int fd );
-	virtual ~SimpleNBWriter();
-	void write();
+	NBSimpleWriter();
+	virtual ~NBSimpleWriter();
+	void write(int fd);
 	bool has_error() const;
 	bool is_finished() const;
 	ssize_t get_total_written() const;
@@ -91,10 +90,10 @@ private:
 //
 
 template<typename T>
-class PrimitiveNBWriter : public SimpleNBWriter {
+class NBPrimitiveWriter : public NBSimpleWriter {
 public:
-	PrimitiveNBWriter( T data, int fd );
-	virtual ~PrimitiveNBWriter();
+	NBPrimitiveWriter( T data );
+	virtual ~NBPrimitiveWriter();
 	virtual ssize_t get_total_bytes() const;
 protected:
 	virtual const unsigned char *get_data() const;
@@ -108,10 +107,10 @@ private:
 //
 
 template<typename T>
-class StreamableNBWriter : public SimpleNBWriter {
+class NBStreamableWriter : public NBSimpleWriter {
 public:
-	StreamableNBWriter( const T& item, int fd );
-	virtual ~StreamableNBWriter();
+	NBStreamableWriter( const T& item );
+	virtual ~NBStreamableWriter();
 	virtual ssize_t get_total_bytes() const;
 protected:
 	virtual const unsigned char *get_data() const;
@@ -125,17 +124,17 @@ private:
 // Writer serializing multiple nb-writers in a non-blocking fashion
 //
 //
-class MultiNBWriter : public NBWriter {
+class NBMultiWriter : public NBWriter {
 public:
-	MultiNBWriter( std::vector<std::unique_ptr<NBWriter>> writers, int fd );
-	virtual void write();
+	NBMultiWriter( std::vector<std::unique_ptr<NBWriter>> writers );
+	virtual void write(int fd);
 	virtual bool has_error() const;
 	virtual bool is_finished() const;
 	virtual ssize_t get_total_written() const;
 	virtual ssize_t get_total_bytes() const;
 	virtual std::string to_string() const;
 protected:
-	MultiNBWriter( int fd );
+	NBMultiWriter();
 	void add_writer( std::unique_ptr<NBWriter> w );
 private:
 	void check_writer( const NBWriter &writer );
@@ -148,9 +147,9 @@ private:
 // Writer sending a message-code and a payload
 //
 
-class NBMessageWriter : public MultiNBWriter {
+class NBMessageWriter : public NBMultiWriter {
 public:
-	NBMessageWriter( uint8_t code, std::unique_ptr<NBWriter> payload, int fd );
+	NBMessageWriter( uint8_t code, std::unique_ptr<NBWriter> payload );
 };
 
 //
@@ -159,7 +158,7 @@ public:
 
 class NBErrorWriter : public NBMessageWriter {
 public:
-	NBErrorWriter( uint8_t code, const std::string &msg, int fd );
+	NBErrorWriter( uint8_t code, const std::string &msg );
 };
 
 
@@ -167,9 +166,9 @@ public:
 // Writer for sending raster-data
 //
 
-class NBRasterWriter : public MultiNBWriter {
+class NBRasterWriter : public NBMultiWriter {
 public:
-	NBRasterWriter( std::shared_ptr<GenericRaster> raster, int fd );
+	NBRasterWriter( std::shared_ptr<GenericRaster> raster );
 private:
 	std::shared_ptr<GenericRaster> raster;
 };
@@ -185,7 +184,7 @@ class NBReader {
 public:
 	virtual ~NBReader();
 	// Reads data from the given fd, setting the error or finished flag
-	virtual void read() = 0;
+	virtual void read(int fd) = 0;
 	// Tells if an error occured during read
 	virtual bool has_error() const = 0;
 	// Tells whether this writer finished reading
@@ -198,9 +197,10 @@ public:
 	virtual void write_data( BinaryStream &stream ) const = 0;
 	// Returns a binary stream holding the data read from fd
 	std::unique_ptr<BinaryStream> get_stream() const;
-	const int fd;
+	// Resets this reader
+	virtual void reset() = 0;
 protected:
-	NBReader( int fd );
+	NBReader();
 };
 
 //
@@ -208,16 +208,17 @@ protected:
 // given fd
 //
 
-class FixedSizeReader : public NBReader {
+class NBFixedSizeReader : public NBReader {
 public:
-	FixedSizeReader( int fd, size_t len );
-	virtual ~FixedSizeReader();
-	virtual void read();
+	NBFixedSizeReader( size_t len );
+	virtual ~NBFixedSizeReader();
+	virtual void read(int fd);
 	virtual bool has_error() const;
 	virtual bool is_finished() const;
 	virtual ssize_t get_total_read() const;
 	virtual std::string to_string() const;
 	virtual void write_data( BinaryStream &stream ) const;
+	virtual void reset();
 private:
 	bool finished;
 	bool error;
@@ -230,16 +231,17 @@ private:
 //
 // Reader for strings
 //
-class StringReader : public NBReader {
+class NBStringReader : public NBReader {
 public:
-	StringReader( int fd );
-	virtual ~StringReader();
-	virtual void read();
+	NBStringReader();
+	virtual ~NBStringReader();
+	virtual void read(int fd);
 	virtual bool has_error() const;
 	virtual bool is_finished() const;
 	virtual ssize_t get_total_read() const;
 	virtual std::string to_string() const;
 	virtual void write_data( BinaryStream &stream ) const;
+	virtual void reset();
 private:
 	bool finished;
 	bool error;
@@ -253,17 +255,18 @@ private:
 //
 // Reader serializing reads of multiple readers
 //
-class MultiReader : public NBReader {
+class NBMultiReader : public NBReader {
 public:
-	MultiReader( std::vector<std::unique_ptr<NBReader>> readers, int fd );
-	virtual void read();
+	NBMultiReader( std::vector<std::unique_ptr<NBReader>> readers );
+	virtual void read(int fd);
 	virtual bool has_error() const;
 	virtual bool is_finished() const;
 	virtual ssize_t get_total_read() const;
 	virtual std::string to_string() const;
 	virtual void write_data( BinaryStream &stream ) const;
+	virtual void reset();
 protected:
-	MultiReader( int fd );
+	NBMultiReader();
 	void add_reader( std::unique_ptr<NBReader> r );
 private:
 	void check_reader( const NBReader &reader );
@@ -271,13 +274,111 @@ private:
 	std::vector<std::unique_ptr<NBReader>> readers;
 };
 
+class NBContainerReader : public NBReader {
+public:
+	NBContainerReader( std::unique_ptr<NBReader> element_reader );
+	virtual void read(int fd);
+	virtual bool has_error() const;
+	virtual bool is_finished() const;
+	virtual ssize_t get_total_read() const;
+	virtual std::string to_string() const;
+	virtual void write_data( BinaryStream &stream ) const;
+	virtual void reset();
+private:
+	std::unique_ptr<NBReader> element_reader;
+	uint64_t size;
+	uint64_t current_index;
+	ssize_t size_read;
+	ssize_t element_read_accum;
+	StreamBuffer buffer;
+	bool error;
+};
+
+class NBKVReader : public NBMultiReader {
+public:
+	NBKVReader( std::unique_ptr<NBReader> kreader, std::unique_ptr<NBReader> vreader );
+};
+
+///////////////////////////////
+//
+// DELIVERY CONNECTION
+//
+///////////////////////////////
 
 //
 // Reader for NodeCacheKeys
 //
-class NodeCacheKeyReader : public MultiReader {
+class NBNodeCacheKeyReader : public NBMultiReader {
 public:
-	NodeCacheKeyReader( int fd );
+	NBNodeCacheKeyReader();
 };
+
+///////////////////////////////
+//
+// CLIENT CONNECTION
+//
+///////////////////////////////
+
+//
+// QueryRectangle
+//
+class NBQueryRectangleReader : public NBFixedSizeReader {
+public:
+	NBQueryRectangleReader();
+};
+
+
+//
+// Reader for BaseRequests
+//
+class NBBaseRequestReader : public NBMultiReader {
+public:
+	NBBaseRequestReader();
+};
+
+///////////////////////////////
+//
+// CONTROL CONNECTION
+//
+///////////////////////////////
+
+//
+// ReorgMoveResult
+//
+class NBReorgMoveResultReader : public NBMultiReader {
+public:
+	NBReorgMoveResultReader();
+};
+
+class NBCapacityReader : public NBFixedSizeReader {
+public:
+	NBCapacityReader();
+};
+
+class NBNodeEntryStatsReader : public NBFixedSizeReader {
+public:
+	NBNodeEntryStatsReader();
+};
+
+class NBCacheStatsReader : public NBContainerReader {
+public:
+	NBCacheStatsReader();
+};
+
+class NBNodeStatsReader : public NBMultiReader {
+public:
+	NBNodeStatsReader();
+};
+
+class NBCacheBoundsReader : public NBFixedSizeReader {
+public:
+	NBCacheBoundsReader();
+};
+
+class NBNodeCacheRefReader : public NBMultiReader {
+public:
+	NBNodeCacheRefReader();
+};
+
 
 #endif /* NIO_H_ */

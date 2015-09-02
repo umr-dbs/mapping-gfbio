@@ -82,19 +82,19 @@ protected:
 private:
 	// Adds the fds of all connections to the read-set
 	// and kills faulty connections
-	int setup_fdset( fd_set *readfds);
+	int setup_fdset( fd_set *readfds, fd_set *writefds);
 
 	// Processes the handshake on newly established connections
 	void process_handshake( std::vector<int> &new_fds, fd_set *readfds);
 
 	// Processes actions on control-connections
-	void process_control_connections(fd_set *readfds);
+	void process_control_connections(fd_set *readfds, fd_set* writefds);
 
 	// Processes actions on worker-connections
-	void process_worker_connections(fd_set *readfds);
+	void process_worker_connections(fd_set *readfds, fd_set* writefds);
 
 	// Processes actions on client-connections
-	void process_client_connections(fd_set *readfds);
+	void process_client_connections(fd_set *readfds, fd_set* writefds);
 
 	// Handles requests from the client
 	void process_client_request( ClientConnection &con );

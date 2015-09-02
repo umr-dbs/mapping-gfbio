@@ -131,7 +131,7 @@ void DeliveryManager::run() {
 		if (FD_ISSET(delivery_fd, &readfds)) {
 			struct sockaddr_storage remote_addr;
 			socklen_t sin_size = sizeof(remote_addr);
-			int new_fd = accept4(delivery_fd, (struct sockaddr *) &remote_addr, &sin_size, SOCK_NONBLOCK);
+			int new_fd = accept(delivery_fd, (struct sockaddr *) &remote_addr, &sin_size);
 			if (new_fd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
 				Log::error("Accept failed: %d", strerror(errno));
 			}

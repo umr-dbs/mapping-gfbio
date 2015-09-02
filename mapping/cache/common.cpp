@@ -21,6 +21,30 @@
 #include <netdb.h>
 
 #include <unistd.h>
+#include <execinfo.h>
+
+
+void ex_handler() {
+	std::ostringstream out;
+
+	std::exception_ptr exptr = std::current_exception();
+	try {
+	    std::rethrow_exception(exptr);
+	}
+	catch (std::exception &ex) {
+	    out << "Uncaught exception: " << ex.what();
+	}
+
+	void *trace_elems[20];
+	int trace_elem_count(backtrace(trace_elems, 20));
+	char **stack_syms(backtrace_symbols(trace_elems, trace_elem_count));
+	for (int i = 0; i < trace_elem_count; ++i) {
+		out << stack_syms[i] << std::endl;
+	}
+	free(stack_syms);
+	Log::error("%s",out.str().c_str());
+	exit(1);
+}
 
 geos::geom::GeometryFactory CacheCommon::gf;
 
@@ -112,6 +136,10 @@ std::unique_ptr<geos::geom::Polygon> CacheCommon::create_square(double lx, doubl
 
 std::unique_ptr<geos::geom::Geometry> CacheCommon::empty_geom() {
 	return std::unique_ptr<geos::geom::Geometry>(gf.createEmptyGeometry());
+}
+
+void CacheCommon::set_uncaught_exception_handler() {
+	std::set_terminate(ex_handler);
 }
 
 std::unique_ptr<geos::geom::Geometry> CacheCommon::union_geom(const std::unique_ptr<geos::geom::Geometry>& p1,

@@ -55,6 +55,8 @@ public:
 	//
 	static std::string raster_to_string( const GenericRaster &raster );
 
+	static void set_uncaught_exception_handler();
+
 	//
 	// Helper to read from a stream with a given timeout. Basically wraps
 	// BinaryStream::read(T*,bool).

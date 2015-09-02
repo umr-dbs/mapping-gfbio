@@ -7,27 +7,15 @@
 
 #include "cache/index/indexserver.h"
 #include "cache/index/reorg_strategy.h"
+#include "cache/common.h"
 #include "util/configuration.h"
 #include <signal.h>
-#include <execinfo.h>
 
 IndexServer *instance = nullptr;
 
 void termination_handler(int signum) {
 	(void) signum;
 	instance->stop();
-}
-
-void ex_handler() {
-	void *trace_elems[20];
-	int trace_elem_count(backtrace(trace_elems, 20));
-	char **stack_syms(backtrace_symbols(trace_elems, trace_elem_count));
-	for (int i = 0; i < trace_elem_count; ++i) {
-		std::cout << stack_syms[i] << std::endl;
-	}
-	free(stack_syms);
-
-	exit(1);
 }
 
 void set_signal_handler() {
@@ -50,7 +38,7 @@ void set_signal_handler() {
 }
 
 int main(void) {
-	std::set_terminate(ex_handler);
+	CacheCommon::set_uncaught_exception_handler();
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 	auto portstr = Configuration::get("indexserver.port");

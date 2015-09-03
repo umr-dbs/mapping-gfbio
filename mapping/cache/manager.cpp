@@ -107,10 +107,11 @@ std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleR
 		QueryProfiler qp;
 		auto &f = items.at(0);
 
-		QueryRectangle rqr = req.get_remainder_query(f->pixel_scale_x, f->pixel_scale_y);
+		QueryRectangle rqr = req.get_remainder_query(*f);
 
 		try {
-			auto rem = graph->getCachedRaster(rqr, qp, GenericOperator::RasterQM::LOOSE);
+			// FIXME: Do sth. on rasterdb to make this work with RasterQM::LOOSE
+			auto rem = graph->getRaster(rqr, qp)->fitToQueryRectangle(rqr);
 
 			if (std::abs(1.0 - f->pixel_scale_x / rem->pixel_scale_x) > 0.01
 				|| std::abs(1.0 - f->pixel_scale_y / rem->pixel_scale_y) > 0.01) {
@@ -130,8 +131,8 @@ std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleR
 		} catch ( const MetadataException &me) {
 			Log::error("Error fetching remainder: %s. Query: %s", me.what(), CacheCommon::qr_to_string(rqr).c_str());
 			throw;
-		} catch ( const SourceException &se ) {
-			Log::error("Error fetching remainder: %s. Query: %s", se.what(), CacheCommon::qr_to_string(rqr).c_str());
+		} catch ( const ArgumentException &ae ) {
+			Log::warn("Error fetching remainder: %s. Query: %s", ae.what(), CacheCommon::qr_to_string(rqr).c_str() );
 			throw;
 		}
 	}

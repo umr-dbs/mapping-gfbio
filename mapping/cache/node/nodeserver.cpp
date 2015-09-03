@@ -44,7 +44,6 @@ void NodeServer::worker_loop() {
 
 			Log::debug("Worker connected to index-server");
 
-
 			while (workers_up && !shutdown) {
 				try {
 					uint8_t cmd;
@@ -62,8 +61,9 @@ void NodeServer::worker_loop() {
 					// Re-throw network-error to outer catch.
 					throw;
 				} catch (const std::exception &e) {
+					Log::error("Unexpected error while processing request: %s", e.what());
 					stream.write(WorkerConnection::RESP_ERROR);
-					stream.write( concat("Unexpected error while processing request: ", e.what()) );
+					stream.write(concat("Unexpected error while processing request: ", e.what()));
 				}
 			}
 		} catch (const NetworkException &ne) {
@@ -97,8 +97,9 @@ void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
 			BaseRequest rr(stream);
 			QueryProfiler profiler;
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			auto tmp = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(rr.query, profiler, GenericOperator::RasterQM::LOOSE);
-			result = std::shared_ptr<GenericRaster>( tmp.release() );
+			auto tmp = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(rr.query, profiler,
+				GenericOperator::RasterQM::LOOSE);
+			result = std::shared_ptr<GenericRaster>(tmp.release());
 			break;
 		}
 		case WorkerConnection::CMD_PUZZLE_RASTER: {
@@ -107,14 +108,14 @@ void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
 			auto tmp = CacheManager::process_raster_puzzle(rr, my_host, my_port);
 			Log::debug("Adding puzzled raster to cache.");
 			CacheManager::getInstance().put_raster(rr.semantic_id, tmp);
-			result = std::shared_ptr<GenericRaster>( tmp.release() );
+			result = std::shared_ptr<GenericRaster>(tmp.release());
 			break;
 		}
 
 		case WorkerConnection::CMD_DELIVER_RASTER: {
 			DeliveryRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			NodeCacheKey key(rr.semantic_id,rr.entry_id);
+			NodeCacheKey key(rr.semantic_id, rr.entry_id);
 			result = CacheManager::getInstance().get_raster_ref(key);
 			break;
 		}
@@ -187,11 +188,11 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 		case ControlConnection::CMD_REORG: {
 			Log::debug("Received reorg command.");
 			ReorgDescription d(stream);
-			for ( auto &rem_item : d.get_removals() ) {
+			for (auto &rem_item : d.get_removals()) {
 				handle_reorg_remove_item(rem_item);
 			}
 			for (auto &move_item : d.get_moves()) {
-				handle_reorg_move_item(move_item,stream);
+				handle_reorg_move_item(move_item, stream);
 			}
 			stream.write(ControlConnection::RESP_REORG_DONE);
 			break;
@@ -200,7 +201,7 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 			Log::debug("Received stats-request.");
 			NodeStats stats = CacheManager::getInstance().get_stats();
 			stream.write(ControlConnection::RESP_STATS);
-			stats.toStream( stream );
+			stats.toStream(stream);
 			break;
 		}
 		default: {
@@ -210,7 +211,7 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 	}
 }
 
-void NodeServer::handle_reorg_remove_item( const ReorgRemoveItem &item ) {
+void NodeServer::handle_reorg_remove_item(const ReorgRemoveItem &item) {
 //	Log::debug("Removing item from cache. Key: %s:%d",item.semantic_id.c_str(), item.entry_id);
 	switch (item.type) {
 		case ReorgMoveItem::Type::RASTER:
@@ -224,7 +225,8 @@ void NodeServer::handle_reorg_remove_item( const ReorgRemoveItem &item ) {
 void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream &index_stream) {
 	uint32_t new_cache_id;
 
-	Log::debug("Moving item from node %d to node %d. Key: %s:%d ", item.from_node_id, my_id, item.semantic_id.c_str(), item.entry_id );
+	Log::debug("Moving item from node %d to node %d. Key: %s:%d ", item.from_node_id, my_id,
+		item.semantic_id.c_str(), item.entry_id);
 
 	std::unique_ptr<BinaryStream> del_stream;
 
@@ -236,9 +238,10 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 
 		switch (del_resp) {
 			case DeliveryConnection::RESP_OK:
-				switch ( item.type ) {
+				switch (item.type) {
 					case ReorgMoveItem::Type::RASTER:
-						new_cache_id = CacheManager::getInstance().put_raster_local(item.semantic_id, GenericRaster::fromStream(*del_stream)).entry_id;
+						new_cache_id = CacheManager::getInstance().put_raster_local(item.semantic_id,
+							GenericRaster::fromStream(*del_stream)).entry_id;
 						break;
 					default:
 						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
@@ -258,11 +261,11 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 		Log::error("Could not initiate move: %s", ne.what());
 		return;
 	}
-	confirm_move( item, new_cache_id, index_stream, *del_stream );
+	confirm_move(item, new_cache_id, index_stream, *del_stream);
 }
 
-std::unique_ptr<BinaryStream> NodeServer::initiate_move( const ReorgMoveItem &item ) {
-	std::unique_ptr<BinaryStream> result = make_unique<UnixSocket>( item.from_host.c_str(), item.from_port );
+std::unique_ptr<BinaryStream> NodeServer::initiate_move(const ReorgMoveItem &item) {
+	std::unique_ptr<BinaryStream> result = make_unique<UnixSocket>(item.from_host.c_str(), item.from_port);
 	result->write(DeliveryConnection::MAGIC_NUMBER);
 
 	uint8_t cmd;
@@ -279,8 +282,8 @@ std::unique_ptr<BinaryStream> NodeServer::initiate_move( const ReorgMoveItem &it
 	return result;
 }
 
-
-void NodeServer::confirm_move( const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream, BinaryStream &del_stream ) {
+void NodeServer::confirm_move(const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream,
+	BinaryStream &del_stream) {
 	// Notify index
 	uint8_t iresp;
 	ReorgMoveResult rr(item.type, item.semantic_id, item.entry_id, item.from_node_id, my_id, new_id);
@@ -311,7 +314,7 @@ void NodeServer::setup_control_connection() {
 	// Establish connection
 	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
 	BinaryStream &stream = *this->control_connection;
-	NodeHandshake hs = CacheManager::getInstance().get_handshake(my_host,my_port);
+	NodeHandshake hs = CacheManager::getInstance().get_handshake(my_host, my_port);
 
 	Log::debug("Sending hello to index-server");
 	// Say hello

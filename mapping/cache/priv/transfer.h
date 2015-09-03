@@ -149,11 +149,13 @@ public:
 
 	virtual void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
-	virtual QueryRectangle get_remainder_query(double xres, double yres) const;
+	virtual QueryRectangle get_remainder_query(const GridSpatioTemporalResult &ref) const;
 
 	GeomP covered;
 	GeomP remainder;
 	std::vector<CacheRef> parts;
+private:
+	void snap_to_pixel_grid( double &v1, double &v2, double ref, double scale ) const;
 };
 
 #endif /* TRANSFER_H_ */

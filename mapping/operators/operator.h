@@ -23,7 +23,7 @@ class GenericPlot;
 
 
 class GenericOperator {
-	friend class RasterProducer;
+	friend class CacheManager;
 	public:
 		enum class RasterQM {
 			EXACT,

@@ -600,7 +600,7 @@ void NBContainerReader::write_data(BinaryStream& stream) const {
 
 void NBContainerReader::reset() {
 	buffer.reset();
-	element_reader.reset();
+	element_reader->reset();
 	error = false;
 	element_read_accum = 0;
 	size_read = 0;

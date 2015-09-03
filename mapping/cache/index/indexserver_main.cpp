@@ -14,8 +14,13 @@
 IndexServer *instance = nullptr;
 
 void termination_handler(int signum) {
-	(void) signum;
-	instance->stop();
+	if (signum == SIGSEGV) {
+		printf("Segmentation fault. Stacktrace:\n%s", CacheCommon::get_stacktrace().c_str());
+		exit(1);
+	}
+	else {
+		instance->stop();
+	}
 }
 
 void set_signal_handler() {
@@ -35,6 +40,8 @@ void set_signal_handler() {
 	sigaction(SIGTERM, NULL, &old_action);
 	if (old_action.sa_handler != SIG_IGN)
 		sigaction(SIGTERM, &new_action, NULL);
+	sigaction(SIGSEGV, NULL, &old_action);
+		sigaction(SIGSEGV, &new_action, NULL);
 }
 
 int main(void) {

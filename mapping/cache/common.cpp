@@ -35,14 +35,8 @@ void ex_handler() {
 	    out << "Uncaught exception: " << ex.what();
 	}
 
-	void *trace_elems[20];
-	int trace_elem_count(backtrace(trace_elems, 20));
-	char **stack_syms(backtrace_symbols(trace_elems, trace_elem_count));
-	for (int i = 0; i < trace_elem_count; ++i) {
-		out << stack_syms[i] << std::endl;
-	}
-	free(stack_syms);
-	Log::error("%s",out.str().c_str());
+
+	Log::error("%s\n%s",out.str().c_str(), CacheCommon::get_stacktrace().c_str() );
 	exit(1);
 }
 
@@ -140,6 +134,18 @@ std::unique_ptr<geos::geom::Geometry> CacheCommon::empty_geom() {
 
 void CacheCommon::set_uncaught_exception_handler() {
 	std::set_terminate(ex_handler);
+}
+
+std::string CacheCommon::get_stacktrace() {
+	std::ostringstream out;
+	void *trace_elems[20];
+	int trace_elem_count(backtrace(trace_elems, 20));
+	char **stack_syms(backtrace_symbols(trace_elems, trace_elem_count));
+	for (int i = 0; i < trace_elem_count; ++i) {
+		out << stack_syms[i] << std::endl;
+	}
+	free(stack_syms);
+	return out.str();
 }
 
 std::unique_ptr<geos::geom::Geometry> CacheCommon::union_geom(const std::unique_ptr<geos::geom::Geometry>& p1,

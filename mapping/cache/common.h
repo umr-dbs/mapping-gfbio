@@ -57,6 +57,8 @@ public:
 
 	static void set_uncaught_exception_handler();
 
+	static std::string get_stacktrace();
+
 	//
 	// Helper to read from a stream with a given timeout. Basically wraps
 	// BinaryStream::read(T*,bool).

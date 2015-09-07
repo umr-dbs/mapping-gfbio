@@ -9,6 +9,7 @@
 #define CACHING_STRATEGY_H_
 
 #include "operators/queryprofiler.h"
+#include <memory>
 
 //
 // The caching-strategy tells whether or not to cache
@@ -18,6 +19,7 @@
 
 class CachingStrategy {
 public:
+	static std::unique_ptr<CachingStrategy> by_name( const std::string &name );
 	CachingStrategy();
 	virtual ~CachingStrategy();
 	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const = 0;
@@ -30,6 +32,16 @@ class CacheAll : public CachingStrategy {
 public:
 	CacheAll();
 	virtual ~CacheAll();
+	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
+};
+
+//
+// Never caches a result
+//
+class CacheNone : public CachingStrategy {
+public:
+	CacheNone();
+	virtual ~CacheNone();
 	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
 };
 
@@ -51,7 +63,8 @@ public:
 //
 class TwoStepStrategy : public CachingStrategy {
 public:
-	TwoStepStrategy(double stacked_threshold, double immediate_threshold, uint stack_depth);
+	// TODO: Figure out good values!
+	TwoStepStrategy(double stacked_threshold = 3, double immediate_threshold = 2, uint stack_depth = 3);
 	virtual ~TwoStepStrategy();
 	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
 private:

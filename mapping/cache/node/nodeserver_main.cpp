@@ -62,18 +62,16 @@ int main(void) {
 
 //	PuzzleTracer::init();
 
-	std::unique_ptr<CacheManager> cache_impl;
+
+	std::string cs = Configuration::get("nodeserver.cache.strategy");
+	size_t raster_size = atoi(Configuration::get("cache.raster.size", "5242880").c_str());
+
 	// Inititalize cache
-	if (Configuration::getBool("cache.enabled", false)) {
-		size_t raster_size = atoi(Configuration::get("cache.raster.size", "5242880").c_str());
-		cache_impl.reset(new RemoteCacheManager(raster_size,hoststr,portnr));
+	std::unique_ptr<CacheManager> cache_impl = make_unique<RemoteCacheManager>(raster_size,hoststr,portnr);
+	auto caching_strategy = CachingStrategy::by_name(cs);
+	CacheManager::init(std::move(cache_impl), std::move(caching_strategy));
 
-	} else {
-		cache_impl.reset(new NopCacheManager());
-	}
-	CacheManager::init(std::move(cache_impl), make_unique<CacheAll>());
-
-
+	// Fire it up
 	instance = new NodeServer(hoststr,portnr,ihoststr,iportnr,num_threads);
 	instance->run();
 	return 0;

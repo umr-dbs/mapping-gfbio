@@ -6,6 +6,21 @@
  */
 
 #include "cache/priv/caching_strategy.h"
+#include "util/exceptions.h"
+#include "util/make_unique.h"
+#include "util/concat.h"
+
+std::unique_ptr<CachingStrategy> CachingStrategy::by_name(const std::string& name) {
+	if ( name == "never")
+		return make_unique<CacheNone>();
+	else if ( name == "always")
+		return make_unique<CacheAll>();
+	else if ( name == "simple")
+		return make_unique<AuthmannStrategy>();
+	else if ( name == "twostep")
+		return make_unique<TwoStepStrategy>();
+	throw ArgumentException(concat("Unknown Caching-Strategy: ", name));
+}
 
 CachingStrategy::CachingStrategy() {
 }
@@ -29,15 +44,31 @@ bool CacheAll::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	return true;
 }
 
-AuthmannStrategy::AuthmannStrategy() {
+//
+// Cache None
+//
+
+CacheNone::CacheNone() {
 }
 
-AuthmannStrategy::~AuthmannStrategy() {
+CacheNone::~CacheNone() {
+}
+
+bool CacheNone::do_cache(const QueryProfiler& profiler, size_t bytes) const {
+	(void) profiler;
+	(void) bytes;
+	return false;
 }
 
 //
 // Authmann Heuristik
 //
+
+AuthmannStrategy::AuthmannStrategy() {
+}
+
+AuthmannStrategy::~AuthmannStrategy() {
+}
 
 bool AuthmannStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	double cache_cpu = 0.000000005 * bytes;

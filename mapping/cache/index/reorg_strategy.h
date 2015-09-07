@@ -36,24 +36,30 @@ public:
 //
 class ReorgStrategy {
 public:
-	ReorgStrategy();
+	static std::unique_ptr<ReorgStrategy> by_name(const std::string &name);
+	ReorgStrategy(double target_usage);
 	virtual ~ReorgStrategy();
 	virtual bool requires_reorg(const IndexCache &cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual void reorganize(const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) = 0;
+	virtual void reorganize(const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const = 0 ;
 
 	static bool entry_less(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
 	static bool entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
 	static double get_score( const IndexCacheEntry &entry );
+protected:
+	double get_target_usage( const IndexCache &cache, const std::map<uint32_t,NodeReorgDescription> &result ) const;
+private:
+	const double target_usage;
 };
 
 //
 // This strategy never triggers reorganization
 //
 class NeverReorgStrategy : public ReorgStrategy {
+public:
 	NeverReorgStrategy();
 	virtual ~NeverReorgStrategy();
 	virtual bool requires_reorg( const IndexCache &cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result );
+	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const;
 };
 
 //
@@ -63,9 +69,9 @@ class NeverReorgStrategy : public ReorgStrategy {
 //
 class CapacityReorgStrategy : public ReorgStrategy {
 public:
-	CapacityReorgStrategy();
+	CapacityReorgStrategy(double target_usage);
 	virtual ~CapacityReorgStrategy();
-	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result );
+	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const;
 };
 
 
@@ -76,12 +82,27 @@ public:
 class GeographicReorgStrategy : public ReorgStrategy {
 	friend class NodePos;
 public:
-	GeographicReorgStrategy();
+	GeographicReorgStrategy(double target_usage);
 	virtual ~GeographicReorgStrategy();
-	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result );
+	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const;
 private:
 	static GDAL::CRSTransformer geosmsg_trans;
 	static GDAL::CRSTransformer webmercator_trans;
 };
+
+
+//
+// This strategy calculates clusters cache-entries
+// by similarity of their operator-graphs
+//
+class GraphReorgStrategy : public ReorgStrategy {
+	friend class NodePos;
+public:
+	GraphReorgStrategy(double target_usage);
+	virtual ~GraphReorgStrategy();
+	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const;
+};
+
+
 
 #endif /* REORG_STRATEGY_H_ */

@@ -52,9 +52,9 @@ int main(void) {
 
 	auto portnr = atoi(portstr.c_str());
 
-	CapacityReorgStrategy cap_reorg;
-
-	instance = new IndexServer(portnr, cap_reorg);
+	std::string rs = Configuration::get("indexserver.reorg.strategy");
+	auto reorg_strategy = ReorgStrategy::by_name(rs);
+	instance = new IndexServer(portnr, *reorg_strategy);
 	instance->run();
 	return 0;
 }

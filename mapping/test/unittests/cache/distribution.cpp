@@ -18,7 +18,7 @@
 
 TEST(DistributionTest,TestRedistibution) {
 
-	CapacityReorgStrategy reorg;
+	CapacityReorgStrategy reorg(0.8);
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, reorg);
@@ -101,7 +101,7 @@ TEST(DistributionTest,TestRedistibution) {
 }
 
 TEST(DistributionTest,TestRemoteNodeFetch) {
-	CapacityReorgStrategy reorg;
+	CapacityReorgStrategy reorg(0.8);
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, reorg);
@@ -154,7 +154,7 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 
 TEST(DistributionTest,TestCapacityReorg) {
 
-	CapacityReorgStrategy reorg;
+	CapacityReorgStrategy reorg(0.8);
 
 	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 0)));
 	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0)));
@@ -207,7 +207,7 @@ TEST(DistributionTest,TestCapacityReorg) {
 
 TEST(DistributionTest,TestGeographicReorg) {
 
-	GeographicReorgStrategy reorg;
+	GeographicReorgStrategy reorg(0.8);
 
 	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 0)));
 	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0)));
@@ -261,7 +261,7 @@ TEST(DistributionTest,TestGeographicReorg) {
 
 
 TEST(DistributionTest,TestStatsAndReorg) {
-	CapacityReorgStrategy reorg;
+	CapacityReorgStrategy reorg(0.8);
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, reorg);

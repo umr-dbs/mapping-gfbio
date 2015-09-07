@@ -7,6 +7,8 @@
 
 #include "cache/index/reorg_strategy.h"
 #include "cache/index/indexserver.h"
+#include "util/exceptions.h"
+#include "util/concat.h"
 #include <ctime>
 #include <algorithm>
 
@@ -18,7 +20,21 @@ NodeReorgDescription::NodeReorgDescription( std::shared_ptr<Node> node ) :
 // ReorgStrategy
 //
 
-ReorgStrategy::ReorgStrategy() {
+std::unique_ptr<ReorgStrategy> ReorgStrategy::by_name(const std::string &name) {
+	if ( name == "none" )
+		return make_unique<NeverReorgStrategy>();
+	else if ( name == "capacity" )
+		return make_unique<CapacityReorgStrategy>(0.8);
+	else if ( name == "geo" )
+		return make_unique<GeographicReorgStrategy>(0.8);
+	else if ( name == "graph" )
+		return make_unique<GraphReorgStrategy>(0.8);
+
+	throw ArgumentException(concat("Unknown Reorg-Strategy: ", name));
+
+}
+
+ReorgStrategy::ReorgStrategy(double target_usage) : target_usage(target_usage) {
 }
 
 ReorgStrategy::~ReorgStrategy() {
@@ -34,6 +50,16 @@ bool ReorgStrategy::requires_reorg(const IndexCache &cache, const std::map<uint3
 		minru = std::min(minru, cache.get_capacity_usage(e.second->capacity));
 	}
 	return maxru - minru > 0.15 || maxru >= 1.0;
+}
+
+double ReorgStrategy::get_target_usage( const IndexCache &cache, const std::map<uint32_t,NodeReorgDescription> &result ) const {
+	// Calculate mean usage
+	double accum(0);
+	for (auto &e : result) {
+		accum += cache.get_capacity_usage(e.second.node->capacity);
+	}
+	// Calculate target memory usage after reorg
+	return std::min( 0.8, accum / result.size() * 1.05);
 }
 
 bool ReorgStrategy::entry_less( const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b ) {
@@ -55,7 +81,7 @@ double ReorgStrategy::get_score(const IndexCacheEntry& entry) {
 // Never reorg
 //
 
-NeverReorgStrategy::NeverReorgStrategy() {
+NeverReorgStrategy::NeverReorgStrategy() : ReorgStrategy(0) {
 }
 
 NeverReorgStrategy::~NeverReorgStrategy() {
@@ -68,7 +94,7 @@ bool NeverReorgStrategy::requires_reorg(const IndexCache &cache, const std::map<
 }
 
 void NeverReorgStrategy::reorganize(const IndexCache& cache,
-	std::map<uint32_t,NodeReorgDescription> &result) {
+	std::map<uint32_t,NodeReorgDescription> &result) const {
 	(void) cache;
 	(void) result;
 }
@@ -79,7 +105,7 @@ void NeverReorgStrategy::reorganize(const IndexCache& cache,
 // Capacity based reorg
 //
 
-CapacityReorgStrategy::CapacityReorgStrategy() {
+CapacityReorgStrategy::CapacityReorgStrategy(double target_usage) : ReorgStrategy(target_usage)  {
 }
 
 CapacityReorgStrategy::~CapacityReorgStrategy() {
@@ -87,27 +113,21 @@ CapacityReorgStrategy::~CapacityReorgStrategy() {
 
 void CapacityReorgStrategy::reorganize(
 	const IndexCache &cache,
-	std::map<uint32_t,NodeReorgDescription> &result) {
+	std::map<uint32_t,NodeReorgDescription> &result) const {
 
 
 	std::unordered_map<uint32_t,std::vector<std::shared_ptr<IndexCacheEntry>>&> per_node;
+	double target_mean = get_target_usage( cache, result );
+
 
 	// Calculate mean usage
-	double raster_accum(0);
 	for (auto &e : result) {
-		raster_accum += cache.get_capacity_usage(e.second.node->capacity);
-
 		auto &node_entries = cache.get_node_entries(e.second.node->id);
 
 		// Sort according to score (ascending) -- for easy removal of least relevant entries
 		std::sort(node_entries.begin(), node_entries.end(), entry_less);
 		per_node.emplace( e.second.node->id, node_entries );
 	}
-
-	// Calculate target memory usage after reorg
-	double target_mean = std::min( 0.8, raster_accum / result.size() * 1.05);
-
-	Log::debug("CapReorg: Target-Mean: %f", target_mean);
 
 	// Find overflowing nodes
 	std::vector<std::shared_ptr<IndexCacheEntry>> overflow;
@@ -211,14 +231,16 @@ double NodePos::dist_to(const IndexCacheEntry& entry) {
 GDAL::CRSTransformer GeographicReorgStrategy::geosmsg_trans(EPSG_GEOSMSG,EPSG_LATLON);
 GDAL::CRSTransformer GeographicReorgStrategy::webmercator_trans(EPSG_WEBMERCATOR,EPSG_LATLON);
 
-GeographicReorgStrategy::GeographicReorgStrategy() {
+GeographicReorgStrategy::GeographicReorgStrategy(double target_usage) : ReorgStrategy(target_usage) {
 }
 
 GeographicReorgStrategy::~GeographicReorgStrategy() {
 }
 
 void GeographicReorgStrategy::reorganize(const IndexCache& cache,
-	std::map<uint32_t,NodeReorgDescription> &result) {
+	std::map<uint32_t,NodeReorgDescription> &result) const {
+
+	double target_mean = get_target_usage( cache, result );
 
 	// Calculate center of mass
 	double weighted_x = 0, weighted_y = 0, mass = 0;
@@ -300,7 +322,7 @@ void GeographicReorgStrategy::reorganize(const IndexCache& cache,
 	// Find overflowing nodes and create result
 	for ( auto &np : n_pos ) {
 		auto &desc = result.at(np.node_id);
-		size_t target = 0.8 * cache.get_total_capacity(desc.node->capacity);
+		size_t target = target_mean * cache.get_total_capacity(desc.node->capacity);
 		size_t used = 0;
 		std::sort(np.entries.begin(), np.entries.end(), entry_greater);
 
@@ -331,4 +353,21 @@ void GeographicReorgStrategy::reorganize(const IndexCache& cache,
 			ReorgRemoveItem( cache.get_reorg_type(), e->semantic_id, e->entry_id )
 		);
 	}
+}
+
+//
+//
+//
+
+GraphReorgStrategy::GraphReorgStrategy(double target_usage) : ReorgStrategy(target_usage)  {
+}
+
+GraphReorgStrategy::~GraphReorgStrategy() {
+}
+
+void GraphReorgStrategy::reorganize(const IndexCache& cache,
+	std::map<uint32_t,NodeReorgDescription> &result) const {
+	(void) cache;
+	(void) result;
+	// TODO: Implement
 }

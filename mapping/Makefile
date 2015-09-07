@@ -33,7 +33,7 @@ OBJ_DATATYPES_COMMON=o/datatypes/attributes.o o/datatypes/spatiotemporal.o o/dat
 OBJ_DATATYPES=${OBJ_DATATYPES_COMMON} o/datatypes/raster/raster.o
 OBJ_DATATYPES_NOCL=${OBJ_DATATYPES_COMMON} o/datatypes/raster/raster_nocl.o
 OBJ_PLOT=o/datatypes/plots/histogram.o o/datatypes/plots/text.o o/datatypes/plots/png.o
-OBJ_UTIL=o/util/gdal.o o/util/hash.o o/util/curl.o o/util/sqlite.o o/util/sunpos.o o/util/binarystream.o o/util/csvparser.o o/util/base64.o o/util/configuration.o o/util/debug.o o/util/timemodification.o o/util/log.o o/util/nio.o
+OBJ_UTIL=o/util/gdal.o o/util/hash.o o/util/curl.o o/util/sqlite.o o/util/sunpos.o o/util/binarystream.o o/util/csvparser.o o/util/base64.o o/util/configuration.o o/util/debug.o o/util/timemodification.o o/util/log.o
 OBJ_POINTVISUALIZATION=o/pointvisualization/BoundingBox.o o/pointvisualization/Circle.o o/pointvisualization/Coordinate.o o/pointvisualization/Dimension.o o/pointvisualization/FindResult.o o/pointvisualization/QuadTreeNode.o o/pointvisualization/CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters/converter.o o/converters/raw.o
 OBJ_OPERATORS_RASTER=o/operators/raster/matrixkernel.o o/operators/raster/opencl.o o/operators/raster/expression.o o/operators/raster/projections.o o/operators/raster/rastersource.o o/operators/raster/r.o o/operators/raster/classification.o
@@ -52,7 +52,7 @@ OBJ_OPERATORS_COMMON=o/operators/operator.o o/operators/queryrectangle.o o/opera
 OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALL}
 OBJ_OPERATORS_STUBS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALLSTUBS}
 
-OBJ_CACHE_COMMON=o/cache/common.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/redistribution.o o/cache/priv/cache_stats.o o/cache/priv/cache_structure.o o/cache/node/node_cache.o o/cache/manager.o o/cache/priv/caching_strategy.o
+OBJ_CACHE_COMMON=o/cache/common.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/redistribution.o o/cache/priv/cache_stats.o o/cache/priv/cache_structure.o o/cache/node/node_cache.o o/cache/manager.o o/cache/priv/caching_strategy.o o/util/nio.o
 OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 
 #

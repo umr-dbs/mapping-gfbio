@@ -272,10 +272,14 @@ const std::shared_ptr<GenericRaster> LocalCacheManager::get_raster_ref(const Nod
 	return raster_cache.get(key);
 }
 
+NodeCacheRef LocalCacheManager::get_raster_info( const NodeCacheKey &key) {
+	return raster_cache.get_entry_metadata(key);
+}
+
 NodeCacheRef LocalCacheManager::put_raster_local(const std::string& semantic_id,
-	const std::unique_ptr<GenericRaster>& raster) {
+	const std::unique_ptr<GenericRaster>& raster, const AccessInfo info) {
 	Log::debug("Adding raster to local cache: %s", CacheCommon::raster_to_string(*raster).c_str());
-	return raster_cache.put(semantic_id, raster);
+	return raster_cache.put(semantic_id, raster, info);
 }
 
 void LocalCacheManager::remove_raster_local(const NodeCacheKey &key) {
@@ -327,10 +331,16 @@ const std::shared_ptr<GenericRaster> NopCacheManager::get_raster_ref(const NodeC
 	throw NoSuchElementException("Cache Miss");
 }
 
+NodeCacheRef NopCacheManager::get_raster_info( const NodeCacheKey &key) {
+	(void) key;
+	throw NoSuchElementException("Cache Miss");
+}
+
 NodeCacheRef NopCacheManager::put_raster_local(const std::string& semantic_id,
-	const std::unique_ptr<GenericRaster>& raster) {
+	const std::unique_ptr<GenericRaster>& raster, const AccessInfo info) {
 	(void) semantic_id;
 	(void) raster;
+	(void) info;
 	CacheEntry ce(CacheEntryBounds(*raster), 0 );
 	return NodeCacheRef(semantic_id,1,ce);
 	// Nothing to-do

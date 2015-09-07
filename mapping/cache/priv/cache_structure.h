@@ -48,12 +48,26 @@ public:
 	double x_res_from, x_res_to, y_res_from, y_res_to;
 };
 
+// Information about data-access
+class AccessInfo {
+public:
+	AccessInfo();
+	AccessInfo( time_t last_access, uint32_t access_count );
+	AccessInfo( BinaryStream &stream );
+
+	void toStream( BinaryStream &stream ) const;
+
+	time_t last_access;
+	uint32_t access_count;
+};
+
 //
 // Basic information about cached data
 //
-class CacheEntry {
+class CacheEntry : public AccessInfo {
 public:
 	CacheEntry(CacheEntryBounds bounds, uint64_t size);
+	CacheEntry(CacheEntryBounds bounds, uint64_t size, time_t last_access, uint32_t access_count);
 	CacheEntry( BinaryStream &stream );
 
 	void toStream( BinaryStream &stream ) const;
@@ -62,8 +76,6 @@ public:
 
 	CacheEntryBounds bounds;
 	uint64_t size;
-	time_t last_access;
-	uint32_t access_count;
 };
 
 //

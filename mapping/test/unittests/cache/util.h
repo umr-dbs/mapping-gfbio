@@ -60,8 +60,9 @@ public:
 
 	virtual std::unique_ptr<GenericRaster> query_raster( const GenericOperator &op, const QueryRectangle &rect );
 	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
+	virtual NodeCacheRef get_raster_info( const NodeCacheKey &key);
 	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
-	virtual NodeCacheRef put_raster_local( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
+	virtual NodeCacheRef put_raster_local( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster, const AccessInfo info = AccessInfo() );
 	virtual void remove_raster_local( const NodeCacheKey &key );
 
 	virtual NodeHandshake get_handshake( const std::string &my_host, uint32_t my_port ) const;

@@ -128,12 +128,19 @@ const unsigned char* NBPrimitiveWriter<T>::get_data() const {
 //
 // Simple Writer
 //
+template<>
+NBStreamableWriter<std::string>::NBStreamableWriter(const std::string& item) {
+	StreamBuffer ss;
+	BinaryStream &stream = ss;
+	stream.write(item);
+	data = ss.get_content();
+}
 
 template<typename T>
 NBStreamableWriter<T>::NBStreamableWriter(const T& item) {
 	StreamBuffer ss;
 	BinaryStream &stream = ss;
-	stream.write(item);
+	item.T::toStream(stream);
 	data = ss.get_content();
 }
 
@@ -154,6 +161,10 @@ const unsigned char* NBStreamableWriter<T>::get_data() const {
 //
 // Multi Writer
 //
+NBMultiWriter::NBMultiWriter( std::unique_ptr<NBWriter> w1, std::unique_ptr<NBWriter> w2 ) : current_index(0), total_bytes(0) {
+	add_writer( std::move(w1) );
+	add_writer( std::move(w2) );
+}
 
 NBMultiWriter::NBMultiWriter(std::vector<std::unique_ptr<NBWriter> > writers) :
 	current_index(0), total_bytes(0), writers(std::move(writers)) {
@@ -272,6 +283,7 @@ NBErrorWriter::NBErrorWriter(uint8_t code, const std::string& msg) :
 template class NBPrimitiveWriter<uint8_t> ;
 template class NBPrimitiveWriter<uint32_t> ;
 template class NBStreamableWriter<DeliveryResponse> ;
+template class NBStreamableWriter<AccessInfo> ;
 template class NBStreamableWriter<ReorgDescription> ;
 template class NBStreamableWriter<CacheRef> ;
 template class NBStreamableWriter<BaseRequest> ;
@@ -664,6 +676,10 @@ NBNodeStatsReader::NBNodeStatsReader() {
 	add_reader( make_unique<NBCacheStatsReader>() );
 }
 
+
+NBAccessInfoReader::NBAccessInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t)) {
+}
+
 NBCacheBoundsReader::NBCacheBoundsReader() :
 	NBFixedSizeReader(
 		//SREF:
@@ -677,6 +693,7 @@ NBCacheBoundsReader::NBCacheBoundsReader() :
 
 NBNodeCacheRefReader::NBNodeCacheRefReader() {
 	add_reader( make_unique<NBNodeCacheKeyReader>() );
+	add_reader( make_unique<NBAccessInfoReader>() );
 	add_reader( make_unique<NBCacheBoundsReader>() );
-	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t) + sizeof(time_t) + sizeof(uint32_t)) );
+	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t)) );
 }

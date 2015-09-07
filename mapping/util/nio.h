@@ -126,6 +126,7 @@ private:
 //
 class NBMultiWriter : public NBWriter {
 public:
+	NBMultiWriter( std::unique_ptr<NBWriter> w1, std::unique_ptr<NBWriter> w2 );
 	NBMultiWriter( std::vector<std::unique_ptr<NBWriter>> writers );
 	virtual void write(int fd);
 	virtual bool has_error() const;
@@ -368,6 +369,11 @@ public:
 class NBNodeStatsReader : public NBMultiReader {
 public:
 	NBNodeStatsReader();
+};
+
+class NBAccessInfoReader : public NBFixedSizeReader {
+public:
+	NBAccessInfoReader();
 };
 
 class NBCacheBoundsReader : public NBFixedSizeReader {

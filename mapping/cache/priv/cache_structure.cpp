@@ -166,23 +166,46 @@ std::string CacheEntryBounds::to_string() const {
 }
 
 //
-// CacheEntry
+// AccessInfo
 //
-CacheEntry::CacheEntry(CacheEntryBounds bounds, uint64_t size) :
-	bounds(bounds), size(size), last_access(time(nullptr)), access_count(1){
+
+AccessInfo::AccessInfo() : last_access(time(nullptr)), access_count(1) {
 }
 
-CacheEntry::CacheEntry(BinaryStream& stream) : bounds(stream) {
-	stream.read(&size);
+AccessInfo::AccessInfo( time_t last_access, uint32_t access_count ) :
+	last_access(last_access), access_count(access_count) {
+}
+
+AccessInfo::AccessInfo( BinaryStream &stream ) {
 	stream.read(&last_access);
 	stream.read(&access_count);
 }
 
-void CacheEntry::toStream(BinaryStream& stream) const {
-	bounds.toStream(stream);
-	stream.write(size);
+void AccessInfo::toStream( BinaryStream &stream ) const {
 	stream.write(last_access);
 	stream.write(access_count);
+}
+
+//
+// CacheEntry
+//
+CacheEntry::CacheEntry(CacheEntryBounds bounds, uint64_t size) : AccessInfo(),
+	bounds(bounds), size(size) {
+}
+
+CacheEntry::CacheEntry(CacheEntryBounds bounds, uint64_t size, time_t last_access, uint32_t access_count) :
+	AccessInfo(last_access,access_count),
+	bounds(bounds), size(size) {
+}
+
+CacheEntry::CacheEntry(BinaryStream& stream) : AccessInfo(stream), bounds(stream) {
+	stream.read(&size);
+}
+
+void CacheEntry::toStream(BinaryStream& stream) const {
+	AccessInfo::toStream(stream);
+	bounds.toStream(stream);
+	stream.write(size);
 }
 
 std::string CacheEntry::to_string() const {

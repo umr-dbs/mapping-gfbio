@@ -94,10 +94,12 @@ void NodeCache<EType>::remove(const NodeCacheKey& key) {
 }
 
 template<typename EType>
-const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const std::unique_ptr<EType> &item) {
+const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const std::unique_ptr<EType> &item, const AccessInfo info) {
 	uint64_t id = next_id++;
 	auto cache = get_structure(semantic_id, true);
 	auto entry = create_entry( id, *item  );
+	entry->last_access = info.last_access;
+	entry->access_count = info.access_count;
 	cache->put( id, entry );
 	current_size += entry->size;
 	return NodeCacheRef( semantic_id, entry->entry_id, *entry );

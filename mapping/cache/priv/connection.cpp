@@ -720,14 +720,19 @@ void DeliveryConnection::send_error(const std::string& msg) {
 			"Can only send error in state DELIVERY_REQUEST_READ or RASTER_CACHE_REQUEST_READ");
 }
 
-void DeliveryConnection::send_raster_move(std::shared_ptr<GenericRaster> raster) {
+void DeliveryConnection::send_raster_move( const AccessInfo &info, std::shared_ptr<GenericRaster> raster) {
 	if (state == State::RASTER_MOVE_REQUEST_READ) {
 		state = State::SENDING_RASTER_MOVE;
-		begin_write (make_unique<NBMessageWriter>(RESP_OK, make_unique<NBRasterWriter> (raster)) );}
-		else
-		throw IllegalStateException("Can only move raster in state RASTER_MOVE_REQUEST_READ");
-
+		begin_write (make_unique<NBMessageWriter>(RESP_OK,
+			make_unique<NBMultiWriter>(
+				make_unique<NBStreamableWriter<AccessInfo>>(info),
+				make_unique<NBRasterWriter> (raster)
+			)
+		));
 	}
+	else
+		throw IllegalStateException("Can only move raster in state RASTER_MOVE_REQUEST_READ");
+}
 
 void DeliveryConnection::release() {
 	if (state == State::MOVE_DONE)

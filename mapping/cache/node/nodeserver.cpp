@@ -228,25 +228,28 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 	Log::debug("Moving item from node %d to node %d. Key: %s:%d ", item.from_node_id, my_id,
 		item.semantic_id.c_str(), item.entry_id);
 
+
 	std::unique_ptr<BinaryStream> del_stream;
+
 
 	// Send move request
 	try {
 		uint8_t del_resp;
 		del_stream = initiate_move(item);
 		del_stream->read(&del_resp);
-
 		switch (del_resp) {
-			case DeliveryConnection::RESP_OK:
+			case DeliveryConnection::RESP_OK: {
+				AccessInfo ai(*del_stream);
 				switch (item.type) {
 					case ReorgMoveItem::Type::RASTER:
 						new_cache_id = CacheManager::getInstance().put_raster_local(item.semantic_id,
-							GenericRaster::fromStream(*del_stream)).entry_id;
+							GenericRaster::fromStream(*del_stream), ai).entry_id;
 						break;
 					default:
 						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
 				}
 				break;
+			}
 			case DeliveryConnection::RESP_ERROR: {
 				std::string msg;
 				del_stream->read(&msg);

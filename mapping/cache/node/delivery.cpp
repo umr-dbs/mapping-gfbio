@@ -205,7 +205,8 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 					auto &key = dc->get_key();
 					try {
 						Log::debug("Moving cache-entry: %s", key.to_string().c_str());
-						dc->send_raster_move( CacheManager::getInstance().get_raster_ref(key) );
+						dc->send_raster_move( CacheManager::getInstance().get_raster_info(key),
+							CacheManager::getInstance().get_raster_ref(key) );
 					} catch (const NoSuchElementException &nse) {
 						dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
 					}

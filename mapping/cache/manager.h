@@ -12,9 +12,11 @@
 #include "cache/priv/caching_strategy.h"
 #include "cache/priv/cache_stats.h"
 #include "cache/priv/transfer.h"
+#include "datatypes/raster.h"
 
 #include <unordered_map>
 #include <unordered_set>
+#include <memory>
 
 //
 // The cache-manager provides uniform access to the cache
@@ -47,7 +49,7 @@ public:
 	// Inserts a raster into the local cache -- omitting any communication
 	// to the remote server (if applicable)
 	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
-		const std::unique_ptr<GenericRaster> &raster) = 0;
+		const std::unique_ptr<GenericRaster> &raster, const AccessInfo info = AccessInfo() ) = 0;
 
 	// Removes the raster with the given key from the cache,
 	// not notifying the index (if applicable)
@@ -56,6 +58,8 @@ public:
 	// Gets a reference to the cached raster for the given key
 	// The result is not a copy and may only be used for delivery purposes
 	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key) = 0;
+
+	virtual NodeCacheRef get_raster_info( const NodeCacheKey &key) = 0;
 
 	// Inserts a raster into the cache
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster) = 0;
@@ -94,8 +98,9 @@ public:
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
 
 	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
+	virtual NodeCacheRef get_raster_info( const NodeCacheKey &key);
 	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
-		const std::unique_ptr<GenericRaster> &raster);
+		const std::unique_ptr<GenericRaster> &raster, const AccessInfo info = AccessInfo());
 	virtual void remove_raster_local(const NodeCacheKey &key);
 
 	virtual NodeHandshake get_handshake( const std::string &my_host, uint32_t my_port ) const;
@@ -115,8 +120,9 @@ public:
 	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
 
 	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
+	virtual NodeCacheRef get_raster_info( const NodeCacheKey &key);
 	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
-		const std::unique_ptr<GenericRaster> &raster);
+		const std::unique_ptr<GenericRaster> &raster, const AccessInfo info = AccessInfo());
 	virtual void remove_raster_local(const NodeCacheKey &key);
 
 	virtual NodeHandshake get_handshake( const std::string &my_host, uint32_t my_port ) const;

@@ -49,7 +49,7 @@ public:
 	virtual ~NodeCache();
 
 	// Adds an entry for the given semantic_id to the cache.
-	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item);
+	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item, const AccessInfo info = AccessInfo());
 
 	// Removes the entry with the given key from the cache
 	void remove( const NodeCacheKey &key );

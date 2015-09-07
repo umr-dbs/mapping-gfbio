@@ -169,14 +169,18 @@ const std::shared_ptr<GenericRaster> TestCacheMan::get_raster_ref(const NodeCach
 	return get_current_instance().get_raster_ref(key);
 }
 
+NodeCacheRef TestCacheMan::get_raster_info( const NodeCacheKey &key) {
+	return get_current_instance().get_raster_info(key);
+}
+
 void TestCacheMan::put_raster(const std::string &semantic_id,
 	const std::unique_ptr<GenericRaster> &raster) {
 	get_current_instance().put_raster(semantic_id, raster);
 }
 
 NodeCacheRef TestCacheMan::put_raster_local(const std::string &semantic_id,
-	const std::unique_ptr<GenericRaster> &raster) {
-	return get_current_instance().put_raster_local(semantic_id, raster);
+	const std::unique_ptr<GenericRaster> &raster, const AccessInfo info) {
+	return get_current_instance().put_raster_local(semantic_id, raster,info);
 }
 
 void TestCacheMan::remove_raster_local(const NodeCacheKey &key) {

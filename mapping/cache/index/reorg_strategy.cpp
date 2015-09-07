@@ -327,7 +327,7 @@ void GeographicReorgStrategy::reorganize(const IndexCache& cache,
 		std::sort(np.entries.begin(), np.entries.end(), entry_greater);
 
 		for ( auto & e : np.entries ) {
-			if ( used + e->size < target ) {
+			if ( used + e->size <= target ) {
 				used += e->size;
 				// Do not create move-item for items already at current node
 				if ( e->node_id == np.node_id )

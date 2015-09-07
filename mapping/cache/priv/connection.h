@@ -388,7 +388,7 @@ public:
 
 	void send_raster( std::shared_ptr<GenericRaster> raster );
 
-	void send_raster_move( std::shared_ptr<GenericRaster> raster );
+	void send_raster_move( const AccessInfo &info, std::shared_ptr<GenericRaster> raster );
 
 	void send_error( const std::string &msg );
 

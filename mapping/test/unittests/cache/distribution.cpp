@@ -209,8 +209,8 @@ TEST(DistributionTest,TestGeographicReorg) {
 
 	GeographicReorgStrategy reorg(0.8);
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 0)));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0)));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 0)));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(40, 0)));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);
@@ -249,6 +249,8 @@ TEST(DistributionTest,TestGeographicReorg) {
 	cache.reorganize(res);
 
 	ASSERT_TRUE(res.at(2).node->id == 2);
+	Log::error("Moves/Removes: %d/%d", res.at(1).get_moves().size(), res.at(1).get_removals().size());
+	Log::error("Moves/Removes: %d/%d", res.at(2).get_moves().size(), res.at(2).get_removals().size());
 	ASSERT_TRUE(res.at(2).get_moves().size() == 1);
 	ASSERT_TRUE(res.at(2).get_moves().at(0).entry_id == 1);
 	ASSERT_TRUE(res.at(2).get_removals().empty());

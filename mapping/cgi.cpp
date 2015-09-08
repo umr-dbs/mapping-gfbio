@@ -357,7 +357,7 @@ std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJso
 	if ( !cache_enabled ) {
 		QueryProfiler profiler;
 		auto graph = GenericOperator::fromJSON(graphJson);
-		return graph->getCachedRaster(rect, profiler);
+		return graph->getCachedRaster(rect, profiler, GenericOperator::RasterQM::EXACT);
 	}
 	// Request cache-server
 	else {

@@ -30,8 +30,8 @@
 //
 ////////////////////////////////////////////////////////////
 
-Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &capacity) :
-	id(id), host(host), port(port), capacity(capacity), last_stat_update(time(nullptr)), control_connection(
+Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &cap) :
+	id(id), host(host), port(port), capacity(cap), last_stat_update(time(nullptr)), control_connection(
 		-1) {
 }
 
@@ -253,21 +253,8 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 						break;
 					}
 					case ControlConnection::MAGIC_NUMBER: {
-						NodeHandshake hs(s);
-						std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, hs.host, hs.port, hs);
-						s.write(ControlConnection::CMD_HELLO);
-						s.write(node->id);
-
-						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us),
-							node);
-						node->control_connection = cc->id;
-						Log::info("New node registered. ID: %d, control-connected fd: %d", node->id,
-							cc->get_read_fd());
+						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us));
 						control_connections.emplace(cc->id, std::move(cc));
-						nodes.emplace(node->id, node);
-
-						for (auto &raster : hs.get_raster_entries())
-							raster_cache.put(IndexCacheEntry(node->id, raster));
 						break;
 					}
 					default:
@@ -298,6 +285,17 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 				continue;
 
 			switch (cc.get_state()) {
+				case ControlConnection::State::HANDSHAKE_READ: {
+					auto &hs = cc.get_handshake();
+					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, hs.host, hs.port);
+					node->control_connection = cc.id;
+					nodes.emplace(node->id, node);
+					Log::info("New node registered. ID: %d, control-connection: %d", node->id, cc.id);
+					for (auto &raster : hs.get_raster_entries())
+						raster_cache.put(IndexCacheEntry(node->id, raster));
+					cc.confirm_handshake(node);
+					break;
+				}
 				case ControlConnection::State::REORG_RESULT_READ:
 					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
 					handle_reorg_result(cc.get_result());

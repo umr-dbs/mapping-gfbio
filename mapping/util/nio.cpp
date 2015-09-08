@@ -702,3 +702,12 @@ NBNodeCacheRefReader::NBNodeCacheRefReader() {
 	add_reader( make_unique<NBCacheBoundsReader>() );
 	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t)) );
 }
+
+NBNodeHandshakeReader::NBNodeHandshakeReader() {
+	add_reader( make_unique<NBCapacityReader>() );
+	add_reader( make_unique<NBStringReader>() );
+	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint32_t)) );
+	add_reader( make_unique<NBContainerReader>(
+		make_unique<NBNodeCacheRefReader>()
+	));
+}

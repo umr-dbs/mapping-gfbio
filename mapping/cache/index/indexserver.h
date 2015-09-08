@@ -29,7 +29,7 @@
 
 class Node {
 public:
-	Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &capacity);
+	Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &cap = Capacity(0,0));
 	// The unique id of this node
 	const uint32_t id;
 	// The hostname of this node

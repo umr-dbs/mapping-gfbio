@@ -62,9 +62,7 @@ void NodeHandshake::toStream(BinaryStream& stream) const {
 	Capacity::toStream(stream);
 	stream.write(host);
 	stream.write(port);
-
-	uint64_t r_size = raster_entries.size();
-	stream.write(r_size);
+	stream.write( static_cast<uint64_t>(raster_entries.size()) );
 	for ( auto &e : raster_entries )
 		e.toStream(stream);
 }

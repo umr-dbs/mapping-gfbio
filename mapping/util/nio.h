@@ -386,5 +386,10 @@ public:
 	NBNodeCacheRefReader();
 };
 
+class NBNodeHandshakeReader : public NBMultiReader {
+public:
+	NBNodeHandshakeReader();
+};
+
 
 #endif /* NIO_H_ */

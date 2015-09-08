@@ -10,6 +10,7 @@
 
 #include "util/binarystream.h"
 #include "cache/node/node_cache.h"
+#include "cache/priv/cache_stats.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
 #include "util/nio.h"
@@ -243,6 +244,7 @@ private:
 class ControlConnection: public BaseConnection {
 public:
 	enum class State {
+		READING_HANDSHAKE, HANDSHAKE_READ, SENDING_HELLO,
 		IDLE,
 		SENDING_REORG, REORGANIZING, READING_REORG_RESULT, REORG_RESULT_READ, SENDING_REORG_CONFIRM, REORG_FINISHED,
 		SENDING_STATS_REQUEST, STATS_REQUESTED, READING_STATS, STATS_RECEIVED
@@ -295,16 +297,19 @@ public:
 
 	State get_state() const;
 
+	void confirm_handshake( std::shared_ptr<Node> node );
 	void send_reorg( const ReorgDescription &desc );
 	void confirm_reorg();
 	void send_get_stats();
 
 	void release();
 
+	const NodeHandshake& get_handshake();
 	const ReorgMoveResult& get_result();
 	const NodeStats& get_stats();
 
-	ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
+
+	ControlConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~ControlConnection();
 	std::shared_ptr<Node> node;
 protected:
@@ -314,6 +319,7 @@ protected:
 private:
 	void reset();
 	State state;
+	std::unique_ptr<NodeHandshake> handshake;
 	std::unique_ptr<ReorgMoveResult> reorg_result;
 	std::unique_ptr<NodeStats> stats;
 };

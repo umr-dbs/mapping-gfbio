@@ -87,7 +87,7 @@ void BaseConnection::begin_write(std::unique_ptr<NBWriter> writer) {
 	if (!writing && !reading) {
 		this->writer = std::move(writer);
 		this->writing = true;
-		output();
+//		output();
 	}
 	else
 		throw IllegalStateException("Cannot start nb-write. Another read or write action is in progress.");
@@ -97,7 +97,7 @@ void BaseConnection::begin_read(std::unique_ptr<NBReader> reader) {
 	if (!writing && !reading) {
 		this->reader = std::move(reader);
 		this->reading = true;
-		input();
+//		input();
 	}
 	else
 		throw IllegalStateException("Cannot start nb-read. Another read or write action is in progress.");
@@ -449,8 +449,9 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 //
 /////////////////////////////////////////////////
 
-ControlConnection::ControlConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node) :
-	BaseConnection(std::move(socket)), node(node), state(State::IDLE) {
+ControlConnection::ControlConnection(std::unique_ptr<UnixSocket> socket) :
+	BaseConnection(std::move(socket)), state(State::READING_HANDSHAKE) {
+	begin_read( make_unique<NBNodeHandshakeReader>() );
 }
 
 ControlConnection::~ControlConnection() {
@@ -498,6 +499,10 @@ void ControlConnection::read_finished(NBReader& reader) {
 			stats.reset(new NodeStats(*reader.get_stream()));
 			state = State::STATS_RECEIVED;
 			break;
+		case State::READING_HANDSHAKE:
+			handshake.reset( new NodeHandshake(*reader.get_stream()));
+			state = State::HANDSHAKE_READ;
+			break;
 		default:
 			throw IllegalStateException("Unexpected end of reading in ControlConnection");
 	}
@@ -514,12 +519,29 @@ void ControlConnection::write_finished() {
 		case State::SENDING_STATS_REQUEST:
 			state = State::STATS_REQUESTED;
 			break;
+		case State::SENDING_HELLO:
+			state = State::IDLE;
+			break;
 		default:
 			throw IllegalStateException("Unexpected end of reading in ControlConnection");
 	}
 }
 
 // ACTIONS
+
+void ControlConnection::confirm_handshake(std::shared_ptr<Node> node) {
+	if ( state == State::HANDSHAKE_READ ) {
+		this->node = node;
+		state = State::SENDING_HELLO;
+		begin_write(
+			make_unique<NBMessageWriter>(CMD_HELLO,
+				make_unique<NBPrimitiveWriter<uint32_t>>(node->id)
+			)
+		);
+	}
+	else
+		throw IllegalStateException("Can only confirm handshake in state HANDSHAKE_READ");
+}
 
 void ControlConnection::send_reorg(const ReorgDescription& desc) {
 	if (state == State::IDLE) {
@@ -561,6 +583,13 @@ void ControlConnection::release() {
 //
 // GETTER
 //
+
+const NodeHandshake& ControlConnection::get_handshake() {
+	if ( state == State::HANDSHAKE_READ )
+		return *handshake;
+	else
+		throw IllegalStateException("Can only return Handshake in state HANDSHAKE_READ");
+}
 
 const ReorgMoveResult& ControlConnection::get_result() {
 	if (state == State::REORG_RESULT_READ)

@@ -27,7 +27,7 @@ public:
 
 	double get_raster_usage() const;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 
 	virtual std::string to_string() const;
 
@@ -49,7 +49,7 @@ public:
 
 	const std::vector<NodeCacheRef>& get_raster_entries() const;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
 
 	std::string host;

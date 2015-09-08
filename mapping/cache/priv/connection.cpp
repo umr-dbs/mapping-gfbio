@@ -330,7 +330,7 @@ void WorkerConnection::process_request(uint8_t command, const BaseRequest& reque
 	if (state == State::IDLE) {
 		state = State::SENDING_REQUEST;
 		begin_write(
-			make_unique<NBMessageWriter>(command, make_unique<NBStreamableWriter<BaseRequest>>(request)));
+			make_unique<NBMessageWriter>(command, make_unique<NBStreamableWriter<BaseRequest>>(request, true)));
 	}
 	else
 		throw IllegalStateException("Can only process requests when idle");

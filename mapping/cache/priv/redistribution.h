@@ -91,7 +91,7 @@ public:
 
 	bool is_empty() const;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 private:
 	std::vector<ReorgMoveItem> moves;
 	std::vector<ReorgRemoveItem> removals;

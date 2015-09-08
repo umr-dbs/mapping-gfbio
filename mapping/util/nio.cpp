@@ -129,7 +129,8 @@ const unsigned char* NBPrimitiveWriter<T>::get_data() const {
 // Simple Writer
 //
 template<>
-NBStreamableWriter<std::string>::NBStreamableWriter(const std::string& item) {
+NBStreamableWriter<std::string>::NBStreamableWriter(const std::string& item, bool use_dynamic_type) {
+	(void) use_dynamic_type;
 	StreamBuffer ss;
 	BinaryStream &stream = ss;
 	stream.write(item);
@@ -137,10 +138,14 @@ NBStreamableWriter<std::string>::NBStreamableWriter(const std::string& item) {
 }
 
 template<typename T>
-NBStreamableWriter<T>::NBStreamableWriter(const T& item) {
+NBStreamableWriter<T>::NBStreamableWriter(const T& item, bool use_dynamic_type) {
 	StreamBuffer ss;
 	BinaryStream &stream = ss;
-	item.T::toStream(stream);
+	if ( use_dynamic_type )
+		item.toStream(stream);
+	else
+		item.T::toStream(stream);
+
 	data = ss.get_content();
 }
 

@@ -109,7 +109,7 @@ private:
 template<typename T>
 class NBStreamableWriter : public NBSimpleWriter {
 public:
-	NBStreamableWriter( const T& item );
+	NBStreamableWriter( const T& item, bool use_dynamic_type = false );
 	virtual ~NBStreamableWriter();
 	virtual ssize_t get_total_bytes() const;
 protected:

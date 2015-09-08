@@ -38,7 +38,7 @@ public:
 	ForeignRef& operator=( const ForeignRef &r ) = default;
 	ForeignRef& operator=( ForeignRef &&r ) = default;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string()  const = 0;
 
 	std::string host;
@@ -60,7 +60,7 @@ public:
 	DeliveryResponse& operator=( const DeliveryResponse &r ) = default;
 	DeliveryResponse& operator=( DeliveryResponse &&r ) = default;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
 
 	uint64_t delivery_id;
@@ -83,7 +83,7 @@ public:
 	CacheRef& operator=( const CacheRef &r ) = default;
 	CacheRef& operator=( CacheRef &&r ) = default;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
 
 	uint64_t entry_id;

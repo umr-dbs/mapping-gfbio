@@ -64,7 +64,7 @@ int main(void) {
 
 
 	std::string cs = Configuration::get("nodeserver.cache.strategy");
-	size_t raster_size = atoi(Configuration::get("cache.raster.size", "5242880").c_str());
+	size_t raster_size = atoi(Configuration::get("nodeserver.cache.raster.size").c_str());
 
 	// Inititalize cache
 	std::unique_ptr<CacheManager> cache_impl = make_unique<RemoteCacheManager>(raster_size,hoststr,portnr);

@@ -104,12 +104,13 @@ std::unique_ptr<GenericRaster> CacheManager::process_raster_puzzle(const PuzzleR
 	if (!req.remainder->isEmpty()) {
 		Log::trace("Creating remainder: %s", req.remainder->toString().c_str());
 		auto graph = GenericOperator::fromJSON(req.semantic_id);
-		QueryProfiler qp;
 		auto &f = items.at(0);
 
 		QueryRectangle rqr = req.get_remainder_query(*f);
 
 		try {
+			QueryProfiler qp;
+			qp.startTimer();
 			// FIXME: Do sth. on rasterdb to make this work with RasterQM::LOOSE
 			auto rem = graph->getRaster(rqr, qp)->fitToQueryRectangle(rqr);
 

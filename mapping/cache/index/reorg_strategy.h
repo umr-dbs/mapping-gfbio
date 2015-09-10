@@ -19,6 +19,7 @@
 // on imbalance
 
 class Node;
+class NodePos;
 
 //
 // Describes the reorganization-tasks for a specific node
@@ -36,17 +37,19 @@ public:
 //
 class ReorgStrategy {
 public:
-	static std::unique_ptr<ReorgStrategy> by_name(const std::string &name);
-	ReorgStrategy(double target_usage);
+	static std::unique_ptr<ReorgStrategy> by_name( const IndexCache &cache, const std::string &name);
 	virtual ~ReorgStrategy();
-	virtual bool requires_reorg(const IndexCache &cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual void reorganize(const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const = 0 ;
+	virtual bool requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
+	virtual void reorganize(std::map<uint32_t,NodeReorgDescription> &result ) const = 0 ;
+	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
 
 	static bool entry_less(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
 	static bool entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
 	static double get_score( const IndexCacheEntry &entry );
 protected:
-	double get_target_usage( const IndexCache &cache, const std::map<uint32_t,NodeReorgDescription> &result ) const;
+	ReorgStrategy(const IndexCache &cache, double target_usage);
+	double get_target_usage( const std::map<uint32_t,NodeReorgDescription> &result ) const;
+	const IndexCache &cache;
 private:
 	const double target_usage;
 };
@@ -56,10 +59,11 @@ private:
 //
 class NeverReorgStrategy : public ReorgStrategy {
 public:
-	NeverReorgStrategy();
+	NeverReorgStrategy(const IndexCache &cache);
 	virtual ~NeverReorgStrategy();
-	virtual bool requires_reorg( const IndexCache &cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const;
+	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	virtual void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 };
 
 //
@@ -69,9 +73,11 @@ public:
 //
 class CapacityReorgStrategy : public ReorgStrategy {
 public:
-	CapacityReorgStrategy(double target_usage);
+	CapacityReorgStrategy(const IndexCache &cache, double target_usage);
 	virtual ~CapacityReorgStrategy();
-	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const;
+	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	virtual void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 };
 
 
@@ -82,10 +88,17 @@ public:
 class GeographicReorgStrategy : public ReorgStrategy {
 	friend class NodePos;
 public:
-	GeographicReorgStrategy(double target_usage);
+	GeographicReorgStrategy(const IndexCache &cache, double target_usage);
 	virtual ~GeographicReorgStrategy();
-	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const;
+	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	virtual void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	// It must be ensured that at least on node is present in the given map
+	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 private:
+	std::map<uint32_t,NodePos> calculate_node_pos(const std::map<uint32_t,NodeReorgDescription> &result) const;
+	uint32_t get_closest_node( const SpatialReference &sref ) const;
+
+	mutable std::map<uint32_t,NodePos> n_pos;
 	static GDAL::CRSTransformer geosmsg_trans;
 	static GDAL::CRSTransformer webmercator_trans;
 };
@@ -98,9 +111,11 @@ private:
 class GraphReorgStrategy : public ReorgStrategy {
 	friend class NodePos;
 public:
-	GraphReorgStrategy(double target_usage);
+	GraphReorgStrategy(const IndexCache &cache, double target_usage);
 	virtual ~GraphReorgStrategy();
-	virtual void reorganize( const IndexCache &cache, std::map<uint32_t,NodeReorgDescription> &result ) const;
+	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	virtual void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 };
 
 

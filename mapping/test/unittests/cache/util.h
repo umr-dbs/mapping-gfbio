@@ -38,7 +38,7 @@ public:
 
 	void force_stat_update();
 
-	TestIdxServer( uint32_t port, ReorgStrategy &strat );
+	TestIdxServer( uint32_t port, const std::string &reorg_strategy );
 };
 
 class TestNodeServer : public NodeServer {

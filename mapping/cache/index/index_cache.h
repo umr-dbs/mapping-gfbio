@@ -52,7 +52,7 @@ public:
 class IndexCache {
 public:
 	// Constructs a new instance with the given reorg-strategy
-	IndexCache( ReorgStrategy &strategy );
+	IndexCache( const std::string &reorg_strategy );
 	virtual ~IndexCache();
 
 	// Adds an entry for the given semantic_id to the cache.
@@ -85,6 +85,9 @@ public:
 	// Calculates an appropriate reorganization
 	void reorganize(std::map<uint32_t, NodeReorgDescription>& result );
 
+	// Tells us which node to use for the given query
+	uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+
 	// Tells the total capacity of the implementing cache
 	virtual size_t get_total_capacity( const Capacity& capacity ) const = 0;
 	// Tells the used capacity of the implementing cache
@@ -110,12 +113,12 @@ private:
 	mutable std::unordered_map<std::string,Struct*> caches;
 
 	// The reorganization strategy
-	ReorgStrategy& reorg_strategy;
+	std::unique_ptr<ReorgStrategy> reorg_strategy;
 };
 
 class IndexRasterCache : public IndexCache {
 public:
-	IndexRasterCache(ReorgStrategy &strategy);
+	IndexRasterCache(const std::string &reorg_strategy);
 	virtual ~IndexRasterCache();
 	virtual size_t get_total_capacity( const Capacity& capacity ) const;
 	virtual size_t get_used_capacity( const Capacity& capacity ) const;

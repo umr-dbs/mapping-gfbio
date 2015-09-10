@@ -18,10 +18,8 @@
 
 TEST(DistributionTest,TestRedistibution) {
 
-	CapacityReorgStrategy reorg(0.8);
-
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
-	TestIdxServer is(12346, reorg);
+	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1("localhost", 12347, "localhost", 12346);
 	TestNodeServer ns2("localhost", 12348, "localhost", 12346);
 
@@ -74,7 +72,7 @@ TEST(DistributionTest,TestRedistibution) {
 
 	is.trigger_reorg(2, rod);
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	std::this_thread::sleep_for(std::chrono::milliseconds(2500));
 
 	// Assert moved
 	try {
@@ -101,10 +99,8 @@ TEST(DistributionTest,TestRedistibution) {
 }
 
 TEST(DistributionTest,TestRemoteNodeFetch) {
-	CapacityReorgStrategy reorg(0.8);
-
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
-	TestIdxServer is(12346, reorg);
+	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1("localhost", 12347, "localhost", 12346);
 	TestNodeServer ns2("localhost", 12348, "localhost", 12346);
 
@@ -154,8 +150,6 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 
 TEST(DistributionTest,TestCapacityReorg) {
 
-	CapacityReorgStrategy reorg(0.8);
-
 	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 0)));
 	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0)));
 
@@ -163,7 +157,7 @@ TEST(DistributionTest,TestCapacityReorg) {
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexRasterCache cache(reorg);
+	IndexRasterCache cache("capacity");
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
@@ -207,8 +201,6 @@ TEST(DistributionTest,TestCapacityReorg) {
 
 TEST(DistributionTest,TestGeographicReorg) {
 
-	GeographicReorgStrategy reorg(0.8);
-
 	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 0)));
 	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(40, 0)));
 
@@ -216,7 +208,7 @@ TEST(DistributionTest,TestGeographicReorg) {
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexRasterCache cache(reorg);
+	IndexRasterCache cache("geo");
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
@@ -263,10 +255,9 @@ TEST(DistributionTest,TestGeographicReorg) {
 
 
 TEST(DistributionTest,TestStatsAndReorg) {
-	CapacityReorgStrategy reorg(0.8);
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
-	TestIdxServer is(12346, reorg);
+	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1("localhost", 12347, "localhost", 12346, 204800 );
 	TestNodeServer ns2("localhost", 12348, "localhost", 12346, 204800 );
 

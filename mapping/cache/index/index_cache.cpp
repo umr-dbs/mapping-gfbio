@@ -39,7 +39,8 @@ IndexCacheEntry::IndexCacheEntry(uint32_t node_id, NodeCacheRef ref) :
 //
 //////////////////////////////////////////////////////////////////
 
-IndexCache::IndexCache(ReorgStrategy& strategy) : reorg_strategy(strategy) {
+IndexCache::IndexCache(const std::string &reorg_strategy) :
+	reorg_strategy(std::move(ReorgStrategy::by_name(*this,reorg_strategy))) {
 }
 
 
@@ -154,13 +155,18 @@ void IndexCache::remove_from_node(const IndexCacheKey& key) {
 	throw NoSuchElementException("Entry not found in node-list.");
 }
 
+
+uint32_t IndexCache::get_node_for_job(const QueryRectangle& query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes) const {
+	return reorg_strategy->get_node_for_job(query, nodes);
+}
+
 bool IndexCache::requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> > &nodes ) {
-	return reorg_strategy.requires_reorg(*this,nodes);
+	return reorg_strategy->requires_reorg(nodes);
 }
 
 void IndexCache::reorganize(
 	std::map<uint32_t, NodeReorgDescription>& result) {
-	reorg_strategy.reorganize(*this,result);
+	reorg_strategy->reorganize(result);
 }
 
 void IndexCache::update_stats(uint32_t node_id, const CacheStats &stats) {
@@ -182,7 +188,7 @@ void IndexCache::update_stats(uint32_t node_id, const CacheStats &stats) {
 // Raster-Cache
 //
 
-IndexRasterCache::IndexRasterCache(ReorgStrategy& strategy) : IndexCache(strategy) {
+IndexRasterCache::IndexRasterCache(const std::string &reorg_strategy) : IndexCache(reorg_strategy) {
 }
 
 IndexRasterCache::~IndexRasterCache() {

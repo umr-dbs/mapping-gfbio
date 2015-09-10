@@ -41,7 +41,7 @@ Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &
 //
 ////////////////////////////////////////////////////////////
 
-IndexServer::IndexServer(int port, ReorgStrategy &reorg_strategy) :
+IndexServer::IndexServer(int port, const std::string &reorg_strategy) :
 	raster_cache(reorg_strategy), port(port), shutdown(false), next_node_id(1), query_manager(raster_cache,
 		nodes), last_reorg(time(nullptr)) {
 }

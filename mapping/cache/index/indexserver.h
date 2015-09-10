@@ -60,7 +60,7 @@ public:
 
 class IndexServer {
 public:
-	IndexServer( int port, ReorgStrategy &reorg_strategy );
+	IndexServer( int port, const std::string &reorg_strategy );
 	virtual ~IndexServer();
 	// Fires up the index-server and will return after
 	// stop() is invoked by another thread

@@ -139,7 +139,7 @@ void TestNodeServer::run_node_thread(TestNodeServer* ns) {
 
 // Test index
 
-TestIdxServer::TestIdxServer(uint32_t port, ReorgStrategy& strat)  : IndexServer(port,strat) {
+TestIdxServer::TestIdxServer(uint32_t port, const std::string &reorg_strategy)  : IndexServer(port,reorg_strategy) {
 }
 
 void TestIdxServer::trigger_reorg(uint32_t node_id, const ReorgDescription& desc)  {

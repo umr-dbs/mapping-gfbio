@@ -5,10 +5,15 @@
  *      Author: mika
  */
 
-#include <cache/common.h>
+#include "cache/common.h"
 #include "cache/priv/transfer.h"
+#include "util/log.h"
 #include <geos/io/WKBWriter.h>
 #include <geos/io/WKBReader.h>
+
+//
+// Foreign reference
+//
 
 ForeignRef::ForeignRef(const std::string& host, uint32_t port) :
 	host(host), port(port) {
@@ -26,6 +31,10 @@ void ForeignRef::toStream(BinaryStream& stream) const {
 	stream.write(host);
 	stream.write(port);
 }
+
+//
+// Delivery response
+//
 
 DeliveryResponse::DeliveryResponse(std::string host, uint32_t port, uint64_t delivery_id) :
 			ForeignRef(host,port), delivery_id(delivery_id) {
@@ -48,6 +57,10 @@ std::string DeliveryResponse::to_string() const {
 	ss << "DeliveryResponse[" << host << ":" << port << ", delivery_id: " << delivery_id << "]";
 	return ss.str();
 }
+
+//
+// Cache-entry reference
+//
 
 
 CacheRef::CacheRef(const std::string& host, uint32_t port, uint64_t entry_id) :
@@ -244,9 +257,13 @@ std::string PuzzleRequest::to_string() const {
 	return ss.str();
 }
 
-QueryRectangle PuzzleRequest::get_remainder_query(double xres, double yres) const {
+//
+//
+// WORK HERE
+QueryRectangle PuzzleRequest::get_remainder_query(const GridSpatioTemporalResult &ref) const {
 	double x1 = DoubleInfinity, x2 = DoubleNegInfinity, y1 = DoubleInfinity, y2 = DoubleNegInfinity;
 	auto cos = remainder->getCoordinates();
+
 
 	for ( size_t i = 0; i < cos->getSize(); i++ ) {
 		auto &c = cos->getAt(i);
@@ -257,13 +274,31 @@ QueryRectangle PuzzleRequest::get_remainder_query(double xres, double yres) cons
 	}
 	delete cos;
 
-	// Enlarge by 2 pixels in each direction
-	x1 -= (2*xres);
-	x2 += (2*xres);
-	y1 -= (2*yres);
-	y2 += (2*yres);
+//	Log::info("Remainder before snap: [%f,%f]x[%f,%f]",x1,x2,y1,y2);
 
-	uint32_t width  = std::floor( (x2-x1) / xres );
-	uint32_t height = std::floor( (y2-y1) / yres );
-	return QueryRectangle( SpatialReference(query.epsg, x1, y1, x2, y2), query, QueryResolution::pixels(width, height) );
+	snap_to_pixel_grid( x1, x2, ref.stref.x1, ref.pixel_scale_x );
+	snap_to_pixel_grid( y1, y2, ref.stref.y1, ref.pixel_scale_y );
+
+//	Log::info("Remainder after snap: [%f,%f]x[%f,%f]",x1,x2,y1,y2);
+
+	// Shrink it just a little
+	// Fixme: Operator throws exception if i leave this out --> Result does not contain...
+	// But while debugging everything was fine
+	x1 = x1+ref.pixel_scale_x*0.001;
+	x2 = x2-ref.pixel_scale_x*0.001;
+	y1 = y1+ref.pixel_scale_y*0.001;
+	y2 = y2-ref.pixel_scale_y*0.001;
+
+	uint32_t width  = std::round((x2-x1) / ref.pixel_scale_x);
+	uint32_t height = std::round((y2-y1) / ref.pixel_scale_y);
+
+	return QueryRectangle(SpatialReference(query.epsg, x1, y1, x2, y2), query, QueryResolution::pixels(width, height));
+}
+
+void PuzzleRequest::snap_to_pixel_grid( double &v1, double &v2, double ref, double scale ) const {
+	if ( ref < v1 )
+		v1 = ref + std::floor( (v1-ref) / scale)*scale;
+	else
+		v1 = ref - std::ceil( (ref-v1) / scale)*scale;
+	v2 = v1 + std::ceil( (v2-v1) / scale)*scale;
 }

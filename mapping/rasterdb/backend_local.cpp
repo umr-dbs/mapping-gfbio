@@ -119,7 +119,7 @@ std::string LocalRasterDBBackend::readJSON() {
 	return json;
 }
 
-RasterDBBackend::rasterid LocalRasterDBBackend::createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value) {
+RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value) {
 	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT id FROM rasters WHERE channel = ? AND ABS(time_start - ?) < 0.001 AND ABS(time_end - ?) < 0.001");
 	stmt.bind(1, channel);
@@ -171,7 +171,7 @@ RasterDBBackend::rasterid LocalRasterDBBackend::createRaster(int channel, double
 	return rasterid;
 }
 
-void LocalRasterDBBackend::writeTile(rasterid rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression) {
+void LocalRasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression) {
 	int zoomfactor = 1 << zoom;
 
 	// Step 1: write data to disk
@@ -270,7 +270,7 @@ RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int ch
 	return RasterDescription{rasterid, time_start, time_end};
 }
 
-void LocalRasterDBBackend::readAttributes(rasterid rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value) {
+void LocalRasterDBBackend::readAttributes(rasterid_t rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value) {
 	SQLiteStatement stmt_md(db);
 	stmt_md.prepare("SELECT isstring, key, value FROM attributes WHERE rasterid = ?");
 	stmt_md.bind(1, rasterid);
@@ -287,7 +287,7 @@ void LocalRasterDBBackend::readAttributes(rasterid rasterid, DirectMetadata<std:
 	}
 }
 
-int LocalRasterDBBackend::getBestZoom(rasterid rasterid, int desiredzoom) {
+int LocalRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 	SQLiteStatement stmt_z(db);
 	stmt_z.prepare("SELECT MAX(zoom) FROM tiles WHERE rasterid = ? AND zoom <= ?");
 	stmt_z.bind(1, rasterid);
@@ -304,7 +304,7 @@ int LocalRasterDBBackend::getBestZoom(rasterid rasterid, int desiredzoom) {
 	return std::min(desiredzoom, max_zoom);
 }
 
-const std::vector<RasterDBBackend::TileDescription> LocalRasterDBBackend::enumerateTiles(int channelid, rasterid rasterid, int x1, int y1, int x2, int y2, int zoom) {
+const std::vector<RasterDBBackend::TileDescription> LocalRasterDBBackend::enumerateTiles(int channelid, rasterid_t rasterid, int x1, int y1, int x2, int y2, int zoom) {
 	std::vector<TileDescription> result;
 
 	// find all overlapping rasters in DB
@@ -320,7 +320,7 @@ const std::vector<RasterDBBackend::TileDescription> LocalRasterDBBackend::enumer
 	stmt.bind(6, y1);
 
 	while (stmt.next()) {
-		tileid tileid = stmt.getInt64(0);
+		tileid_t tileid = stmt.getInt64(0);
 		uint32_t r_x1 = stmt.getInt(1);
 		uint32_t r_y1 = stmt.getInt(2);
 		//uint32_t r_z1 = stmt.getInt(3);
@@ -344,7 +344,7 @@ const std::vector<RasterDBBackend::TileDescription> LocalRasterDBBackend::enumer
 	return result;
 }
 
-bool LocalRasterDBBackend::hasTile(rasterid rasterid, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom) {
+bool LocalRasterDBBackend::hasTile(rasterid_t rasterid, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom) {
 	int zoomfactor = 1 << zoom;
 
 	SQLiteStatement stmt(db);

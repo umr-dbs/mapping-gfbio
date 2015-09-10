@@ -13,6 +13,28 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 
+Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<GenericRaster> raster) :
+	id(id), creation_time(time(0)), count(count), type(Type::RASTER), raster(raster) {
+}
+
+void Delivery::send(DeliveryConnection& connection) {
+	if ( count == 0 )
+		throw DeliveryException(concat("Cannot send deliver: ", id, ". Delivery count reached."));
+	count--;
+	switch ( type ) {
+		case Type::RASTER:
+			connection.send_raster( raster );
+			break;
+		default:
+			throw ArgumentException("Cannot send other types than raster.");
+	}
+}
+
+Delivery::Delivery(Delivery&& d) :
+	id(d.id), creation_time(d.creation_time),
+	count(d.count), type(d.type), raster(std::move(d.raster)) {
+}
+
 ////////////////////////////////////////////////////////////
 //
 // DELIVERY MANAGER
@@ -23,7 +45,7 @@ DeliveryManager::DeliveryManager(uint32_t listen_port) :
 	shutdown(false), listen_port(listen_port), delivery_id(1) {
 }
 
-uint64_t DeliveryManager::add_raster_delivery(std::unique_ptr<GenericRaster>& result, unsigned int count) {
+uint64_t DeliveryManager::add_raster_delivery(std::shared_ptr<GenericRaster> result, unsigned int count) {
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
 	uint64_t res = delivery_id++;
 	deliveries.emplace(res, Delivery(res,count,result) );
@@ -37,19 +59,13 @@ Delivery& DeliveryManager::get_delivery(uint64_t id) {
 	return deliveries.at(id);
 }
 
-void DeliveryManager::remove_delivery(uint64_t id) {
-	std::lock_guard<std::mutex> del_lock(delivery_mutex);
-	Log::trace("Removing delivery with id: %d", id);
-	deliveries.erase(id);
-}
-
 void DeliveryManager::remove_expired_deliveries() {
 	time_t now = time(nullptr);
 
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
 	auto iter = deliveries.begin();
 	while ( iter != deliveries.end() ) {
-		if ( difftime(now, iter->second.creation_time) >= 30 )
+		if ( iter->second.count == 0 || difftime(now, iter->second.creation_time) >= 30 )
 			deliveries.erase(iter++);
 		else
 			iter++;
@@ -66,7 +82,9 @@ void DeliveryManager::run() {
 	while (!shutdown) {
 		struct timeval tv { 2, 0 };
 		fd_set readfds;
+		fd_set writefds;
 		FD_ZERO(&readfds);
+		FD_ZERO(&writefds);
 		FD_SET(delivery_fd, &readfds);
 
 		int maxfd = delivery_fd;
@@ -76,15 +94,15 @@ void DeliveryManager::run() {
 			maxfd = std::max(maxfd, fd);
 		}
 
-		maxfd = std::max(maxfd, setup_fdset(&readfds));
+		maxfd = std::max(maxfd, setup_fdset(&readfds,&writefds));
 
-		int ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
+		int ret = select(maxfd + 1, &readfds, &writefds, nullptr, &tv);
 		if (ret <= 0)
 			continue;
 
 		// Current connections
 		// Action on delivery connections
-		process_connections(&readfds);
+		process_connections(&readfds,&writefds);
 
 		// Handshake
 		auto fd_it = new_fds.begin();
@@ -95,8 +113,8 @@ void DeliveryManager::run() {
 				uint32_t magic;
 				stream.read(&magic);
 				if (magic == DeliveryConnection::MAGIC_NUMBER) {
-					std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(socket);
-					Log::info("New delivery-connection created on fd: %d", *fd_it);
+					std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(std::move(socket));
+					Log::debug("New delivery-connection created on fd: %d", *fd_it);
 					connections.push_back(std::move(dc));
 				}
 				else {
@@ -129,28 +147,36 @@ void DeliveryManager::run() {
 	Log::info("Delivery-Manager done.");
 }
 
-int DeliveryManager::setup_fdset(fd_set* readfds) {
+int DeliveryManager::setup_fdset(fd_set* readfds, fd_set* write_fds) {
 	int maxfd = -1;
 	auto dciter = connections.begin();
 	while (dciter != connections.end()) {
 		DeliveryConnection &dc = **dciter;
 		if ( dc.is_faulty() )
 			dciter = connections.erase(dciter);
+		else if ( dc.is_writing() ) {
+			FD_SET(dc.get_write_fd(), write_fds);
+			maxfd = std::max(maxfd, dc.get_write_fd());
+			dciter++;
+		}
 		else {
 			FD_SET(dc.get_read_fd(), readfds);
 			maxfd = std::max(maxfd, dc.get_read_fd());
-			++dciter;
+			dciter++;
 		}
 	}
 	return maxfd;
 }
 
-void DeliveryManager::process_connections(fd_set* readfds) {
+void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 	for ( auto &dc : connections ) {
-		if ( FD_ISSET(dc->get_read_fd(), readfds)) {
+		if ( dc->is_writing() && FD_ISSET(dc->get_write_fd(), writefds) ) {
+			dc->output();
+		}
+		else if ( !dc->is_writing() && FD_ISSET(dc->get_read_fd(), readfds)) {
 			dc->input();
-			// Skip faulty connections
-			if ( dc->is_faulty() )
+			// Skip faulty/reading connections
+			if ( dc->is_faulty() || dc->is_reading() )
 				continue;
 			switch ( dc->get_state() ) {
 				case DeliveryConnection::State::DELIVERY_REQUEST_READ: {
@@ -158,11 +184,8 @@ void DeliveryManager::process_connections(fd_set* readfds) {
 					try {
 						auto &res = get_delivery(id);
 						Log::debug("Sending delivery: %d", id);
-						res.send( *dc );
-						Log::debug("Finished sending delivery: %d", id);
-						if ( res.count == 0 )
-							remove_delivery(res.id);
-					} catch (std::out_of_range &oor) {
+						res.send(*dc);
+					} catch (const std::out_of_range &oor) {
 						Log::info("Received request for unknown delivery-id: %d", id);
 						dc->send_error(concat("Invalid delivery id: ",id));
 					}
@@ -171,29 +194,27 @@ void DeliveryManager::process_connections(fd_set* readfds) {
 				case DeliveryConnection::State::RASTER_CACHE_REQUEST_READ: {
 					auto &key = dc->get_key();
 					try {
-						Log::debug("Sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-						auto res = CacheManager::getInstance().get_raster_local(key);
-						dc->send_raster(*res);
-						Log::debug("Finished sending cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-					} catch (NoSuchElementException &nse) {
-						dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
+						Log::debug("Sending cache-entry: %s", key.to_string().c_str());
+						dc->send_raster( CacheManager::getInstance().get_raster_ref(key) );
+					} catch (const NoSuchElementException &nse) {
+						dc->send_error(concat("No cache-entry found for key: ", key.to_string()));
 					}
 					break;
 				}
 				case DeliveryConnection::State::RASTER_MOVE_REQUEST_READ: {
 					auto &key = dc->get_key();
 					try {
-						Log::debug("Moving cache-entry: %s:%d", key.semantic_id.c_str(), key.entry_id);
-						auto res = CacheManager::getInstance().get_raster_local(key);
-						dc->send_raster_move(*res);
-					} catch (NoSuchElementException &nse) {
+						Log::debug("Moving cache-entry: %s", key.to_string().c_str());
+						dc->send_raster_move( CacheManager::getInstance().get_raster_info(key),
+							CacheManager::getInstance().get_raster_ref(key) );
+					} catch (const NoSuchElementException &nse) {
 						dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
 					}
 					break;
 				}
 				case DeliveryConnection::State::MOVE_DONE: {
 					auto &key = dc->get_key();
-					Log::debug("Move of entry: %s:%d confirmed. Dropping.", key.semantic_id.c_str(), key.entry_id);
+					Log::debug("Move of entry: %s confirmed. Dropping.", key.to_string().c_str());
 					CacheManager::getInstance().remove_raster_local(key);
 					dc->release();
 					break;

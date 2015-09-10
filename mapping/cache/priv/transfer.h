@@ -38,7 +38,7 @@ public:
 	ForeignRef& operator=( const ForeignRef &r ) = default;
 	ForeignRef& operator=( ForeignRef &&r ) = default;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string()  const = 0;
 
 	std::string host;
@@ -60,7 +60,7 @@ public:
 	DeliveryResponse& operator=( const DeliveryResponse &r ) = default;
 	DeliveryResponse& operator=( DeliveryResponse &&r ) = default;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
 
 	uint64_t delivery_id;
@@ -83,7 +83,7 @@ public:
 	CacheRef& operator=( const CacheRef &r ) = default;
 	CacheRef& operator=( CacheRef &&r ) = default;
 
-	virtual void toStream( BinaryStream &stream ) const;
+	void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
 
 	uint64_t entry_id;
@@ -100,12 +100,7 @@ public:
 	BaseRequest( const std::string &sem_id, const QueryRectangle &rect );
 	BaseRequest( BinaryStream &stream );
 
-	BaseRequest( const BaseRequest &r ) = default;
-	BaseRequest( BaseRequest &&r ) = default;
 	virtual ~BaseRequest();
-
-	BaseRequest& operator=( const BaseRequest & r ) = default;
-	BaseRequest& operator=( BaseRequest &&r ) = default;
 
 	virtual void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
@@ -124,12 +119,7 @@ public:
 	DeliveryRequest( const std::string &sem_id, const QueryRectangle &rect, uint64_t entry_id );
 	DeliveryRequest( BinaryStream &stream );
 
-	DeliveryRequest( const DeliveryRequest &r ) = default;
-	DeliveryRequest( DeliveryRequest &&r ) = default;
 	virtual ~DeliveryRequest();
-
-	DeliveryRequest& operator=( const DeliveryRequest & r ) = default;
-	DeliveryRequest& operator=( DeliveryRequest &&r ) = default;
 
 	virtual void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
@@ -159,11 +149,13 @@ public:
 
 	virtual void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
-	virtual QueryRectangle get_remainder_query(double xres, double yres) const;
+	virtual QueryRectangle get_remainder_query(const GridSpatioTemporalResult &ref) const;
 
 	GeomP covered;
 	GeomP remainder;
 	std::vector<CacheRef> parts;
+private:
+	void snap_to_pixel_grid( double &v1, double &v2, double ref, double scale ) const;
 };
 
 #endif /* TRANSFER_H_ */

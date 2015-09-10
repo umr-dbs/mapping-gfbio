@@ -6,14 +6,21 @@
  */
 
 #include "cache/index/indexserver.h"
+#include "cache/index/reorg_strategy.h"
+#include "cache/common.h"
 #include "util/configuration.h"
 #include <signal.h>
 
 IndexServer *instance = nullptr;
 
 void termination_handler(int signum) {
-	(void) signum;
-	instance->stop();
+	if (signum == SIGSEGV) {
+		printf("Segmentation fault. Stacktrace:\n%s", CacheCommon::get_stacktrace().c_str());
+		exit(1);
+	}
+	else {
+		instance->stop();
+	}
 }
 
 void set_signal_handler() {
@@ -33,16 +40,21 @@ void set_signal_handler() {
 	sigaction(SIGTERM, NULL, &old_action);
 	if (old_action.sa_handler != SIG_IGN)
 		sigaction(SIGTERM, &new_action, NULL);
+	sigaction(SIGSEGV, NULL, &old_action);
+		sigaction(SIGSEGV, &new_action, NULL);
 }
 
 int main(void) {
+	CacheCommon::set_uncaught_exception_handler();
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 	auto portstr = Configuration::get("indexserver.port");
 
 	auto portnr = atoi(portstr.c_str());
 
-	instance = new IndexServer(portnr);
+	std::string rs = Configuration::get("indexserver.reorg.strategy");
+	auto reorg_strategy = ReorgStrategy::by_name(rs);
+	instance = new IndexServer(portnr, *reorg_strategy);
 	instance->run();
 	return 0;
 }

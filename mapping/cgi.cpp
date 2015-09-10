@@ -357,7 +357,7 @@ std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJso
 	if ( !cache_enabled ) {
 		QueryProfiler profiler;
 		auto graph = GenericOperator::fromJSON(graphJson);
-		return graph->getCachedRaster(rect, profiler);
+		return graph->getCachedRaster(rect, profiler, GenericOperator::RasterQM::EXACT);
 	}
 	// Request cache-server
 	else {
@@ -467,8 +467,7 @@ int main() {
 
 		// Plug in Cache-Dummy if cache is disabled
 		if ( !cache_enabled ) {
-			std::unique_ptr<CacheManager> mgrImpl( new NopCacheManager() );
-			CacheManager::init( mgrImpl );
+			CacheManager::init( make_unique<NopCacheManager>(), make_unique<CacheAll>() );
 		}
 
 		const char *query_string = getenv("QUERY_STRING");

@@ -1,76 +1,120 @@
 #include "cache/priv/redistribution.h"
 #include "util/log.h"
 
-ReorgResult::ReorgResult(Type type, const std::string& semantic_id, uint64_t cache_id,
-	uint64_t idx_cache_id) : type(type), semantic_id(semantic_id),
-	cache_id(cache_id), idx_cache_id(idx_cache_id) {
+ReorgRemoveItem::ReorgRemoveItem(Type type, const std::string& semantic_id, uint64_t cache_id) :
+	NodeCacheKey(semantic_id, cache_id), type(type) {
 }
 
-ReorgResult::ReorgResult(BinaryStream& stream) {
+ReorgRemoveItem::ReorgRemoveItem(BinaryStream& stream) :
+	NodeCacheKey(stream) {
 	stream.read(&type);
-	stream.read(&semantic_id);
-	stream.read(&cache_id);
-	stream.read(&idx_cache_id);
 }
 
-ReorgResult::~ReorgResult() {
+void ReorgRemoveItem::toStream(BinaryStream& stream) const {
+	NodeCacheKey::toStream(stream);
+	stream.write(type);
 }
 
-void ReorgResult::toStream(BinaryStream& stream) const {
-	stream.write( type );
-	stream.write( semantic_id );
-	stream.write( cache_id );
-	stream.write( idx_cache_id );
+//
+// ReorgResult
+//
+
+ReorgMoveResult::ReorgMoveResult(Type type, const std::string& semantic_id, uint64_t from_cache_id,
+	uint32_t from_node_id, uint32_t to_node_id, uint64_t to_cache_id) :
+	ReorgRemoveItem(type, semantic_id, from_cache_id), from_node_id(from_node_id), to_node_id(to_node_id), to_cache_id(
+		to_cache_id) {
 }
 
-
-ReorgItem::ReorgItem(Type type, const std::string& host, uint32_t port, const std::string& semantic_id,
-	uint64_t cache_id, uint64_t idx_cache_id) : ReorgResult(type, semantic_id, cache_id, idx_cache_id ),
-	from_host(host), from_port(port) {
+ReorgMoveResult::ReorgMoveResult(BinaryStream& stream) :
+	ReorgRemoveItem(stream) {
+	stream.read(&from_node_id);
+	stream.read(&to_node_id);
+	stream.read(&to_cache_id);
 }
 
-ReorgItem::ReorgItem(BinaryStream& stream) : ReorgResult(stream) {
+void ReorgMoveResult::toStream(BinaryStream& stream) const {
+	ReorgRemoveItem::toStream(stream);
+	stream.write(from_node_id);
+	stream.write(to_node_id);
+	stream.write(to_cache_id);
+}
+
+//
+// Reorg Item
+//
+
+ReorgMoveItem::ReorgMoveItem(Type type, const std::string& semantic_id, uint64_t from_cache_id,
+	uint32_t from_node_id, const std::string& from_host, uint32_t from_port) :
+	ReorgRemoveItem(type, semantic_id, from_cache_id), from_node_id(from_node_id), from_host(from_host), from_port(
+		from_port) {
+}
+
+ReorgMoveItem::ReorgMoveItem(BinaryStream& stream) :
+	ReorgRemoveItem(stream) {
+	stream.read(&from_node_id);
 	stream.read(&from_host);
 	stream.read(&from_port);
 }
 
-ReorgItem::~ReorgItem() {
+void ReorgMoveItem::toStream(BinaryStream& stream) const {
+	ReorgRemoveItem::toStream(stream);
+	stream.write(from_node_id);
+	stream.write(from_host);
+	stream.write(from_port);
 }
 
-void ReorgItem::toStream(BinaryStream& stream) const {
-	ReorgResult::toStream(stream);
-	stream.write( from_host );
-	stream.write( from_port );
-}
+//
+// ReorgDescription
+//
 
 ReorgDescription::ReorgDescription() {
 }
 
 ReorgDescription::ReorgDescription(BinaryStream& stream) {
 	uint64_t size;
-	stream.read( &size );
-	Log::debug("Reading %d items from stream", size);
-	items.reserve(size);
-	for ( uint64_t i = 0; i < size; i++ )
-		items.push_back( ReorgItem(stream) );
+	stream.read(&size);
+	moves.reserve(size);
+	for (uint64_t i = 0; i < size; i++)
+		moves.push_back(ReorgMoveItem(stream));
+
+	stream.read(&size);
+	removals.reserve(size);
+	for (uint64_t i = 0; i < size; i++)
+		removals.push_back(ReorgRemoveItem(stream));
+
 }
 
-void ReorgDescription::add_item(ReorgItem item) {
-	items.push_back(item);
+ReorgDescription::~ReorgDescription() {
 }
 
-void ReorgDescription::add_item(ReorgItem&& item) {
-	items.push_back(item);
+void ReorgDescription::add_move(ReorgMoveItem item) {
+	moves.push_back(item);
 }
 
-const std::vector<ReorgItem>& ReorgDescription::get_items() const {
-	return items;
+const std::vector<ReorgMoveItem>& ReorgDescription::get_moves() const {
+	return moves;
+}
+
+void ReorgDescription::add_removal(ReorgRemoveItem item) {
+	removals.push_back(item);
+}
+
+const std::vector<ReorgRemoveItem>& ReorgDescription::get_removals() const {
+	return removals;
+}
+
+bool ReorgDescription::is_empty() const {
+	return moves.empty() && removals.empty();
 }
 
 void ReorgDescription::toStream(BinaryStream& stream) const {
-	uint64_t size = items.size();
-	stream.write( size );
-	for ( auto &item : items )
-		item.toStream( stream );
-}
+	uint64_t size = moves.size();
+	stream.write(size);
+	for (auto &item : moves)
+		item.toStream(stream);
 
+	size = removals.size();
+	stream.write(size);
+	for (auto &item : removals)
+		item.toStream(stream);
+}

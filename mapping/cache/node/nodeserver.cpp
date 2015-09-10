@@ -11,7 +11,6 @@
 #include "cache/index/indexserver.h"
 #include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
-#include "cache/cache.h"
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/log.h"
@@ -35,41 +34,39 @@ NodeServer::NodeServer(std::string my_host, uint32_t my_port, std::string index_
 void NodeServer::worker_loop() {
 	while (workers_up && !shutdown) {
 		try {
+			// Setup index connection
 			UnixSocket sock(index_host.c_str(), index_port);
-			Log::debug("Worker connected to index-server");
 			BinaryStream &stream = sock;
 			uint32_t magic = WorkerConnection::MAGIC_NUMBER;
 			stream.write(magic);
 			stream.write(my_id);
-
 			CacheManager::remote_connection = &sock;
+
+			Log::debug("Worker connected to index-server");
 
 			while (workers_up && !shutdown) {
 				try {
 					uint8_t cmd;
-					if (CacheCommon::read(&cmd, sock, 2, true)) {
+					if (CacheCommon::read(&cmd, sock, 2, true))
 						process_worker_command(cmd, stream);
-					}
 					else {
 						Log::info("Disconnect on worker.");
 						break;
 					}
-				} catch (TimeoutException &te) {
+				} catch (const TimeoutException &te) {
 					//Log::trace("Read on worker-connection timed out. Trying again");
-				} catch (InterruptedException &ie) {
+				} catch (const InterruptedException &ie) {
 					Log::info("Read on worker-connection interrupted. Trying again.");
-				} catch (NetworkException &ne) {
+				} catch (const NetworkException &ne) {
 					// Re-throw network-error to outer catch.
 					throw;
-				} catch (std::exception &e) {
-					std::ostringstream os;
-					os << "Unexpected error while processing request: " << e.what();
-					std::string msg = os.str();
+				} catch (const std::exception &e) {
+					Log::error("Unexpected error while processing request: %s", e.what());
 					stream.write(WorkerConnection::RESP_ERROR);
-					stream.write(msg);
+					stream.write(concat("Unexpected error while processing request: ", e.what()));
 				}
 			}
-		} catch (NetworkException &ne) {
+		} catch (const NetworkException &ne) {
 			Log::info("Worker lost connection to index... Reconnecting. Reason: %s", ne.what());
 		}
 		std::this_thread::sleep_for(std::chrono::seconds(2));
@@ -78,7 +75,7 @@ void NodeServer::worker_loop() {
 }
 
 void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
-	Log::debug("Received command: %d", cmd);
+	Log::debug("Processing command: %d", cmd);
 	switch (cmd) {
 		case WorkerConnection::CMD_CREATE_RASTER:
 		case WorkerConnection::CMD_PUZZLE_RASTER:
@@ -87,36 +84,39 @@ void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
 			break;
 		default: {
 			Log::error("Unknown command from index-server: %d. Dropping connection.", cmd);
-			throw NetworkException("Unknown command from index-server");
+			throw NetworkException(concat("Unknown command from index-server", cmd));
 		}
 	}
 	Log::debug("Finished processing command: %d", cmd);
 }
 
 void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
-	std::unique_ptr<GenericRaster> result;
+	std::shared_ptr<GenericRaster> result;
 	switch (cmd) {
 		case WorkerConnection::CMD_CREATE_RASTER: {
 			BaseRequest rr(stream);
 			QueryProfiler profiler;
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			result = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(rr.query, profiler,
+			auto tmp = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(rr.query, profiler,
 				GenericOperator::RasterQM::LOOSE);
+			result = std::shared_ptr<GenericRaster>(tmp.release());
 			break;
 		}
 		case WorkerConnection::CMD_PUZZLE_RASTER: {
 			PuzzleRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			result = CacheCommon::process_raster_puzzle(rr, my_host, my_port);
+			auto tmp = CacheManager::process_raster_puzzle(rr, my_host, my_port);
 			Log::debug("Adding puzzled raster to cache.");
-			CacheManager::getInstance().put_raster(rr.semantic_id, result);
+			CacheManager::getInstance().put_raster(rr.semantic_id, tmp);
+			result = std::shared_ptr<GenericRaster>(tmp.release());
 			break;
 		}
 
 		case WorkerConnection::CMD_DELIVER_RASTER: {
 			DeliveryRequest rr(stream);
 			Log::debug("Processing request: %s", rr.to_string().c_str());
-			result = CacheManager::getInstance().get_raster_local(rr.semantic_id, rr.entry_id);
+			NodeCacheKey key(rr.semantic_id, rr.entry_id);
+			result = CacheManager::getInstance().get_raster_ref(key);
 			break;
 		}
 	}
@@ -140,6 +140,7 @@ void NodeServer::run() {
 	Log::info("Starting Node-Server");
 
 	delivery_thread = delivery_manager.run_async();
+	uint8_t cmd;
 
 	while (!shutdown) {
 		try {
@@ -152,21 +153,16 @@ void NodeServer::run() {
 			// Read on control
 			while (!shutdown) {
 				try {
-					uint8_t cmd;
-					if (CacheCommon::read(&cmd, *control_connection, 2, true)) {
+					if (CacheCommon::read(&cmd, *control_connection, 2, true))
 						process_control_command(cmd, *control_connection);
-					}
 					else {
 						Log::info("Disconnect on control-connection. Reconnecting.");
 						break;
 					}
-				} catch (TimeoutException &te) {
-					//Log::trace("Timeout on read from control-connection.");
-
-				} catch (InterruptedException &ie) {
+				} catch (const TimeoutException &te) {
+				} catch (const InterruptedException &ie) {
 					Log::info("Interrupt on read from control-connection.");
-
-				} catch (NetworkException &ne) {
+				} catch (const NetworkException &ne) {
 					Log::error("Error reading on control-connection. Reconnecting");
 					break;
 				}
@@ -177,93 +173,140 @@ void NodeServer::run() {
 				w->join();
 			}
 			workers.clear();
-		} catch (NetworkException &ne_c) {
+		} catch (const NetworkException &ne_c) {
 			Log::warn("Could not connect to index-server. Retrying in 5s. Reason: %s", ne_c.what());
 			std::this_thread::sleep_for(std::chrono::seconds(5));
 		}
 	}
 	delivery_manager.stop();
 	delivery_thread->join();
-
 	Log::info("Node-Server done.");
 }
 
 void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 	switch (cmd) {
-		case ControlConnection::RESP_REORG: {
+		case ControlConnection::CMD_REORG: {
 			Log::debug("Received reorg command.");
 			ReorgDescription d(stream);
-			Log::debug("Read reorg description from stream.");
-			for (auto &ri : d.get_items()) {
-				switch (ri.type) {
-					case ReorgItem::Type::RASTER:
-						handle_raster_reorg_item(ri, stream);
-						break;
-					default:
-						throw ArgumentException(concat("Type ", (int) ri.type, " not supported yet"));
-				}
+			for (auto &rem_item : d.get_removals()) {
+				handle_reorg_remove_item(rem_item);
 			}
-			stream.write(ControlConnection::CMD_REORG_DONE);
+			for (auto &move_item : d.get_moves()) {
+				handle_reorg_move_item(move_item, stream);
+			}
+			stream.write(ControlConnection::RESP_REORG_DONE);
+			break;
+		}
+		case ControlConnection::CMD_GET_STATS: {
+			Log::debug("Received stats-request.");
+			NodeStats stats = CacheManager::getInstance().get_stats();
+			stream.write(ControlConnection::RESP_STATS);
+			stats.toStream(stream);
+			break;
+		}
+		default: {
+			Log::error("Unknown control-command from index-server: %d. Dropping control-connection.", cmd);
+			throw NetworkException("Unknown control-command from index-server");
 		}
 	}
 }
 
-void NodeServer::handle_raster_reorg_item(const ReorgItem& item, BinaryStream &index_stream) {
+void NodeServer::handle_reorg_remove_item(const ReorgRemoveItem &item) {
+//	Log::debug("Removing item from cache. Key: %s:%d",item.semantic_id.c_str(), item.entry_id);
+	switch (item.type) {
+		case ReorgMoveItem::Type::RASTER:
+			CacheManager::getInstance().remove_raster_local(item);
+			break;
+		default:
+			throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+	}
+}
+
+void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream &index_stream) {
+	uint32_t new_cache_id;
+
+	Log::debug("Moving item from node %d to node %d. Key: %s:%d ", item.from_node_id, my_id,
+		item.semantic_id.c_str(), item.entry_id);
+
+
 	std::unique_ptr<BinaryStream> del_stream;
-	STCacheKey my_id("",0);
+
 
 	// Send move request
 	try {
-		uint8_t nresp;
-		del_stream.reset(new UnixSocket(item.from_host.c_str(), item.from_port));
-		STCacheKey key(item.semantic_id, item.cache_id);
-		del_stream->write(DeliveryConnection::MAGIC_NUMBER);
-		del_stream->write(DeliveryConnection::CMD_MOVE_RASTER);
-		key.toStream(*del_stream);
-
-		del_stream->read(&nresp);
-		switch (nresp) {
+		uint8_t del_resp;
+		del_stream = initiate_move(item);
+		del_stream->read(&del_resp);
+		switch (del_resp) {
 			case DeliveryConnection::RESP_OK: {
-				auto res = GenericRaster::fromStream(*del_stream);
-				// Store item
-				my_id = CacheManager::getInstance().put_raster_local(item.semantic_id, res);
+				AccessInfo ai(*del_stream);
+				switch (item.type) {
+					case ReorgMoveItem::Type::RASTER:
+						new_cache_id = CacheManager::getInstance().put_raster_local(item.semantic_id,
+							GenericRaster::fromStream(*del_stream), ai).entry_id;
+						break;
+					default:
+						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+				}
 				break;
 			}
 			case DeliveryConnection::RESP_ERROR: {
 				std::string msg;
 				del_stream->read(&msg);
 				throw NetworkException(
-					concat("Could not move raster", item.semantic_id, ":", item.cache_id, " from ",
+					concat("Could not move item", item.semantic_id, ":", item.entry_id, " from ",
 						item.from_host, ":", item.from_port, ": ", msg));
 			}
 			default:
-				throw NetworkException(concat("Received illegal response from delivery-node: ", nresp));
+				throw NetworkException(concat("Received illegal response from delivery-node: ", del_resp));
 		}
-	} catch (NetworkException &ne) {
-		Log::error("Could not initiate raster move: %s", ne.what());
+	} catch (const NetworkException &ne) {
+		Log::error("Could not initiate move: %s", ne.what());
 		return;
 	}
+	confirm_move(item, new_cache_id, index_stream, *del_stream);
+}
 
+std::unique_ptr<BinaryStream> NodeServer::initiate_move(const ReorgMoveItem &item) {
+	std::unique_ptr<BinaryStream> result = make_unique<UnixSocket>(item.from_host.c_str(), item.from_port);
+	result->write(DeliveryConnection::MAGIC_NUMBER);
+
+	uint8_t cmd;
+	switch (item.type) {
+		case ReorgMoveItem::Type::RASTER:
+			cmd = DeliveryConnection::CMD_MOVE_RASTER;
+			break;
+		default:
+			throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+	}
+
+	result->write(cmd);
+	item.NodeCacheKey::toStream(*result);
+	return result;
+}
+
+void NodeServer::confirm_move(const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream,
+	BinaryStream &del_stream) {
 	// Notify index
 	uint8_t iresp;
-	ReorgResult rr(ReorgResult::Type::RASTER, my_id.semantic_id, my_id.entry_id, item.idx_cache_id);
-	index_stream.write(ControlConnection::CMD_REORG_ITEM_MOVED);
+	ReorgMoveResult rr(item.type, item.semantic_id, item.entry_id, item.from_node_id, my_id, new_id);
+	index_stream.write(ControlConnection::RESP_REORG_ITEM_MOVED);
 	rr.toStream(index_stream);
 	index_stream.read(&iresp);
 
 	try {
 		switch (iresp) {
-			case ControlConnection::RESP_REORG_ITEM_OK: {
+			case ControlConnection::CMD_REORG_ITEM_OK: {
 				Log::debug("Reorg of item finished. Notifying delivery instance.");
-				del_stream->write(DeliveryConnection::CMD_MOVE_DONE);
+				del_stream.write(DeliveryConnection::CMD_MOVE_DONE);
 				break;
 			}
 			default: {
-				Log::warn("Index could not handle reorg of: %s:%d", item.semantic_id.c_str(), item.cache_id);
+				Log::warn("Index could not handle reorg of: %s:%d", item.semantic_id.c_str(), item.entry_id);
 				break;
 			}
 		}
-	} catch (NetworkException &ne) {
+	} catch (const NetworkException &ne) {
 		Log::error("Could not confirm reorg of raster-item to delivery instance.");
 	}
 }
@@ -274,19 +317,19 @@ void NodeServer::setup_control_connection() {
 	// Establish connection
 	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
 	BinaryStream &stream = *this->control_connection;
+	NodeHandshake hs = CacheManager::getInstance().get_handshake(my_host, my_port);
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
 	uint32_t magic = ControlConnection::MAGIC_NUMBER;
 	stream.write(magic);
-	stream.write(my_host);
-	stream.write(my_port);
+	hs.toStream(stream);
 
 	Log::debug("Waiting for response from index-server");
 	// Read node-id
 	uint8_t resp;
 	stream.read(&resp);
-	if (resp == ControlConnection::RESP_HELLO) {
+	if (resp == ControlConnection::CMD_HELLO) {
 		stream.read(&my_id);
 		Log::info("Successfuly connected to index-server. My Id is: %d", my_id);
 	}

@@ -7,6 +7,7 @@
 
 #include "cache/node/nodeserver.h"
 #include "cache/manager.h"
+#include "cache/common.h"
 #include "cache/node/puzzletracer.h"
 #include "util/configuration.h"
 #include <signal.h>
@@ -14,8 +15,13 @@
 NodeServer *instance = nullptr;
 
 void termination_handler(int signum) {
-	(void) signum;
-	instance->stop();
+	if ( signum == SIGSEGV ) {
+		printf("Segmentation fault. Stacktrace:\n%s", CacheCommon::get_stacktrace().c_str());
+		exit(1);
+	}
+	else {
+		instance->stop();
+	}
 }
 
 void set_signal_handler() {
@@ -35,9 +41,12 @@ void set_signal_handler() {
 	sigaction(SIGTERM, NULL, &old_action);
 	if (old_action.sa_handler != SIG_IGN)
 		sigaction(SIGTERM, &new_action, NULL);
+	sigaction(SIGSEGV, NULL, &old_action);
+		sigaction(SIGSEGV, &new_action, NULL);
 }
 
 int main(void) {
+	CacheCommon::set_uncaught_exception_handler();
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 	auto portstr = Configuration::get("nodeserver.port");
@@ -53,18 +62,16 @@ int main(void) {
 
 //	PuzzleTracer::init();
 
-	std::unique_ptr<CacheManager> cache_impl;
+
+	std::string cs = Configuration::get("nodeserver.cache.strategy");
+	size_t raster_size = atoi(Configuration::get("nodeserver.cache.raster.size").c_str());
+
 	// Inititalize cache
-	if (Configuration::getBool("cache.enabled", false)) {
-		size_t raster_size = atoi(Configuration::get("cache.raster.size", "5242880").c_str());
-		cache_impl.reset(new RemoteCacheManager(raster_size,hoststr,portnr));
+	std::unique_ptr<CacheManager> cache_impl = make_unique<RemoteCacheManager>(raster_size,hoststr,portnr);
+	auto caching_strategy = CachingStrategy::by_name(cs);
+	CacheManager::init(std::move(cache_impl), std::move(caching_strategy));
 
-	} else {
-		cache_impl.reset(new NopCacheManager());
-	}
-	CacheManager::init(cache_impl);
-
-
+	// Fire it up
 	instance = new NodeServer(hoststr,portnr,ihoststr,iportnr,num_threads);
 	instance->run();
 	return 0;

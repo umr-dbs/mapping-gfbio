@@ -8,14 +8,18 @@
 #ifndef PUZZLETRACER_H_
 #define PUZZLETRACER_H_
 
+#include "datatypes/raster.h"
+
 #include <atomic>
 #include <string>
 #include <sys/stat.h>
 #include <iostream>
 #include <fstream>
 #include <geos/geom/Geometry.h>
-#include "datatypes/raster.h"
-#include "raster/colors.h"
+
+//
+// Helper to trace the process of puzzling raster-requests
+//
 
 class RasterWriter {
 public:

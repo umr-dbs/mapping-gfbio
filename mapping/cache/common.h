@@ -30,8 +30,7 @@
 #include <geos/geom/Polygon.h>
 
 //
-// Provides helper functions for common tasks and
-// all command and response codes used by the cache.
+// Provides helper functions for common tasks.
 //
 class CacheCommon {
 public:
@@ -41,21 +40,24 @@ public:
 	//
 	static int get_listening_socket(int port, bool nonblock = true, int backlog = 10);
 
+	//
+	// Returns a string-representation for the given query-rectange
+	//
 	static std::string qr_to_string( const QueryRectangle &rect );
 
+	//
+	// Returns a string-representation for the given spatio-temporal reference
+	//
 	static std::string stref_to_string( const SpatioTemporalReference &ref );
 
 	//
-	// Fetches a raster directly from the delivery-manager of the given node
-	// by passing the unique STCacheKey
+	// Returns a string-representation of the given raster
 	//
-	static std::unique_ptr<GenericRaster> fetch_raster(const std::string & host, uint32_t port, const STCacheKey &key );
+	static std::string raster_to_string( const GenericRaster &raster );
 
-	//
-	// Puzzles a raster by combinig parts
-	//
-	static std::unique_ptr<GenericRaster> process_raster_puzzle(const PuzzleRequest &req, std::string my_host,
-		uint32_t my_port);
+	static void set_uncaught_exception_handler();
+
+	static std::string get_stacktrace();
 
 	//
 	// Helper to read from a stream with a given timeout. Basically wraps
@@ -81,9 +83,7 @@ public:
 		else if ( errno == EINTR )
 			throw InterruptedException("Select interrupted");
 		else {
-			std::ostringstream msg;
-			msg << "UnixSocket: read() failed: " << strerror(errno);
-			throw NetworkException(msg.str());
+			throw NetworkException(concat("UnixSocket: read() failed: ", strerror(errno)));
 		}
 	}
 

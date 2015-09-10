@@ -13,10 +13,14 @@
 
 #include <memory>
 
+//
+// A client used to communicate with the cache-index
+//
 class CacheClient {
 public:
 	CacheClient( std::string index_host, uint32_t index_port );
 	virtual ~CacheClient();
+	// Fetches the raster specified by the given query-parameters from the cache
 	std::unique_ptr<GenericRaster> get_raster(	const std::string &graph_json,
 												const QueryRectangle &query,
 												const GenericOperator::RasterQM query_mode = GenericOperator::RasterQM::EXACT );

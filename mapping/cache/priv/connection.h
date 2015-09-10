@@ -9,9 +9,11 @@
 #define CONNECTION_H_
 
 #include "util/binarystream.h"
-#include "cache/cache.h"
+#include "cache/node/node_cache.h"
+#include "cache/priv/cache_stats.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
+#include "util/nio.h"
 
 #include <map>
 #include <memory>
@@ -20,17 +22,44 @@ class Node;
 
 class BaseConnection {
 public:
-	BaseConnection(std::unique_ptr<UnixSocket> &socket);
+	BaseConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~BaseConnection();
-	int get_read_fd();
-	const uint64_t id;
+	// Called if data is available on the unerlying socket and this connection is not in writing mode
 	void input();
+	// Called if data can be written to the unerlying socket and this connection is in writing-mode
+	void output();
+
+	// Returns the fd used for writes by this connection
+	int get_write_fd();
+	// Returns the fd used for reads by this connection
+	int get_read_fd();
+	// Tells whether an error occured on this connection
 	bool is_faulty();
+	// Tells whether this connection is currently reading data
+	bool is_reading();
+	// Tells whether this connection is currently writing data
+	bool is_writing();
+
+	// This connection's id
+	const uint64_t id;
 protected:
+	// Callback for commands read from the socket
 	virtual void process_command( uint8_t cmd ) = 0;
-	BinaryStream &stream;
-	bool faulty;
+	// Callback for finished non-blocking writes
+	virtual void write_finished() = 0;
+	// Callback for finished non-blocking reads
+	virtual void read_finished( NBReader& reader) = 0;
+	// Called by implementing classes to trigger a non-blocking write
+	void begin_write( std::unique_ptr<NBWriter> writer );
+	// Called by implementing classes to trigger a non-blocking read
+	void begin_read( std::unique_ptr<NBReader> reader );
 private:
+	bool writing;
+	bool reading;
+	bool faulty;
+	BinaryStream &stream;
+	std::unique_ptr<NBWriter> writer;
+	std::unique_ptr<NBReader> reader;
 	std::unique_ptr<UnixSocket> socket;
 	static uint64_t next_id;
 };
@@ -38,7 +67,7 @@ private:
 class ClientConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, AWAIT_RESPONSE
+		IDLE, READING_REQUEST, AWAIT_RESPONSE, WRITING_RESPONSE
 	};
 	enum class RequestType {
 		NONE, RASTER, POINT, LINE, POLY, PLOT
@@ -64,7 +93,7 @@ public:
 	// message:string -- a description of the error
 	static const uint8_t RESP_ERROR = 19;
 
-	ClientConnection(std::unique_ptr<UnixSocket> &socket);
+	ClientConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~ClientConnection();
 
 	State get_state() const;
@@ -79,7 +108,8 @@ public:
 
 protected:
 	virtual void process_command( uint8_t cmd );
-
+	virtual void write_finished();
+	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
 	State state;
@@ -90,7 +120,12 @@ private:
 class WorkerConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, PROCESSING, NEW_RASTER_ENTRY, RASTER_QUERY_REQUESTED, DONE, WAITING_DELIVERY, DELIVERY_READY, ERROR
+		IDLE,
+		SENDING_REQUEST, PROCESSING, READING_RASTER_ENTRY, NEW_RASTER_ENTRY,
+		READING_RASTER_QUERY, RASTER_QUERY_REQUESTED, SENDING_QUERY_RESPONSE,
+		DONE,
+		SENDING_DELIVERY_QTY, WAITING_DELIVERY, READING_DELIVERY_ID, DELIVERY_READY,
+		READING_ERROR, ERROR
 	};
 	static const uint32_t MAGIC_NUMBER = 0x32345678;
 
@@ -171,7 +206,7 @@ public:
 	// message:string -- a description of the error
 	static const uint8_t RESP_ERROR = 39;
 
-	WorkerConnection(std::unique_ptr<UnixSocket> &socket, const std::shared_ptr<Node> &node);
+	WorkerConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
 	virtual ~WorkerConnection();
 
 	State get_state() const;
@@ -184,7 +219,7 @@ public:
 	void send_delivery_qty(uint32_t qty);
 	void release();
 
-	const STRasterRefKeyed& get_new_raster_entry() const;
+	const NodeCacheRef& get_new_raster_entry() const;
 	const BaseRequest& get_raster_query() const;
 
 	const DeliveryResponse &get_result() const;
@@ -194,13 +229,14 @@ public:
 
 protected:
 	virtual void process_command( uint8_t cmd );
-
+	virtual void write_finished();
+	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
 
 	State state;
 	std::unique_ptr<DeliveryResponse> result;
-	std::unique_ptr<STRasterRefKeyed> new_raster_entry;
+	std::unique_ptr<NodeCacheRef> new_raster_entry;
 	std::unique_ptr<BaseRequest> raster_query;
 	std::string error_msg;
 };
@@ -208,9 +244,37 @@ private:
 class ControlConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, REORGANIZING, REORG_RESULT_READ, REORG_FINISHED
+		READING_HANDSHAKE, HANDSHAKE_READ, SENDING_HELLO,
+		IDLE,
+		SENDING_REORG, REORGANIZING, READING_REORG_RESULT, REORG_RESULT_READ, SENDING_REORG_CONFIRM, REORG_FINISHED,
+		SENDING_STATS_REQUEST, STATS_REQUESTED, READING_STATS, STATS_RECEIVED
 	};
 	static const uint32_t MAGIC_NUMBER = 0x42345678;
+
+	//
+	// Tells the node to fetch the attached
+	// items and store them in its local cache
+	// ReorgDescription
+	//
+	static const uint8_t CMD_REORG = 40;
+
+	//
+	// Tells the node to send an update
+	// of the local cache stats
+	//
+	static const uint8_t CMD_GET_STATS = 41;
+
+	//
+	// Tells the node that the reorg on index was OK
+	// There is no data on stream
+	//
+	static const uint8_t CMD_REORG_ITEM_OK = 42;
+
+	//
+	// Response from index-server after successful
+	// registration of a new node. Data on stream is:
+	// id:uint32_t -- the id assigned to the node
+	static const uint8_t CMD_HELLO = 43;
 
 	//
 	// Tells the index that the node finished
@@ -218,52 +282,46 @@ public:
 	// Data on stream is:
 	// ReorgResult
 	//
-	static const uint8_t CMD_REORG_ITEM_MOVED = 40;
+	static const uint8_t RESP_REORG_ITEM_MOVED = 51;
 
 	//
 	// Response from worker to signal that the reorganization
 	// is finished.
 	//
-	static const uint8_t CMD_REORG_DONE = 41;
+	static const uint8_t RESP_REORG_DONE = 52;
 
 	//
-	// Response from index-server after successful
-	// registration of a new node. Data on stream is:
-	// id:uint32_t -- the id assigned to the node
-	static const uint8_t RESP_HELLO = 50;
-
+	// Response from worker including stats update
 	//
-	// Tells the node to fetch the attached
-	// items and store them in its local cache
-	// ReorgDescription
-	//
-	static const uint8_t RESP_REORG = 51;
-
-	//
-	// Tells the node that the reorg on index was OK
-	// There is no data on stream
-	//
-	static const uint8_t RESP_REORG_ITEM_OK = 52;
+	static const uint8_t RESP_STATS = 53;
 
 	State get_state() const;
 
+	void confirm_handshake( std::shared_ptr<Node> node );
 	void send_reorg( const ReorgDescription &desc );
 	void confirm_reorg();
+	void send_get_stats();
+
 	void release();
 
-	const ReorgResult& get_result();
+	const NodeHandshake& get_handshake();
+	const ReorgMoveResult& get_result();
+	const NodeStats& get_stats();
 
-	ControlConnection(std::unique_ptr<UnixSocket> &socket, const std::shared_ptr<Node> &node);
+
+	ControlConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~ControlConnection();
-	const std::shared_ptr<Node> node;
-
+	std::shared_ptr<Node> node;
 protected:
 	virtual void process_command( uint8_t cmd );
-
+	virtual void write_finished();
+	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
 	State state;
-	std::unique_ptr<ReorgResult> reorg_result;
+	std::unique_ptr<NodeHandshake> handshake;
+	std::unique_ptr<ReorgMoveResult> reorg_result;
+	std::unique_ptr<NodeStats> stats;
 };
 
 ////////////////////////////////////////////////////
@@ -275,7 +333,12 @@ private:
 class DeliveryConnection: public BaseConnection {
 public:
 	enum class State {
-		IDLE, DELIVERY_REQUEST_READ, RASTER_CACHE_REQUEST_READ, RASTER_MOVE_REQUEST_READ, AWAITING_MOVE_CONFIRM, MOVE_DONE
+		IDLE,
+		READING_DELIVERY_REQUEST, DELIVERY_REQUEST_READ,
+		READING_RASTER_CACHE_REQUEST, RASTER_CACHE_REQUEST_READ,
+		READING_RASTER_MOVE_REQUEST, RASTER_MOVE_REQUEST_READ,
+		AWAITING_MOVE_CONFIRM, MOVE_DONE,
+		SENDING_RASTER, SENDING_RASTER_MOVE, SENDING_ERROR
 	};
 
 	static const uint32_t MAGIC_NUMBER = 0x52345678;
@@ -320,18 +383,18 @@ public:
 	//
 	static const uint8_t RESP_ERROR = 80;
 
-	DeliveryConnection(std::unique_ptr<UnixSocket> &socket);
+	DeliveryConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~DeliveryConnection();
 
 	State get_state() const;
 
-	const STCacheKey& get_key() const;
+	const NodeCacheKey& get_key() const;
 
 	uint64_t get_delivery_id() const;
 
-	void send_raster( GenericRaster &raster );
+	void send_raster( std::shared_ptr<GenericRaster> raster );
 
-	void send_raster_move( GenericRaster &raster );
+	void send_raster_move( const AccessInfo &info, std::shared_ptr<GenericRaster> raster );
 
 	void send_error( const std::string &msg );
 
@@ -339,11 +402,12 @@ public:
 
 protected:
 	virtual void process_command( uint8_t cmd );
-
+	virtual void write_finished();
+	virtual void read_finished( NBReader& reader);
 private:
 	State state;
 	uint64_t delivery_id;
-	STCacheKey cache_key;
+	NodeCacheKey cache_key;
 };
 
 #endif /* CONNECTION_H_ */

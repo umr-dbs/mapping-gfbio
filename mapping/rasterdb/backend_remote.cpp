@@ -64,7 +64,7 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 	return res;
 }
 
-void RemoteRasterDBBackend::readAttributes(rasterid rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value) {
+void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value) {
 	auto c = COMMAND_READATTRIBUTES;
 	stream->write(c);
 	stream->write(rasterid);
@@ -90,7 +90,7 @@ void RemoteRasterDBBackend::readAttributes(rasterid rasterid, DirectMetadata<std
 	}
 }
 
-int RemoteRasterDBBackend::getBestZoom(rasterid rasterid, int desiredzoom) {
+int RemoteRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 	auto c = COMMAND_GETBESTZOOM;
 	stream->write(c);
 	stream->write(rasterid);
@@ -100,7 +100,7 @@ int RemoteRasterDBBackend::getBestZoom(rasterid rasterid, int desiredzoom) {
 	return bestzoom;
 }
 
-const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enumerateTiles(int channelid, rasterid rasterid, int x1, int y1, int x2, int y2, int zoom) {
+const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enumerateTiles(int channelid, rasterid_t rasterid, int x1, int y1, int x2, int y2, int zoom) {
 	auto c = COMMAND_ENUMERATETILES;
 	stream->write(c);
 	stream->write(channelid);
@@ -118,7 +118,7 @@ const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enume
 	return result;
 }
 
-bool RemoteRasterDBBackend::hasTile(rasterid rasterid, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom) {
+bool RemoteRasterDBBackend::hasTile(rasterid_t rasterid, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom) {
 	throw std::runtime_error("RemoteRasterDBBackend::hasTile() not implemented");
 }
 

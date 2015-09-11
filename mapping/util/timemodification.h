@@ -1,5 +1,5 @@
-#ifndef __TIMEMODIFICATION_H
-#define __TIMEMODIFICATION_H
+#ifndef UTIL_TIMEMODIFICATION_H
+#define UTIL_TIMEMODIFICATION_H
 
 #include "datatypes/spatiotemporal.h"
 

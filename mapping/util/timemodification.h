@@ -1,13 +1,14 @@
-#pragma once
+#ifndef __TIMEMODIFICATION_H
+#define __TIMEMODIFICATION_H
+
+#include "datatypes/spatiotemporal.h"
 
 #include <map>
 #include <memory>
 
 #include <ctime>
-#include "boost/date_time/gregorian/gregorian.hpp"
-#include "boost/date_time/posix_time/posix_time.hpp"
-
-#include "datatypes/spatiotemporal.h"
+#include <boost/date_time/gregorian/gregorian.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
 
 class TimeShift {
 	public:
@@ -237,3 +238,5 @@ class TimeModification {
 
 		bool isApplyCalled = false;
 };
+
+#endif

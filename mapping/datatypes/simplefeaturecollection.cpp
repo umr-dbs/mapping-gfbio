@@ -163,7 +163,9 @@ std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 	arff << "@DATA" << std::endl;
 
 	for (size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex) {
-		arff << "\"" << featureToWKT(featureIndex) << "\"";
+		arff << "\"";
+		featureToWKT(featureIndex, arff);
+		arff << "\"";
 		if (hasTime()){
 			arff << "," << "\"" << stref.toIsoString(time_start[featureIndex]) << "\"" << ","
 					 << "\"" << stref.toIsoString(time_end[featureIndex]) << "\"";

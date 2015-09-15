@@ -87,7 +87,7 @@ void LineCollection::addCoordinate(double x, double y){
 }
 
 size_t LineCollection::finishLine(){
-	if(coordinates.size() - start_line.back() < 2){
+	if(coordinates.size() < start_line.back() + 2){
 		throw FeatureException("Tried to finish line with less than 2 coordinates");
 	}
 	start_line.push_back(coordinates.size());

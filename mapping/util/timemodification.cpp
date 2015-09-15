@@ -249,23 +249,33 @@ auto TimeModification::apply(const TemporalReference& input) -> const TemporalRe
 
 	switch(input.timetype) {
 		case TIMETYPE_UNKNOWN:
-			throw OperatorException("It is not possible to modify an unknown time type.");
+			{
+				throw OperatorException("It is not possible to modify an unknown time type.");
+			}
 		case TIMETYPE_UNREFERENCED:
-			throw OperatorException("It is not possible to modify an unreferenced time type.");
+			{
+				throw OperatorException("It is not possible to modify an unreferenced time type.");
+			}
 		case TIMETYPE_UNIX:
-			std::time_t time_from = static_cast<std::time_t>(input.t1);
-			std::time_t time_to = static_cast<std::time_t>(input.t2);
+			{
+				std::time_t time_from = static_cast<std::time_t>(input.t1);
+				std::time_t time_to = static_cast<std::time_t>(input.t2);
 
-			time_from = from_shift->apply(time_from);
-			time_to = to_shift->apply(time_to);
+				time_from = from_shift->apply(time_from);
+				time_to = to_shift->apply(time_to);
 
-			time_from = stretch->apply(time_from);
-			time_to = stretch->apply(time_to);
+				time_from = stretch->apply(time_from);
+				time_to = stretch->apply(time_to);
 
-			time_from = from_snap->apply(time_from);
-			time_to = to_snap->apply(time_to);
+				time_from = from_snap->apply(time_from);
+				time_to = to_snap->apply(time_to);
 
-			return TemporalReference{TIMETYPE_UNIX, static_cast<double>(time_from), static_cast<double>(time_to)};
+				return TemporalReference{TIMETYPE_UNIX, static_cast<double>(time_from), static_cast<double>(time_to)};
+			}
+		default:
+			{
+				throw OperatorException("The time type is invalid.");
+			}
 	}
 }
 

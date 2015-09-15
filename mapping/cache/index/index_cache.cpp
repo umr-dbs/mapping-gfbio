@@ -86,7 +86,7 @@ void IndexCache::remove(const IndexCacheKey& key) {
 		}
 	}
 	else
-		Log::warn("Removal of index-entry failed. No structure for semantic_id: %s", key.semantic_id);
+		Log::warn("Removal of index-entry failed. No structure for semantic_id: %s", key.semantic_id.c_str());
 }
 
 void IndexCache::move(const IndexCacheKey& old_key, const IndexCacheKey& new_key) {

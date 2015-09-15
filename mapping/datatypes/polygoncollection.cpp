@@ -212,10 +212,10 @@ void PolygonCollection::addCoordinate(double x, double y){
 }
 
 size_t PolygonCollection::finishRing(){
-	if(coordinates.size() - start_ring.back() < 4){
+	if(coordinates.size() < start_ring.back() + 4){
 		throw FeatureException("Tried to finish ring with less than 3 vertices (4 coordinates)");
 	}
-	if(!(coordinates[coordinates.size() - 1] == coordinates[start_ring.back()])){
+	if(!(coordinates[coordinates.size() - 1].almostEquals(coordinates[start_ring.back()]))){
 		throw FeatureException("Last coordinate of ring is not equal to the first one");
 	}
 
@@ -345,7 +345,7 @@ void PolygonCollection::PointInCollectionBulkTester::performPrecalculation(){
 	for(auto feature : polygonCollection){
 		for(auto polygon : feature){
 			for(auto ring : polygon){
-				precalculateRing(polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1]);
+				precalculateRing(polygonCollection.start_ring[ring.getRingIndex()], polygonCollection.start_ring[ring.getRingIndex() + 1]);
 			}
 		}
 	}
@@ -378,13 +378,13 @@ bool PolygonCollection::PointInCollectionBulkTester::pointInCollection(const Coo
 			size_t ringIndex = 0;
 			for(auto ring : polygon){
 				if(ringIndex == 0){
-					if(!pointInRing(coordinate, polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1])){
+					if(!pointInRing(coordinate, polygonCollection.start_ring[ring.getRingIndex()], polygonCollection.start_ring[ring.getRingIndex() + 1])){
 						contained = false;
 						break;
 					}
 				}
 				else {
-					if(pointInRing(coordinate, polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1])){
+					if(pointInRing(coordinate, polygonCollection.start_ring[ring.getRingIndex()], polygonCollection.start_ring[ring.getRingIndex() + 1])){
 						contained = false;
 						break;
 					}

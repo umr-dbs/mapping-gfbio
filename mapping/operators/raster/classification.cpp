@@ -72,9 +72,6 @@ ClassificationOperator::~ClassificationOperator() {
 REGISTER_OPERATOR(ClassificationOperator, "reclass");
 
 void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream) {
-	if(!(classification_lower_border.size() == classification_upper_border.size() && classification_upper_border.size() == classification_classes.size()))
-		throw OperatorException("ClassificationOperator::writeSemanticParameters: unequal parameter vector sizes!");
-
 	const size_t size = classification_classes.size();
 
 	stream << "\"RemapRange:\":[";

@@ -262,9 +262,9 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 	GDALDriver *poDriver;
 	GDALDataset *poDstDS;
     GDALRasterBand *poBand;
-    char **papszMetadata;
+    //char **papszMetadata;
 
-	int count = GetGDALDriverManager()->GetDriverCount();
+//	int count = GetGDALDriverManager()->GetDriverCount();
 //	printf("GDAL has %d drivers\n", count);
 //	for (int i=0;i<count;i++) {
 //		poDriver = GetGDALDriverManager()->GetDriver(i);
@@ -295,7 +295,15 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 //		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
 
 	//now create a GDAL dataset using the driver for gdalFormatName
-	poDstDS = poDriver->Create( filename, width, height, 1, dd.datatype, NULL);
+	char **papszOptions = nullptr;
+
+	if (strcmp(gdalDriverName, "GTiff") == 0) {
+		papszOptions = CSLSetNameValue(papszOptions, "COMPRESS", "DEFLATE");
+	}
+
+	poDstDS = poDriver->Create( filename, width, height, 1, dd.datatype, papszOptions);
+
+	CSLDestroy(papszOptions);
 
 	//set the affine transformation coefficients for pixel <-> world conversion and create the spatial reference and
 	double scale_x = pixel_scale_x * (flipx ? -1 : 1);
@@ -320,7 +328,8 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 
 
 	//add the metadata to the dataset
-	poDstDS->SetMetadataItem("test1","test2","UMR_MAPPING");
+	//poDstDS->SetMetadataItem("test1","test2","UMR_MAPPING");
+
 	//close all GDAL
 	GDALClose( (GDALDatasetH) poDstDS );
 

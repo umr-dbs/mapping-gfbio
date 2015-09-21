@@ -345,7 +345,7 @@ void PolygonCollection::PointInCollectionBulkTester::performPrecalculation(){
 	for(auto feature : polygonCollection){
 		for(auto polygon : feature){
 			for(auto ring : polygon){
-				precalculateRing(polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1]);
+				precalculateRing(polygonCollection.start_ring[ring.getRingIndex()], polygonCollection.start_ring[ring.getRingIndex() + 1]);
 			}
 		}
 	}
@@ -378,13 +378,13 @@ bool PolygonCollection::PointInCollectionBulkTester::pointInCollection(const Coo
 			size_t ringIndex = 0;
 			for(auto ring : polygon){
 				if(ringIndex == 0){
-					if(!pointInRing(coordinate, polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1])){
+					if(!pointInRing(coordinate, polygonCollection.start_ring[ring.getRingIndex()], polygonCollection.start_ring[ring.getRingIndex() + 1])){
 						contained = false;
 						break;
 					}
 				}
 				else {
-					if(pointInRing(coordinate, polygonCollection.start_ring[ring], polygonCollection.start_ring[ring + 1])){
+					if(pointInRing(coordinate, polygonCollection.start_ring[ring.getRingIndex()], polygonCollection.start_ring[ring.getRingIndex() + 1])){
 						contained = false;
 						break;
 					}

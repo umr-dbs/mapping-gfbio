@@ -180,7 +180,10 @@ private:
 		    	return pc.start_polygon[idx+1] - pc.start_polygon[idx];
 		    }
 
-		    operator size_t() const {
+		    /**
+		     * return the index of the current polygon in the start_polygon array
+		     */
+		    size_t getPolygonIndex() const {
 				return idx;
 			}
 
@@ -246,7 +249,10 @@ private:
 		    	return pc.start_ring[idx+1] - pc.start_ring[idx];
 		    }
 
-		    operator size_t() const {
+		    /**
+			 * return the index of the current ring in the start_ring array
+			 */
+		    size_t getRingIndex() const {
 				return idx;
 			}
 

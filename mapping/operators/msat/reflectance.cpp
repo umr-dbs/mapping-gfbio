@@ -32,6 +32,8 @@ class MSATReflectanceOperator : public GenericOperator {
 		void writeSemanticParameters(std::ostringstream& stream);
 	private:
 		bool solarCorrection;
+		bool isHRV;
+		std::string forceSatellite;
 };
 
 
@@ -43,6 +45,8 @@ MSATReflectanceOperator::MSATReflectanceOperator(int sourcecounts[], GenericOper
 	assumeSources(1);
 
 	solarCorrection = params.get("solarCorrection", true).asBool();
+	isHRV = params.get("isHRV", false).asBool();
+	forceSatellite = params.get("forceSatellite", "").asString();
 }
 MSATReflectanceOperator::~MSATReflectanceOperator() {
 }
@@ -50,6 +54,8 @@ REGISTER_OPERATOR(MSATReflectanceOperator, "msatreflectance");
 
 void MSATReflectanceOperator::writeSemanticParameters(std::ostringstream& stream) {
 	stream << "\"solarCorrection\":" << (solarCorrection ? "true" : "false");
+	stream << ", \"isHRV\":" << (isHRV ? "true" : "false");
+	stream << ", \"forceSatellite\":" << "\"" << forceSatellite << "\"";
 }
 
 
@@ -62,11 +68,26 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
 
-	// get the timestamp of the MSG scene from the raster metadata
+	// get all the metadata:
+	int channel = (isHRV) ? 11 : (int) raster->md_value.get("Channel");
 	std::string timestamp = raster->md_string.get("TimeStamp");
+	std::string satellite_name = (forceSatellite.length() > 0) ? forceSatellite : raster->md_string.get("Satellite");
+
+	msg::Satellite satellite;
+
+	if(satellite_name == "Meteosat-8")
+		satellite = msg::meteosat_08;
+	else if(satellite_name == "Meteosat-9")
+		satellite = msg::meteosat_09;
+	else if(satellite_name == "Meteosat-10")
+		satellite = msg::meteosat_10;
+	else if(satellite_name == "Meteosat-11")
+		satellite = msg::meteosat_11;
+	else
+		throw OperatorException("No known Satellite name found!");
+
 	// create and store a real time object
 	std::tm timeDate;
-
 	/** TODO: This would be the c++11 way to do it. Sadly this is not implemented in GCC 4.8...
 	std::istringstream ss(timestamp);
 	ss >> std::get_time(&time, "%Y%m%d%H%M%S");
@@ -103,11 +124,10 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	std::cerr<<std::endl;
 	*/
 
-	// now we need the channelNumber to calculate ETSR and ESD
-	int channel = (int) raster->md_value.get("Channel");
-	double dETSRconst = msg::dETSRconst[channel]; //TODO: channel msg:12 is mapped to a separate datasource and uses channel "0" instead of msg:12/mapping:11. The fetched dETSRconst for channel 12 is actually the one for channel mapping:0/msg:1.
+
+
+	double dETSRconst = satellite.etsr[channel]/M_PI;
 	double dESD = calculateESD(timeDate.tm_yday+1);
-	//std::cerr<<"channel:"<<channel<<"|dETSRconst"<<dETSRconst<<"|dESD:"<<dESD<<std::endl;
 
 	//TODO: Channel12 would use 65536 / -40927014 * 1000.134348869 = -1.601074451590�10^-6. The difference is: 1.93384285�10^-9
 	double projectionCooridnateToViewAngleFactor = 65536 / (-13642337.0 * 3000.403165817); //= -1.59914060874�10^-6

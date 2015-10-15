@@ -37,8 +37,9 @@ namespace msg{
 
 	// struct representing  the parameters of a Meteosat Satellite
 	struct Satellite {
-		short meteosat_id;
-		short msg_id;
+		std::string name;
+		int meteosat_id;
+		int msg_id;
 		const double *cwl;
 		const double *etsr;
 		const double *vc;
@@ -47,11 +48,40 @@ namespace msg{
 	};
 
 	// static Satellites
-	static const Satellite meteosat_08 {8,  1, dCwl, meteosat_08_ETSR, meteosat_08_VC, meteosat_08_ALPHA, meteosat_08_BETA};
-	static const Satellite meteosat_09 {9,  2, dCwl, meteosat_09_ETSR, meteosat_09_VC, meteosat_09_ALPHA, meteosat_09_BETA};
-	static const Satellite meteosat_10 {10, 3, dCwl, meteosat_10_ETSR, meteosat_10_VC, meteosat_10_ALPHA, meteosat_10_BETA};
-	static const Satellite meteosat_11 {11, 4, dCwl, meteosat_11_ETSR, meteosat_11_VC, meteosat_11_ALPHA, meteosat_11_BETA};
+	static const Satellite meteosat_08 {"Meteosat-8", 8,  1, dCwl, meteosat_08_ETSR, meteosat_08_VC, meteosat_08_ALPHA, meteosat_08_BETA};
+	static const Satellite meteosat_09 {"Meteosat-9", 9,  2, dCwl, meteosat_09_ETSR, meteosat_09_VC, meteosat_09_ALPHA, meteosat_09_BETA};
+	static const Satellite meteosat_10 {"Meteosat-10", 10, 3, dCwl, meteosat_10_ETSR, meteosat_10_VC, meteosat_10_ALPHA, meteosat_10_BETA};
+	static const Satellite meteosat_11 {"Meteosat-11", 11, 4, dCwl, meteosat_11_ETSR, meteosat_11_VC, meteosat_11_ALPHA, meteosat_11_BETA};
 
+	static Satellite getSatelliteForName(std::string satellite_name) {
+		Satellite satellite;
+		if(satellite_name == "Meteosat-8")
+			satellite = msg::meteosat_08;
+		else if(satellite_name == "Meteosat-9")
+			satellite = msg::meteosat_09;
+		else if(satellite_name == "Meteosat-10")
+			satellite = msg::meteosat_10;
+		else if(satellite_name == "Meteosat-11")
+			satellite = msg::meteosat_11;
+		else
+			throw ArgumentException(satellite_name + " is not a known Satellite name!");
+		return satellite;
+	}
+
+	static Satellite getSatelliteForMsgId(int msg_id) {
+			Satellite satellite;
+			if(msg_id == 1)
+				satellite = msg::meteosat_08;
+			else if(msg_id == 2)
+				satellite = msg::meteosat_09;
+			else if(msg_id == 3)
+				satellite = msg::meteosat_10;
+			else if(msg_id == 4)
+				satellite = msg::meteosat_11;
+			else
+				throw ArgumentException(msg_id + " is no id of a known Satellite!");
+			return satellite;
+		}
 
 
 }

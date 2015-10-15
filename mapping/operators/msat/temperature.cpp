@@ -4,11 +4,13 @@
 #include "raster/profiler.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
+#include "operators/msat/msg_constants.h"
 
 
 #include <vector>
 #include <limits>
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <sstream>
 #include <json/json.h>
@@ -23,10 +25,16 @@ class MSATTemperatureOperator : public GenericOperator {
 #ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 #endif
+	protected:
+		void writeSemanticParameters(std::ostringstream& stream);
 	private:
+		std::string forceSatellite;
+
 };
 MSATTemperatureOperator::MSATTemperatureOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
+
+	forceSatellite = params.get("forceSatellite", "").asString();
 }
 MSATTemperatureOperator::~MSATTemperatureOperator() {
 }
@@ -35,90 +43,17 @@ REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
 
 #ifndef MAPPING_OPERATOR_STUBS
 
-class RadianceTable {
-	public:
-		RadianceTable(int channel, int length, const float *temperatures, const float *radiances)
-			: channel(channel), length(length), temperatures(temperatures), radiances(radiances) {
-
-		};
-		~RadianceTable() {};
-
-		float getMinTemp() { return temperatures[0]; }
-		float getMaxTemp() { return temperatures[length-1]; }
-		float getTempFromRadiance(float radiance);
-		float getRadianceFromTemp(float temp);
-	private:
-		int channel;
-		int length;
-		const float *temperatures;
-		const float *radiances;
-};
-
-float RadianceTable::getTempFromRadiance(float radiance) {
-	if (radiance <= radiances[0])
-		return temperatures[0];
-	if (radiance >= radiances[length-1])
-		return temperatures[length-1];
-
-	for(int i=1;i<length;i++) {
-		float prev = radiances[i-1], next = radiances[i];
-		if (prev == radiance)
-			return temperatures[i-1];
-		if (prev < radiance && next > radiance) {
-
-			/* TODO: selector for multiple methods
-			// Return a linear interpolation between the two values.
-			// The table should be dense enough that this returns reasonably accurate results.
-			float l = (next - prev) / (radiance - prev); // [0..1]
-			l = std::min(1.0f, std::max(0.0f, l)); // just in case..
-			return temperatures[i-1] + l * (temperatures[i]-temperatures[i-1]);
-			*/
-
-			float distPrev = std::abs(radiance - prev);
-			float distNext = std::abs(radiance - next);
-			if(distPrev < distNext )
-				return temperatures[i-1];
-			else
-				return temperatures[i];
-
-		}
-	}
-
-	throw ArgumentException("Radiance not found in table (wtf?)");
-}
-float RadianceTable::getRadianceFromTemp(float temp) {
-	return 0.0;
-}
-
-
-#include "operators/msat/temperature_tables.h"
-
-static RadianceTable *getRadianceTable(int channel) {
-	if (channel == 3)
-		return &radiancetable_4;
-	if (channel == 4)
-		return &radiancetable_5;
-	if (channel == 5)
-		return &radiancetable_6;
-	if (channel == 6)
-		return &radiancetable_7;
-	if (channel == 7)
-		return &radiancetable_8;
-	if (channel == 8)
-		return &radiancetable_9;
-	if (channel == 9)
-		return &radiancetable_10;
-	if (channel == 10)
-		return &radiancetable_11;
-	std::stringstream msg;
-	msg << "getRadianceTable: invalid channel number "<<channel<<" (only 3 - 10 are allowed)";
-	throw ArgumentException(msg.str());
-}
-
-
-
 #include "operators/msat/temperature.cl.h"
 
+static double calculateTempFromEffectiveRadiance(double wavenumber, double alpha, double beta, double radiance) {
+	double temp = (msg::c1 * 1.0e6 * wavenumber*wavenumber*wavenumber) / (1.0e-5 * radiance);
+	temp = ((msg::c2* 100. * wavenumber / std::log(temp + 1)) - beta) / alpha;
+	return temp;
+}
+
+void MSATTemperatureOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << ", \"forceSatellite\":" << "\"" << forceSatellite << "\"";
+}
 
 std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
@@ -127,27 +62,43 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 	if (raster->dd.min != 0 && raster->dd.max != 1024)
 		throw OperatorException("Input raster does not appear to be a meteosat raster");
 
+	msg::Satellite satellite;
+	if(forceSatellite.length() > 0){
+		satellite = msg::getSatelliteForName(forceSatellite);
+	}
+	else{
+		std::string satellite_id_str = raster->md_string.get("Satellite");
+		int satellite_id = std::stoi(satellite_id_str);
+		satellite = msg::getSatelliteForMsgId(satellite_id);
+	}
+
 	int channel = (int) raster->md_value.get("Channel");
+
+	if (channel < 3 || channel >10)
+		throw OperatorException("BT calculation is only valid for Channels 4-11");
+
 	float offset = raster->md_value.get("CalibrationOffset");
 	float slope = raster->md_value.get("CalibrationSlope");
 	//std::string timestamp = raster->md_string.get("TimeStamp");
 
-	RadianceTable *table = getRadianceTable(channel);
+	double wavenumber = satellite.vc[channel];
+	double alpha = satellite.alpha[channel];
+	double beta = satellite.beta[channel];
 
 	Profiler::Profiler p1("CL_MSATTEMPERATURE_LOOKUPTABLE");
 	std::vector<float> lut;
 	lut.reserve(1024);
 	for(int i = 0; i < 1024; i++) {
 		float radiance = offset + i * slope;
-		float temperature = table->getTempFromRadiance(radiance);
+		float temperature = calculateTempFromEffectiveRadiance(wavenumber, alpha, beta, radiance);
 		lut.push_back(temperature);
 	}
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
 
-	double newmin = table->getMinTemp();
-	double newmax = table->getMaxTemp();
+	double newmin = 200;//table->getMinTemp();
+	double newmax = 330;//table->getMaxTemp();
 
 	DataDescription out_dd(GDT_Float32, newmin, newmax);
 	if (raster->dd.has_no_data) {

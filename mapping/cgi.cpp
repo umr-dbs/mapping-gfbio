@@ -411,6 +411,8 @@ int processWCS(std::map<std::string, std::string> &params) {
 
 		//TODO: parse datetime!
 		time_t timestamp = 1295266500; // 2011-1-17 12:15
+		timestamp = parseIso8601DateTime(params["time"]);
+
 		//build the queryRectangle and get the data
 		bool flipx, flipy;
 		QueryRectangle query_rect(

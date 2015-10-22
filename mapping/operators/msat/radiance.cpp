@@ -22,8 +22,8 @@ class MSATRadianceOperator : public GenericOperator {
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
-	private:
-		bool convert; // indicates if radiance will be converted to W/ �m m� sr
+	//private:
+	//	bool convert; // indicates if radiance will be converted to W/ �m m� sr
 };
 
 
@@ -34,7 +34,7 @@ class MSATRadianceOperator : public GenericOperator {
 MSATRadianceOperator::MSATRadianceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
-	this->convert = params.get("conversion", false).asBool();
+	//this->convert = params.get("conversion", false).asBool();
 }
 
 MSATRadianceOperator::~MSATRadianceOperator() {
@@ -42,9 +42,11 @@ MSATRadianceOperator::~MSATRadianceOperator() {
 
 REGISTER_OPERATOR(MSATRadianceOperator, "msatradiance");
 
+
 void MSATRadianceOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"convert\":" << (convert ? "true" : "false");
+	//stream << "\"convert\":" << (convert ? "true" : "false");
 }
+
 
 #ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
@@ -61,10 +63,12 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	double newmax = offset + raster->dd.max * slope;
 	float conversionFactor = 1.0f;
 
+	/*
 	if(this->convert){
 		float dCwl = msg::dCwl[channel];
 		conversionFactor = 10.0f /(dCwl*dCwl);
 	}
+	*/
 
 	DataDescription out_dd(GDT_Float32, newmin, newmax); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster->dd.has_no_data)

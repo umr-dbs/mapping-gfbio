@@ -130,30 +130,35 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 	*/
 
 	// Read Pixel data
-	poBand->RasterIO( GF_Read,
+	auto res = poBand->RasterIO( GF_Read,
 		pixel_x1, pixel_y1, pixel_width, pixel_height, // rectangle in the source raster
 		buffer, raster->width, raster->height, // position and size of the destination buffer
 		type, 0, 0);
+
+	if (res != CE_None)
+		throw ImporterException("GDAL: RasterIO failed");
 
 	// Selectively read metadata
 	//char **mdList = GDALGetMetadata(poBand, "msg");
 	if (epsg == EPSG_GEOSMSG) {
 		char **mdList = poBand->GetMetadata("msg");
 		for (int i = 0; mdList && mdList[i] != nullptr; i++ ) {
-			printf("GDALImport: got Metadata %s\n", mdList[i]);
+			//printf("GDALImport: got Metadata %s\n", mdList[i]);
 			std::string md(mdList[i]);
 			size_t split = md.find('=');
 			if (split == std::string::npos)
 				continue;
 
 			std::string key = md.substr(0, split);
+			std::string mkey = "msg." + key;
 			std::string value = md.substr(split+1, std::string::npos);
 
-			if (key == "TimeStamp")
-				raster->md_string.set(key, value);
-			else if (key == "CalibrationOffset" || key == "CalibrationSlope") {
-				double dvalue = std::strtod(value.c_str(), nullptr);
-				raster->md_value.set(key, dvalue);
+			double dvalue = std::strtod(value.c_str(), nullptr);
+			if (key == "TimeStamp" || (dvalue == 0 && value != "0")) {
+				raster->md_string.set(mkey, value);
+			}
+			else {
+				raster->md_value.set(mkey, dvalue);
 			}
 		}
 	}
@@ -166,11 +171,8 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadDataset(const char *filen
 
 	GDALDataset *dataset = (GDALDataset *) GDALOpen(filename, GA_ReadOnly);
 
-	if (dataset == NULL) {
-		std::ostringstream msg;
-		msg << "Could not open dataset " << filename;
-		throw ImporterException(msg.str());
-	}
+	if (dataset == NULL)
+		throw ImporterException(concat("Could not open dataset ", filename));
 
 
 /*
@@ -262,9 +264,9 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 	GDALDriver *poDriver;
 	GDALDataset *poDstDS;
     GDALRasterBand *poBand;
-    char **papszMetadata;
+    //char **papszMetadata;
 
-	int count = GetGDALDriverManager()->GetDriverCount();
+//	int count = GetGDALDriverManager()->GetDriverCount();
 //	printf("GDAL has %d drivers\n", count);
 //	for (int i=0;i<count;i++) {
 //		poDriver = GetGDALDriverManager()->GetDriver(i);
@@ -295,7 +297,15 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 //		printf( "Driver %s supports CreateCopy() method.\n", gdalFormatName);
 
 	//now create a GDAL dataset using the driver for gdalFormatName
-	poDstDS = poDriver->Create( filename, width, height, 1, dd.datatype, NULL);
+	char **papszOptions = nullptr;
+
+	if (strcmp(gdalDriverName, "GTiff") == 0) {
+		papszOptions = CSLSetNameValue(papszOptions, "COMPRESS", "DEFLATE");
+	}
+
+	poDstDS = poDriver->Create( filename, width, height, 1, dd.datatype, papszOptions);
+
+	CSLDestroy(papszOptions);
 
 	//set the affine transformation coefficients for pixel <-> world conversion and create the spatial reference and
 	double scale_x = pixel_scale_x * (flipx ? -1 : 1);
@@ -316,11 +326,13 @@ template<typename T> void Raster2D<T>::toGDAL(const char *filename, const char *
 			poBand->SetNoDataValue(dd.no_data);
 	}
 
-	poBand->RasterIO( GF_Write, 0, 0, width, height, data, width, height, dd.datatype, 0, 0 );
-
+	auto res = poBand->RasterIO( GF_Write, 0, 0, width, height, data, width, height, dd.datatype, 0, 0 );
+	if (res != CE_None)
+		throw ImporterException("GDAL: RasterIO for writing failed");
 
 	//add the metadata to the dataset
-	poDstDS->SetMetadataItem("test1","test2","UMR_MAPPING");
+	//poDstDS->SetMetadataItem("test1","test2","UMR_MAPPING");
+
 	//close all GDAL
 	GDALClose( (GDALDatasetH) poDstDS );
 

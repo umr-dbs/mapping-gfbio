@@ -45,6 +45,17 @@ REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
 
 #include "operators/msat/temperature.cl.h"
 
+
+
+/**
+ * This function uses the approximation method published by Eumetsat to calculate BTs from Radiance.
+ * https://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=PDF_EFFECT_RAD_TO_BRIGHTNESS&RevisionSelectionMethod=LatestReleased&Rendition=Web
+ * @param wavenumber the wavenumber of a channel
+ * @param alpha the alpha constant of a channel
+ * @param beta the beta constant of a channel
+ * @param radiance the radiance for which the BT should be computed
+ * @return BT
+ */
 static double calculateTempFromEffectiveRadiance(double wavenumber, double alpha, double beta, double radiance) {
 	double temp = (msg::c1 * 1.0e6 * wavenumber*wavenumber*wavenumber) / (1.0e-5 * radiance);
 	temp = ((msg::c2* 100. * wavenumber / std::log(temp + 1)) - beta) / alpha;
@@ -67,19 +78,17 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 		satellite = msg::getSatelliteForName(forceSatellite);
 	}
 	else{
-		std::string satellite_id_str = raster->md_string.get("Satellite");
-		int satellite_id = std::stoi(satellite_id_str);
+		int satellite_id = (int) raster->md_value.get("msg.Satellite");
 		satellite = msg::getSatelliteForMsgId(satellite_id);
 	}
 
-	int channel = (int) raster->md_value.get("Channel");
+	int channel = (int) raster->md_value.get("msg.Channel");
 
 	if (channel < 3 || channel >10)
 		throw OperatorException("BT calculation is only valid for Channels 4-11");
 
-	float offset = raster->md_value.get("CalibrationOffset");
-	float slope = raster->md_value.get("CalibrationSlope");
-	//std::string timestamp = raster->md_string.get("TimeStamp");
+	float offset = raster->md_value.get("msg.CalibrationOffset");
+	float slope = raster->md_value.get("msg.CalibrationSlope");
 
 	double wavenumber = satellite.vc[channel];
 	double alpha = satellite.alpha[channel];
@@ -90,13 +99,14 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 	lut.reserve(1024);
 	for(int i = 0; i < 1024; i++) {
 		float radiance = offset + i * slope;
-		float temperature = calculateTempFromEffectiveRadiance(wavenumber, alpha, beta, radiance);
+		float temperature = (float) calculateTempFromEffectiveRadiance(wavenumber, alpha, beta, radiance);
 		lut.push_back(temperature);
 	}
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");
 	raster->setRepresentation(GenericRaster::OPENCL);
 
+	//TODO: find min/max in the lut or use min/max of the input data...
 	double newmin = 200;//table->getMinTemp();
 	double newmax = 330;//table->getMaxTemp();
 

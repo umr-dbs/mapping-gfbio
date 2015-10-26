@@ -58,6 +58,12 @@ void MSATReflectanceOperator::writeSemanticParameters(std::ostringstream& stream
 
 
 #ifndef MAPPING_OPERATOR_STUBS
+
+/**
+ * This function calculates the earth sun distance for a given day of year
+ * @param dayOfYear day of year
+ * @return earth sun distance
+ */
 double calculateESD(int dayOfYear){
 	return 1.0 - 0.0167 * cos(2.0 * acos(-1.0) * ((dayOfYear - 3.0) / 365.0));
 }
@@ -67,8 +73,8 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	auto raster = getRasterFromSource(0, rect, profiler);
 
 	// get all the metadata:
-	int channel = (forceHRV) ? 11 : (int) raster->md_value.get("Channel");
-	std::string timestamp = raster->md_string.get("TimeStamp");
+	int channel = (forceHRV) ? 11 : (int) raster->md_value.get("msg.Channel");
+	std::string timestamp = raster->md_string.get("msg.TimeStamp");
 
 	msg::Satellite satellite;
 
@@ -76,8 +82,7 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 		satellite = msg::getSatelliteForName(forceSatellite);
 	}
 	else{
-		std::string satellite_id_str = raster->md_string.get("Satellite");
-		int satellite_id = std::stoi(satellite_id_str);
+		int satellite_id = (int) raster->md_value.get("msg.Satellite");
 		satellite = msg::getSatelliteForMsgId(satellite_id);
 	}
 
@@ -89,11 +94,9 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	ss >> std::get_time(&time, "%Y%m%d%H%M%S");
 	*/
 	strptime(timestamp.c_str(),"%Y%m%d%H%M", &timeDate);
-	//std::cerr<<"timeDate.tm_mday:"<<timeDate.tm_mday<<"|timeDate.tm_mon:"<<timeDate.tm_mon<<"|timeDate.tm_year:"<<timeDate.tm_year<<"|timeDate.tm_hour:"<<timeDate.tm_hour<<"|timeDate.tm_min:"<<timeDate.tm_min<<"|ORIGINAL:"<<timestamp<<std::endl;
 
 	//now calculate the intermediate values using PSA algorithm
 	cIntermediateVariables psaIntermediateValues = sunposIntermediate(timeDate.tm_year+1900, timeDate.tm_mon+1,	timeDate.tm_mday, timeDate.tm_hour, timeDate.tm_min, 0.0);
-	//std::cerr<<"GMST: "<<psaIntermediateValues.dGreenwichMeanSiderealTime<<" dRightAscension: "<<psaIntermediateValues.dRightAscension<<" dDeclination: "<<psaIntermediateValues.dDeclination<<std::endl;
 
 	/* DEBUG infos
 	//get more information about the raster dimensions of the processed tile
@@ -128,7 +131,7 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	//calculate the projection to viewangle factor:
 	// channel 01-10 (1-11) = -13642337.0 * 3000.403165817
 	// channel 11 (12 = HRV)= -40927014.0 * 1000.134348869
-	double projectionCooridnateToViewAngleFactor = 65536 / (channel == 11)? (-40927014 * 1000.134348869) : (-13642337 * 3000.403165817); //= -1.59914060874�10^-6
+	double projectionCooridnateToViewAngleFactor = 65536 / ((channel == 11)? (-40927014 * 1000.134348869) : (-13642337 * 3000.403165817)); //= -1.59914060874�10^-6
 
 
 	Profiler::Profiler p("CL_MSATRADIANCE_OPERATOR");

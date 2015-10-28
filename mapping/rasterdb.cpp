@@ -222,7 +222,7 @@ static QueryResolution qres_from_json(Json::Value &root){
 		Json::Value& json = root["resolution"];
 
 		int x = json.get("x", 1000).asInt();
-		int y = json.get("x", 1000).asInt();
+		int y = json.get("y", 1000).asInt();
 
 		return QueryResolution::pixels(x, y);
 	}

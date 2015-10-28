@@ -369,6 +369,12 @@ std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJso
 	}
 }
 
+
+/**
+ * Function to process WCS requests.
+ * @param params the parameter map
+ * @return 0/1 indicating success or failure
+ */
 int processWCS(std::map<std::string, std::string> &params) {
 
 	/*http://www.myserver.org:port/path?
@@ -409,7 +415,6 @@ int processWCS(std::map<std::string, std::string> &params) {
 		unsigned int sizeX = getWfsParameterInteger(params["size_x"]);
 		unsigned int sizeY = getWfsParameterInteger(params["size_y"]);
 
-		//TODO: parse datetime!
 		time_t timestamp = 1295266500; // 2011-1-17 12:15
 		if(params.count("time") > 0)
 			timestamp = parseIso8601DateTime(params["time"]);

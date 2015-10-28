@@ -2,11 +2,20 @@
 #ifndef __MSG_CONSTANTS_H_INCLUDED__
 #define __MSG_CONSTANTS_H_INCLUDED__
 
+
+
 namespace msg{
 
-	//static const double dETSR[4] = { 519.0318f, 353.8837f, 75.72047f, 445.3367f };
-	//static const double dETSRconst[4] = { 20.76f, 23.24f, 19.85f, 25.11f };
+
+	/** This namespace contains constants for METEOSAT processing.*/
+
+	// the central wavelength of the channels
 	static const double dCwl[12] = { 0.639f, 0.809f, 1.635f, 3.965f, 6.337f, 7.362f, 8.718f, 9.668f, 10.763f, 11.938f, 13.355f, 0.674f };
+
+	/**
+	 * The following tables are from: "The Conversion from Effective Radiances to Equivalent Brightness Temperatures"
+	 * https://www.eumetsat.int/website/wcm/idc/idcplg?IdcService=GET_FILE&dDocName=PDF_EFFECT_RAD_TO_BRIGHTNESS&RevisionSelectionMethod=LatestReleased&Rendition=Web
+	 */
 
 	// solar irradiance *PI						 VIS006,  VIS008,  IR_016,  IR_039,  WV_062,  WV_073,  IR_087,  IR_097,  IR_108,  IR_120,  IR_134,     HRV
 	static const double meteosat_08_ETSR[12] = {65.2296, 73.0127, 62.3715, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 0.00000, 78.7599};
@@ -32,8 +41,14 @@ namespace msg{
 	static const double meteosat_10_BETA[12] = {0.00000, 0.00000, 0.00000, 2.9002, 2.0337, 0.4340, 0.1714, 0.0527, 0.6084, 0.3882, 0.5390, 0};
 	static const double meteosat_11_BETA[12] = {0.00000, 0.00000, 0.00000, 2.9438, 2.0780, 0.4929, 0.1731, 0.0597, 0.6256, 0.4002, 0.5635, 0};
 
+	// radiantion constants
 	static const double c1 = 1.19104273e-16;
 	static const double c2 = 0.0143877523;
+
+
+	/**
+	 * Satellite struct and constant satellites for Meteosat 8-11
+	 */
 
 	// struct representing  the parameters of a Meteosat Satellite
 	struct Satellite {
@@ -53,35 +68,34 @@ namespace msg{
 	static const Satellite meteosat_10 {"Meteosat-10", 10, 3, dCwl, meteosat_10_ETSR, meteosat_10_VC, meteosat_10_ALPHA, meteosat_10_BETA};
 	static const Satellite meteosat_11 {"Meteosat-11", 11, 4, dCwl, meteosat_11_ETSR, meteosat_11_VC, meteosat_11_ALPHA, meteosat_11_BETA};
 
+	// static array containing all known Satellites
+	static const Satellite satellites[4] = {meteosat_08, meteosat_09, meteosat_10, meteosat_11 };
+
+	/**
+	 * Find a Satellite by name
+	 * @param satellite_name the name of the METEOSAT satellite
+	 * @return the Satellite with the specified name
+	 */
 	static Satellite getSatelliteForName(std::string satellite_name) {
-		Satellite satellite;
-		if(satellite_name == "Meteosat-8")
-			satellite = msg::meteosat_08;
-		else if(satellite_name == "Meteosat-9")
-			satellite = msg::meteosat_09;
-		else if(satellite_name == "Meteosat-10")
-			satellite = msg::meteosat_10;
-		else if(satellite_name == "Meteosat-11")
-			satellite = msg::meteosat_11;
-		else
-			throw ArgumentException(satellite_name + " is not a known Satellite name!");
-		return satellite;
+		for(const Satellite &sat : satellites){
+			if (sat.name == satellite_name)
+				return sat;
+		}
+		throw ArgumentException(satellite_name + " is not a known METEOSAT Satellite name!");
 	}
 
+	/**
+	 * Find a Satellite by id
+	 * @param msg_id the id of the METEOSAT satellite
+	 * @return the Satellite with the specified name
+	 */
 	static Satellite getSatelliteForMsgId(int msg_id) {
-			Satellite satellite;
-			if(msg_id == 1)
-				satellite = msg::meteosat_08;
-			else if(msg_id == 2)
-				satellite = msg::meteosat_09;
-			else if(msg_id == 3)
-				satellite = msg::meteosat_10;
-			else if(msg_id == 4)
-				satellite = msg::meteosat_11;
-			else
-				throw ArgumentException(msg_id + " is no id of a known Satellite!");
-			return satellite;
-		}
+		for(const Satellite &sat : satellites){
+					if (sat.msg_id == msg_id)
+						return sat;
+				}
+		throw ArgumentException(std::to_string(msg_id) + " is no id of a known METEOSAT Satellite!");
+	}
 
 
 }

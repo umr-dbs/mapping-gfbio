@@ -53,9 +53,8 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
 
-	float offset = raster->md_value.get("CalibrationOffset");
-	float slope = raster->md_value.get("CalibrationSlope");
-	int channel = (int) raster->md_value.get("Channel");
+	float offset = raster->md_value.get("msg.CalibrationOffset");
+	float slope = raster->md_value.get("msg.CalibrationSlope");
 
 	raster->setRepresentation(GenericRaster::OPENCL);
 

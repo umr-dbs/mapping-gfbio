@@ -17,7 +17,7 @@
 				{
 					"params" : 
 					{
-						"filename" : "test/data/places_dump/places_dump_DE.csv"
+						"filename" : "test/systemtests/data/places_dump/places_dump_DE.csv"
 					},
 					"type" : "csvpointsource"
 				}

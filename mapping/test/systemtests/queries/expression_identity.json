@@ -1,0 +1,33 @@
+{
+    "query_epsg" : 4326,
+    "query_x1": -180,
+    "query_x2": 180,
+    "query_y1": -90,
+    "query_y2": 90,
+    "query_xres": 1000,
+    "query_yres": 1000,
+    "starttime": 0,
+    "endtime": 0,
+    "name": "Identity Expression",
+    "query": {
+        "params": {
+            "datatype": "input",
+            "expression": "A",
+            "max": 255,
+            "min": 71
+        },
+        "sources": {
+            "raster": [
+                {
+                    "params": {
+                        "channel": 0,
+                        "sourcename": "world1"
+                    },
+                    "type": "source"
+                }
+            ]
+        },
+        "type": "expression"
+    },
+    "query_expected_hash": "715612544ff0b8cd1933a5f5ed860f83"
+}

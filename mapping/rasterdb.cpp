@@ -178,30 +178,71 @@ static void link(int argc, char *argv[]) {
 	}
 }
 
+static SpatialReference stref_from_json(Json::Value &root, bool &flipx, bool &flipy){
+	if(root.isMember("spatial_reference")){
+		Json::Value& json = root["spatial_reference"];
+
+		epsg_t epsg = epsgCodeFromSrsString(json.get("projection", "EPSG:4326").asString());
+
+		double x1 = json.get("x1", -180).asDouble();
+		double y1 = json.get("y1", -90).asDouble();
+		double x2 = json.get("x2", 180).asDouble();
+		double y2 = json.get("y2", 90).asDouble();
+
+		return SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy);
+	}
+
+	return SpatialReference::unreferenced();
+}
+
+static TemporalReference tref_from_json(Json::Value &root){
+	if(root.isMember("temporal_reference")){
+		Json::Value& json = root["temporal_reference"];
+
+		std::string type = json.get("type", "UNIX").asString();
+
+		timetype_t time_type;
+
+		if(type == "UNIX")
+			time_type = TIMETYPE_UNIX;
+		else
+			time_type = TIMETYPE_UNKNOWN;
+
+		double start = json.get("start", 0).asDouble();
+		double end = json.get("end", 0).asDouble();
+
+		return TemporalReference(time_type, start, end);
+	}
+
+	return TemporalReference::unreferenced();
+}
+
+static QueryResolution qres_from_json(Json::Value &root){
+	if(root.isMember("resolution")){
+		Json::Value& json = root["resolution"];
+
+		int x = json.get("x", 1000).asInt();
+		int y = json.get("x", 1000).asInt();
+
+		return QueryResolution::pixels(x, y);
+	}
+
+	return QueryResolution::none();
+}
 
 static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {
-	epsg_t epsg = (epsg_t) root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
-	double x1 = root.get("query_x1", -20037508).asDouble();
-	double y1 = root.get("query_y1", -20037508).asDouble();
-	double x2 = root.get("query_x2", 20037508).asDouble();
-	double y2 = root.get("query_y2", 20037508).asDouble();
-	int xres = root.get("query_xres", 1000).asInt();
-	int yres = root.get("query_yres", 1000).asInt();
-	double timeStart = root.get("starttime", 0).asDouble();
-	double timeEnd = root.get("endtime", 0).asDouble();
-
-	QueryRectangle result(
-		SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy),
-		TemporalReference(TIMETYPE_UNIX, timeStart, timeEnd),
-		QueryResolution::pixels(xres, yres)
+	return QueryRectangle (
+		stref_from_json(root, flipx, flipy),
+		tref_from_json(root),
+		qres_from_json(root)
 	);
-	return result;
 }
 
 static QueryRectangle qrect_from_json(Json::Value &root) {
 	bool flipx, flipy;
 	return qrect_from_json(root, flipx, flipy);
 }
+
 
 static void runquery(int argc, char *argv[]) {
 	if (argc < 3) {
@@ -231,11 +272,21 @@ static void runquery(int argc, char *argv[]) {
 	auto graph = GenericOperator::fromJSON(root["query"]);
 	std::string result = root.get("query_result", "raster").asString();
 
+	bool flipx, flipy;
+	auto qrect = qrect_from_json(root, flipx, flipy);
+
 	if (result == "raster") {
 		QueryProfiler profiler;
-		bool flipx, flipy;
-		auto qrect = qrect_from_json(root, flipx, flipy);
-		auto raster = graph->getCachedRaster(qrect, profiler);
+
+		std::string queryModeParam = root.get("query_mode", "exact").asString();
+		GenericOperator::RasterQM queryMode;
+
+		if(queryModeParam == "exact")
+			queryMode = GenericOperator::RasterQM::EXACT;
+		else
+			queryMode = GenericOperator::RasterQM::LOOSE;
+
+		auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
 		printf("flip: %d %d\n", flipx, flipy);
 		printf("QRect(%f,%f -> %f,%f)\n", qrect.x1, qrect.y1, qrect.x2, qrect.y2);
 		if (flipx || flipy)
@@ -257,8 +308,6 @@ static void runquery(int argc, char *argv[]) {
 	}
 	else if (result == "points") {
 		QueryProfiler profiler;
-		auto qrect1 = qrect_from_json(root);
-		QueryRectangle qrect(qrect1, qrect1, QueryResolution::none());
 		auto points = graph->getCachedPointCollection(qrect, profiler);
 		auto csv = points->toCSV();
 		if (out_filename) {

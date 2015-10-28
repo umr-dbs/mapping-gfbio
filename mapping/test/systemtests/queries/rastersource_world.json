@@ -1,20 +1,29 @@
 {
-    "query_epsg": 4326,
-    "query_x1": -180,
-    "query_x2": 180,
-    "query_y1": -90,
-    "query_y2": 90,
-    "query_xres": 1000,
-    "query_yres": 1000,
-    "starttime": 0,
-    "endtime": 0,
     "name": "Load world raster",
+	"query_result": "raster",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 0
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "resolution": {
+        "x": 10800,
+        "y": 5400
+    },
+    "query_mode": "exact",
     "query": {
+        "channel": 0,
         "params": {
-            "channel": 0,
             "sourcename": "world1"
         },
         "type": "source"
     },
-    "query_expected_hash": "715612544ff0b8cd1933a5f5ed860f83"
+    "query_expected_hash": "bff6f80cded7ec9d106a9ab0916b3d15"
 }

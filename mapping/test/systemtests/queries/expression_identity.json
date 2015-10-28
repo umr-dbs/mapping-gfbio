@@ -1,13 +1,22 @@
 {
-    "query_epsg" : 4326,
-    "query_x1": -180,
-    "query_x2": 180,
-    "query_y1": -90,
-    "query_y2": 90,
-    "query_xres": 1000,
-    "query_yres": 1000,
-    "starttime": 0,
-    "endtime": 0,
+	"name": "Identity expression",
+	"query_result": "raster",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 0
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "resolution": {
+        "x": 10800,
+        "y": 5400
+    },
     "name": "Identity Expression",
     "query": {
         "params": {

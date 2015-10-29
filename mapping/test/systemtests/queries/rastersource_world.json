@@ -14,6 +14,7 @@
         "y2": 90
     },
     "resolution": {
+    	"type": "pixels",
         "x": 10800,
         "y": 5400
     },

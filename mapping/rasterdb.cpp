@@ -178,7 +178,7 @@ static void link(int argc, char *argv[]) {
 	}
 }
 
-static SpatialReference stref_from_json(Json::Value &root, bool &flipx, bool &flipy){
+static SpatialReference sref_from_json(Json::Value &root, bool &flipx, bool &flipy){
 	if(root.isMember("spatial_reference")){
 		Json::Value& json = root["spatial_reference"];
 
@@ -221,10 +221,21 @@ static QueryResolution qres_from_json(Json::Value &root){
 	if(root.isMember("resolution")){
 		Json::Value& json = root["resolution"];
 
-		int x = json.get("x", 1000).asInt();
-		int y = json.get("y", 1000).asInt();
+		std::string type = json.get("type", "none").asString();
 
-		return QueryResolution::pixels(x, y);
+		if(type == "pixels"){
+			int x = json.get("x", 1000).asInt();
+			int y = json.get("y", 1000).asInt();
+
+			return QueryResolution::pixels(x, y);
+		} else if(type == "none")
+			return QueryResolution::none();
+		else {
+			fprintf(stderr, "invalid query resolution");
+			exit(5);
+		}
+
+
 	}
 
 	return QueryResolution::none();
@@ -232,7 +243,7 @@ static QueryResolution qres_from_json(Json::Value &root){
 
 static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {
 	return QueryRectangle (
-		stref_from_json(root, flipx, flipy),
+		sref_from_json(root, flipx, flipy),
 		tref_from_json(root),
 		qres_from_json(root)
 	);
@@ -283,8 +294,12 @@ static void runquery(int argc, char *argv[]) {
 
 		if(queryModeParam == "exact")
 			queryMode = GenericOperator::RasterQM::EXACT;
-		else
+		else if(queryModeParam == "loose")
 			queryMode = GenericOperator::RasterQM::LOOSE;
+		else {
+			fprintf(stderr, "invalid query mode");
+			exit(5);
+		}
 
 		auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
 		printf("flip: %d %d\n", flipx, flipy);
@@ -362,18 +377,31 @@ static int testquery(int argc, char *argv[]) {
 
 		std::string real_hash;
 
+		bool flipx, flipy;
+		auto qrect = qrect_from_json(root, flipx, flipy);
 		if (result == "raster") {
 			QueryProfiler profiler;
-			bool flipx, flipy;
-			auto qrect = qrect_from_json(root, flipx, flipy);
-			auto raster = graph->getCachedRaster(qrect, profiler);
+
+			std::string queryModeParam = root.get("query_mode", "exact").asString();
+			GenericOperator::RasterQM queryMode;
+
+			if(queryModeParam == "exact")
+				queryMode = GenericOperator::RasterQM::EXACT;
+			else if(queryModeParam == "loose")
+				queryMode = GenericOperator::RasterQM::LOOSE;
+			else {
+				fprintf(stderr, "invalid query mode");
+				exit(5);
+			}
+
+			auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
 			if (flipx || flipy)
 				raster = raster->flip(flipx, flipy);
 			real_hash = raster->hash();
 		}
 		else if (result == "points") {
 			QueryProfiler profiler;
-			auto points = graph->getCachedPointCollection(qrect_from_json(root), profiler);
+			auto points = graph->getCachedPointCollection(qrect, profiler);
 			real_hash = points->hash();
 		}
 		else {

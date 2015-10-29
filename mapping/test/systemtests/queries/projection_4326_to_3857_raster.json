@@ -8,15 +8,17 @@
     },
     "spatial_reference": {
         "projection": "EPSG:3857",
-        "x1": -180,
-        "x2": 180,
-        "y1": -90,
-        "y2": 90
+		"x1" : -20037508,
+		"x2" : 20037508,
+		"y1" : -20037508,
+		"y2" : 20037508
     },
     "resolution": {
-        "x": 10800,
-        "y": 5400
+    	"type": "pixels",
+        "x": 7284, 
+        "y": 9630
     },
+    "query_mode": "exact",
 	"query" : 
 	{
 		"params" : 

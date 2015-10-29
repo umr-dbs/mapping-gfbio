@@ -80,7 +80,7 @@ all: $(CL_HEADERS) ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEIND
 # Dependencies and compiler flags of all executables
 #
 
-${EXE}:	o/rasterdb.o ${OBJ_COMMON}
+${EXE}:	o/mapping_manager.o ${OBJ_COMMON}
 	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} -o $@
 
 ${EXECGI}:	o/cgi.o o/cache/client.o ${OBJ_COMMON}

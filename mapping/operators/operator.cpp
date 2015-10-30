@@ -102,6 +102,28 @@ void GenericOperator::assumeSources(int rasters, int pointcollections, int linec
 		throw OperatorException("Wrong amount of polygoncollection sources");
 }
 
+
+void GenericOperator::validateQRect(const QueryRectangle &rect, GenericOperator::validateQRectRes res) {
+	if (res == validateQRectRes::NEEDS_RESOLUTION && rect.restype == QueryResolution::Type::NONE)
+		throw OperatorException("Cannot query a raster without specifying a desired resolution");
+	else if (res == validateQRectRes::WITHOUT_RESOLUTION && rect.restype != QueryResolution::Type::NONE)
+		throw OperatorException("Cannot query a point collection when specifying a desired resolution");
+
+	if (rect.epsg == EPSG_UNREFERENCED)
+		throw OperatorException("Cannot query with EPSG_UNREFERENCED");
+	if (rect.timetype == TIMETYPE_UNREFERENCED)
+		throw OperatorException("Cannot query with TIMETYPE_UNREFERENCED");
+}
+
+void GenericOperator::validateResult(SpatioTemporalResult *result) {
+	if (result->stref.epsg == EPSG_UNREFERENCED)
+		throw OperatorException("Operator returned result with EPSG_UNREFERENCED");
+	if (result->stref.timetype == TIMETYPE_UNREFERENCED)
+		throw OperatorException("Operator returned result with TIMETYPE_UNREFERENCED");
+}
+
+
+
 std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &, QueryProfiler &) {
 	throw OperatorException("getRaster() called on an operator that doesn't return rasters");
 }
@@ -139,8 +161,7 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 }
 
 std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
-	if (rect.restype == QueryResolution::Type::NONE)
-		throw OperatorException("Cannot query a raster without specifying a desired resolution");
+	validateQRect(rect, validateQRectRes::NEEDS_RESOLUTION);
 	std::unique_ptr<GenericRaster> result;
 	{
 		try {
@@ -152,6 +173,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 			{
 				QueryProfilerRunningGuard guard(parent_profiler, profiler);
 				result = getRaster(rect,profiler);
+				validateResult(result.get());
 			}
 			if ( CacheManager::get_strategy().do_cache(profiler,result->getDataSize()) )
 				CacheManager::getInstance().put_raster(semantic_id,result);
@@ -168,14 +190,14 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	return result;
 }
 std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
-	if (rect.restype != QueryResolution::Type::NONE)
-		throw OperatorException("Cannot query a point collection when specifying a desired resolution");
+	validateQRect(rect, validateQRectRes::WITHOUT_RESOLUTION);
 
 	QueryProfiler profiler;
 	std::unique_ptr<PointCollection> result;
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		result = getPointCollection(rect, profiler);
+		validateResult(result.get());
 	}
 	d_profile(depth, type, "points", profiler);
 
@@ -189,14 +211,14 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 	return result;
 }
 std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
-	if (rect.restype != QueryResolution::Type::NONE)
-		throw OperatorException("Cannot query a line collection when specifying a desired resolution");
+	validateQRect(rect, validateQRectRes::WITHOUT_RESOLUTION);
 
 	QueryProfiler profiler;
 	std::unique_ptr<LineCollection> result;
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		result = getLineCollection(rect, profiler);
+		validateResult(result.get());
 	}
 	d_profile(depth, type, "lines", profiler);
 
@@ -210,14 +232,14 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 	return result;
 }
 std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
-	if (rect.restype != QueryResolution::Type::NONE)
-		throw OperatorException("Cannot query a polygon collection when specifying a desired resolution");
+	validateQRect(rect, validateQRectRes::WITHOUT_RESOLUTION);
 
 	QueryProfiler profiler;
 	std::unique_ptr<PolygonCollection> result;
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		result = getPolygonCollection(rect, profiler);
+		validateResult(result.get());
 	}
 	d_profile(depth, type, "polygons", profiler);
 
@@ -231,9 +253,8 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 	return result;
 }
 std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
-//	TODO: do we want this requirement for plots, too?
-//	if (rect.restype != QueryResolution::Type::NONE)
-//		throw OperatorException("Cannot query a histogram when specifying a desired resolution");
+	//	TODO: do we want plots to allow resolutions?
+	validateQRect(rect, validateQRectRes::NO_RESOLUTION_ENFORCED);
 
 	QueryProfiler profiler;
 	std::unique_ptr<GenericPlot> result;

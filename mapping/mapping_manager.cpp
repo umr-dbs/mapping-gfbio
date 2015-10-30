@@ -30,8 +30,10 @@ static void usage() {
 		printf("%s createsource <epsg> <channel1_example> <channel2_example> ...\n", program_name);
 		printf("%s loadsource <sourcename>\n", program_name);
 		printf("%s import <sourcename> <filename> <filechannel> <sourcechannel> <time_start> <duration> <compression>\n", program_name);
+		printf("%s link <sourcename> <sourcechannel> <time_reference> <time_start> <duration>\n", program_name);
 		printf("%s query <queryname> <png_filename>\n", program_name);
-		printf("%s hash <queryname>\n", program_name);
+		printf("%s testquery <queryname>\n", program_name);
+		printf("%s testsemantic <queryname>\n", program_name);
 		exit(5);
 }
 
@@ -373,8 +375,11 @@ static int testquery(int argc, char *argv[]) {
 		}
 
 		auto graph = GenericOperator::fromJSON(root["query"]);
-		std::string result = root.get("query_result", "raster").asString();
 
+		/*
+		 * Step #2: run the query and see if the results match
+		 */
+		std::string result = root.get("query_result", "raster").asString();
 		std::string real_hash;
 
 		bool flipx, flipy;
@@ -438,6 +443,58 @@ static int testquery(int argc, char *argv[]) {
 	return 0;
 }
 
+static int testsemantic(int argc, char *argv[]) {
+	if (argc < 3) {
+		usage();
+	}
+	char *in_filename = argv[2];
+
+	try {
+		/*
+		 * Step #1: open the query.json file and parse it
+		 */
+		std::ifstream file(in_filename);
+		if (!file.is_open()) {
+			printf("unable to open query file %s\n", in_filename);
+			return 5;
+		}
+
+		Json::Reader reader(Json::Features::strictMode());
+		Json::Value root;
+		if (!reader.parse(file, root)) {
+			printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
+			return 5;
+		}
+
+		auto graph = GenericOperator::fromJSON(root["query"]);
+
+		/*
+		 * Step #2: make sure the graph's semantic id works
+		 */
+		auto semantic1 = graph->getSemanticId();
+		decltype(graph) graph2 = nullptr;
+		try {
+			graph2 = GenericOperator::fromJSON(semantic1);
+		}
+		catch (const std::exception &e) {
+			printf("Exception parsing graph from semantic id: %s\n%s", e.what(), semantic1.c_str());
+			return 5;
+		}
+		auto semantic2 = graph2->getSemanticId();
+		if (semantic1 != semantic2) {
+			printf("Semantic ID changes after reconstruction:\n%s\n%s\n", semantic1.c_str(), semantic2.c_str());
+			exit(5);
+		}
+	}
+	catch (const std::exception &e) {
+		printf("Exception: %s\n", e.what());
+		return 5;
+	}
+	printf("Semantic ID is ok\n");
+	return 0;
+}
+
+
 int main(int argc, char *argv[]) {
 
 	program_name = argv[0];
@@ -472,6 +529,9 @@ int main(int argc, char *argv[]) {
 	}
 	else if (strcmp(command, "testquery") == 0) {
 		return testquery(argc, argv);
+	}
+	else if (strcmp(command, "testsemantic") == 0) {
+		return testsemantic(argc, argv);
 	}
 	else if (strcmp(command, "msgcoord") == 0) {
 		GDAL::CRSTransformer t(EPSG_LATLON, EPSG_GEOSMSG);

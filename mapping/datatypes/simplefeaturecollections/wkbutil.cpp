@@ -77,3 +77,37 @@ std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::string& w
 
 	return polygonCollection;
 }
+
+
+void WKBUtil::addFeatureToCollection(PointCollection& collection, std::string& wkt){
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+	geos::io::WKTReader wktreader(*gf);
+
+	geos::geom::Geometry* geom = wktreader.read(wkt);
+
+	GeosGeomUtil::addFeatureToCollection(collection, *geom);
+
+	gf->destroyGeometry(geom);
+}
+
+void WKBUtil::addFeatureToCollection(LineCollection& collection, std::string& wkt){
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+	geos::io::WKTReader wktreader(*gf);
+
+	geos::geom::Geometry* geom = wktreader.read(wkt);
+
+	GeosGeomUtil::addFeatureToCollection(collection, *geom);
+
+	gf->destroyGeometry(geom);
+}
+
+void WKBUtil::addFeatureToCollection(PolygonCollection& collection, std::string& wkt){
+	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
+	geos::io::WKTReader wktreader(*gf);
+
+	geos::geom::Geometry* geom = wktreader.read(wkt);
+
+	GeosGeomUtil::addFeatureToCollection(collection, *geom);
+
+	gf->destroyGeometry(geom);
+}

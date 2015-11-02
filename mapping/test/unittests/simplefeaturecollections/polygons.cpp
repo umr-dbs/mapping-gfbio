@@ -642,3 +642,65 @@ TEST(PolygonCollection, bulkPointInPolygon){
 	EXPECT_EQ(true, tester.pointInCollection(a));
 	EXPECT_EQ(false, tester.pointInCollection(b));
 }
+
+TEST(PolygonCollection, WKTImport){
+	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((10 20, 30 30, 0 30, 10 20), (2 2, 5 2, 1 1, 2 2)))";
+	auto polygons = WKBUtil::readPolygonCollection(wkt);
+
+	EXPECT_EQ(1, polygons->getFeatureCount());
+	EXPECT_EQ(1, polygons->getFeatureReference(0).size());
+	EXPECT_EQ(2, polygons->getFeatureReference(0).getPolygonReference(0).size());
+}
+
+TEST(PolygonCollection, WKTImportMultiPolygon){
+	std::string wkt = "GEOMETRYCOLLECTION(MULTIPOLYGON(((1 2, 3 3, 0 3, 1 2)), ((7 8, 9 10, 11 12, 13 14, 7 8))))";
+	auto polygons = WKBUtil::readPolygonCollection(wkt);
+
+	EXPECT_EQ(1, polygons->getFeatureCount());
+	EXPECT_EQ(2, polygons->getFeatureReference(0).size());
+}
+
+TEST(PolygonCollection, WKTImportMixed){
+	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((10 20, 30 30, 0 30, 10 20), (2 2, 5 2, 1 1, 2 2)), MULTIPOLYGON(((1 2, 3 3, 0 3, 1 2)), ((7 8, 9 10, 11 12, 13 14, 7 8))))";
+	auto polygons = WKBUtil::readPolygonCollection(wkt);
+
+	EXPECT_EQ(2, polygons->getFeatureCount());
+	EXPECT_EQ(2, polygons->getFeatureReference(0).getPolygonReference(0).size());
+	EXPECT_EQ(2, polygons->getFeatureReference(1).size());
+}
+
+TEST(PolygonCollection, WKTAddSingleFeature){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+	polygons.addCoordinate(20,20);
+	polygons.addCoordinate(20,30);
+	polygons.addCoordinate(30,30);
+	polygons.addCoordinate(30,20);
+	polygons.addCoordinate(20,20);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	std::string wkt = "POLYGON((10 20, 30 30, 0 30, 10 20), (2 2, 5 2, 1 1, 2 2))";
+	WKBUtil::addFeatureToCollection(polygons, wkt);
+
+	EXPECT_EQ(2, polygons.getFeatureCount());
+	EXPECT_EQ(2, polygons.getFeatureReference(1).getPolygonReference(0).size());
+}
+
+TEST(PolygonCollection, WKTAddMultiFeature){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+	polygons.addCoordinate(20,20);
+	polygons.addCoordinate(20,30);
+	polygons.addCoordinate(30,30);
+	polygons.addCoordinate(30,20);
+	polygons.addCoordinate(20,20);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	std::string wkt = "MULTIPOLYGON(((1 2, 3 3, 0 3, 1 2)), ((7 8, 9 10, 11 12, 13 14, 7 8)))";
+	WKBUtil::addFeatureToCollection(polygons, wkt);
+
+	EXPECT_EQ(2, polygons.getFeatureCount());
+	EXPECT_EQ(2, polygons.getFeatureReference(1).size());
+}

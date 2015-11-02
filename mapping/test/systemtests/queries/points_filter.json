@@ -12,7 +12,7 @@
         "x2": 180,
         "y1": -90,
         "y2": 90
-    },
+    },	
 	"name" : "Filter points",
 	"query" : 
 	{
@@ -37,5 +37,5 @@
 		},
 		"type" : "points_filter_by_range"
 	},
-	"query_expected_hash" : "822052f98ae623909501d41536b0e8b9"
+	"query_expected_hash" : "b1792aeacbcb267c47ea0ffe74c30d40"
 }

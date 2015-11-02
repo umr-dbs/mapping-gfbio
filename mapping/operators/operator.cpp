@@ -103,11 +103,11 @@ void GenericOperator::assumeSources(int rasters, int pointcollections, int linec
 }
 
 
-void GenericOperator::validateQRect(const QueryRectangle &rect, GenericOperator::validateQRectRes res) {
-	if (res == validateQRectRes::NEEDS_RESOLUTION && rect.restype == QueryResolution::Type::NONE)
+void GenericOperator::validateQRect(const QueryRectangle &rect, GenericOperator::ResolutionRequirement res) {
+	if (res == ResolutionRequirement::REQUIRED && rect.restype == QueryResolution::Type::NONE)
 		throw OperatorException("Cannot query a raster without specifying a desired resolution");
-	else if (res == validateQRectRes::WITHOUT_RESOLUTION && rect.restype != QueryResolution::Type::NONE)
-		throw OperatorException("Cannot query a point collection when specifying a desired resolution");
+	else if (res == ResolutionRequirement::FORBIDDEN && rect.restype != QueryResolution::Type::NONE)
+		throw OperatorException("Cannot query a feature collection when specifying a desired resolution");
 
 	if (rect.epsg == EPSG_UNREFERENCED)
 		throw OperatorException("Cannot query with EPSG_UNREFERENCED");
@@ -115,11 +115,14 @@ void GenericOperator::validateQRect(const QueryRectangle &rect, GenericOperator:
 		throw OperatorException("Cannot query with TIMETYPE_UNREFERENCED");
 }
 
-void GenericOperator::validateResult(SpatioTemporalResult *result) {
+void GenericOperator::validateResult(const QueryRectangle &rect, SpatioTemporalResult *result) {
 	if (result->stref.epsg == EPSG_UNREFERENCED)
-		throw OperatorException("Operator returned result with EPSG_UNREFERENCED");
+		throw OperatorException(concat("Operator ", type, " returned result with EPSG_UNREFERENCED"));
 	if (result->stref.timetype == TIMETYPE_UNREFERENCED)
-		throw OperatorException("Operator returned result with TIMETYPE_UNREFERENCED");
+		throw OperatorException(concat("Operator ", type, " returned result with TIMETYPE_UNREFERENCED"));
+
+	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
+		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
 }
 
 
@@ -161,7 +164,7 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 }
 
 std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
-	validateQRect(rect, validateQRectRes::NEEDS_RESOLUTION);
+	validateQRect(rect, ResolutionRequirement::REQUIRED);
 	std::unique_ptr<GenericRaster> result;
 	{
 		try {
@@ -173,7 +176,6 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 			{
 				QueryProfilerRunningGuard guard(parent_profiler, profiler);
 				result = getRaster(rect,profiler);
-				validateResult(result.get());
 			}
 			if ( CacheManager::get_strategy().do_cache(profiler,result->getDataSize()) )
 				CacheManager::getInstance().put_raster(semantic_id,result);
@@ -181,8 +183,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	}
 	//d_profile(depth, type, "raster", profiler, result->getDataSize());
 
-	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
-		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+	validateResult(rect, result.get());
 
 	// the costs of adjusting the result are assigned to the calling operator
 	if (query_mode == RasterQM::EXACT)
@@ -190,63 +191,60 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	return result;
 }
 std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
-	validateQRect(rect, validateQRectRes::WITHOUT_RESOLUTION);
+	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
 
 	QueryProfiler profiler;
 	std::unique_ptr<PointCollection> result;
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		result = getPointCollection(rect, profiler);
-		validateResult(result.get());
 	}
 	d_profile(depth, type, "points", profiler);
 
+	// validate the SimpleFeature data structure
 	result->validate();
-
-	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
-		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+	// validate the invariants of the operator graph
+	validateResult(rect, result.get());
 
 	if (query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple())
 		throw OperatorException("Operator did not return Features consisting only of single points");
 	return result;
 }
 std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
-	validateQRect(rect, validateQRectRes::WITHOUT_RESOLUTION);
+	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
 
 	QueryProfiler profiler;
 	std::unique_ptr<LineCollection> result;
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		result = getLineCollection(rect, profiler);
-		validateResult(result.get());
 	}
 	d_profile(depth, type, "lines", profiler);
 
+	// validate the SimpleFeature data structure
 	result->validate();
-
-	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
-		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+	// validate the invariants of the operator graph
+	validateResult(rect, result.get());
 
 	if (query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple())
 		throw OperatorException("Operator did not return Features consisting only of single lines");
 	return result;
 }
 std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
-	validateQRect(rect, validateQRectRes::WITHOUT_RESOLUTION);
+	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
 
 	QueryProfiler profiler;
 	std::unique_ptr<PolygonCollection> result;
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		result = getPolygonCollection(rect, profiler);
-		validateResult(result.get());
 	}
 	d_profile(depth, type, "polygons", profiler);
 
+	// validate the SimpleFeature data structure
 	result->validate();
-
-	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
-		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+	// validate the invariants of the operator graph
+	validateResult(rect, result.get());
 
 	if (query_mode == FeatureCollectionQM::SINGLE_ELEMENT_FEATURES && !result->isSimple())
 		throw OperatorException("Operator did not return Features consisting only of single polygons");
@@ -254,7 +252,7 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 }
 std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
 	//	TODO: do we want plots to allow resolutions?
-	validateQRect(rect, validateQRectRes::NO_RESOLUTION_ENFORCED);
+	validateQRect(rect, ResolutionRequirement::OPTIONAL);
 
 	QueryProfiler profiler;
 	std::unique_ptr<GenericPlot> result;

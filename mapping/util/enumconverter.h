@@ -10,11 +10,11 @@
 
 #include <string>
 #include <tuple>
+#include <array>
 #include <vector>
 #include <json/json.h>
 
-
-template<typename T, const std::vector< std::pair<T, std::string> > &map>
+template<typename T, std::size_t F, const std::array< std::pair<T, const char*>, F> &map	>
 struct EnumConverter {
 	EnumConverter() = delete;
 

@@ -33,8 +33,10 @@
 
 const int TIMEOUT_SECONDS = 600;
 
+#ifdef __clang__ // Prevent GCC from complaining about unknown pragmas.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused-parameter" // silence the myriad of warnings in ***REMOVED*** headers
+#endif // __clang__
 #include <***REMOVED***Common.h>
 
 #include "rserver/***REMOVED***_wrapper.h" // declarations only

@@ -39,7 +39,7 @@ std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::stringstr
 	return polygonCollection;
 }
 
-std::unique_ptr<PointCollection> WKBUtil::readPointCollection(std::string& wkt){
+std::unique_ptr<PointCollection> WKBUtil::readPointCollection(const std::string& wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
@@ -52,7 +52,7 @@ std::unique_ptr<PointCollection> WKBUtil::readPointCollection(std::string& wkt){
 	return pointCollection;
 }
 
-std::unique_ptr<LineCollection> WKBUtil::readLineCollection(std::string& wkt){
+std::unique_ptr<LineCollection> WKBUtil::readLineCollection(const std::string& wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
@@ -65,7 +65,7 @@ std::unique_ptr<LineCollection> WKBUtil::readLineCollection(std::string& wkt){
 	return lineCollection;
 }
 
-std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::string& wkt){
+std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(const std::string& wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
@@ -79,7 +79,7 @@ std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::string& w
 }
 
 
-void WKBUtil::addFeatureToCollection(PointCollection& collection, std::string& wkt){
+void WKBUtil::addFeatureToCollection(PointCollection& collection, const std::string& wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
@@ -90,7 +90,7 @@ void WKBUtil::addFeatureToCollection(PointCollection& collection, std::string& w
 	gf->destroyGeometry(geom);
 }
 
-void WKBUtil::addFeatureToCollection(LineCollection& collection, std::string& wkt){
+void WKBUtil::addFeatureToCollection(LineCollection& collection, const std::string& wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
@@ -101,7 +101,7 @@ void WKBUtil::addFeatureToCollection(LineCollection& collection, std::string& wk
 	gf->destroyGeometry(geom);
 }
 
-void WKBUtil::addFeatureToCollection(PolygonCollection& collection, std::string& wkt){
+void WKBUtil::addFeatureToCollection(PolygonCollection& collection, const std::string& wkt){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 

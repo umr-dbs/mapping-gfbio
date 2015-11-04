@@ -71,6 +71,8 @@ public:
 
 	bool pointInCollection(Coordinate& coordinate) const;
 
+	std::string hash();
+
 	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 

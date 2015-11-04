@@ -73,7 +73,7 @@ REGISTER_OPERATOR(ClassificationOperator, "reclass");
 
 void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream) {
 	const size_t size = classification_classes.size();
-
+	stream << "{";
 	stream << "\"RemapRange:\":[";
 	for(size_t i = 0; i < size; i++) {
 	  if (i > 0)
@@ -81,6 +81,7 @@ void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream)
 	  stream << "[" << classification_lower_border[i] <<"," <<classification_upper_border[i] <<","<< classification_classes[i] << "]";
 	}
 	stream << "],\"reclassNoData\":" << reclassNoData <<",\"noDataClass\":" << noDataClass << "]";
+	stream << "}";
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

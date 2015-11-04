@@ -49,11 +49,11 @@ MatrixKernelOperator::~MatrixKernelOperator() {
 REGISTER_OPERATOR(MatrixKernelOperator, "matrix");
 
 void MatrixKernelOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"matrix\":[" << matrix[0];
+	stream << "{\"matrix\":[" << matrix[0];
 	for (int i = 1; i < matrixsize; ++i) {
 		stream << "," << matrix[i];
 	}
-	stream << "]";
+	stream << "]}";
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

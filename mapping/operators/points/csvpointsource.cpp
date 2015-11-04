@@ -1,4 +1,6 @@
 #include "operators/operator.h"
+#include "datatypes/simplefeaturecollections/wkbutil.h"
+
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/csvparser.h"
@@ -8,11 +10,11 @@
 #include <fstream>
 #include <sstream>
 #include <streambuf>
-#include <array>
 #include <algorithm>
+#include <functional>
 #include <json/json.h>
 #include <sys/stat.h>
-#include "datatypes/pointcollection.h"
+
 
 
 /*
@@ -29,12 +31,12 @@ enum class GeometrySpecification {
 	// ShapeFile? Others?
 };
 
-extern constexpr std::array< std::pair<GeometrySpecification, const char*>, 2 > GeometrySpecificationMap {
+const std::vector< std::pair<GeometrySpecification, std::string> > GeometrySpecificationMap {
 	std::make_pair(GeometrySpecification::XY, "xy"),
 	std::make_pair(GeometrySpecification::WKT, "wkt")
 };
 
-using GeometrySpecificationConverter = EnumConverter<GeometrySpecification, 2, GeometrySpecificationMap>;
+EnumConverter<GeometrySpecification> GeometrySpecificationConverter(GeometrySpecificationMap);
 
 enum class TimeSpecification {
 	NONE,
@@ -43,26 +45,26 @@ enum class TimeSpecification {
 	START_DURATION
 };
 
-extern constexpr std::array< std::pair<TimeSpecification, const char*>, 4 > TimeSpecificationMap = {
+const std::vector< std::pair<TimeSpecification, std::string> > TimeSpecificationMap = {
 	std::make_pair(TimeSpecification::NONE, "none"),
 	std::make_pair(TimeSpecification::START, "start"),
 	std::make_pair(TimeSpecification::START_END, "start+end"),
 	std::make_pair(TimeSpecification::START_DURATION, "start+duration")
 };
 
-using TimeSpecificationConverter = EnumConverter<TimeSpecification, 4, TimeSpecificationMap>;
+EnumConverter<TimeSpecification> TimeSpecificationConverter(TimeSpecificationMap);
 
 enum class TimeFormat {
 	SECONDS,
 	DMYHM // for hanna's data
 };
 
-extern constexpr std::array< std::pair<TimeFormat, const char*>, 2 > TimeFormatMap = {
+const std::vector< std::pair<TimeFormat, std::string> > TimeFormatMap = {
 	std::make_pair(TimeFormat::SECONDS, "seconds"),
 	std::make_pair(TimeFormat::DMYHM, "dmyhm")
 };
 
-using TimeFormatConverter = EnumConverter<TimeFormat, 2, TimeFormatMap>;
+EnumConverter<TimeFormat> TimeFormatConverter(TimeFormatMap);
 
 
 /*
@@ -75,11 +77,16 @@ class CSVPointSource : public GenericOperator {
 
 #ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
+		void readAnyCollection(SimpleFeatureCollection *collection, const QueryRectangle &rect, QueryProfiler &profiler,
+			std::function<bool(const std::string &,const std::string &)> addFeature);
+
 		std::string filename;
 		FileType filetype;
 		GeometrySpecification geometry_specification;
@@ -93,6 +100,7 @@ class CSVPointSource : public GenericOperator {
 		TimeFormat format_time2;
 		std::vector<std::string> columns_numeric;
 		std::vector<std::string> columns_textual;
+		char field_separator;
 };
 
 
@@ -113,21 +121,27 @@ CSVPointSource::CSVPointSource(int sourcecounts[], GenericOperator *sources[], J
 	else
 		filetype = FileType::CSV;
 
-	geometry_specification = GeometrySpecificationConverter::from_json(params, "geometry");
+	std::string default_separator = (filetype == FileType::TTX ? "\t" : ",");
+	auto configured_separator = params.get("separator", default_separator).asString();
+	if (configured_separator.length() != 1)
+		throw ArgumentException("CSVPointSource: Configured separator is not a single character");
+	field_separator = configured_separator[0];
+
+	geometry_specification = GeometrySpecificationConverter.from_json(params, "geometry");
 
 	auto columns = params.get("columns", Json::Value(Json::ValueType::objectValue));
 	column_x = columns.get("x", "x").asString();
 	column_y = columns.get("y", "y").asString();
 
-	time_specification = TimeSpecificationConverter::from_json(params, "time");
+	time_specification = TimeSpecificationConverter.from_json(params, "time");
 	time_duration = 0.0;
 	if (time_specification == TimeSpecification::START)
 		time_duration = params.get("duration", 1.0).asDouble();
 
 	column_time1 = columns.get("time1", "time1").asString();
-	format_time1 = TimeFormatConverter::from_json(columns, "time1_format");
+	format_time1 = TimeFormatConverter.from_json(columns, "time1_format");
 	column_time2 = columns.get("time2", "time2").asString();
-	format_time2 = TimeFormatConverter::from_json(columns, "time2_format");
+	format_time2 = TimeFormatConverter.from_json(columns, "time2_format");
 
 	auto textual = columns.get("textual", Json::Value(Json::ValueType::arrayValue));
     for (auto &name : textual)
@@ -148,39 +162,41 @@ CSVPointSource::~CSVPointSource() {
 REGISTER_OPERATOR(CSVPointSource, "csvpointsource");
 
 void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"filename\":\"" << filename << "\",";
-	stream << "\"geometry\":\"" << GeometrySpecificationConverter::to_string(geometry_specification) << "\",";
-	stream << "\"time\":\"" << TimeSpecificationConverter::to_string(time_specification) << "\",";
-	if (time_specification == TimeSpecification::START_DURATION)
-		stream << "\"duration\":" << time_duration << ",";
+	Json::Value params(Json::ValueType::objectValue);
 
-	stream << "\"columns\": {";
-		stream << "\"x\":\"" << column_x << "\",";
-		if (geometry_specification != GeometrySpecification::WKT)
-			stream << "\"y\":\"" << column_y << "\",";
-		if (time_specification != TimeSpecification::NONE) {
-			stream << "\"time1\": \"" << column_time1 << "\",";
-			stream << "\"time1_format\": \"" << TimeFormatConverter::to_string(format_time1) << "\",";
-			if (time_specification != TimeSpecification::START) {
-				stream << "\"time2\": \"" << column_time2 << "\",";
-				stream << "\"time2_format\": \"" << TimeFormatConverter::to_string(format_time2) << "\",";
-			}
+	params["filename"] = filename;
+	params["separator"] = std::string(1, field_separator);
+	params["geometry"] = GeometrySpecificationConverter.to_string(geometry_specification);
+	params["time"] = TimeSpecificationConverter.to_string(time_specification);
+	if (time_specification == TimeSpecification::START_DURATION)
+		params["duration"] = time_duration;
+
+	Json::Value columns(Json::ValueType::objectValue);
+	columns["x"] = column_x;
+	if (geometry_specification != GeometrySpecification::WKT)
+		columns["y"] = column_y;
+	if (time_specification != TimeSpecification::NONE) {
+		columns["time1"] = column_time1;
+		columns["time1_format"] = TimeFormatConverter.to_string(format_time1);;
+		if (time_specification != TimeSpecification::START) {
+			columns["time2"] = column_time2;
+			columns["time2_format"] = TimeFormatConverter.to_string(format_time2);
 		}
-		stream << "\"textual\": [";
-		for (size_t i=0;i<columns_textual.size();i++) {
-			if (i > 0)
-				stream << ",";
-			stream << "\"" << columns_textual[i] << "\"";
-		}
-		stream << "],";
-		stream << "\"numeric\": [";
-		for (size_t i=0;i<columns_numeric.size();i++) {
-			if (i > 0)
-				stream << ",";
-			stream << "\"" << columns_numeric[i] << "\"";
-		}
-		stream << "]";
-	stream << "}";
+	}
+
+	Json::Value textual(Json::ValueType::arrayValue);
+	for (const auto &c : columns_textual)
+		textual.append(c);
+	Json::Value numeric(Json::ValueType::arrayValue);
+	for (const auto &c : columns_numeric)
+		numeric.append(c);
+
+	columns["textual"] = textual;
+	columns["numeric"] = numeric;
+	params["columns"] = columns;
+
+	Json::FastWriter writer;
+	stream << writer.write(params);
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
@@ -208,9 +224,8 @@ static double parseTime(const std::string &str, TimeFormat format) {
 	throw ArgumentException("parseTime: unknown TimeFormat");
 }
 
-std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = make_unique<PointCollection>(rect);
-
+void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, const QueryRectangle &rect, QueryProfiler &profiler,
+		std::function<bool(const std::string &,const std::string &)> addFeature) {
 	auto filesize = getFilesize(filename.c_str());
 	if (filesize <= 0)
 		throw OperatorException("CSVPointSource: getFilesize() failed, unable to estimate I/O costs");
@@ -220,7 +235,7 @@ std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryR
 	std::ifstream data(filename);
 
 	//header
-	CSVParser parser(data, filetype == FileType::TTX ? '\t' : ',', '\n');
+	CSVParser parser(data, field_separator, '\n');
 	auto headers = parser.readHeaders();
 
 	// Try to match up all headers
@@ -270,20 +285,17 @@ std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryR
 	for (size_t k=0;k<columns_numeric.size();k++) {
 		if (pos_numeric[k] == no_pos)
 			throw OperatorException(concat("CSVPointSource: numeric column \"", columns_numeric[k], "\" not found."));
-		points_out->local_md_value.addEmptyVector(columns_numeric[k]);
+		collection->local_md_value.addEmptyVector(columns_numeric[k]);
 	}
 
 	for (size_t k=0;k<columns_textual.size();k++) {
 		if (pos_textual[k] == no_pos)
 			throw OperatorException(concat("CSVPointSource: textual column \"", columns_textual[k], "\" not found."));
-		points_out->local_md_string.addEmptyVector(columns_textual[k]);
+		collection->local_md_string.addEmptyVector(columns_textual[k]);
 	}
 
 
-	auto minx = rect.minx();
-	auto maxx = rect.maxx();
-	auto miny = rect.miny();
-	auto maxy = rect.maxy();
+	const std::string empty_string = "";
 
 	size_t current_idx = 0;
 	while (true) {
@@ -292,27 +304,19 @@ std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryR
 			break;
 
 		// Step 1: extract the geometry
-		if (geometry_specification == GeometrySpecification::XY) {
-			// Workaround for safecast data: ignore entries without coordinates
-			if (tuple[pos_x] == "" || tuple[pos_y] == "")
-				continue;
-
-			double x, y;
-			try {
-				x = std::stod(tuple[pos_x]);
-				y = std::stod(tuple[pos_y]);
-			}
-			catch (const std::exception &e) {
-				throw OperatorException("Coordinate value in CSV is not a number");
-			}
-			if (x < minx || x > maxx || y < miny || y > maxy)
-				continue;
-
-			points_out->addSinglePointFeature(Coordinate(x, y));
+		// Note: faulty geometries lead to an error; empty geometries are simply skipped
+		const std::string &x_str = (pos_x == no_pos ? empty_string : tuple[pos_x]);
+		const std::string &y_str = (pos_y == no_pos ? empty_string : tuple[pos_y]);
+		bool added = false;
+		try {
+			added = addFeature(x_str, y_str);
 		}
-		else
-			throw ArgumentException("TODO: WKT not yet implemented");
-
+		catch (const std::exception &e) {
+			throw OperatorException(concat("Geometry in CSV could not be parsed: '", x_str, "', '", y_str, "'"));
+		}
+		if (!added)
+			continue;
+		// TODO: check if geometry is outside the query rectangle?
 
 		// Step 2: extract the time information
 		if (time_specification != TimeSpecification::NONE) {
@@ -329,24 +333,83 @@ std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryR
 				t1 = parseTime(tuple[pos_time1], format_time1);
 				t2 = t1 + parseTime(tuple[pos_time2], format_time2);
 			}
-			points_out->time_start.push_back(t1);
-			points_out->time_end.push_back(t2);
+			collection->time_start.push_back(t1);
+			collection->time_end.push_back(t2);
 			// TODO: what if they're outside of the query rectangle? We cannot just 'continue', since the Feature was already added
 		}
 
 
 		// Step 3: extract the attributes
 		for (size_t k=0;k<columns_numeric.size();k++) {
-			points_out->local_md_value.set(current_idx, columns_numeric[k], std::strtod(tuple[pos_numeric[k]].c_str(), nullptr));
+			collection->local_md_value.set(current_idx, columns_numeric[k], std::strtod(tuple[pos_numeric[k]].c_str(), nullptr));
 		}
 		for (size_t k=0;k<columns_textual.size();k++) {
-			points_out->local_md_string.set(current_idx, columns_textual[k], tuple[pos_textual[k]]);
+			collection->local_md_string.set(current_idx, columns_textual[k], tuple[pos_textual[k]]);
 		}
 
 		// Step 4: increase the current idx, since our feature is finished
 		current_idx++;
 	}
-
-	return points_out;
 }
+
+
+std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto collection = make_unique<PointCollection>(rect);
+	auto add_xy = [&](const std::string &x_str, const std::string &y_str) -> bool {
+		// Workaround for safecast data: ignore entries without coordinates
+		if (x_str == "" || y_str == "")
+			return false;
+
+		double x, y;
+		x = std::stod(x_str);
+		y = std::stod(y_str);
+
+		collection->addSinglePointFeature(Coordinate(x, y));
+		return true;
+	};
+	auto add_wkt = [&](const std::string &wkt, const std::string &) -> bool {
+		WKBUtil::addFeatureToCollection(*collection, wkt);
+		return true;
+	};
+	if (geometry_specification == GeometrySpecification::XY) {
+		readAnyCollection(collection.get(), rect, profiler, add_xy);
+	}
+	else if (geometry_specification == GeometrySpecification::WKT) {
+		readAnyCollection(collection.get(), rect, profiler, add_wkt);
+	}
+	else
+		throw OperatorException("Unimplemented geometry_specification for Points");
+
+	return collection;
+}
+
+std::unique_ptr<LineCollection> CSVPointSource::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto collection = make_unique<LineCollection>(rect);
+	auto add_wkt = [&](const std::string &wkt, const std::string &) -> bool {
+		WKBUtil::addFeatureToCollection(*collection, wkt);
+		return true;
+	};
+	if (geometry_specification == GeometrySpecification::WKT) {
+		readAnyCollection(collection.get(), rect, profiler, add_wkt);
+	}
+	else
+		throw OperatorException("Unimplemented geometry_specification for Lines");
+	return collection;
+}
+
+std::unique_ptr<PolygonCollection> CSVPointSource::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+	auto collection = make_unique<PolygonCollection>(rect);
+	auto add_wkt = [&](const std::string &wkt, const std::string &) -> bool {
+		WKBUtil::addFeatureToCollection(*collection, wkt);
+		return true;
+	};
+	if (geometry_specification == GeometrySpecification::WKT) {
+		readAnyCollection(collection.get(), rect, profiler, add_wkt);
+	}
+	else
+		throw OperatorException("Unimplemented geometry_specification for Polygons");
+	return collection;
+}
+
+
 #endif

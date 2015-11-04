@@ -59,14 +59,14 @@ RasterMetaDataToPoints::~RasterMetaDataToPoints() {
 REGISTER_OPERATOR(RasterMetaDataToPoints, "raster_metadata_to_points");
 
 void RasterMetaDataToPoints::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"names\":[";
+	stream << "{\"names\":[";
 	for(auto& name : names) {
 		stream << "\"" << name << "\",";
 	}
 	stream.seekp(((long) stream.tellp()) - 1); // remove last comma
 	stream << "],";
 	stream << "\"xResolution\": " << xResolution << ",";
-	stream << "\"yResolution\": " << yResolution;
+	stream << "\"yResolution\": " << yResolution << "}";
 }
 
 

@@ -63,8 +63,8 @@ ROperator::~ROperator() {
 REGISTER_OPERATOR(ROperator, "r");
 
 void ROperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"source\":\"" << source << "\","
-			<< "\"result_type\":\"" << result_type << "\"";
+	stream << "{\"source\":\"" << source << "\","
+			<< "\"result_type\":\"" << result_type << "\"}";
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

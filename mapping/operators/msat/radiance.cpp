@@ -44,6 +44,7 @@ REGISTER_OPERATOR(MSATRadianceOperator, "msatradiance");
 
 
 void MSATRadianceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "{}";
 	//stream << "\"convert\":" << (convert ? "true" : "false");
 }
 

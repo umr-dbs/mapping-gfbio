@@ -41,8 +41,8 @@ PointsToRasterOperator::~PointsToRasterOperator() {
 REGISTER_OPERATOR(PointsToRasterOperator, "points2raster");
 
 void PointsToRasterOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"renderattribute\":\"" << renderattribute << "\","
-			<< "\"radius\":" << radius;
+	stream << "{\"renderattribute\":\"" << renderattribute << "\","
+			<< "\"radius\":" << radius << "}";
 }
 
 

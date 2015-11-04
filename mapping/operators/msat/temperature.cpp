@@ -63,7 +63,7 @@ static double calculateTempFromEffectiveRadiance(double wavenumber, double alpha
 }
 
 void MSATTemperatureOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << ", \"forceSatellite\":" << "\"" << forceSatellite << "\"";
+	stream << "{\"forceSatellite\":" << "\"" << forceSatellite << "\"}";
 }
 
 std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {

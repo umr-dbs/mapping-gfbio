@@ -59,7 +59,7 @@ ProjectionOperator::~ProjectionOperator() {
 REGISTER_OPERATOR(ProjectionOperator, "projection");
 
 void ProjectionOperator::writeSemanticParameters(std::ostringstream &stream) {
-	stream << "\"src_projection\": \"EPSG:" << (int) src_epsg << "\", \"dest_projection\": \"EPSG:" << (int) dest_epsg << "\"";
+	stream << "{\"src_projection\": \"EPSG:" << (int) src_epsg << "\", \"dest_projection\": \"EPSG:" << (int) dest_epsg << "\"}";
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

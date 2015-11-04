@@ -39,7 +39,7 @@ PointsDifferenceOperator::~PointsDifferenceOperator() {}
 REGISTER_OPERATOR(PointsDifferenceOperator, "points_difference");
 
 void PointsDifferenceOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"epsilonDistance\":" << epsilonDistance;
+	stream << "{\"epsilonDistance\":" << epsilonDistance << "}";
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

@@ -87,7 +87,8 @@ GenericOperator::~GenericOperator() {
 	}
 }
 
-void GenericOperator::writeSemanticParameters(std::ostringstream &) {
+void GenericOperator::writeSemanticParameters(std::ostringstream &stream) {
+	stream << "{}";
 }
 
 void GenericOperator::assumeSources(int rasters, int pointcollections, int linecollections, int polygoncollections) {
@@ -353,9 +354,9 @@ std::unique_ptr<GenericOperator> GenericOperator::fromJSON(Json::Value &json, in
 
 		// Finally construct the semantic id
 		std::ostringstream semantic_id;
-		semantic_id << "{ \"type\": \"" << type << "\", \"params\": {";
+		semantic_id << "{ \"type\": \"" << type << "\", \"params\": ";
 		op->writeSemanticParameters(semantic_id);
-		semantic_id << "}, \"sources\":{";
+		semantic_id << ", \"sources\":{";
 		int sourceidx = 0;
 		bool first_sourcetype = true;
 		for (int i=0;i<MAX_INPUT_TYPES;i++) {

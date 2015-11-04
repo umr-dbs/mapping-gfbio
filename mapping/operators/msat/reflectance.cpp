@@ -51,9 +51,11 @@ MSATReflectanceOperator::~MSATReflectanceOperator() {
 REGISTER_OPERATOR(MSATReflectanceOperator, "msatreflectance");
 
 void MSATReflectanceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "{";
 	stream << "\"solarCorrection\":" << (solarCorrection ? "true" : "false");
 	stream << ", \"forceHRV\":" << (forceHRV ? "true" : "false");
 	stream << ", \"forceSatellite\":" << "\"" << forceSatellite << "\"";
+	stream << "}";
 }
 
 

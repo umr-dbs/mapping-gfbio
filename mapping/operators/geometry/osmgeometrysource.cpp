@@ -40,7 +40,7 @@ OSMGeometrySourceOperator::~OSMGeometrySourceOperator() {
 REGISTER_OPERATOR(OSMGeometrySourceOperator, "osmgeometrysource");
 
 void OSMGeometrySourceOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"querystring\":\"" << querystring << "\"";
+	stream << "{\"querystring\":\"" << querystring << "\"}";
 }
 
 //TODO: migrate to new simplefeaturecollection

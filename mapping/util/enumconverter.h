@@ -10,36 +10,38 @@
 
 #include <string>
 #include <tuple>
-#include <array>
 #include <vector>
 #include <json/json.h>
 
-template<typename T, std::size_t F, const std::array< std::pair<T, const char*>, F> &map	>
-struct EnumConverter {
-	EnumConverter() = delete;
+template<typename T>
+class EnumConverter {
+	public:
+		EnumConverter(const std::vector< std::pair<T, std::string>> &map) : map(map) {};
 
-	static const std::string &to_string(T t) {
-		for (auto &tuple : map) {
-			if (tuple.first == t)
-				return tuple.second;
+		const std::string &to_string(T t) {
+			for (auto &tuple : map) {
+				if (tuple.first == t)
+					return tuple.second;
+			}
+			throw ArgumentException("No string found for enum value");
 		}
-		throw ArgumentException("No string found for enum value");
-	}
 
-	static const std::string &default_string() {
-		return map.at(0).second;
-	}
-
-	static T from_string(const std::string &s) {
-		for (auto &tuple : map) {
-			if (tuple.second == s)
-				return tuple.first;
+		const std::string &default_string() {
+			return map.at(0).second;
 		}
-		throw ArgumentException(concat("No enum value found for identifier \"", s, "\""));
-	}
 
-	static T from_json(const Json::Value &root, const std::string &name) {
-		auto str = root.get(name, default_string()).asString();
-		return from_string(str);
-	}
+		T from_string(const std::string &s) {
+			for (auto &tuple : map) {
+				if (tuple.second == s)
+					return tuple.first;
+			}
+			throw ArgumentException(concat("No enum value found for identifier \"", s, "\""));
+		}
+
+		T from_json(const Json::Value &root, const std::string &name) {
+			auto str = root.get(name, default_string()).asString();
+			return from_string(str);
+		}
+	private:
+		const std::vector< std::pair<T, std::string>> &map;
 };

@@ -10,7 +10,6 @@
 #include <fstream>
 #include <sstream>
 #include <streambuf>
-#include <array>
 #include <algorithm>
 #include <functional>
 #include <json/json.h>
@@ -32,12 +31,12 @@ enum class GeometrySpecification {
 	// ShapeFile? Others?
 };
 
-extern constexpr std::array< std::pair<GeometrySpecification, const char*>, 2 > GeometrySpecificationMap {
+const std::vector< std::pair<GeometrySpecification, std::string> > GeometrySpecificationMap {
 	std::make_pair(GeometrySpecification::XY, "xy"),
 	std::make_pair(GeometrySpecification::WKT, "wkt")
 };
 
-using GeometrySpecificationConverter = EnumConverter<GeometrySpecification, 2, GeometrySpecificationMap>;
+EnumConverter<GeometrySpecification> GeometrySpecificationConverter(GeometrySpecificationMap);
 
 enum class TimeSpecification {
 	NONE,
@@ -46,26 +45,26 @@ enum class TimeSpecification {
 	START_DURATION
 };
 
-extern constexpr std::array< std::pair<TimeSpecification, const char*>, 4 > TimeSpecificationMap = {
+const std::vector< std::pair<TimeSpecification, std::string> > TimeSpecificationMap = {
 	std::make_pair(TimeSpecification::NONE, "none"),
 	std::make_pair(TimeSpecification::START, "start"),
 	std::make_pair(TimeSpecification::START_END, "start+end"),
 	std::make_pair(TimeSpecification::START_DURATION, "start+duration")
 };
 
-using TimeSpecificationConverter = EnumConverter<TimeSpecification, 4, TimeSpecificationMap>;
+EnumConverter<TimeSpecification> TimeSpecificationConverter(TimeSpecificationMap);
 
 enum class TimeFormat {
 	SECONDS,
 	DMYHM // for hanna's data
 };
 
-extern constexpr std::array< std::pair<TimeFormat, const char*>, 2 > TimeFormatMap = {
+const std::vector< std::pair<TimeFormat, std::string> > TimeFormatMap = {
 	std::make_pair(TimeFormat::SECONDS, "seconds"),
 	std::make_pair(TimeFormat::DMYHM, "dmyhm")
 };
 
-using TimeFormatConverter = EnumConverter<TimeFormat, 2, TimeFormatMap>;
+EnumConverter<TimeFormat> TimeFormatConverter(TimeFormatMap);
 
 
 /*
@@ -128,21 +127,21 @@ CSVPointSource::CSVPointSource(int sourcecounts[], GenericOperator *sources[], J
 		throw ArgumentException("CSVPointSource: Configured separator is not a single character");
 	field_separator = configured_separator[0];
 
-	geometry_specification = GeometrySpecificationConverter::from_json(params, "geometry");
+	geometry_specification = GeometrySpecificationConverter.from_json(params, "geometry");
 
 	auto columns = params.get("columns", Json::Value(Json::ValueType::objectValue));
 	column_x = columns.get("x", "x").asString();
 	column_y = columns.get("y", "y").asString();
 
-	time_specification = TimeSpecificationConverter::from_json(params, "time");
+	time_specification = TimeSpecificationConverter.from_json(params, "time");
 	time_duration = 0.0;
 	if (time_specification == TimeSpecification::START)
 		time_duration = params.get("duration", 1.0).asDouble();
 
 	column_time1 = columns.get("time1", "time1").asString();
-	format_time1 = TimeFormatConverter::from_json(columns, "time1_format");
+	format_time1 = TimeFormatConverter.from_json(columns, "time1_format");
 	column_time2 = columns.get("time2", "time2").asString();
-	format_time2 = TimeFormatConverter::from_json(columns, "time2_format");
+	format_time2 = TimeFormatConverter.from_json(columns, "time2_format");
 
 	auto textual = columns.get("textual", Json::Value(Json::ValueType::arrayValue));
     for (auto &name : textual)
@@ -164,8 +163,8 @@ REGISTER_OPERATOR(CSVPointSource, "csvpointsource");
 
 void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
 	stream << "\"filename\":\"" << filename << "\",";
-	stream << "\"geometry\":\"" << GeometrySpecificationConverter::to_string(geometry_specification) << "\",";
-	stream << "\"time\":\"" << TimeSpecificationConverter::to_string(time_specification) << "\",";
+	stream << "\"geometry\":\"" << GeometrySpecificationConverter.to_string(geometry_specification) << "\",";
+	stream << "\"time\":\"" << TimeSpecificationConverter.to_string(time_specification) << "\",";
 	if (time_specification == TimeSpecification::START_DURATION)
 		stream << "\"duration\":" << time_duration << ",";
 
@@ -175,10 +174,10 @@ void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
 			stream << "\"y\":\"" << column_y << "\",";
 		if (time_specification != TimeSpecification::NONE) {
 			stream << "\"time1\": \"" << column_time1 << "\",";
-			stream << "\"time1_format\": \"" << TimeFormatConverter::to_string(format_time1) << "\",";
+			stream << "\"time1_format\": \"" << TimeFormatConverter.to_string(format_time1) << "\",";
 			if (time_specification != TimeSpecification::START) {
 				stream << "\"time2\": \"" << column_time2 << "\",";
-				stream << "\"time2_format\": \"" << TimeFormatConverter::to_string(format_time2) << "\",";
+				stream << "\"time2_format\": \"" << TimeFormatConverter.to_string(format_time2) << "\",";
 			}
 		}
 		stream << "\"textual\": [";

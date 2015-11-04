@@ -136,7 +136,7 @@ std::unique_ptr<JobDescription> QueryManager::create_raster_job(const BaseReques
 	else {
 		Log::debug("Full MISS.");
 		std::unique_ptr<BaseRequest> jreq = make_unique<BaseRequest>(req);
-		return make_unique<CreateJob>(QueryInfo::Type::RASTER, jreq);
+		return make_unique<CreateJob>(QueryInfo::Type::RASTER, jreq, nodes, raster_cache);
 	}
 }
 
@@ -228,9 +228,10 @@ JobDescription::JobDescription( Type type, std::unique_ptr<BaseRequest> request)
 	QueryInfo(type, *request), request(std::move(request)) {
 }
 
-CreateJob::CreateJob(Type type, std::unique_ptr<BaseRequest>& request) :
+CreateJob::CreateJob(Type type, std::unique_ptr<BaseRequest>& request,
+					 const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const IndexCache &cache) :
 	JobDescription(type, std::unique_ptr<BaseRequest>(request.release())), orig_query(query), orig_area(
-		(query.x2 - query.x1) * (query.y2 - query.y1)) {
+		(query.x2 - query.x1) * (query.y2 - query.y1)), nodes(nodes), cache(cache) {
 }
 
 CreateJob::~CreateJob() {
@@ -282,9 +283,14 @@ bool CreateJob::extend(Type type, const BaseRequest& req) {
 }
 
 uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
+	// Do not schedule if we have no nodes
+	if ( nodes.empty() )
+		return 0;
+
+	uint32_t node_id = cache.get_node_for_job(query,nodes);
 	for (auto &e : connections) {
 		auto &con = *e.second;
-		if (!con.is_faulty() && con.get_state() == WorkerConnection::State::IDLE) {
+		if (!con.is_faulty() && con.node->id == node_id && con.get_state() == WorkerConnection::State::IDLE) {
 			con.process_request(WorkerConnection::CMD_CREATE_RASTER, *request);
 			return con.id;
 		}

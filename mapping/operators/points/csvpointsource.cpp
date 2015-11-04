@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sstream>
 #include <streambuf>
+#include <array>
 #include <algorithm>
 #include <functional>
 #include <json/json.h>
@@ -30,11 +31,13 @@ enum class GeometrySpecification {
 	WKT
 	// ShapeFile? Others?
 };
-static const std::vector< std::pair<GeometrySpecification, std::string> > GeometrySpecificationMap = {
+
+extern constexpr std::array< std::pair<GeometrySpecification, const char*>, 2 > GeometrySpecificationMap {
 	std::make_pair(GeometrySpecification::XY, "xy"),
 	std::make_pair(GeometrySpecification::WKT, "wkt")
 };
-using GeometrySpecificationConverter = EnumConverter<GeometrySpecification, GeometrySpecificationMap>;
+
+using GeometrySpecificationConverter = EnumConverter<GeometrySpecification, 2, GeometrySpecificationMap>;
 
 enum class TimeSpecification {
 	NONE,
@@ -42,23 +45,27 @@ enum class TimeSpecification {
 	START_END,
 	START_DURATION
 };
-static const std::vector< std::pair<TimeSpecification, std::string> > TimeSpecificationMap = {
+
+extern constexpr std::array< std::pair<TimeSpecification, const char*>, 4 > TimeSpecificationMap = {
 	std::make_pair(TimeSpecification::NONE, "none"),
 	std::make_pair(TimeSpecification::START, "start"),
 	std::make_pair(TimeSpecification::START_END, "start+end"),
 	std::make_pair(TimeSpecification::START_DURATION, "start+duration")
 };
-using TimeSpecificationConverter = EnumConverter<TimeSpecification, TimeSpecificationMap>;
+
+using TimeSpecificationConverter = EnumConverter<TimeSpecification, 4, TimeSpecificationMap>;
 
 enum class TimeFormat {
 	SECONDS,
 	DMYHM // for hanna's data
 };
-static const std::vector< std::pair<TimeFormat, std::string> > TimeFormatMap = {
+
+extern constexpr std::array< std::pair<TimeFormat, const char*>, 2 > TimeFormatMap = {
 	std::make_pair(TimeFormat::SECONDS, "seconds"),
 	std::make_pair(TimeFormat::DMYHM, "dmyhm")
 };
-using TimeFormatConverter = EnumConverter<TimeFormat, TimeFormatMap>;
+
+using TimeFormatConverter = EnumConverter<TimeFormat, 2, TimeFormatMap>;
 
 
 /*

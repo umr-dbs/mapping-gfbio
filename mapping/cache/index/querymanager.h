@@ -52,7 +52,7 @@ public:
 	// -> Enlarges the result to satisfy more than the original query
 	virtual bool extend( Type type, const BaseRequest &req );
 	// Schedules this job on one of the given worker-connections
-	virtual uint64_t  schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
+	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
 	virtual bool is_affected_by_node( uint32_t node_id ) = 0;
 protected:
 	JobDescription( Type type, std::unique_ptr<BaseRequest> request );
@@ -65,16 +65,18 @@ protected:
 //
 class CreateJob : public JobDescription {
 public:
-	CreateJob( Type type, std::unique_ptr<BaseRequest> &request );
+	CreateJob( Type type, std::unique_ptr<BaseRequest> &request,
+		const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const IndexCache &cache );
 	virtual ~CreateJob();
 	virtual bool extend( Type type, const BaseRequest &req );
-	virtual uint64_t  schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
 	virtual bool is_affected_by_node( uint32_t node_id );
 private:
 	// The original query (before any calls to extends
 	const QueryRectangle orig_query;
 	const double orig_area;
-
+	const std::map<uint32_t,std::shared_ptr<Node>> &nodes;
+	const IndexCache &cache;
 };
 
 //

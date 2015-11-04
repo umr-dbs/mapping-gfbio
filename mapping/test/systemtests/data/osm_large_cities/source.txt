@@ -1,0 +1,7 @@
+OSM data downloaded from http://wiki.openstreetmap.org/wiki/Planet.osm
+
+extracted by OGR:
+ogr2ogr -progress -f PostgreSQL PG:"dbname='osm' host='localhost' port='5433' user='postgres' password='***'" planet-latest.osm.pbf -lco COLUMN_TYPES=other_tags=hstore -sql "select * from points where place = 'city' and cast(population as integer) > 250000"
+
+exported to csv from PostGIS by:
+Copy (select ST_AsText(wkb_geometry) wkt, osm_id, "name", is_in, osm_timestamp time_start from points) To 'D:\osm_large_cities.csv' delimiter ';' CSV header;

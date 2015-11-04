@@ -1,0 +1,5 @@
+Country borders downloaded from http://www.naturalearthdata.com/downloads/10m-cultural-vectors/
+
+UN date information from https://en.wikipedia.org/wiki/Member_states_of_the_United_Nations
+
+data joined manually on country name

@@ -1,4 +1,4 @@
-Country polygons public domain from naturalearth.com:
+Country polygons public domain from http://www.naturalearthdata.com/:
 "No permission is needed to use Natural Earth. Crediting the authors is unnecessary."
 
 UN member state information is public information from

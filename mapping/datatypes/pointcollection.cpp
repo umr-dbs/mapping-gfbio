@@ -1,4 +1,4 @@
-#include "pointcollection.h"
+#include "datatypes/pointcollection.h"
 
 #include "util/binarystream.h"
 #include "util/hash.h"

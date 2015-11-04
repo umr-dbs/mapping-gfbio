@@ -1,7 +1,9 @@
 
-#include <sstream>
-#include "polygoncollection.h"
+#include "datatypes/polygoncollection.h"
 #include "util/make_unique.h"
+#include "util/hash.h"
+
+#include <sstream>
 
 template<typename T>
 std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vector<T> &keep) {
@@ -203,6 +205,13 @@ void PolygonCollection::featureToWKT(size_t featureIndex, std::ostringstream& wk
 	}
 }
 
+std::string PolygonCollection::hash() {
+	// certainly not the most stable solution, but it has few lines of code..
+	std::string serialized = toGeoJSON(true);
+
+	return calculateHash((const unsigned char *) serialized.c_str(), (int) serialized.length()).asHex();
+}
+
 bool PolygonCollection::isSimple() const {
 	return getFeatureCount() == (start_polygon.size() - 1);
 }
@@ -299,7 +308,7 @@ bool PolygonCollection::pointInCollection(Coordinate& coordinate) const {
 
 	return false;
 }
-	
+
 SpatialReference PolygonCollection::getFeatureMBR(size_t featureIndex) const {
 	return getFeatureReference(featureIndex).getMBR();
 }

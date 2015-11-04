@@ -22,6 +22,8 @@
 
 #include <json/json.h>
 #include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
 
 static char *program_name;
 static void usage() {
@@ -408,6 +410,11 @@ static int testquery(int argc, char *argv[]) {
 			QueryProfiler profiler;
 			auto points = graph->getCachedPointCollection(qrect, profiler);
 			real_hash = points->hash();
+		}
+		else if (result == "polygons") {
+			QueryProfiler profiler;
+			auto polygons = graph->getCachedPolygonCollection(qrect, profiler);
+			real_hash = polygons->hash();
 		}
 		else {
 			printf("Unknown result type: %s\n", result.c_str());

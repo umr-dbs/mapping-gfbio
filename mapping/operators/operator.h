@@ -74,6 +74,14 @@ class GenericOperator {
 		// there is no getPlotFromSource, because plots are by definition the final step of a chain
 
 	private:
+		enum class ResolutionRequirement {
+			REQUIRED,
+			FORBIDDEN,
+			OPTIONAL
+		};
+		void validateQRect(const QueryRectangle &rect, ResolutionRequirement res = ResolutionRequirement::OPTIONAL);
+		void validateResult(const QueryRectangle &rect, SpatioTemporalResult *result);
+
 		int sourcecounts[MAX_INPUT_TYPES];
 		GenericOperator *sources[MAX_SOURCES];
 

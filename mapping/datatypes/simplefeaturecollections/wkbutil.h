@@ -13,18 +13,69 @@ class WKBUtil {
 public:
 	WKBUtil() = delete;
 
+	/**
+	 * read PointCollection from well-known binary
+	 * @param wkb the well-known binary containing a collection of Points/Multi-Points
+	 * @return PointCollection from well-known binary
+	 */
 	static std::unique_ptr<PointCollection> readPointCollection(std::stringstream& wkb);
 
+	/**
+	 * read LineCollection from well-known binary
+	 * @param wkb the well-known binary containing a collection of Lines/Multi-Lines
+	 * @return LineCollection from well-known binary
+	 */
 	static std::unique_ptr<LineCollection> readLineCollection(std::stringstream& wkb);
 
+	/**
+	 * read PolygonCollection from well-known binary
+	 * @param wkb the well-known binary containing a collection of Polygon/Multi-Polygons
+	 * @return PolygonCollection from well-known binary
+	 */
 	static std::unique_ptr<PolygonCollection> readPolygonCollection(std::stringstream& wkb);
 
-	static std::unique_ptr<PointCollection> readPointCollection(std::string& wkt);
+	/**
+	 * read PointCollection from well-known text
+	 * @param wkt the well-known text containing a collection of Points/Multi-Points
+	 * @return PointCollection from well-known text
+	 */
+	static std::unique_ptr<PointCollection> readPointCollection(const std::string& wkt);
 
-	static std::unique_ptr<LineCollection> readLineCollection(std::string& wkt);
+	/**
+	 * read LineCollection from well-known text
+	 * @param wkt the well-known text containing a collection of Lines/Multi-Lines
+	 * @return LineCollection from well-known text
+	 */
+	static std::unique_ptr<LineCollection> readLineCollection(const std::string& wkt);
 
-	static std::unique_ptr<PolygonCollection> readPolygonCollection(std::string& wkt);
+	/**
+	 * read PolygonCollection from well-known text
+	 * @param wkt the well-known text containing a collection of Polygon/Multi-Polygons
+	 * @return PolygonCollection from well-known text
+	 */
+	static std::unique_ptr<PolygonCollection> readPolygonCollection(const std::string& wkt);
 
+
+	/**
+	 * add a feature as well-known text to a PointCollection
+	 * @param collection the collection
+	 * @param wkt the well-known text
+	 */
+	static void addFeatureToCollection(PointCollection& collection, const std::string& wkt);
+
+	/**
+	 * add a feature as well-known text to a LineCollection
+	 * @param collection the collection
+	 * @param wkt the well-known text
+	 */
+	static void addFeatureToCollection(LineCollection& collection, const std::string& wkt);
+
+	/**
+	 * add a feature as well-known text to a PolygonCollection
+	 * @param collection the collection
+	 * @param wkt the well-known text
+	 */
+	static void addFeatureToCollection(PolygonCollection& collection, const std::string& wkt);
 
 };
 

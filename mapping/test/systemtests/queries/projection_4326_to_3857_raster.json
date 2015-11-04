@@ -1,0 +1,47 @@
+{
+	"name" : "Projection 4326 tp 3857 raster",
+	"query_result": "raster",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 0
+    },
+    "spatial_reference": {
+        "projection": "EPSG:3857",
+		"x1" : -20037508,
+		"x2" : 20037508,
+		"y1" : -20037508,
+		"y2" : 20037508
+    },
+    "resolution": {
+    	"type": "pixels",
+        "x": 7284, 
+        "y": 9630
+    },
+    "query_mode": "exact",
+	"query" : 
+	{
+		"params" : 
+		{
+			"dest_projection" : "EPSG:3857",
+			"src_projection" : "EPSG:4326"
+		},
+		"sources" : 
+		{
+			"raster" : 
+			[
+				
+				{
+					"params" : 
+					{
+						"channel" : 0,
+						"sourcename" : "world1"
+					},
+					"type" : "source"
+				}
+			]
+		},
+		"type" : "projection"
+	},
+	"query_expected_hash" : "715612544ff0b8cd1933a5f5ed860f83"
+}

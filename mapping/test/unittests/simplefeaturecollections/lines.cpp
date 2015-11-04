@@ -362,3 +362,83 @@ TEST(LineCollection, calculateMBR){
 	EXPECT_DOUBLE_EQ(-6, mbr.y1);
 	EXPECT_DOUBLE_EQ(-4, mbr.y2);
 }
+
+TEST(LineCollection, WKTImport){
+	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2, 3 4, 5 6))";
+	auto lines = WKBUtil::readLineCollection(wkt);
+
+	EXPECT_EQ(1, lines->getFeatureCount());
+	EXPECT_EQ(1, lines->coordinates[0].x);
+	EXPECT_EQ(2, lines->coordinates[0].y);
+	EXPECT_EQ(5, lines->coordinates[2].x);
+	EXPECT_EQ(6, lines->coordinates[2].y);
+}
+
+TEST(LineCollection, WKTImportMulti){
+	std::string wkt = "GEOMETRYCOLLECTION(MULTILINESTRING((1 2, 3 4, 5 6), (7 8, 9 10, 11 12, 13 14)))";
+	auto lines = WKBUtil::readLineCollection(wkt);
+
+	EXPECT_EQ(1, lines->getFeatureCount());
+	EXPECT_EQ(1, lines->coordinates[0].x);
+	EXPECT_EQ(2, lines->coordinates[0].y);
+	EXPECT_EQ(13, lines->coordinates[6].x);
+	EXPECT_EQ(14, lines->coordinates[6].y);
+}
+
+TEST(LineCollection, WKTImportMixed){
+	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2, 3 4, 5 6), MULTILINESTRING((1 2, 3 4, 5 6), (7 8, 9 10, 11 12, 13 14)))";
+	auto lines = WKBUtil::readLineCollection(wkt);
+
+	EXPECT_EQ(2, lines->getFeatureCount());
+	EXPECT_EQ(1, lines->coordinates[0].x);
+	EXPECT_EQ(2, lines->coordinates[0].y);
+	EXPECT_EQ(5, lines->coordinates[2].x);
+	EXPECT_EQ(6, lines->coordinates[2].y);
+
+	EXPECT_EQ(1, lines->start_feature[1]);
+	EXPECT_EQ(3, lines->start_line[1]);
+
+	EXPECT_EQ(13, lines->coordinates[9].x);
+	EXPECT_EQ(14, lines->coordinates[9].y);
+}
+
+TEST(LineCollection, WKTAddSingleFeature){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	lines.addCoordinate(1, 2);
+	lines.addCoordinate(2, 3);
+	lines.addCoordinate(3, 4);
+	lines.finishLine();
+	lines.finishFeature();
+	std::string wkt = "LINESTRING(3 4, 5 5, 6 7)";
+	WKBUtil::addFeatureToCollection(lines, wkt);
+
+	EXPECT_EQ(2, lines.getFeatureCount());
+	EXPECT_EQ(1, lines.coordinates[0].x);
+	EXPECT_EQ(2, lines.coordinates[0].y);
+	EXPECT_EQ(6, lines.coordinates[5].x);
+	EXPECT_EQ(7, lines.coordinates[5].y);
+}
+
+TEST(LineCollection, WKTAddMultiFeature){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	lines.addCoordinate(1, 2);
+	lines.addCoordinate(2, 3);
+	lines.addCoordinate(3, 4);
+	lines.finishLine();
+	lines.finishFeature();
+	std::string wkt = "MULTILINESTRING((3 4, 5 6, 8 8), (9 9, 5 2, 1 1))";
+	WKBUtil::addFeatureToCollection(lines, wkt);
+
+	EXPECT_EQ(2, lines.getFeatureCount());
+	EXPECT_EQ(2, lines.getFeatureReference(1).size());
+	EXPECT_EQ(1, lines.coordinates[0].x);
+	EXPECT_EQ(2, lines.coordinates[0].y);
+	EXPECT_EQ(2, lines.coordinates[1].x);
+	EXPECT_EQ(3, lines.coordinates[1].y);
+
+	EXPECT_EQ(1, lines.start_feature[1]);
+	EXPECT_EQ(3, lines.start_line[1]);
+
+	EXPECT_EQ(1, lines.coordinates[8].x);
+	EXPECT_EQ(1, lines.coordinates[8].y);
+}

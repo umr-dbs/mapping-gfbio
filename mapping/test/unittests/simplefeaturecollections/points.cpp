@@ -365,3 +365,66 @@ TEST(PointCollection, calulcateMBR){
 	EXPECT_DOUBLE_EQ(1, mbr.y1);
 	EXPECT_DOUBLE_EQ(2, mbr.y2);
 }
+
+TEST(PointCollection, WKTImport){
+	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2))";
+	auto points = WKBUtil::readPointCollection(wkt);
+
+	EXPECT_EQ(1, points->getFeatureCount());
+	EXPECT_EQ(1, points->coordinates[0].x);
+	EXPECT_EQ(2, points->coordinates[0].y);
+}
+
+TEST(PointCollection, WKTImportMultiPoint){
+	std::string wkt = "GEOMETRYCOLLECTION(MULTIPOINT(1 2, 3 4))";
+	auto points = WKBUtil::readPointCollection(wkt);
+
+	EXPECT_EQ(1, points->getFeatureCount());
+	EXPECT_EQ(1, points->coordinates[0].x);
+	EXPECT_EQ(2, points->coordinates[0].y);
+	EXPECT_EQ(3, points->coordinates[1].x);
+	EXPECT_EQ(4, points->coordinates[1].y);
+}
+
+TEST(PointCollection, WKTImportMixed){
+	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), MULTIPOINT(1 2, 3 4))";
+	auto points = WKBUtil::readPointCollection(wkt);
+
+	EXPECT_EQ(2, points->getFeatureCount());
+	EXPECT_EQ(1, points->coordinates[0].x);
+	EXPECT_EQ(2, points->coordinates[0].y);
+	EXPECT_EQ(1, points->coordinates[1].x);
+	EXPECT_EQ(2, points->coordinates[1].y);
+	EXPECT_EQ(3, points->coordinates[2].x);
+	EXPECT_EQ(4, points->coordinates[2].y);
+	EXPECT_EQ(3, points->coordinates[2].x);
+	EXPECT_EQ(1, points->start_feature[1]);
+}
+
+TEST(PointCollection, WKTAddSingleFeature){
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	points.addSinglePointFeature(Coordinate(1, 2));
+	std::string wkt = "POINT(3 4)";
+	WKBUtil::addFeatureToCollection(points, wkt);
+
+	EXPECT_EQ(2, points.getFeatureCount());
+	EXPECT_EQ(1, points.coordinates[0].x);
+	EXPECT_EQ(2, points.coordinates[0].y);
+	EXPECT_EQ(3, points.coordinates[1].x);
+	EXPECT_EQ(4, points.coordinates[1].y);
+}
+
+TEST(PointCollection, WKTAddMultiFeature){
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	points.addSinglePointFeature(Coordinate(1, 2));
+	std::string wkt = "MULTIPOINT(3 4, 5 6)";
+	WKBUtil::addFeatureToCollection(points, wkt);
+
+	EXPECT_EQ(2, points.getFeatureCount());
+	EXPECT_EQ(1, points.coordinates[0].x);
+	EXPECT_EQ(2, points.coordinates[0].y);
+	EXPECT_EQ(3, points.coordinates[1].x);
+	EXPECT_EQ(4, points.coordinates[1].y);
+	EXPECT_EQ(5, points.coordinates[2].x);
+	EXPECT_EQ(6, points.coordinates[2].y);
+}

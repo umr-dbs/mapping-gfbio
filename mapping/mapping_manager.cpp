@@ -30,8 +30,10 @@ static void usage() {
 		printf("%s createsource <epsg> <channel1_example> <channel2_example> ...\n", program_name);
 		printf("%s loadsource <sourcename>\n", program_name);
 		printf("%s import <sourcename> <filename> <filechannel> <sourcechannel> <time_start> <duration> <compression>\n", program_name);
+		printf("%s link <sourcename> <sourcechannel> <time_reference> <time_start> <duration>\n", program_name);
 		printf("%s query <queryname> <png_filename>\n", program_name);
-		printf("%s hash <queryname>\n", program_name);
+		printf("%s testquery <queryname>\n", program_name);
+		printf("%s testsemantic <queryname>\n", program_name);
 		exit(5);
 }
 
@@ -178,29 +180,82 @@ static void link(int argc, char *argv[]) {
 	}
 }
 
+static SpatialReference sref_from_json(Json::Value &root, bool &flipx, bool &flipy){
+	if(root.isMember("spatial_reference")){
+		Json::Value& json = root["spatial_reference"];
+
+		epsg_t epsg = epsgCodeFromSrsString(json.get("projection", "EPSG:4326").asString());
+
+		double x1 = json.get("x1", -180).asDouble();
+		double y1 = json.get("y1", -90).asDouble();
+		double x2 = json.get("x2", 180).asDouble();
+		double y2 = json.get("y2", 90).asDouble();
+
+		return SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy);
+	}
+
+	return SpatialReference::unreferenced();
+}
+
+static TemporalReference tref_from_json(Json::Value &root){
+	if(root.isMember("temporal_reference")){
+		Json::Value& json = root["temporal_reference"];
+
+		std::string type = json.get("type", "UNIX").asString();
+
+		timetype_t time_type;
+
+		if(type == "UNIX")
+			time_type = TIMETYPE_UNIX;
+		else
+			time_type = TIMETYPE_UNKNOWN;
+
+		double start = json.get("start", 0).asDouble();
+		double end = json.get("end", 0).asDouble();
+
+		return TemporalReference(time_type, start, end);
+	}
+
+	return TemporalReference::unreferenced();
+}
+
+static QueryResolution qres_from_json(Json::Value &root){
+	if(root.isMember("resolution")){
+		Json::Value& json = root["resolution"];
+
+		std::string type = json.get("type", "none").asString();
+
+		if(type == "pixels"){
+			int x = json.get("x", 1000).asInt();
+			int y = json.get("y", 1000).asInt();
+
+			return QueryResolution::pixels(x, y);
+		} else if(type == "none")
+			return QueryResolution::none();
+		else {
+			fprintf(stderr, "invalid query resolution");
+			exit(5);
+		}
+
+
+	}
+
+	return QueryResolution::none();
+}
 
 static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flipy) {
-	epsg_t epsg = (epsg_t) root.get("query_epsg", EPSG_WEBMERCATOR).asInt();
-	double x1 = root.get("query_x1", -20037508).asDouble();
-	double y1 = root.get("query_y1", -20037508).asDouble();
-	double x2 = root.get("query_x2", 20037508).asDouble();
-	double y2 = root.get("query_y2", 20037508).asDouble();
-	int xres = root.get("query_xres", 1000).asInt();
-	int yres = root.get("query_yres", 1000).asInt();
-	double timestamp = root.get("starttime", 0).asDouble();
-
-	QueryRectangle result(
-		SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy),
-		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
-		QueryResolution::pixels(xres, yres)
+	return QueryRectangle (
+		sref_from_json(root, flipx, flipy),
+		tref_from_json(root),
+		qres_from_json(root)
 	);
-	return result;
 }
 
 static QueryRectangle qrect_from_json(Json::Value &root) {
 	bool flipx, flipy;
 	return qrect_from_json(root, flipx, flipy);
 }
+
 
 static void runquery(int argc, char *argv[]) {
 	if (argc < 3) {
@@ -230,11 +285,25 @@ static void runquery(int argc, char *argv[]) {
 	auto graph = GenericOperator::fromJSON(root["query"]);
 	std::string result = root.get("query_result", "raster").asString();
 
+	bool flipx, flipy;
+	auto qrect = qrect_from_json(root, flipx, flipy);
+
 	if (result == "raster") {
 		QueryProfiler profiler;
-		bool flipx, flipy;
-		auto qrect = qrect_from_json(root, flipx, flipy);
-		auto raster = graph->getCachedRaster(qrect, profiler);
+
+		std::string queryModeParam = root.get("query_mode", "exact").asString();
+		GenericOperator::RasterQM queryMode;
+
+		if(queryModeParam == "exact")
+			queryMode = GenericOperator::RasterQM::EXACT;
+		else if(queryModeParam == "loose")
+			queryMode = GenericOperator::RasterQM::LOOSE;
+		else {
+			fprintf(stderr, "invalid query mode");
+			exit(5);
+		}
+
+		auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
 		printf("flip: %d %d\n", flipx, flipy);
 		printf("QRect(%f,%f -> %f,%f)\n", qrect.x1, qrect.y1, qrect.x2, qrect.y2);
 		if (flipx || flipy)
@@ -256,8 +325,6 @@ static void runquery(int argc, char *argv[]) {
 	}
 	else if (result == "points") {
 		QueryProfiler profiler;
-		auto qrect1 = qrect_from_json(root);
-		QueryRectangle qrect(qrect1, qrect1, QueryResolution::none());
 		auto points = graph->getCachedPointCollection(qrect, profiler);
 		auto csv = points->toCSV();
 		if (out_filename) {
@@ -308,22 +375,38 @@ static int testquery(int argc, char *argv[]) {
 		}
 
 		auto graph = GenericOperator::fromJSON(root["query"]);
-		std::string result = root.get("query_result", "raster").asString();
 
+		/*
+		 * Step #2: run the query and see if the results match
+		 */
+		std::string result = root.get("query_result", "raster").asString();
 		std::string real_hash;
 
+		bool flipx, flipy;
+		auto qrect = qrect_from_json(root, flipx, flipy);
 		if (result == "raster") {
 			QueryProfiler profiler;
-			bool flipx, flipy;
-			auto qrect = qrect_from_json(root, flipx, flipy);
-			auto raster = graph->getCachedRaster(qrect, profiler);
+
+			std::string queryModeParam = root.get("query_mode", "exact").asString();
+			GenericOperator::RasterQM queryMode;
+
+			if(queryModeParam == "exact")
+				queryMode = GenericOperator::RasterQM::EXACT;
+			else if(queryModeParam == "loose")
+				queryMode = GenericOperator::RasterQM::LOOSE;
+			else {
+				fprintf(stderr, "invalid query mode");
+				exit(5);
+			}
+
+			auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
 			if (flipx || flipy)
 				raster = raster->flip(flipx, flipy);
 			real_hash = raster->hash();
 		}
 		else if (result == "points") {
 			QueryProfiler profiler;
-			auto points = graph->getCachedPointCollection(qrect_from_json(root), profiler);
+			auto points = graph->getCachedPointCollection(qrect, profiler);
 			real_hash = points->hash();
 		}
 		else {
@@ -360,6 +443,58 @@ static int testquery(int argc, char *argv[]) {
 	return 0;
 }
 
+static int testsemantic(int argc, char *argv[]) {
+	if (argc < 3) {
+		usage();
+	}
+	char *in_filename = argv[2];
+
+	try {
+		/*
+		 * Step #1: open the query.json file and parse it
+		 */
+		std::ifstream file(in_filename);
+		if (!file.is_open()) {
+			printf("unable to open query file %s\n", in_filename);
+			return 5;
+		}
+
+		Json::Reader reader(Json::Features::strictMode());
+		Json::Value root;
+		if (!reader.parse(file, root)) {
+			printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
+			return 5;
+		}
+
+		auto graph = GenericOperator::fromJSON(root["query"]);
+
+		/*
+		 * Step #2: make sure the graph's semantic id works
+		 */
+		auto semantic1 = graph->getSemanticId();
+		decltype(graph) graph2 = nullptr;
+		try {
+			graph2 = GenericOperator::fromJSON(semantic1);
+		}
+		catch (const std::exception &e) {
+			printf("Exception parsing graph from semantic id: %s\n%s", e.what(), semantic1.c_str());
+			return 5;
+		}
+		auto semantic2 = graph2->getSemanticId();
+		if (semantic1 != semantic2) {
+			printf("Semantic ID changes after reconstruction:\n%s\n%s\n", semantic1.c_str(), semantic2.c_str());
+			exit(5);
+		}
+	}
+	catch (const std::exception &e) {
+		printf("Exception: %s\n", e.what());
+		return 5;
+	}
+	printf("Semantic ID is ok\n");
+	return 0;
+}
+
+
 int main(int argc, char *argv[]) {
 
 	program_name = argv[0];
@@ -394,6 +529,9 @@ int main(int argc, char *argv[]) {
 	}
 	else if (strcmp(command, "testquery") == 0) {
 		return testquery(argc, argv);
+	}
+	else if (strcmp(command, "testsemantic") == 0) {
+		return testsemantic(argc, argv);
 	}
 	else if (strcmp(command, "msgcoord") == 0) {
 		GDAL::CRSTransformer t(EPSG_LATLON, EPSG_GEOSMSG);

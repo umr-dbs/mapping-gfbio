@@ -12,7 +12,7 @@ time_t parseIso8601DateTime(std::string dateTimeString) {
 	const std::string dateTimeFormat { "%Y-%m-%dT%H:%M:%S" }; //TODO: we should allow millisec -> "%Y-%m-%dT%H:%M:%S.SSSZ" std::get_time and the tm struct dont have them.
 
 	//std::stringstream dateTimeStream{dateTimeString}; //TODO: use this with gcc >5.0
-	tm queryDateTime { 0 };
+	tm queryDateTime;
 	//std::get_time(&queryDateTime, dateTimeFormat); //TODO: use this with gcc >5.0
 	strptime(dateTimeString.c_str(), dateTimeFormat.c_str(), &queryDateTime); //TODO: remove this with gcc >5.0
 	time_t queryTimestamp = timegm(&queryDateTime); //TODO: is there a c++ version for timegm?

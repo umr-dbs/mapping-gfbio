@@ -5,13 +5,13 @@
 LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
 CPATH := /usr/local/include/:$(CPATH)
 
-#CPP=g++
-CPP=clang++-3.5
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/
+CPP=g++
+#CPP=clang++-3.5
+CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++0x -I. -I/usr/include/jsoncpp/ -I/usr/include/gdal
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_CL=-lOpenCL
-LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
+LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib apt-l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-luriparser
 LDFLAGS_GTEST=-lgtest -lgtest_main -lpthread
 CL_SOURCES:=$(wildcard operators/*/*.cl)
@@ -75,34 +75,35 @@ EXECACHENODE=cache_node
 .SECONDEXPANSION:
 
 all: $(CL_HEADERS) ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED}
+without-rserver: $(CL_HEADERS) ${EXE} ${EXECGI} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED}
 
 #
 # Dependencies and compiler flags of all executables
 #
 
-${EXE}:	o/rasterdb.o ${OBJ_COMMON}
-	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} -o $@
+${EXE}:	o/mapping_manager.o ${OBJ_COMMON}
+	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
 ${EXECGI}:	o/cgi.o o/cache/client.o ${OBJ_COMMON}
-	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_CGI} -o $@
+	${CPP} $+ -o $@  ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_CGI}
 
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/colors.o o/raster/profiler.o
-	${CPP} ${LDFLAGS} ${LDFLAGS_R} $+ -o $@
+	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 	
 ${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/client.o o/test/unittests/init.o o/test/unittests/example.o o/test/unittests/simplefeaturecollections/points.o o/test/unittests/simplefeaturecollections/lines.o o/test/unittests/simplefeaturecollections/polygons.o o/test/unittests/temporal/timeshift.o o/test/unittests/cache/util.o o/test/unittests/cache/stcache.o o/test/unittests/cache/distribution.o
-	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST} -o $@
+	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 
 ${EXEGEOMETRYTESTBED}:	o/geometrytestbed.o ${OBJ_COMMON}
-	${CPP} $+ ${LDFLAGS} ${LDFLAGS_CL} -o $@
+	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} 
 
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o 
-	${CPP} ${LDFLAGS} $+ -o $@
+	${CPP} $+ -o $@  ${LDFLAGS}
 
 ${EXECACHEINDEX}:	o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/colors.o o/raster/profiler.o 
-	${CPP} ${LDFLAGS} $+ -o $@
+	${CPP} $+ -o $@ ${LDFLAGS}
 
 ${EXECACHENODE}:	o/cache/node/nodeserver_main.o o/cache/node/nodeserver.o o/cache/node/delivery.o ${OBJ_COMMON}
-	${CPP} ${LDFLAGS} ${LDFLAGS_CL} $+ -o $@
+	${CPP}  $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
 
 
@@ -192,6 +193,7 @@ system_testenvironment: ${EXE}
 
 test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} test/systemtests/data/world1.dat 
 	echo -n >$@
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE} testsemantic $< 2>&1) ; then echo "semantic_passed: yes" >>$@ ; else echo "semantic_passed: no\n$$EXELOG" >>$@ ; fi
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE} testquery $< 2>&1) ; then echo "hash_passed: yes" >>$@ ; else echo "hash_passed: no\n$$EXELOG" >>$@ ; fi
 	#MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if VGLOG=$$(timeout 180 ${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
 

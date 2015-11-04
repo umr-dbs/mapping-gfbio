@@ -1,24 +1,34 @@
-
 {
-	"endtime" : 42,
-	"name" : "Load points",
+	"name" : "Load points",	
+	"query_result": "points",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 0
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
 	"query" : 
 	{
 		"params" : 
 		{
-			"filename" : "test/data/places_dump/places_dump_DE.csv"
+			"filename" : "test/systemtests/data/places_dump/places_dump_DE.csv",
+			"geometry": "xy",
+			"time": "none",
+			"columns": {
+				"x": "X",
+				"y": "Y",
+				"numeric": ["PLZ"],
+				"textual": ["Name"]
+			}
 		},
 		"sources" : null,
 		"type" : "csvpointsource"
 	},
-	"query_expected_hash" : "8c879f74b7bacd5e824c0496929d7a76",
-	"query_result" : "points",
-	"query_x1" : -180,
-	"query_x2" : 180,
-	"query_xres" : 1000,
-	"query_y1" : -90,
-	"query_y2" : 90,
-	"query_yres" : 1000,
-	"starttime" : 42,
-	"timeinterval" : 1
+	"query_expected_hash" : "8c879f74b7bacd5e824c0496929d7a76"
 }

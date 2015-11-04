@@ -44,10 +44,10 @@ FilterFeaturesByRangeOperator::~FilterFeaturesByRangeOperator() {
 REGISTER_OPERATOR(FilterFeaturesByRangeOperator, "features_filter_by_range");
 
 void FilterFeaturesByRangeOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"name\":\"" << name << "\","
-			<< "\"includeNoData\":" << includeNoData
-			<< "\"rangeMin\"" << rangeMin
-			<< "\"rangeMax\"" << rangeMax;
+	stream << "\"includeNoData\":" << std::boolalpha << includeNoData << ","
+			<< "\"name\":\"" << name << "\","
+			<< "\"rangeMin\":" << rangeMin << ","
+			<< "\"rangeMax\":" << rangeMax;
 }
 
 

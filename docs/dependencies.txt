@@ -49,3 +49,7 @@ apt-get install libsqlite3-dev
 apt-get install libproj-dev
 apt-get install git
 apt-get install valgrind
+
+apt-get install r-cran-***REMOVED***
+apt-get install libgdal-dev
+apt-get install libpqxx-dev

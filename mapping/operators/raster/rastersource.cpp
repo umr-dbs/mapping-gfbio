@@ -67,5 +67,5 @@ std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &r
 #endif
 
 void SourceOperator::writeSemanticParameters(std::ostringstream &stream) {
-	stream << "\"sourcename\": \"" << sourcename << "\"";
+	stream << "{\"sourcename\": \"" << sourcename << "\"}";
 }

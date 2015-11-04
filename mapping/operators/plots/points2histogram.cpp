@@ -60,6 +60,7 @@ HistogramFromFeaturesOperator::~HistogramFromFeaturesOperator() {
 REGISTER_OPERATOR(HistogramFromFeaturesOperator, "histogram_from_features");
 
 void HistogramFromFeaturesOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "{";
 	stream << "\"name\":\"" << attributename << "\","
 			<< "\"numberOfBuckets\":" << numberOfBuckets << ",";
 	if(autoRange) {
@@ -67,6 +68,7 @@ void HistogramFromFeaturesOperator::writeSemanticParameters(std::ostringstream& 
 	} else {
 		stream << "\"autoRange\":false, \"rangeMin\":" << rangeMin << ",\"rangeMax\":" << rangeMax;
 	}
+	stream << "}";
 }
 
 

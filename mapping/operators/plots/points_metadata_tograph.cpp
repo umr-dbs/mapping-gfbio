@@ -50,12 +50,12 @@ PointsMetadataToGraph::~PointsMetadataToGraph() {}
 REGISTER_OPERATOR(PointsMetadataToGraph, "points_metadata_to_graph");
 
 void PointsMetadataToGraph::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"attributeNames\":[";
+	stream << "{\"attributeNames\":[";
 	for(auto& name : attributeNames) {
 		stream << "\"" << name << "\",";
 	}
 	stream.seekp(((long) stream.tellp()) - 1); // remove last comma
-	stream << "]";
+	stream << "]}";
 }
 
 

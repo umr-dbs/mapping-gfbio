@@ -162,39 +162,41 @@ CSVPointSource::~CSVPointSource() {
 REGISTER_OPERATOR(CSVPointSource, "csvpointsource");
 
 void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"filename\":\"" << filename << "\",";
-	stream << "\"geometry\":\"" << GeometrySpecificationConverter.to_string(geometry_specification) << "\",";
-	stream << "\"time\":\"" << TimeSpecificationConverter.to_string(time_specification) << "\",";
-	if (time_specification == TimeSpecification::START_DURATION)
-		stream << "\"duration\":" << time_duration << ",";
+	Json::Value params(Json::ValueType::objectValue);
 
-	stream << "\"columns\": {";
-		stream << "\"x\":\"" << column_x << "\",";
-		if (geometry_specification != GeometrySpecification::WKT)
-			stream << "\"y\":\"" << column_y << "\",";
-		if (time_specification != TimeSpecification::NONE) {
-			stream << "\"time1\": \"" << column_time1 << "\",";
-			stream << "\"time1_format\": \"" << TimeFormatConverter.to_string(format_time1) << "\",";
-			if (time_specification != TimeSpecification::START) {
-				stream << "\"time2\": \"" << column_time2 << "\",";
-				stream << "\"time2_format\": \"" << TimeFormatConverter.to_string(format_time2) << "\",";
-			}
+	params["filename"] = filename;
+	params["separator"] = std::string(1, field_separator);
+	params["geometry"] = GeometrySpecificationConverter.to_string(geometry_specification);
+	params["time"] = TimeSpecificationConverter.to_string(time_specification);
+	if (time_specification == TimeSpecification::START_DURATION)
+		params["duration"] = time_duration;
+
+	Json::Value columns(Json::ValueType::objectValue);
+	columns["x"] = column_x;
+	if (geometry_specification != GeometrySpecification::WKT)
+		columns["y"] = column_y;
+	if (time_specification != TimeSpecification::NONE) {
+		columns["time1"] = column_time1;
+		columns["time1_format"] = TimeFormatConverter.to_string(format_time1);;
+		if (time_specification != TimeSpecification::START) {
+			columns["time2"] = column_time2;
+			columns["time2_format"] = TimeFormatConverter.to_string(format_time2);
 		}
-		stream << "\"textual\": [";
-		for (size_t i=0;i<columns_textual.size();i++) {
-			if (i > 0)
-				stream << ",";
-			stream << "\"" << columns_textual[i] << "\"";
-		}
-		stream << "],";
-		stream << "\"numeric\": [";
-		for (size_t i=0;i<columns_numeric.size();i++) {
-			if (i > 0)
-				stream << ",";
-			stream << "\"" << columns_numeric[i] << "\"";
-		}
-		stream << "]";
-	stream << "}";
+	}
+
+	Json::Value textual(Json::ValueType::arrayValue);
+	for (const auto &c : columns_textual)
+		textual.append(c);
+	Json::Value numeric(Json::ValueType::arrayValue);
+	for (const auto &c : columns_numeric)
+		numeric.append(c);
+
+	columns["textual"] = textual;
+	columns["numeric"] = numeric;
+	params["columns"] = columns;
+
+	Json::FastWriter writer;
+	stream << writer.write(params);
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

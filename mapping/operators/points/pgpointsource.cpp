@@ -48,7 +48,7 @@ PGPointSourceOperator::~PGPointSourceOperator() {
 REGISTER_OPERATOR(PGPointSourceOperator, "pgpointsource");
 
 void PGPointSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "\"querystring\":\"" << querystring << "\"";
+	stream << "{\"querystring\":\"" << querystring << "\"}";
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

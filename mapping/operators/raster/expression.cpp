@@ -52,10 +52,12 @@ ExpressionOperator::~ExpressionOperator() {
 REGISTER_OPERATOR(ExpressionOperator, "expression");
 
 void ExpressionOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "{";
 	stream << "\"expression\":\"" << expression << "\","
 			<< "\"datatype\":\"" << (output_type == GDT_Unknown ? "input" : GDALGetDataTypeName(output_type)) << "\","
 			<< "\"min\":" << output_min << ","
 			<< "\"max\":" << output_max;
+	stream << "}";
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

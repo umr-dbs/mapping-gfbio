@@ -79,6 +79,7 @@ class TimeShiftOperator : public GenericOperator {
 };
 
 void TimeShiftOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "{";
 	bool has_shift = shift_has_from || shift_has_to;
 	bool has_snap = snap_has_from || snap_has_to;
 
@@ -122,6 +123,7 @@ void TimeShiftOperator::writeSemanticParameters(std::ostringstream& stream) {
 		}
 		stream << "}";
 	}
+	stream << "}";
 }
 
 TimeShiftOperator::TimeShiftOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {

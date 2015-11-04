@@ -39,8 +39,8 @@ class WKTSource : public GenericOperator {
 #endif
 
 		void writeSemanticParameters(std::ostringstream& stream) {
-			stream << "\"type\":\"" << type << "\","
-					<< "\"wkt\":\"" << wkt << "\"";
+			stream << "{\"type\":\"" << type << "\","
+					<< "\"wkt\":\"" << wkt << "\"}";
 		}
 
 		virtual ~WKTSource(){};

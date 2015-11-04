@@ -52,9 +52,11 @@ MSG_Pansharpening_Operator::~MSG_Pansharpening_Operator() {
 REGISTER_OPERATOR(MSG_Pansharpening_Operator, "msatpansharpening");
 
 void MSG_Pansharpening_Operator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "{";
 	stream << "\"local_regression\": " << local_regression << ",";
 	stream << "\"spatial\": " << (spatial ? "true" : "false") << ",";
 	stream << "\"distance\": " << distance;
+	stream << "}";
 }
 
 

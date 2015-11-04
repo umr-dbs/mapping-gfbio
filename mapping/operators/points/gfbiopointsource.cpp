@@ -53,9 +53,11 @@ GFBioPointSourceOperator::~GFBioPointSourceOperator() {
 REGISTER_OPERATOR(GFBioPointSourceOperator, "gfbiopointsource");
 
 void GFBioPointSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "{";
 	stream << "\"datasource\":\"" << datasource << "\","
 			<< "\"query\":\"" << query << "\","
 			<< "\"includeMetadata\":\"" << includeMetadata << "\"";
+	stream << "}";
 }
 
 class GFBioGeometrySourceOperator : public GFBioPointSourceOperator {

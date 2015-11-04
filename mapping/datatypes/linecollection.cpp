@@ -103,73 +103,27 @@ size_t LineCollection::finishFeature(){
 	return start_feature.size() -2;
 }
 
-std::string LineCollection::toGeoJSON(bool displayMetadata) const {
-	//TODO: implement inclusion of metadata
-	//TODO: output MultiLineString that consists of single Line as LineString?
+void LineCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const {
+	auto feature = getFeatureReference(featureIndex);
 
-	std::ostringstream json;
-	json << std::fixed;
+	if(feature.size() == 1)
+		json << "{\"type\":\"LineString\",\"coordinates\":";
+	else
+		json << "{\"type\":\"MultiLineString\",\"coordinates\":[";
 
-	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
-
-	auto value_keys = local_md_value.getKeys();
-	auto string_keys = local_md_string.getKeys();
-	for(auto feature : *this){
-		json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiLineString\",\"coordinates\":[";
-
-		for(auto line : feature){
-			json << "[";
-
-			for(auto& c : line){
-				json << "[" << c.x << "," << c.y << "],";
-			}
-
-			if(line.size() > 0)
-				json.seekp(((long)json.tellp()) - 1);
-
-			json << "],";
+	for(auto line : feature){
+		json << "[";
+		for(auto& c : line){
+			json << "[" << c.x << "," << c.y << "],";
 		}
-		if(feature.size() > 0)
-			json.seekp(((long)json.tellp()) - 1);
-
-		json << "]}";
-
-		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || hasTime())){
-			json << ",\"properties\":{";
-			//TODO: handle missing metadata values
-			for (auto &key : string_keys) {
-				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
-			}
-
-			for (auto &key : value_keys) {
-				double value = local_md_value.get(feature, key);
-				json << "\"" << key << "\":";
-				if (std::isfinite(value)) {
-					json << value;
-				}
-				else {
-					json << "null";
-				}
-
-				json << ",";
-			}
-
-			if (hasTime()) {
-				json << "\"time_start\":" << time_start[feature] << ",\"time_end\":" << time_end[feature] << ",";
-			}
-
-			json.seekp(((long) json.tellp()) - 1); // delete last ,
-			json << "}";
-		}
-
-		json << "},";
+		json.seekp(((long)json.tellp()) - 1); //delete last ,
+		json << "],";
 	}
-	if(getFeatureCount() > 0)
-		json.seekp(((long)json.tellp()) - 1);
+	json.seekp(((long)json.tellp()) - 1); //delete last ,
 
-	json << "]}";
-
-	return json.str();
+	if(feature.size() > 1)
+		json << "]";
+	json << "}";
 }
 
 std::string LineCollection::toCSV() const {

@@ -113,6 +113,59 @@ void SimpleFeatureCollection::validate() const {
 /*
  * Export
  */
+std::string SimpleFeatureCollection::toGeoJSON(bool displayMetadata) const {
+	std::ostringstream json;
+	json << std::fixed; // std::setprecision(4);
+
+	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
+
+	auto value_keys = local_md_value.getKeys();
+	auto string_keys = local_md_string.getKeys();
+	bool isSimpleCollection = isSimple();
+	for (size_t feature = 0; feature < getFeatureCount(); ++feature) {
+		json << "{\"type\":\"Feature\",\"geometry\":";
+		featureToGeoJSONGeometry(feature, json);
+
+		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || hasTime())){
+			json << ",\"properties\":{";
+
+			//TODO: handle missing metadata values
+			for (auto &key : string_keys) {
+				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
+			}
+
+			for (auto &key : value_keys) {
+				double value = local_md_value.get(feature, key);
+				json << "\"" << key << "\":";
+				if (std::isfinite(value)) {
+					json << value;
+				}
+				else {
+					json << "null";
+				}
+
+				json << ",";
+			}
+
+			if (hasTime()) {
+				json << "\"time_start\":" << time_start[feature] << ",\"time_end\":" << time_end[feature] << ",";
+			}
+
+			json.seekp(((long) json.tellp()) - 1); // delete last ,
+			json << "}";
+		}
+		json << "},";
+
+	}
+
+	if(getFeatureCount() > 0)
+		json.seekp(((long) json.tellp()) - 1); // delete last ,
+	json << "]}";
+
+	return json.str();
+}
+
+
 std::string SimpleFeatureCollection::toWKT() const {
 	std::ostringstream wkt;
 
@@ -139,7 +192,6 @@ std::string SimpleFeatureCollection::featureToWKT(size_t featureIndex) const{
 std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 	std::ostringstream arff;
 
-	//TODO: maybe take name of layer as relation name, but this is not accessible here
 	arff << "@RELATION " << layerName << std::endl << std::endl;
 
 	arff << "@ATTRIBUTE wkt STRING" << std::endl;

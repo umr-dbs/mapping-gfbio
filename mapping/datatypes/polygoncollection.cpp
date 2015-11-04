@@ -87,77 +87,32 @@ std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<c
 	return ::filter<char>(this, keep);
 }
 
-std::string PolygonCollection::toGeoJSON(bool displayMetadata) const {
-	//TODO: implement inclusion of metadata
-	//TODO: output MultiPolygon that consists of single polygon as Polygon?
+void PolygonCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const {
+	auto feature = getFeatureReference(featureIndex);
 
-	//TODO: move this method up to simplefeaturecollection and only serialize feature here
+	if(feature.size() == 1)
+		json << "{\"type\":\"Polygon\",\"coordinates\":";
+	else
+		json << "{\"type\":\"MultiPolygon\",\"coordinates\":[";
 
-	std::ostringstream json;
-	json << std::fixed;
-
-	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
-
-	auto value_keys = local_md_value.getKeys();
-	auto string_keys = local_md_string.getKeys();
-	for (auto feature: *this) {
-		json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPolygon\",\"coordinates\":[";
-
-		for (auto polygon : feature) {
+	for(auto polygon : feature){
+		json << "[";
+		for(auto ring : polygon){
 			json << "[";
-
-			for (auto ring : polygon) {
-				json << "[";
-
-				for (auto & coordinate : ring) {
-					json << "[" << coordinate.x << "," << coordinate.y << "],";
-				}
-				if(ring.size() > 0)
-					json.seekp(((long)json.tellp()) - 1);
-				json << "],";
+			for(auto& c : ring){
+				json << "[" << c.x << "," << c.y << "],";
 			}
-			if(polygon.size() > 0)
-				json.seekp(((long)json.tellp()) - 1);
+			json.seekp(((long)json.tellp()) - 1); //delete last ,
 			json << "],";
 		}
-		if(feature.size() > 0)
-			json.seekp(((long)json.tellp()) - 1);
-		json << "]}";
-
-		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || hasTime())){
-			json << ",\"properties\":{";
-			//TODO: handle missing metadata values
-			for (auto &key : string_keys) {
-				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
-			}
-
-			for (auto &key : value_keys) {
-				double value = local_md_value.get(feature, key);
-				json << "\"" << key << "\":";
-				if (std::isfinite(value)) {
-					json << value;
-				}
-				else {
-					json << "null";
-				}
-
-				json << ",";
-			}
-
-			if (hasTime()) {
-				json << "\"time_start\":" << time_start[feature] << ",\"time_end\":" << time_end[feature] << ",";
-			}
-
-			json.seekp(((long) json.tellp()) - 1); // delete last ,
-			json << "}";
-		}
-		json << "},";
+		json.seekp(((long)json.tellp()) - 1); //delete last ,
+		json << "],";
 	}
-	if(getFeatureCount() > 0)
-		json.seekp(((long)json.tellp()) - 1);
-	json << "]}";
+	json.seekp(((long)json.tellp()) - 1); //delete last ,
 
-	return json.str();
+	if(feature.size() > 1)
+		json << "]";
+	json << "}";
 }
 
 std::string PolygonCollection::toCSV() const {

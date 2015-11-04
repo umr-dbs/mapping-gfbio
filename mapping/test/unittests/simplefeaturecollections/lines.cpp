@@ -194,7 +194,7 @@ TEST(LineCollection, toGeoJSON){
 
 	lines.addDefaultTimestamps();
 
-	std::string expected = "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:1\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiLineString\",\"coordinates\":[[[1.000000,2.000000],[1.000000,3.000000]]]}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiLineString\",\"coordinates\":[[[1.000000,2.000000],[2.000000,3.000000]],[[2.000000,4.000000],[5.000000,6.000000]]]}}]}";
+	std::string expected = "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:1\"}},\"features\":[{\"type\":\"Feature\",\"geometry\":{\"type\":\"LineString\",\"coordinates\":[[1.000000,2.000000],[1.000000,3.000000]]}},{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiLineString\",\"coordinates\":[[[1.000000,2.000000],[2.000000,3.000000]],[[2.000000,4.000000],[5.000000,6.000000]]]}}]}";
 
 	EXPECT_EQ(expected, lines.toGeoJSON(false));
 }
@@ -231,7 +231,7 @@ TEST(LineCollection, toGeoJSONMetadata){
 
 	lines.addDefaultTimestamps(0,1);
 
-	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[[[1.000000,2.000000],[1.000000,3.000000]]]},"properties":{"test":"test","test2":5.100000,"time_start":0.000000,"time_end":1.000000}},{"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[[[1.000000,2.000000],[2.000000,3.000000]],[[2.000000,4.000000],[5.000000,6.000000]]]},"properties":{"test":"test123","test2":4.100000,"time_start":0.000000,"time_end":1.000000}}]})";
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"LineString","coordinates":[[1.000000,2.000000],[1.000000,3.000000]]},"properties":{"test":"test","test2":5.100000,"time_start":0.000000,"time_end":1.000000}},{"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[[[1.000000,2.000000],[2.000000,3.000000]],[[2.000000,4.000000],[5.000000,6.000000]]]},"properties":{"test":"test123","test2":4.100000,"time_start":0.000000,"time_end":1.000000}}]})";
 
 	EXPECT_EQ(expected, lines.toGeoJSON(true));
 }

@@ -55,7 +55,6 @@ public:
 
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
-	virtual std::string toGeoJSON(bool displayMetadata) const;
 	virtual std::string toCSV() const;
 	virtual std::string toARFF(std::string layerName = "export") const;
 
@@ -70,6 +69,7 @@ public:
 	virtual ~PointCollection(){};
 
 protected:
+	virtual void featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const;
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const;
 
 	virtual void validateSpecifics() const;

@@ -79,7 +79,7 @@ TEST(PointCollection, toGeoJSON) {
 	points.addCoordinate(3,4);
 	points.finishFeature();
 
-	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[1.000000,2.000000]]}},{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[2.000000,3.000000],[3.000000,4.000000]]}}]})";
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[1.000000,2.000000]}},{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[2.000000,3.000000],[3.000000,4.000000]]}}]})";
 	EXPECT_EQ(expected, points.toGeoJSON(false));
 }
 
@@ -106,7 +106,7 @@ TEST(PointCollection, toGeoJSONWithMetadata) {
 	points.finishFeature();
 	points.local_md_value.set(1, "test", 2.1);
 
-	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[1.000000,2.000000]]},"properties":{"test":5.100000}},{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[2.000000,3.000000],[3.000000,4.000000]]},"properties":{"test":2.100000}}]})";
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[1.000000,2.000000]},"properties":{"test":5.100000}},{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[2.000000,3.000000],[3.000000,4.000000]]},"properties":{"test":2.100000}}]})";
 	EXPECT_EQ(expected, points.toGeoJSON(true));
 }
 

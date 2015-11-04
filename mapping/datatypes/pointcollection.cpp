@@ -206,72 +206,25 @@ void PointCollection::toOGR(const char *driver = "ESRI Shapefile") {
 }
 #endif
 
-//TODO: include global metadata?
-std::string PointCollection::toGeoJSON(bool displayMetadata) const {
-	std::ostringstream json;
-	json << std::fixed; // std::setprecision(4);
 
-	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
+void PointCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const {
+	auto feature = getFeatureReference(featureIndex);
 
-	auto value_keys = local_md_value.getKeys();
-	auto string_keys = local_md_string.getKeys();
-	bool isSimpleCollection = isSimple();
-	for (auto feature : *this) {
-		if(isSimpleCollection){
-			//all features are single points
-			const Coordinate &c = *(feature.begin());
-			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"Point\",\"coordinates\":[" << c.x << "," << c.y << "]}";
-		}
-		else {
-			json << "{\"type\":\"Feature\",\"geometry\":{\"type\":\"MultiPoint\",\"coordinates\":[";
+	if(feature.size() == 1)
+		json << "{\"type\":\"Point\",\"coordinates\":";
+	else
+		json << "{\"type\":\"MultiPoint\",\"coordinates\":[";
 
-			for (auto &c : feature) {
-				json << "[" << c.x << "," << c.y << "],";
-			}
-			if(feature.size() > 0)
-				json.seekp(((long) json.tellp()) - 1); // delete last ,
-
-			json << "]}";
-		}
-
-		if(displayMetadata && (string_keys.size() > 0 || value_keys.size() > 0 || hasTime())){
-			json << ",\"properties\":{";
-
-			//TODO: handle missing metadata values
-			for (auto &key : string_keys) {
-				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
-			}
-
-			for (auto &key : value_keys) {
-				double value = local_md_value.get(feature, key);
-				json << "\"" << key << "\":";
-				if (std::isfinite(value)) {
-					json << value;
-				}
-				else {
-					json << "null";
-				}
-
-				json << ",";
-			}
-
-			if (hasTime()) {
-				json << "\"time_start\":" << time_start[feature] << ",\"time_end\":" << time_end[feature] << ",";
-			}
-
-			json.seekp(((long) json.tellp()) - 1); // delete last ,
-			json << "}";
-		}
-		json << "},";
-
+	for(auto& c : feature){
+		json << "[" << c.x << "," << c.y << "],";
 	}
+	json.seekp(((long)json.tellp()) - 1); //delete last ,
 
-	if(getFeatureCount() > 0)
-		json.seekp(((long) json.tellp()) - 1); // delete last ,
-	json << "]}";
-
-	return json.str();
+	if(feature.size() > 1)
+		json << "]";
+	json << "}";
 }
+
 //TODO: include global metadata?
 std::string PointCollection::toCSV() const {
 	std::ostringstream csv;

@@ -77,9 +77,9 @@ public:
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const = 0;
 
 	// Export
-	virtual std::string toGeoJSON(bool displayMetadata = false) const;
+	std::string toGeoJSON(bool displayMetadata = false) const;
 	virtual std::string toCSV() const = 0;
-	virtual std::string toWKT() const;
+	std::string toWKT() const;
 	virtual std::string toARFF(std::string layerName = "export") const;
 
 	virtual std::string featureToWKT(size_t featureIndex) const;

@@ -6,6 +6,7 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
+#include <json/json.h>
 
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
@@ -109,6 +110,26 @@ TEST(PointCollection, toGeoJSONWithMetadata) {
 	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[1.000000,2.000000]},"properties":{"test":5.100000}},{"type":"Feature","geometry":{"type":"MultiPoint","coordinates":[[2.000000,3.000000],[3.000000,4.000000]]},"properties":{"test":2.100000}}]})";
 	EXPECT_EQ(expected, points.toGeoJSON(true));
 }
+
+
+//representative for all featurecollections, as serialization of metadata is done identically
+TEST(PointCollection, toGeoJSONStringEscaping) {
+	PointCollection points = PointCollection(SpatioTemporalReference::unreferenced());
+	points.local_md_string.addEmptyVector("test");
+
+	points.addCoordinate(1,2);
+	points.finishFeature();
+	points.local_md_string.set(0, "test", "Simple \\nTest \" of ,.;:--//\t\0 symbols");
+
+	Json::Reader reader(Json::Features::strictMode());
+	Json::Value root;
+
+	std::istringstream iss(points.toGeoJSON(true));
+	bool success = reader.parse(iss, root);
+
+	EXPECT_EQ(true, success);
+}
+
 
 TEST(PointCollection, toCSV) {
 	PointCollection points(SpatioTemporalReference::unreferenced());

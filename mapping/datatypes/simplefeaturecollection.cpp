@@ -10,6 +10,7 @@
 #include <iostream>
 #include <cmath>
 #include <limits>
+#include <json/json.h>
 
 Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
@@ -131,7 +132,7 @@ std::string SimpleFeatureCollection::toGeoJSON(bool displayMetadata) const {
 
 			//TODO: handle missing metadata values
 			for (auto &key : string_keys) {
-				json << "\"" << key << "\":\"" << local_md_string.get(feature, key) << "\",";
+				json << "\"" << key << "\":" << Json::valueToQuotedString(local_md_string.get(feature, key).c_str()) << ",";
 			}
 
 			for (auto &key : value_keys) {

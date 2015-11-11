@@ -81,7 +81,9 @@ void Unit::init(const Json::Value &json) {
 	}
 }
 
-Unit::Unit(const std::string &measurement, const std::string &unit) : measurement(measurement), unit(unit) {
+Unit::Unit(const std::string &_measurement, const std::string &_unit) : measurement(_measurement), unit(_unit) {
+	str_to_lower(measurement);
+	str_to_lower(unit);
 	min = -std::numeric_limits<double>::infinity();
 	max = std::numeric_limits<double>::infinity();
 	interpolation = Interpolation::Unknown;

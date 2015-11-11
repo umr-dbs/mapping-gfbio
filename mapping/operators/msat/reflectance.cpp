@@ -74,6 +74,9 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
 
+	if (raster->dd.unit.getMeasurement() != "radiance" || raster->dd.unit.getUnit() != "W·m^(-2)·sr^(-1)·cm^(-1)")
+		throw OperatorException("Input raster does not appear to be a meteosat radiance raster");
+
 	// get all the metadata:
 	int channel = (forceHRV) ? 11 : (int) raster->md_value.get("msg.Channel");
 	std::string timestamp = raster->md_string.get("msg.TimeStamp");
@@ -140,7 +143,10 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	raster->setRepresentation(GenericRaster::OPENCL);
 
 	//
-	DataDescription out_dd(GDT_Float32, -0.1, 1.2); // no no_data //raster->dd.has_no_data, output_no_data);
+	Unit out_unit("reflectance", "fraction");
+	out_unit.setMinMax(-0.1, 1.2); // TODO: ??? Shouldn't this be between 0 and 1?
+	out_unit.setInterpolation(Unit::Interpolation::Continuous);
+	DataDescription out_dd(GDT_Float32, out_unit); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 

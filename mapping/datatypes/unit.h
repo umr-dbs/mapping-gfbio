@@ -40,17 +40,31 @@ class Unit {
 				std::string name;
 				// TODO: color?
 		};
+		class Uninitialized_t {
+		};
 	public:
+		Unit() = delete;
+		Unit(Uninitialized_t u);
+		static const Uninitialized_t UNINITIALIZED;
 		Unit(const std::string &description);
 		Unit(const Json::Value &json);
+		Unit(const std::string &measurement, const std::string &unit);
 		~Unit();
+
+		void verify() const;
+
+		static Unit unknown();
 		std::string toJson() const;
+		Json::Value toJsonObject() const;
 
 		bool isContinuous() const { return interpolation == Interpolation::Continuous; }
 		bool isDiscrete() const { return interpolation == Interpolation::Discrete; }
+		void setInterpolation(Interpolation i) { interpolation = i; }
 		bool isClassification() const { return unit == "classification"; }
 		double getMin() const { return min; }
 		double getMax() const { return max; }
+		bool hasMinMax() const;
+		void setMinMax(double min, double max);
 
 		const std::string &getMeasurement() const { return measurement; }
 		const std::string &getUnit() const { return unit; }

@@ -31,9 +31,11 @@ Unit::Unit(const std::string &json) {
 		throw ArgumentException("Unit invalid: not a parseable json object");
 
 	init(root);
+	verify();
 }
 Unit::Unit(const Json::Value &json) {
 	init(json);
+	verify();
 }
 
 void Unit::init(const Json::Value &json) {
@@ -42,14 +44,8 @@ void Unit::init(const Json::Value &json) {
 	unit = json.get("unit", "").asString();
 	str_to_lower(unit);
 
-	if (measurement.size() == 0 || unit.size() == 0)
-		throw ArgumentException("Unit invalid: measurement or unit empty");
-
 	min = json.get("min", -std::numeric_limits<double>::infinity()).asDouble();
 	max = json.get("max", std::numeric_limits<double>::infinity()).asDouble();
-
-	if (std::isnan(min) || std::isnan(max) || min >= max)
-		throw ArgumentException("min or max not valid");
 
 	bool is_classification = isClassification();
 
@@ -82,18 +78,29 @@ void Unit::init(const Json::Value &json) {
 
 			classes.insert( std::make_pair((uint32_t) key_int, Class{(*itr).asString()}) );
 	    }
-
-		if (classes.size() == 0)
-			throw ArgumentException("Unit string invalid: Cannot use a classification without specifying any classes");
 	}
 }
 
+Unit::Unit(const std::string &measurement, const std::string &unit) : measurement(measurement), unit(unit) {
+	min = -std::numeric_limits<double>::infinity();
+	max = std::numeric_limits<double>::infinity();
+	interpolation = Interpolation::Unknown;
+
+	verify();
+}
+
+Unit::Unit(Uninitialized_t u) {
+}
 
 Unit::~Unit() {
 
 }
 
-std::string Unit::toJson() const {
+Unit Unit::unknown() {
+	return Unit("unknown", "unknown");
+}
+
+Json::Value Unit::toJsonObject() const {
 	Json::Value root(Json::ValueType::objectValue);
 	root["measurement"] = measurement;
 	root["unit"] = unit;
@@ -110,6 +117,34 @@ std::string Unit::toJson() const {
 		root["classes"] = classes;
 	}
 
+	return root;
+}
+
+std::string Unit::toJson() const {
+	auto root = toJsonObject();
+
 	Json::FastWriter writer;
 	return writer.write(root);
+}
+
+void Unit::verify() const {
+	if (measurement.size() == 0 || unit.size() == 0)
+		throw ArgumentException("Unit invalid: measurement or unit empty");
+
+	if (std::isnan(min) || std::isnan(max) || min >= max)
+		throw ArgumentException("Unit invalid: min or max not valid");
+
+	if (isClassification() && classes.size() == 0)
+		throw ArgumentException("Unit invalid: Cannot use a classification without specifying any classes");
+	else if (!isClassification() && classes.size() > 0)
+		throw ArgumentException("Unit invalid: a unit that is not a classification must not have any classes");
+}
+
+
+bool Unit::hasMinMax() const {
+	return std::isfinite(min) && std::isfinite(max);
+}
+void Unit::setMinMax(double _min, double _max) {
+	min = _min;
+	max = _max;
 }

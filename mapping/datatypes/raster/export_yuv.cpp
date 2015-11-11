@@ -4,6 +4,9 @@
 #include <stdio.h>
 
 template<typename T> void Raster2D<T>::toYUV(const char *filename) {
+	if (!dd.unit.hasMinMax())
+		throw ConverterException("Cannot export as YUV because the unit does not have finite min/max");
+
 	FILE *file = fopen(filename, "w");
 	if (!file)
 		throw ExporterException("Could not write to file");
@@ -17,7 +20,7 @@ template<typename T> void Raster2D<T>::toYUV(const char *filename) {
 	// Y in voller Auflösung
 	for (uint32_t y=0;y<height;y++) {
 		for (uint32_t x=0;x<width;x++) {
-			fprintf(file, "%c", (unsigned char) (256.0*get(x, y)/dd.max));
+			fprintf(file, "%c", (unsigned char) (256.0*get(x, y)/dd.unit.getMax()));
 		}
 	}
 

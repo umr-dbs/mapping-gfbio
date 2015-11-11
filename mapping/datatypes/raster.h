@@ -11,7 +11,7 @@
 #include "util/exceptions.h"
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/attributes.h"
-
+#include "datatypes/unit.h"
 
 class QueryRectangle;
 class BinaryStream;
@@ -19,11 +19,11 @@ class BinaryStream;
 
 class DataDescription {
 	public:
-		DataDescription(GDALDataType datatype, double min, double max)
-			: datatype(datatype), min(min), max(max), has_no_data(false), no_data(0.0) {};
+		DataDescription(GDALDataType datatype, const Unit &unit)
+			: datatype(datatype), unit(unit), has_no_data(false), no_data(0.0) {};
 
-		DataDescription(GDALDataType datatype, double min, double max, bool has_no_data, double no_data)
-			: datatype(datatype), min(min), max(max), has_no_data(has_no_data), no_data(has_no_data ? no_data : 0.0) {};
+		DataDescription(GDALDataType datatype, const Unit &unit, bool has_no_data, double no_data)
+			: datatype(datatype), unit(unit), has_no_data(has_no_data), no_data(has_no_data ? no_data : 0.0) {};
 
 		DataDescription(BinaryStream &stream);
 
@@ -38,8 +38,6 @@ class DataDescription {
 
 		void addNoData();
 
-		bool operator==(const DataDescription &b) const;
-		bool operator!=(const DataDescription &b) const { return !(*this == b); }
 		void verify() const;
 
 		void toStream(BinaryStream &stream) const;
@@ -69,7 +67,7 @@ class DataDescription {
 		friend std::ostream& operator<< (std::ostream &out, const DataDescription &dd);
 
 		GDALDataType datatype;
-		double min, max;
+		Unit unit;
 		bool has_no_data;
 		double no_data;
 };

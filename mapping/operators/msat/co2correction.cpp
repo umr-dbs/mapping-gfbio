@@ -52,7 +52,7 @@ std::unique_ptr<GenericRaster> MSATCo2CorrectionOperator::getRaster(const QueryR
 	raster_bt134->setRepresentation(GenericRaster::OPENCL);
 
 	//TODO: check if raster lcrs are equal
-	DataDescription out_dd(GDT_Float32, raster_bt039->dd.min, raster_bt039->dd.max); // no no_data //raster->dd.has_no_data, output_no_data);
+	DataDescription out_dd(GDT_Float32, raster_bt039->dd.unit); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster_bt039->dd.has_no_data||raster_bt108->dd.has_no_data||raster_bt134->dd.has_no_data)
 		out_dd.addNoData();
 	auto raster_out = GenericRaster::create(out_dd, *raster_bt039, GenericRaster::Representation::OPENCL);

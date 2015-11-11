@@ -84,17 +84,27 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char>
 	return ::filter<char>(this, keep);
 }
 
+bool PointCollection::featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const{
+	for(auto& c : getFeatureReference(featureIndex)){
+		if(c.x >= x1 && c.x <= x2 && c.y >= y1 && c.y <= y2){
+			return true;
+		}
+	}
+	return false;
+}
+
 std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
 	std::vector<bool> keep(getFeatureCount());
 	for(auto feature : *this){
-		for(auto& c : feature){
-			if(c.x >= x1 && c.x <= x2 && c.y >= y1 && c.y <= y2){
-				keep[feature] = true;
-				break;
-			}
+		if(featureIntersectsRectangle(feature, x1, y1, x2, y2)){
+			keep[feature] = true;
 		}
 	}
 	return filter(keep);
+}
+
+std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(const SpatialReference& sref){
+	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
 PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {

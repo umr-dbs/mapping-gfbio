@@ -63,6 +63,15 @@ public:
 	 */
 	virtual std::unique_ptr<LineCollection> filterByRectangleIntersection(double x1, double y1, double x2, double y2);
 
+	/**
+	 * filter collection by a given spatial reference
+	 * @param sref spatial reference
+	 * @return new collection that contains only features that intersect with rectangle given by sref
+	 */
+	virtual std::unique_ptr<LineCollection> filterByRectangleIntersection(const SpatialReference& sref);
+
+	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
+
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
 	virtual std::string toCSV() const;

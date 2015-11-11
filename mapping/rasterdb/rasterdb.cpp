@@ -95,16 +95,17 @@ class RasterDBChannel {
 	public:
 		//friend class RasterDB;
 
-		RasterDBChannel(const DataDescription &dd) : dd(dd), has_transform(false) {}
+		RasterDBChannel(const DataDescription &dd) : dd(dd), has_transform(false), transform_unit(Unit::unknown()) {}
 		~RasterDBChannel() {}
 
-		void setTransform(GDALDataType datatype, double offset, double scale, const std::string &offset_metadata, const std::string &scale_metadata) {
+		void setTransform(GDALDataType datatype, const Unit &transformed_unit, double offset, double scale, const std::string &offset_metadata, const std::string &scale_metadata) {
 			has_transform = true;
 			transform_offset = offset;
 			transform_scale = scale;
 			transform_offset_metadata = offset_metadata;
 			transform_scale_metadata = scale_metadata;
 			transform_datatype = datatype == GDT_Unknown ? dd.datatype : datatype;
+			transform_unit = transformed_unit;
 		}
 		double getOffset(const DirectMetadata<double> &md) {
 			if (!has_transform)
@@ -125,9 +126,13 @@ class RasterDBChannel {
 				return dd;
 			double offset = getOffset(md);
 			double scale = getScale(md);
-			double transformed_min = dd.min * scale + offset;
-			double transformed_max = dd.max * scale + offset;
-			DataDescription transformed_dd(transform_datatype, transformed_min, transformed_max);
+			Unit u = transform_unit;
+			if (dd.unit.hasMinMax() && !u.hasMinMax()) {
+				double transformed_min = dd.unit.getMin() * scale + offset;
+				double transformed_max = dd.unit.getMax() * scale + offset;
+				u.setMinMax(transformed_min, transformed_max);
+			}
+			DataDescription transformed_dd(transform_datatype, u);
 			transformed_dd.addNoData();
 			transformed_dd.verify();
 			return transformed_dd;
@@ -143,6 +148,7 @@ class RasterDBChannel {
 		double transform_scale;
 		std::string transform_offset_metadata;
 		std::string transform_scale_metadata;
+		Unit transform_unit;
 
 };
 
@@ -190,7 +196,7 @@ void RasterDB::init() {
 	int dimensions = sizes.size();
 	if (dimensions != (int) origins.size() || dimensions != (int) scales.size())
 		throw SourceException("json invalid, different dimensions in data");
-	epsg_t epsg = (epsg_t) jrm.get("epsg", EPSG_UNKNOWN).asInt();
+	epsg_t epsg = (epsg_t) jrm.get("epsg", (int) EPSG_UNKNOWN).asInt();
 
 	if (dimensions == 2) {
 		crs = new GDALCRS(
@@ -228,8 +234,7 @@ void RasterDB::init() {
 
 		channels[i] = new RasterDBChannel(DataDescription(
 			GDALGetDataTypeByName(datatype.c_str()),
-			channel.get("min", 0).asDouble(),
-			channel.get("max", -1).asDouble(),
+			channel.isMember("unit") ? Unit(channel["unit"]) : Unit::unknown(),
 			has_no_data, no_data
 		));
 		if (channel.isMember("transform")) {
@@ -238,6 +243,7 @@ void RasterDB::init() {
 			Json::Value scale = transform["scale"];
 			channels[i]->setTransform(
 				GDALGetDataTypeByName(transform.get("datatype", "unknown").asString().c_str()),
+				transform.isMember("unit") ? Unit(transform["unit"]) : Unit::unknown(),
 				offset.type() != Json::stringValue ? offset.asDouble() : 0.0,
 				scale.type()  != Json::stringValue ? scale.asDouble()  : 0.0,
 				offset.type() == Json::stringValue ? offset.asString() : "",

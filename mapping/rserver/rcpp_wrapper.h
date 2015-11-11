@@ -107,8 +107,8 @@ namespace ***REMOVED*** {
 		data.slot("inmemory") = true;
 		data.slot("fromdisk") = false;
 		data.slot("haveminmax") = true;
-		data.slot("min") = raster.dd.min;
-		data.slot("max") = raster.dd.max;
+		data.slot("min") = raster.dd.unit.getMin();
+		data.slot("max") = raster.dd.unit.getMax();
 
 		// TODO: how exactly would R like the Extent to be?
 		***REMOVED***::S4 extent("Extent");
@@ -168,7 +168,10 @@ namespace ***REMOVED*** {
 		double min = data.slot("min");
 		double max = data.slot("max");
 
-		DataDescription dd(GDT_Float32, min, max, true, NAN);
+		Unit u = Unit::unknown();
+		u.setMinMax(min, max);
+		DataDescription dd(GDT_Float32, u);
+		dd.addNoData();
 		dd.verify();
 		auto raster_out = GenericRaster::create(dd, stref, width, height, GenericRaster::Representation::CPU);
 		Raster2D<float> *raster2d = (Raster2D<float> *) raster_out.get();

@@ -36,8 +36,8 @@ struct histogram{
 	static std::unique_ptr<GenericPlot> execute(Raster2D<T> *raster) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
-		T max = (T) raster->dd.max;
-		T min = (T) raster->dd.min;
+		T max = (T) raster->dd.unit.getMax();
+		T min = (T) raster->dd.unit.getMin();
 
 		auto range = RasterTypeInfo<T>::getRange(min, max);
 		auto histogram = make_unique<Histogram>(range, min, max);
@@ -59,6 +59,9 @@ struct histogram{
 
 std::unique_ptr<GenericPlot> HistogramOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto raster = getRasterFromSource(0, rect, profiler);
+
+	if (!raster->dd.unit.hasMinMax())
+		throw OperatorException("Cannot create histogram from raster without min/max values in its unit");
 
 	Profiler::Profiler p("HISTOGRAM_OPERATOR");
 	return callUnaryOperatorFunc<histogram>(raster.get());

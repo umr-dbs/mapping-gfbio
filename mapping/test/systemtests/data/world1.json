@@ -2,8 +2,12 @@
    "channels" : [
       {
          "datatype" : "Byte",
-         "max" : 255.0,
-         "min" : 71.0
+         "unit": {
+         	"measurement": "unknown",
+         	"unit": "unknown",
+         	"min": 71,
+         	"max": 255
+         }
       }
    ],
    "coords" : {

@@ -6,6 +6,7 @@
 #include <png.h>
 #include <stdio.h>
 #include <sstream>
+#include <cmath>
 
 template<typename T> void Raster2D<T>::toPNG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy, Raster2D<uint8_t> *overlay) {
 	this->setRepresentation(GenericRaster::Representation::CPU);
@@ -28,11 +29,15 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 		std::ostringstream msg_scale;
 		msg_scale.precision(2);
 		msg_scale << std::fixed << "scale: " << pixel_scale_x << ", " << pixel_scale_y;
-		overlay->print(4, 26, overlay->dd.max, msg_scale.str().c_str());
+		overlay->print(4, 26, 1, msg_scale.str().c_str());
+
+		std::ostringstream msg_unit;
+		msg_unit << "Unit: " << dd.unit.getMeasurement() << ", " << dd.unit.getUnit();
+		overlay->print(4, 36, 1, msg_unit.str().c_str());
 	}
 
-	T max = dd.max;
-	T min = dd.min;
+	T max = dd.unit.getMax();
+	T min = dd.unit.getMin();
 
 	png_structp png_ptr = png_create_write_struct(
 			PNG_LIBPNG_VER_STRING,
@@ -86,6 +91,10 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 			actual_max = 1;
 		}
 	}
+
+	if (!std::isfinite(actual_min) || !std::isfinite(actual_max))
+		throw ExporterException("Cannot export PNG without either a known min/max or an absolute colorizer");
+
 	//auto actual_range = RasterTypeInfo<T>::getRange(actual_min, actual_max);
 
 	uint32_t colors[256];

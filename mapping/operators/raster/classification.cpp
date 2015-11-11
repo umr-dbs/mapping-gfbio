@@ -97,8 +97,11 @@ std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRect
 	const double min = std::min(*min_max_classes.first, noDataClass);
 	const double max = std::max(*min_max_classes.second, noDataClass);
 
+	Unit output_unit = Unit(raster_in->dd.unit.getMeasurement(), "classification");
+	output_unit.setMinMax(min, max);
+	// TODO: add classes
 
-	DataDescription out_data_description{GDT_Int32, min, max};
+	DataDescription out_data_description{GDT_Int32, output_unit};
 	out_data_description.addNoData();
 
 	const int new_nodata_class = (reclassNoData)?noDataClass:static_cast<int>(out_data_description.no_data);

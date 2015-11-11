@@ -41,7 +41,9 @@ std::unique_ptr<GenericRaster> PointsToClusterRasterOperator::getRaster(const Qu
 
 	std::unique_ptr<PointCollection> points = getPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
 
-	DataDescription dd(GDT_Byte, 0, MAX, true, 0);
+	Unit unit = Unit("frequency", "heatmap");
+	unit.setMinMax(1, MAX);
+	DataDescription dd(GDT_Byte, unit, true, 0);
 
 	GridSpatioTemporalResult crs(rect, rect.xres, rect.yres);
 

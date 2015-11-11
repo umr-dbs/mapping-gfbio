@@ -109,8 +109,7 @@ static void createsource(int argc, char *argv[]) {
 
 		Json::Value channel(Json::objectValue);
 		channel["datatype"] = GDALGetDataTypeName(raster->dd.datatype);
-		channel["min"] = raster->dd.min;
-		channel["max"] = raster->dd.max;
+		channel["unit"] = raster->dd.unit.toJsonObject();
 		if (raster->dd.has_no_data)
 			channel["nodata"] = raster->dd.no_data;
 

@@ -255,6 +255,10 @@ std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster
 	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, profiler);
 	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, profiler);
 
+	// TODO: verify units of the source rasters
+	if (!bt108_minus_bt039_raster->dd.unit.hasMinMax())
+		throw OperatorException("source raster does not have a proper unit");
+
 	//setup the profiler
 	Profiler::Profiler p("MSATGCCTHERMTHRESHOLDDETECTION_OPERATOR");
 
@@ -263,8 +267,8 @@ std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster
 	bt108_minus_bt039_raster->setRepresentation(GenericRaster::CPU);
 
 	//get min and max values and calculate the needed buckets
-	double value_raster_min = bt108_minus_bt039_raster->dd.min;
-	double value_raster_max = bt108_minus_bt039_raster->dd.max;
+	double value_raster_min = bt108_minus_bt039_raster->dd.unit.getMin();
+	double value_raster_max = bt108_minus_bt039_raster->dd.unit.getMax();
 	int buckets = static_cast<int>(std::ceil((value_raster_max-value_raster_min)/bucket_size));
 
 	//create the histogram for day mode
@@ -292,7 +296,9 @@ std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster
 	//create the output raster
 	double min = std::min(temperature_threshold_day, temperature_threshold_night);
 	double max = std::max(temperature_threshold_day, temperature_threshold_night);
-	DataDescription out_dd(GDT_Float32, min, max); // no no_data //raster->dd.has_no_data, output_no_data);
+	Unit out_unit("unknown", "unknown"); // TODO: proper unit
+	out_unit.setMinMax(min, max);
+	DataDescription out_dd(GDT_Float32, out_unit); // no no_data //raster->dd.has_no_data, output_no_data);
 	out_dd.addNoData();
 	auto raster_out = GenericRaster::create(out_dd, *solar_zenith_angle_raster, GenericRaster::Representation::OPENCL);
 
@@ -319,6 +325,10 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, profiler);
 	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, profiler);
 
+	// TODO: verify units of the source rasters
+	if (!bt108_minus_bt039_raster->dd.unit.hasMinMax())
+		throw OperatorException("source raster does not have a proper unit");
+
 	//setup the profiler
 	Profiler::Profiler p("MSATGCCTHERMTHRESHOLDDETECTION_OPERATOR");
 
@@ -327,8 +337,8 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 	bt108_minus_bt039_raster->setRepresentation(GenericRaster::CPU);
 
 	//get min and max values and calculate the needed buckets
-	double value_raster_min = bt108_minus_bt039_raster->dd.min;
-	double value_raster_max = bt108_minus_bt039_raster->dd.max;
+	double value_raster_min = bt108_minus_bt039_raster->dd.unit.getMin();
+	double value_raster_max = bt108_minus_bt039_raster->dd.unit.getMax();
 	int buckets = static_cast<int>(std::ceil((value_raster_max-value_raster_min)/bucket_size));
 
 	//create the histogram

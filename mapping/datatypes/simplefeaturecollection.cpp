@@ -269,3 +269,68 @@ SpatialReference SimpleFeatureCollection::calculateMBR(size_t coordinateIndexSta
 SpatialReference SimpleFeatureCollection::getCollectionMBR() const {
 	return calculateMBR(0, coordinates.size());
 }
+
+/**
+ * check if Coordinate c is on line given by Coordinate p1, p2
+ * @param p1 start of line
+ * @param p2 end of line
+ * @param c coordinate to check, must be collinear to p1, p2
+ * @return true if c is on line segment
+ */
+bool onSegment(const Coordinate& p1, const Coordinate& p2, const Coordinate& c)
+{
+    if (c.x <= std::max(p1.x, p2.x) && c.x >= std::min(p1.x, p2.x) &&
+        c.y <= std::max(p1.y, p2.y) && c.y >= std::min(p1.y, p2.y))
+       return true;
+
+    return false;
+}
+enum Orientation {
+	LEFT, RIGHT, ON
+};
+
+/**
+ * calculate orientation of coordinate c with respect to line from p1 to p2
+ * @param p1 start of line
+ * @param p2 end of line
+ * @param c coordinate to check
+ * @return the orientation of c
+ */
+Orientation orientation(const Coordinate& p1, const Coordinate& p2, const Coordinate& c) {
+    int val = (p2.y - p1.y) * (c.x - p2.x) -
+              (p2.x - p1.x) * (c.y - p2.y);
+
+    if (val == 0) return ON;  // colinear
+
+    return (val > 0)? RIGHT: LEFT;
+}
+
+bool SimpleFeatureCollection::lineSegmentsIntersect(const Coordinate& p1, const Coordinate& p2, const Coordinate& p3, const Coordinate& p4) const {
+	// idea from: http://www.geeksforgeeks.org/check-if-two-given-line-segments-intersect/
+
+	//TODO: quick check if bounding box intersects to exit early?
+
+	Orientation o1 = orientation(p1, p2, p3);
+	Orientation o2 = orientation(p1, p2, p4);
+	Orientation o3 = orientation(p3, p4, p1);
+	Orientation o4 = orientation(p3, p4, p2);
+
+	// General case
+	if (o1 != o2 && o3 != o4)
+		return true;
+
+	// Special Cases
+	// p1, p2 and p3 are collinear and p3 lies on segment p1p2
+	if (o1 == ON && onSegment(p1, p2, p3)) return true;
+
+	// p1, p2 and p3 are collinear and p4 lies on segment p1p2
+	if (o2 == ON && onSegment(p1, p2, p4)) return true;
+
+	// p3, p4 and p1 are colinear and p1 lies on segment p3p4
+	if (o3 == ON && onSegment(p3, p4, p1)) return true;
+
+	 // p3, p4 and p2 are collinear and p2 lies on segment p3p4
+	if (o4 == ON && onSegment(p3, p4, p2)) return true;
+
+	return false;
+}

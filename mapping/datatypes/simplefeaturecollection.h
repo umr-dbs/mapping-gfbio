@@ -100,6 +100,18 @@ protected:
 	//calculate the MBR of the coordinates in range from start to stop (exclusive)
 	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;
 
+	//geometry helper functions
+
+	/**
+	 * check if two line segments intersect
+	 * @param p1 first point of first line
+	 * @param p2 second point of first line
+	 * @param p3 first point of first line
+	 * @param p4 second point of first line
+	 * @return true if the two line segments intersect
+	 */
+	bool lineSegmentsIntersect(const Coordinate& p1, const Coordinate& p2, const Coordinate& p3, const Coordinate& p4) const;
+
 
 	/*
 	 * Helper classes for iteration over Collections

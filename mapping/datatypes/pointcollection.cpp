@@ -84,6 +84,19 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char>
 	return ::filter<char>(this, keep);
 }
 
+std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+	std::vector<bool> keep(getFeatureCount());
+	for(auto feature : *this){
+		for(auto& c : feature){
+			if(c.x >= x1 && c.x <= x2 && c.y >= y1 && c.y <= y2){
+				keep[feature] = true;
+				break;
+			}
+		}
+	}
+	return filter(keep);
+}
+
 PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
 	size_t coordinateCount;
 	stream.read(&coordinateCount);

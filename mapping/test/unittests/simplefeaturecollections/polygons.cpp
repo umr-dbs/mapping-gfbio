@@ -704,3 +704,129 @@ TEST(PolygonCollection, WKTAddMultiFeature){
 	EXPECT_EQ(2, polygons.getFeatureCount());
 	EXPECT_EQ(2, polygons.getFeatureReference(1).size());
 }
+
+TEST(PolygonCollection, filterByRectangleIntersection){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	polygons.addCoordinate(1,1);
+	polygons.addCoordinate(2,8);
+	polygons.addCoordinate(8,2);
+	polygons.addCoordinate(1,1);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature(); //inside
+
+	polygons.addCoordinate(11,11);
+	polygons.addCoordinate(12,18);
+	polygons.addCoordinate(18,12);
+	polygons.addCoordinate(11,11);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature(); //outside
+
+	polygons.addCoordinate(1,1);
+	polygons.addCoordinate(12,18);
+	polygons.addCoordinate(18,12);
+	polygons.addCoordinate(1,1);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature(); //crosses
+
+	polygons.addCoordinate(10,10);
+	polygons.addCoordinate(12,18);
+	polygons.addCoordinate(18,12);
+	polygons.addCoordinate(10,10);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature(); //touches
+
+	polygons.addCoordinate(-10,-10);
+	polygons.addCoordinate(-10,20);
+	polygons.addCoordinate(20,20);
+	polygons.addCoordinate(20,-10);
+	polygons.addCoordinate(-10,-10);
+	polygons.finishRing();
+	polygons.addCoordinate(-5,-5);
+	polygons.addCoordinate(-5,15);
+	polygons.addCoordinate(15,15);
+	polygons.addCoordinate(15,-5);
+	polygons.addCoordinate(-5,-5);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature(); //rectangle in hole
+
+	polygons.addCoordinate(1,1);
+	polygons.addCoordinate(2,8);
+	polygons.addCoordinate(8,2);
+	polygons.addCoordinate(1,1);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(11,11);
+	polygons.addCoordinate(12,18);
+	polygons.addCoordinate(18,12);
+	polygons.addCoordinate(11,11);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature(); //one polygon inside, one outside
+
+	auto filteredPolygons = polygons.filterByRectangleIntersection(0, 0, 10, 10);
+	EXPECT_EQ(4, filteredPolygons->getFeatureCount());
+
+	EXPECT_EQ(1, filteredPolygons->getFeatureReference(0).size());
+	EXPECT_EQ(1, filteredPolygons->getFeatureReference(0).getPolygonReference(0).size());
+	EXPECT_EQ(4, filteredPolygons->getFeatureReference(0).getPolygonReference(0).getRingReference(0).size());
+	EXPECT_EQ(1, filteredPolygons->coordinates[0].x);
+	EXPECT_EQ(1, filteredPolygons->coordinates[0].y);
+	EXPECT_EQ(2, filteredPolygons->coordinates[1].x);
+	EXPECT_EQ(8, filteredPolygons->coordinates[1].y);
+	EXPECT_EQ(8, filteredPolygons->coordinates[2].x);
+	EXPECT_EQ(2, filteredPolygons->coordinates[2].y);
+	EXPECT_EQ(1, filteredPolygons->coordinates[3].x);
+	EXPECT_EQ(1, filteredPolygons->coordinates[3].y);
+
+	EXPECT_EQ(1, filteredPolygons->getFeatureReference(1).size());
+	EXPECT_EQ(1, filteredPolygons->getFeatureReference(1).getPolygonReference(0).size());
+	EXPECT_EQ(4, filteredPolygons->getFeatureReference(1).getPolygonReference(0).getRingReference(0).size());
+	EXPECT_EQ(1, filteredPolygons->coordinates[4].x);
+	EXPECT_EQ(1, filteredPolygons->coordinates[4].y);
+	EXPECT_EQ(12, filteredPolygons->coordinates[5].x);
+	EXPECT_EQ(18, filteredPolygons->coordinates[5].y);
+	EXPECT_EQ(18, filteredPolygons->coordinates[6].x);
+	EXPECT_EQ(12, filteredPolygons->coordinates[6].y);
+	EXPECT_EQ(1, filteredPolygons->coordinates[7].x);
+	EXPECT_EQ(1, filteredPolygons->coordinates[7].y);
+
+	EXPECT_EQ(1, filteredPolygons->getFeatureReference(2).size());
+	EXPECT_EQ(1, filteredPolygons->getFeatureReference(2).getPolygonReference(0).size());
+	EXPECT_EQ(4, filteredPolygons->getFeatureReference(2).getPolygonReference(0).getRingReference(0).size());
+	EXPECT_EQ(10, filteredPolygons->coordinates[8].x);
+	EXPECT_EQ(10, filteredPolygons->coordinates[8].y);
+	EXPECT_EQ(12, filteredPolygons->coordinates[9].x);
+	EXPECT_EQ(18, filteredPolygons->coordinates[9].y);
+	EXPECT_EQ(18, filteredPolygons->coordinates[10].x);
+	EXPECT_EQ(12, filteredPolygons->coordinates[10].y);
+	EXPECT_EQ(10, filteredPolygons->coordinates[11].x);
+	EXPECT_EQ(10, filteredPolygons->coordinates[11].y);
+
+	EXPECT_EQ(2, filteredPolygons->getFeatureReference(3).size());
+	EXPECT_EQ(1, filteredPolygons->getFeatureReference(3).getPolygonReference(0).size());
+	EXPECT_EQ(4, filteredPolygons->getFeatureReference(3).getPolygonReference(0).getRingReference(0).size());
+	EXPECT_EQ(1, filteredPolygons->getFeatureReference(3).getPolygonReference(1).size());
+	EXPECT_EQ(4, filteredPolygons->getFeatureReference(3).getPolygonReference(1).getRingReference(0).size());
+	EXPECT_EQ(1, filteredPolygons->coordinates[12].x);
+	EXPECT_EQ(1, filteredPolygons->coordinates[12].y);
+	EXPECT_EQ(2, filteredPolygons->coordinates[13].x);
+	EXPECT_EQ(8, filteredPolygons->coordinates[13].y);
+	EXPECT_EQ(8, filteredPolygons->coordinates[14].x);
+	EXPECT_EQ(2, filteredPolygons->coordinates[14].y);
+	EXPECT_EQ(1, filteredPolygons->coordinates[15].x);
+	EXPECT_EQ(1, filteredPolygons->coordinates[15].y);
+	EXPECT_EQ(11, filteredPolygons->coordinates[16].x);
+	EXPECT_EQ(11, filteredPolygons->coordinates[16].y);
+	EXPECT_EQ(12, filteredPolygons->coordinates[17].x);
+	EXPECT_EQ(18, filteredPolygons->coordinates[17].y);
+	EXPECT_EQ(18, filteredPolygons->coordinates[18].x);
+	EXPECT_EQ(12, filteredPolygons->coordinates[18].y);
+	EXPECT_EQ(11, filteredPolygons->coordinates[19].x);
+	EXPECT_EQ(11, filteredPolygons->coordinates[19].y);
+}

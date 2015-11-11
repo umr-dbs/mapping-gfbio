@@ -82,6 +82,35 @@ std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<char> &
 	return ::filter<char>(this, keep);
 }
 
+
+
+std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+	std::vector<bool> keep(getFeatureCount());
+	Coordinate rectP1 = Coordinate(x1, y1);
+	Coordinate rectP2 = Coordinate(x2, y1);
+	Coordinate rectP3 = Coordinate(x2, y2);
+	Coordinate rectP4 = Coordinate(x1, y2);
+
+	for(auto feature : *this){
+		for(auto line : feature){
+			for(int i = start_line[line.getLineIndex()]; i < start_line[line.getLineIndex()+1] - 1; ++i){
+				Coordinate& c1 = coordinates[i];
+				Coordinate& c2 = coordinates[i + 1];
+				if((c1.x >= x1 && c1.x <= x2 && c1.y >= y1 && c1.y <= y2) ||
+				   lineSegmentsIntersect(c1, c2, rectP1, rectP2) ||
+				   lineSegmentsIntersect(c1, c2, rectP2, rectP3) ||
+				   lineSegmentsIntersect(c1, c2, rectP3, rectP4) ||
+				   lineSegmentsIntersect(c1, c2, rectP4, rectP1)){
+					keep[feature] = true;
+					break;
+				}
+			}
+		}
+	}
+
+	return filter(keep);
+}
+
 void LineCollection::addCoordinate(double x, double y){
 	coordinates.push_back(Coordinate(x, y));
 }

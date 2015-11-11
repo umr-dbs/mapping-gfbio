@@ -87,6 +87,43 @@ std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<c
 	return ::filter<char>(this, keep);
 }
 
+std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+	std::vector<bool> keep(getFeatureCount());
+	Coordinate rectP1 = Coordinate(x1, y1);
+	Coordinate rectP2 = Coordinate(x2, y1);
+	Coordinate rectP3 = Coordinate(x2, y2);
+	Coordinate rectP4 = Coordinate(x1, y2);
+
+	for(auto feature : *this){
+		if(feature.contains(rectP1) || feature.contains(rectP2) ||
+		   feature.contains(rectP3) || feature.contains(rectP4)){
+			keep[feature] = true;
+			continue;
+		}
+		for(auto polygon : feature){
+			auto shellIndex = polygon.getRingReference(0).getRingIndex();
+			for(int i = start_ring[shellIndex]; i < start_ring[shellIndex + 1] - 1; ++i){
+				Coordinate& c1 = coordinates[i];
+				Coordinate& c2 = coordinates[i +1];
+
+				if((c1.x >= x1 && c1.x <= x2 && c1.y >= y1 && c1.y <= y2) ||
+				   lineSegmentsIntersect(c1, c2, rectP1, rectP2) ||
+				   lineSegmentsIntersect(c1, c2, rectP2, rectP3) ||
+				   lineSegmentsIntersect(c1, c2, rectP3, rectP4) ||
+				   lineSegmentsIntersect(c1, c2, rectP4, rectP1)){
+					keep[feature] = true;
+					break;
+				}
+			}
+
+			if(keep[feature])
+				break;
+		}
+	}
+
+	return filter(keep);
+}
+
 void PolygonCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const {
 	auto feature = getFeatureReference(featureIndex);
 

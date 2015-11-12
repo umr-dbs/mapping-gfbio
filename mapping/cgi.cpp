@@ -1,7 +1,7 @@
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/plot.h"
-#include "raster/colors.h"
+#include "datatypes/colorizer.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/configuration.h"

@@ -1,6 +1,6 @@
 
 
-#include "raster/colors.h"
+#include "datatypes/colorizer.h"
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 

@@ -1,5 +1,5 @@
-#ifndef RASTER_COLORS_H
-#define RASTER_COLORS_H
+#ifndef DATATYPES_COLORIZER_H
+#define DATATYPES_COLORIZER_H
 
 #include <stdint.h>
 #include <memory>

@@ -1,6 +1,6 @@
 #include "datatypes/raster.h"
+#include "datatypes/colorizer.h"
 #include "rasterdb/rasterdb.h"
-#include "raster/colors.h"
 #include "raster/opencl.h"
 #include "cache/manager.h"
 

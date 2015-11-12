@@ -86,26 +86,28 @@ class Unit {
 		/**
 		 * A named constructor for an unknown unit.
 		 *
-		 * @returns A valid Unit with unknown measurement, unit and interpolation
+		 * @return A valid Unit with unknown measurement, unit and interpolation
 		 */
 		static Unit unknown();
 		/**
 		 * Returns the unit's JSON representation
-		 * @returns the unit's JSON representation as a string
+		 * @return the unit's JSON representation as a string
 		 */
 		std::string toJson() const;
 		/**
 		 * Returns the unit's JSON representation
-		 * @returns the unit's JSON representation as a Json::Value
+		 * @return the unit's JSON representation as a Json::Value
 		 */
 		Json::Value toJsonObject() const;
 
 		/**
 		 * Returns whether the interpolation is continuous or not.
+		 * @return true if the interpolation is continuous, false otherwise
 		 */
 		bool isContinuous() const { return interpolation == Interpolation::Continuous; }
 		/**
 		 * Returns whether the interpolation is discrete or not.
+		 * @return true if the interpolation is discrete, false otherwise
 		 */
 		bool isDiscrete() const { return interpolation == Interpolation::Discrete; }
 		/**
@@ -115,18 +117,22 @@ class Unit {
 		void setInterpolation(Interpolation i) { interpolation = i; }
 		/**
 		 * Returns whether the unit is a classification
+		 * @return true if the unit is a classification, false otherwise
 		 */
 		bool isClassification() const { return unit == "classification"; }
 		/**
 		 * Returns the min value, defaults to -inf
+		 * @return the min value
 		 */
 		double getMin() const { return min; }
 		/**
 		 * Returns the max value, defaults to +inf
+		 * @return the max value
 		 */
 		double getMax() const { return max; }
 		/**
 		 * Returns true if both min and max are set and finite
+		 * @return true if both min and max are set and finite, false otherwise
 		 */
 		bool hasMinMax() const;
 		/**
@@ -135,10 +141,12 @@ class Unit {
 		void setMinMax(double min, double max);
 		/**
 		 * returns the measurement (in lower case)
+		 * @return the measurement
 		 */
 		const std::string &getMeasurement() const { return measurement; }
 		/**
 		 * returns the unit (in lower case)
+		 * @return the unit
 		 */
 		const std::string &getUnit() const { return unit; }
 

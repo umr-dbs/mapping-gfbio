@@ -146,16 +146,16 @@ private:
 		    	return idx;
 		    }
 
-		    inline PolygonPolygonReference<PolygonCollection> getPolygonReference(size_t polygonIndex){
+		    inline PolygonPolygonReference<C> getPolygonReference(size_t polygonIndex){
 		    	if(polygonIndex >= size())
 		    		throw ArgumentException("polygonIndex >= Count");
-				return PolygonPolygonReference<PolygonCollection>(pc, pc.start_feature[idx] + polygonIndex);
+				return PolygonPolygonReference<C>(pc, pc.start_feature[idx] + polygonIndex);
 			}
 
-			inline PolygonPolygonReference<const PolygonCollection> getPolygonReference(size_t polygonIndex) const{
+			inline PolygonPolygonReference<const C> getPolygonReference(size_t polygonIndex) const{
 				if(polygonIndex >= size())
 					throw ArgumentException("polygonIndex >= Count");
-				return PolygonPolygonReference<const PolygonCollection>(pc, pc.start_feature[idx] + polygonIndex);
+				return PolygonPolygonReference<const C>(pc, pc.start_feature[idx] + polygonIndex);
 			}
 
 			bool contains(Coordinate& coordinate) const {
@@ -208,16 +208,16 @@ private:
 				return idx;
 			}
 
-			inline PolygonRingReference<PolygonCollection> getRingReference(size_t ringIndex){
+			inline PolygonRingReference<C> getRingReference(size_t ringIndex){
 				if(ringIndex >= size())
 					throw ArgumentException("RingIndex >= Count");
-				return PolygonRingReference<PolygonCollection>(pc, pc.start_polygon[idx] + ringIndex);
+				return PolygonRingReference<C>(pc, pc.start_polygon[idx] + ringIndex);
 			}
 
-			inline PolygonRingReference<const PolygonCollection> getRingReference(size_t ringIndex) const{
+			inline PolygonRingReference<const C> getRingReference(size_t ringIndex) const{
 				if(ringIndex >= size())
 					throw ArgumentException("RingIndex >= Count");
-				return PolygonRingReference<const PolygonCollection>(pc, pc.start_polygon[idx] + ringIndex);
+				return PolygonRingReference<const C>(pc, pc.start_polygon[idx] + ringIndex);
 			}
 
 			bool contains(Coordinate& coordinate) const {

@@ -99,7 +99,7 @@ bool PolygonCollection::featureIntersectsRectangle(size_t featureIndex, double x
 	   feature.contains(rectP3) || feature.contains(rectP4)){
 		return true;
 	}
-	for(const auto polygon : feature){
+	for(auto polygon : feature){
 		size_t shellIndex = polygon.getRingReference(0).getRingIndex();
 		for(int i = start_ring[shellIndex]; i < start_ring[shellIndex + 1] - 1; ++i){
 			const Coordinate& c1 = coordinates[i];

@@ -47,9 +47,8 @@ static void convert(int argc, char *argv[]) {
 
 	try {
 		auto raster = GenericRaster::fromGDAL(argv[2], 1);
-		GreyscaleColorizer c;
-		raster->toPNG(argv[3], c);
-
+		auto c = Colorizer::make("grey");
+		raster->toPNG(argv[3], *c);
 	}
 	catch (ImporterException &e) {
 		printf("%s\n", e.what());

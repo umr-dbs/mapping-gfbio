@@ -61,6 +61,230 @@ Colorizer::Colorizer(bool is_absolute) : is_absolute(is_absolute) {
 Colorizer::~Colorizer() {
 }
 
+
+
+
+
+class GreyscaleColorizer : public Colorizer {
+	public:
+		GreyscaleColorizer() : Colorizer(false) {}
+		virtual ~GreyscaleColorizer() {};
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+			for (int c = 0; c < num_colors; c++) {
+				uint8_t color = (uint8_t) (255.0*c/num_colors);
+				colors[c] = color_from_rgba(color, color, color, 255);
+			}
+		}
+};
+
+
+
+class HSVColorizer : public Colorizer {
+	public:
+		HSVColorizer() : Colorizer(false) {}
+		virtual ~HSVColorizer() {};
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+			for (int c = 0; c < num_colors; c++) {
+				double frac = (double) c / num_colors;
+				colors[c] = color_from_hsva((uint16_t) (120.0-(120.0*frac)), 150, 255);
+			}
+		}
+};
+
+
+
+
+class HeatmapColorizer : public Colorizer {
+	public:
+		HeatmapColorizer() : Colorizer(false) {}
+		virtual ~HeatmapColorizer() {}
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+			for (int c = 0; c < num_colors; c++) {
+				int f = floor((double) c / num_colors * 256);
+				uint8_t alpha = 255;
+				if (f < 100)
+					colors[c] = color_from_rgba(0, 0, 255, 50+f);
+				else if (f < 150)
+					colors[c] = color_from_rgba(0, 255-5*(149-f), 255, alpha);
+				else if (f < 200)
+					colors[c] = color_from_rgba(0, 255, 5*(199-f), alpha);
+				else if (f < 235)
+					colors[c] = color_from_rgba(255-8*(234-f), 255, 0, alpha);
+				else
+					colors[c] = color_from_rgba(f, 12*(255-f), 0, alpha);
+			}
+		}
+};
+
+
+
+
+class TemperatureColorizer : public Colorizer {
+	public:
+		TemperatureColorizer() : Colorizer(true) {}
+		virtual ~TemperatureColorizer() {}
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+			double step = (max - min) / num_colors;
+			for (int c = 0; c < num_colors; c++) {
+				double value = min + c*step;
+
+				value = std::max(-120.0, std::min(180.0, value/4)); // -30 to +45° C
+				colors[c] = color_from_hsva(180.0-value, 150, 255);
+			}
+		}
+};
+
+
+
+
+class HeightColorizer : public Colorizer {
+	public:
+		HeightColorizer() : Colorizer(true) {}
+		virtual ~HeightColorizer() {};
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+			double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
+			for (int c = 0; c < num_colors; c++) {
+				double value = min + c*step;
+				uint32_t color;
+				if (value <= 0) { // #AAFFAA
+					color = color_from_rgba(170, 255, 170);
+				}
+				else if (value <= 1000) { // #00FF00
+					double scale = 170-(170*value/1000);
+					color = color_from_rgba(scale, 255, scale);
+				}
+				else if (value <= 1200) { // #FFFF00
+					double scale = 255*((value-1000)/200);
+					color = color_from_rgba(scale, 255, 0);
+				}
+				else if (value <= 1400) { // #FF7F00
+					double scale = 255-128*((value-1200)/200);
+					color = color_from_rgba(255, scale, 0);
+				}
+				else if (value <= 1600) { // #BF7F3F
+					double scale = 64*((value-1400)/200);
+					color = color_from_rgba(255-scale, 127, scale);
+				}
+				else if (value <= 2000) { // 000000
+					double scale = 1-((value-1600)/400);
+					color = color_from_rgba(191*scale, 127*scale, 64);
+				}
+				else if (value <= 4000) { // #ffffff
+					double scale = 255*((value-2000)/2000);
+					color = color_from_rgba(scale, scale, scale);
+				}
+				else if (value <= 8000) { // #0000ff
+					double scale = 255*((value-4000)/4000);
+					color = color_from_rgba(255-scale, 255-scale, 255);
+				}
+				else {
+					color = color_from_rgba(0, 0, 255);
+				}
+
+				colors[c] = color;
+			}
+		};
+};
+
+
+
+class CPMColorizer : public Colorizer {
+	public:
+		CPMColorizer() : Colorizer(true) {}
+		virtual ~CPMColorizer() {}
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+			double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
+			for (int c = 0; c < num_colors; c++) {
+				double value = min + c*step;
+				uint32_t color;
+				if (value <= 100)
+					color = color_from_rgba(2*value,255,0);
+				else if (value <= 1000) {
+					double d = (value-100)/900;
+					color = color_from_rgba(200+d*55,255-d*255,0);
+				}
+				else if (value <= 10000) {
+					double d = (value-1000)/9000;
+					color = color_from_rgba(255-d*255,0,0);
+				}
+				else
+					color = color_from_rgba(0,0,0);
+
+				colors[c] = color;
+			}
+		}
+};
+
+
+
+
+
+class GlobalLandCoverColorizer : public Colorizer {
+	public:
+		GlobalLandCoverColorizer() : Colorizer(true) {}
+		virtual ~GlobalLandCoverColorizer() {}
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+			double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
+			for (int c = 0; c < num_colors; c++) {
+				int value = std::round(min + c*step);
+				uint32_t color;
+				if (value == 1)
+					color = color_from_rgba(0, 100, 0);
+				else if (value == 2)
+					color = color_from_rgba(0, 150, 0);
+				else if (value == 3)
+					color = color_from_rgba(175, 255, 98);
+				else if (value == 4)
+					color = color_from_rgba(139, 68, 18);
+				else if (value == 5)
+					color = color_from_rgba(205, 126, 95);
+				else if (value == 6)
+					color = color_from_rgba(140, 190, 0);
+				else if (value == 7)
+					color = color_from_rgba(119, 150, 255);
+				else if (value == 8)
+					color = color_from_rgba(0, 70, 200);
+				else if (value == 9)
+					color = color_from_rgba(0, 230, 0);
+				else if (value == 10)
+					color = color_from_rgba(0, 0, 0);
+				else if (value == 11)
+					color = color_from_rgba(255, 118, 0);
+				else if (value == 12)
+					color = color_from_rgba(255, 179, 0);
+				else if (value == 13)
+					color = color_from_rgba(255, 234, 158);
+				else if (value == 14)
+					color = color_from_rgba(222, 202, 161);
+				else if (value == 15)
+					color = color_from_rgba(0, 150, 150);
+				else if (value == 16)
+					color = color_from_rgba(255, 224, 229);
+				else if (value == 17)
+					color = color_from_rgba(255, 116, 232);
+				else if (value == 18)
+					color = color_from_rgba(202, 138, 255);
+				else if (value == 19)
+					color = color_from_rgba(180, 180, 180);
+				else if (value == 20)
+					color = color_from_rgba(138, 227, 255);
+				else if (value == 21)
+					color = color_from_rgba(240, 240, 240);
+				else if (value == 22)
+					color = color_from_rgba(255, 0, 0);
+				else if (value == 23)
+					color = color_from_rgba(255, 255, 255);
+				else
+					color = color_from_rgba(0, 0, 255);
+
+				colors[c] = color;
+			}
+		};
+};
+
+
+
+
 std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
 	if (name == "hsv")
 		return make_unique<HSVColorizer>();
@@ -75,221 +299,4 @@ std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
 	if (name == "glc")
 		return make_unique<GlobalLandCoverColorizer>();
 	return make_unique<GreyscaleColorizer>();
-}
-
-
-
-
-GreyscaleColorizer::GreyscaleColorizer() : Colorizer(false) {
-}
-
-GreyscaleColorizer::~GreyscaleColorizer() {
-}
-
-void GreyscaleColorizer::fillPalette(uint32_t *colors, int num_colors, double, double) const {
-	for (int c = 0; c < num_colors; c++) {
-		uint8_t color = (uint8_t) (255.0*c/num_colors);
-		colors[c] = color_from_rgba(color, color, color, 255);
-	}
-}
-
-
-
-HSVColorizer::HSVColorizer() : Colorizer(false) {
-}
-
-HSVColorizer::~HSVColorizer() {
-}
-
-void HSVColorizer::fillPalette(uint32_t *colors, int num_colors, double, double) const {
-	for (int c = 0; c < num_colors; c++) {
-		double frac = (double) c / num_colors;
-		colors[c] = color_from_hsva((uint16_t) (120.0-(120.0*frac)), 150, 255);
-	}
-}
-
-
-
-HeatmapColorizer::HeatmapColorizer() : Colorizer(false) {
-}
-
-HeatmapColorizer::~HeatmapColorizer() {
-}
-
-void HeatmapColorizer::fillPalette(uint32_t *colors, int num_colors, double, double) const {
-	for (int c = 0; c < num_colors; c++) {
-		int f = floor((double) c / num_colors * 256);
-		uint8_t alpha = 255;
-		if (f < 100)
-			colors[c] = color_from_rgba(0, 0, 255, 50+f);
-		else if (f < 150)
-			colors[c] = color_from_rgba(0, 255-5*(149-f), 255, alpha);
-		else if (f < 200)
-			colors[c] = color_from_rgba(0, 255, 5*(199-f), alpha);
-		else if (f < 235)
-			colors[c] = color_from_rgba(255-8*(234-f), 255, 0, alpha);
-		else
-			colors[c] = color_from_rgba(f, 12*(255-f), 0, alpha);
-	}
-}
-
-
-TemperatureColorizer::TemperatureColorizer() : Colorizer(true) {
-}
-
-TemperatureColorizer::~TemperatureColorizer() {
-}
-
-void TemperatureColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-	double step = (max - min) / num_colors;
-	for (int c = 0; c < num_colors; c++) {
-		double value = min + c*step;
-
-		value = std::max(-120.0, std::min(180.0, value/4)); // -30 to +45° C
-		colors[c] = color_from_hsva(180.0-value, 150, 255);
-	}
-}
-
-
-HeightColorizer::HeightColorizer() : Colorizer(true) {
-}
-
-HeightColorizer::~HeightColorizer() {
-}
-
-void HeightColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-	double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
-	for (int c = 0; c < num_colors; c++) {
-		double value = min + c*step;
-		uint32_t color;
-		if (value <= 0) { // #AAFFAA
-			color = color_from_rgba(170, 255, 170);
-		}
-		else if (value <= 1000) { // #00FF00
-			double scale = 170-(170*value/1000);
-			color = color_from_rgba(scale, 255, scale);
-		}
-		else if (value <= 1200) { // #FFFF00
-			double scale = 255*((value-1000)/200);
-			color = color_from_rgba(scale, 255, 0);
-		}
-		else if (value <= 1400) { // #FF7F00
-			double scale = 255-128*((value-1200)/200);
-			color = color_from_rgba(255, scale, 0);
-		}
-		else if (value <= 1600) { // #BF7F3F
-			double scale = 64*((value-1400)/200);
-			color = color_from_rgba(255-scale, 127, scale);
-		}
-		else if (value <= 2000) { // 000000
-			double scale = 1-((value-1600)/400);
-			color = color_from_rgba(191*scale, 127*scale, 64);
-		}
-		else if (value <= 4000) { // #ffffff
-			double scale = 255*((value-2000)/2000);
-			color = color_from_rgba(scale, scale, scale);
-		}
-		else if (value <= 8000) { // #0000ff
-			double scale = 255*((value-4000)/4000);
-			color = color_from_rgba(255-scale, 255-scale, 255);
-		}
-		else {
-			color = color_from_rgba(0, 0, 255);
-		}
-
-		colors[c] = color;
-	}
-}
-
-
-CPMColorizer::CPMColorizer() : Colorizer(true) {
-}
-
-CPMColorizer::~CPMColorizer() {
-}
-
-void CPMColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-	double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
-	for (int c = 0; c < num_colors; c++) {
-		double value = min + c*step;
-		uint32_t color;
-		if (value <= 100)
-			color = color_from_rgba(2*value,255,0);
-		else if (value <= 1000) {
-			double d = (value-100)/900;
-			color = color_from_rgba(200+d*55,255-d*255,0);
-		}
-		else if (value <= 10000) {
-			double d = (value-1000)/9000;
-			color = color_from_rgba(255-d*255,0,0);
-		}
-		else
-			color = color_from_rgba(0,0,0);
-
-		colors[c] = color;
-	}
-}
-
-GlobalLandCoverColorizer::GlobalLandCoverColorizer() : Colorizer(true) {
-}
-
-GlobalLandCoverColorizer::~GlobalLandCoverColorizer() {
-}
-
-void GlobalLandCoverColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-	double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
-	for (int c = 0; c < num_colors; c++) {
-		int value = std::round(min + c*step);
-		uint32_t color;
-		if (value == 1)
-			color = color_from_rgba(0, 100, 0);
-		else if (value == 2)
-			color = color_from_rgba(0, 150, 0);
-		else if (value == 3)
-			color = color_from_rgba(175, 255, 98);
-		else if (value == 4)
-			color = color_from_rgba(139, 68, 18);
-		else if (value == 5)
-			color = color_from_rgba(205, 126, 95);
-		else if (value == 6)
-			color = color_from_rgba(140, 190, 0);
-		else if (value == 7)
-			color = color_from_rgba(119, 150, 255);
-		else if (value == 8)
-			color = color_from_rgba(0, 70, 200);
-		else if (value == 9)
-			color = color_from_rgba(0, 230, 0);
-		else if (value == 10)
-			color = color_from_rgba(0, 0, 0);
-		else if (value == 11)
-			color = color_from_rgba(255, 118, 0);
-		else if (value == 12)
-			color = color_from_rgba(255, 179, 0);
-		else if (value == 13)
-			color = color_from_rgba(255, 234, 158);
-		else if (value == 14)
-			color = color_from_rgba(222, 202, 161);
-		else if (value == 15)
-			color = color_from_rgba(0, 150, 150);
-		else if (value == 16)
-			color = color_from_rgba(255, 224, 229);
-		else if (value == 17)
-			color = color_from_rgba(255, 116, 232);
-		else if (value == 18)
-			color = color_from_rgba(202, 138, 255);
-		else if (value == 19)
-			color = color_from_rgba(180, 180, 180);
-		else if (value == 20)
-			color = color_from_rgba(138, 227, 255);
-		else if (value == 21)
-			color = color_from_rgba(240, 240, 240);
-		else if (value == 22)
-			color = color_from_rgba(255, 0, 0);
-		else if (value == 23)
-			color = color_from_rgba(255, 255, 255);
-		else
-			color = color_from_rgba(0, 0, 255);
-
-		colors[c] = color;
-	}
 }

@@ -5,9 +5,35 @@
 #include "util/make_unique.h"
 
 #include <cmath>
+#include <vector>
+#include <utility>
 
 uint32_t color_from_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 	return (uint32_t) a << 24 | (uint32_t) b << 16 | (uint32_t) g << 8 | (uint32_t) r;
+}
+
+static uint8_t r_from_color(uint32_t color) {
+	return color & 0xff;
+}
+
+static uint8_t g_from_color(uint32_t color) {
+	return (color & 0xff00) >> 8;
+}
+
+static uint8_t b_from_color(uint32_t color) {
+	return (color & 0xff0000) >> 16;
+}
+
+static uint8_t a_from_color(uint32_t color) {
+	return (color & 0xff000000) >> 24;
+}
+
+static uint8_t channel_from_double(double c) {
+	if (c > 255.0)
+		return 255;
+	if (c < 0)
+		return 0;
+	return std::round(c);
 }
 
 // h: 0..359, s: 0..255, v: 0..255
@@ -62,6 +88,48 @@ Colorizer::~Colorizer() {
 }
 
 
+class InterpolatingAbsoluteColorizer : public Colorizer {
+	public:
+		InterpolatingAbsoluteColorizer(const std::vector< std::pair<double,uint32_t> > &breakpoints) : Colorizer(true), breakpoints(breakpoints) {}
+		~InterpolatingAbsoluteColorizer() {}
+		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
+	private:
+		const std::vector< std::pair<double, uint32_t> > &breakpoints;
+};
+
+void InterpolatingAbsoluteColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+	double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
+	for (int c = 0; c < num_colors; c++) {
+		double value = min + c*step;
+		uint32_t color;
+		if (value <= breakpoints[0].first) {
+			color = breakpoints[0].second;
+		}
+		else if (value >= breakpoints[breakpoints.size()-1].first) {
+			color = breakpoints[breakpoints.size()-1].second;
+		}
+		else {
+			for (int i=1;i<breakpoints.size();i++) {
+				if (value <= breakpoints[i].first) {
+					auto last_color = breakpoints[i-1].second;
+					auto next_color = breakpoints[i].second;
+					double fraction = (value-breakpoints[i-1].first) / (breakpoints[i].first - breakpoints[i-1].first);
+
+					uint8_t r = channel_from_double(r_from_color(last_color) * (1-fraction) + r_from_color(next_color) * fraction);
+					uint8_t g = channel_from_double(g_from_color(last_color) * (1-fraction) + g_from_color(next_color) * fraction);
+					uint8_t b = channel_from_double(b_from_color(last_color) * (1-fraction) + b_from_color(next_color) * fraction);
+					uint8_t a = channel_from_double(a_from_color(last_color) * (1-fraction) + a_from_color(next_color) * fraction);
+
+					color = color_from_rgba(r, g, b, a);
+					break;
+				}
+			}
+		}
+
+		colors[c] = color;
+	}
+}
+
 
 
 
@@ -92,130 +160,45 @@ class HSVColorizer : public Colorizer {
 };
 
 
-
-
-class HeatmapColorizer : public Colorizer {
-	public:
-		HeatmapColorizer() : Colorizer(false) {}
-		virtual ~HeatmapColorizer() {}
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-			for (int c = 0; c < num_colors; c++) {
-				int f = floor((double) c / num_colors * 256);
-				uint8_t alpha = 255;
-				if (f < 100)
-					colors[c] = color_from_rgba(0, 0, 255, 50+f);
-				else if (f < 150)
-					colors[c] = color_from_rgba(0, 255-5*(149-f), 255, alpha);
-				else if (f < 200)
-					colors[c] = color_from_rgba(0, 255, 5*(199-f), alpha);
-				else if (f < 235)
-					colors[c] = color_from_rgba(255-8*(234-f), 255, 0, alpha);
-				else
-					colors[c] = color_from_rgba(f, 12*(255-f), 0, alpha);
-			}
-		}
+static const std::vector< std::pair<double, uint32_t> > heatmap_breakpoints = {
+	std::make_pair(  0, color_from_rgba(  0,   0, 255,  50)),
+	std::make_pair(100, color_from_rgba(  0,   0, 255, 150)),
+	std::make_pair(150, color_from_rgba(  0, 255, 255, 255)),
+	std::make_pair(200, color_from_rgba(  0, 255,   0, 255)),
+	std::make_pair(235, color_from_rgba(255, 255,   0, 255)),
+	std::make_pair(255, color_from_rgba(255,   0,   0, 255))
 };
 
 
-
-
-class TemperatureColorizer : public Colorizer {
-	public:
-		TemperatureColorizer() : Colorizer(true) {}
-		virtual ~TemperatureColorizer() {}
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-			double step = (max - min) / num_colors;
-			for (int c = 0; c < num_colors; c++) {
-				double value = min + c*step;
-
-				value = std::max(-120.0, std::min(180.0, value/4)); // -30 to +45° C
-				colors[c] = color_from_hsva(180.0-value, 150, 255);
-			}
-		}
+static const std::vector< std::pair<double, uint32_t> > temperature_breakpoints = {
+	std::make_pair(-50, color_from_rgba(  0,   0,   0)),
+	std::make_pair(-30, color_from_rgba(255,   0, 255)),
+	std::make_pair(-10, color_from_rgba(  0,   0, 255)),
+	std::make_pair(  0, color_from_rgba(  0, 255, 255)),
+	std::make_pair( 10, color_from_rgba(255, 255,   0)),
+	std::make_pair( 30, color_from_rgba(255,   0,   0)),
+	std::make_pair( 50, color_from_rgba(255, 255, 255))
 };
 
 
-
-
-class HeightColorizer : public Colorizer {
-	public:
-		HeightColorizer() : Colorizer(true) {}
-		virtual ~HeightColorizer() {};
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-			double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
-			for (int c = 0; c < num_colors; c++) {
-				double value = min + c*step;
-				uint32_t color;
-				if (value <= 0) { // #AAFFAA
-					color = color_from_rgba(170, 255, 170);
-				}
-				else if (value <= 1000) { // #00FF00
-					double scale = 170-(170*value/1000);
-					color = color_from_rgba(scale, 255, scale);
-				}
-				else if (value <= 1200) { // #FFFF00
-					double scale = 255*((value-1000)/200);
-					color = color_from_rgba(scale, 255, 0);
-				}
-				else if (value <= 1400) { // #FF7F00
-					double scale = 255-128*((value-1200)/200);
-					color = color_from_rgba(255, scale, 0);
-				}
-				else if (value <= 1600) { // #BF7F3F
-					double scale = 64*((value-1400)/200);
-					color = color_from_rgba(255-scale, 127, scale);
-				}
-				else if (value <= 2000) { // 000000
-					double scale = 1-((value-1600)/400);
-					color = color_from_rgba(191*scale, 127*scale, 64);
-				}
-				else if (value <= 4000) { // #ffffff
-					double scale = 255*((value-2000)/2000);
-					color = color_from_rgba(scale, scale, scale);
-				}
-				else if (value <= 8000) { // #0000ff
-					double scale = 255*((value-4000)/4000);
-					color = color_from_rgba(255-scale, 255-scale, 255);
-				}
-				else {
-					color = color_from_rgba(0, 0, 255);
-				}
-
-				colors[c] = color;
-			}
-		};
+static const std::vector< std::pair<double, uint32_t> > height_breakpoints = {
+	std::make_pair(   0, color_from_rgba(170, 255, 170)), // #AAFFAA
+	std::make_pair(1000, color_from_rgba(  0, 255,   0)), // #00FF00
+	std::make_pair(1200, color_from_rgba(255, 255,   0)), // #FFFF00
+	std::make_pair(1400, color_from_rgba(255, 127,   0)), // #FF7F00
+	std::make_pair(1600, color_from_rgba(191, 127,  63)), // #BF7F3F
+	std::make_pair(2000, color_from_rgba(  0,   0,   0)), // #000000
+	std::make_pair(4000, color_from_rgba(255, 255, 255)), // #ffffff
+	std::make_pair(8000, color_from_rgba(  0,   0, 255))  // #0000ff
 };
 
 
-
-class CPMColorizer : public Colorizer {
-	public:
-		CPMColorizer() : Colorizer(true) {}
-		virtual ~CPMColorizer() {}
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-			double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
-			for (int c = 0; c < num_colors; c++) {
-				double value = min + c*step;
-				uint32_t color;
-				if (value <= 100)
-					color = color_from_rgba(2*value,255,0);
-				else if (value <= 1000) {
-					double d = (value-100)/900;
-					color = color_from_rgba(200+d*55,255-d*255,0);
-				}
-				else if (value <= 10000) {
-					double d = (value-1000)/9000;
-					color = color_from_rgba(255-d*255,0,0);
-				}
-				else
-					color = color_from_rgba(0,0,0);
-
-				colors[c] = color;
-			}
-		}
+static const std::vector< std::pair<double, uint32_t> > cpm_breakpoints = {
+	std::make_pair(    0, color_from_rgba(  0, 255,   0)),
+	std::make_pair(  100, color_from_rgba(200, 255,   0)),
+	std::make_pair( 1000, color_from_rgba(255,   0,   0)),
+	std::make_pair(10000, color_from_rgba(  0,   0,   0))
 };
-
-
 
 
 
@@ -289,13 +272,13 @@ std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
 	if (name == "hsv")
 		return make_unique<HSVColorizer>();
 	if (name == "heatmap")
-		return make_unique<HeatmapColorizer>();
+		return make_unique<InterpolatingAbsoluteColorizer>(heatmap_breakpoints);
 	if (name == "temperature")
-		return make_unique<TemperatureColorizer>();
+		return make_unique<InterpolatingAbsoluteColorizer>(temperature_breakpoints);
 	if (name == "height")
-		return make_unique<HeightColorizer>();
+		return make_unique<InterpolatingAbsoluteColorizer>(height_breakpoints);
 	if (name == "cpm")
-		return make_unique<CPMColorizer>();
+		return make_unique<InterpolatingAbsoluteColorizer>(cpm_breakpoints);
 	if (name == "glc")
 		return make_unique<GlobalLandCoverColorizer>();
 	return make_unique<GreyscaleColorizer>();

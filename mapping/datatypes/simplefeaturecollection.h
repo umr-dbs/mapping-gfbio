@@ -76,6 +76,24 @@ public:
 	virtual SpatialReference getCollectionMBR() const;
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const = 0;
 
+	/**
+	 * check whether feature intersects with given rectangle
+	 * @param featureIndex index of the feate
+	 * @param x1 x of upper left coordinate of rectangle
+	 * @param y1 y of upper left coordiante of rectangle
+	 * @param x2 y of lower right coordinate of rectangle
+	 * @param y2 x of lower right coordinate of rectangle
+	 * @return true if feature with given index intersects given rectangle
+	 */
+	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const = 0;
+
+	/**
+	 * filter collection by a given spatial reference
+	 * @param sref spatial reference
+	 * @return new collection that contains only features that intersect with rectangle given by sref
+	 */
+	bool featureIntersectsRectangle(size_t featureIndex, const SpatialReference& sref) const;
+
 	// Export
 	std::string toGeoJSON(bool displayMetadata = false) const;
 	virtual std::string toCSV() const = 0;

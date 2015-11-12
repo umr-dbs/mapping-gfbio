@@ -63,6 +63,15 @@ public:
 	 */
 	virtual std::unique_ptr<LineCollection> filterByRectangleIntersection(double x1, double y1, double x2, double y2);
 
+	/**
+	 * filter collection by a given spatial reference
+	 * @param sref spatial reference
+	 * @return new collection that contains only features that intersect with rectangle given by sref
+	 */
+	virtual std::unique_ptr<LineCollection> filterByRectangleIntersection(const SpatialReference& sref);
+
+	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
+
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
 	virtual std::string toCSV() const;
@@ -121,16 +130,16 @@ private:
 		    	return lc.calculateMBR(lc.start_line[lc.start_feature[idx]], lc.start_line[lc.start_feature[idx + 1]]);
 		    }
 
-		    inline LineLineReference<LineCollection> getLineReference(size_t lineIndex){
+		    inline LineLineReference<C> getLineReference(size_t lineIndex){
 		    	if(lineIndex >= size())
 		    		throw ArgumentException("LineIndex >= Count");
-		    	return LineLineReference<LineCollection>(lc, lc.start_feature[idx] + lineIndex);
+		    	return LineLineReference<C>(lc, lc.start_feature[idx] + lineIndex);
 			}
 
-			inline LineLineReference<const LineCollection> getLineReference(size_t lineIndex) const{
+			inline LineLineReference<const C> getLineReference(size_t lineIndex) const{
 				if(lineIndex >= size())
 					throw ArgumentException("LineIndex >= Count");
-				return LineLineReference<const LineCollection>(lc, lc.start_feature[idx] + lineIndex);
+				return LineLineReference<const C>(lc, lc.start_feature[idx] + lineIndex);
 			}
 
 		private:

@@ -334,3 +334,8 @@ bool SimpleFeatureCollection::lineSegmentsIntersect(const Coordinate& p1, const 
 
 	return false;
 }
+
+bool SimpleFeatureCollection::featureIntersectsRectangle(size_t featureIndex, const SpatialReference& sref) const{
+	return featureIntersectsRectangle(featureIndex, sref.x1, sref.y1, sref.x2, sref.y2);
+}
+

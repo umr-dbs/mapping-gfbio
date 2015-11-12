@@ -1,6 +1,7 @@
 
 
 #include "datatypes/colorizer.h"
+#include "datatypes/unit.h"
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 
@@ -200,6 +201,9 @@ static const std::vector< std::pair<double, uint32_t> > cpm_breakpoints = {
 	std::make_pair(10000, color_from_rgba(  0,   0,   0))
 };
 
+static const std::vector< std::pair<double, uint32_t> > error_breakpoints = {
+	std::make_pair(1, color_from_rgba(255, 0, 0))
+};
 
 
 class GlobalLandCoverColorizer : public Colorizer {
@@ -266,6 +270,23 @@ class GlobalLandCoverColorizer : public Colorizer {
 };
 
 
+std::unique_ptr<Colorizer> Colorizer::fromUnit(const Unit &unit) {
+	if (unit.getMeasurement() == "temperature" && unit.getUnit() == "c")
+		return make("temperature");
+	if (unit.getMeasurement() == "elevation" && unit.getUnit() == "m")
+		return make("height");
+	if (unit.getMeasurement() == "frequency" && unit.getUnit() == "heatmap")
+		return make("heatmap");
+	if (unit.getMeasurement() == "radiation" && unit.getUnit() == "cpm")
+		return make("cpm");
+	if (unit.getUnit() == "errormessage")
+		return make("error");
+	if (unit.getUnit() == "classification")
+		return make("glc"); // TODO: we need a better default colorizer, optimized for contrast
+
+	// TODO: if we have a min/max, we can do a proper scaling. If we don't, what do we do?
+	return make("grey");
+}
 
 
 std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
@@ -279,6 +300,8 @@ std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
 		return make_unique<InterpolatingAbsoluteColorizer>(height_breakpoints);
 	if (name == "cpm")
 		return make_unique<InterpolatingAbsoluteColorizer>(cpm_breakpoints);
+	if (name == "error")
+		return make_unique<InterpolatingAbsoluteColorizer>(error_breakpoints);
 	if (name == "glc")
 		return make_unique<GlobalLandCoverColorizer>();
 	return make_unique<GreyscaleColorizer>();

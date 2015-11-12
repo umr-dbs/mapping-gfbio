@@ -164,10 +164,17 @@ static time_t parseIso8601DateTime(std::string dateTimeString){
 
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
-	auto colorizer = Colorizer::make(colors); // TODO: guess from raster->dd.unit
-	print_debug_header();
+	// For now, always guess the colorizer, ignore any user-specified colors
+	//auto colorizer = Colorizer::make(colors);
+	auto colorizer = Colorizer::fromUnit(raster->dd.unit);
+static bool has_headers = false;
+
 #if 1
-	printf("Content-type: image/png\r\n\r\n");
+	if (!has_headers) {
+		print_debug_header();
+		printf("Content-type: image/png\r\n\r\n");
+	}
+	has_headers = true;
 
 	raster->toPNG(nullptr, *colorizer, flipx, flipy, overlay); //"/tmp/xyz.tmp.png");
 #else
@@ -736,14 +743,13 @@ int main() {
 					// Alright, something went wrong.
 					// We're still in a WMS request though, so do our best to output an image with a clear error message.
 
-					Unit u = Unit::unknown();
-					u.setMinMax(1, 255);
+					Unit u("errormessage", "errormessage");
 					DataDescription dd(GDT_Byte, u, true, 0);
 					auto errorraster = GenericRaster::create(dd, SpatioTemporalReference::unreferenced(), output_width, output_height);
 					errorraster->clear(0);
 
 					auto msg = e.what();
-					errorraster->printCentered(254, msg);
+					errorraster->printCentered(1, msg);
 
 					outputImage(errorraster.get(), false, false, "hsv");
 				}

@@ -11,13 +11,6 @@
 template<typename T> void Raster2D<T>::toPNG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy, Raster2D<uint8_t> *overlay) {
 	this->setRepresentation(GenericRaster::Representation::CPU);
 
-	FILE *file = nullptr;
-	if (filename != nullptr) {
-		file = fopen(filename, "w");
-		if (!file)
-			throw ExporterException("Could not write to file");
-	}
-
 	if (overlay) {
 		// do not use the overlay if the size does not match
 		if (overlay->width != width || overlay->height != height)
@@ -38,37 +31,6 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 
 	T max = dd.unit.getMax();
 	T min = dd.unit.getMin();
-
-	png_structp png_ptr = png_create_write_struct(
-			PNG_LIBPNG_VER_STRING,
-			NULL, NULL, NULL
-			/*
-			(png_voidp) user_error_ptr,
-			user_error_fn,
-			user_warning_fn
-			*/
-	);
-	if (!png_ptr)
-		throw ExporterException("Could not initialize libpng");
-
-	png_infop info_ptr = png_create_info_struct(png_ptr);
-	if (!info_ptr) {
-		png_destroy_write_struct(&png_ptr, (png_infopp) NULL);
-		throw ExporterException("Could not initialize libpng");
-	}
-
-	if (filename != nullptr) {
-		png_init_io(png_ptr, file);
-	}
-	else {
-		png_init_io(png_ptr, stdout);
-	}
-
-	png_set_IHDR(png_ptr, info_ptr,
-		width, height,
-		8, PNG_COLOR_TYPE_PALETTE,
-		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
-	);
 
 	T actual_min = min;
 	T actual_max = max;
@@ -108,6 +70,45 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 		overlay->print(4, 16, 1, msg.str().c_str());
 	}
 
+
+	// start PNG output
+	FILE *file = nullptr;
+	if (filename != nullptr) {
+		file = fopen(filename, "w");
+		if (!file)
+			throw ExporterException("Could not write to file");
+	}
+
+	png_structp png_ptr = png_create_write_struct(
+			PNG_LIBPNG_VER_STRING,
+			NULL, NULL, NULL
+			/*
+			(png_voidp) user_error_ptr,
+			user_error_fn,
+			user_warning_fn
+			*/
+	);
+	if (!png_ptr)
+		throw ExporterException("Could not initialize libpng");
+
+	png_infop info_ptr = png_create_info_struct(png_ptr);
+	if (!info_ptr) {
+		png_destroy_write_struct(&png_ptr, (png_infopp) NULL);
+		throw ExporterException("Could not initialize libpng");
+	}
+
+	if (filename != nullptr) {
+		png_init_io(png_ptr, file);
+	}
+	else {
+		png_init_io(png_ptr, stdout);
+	}
+
+	png_set_IHDR(png_ptr, info_ptr,
+		width, height,
+		8, PNG_COLOR_TYPE_PALETTE,
+		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
+	);
 
 	// transform into png_color array to set PLTE chunk
 	png_color colors_rgb[256];

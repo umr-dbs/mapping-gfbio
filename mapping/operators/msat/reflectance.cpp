@@ -78,8 +78,8 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 		throw OperatorException("Input raster does not appear to be a meteosat radiance raster");
 
 	// get all the metadata:
-	int channel = (forceHRV) ? 11 : (int) raster->md_value.get("msg.Channel");
-	std::string timestamp = raster->md_string.get("msg.TimeStamp");
+	int channel = (forceHRV) ? 11 : (int) raster->global_attributes.getNumeric("msg.Channel");
+	std::string timestamp = raster->global_attributes.getTextual("msg.TimeStamp");
 
 	msg::Satellite satellite;
 
@@ -87,7 +87,7 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 		satellite = msg::getSatelliteForName(forceSatellite);
 	}
 	else{
-		int satellite_id = (int) raster->md_value.get("msg.Satellite");
+		int satellite_id = (int) raster->global_attributes.getNumeric("msg.Satellite");
 		satellite = msg::getSatelliteForMsgId(satellite_id);
 	}
 

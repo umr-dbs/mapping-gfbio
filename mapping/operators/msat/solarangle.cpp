@@ -73,7 +73,7 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	// TODO: do we have any requirement for the input raster?
 
 	// get the timestamp of the MSG scene from the raster metadata
-	std::string timestamp = raster->md_string.get("TimeStamp");
+	std::string timestamp = raster->global_attributes.getTextual("TimeStamp");
 	// create and store a real time object
 	std::tm timeDate;
 

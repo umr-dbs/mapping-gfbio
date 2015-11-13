@@ -9,27 +9,45 @@
 
 class BinaryStream;
 
-template<typename T>
-class DirectMetadata {
+
+template <typename T>
+class ConstIterableMapReference {
 	public:
-		DirectMetadata();
-		DirectMetadata(BinaryStream &stream);
-		~DirectMetadata();
+		using map_type = typename std::map<std::string, T>;
+		using iterator = typename map_type::const_iterator;
+
+		ConstIterableMapReference(const map_type &map) : map(map) {};
+
+		iterator begin() const noexcept { return map.cbegin(); }
+		iterator end() const noexcept { return map.cend(); }
+
+	private:
+		const std::map<std::string, T> &map;
+};
+
+
+class AttributeMaps {
+	public:
+		AttributeMaps();
+		AttributeMaps(BinaryStream &stream);
+		~AttributeMaps();
 
 		void fromStream(BinaryStream &stream);
 		void toStream(BinaryStream &stream) const;
 
-		void set(const std::string &key, const T &value);
-		const T &get(const std::string &key) const;
-		const T &get(const std::string &key, const T &defaultvalue) const;
+		void setNumeric(const std::string &key, double value);
+		void setTextual(const std::string &key, const std::string &value);
 
-		//typename std::map<std::string, T>::iterator begin() { return data.begin(); }
-		typename std::map<std::string, T>::const_iterator begin() const { return data.begin(); }
+		double getNumeric(const std::string &key) const;
+		double getNumeric(const std::string &key, double defaultvalue) const;
+		const std::string &getTextual(const std::string &key) const;
+		const std::string &getTextual(const std::string &key, const std::string &defaultvalue) const;
 
-	    //typename std::map<std::string, T>::iterator end() { return data.end(); }
-		typename std::map<std::string, T>::const_iterator end() const { return data.end(); }
+		ConstIterableMapReference<double> numeric() const { return ConstIterableMapReference<double>(_numeric); }
+		ConstIterableMapReference<std::string> textual() const { return ConstIterableMapReference<std::string>(_textual); }
 	private:
-		std::map<std::string, T> data;
+		std::map<std::string, double> _numeric;
+		std::map<std::string, std::string> _textual;
 };
 
 

@@ -20,9 +20,9 @@ std::unique_ptr<LineCollection> filter(LineCollection *in, const std::vector<T> 
 
 	auto out = make_unique<LineCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
-	// copy global metadata
-	out->global_md_string = in->global_md_string;
-	out->global_md_value = in->global_md_value;
+
+	// copy global attributes
+	out->global_attributes = in->global_attributes;
 
 	// copy features
 	for (auto feature : *in) {

@@ -135,9 +135,6 @@ class GenericRaster : public GridSpatioTemporalResult {
 
 		const DataDescription dd;
 
-		DirectMetadata<std::string> md_string;
-		DirectMetadata<double> md_value;
-
 	protected:
 		GenericRaster(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth = 0);
 		Representation representation;

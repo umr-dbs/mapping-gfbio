@@ -54,20 +54,6 @@ public:
 	void addDefaultTimestamps();
 	void addDefaultTimestamps(double min, double max);
 
-	// global MetaData (one value per SimpleFeatureCollection)
-	const std::string &getGlobalMDString(const std::string &key) const;
-	double getGlobalMDValue(const std::string &key) const;
-	DirectMetadata<double>* getGlobalMDValueIterator();
-	DirectMetadata<std::string>* getGlobalMDStringIterator();
-	std::vector<std::string> getGlobalMDValueKeys() const;
-	std::vector<std::string> getGlobalMDStringKeys() const;
-	void setGlobalMDString(const std::string &key, const std::string &value);
-	void setGlobalMDValue(const std::string &key, double value);
-
-	// global MetaData (one value per feature)
-	DirectMetadata<std::string> global_md_string;
-	DirectMetadata<double> global_md_value;
-
 	// local MetaData (one value per feature)
 	MetadataArrays<std::string> local_md_string;
 	MetadataArrays<double> local_md_value;

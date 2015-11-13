@@ -78,17 +78,17 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 		satellite = msg::getSatelliteForName(forceSatellite);
 	}
 	else{
-		int satellite_id = (int) raster->md_value.get("msg.Satellite");
+		int satellite_id = (int) raster->global_attributes.getNumeric("msg.Satellite");
 		satellite = msg::getSatelliteForMsgId(satellite_id);
 	}
 
-	int channel = (int) raster->md_value.get("msg.Channel");
+	int channel = (int) raster->global_attributes.getNumeric("msg.Channel");
 
 	if (channel < 3 || channel >10)
 		throw OperatorException("BT calculation is only valid for Channels 4-11");
 
-	float offset = raster->md_value.get("msg.CalibrationOffset");
-	float slope = raster->md_value.get("msg.CalibrationSlope");
+	float offset = raster->global_attributes.getNumeric("msg.CalibrationOffset");
+	float slope = raster->global_attributes.getNumeric("msg.CalibrationSlope");
 
 	double wavenumber = satellite.vc[channel];
 	double alpha = satellite.alpha[channel];

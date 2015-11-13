@@ -157,10 +157,10 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 
 			double dvalue = std::strtod(value.c_str(), nullptr);
 			if (key == "TimeStamp" || (dvalue == 0 && value != "0")) {
-				raster->md_string.set(mkey, value);
+				raster->global_attributes.setTextual(mkey, value);
 			}
 			else {
-				raster->md_value.set(mkey, dvalue);
+				raster->global_attributes.setNumeric(mkey, dvalue);
 			}
 		}
 	}

@@ -107,25 +107,25 @@ class RasterDBChannel {
 			transform_datatype = datatype == GDT_Unknown ? dd.datatype : datatype;
 			transform_unit = transformed_unit;
 		}
-		double getOffset(const DirectMetadata<double> &md) {
+		double getOffset(const AttributeMaps &attr) {
 			if (!has_transform)
 				return 0;
 			if (transform_offset_metadata.length() > 0)
-				return md.get(transform_offset_metadata, 0.0);
+				return attr.getNumeric(transform_offset_metadata, 0.0);
 			return transform_offset;
 		}
-		double getScale(const DirectMetadata<double> &md) {
+		double getScale(const AttributeMaps &attr) {
 			if (!has_transform)
 				return 0;
 			if (transform_scale_metadata.length() > 0)
-				return md.get(transform_scale_metadata, 1.0);
+				return attr.getNumeric(transform_scale_metadata, 1.0);
 			return transform_scale;
 		}
-		DataDescription getTransformedDD(const DirectMetadata<double> &md) {
+		DataDescription getTransformedDD(const AttributeMaps &attr) {
 			if (!has_transform)
 				return dd;
-			double offset = getOffset(md);
-			double scale = getScale(md);
+			double offset = getOffset(attr);
+			double scale = getScale(attr);
 			Unit u = transform_unit;
 			if (dd.unit.hasMinMax() && !u.hasMinMax()) {
 				double transformed_min = dd.unit.getMin() * scale + offset;
@@ -326,7 +326,7 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 
 	printf("starting import for raster of size %d x %d, time %f -> %f\n", raster->width, raster->height, time_start, time_end);
 
-	auto rasterid = backend->createRaster(channelid, time_start, time_end, raster->md_string, raster->md_value);
+	auto rasterid = backend->createRaster(channelid, time_start, time_end, raster->global_attributes);
 
 	for (int zoom=0;;zoom++) {
 		int zoomfactor = 1 << zoom;
@@ -454,11 +454,10 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 	if (x1 > x2 || y1 > y2)
 		throw SourceException(concat("RasterDB::load(", channelid, ", ", t.t1, "-", t.t2, ", [",x1,",",y1," -> ",x2,",",y2,"]): coords swapped"));
 
-	decltype(GenericRaster::md_value) result_md_value;
-	decltype(GenericRaster::md_string) result_md_string;
-	backend->readAttributes(rasterid, result_md_string, result_md_value);
+	AttributeMaps result_attributes;
+	backend->readAttributes(rasterid, result_attributes);
 
-	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_md_value) : channels[channelid]->dd;
+	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_attributes) : channels[channelid]->dd;
 	auto result = GenericRaster::create(transformed_dd, resultstref, width, height);
 	result->clear(transformed_dd.no_data);
 
@@ -478,7 +477,7 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 			transformedBlit(
 				result.get(), tile_raster.get(),
 				((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
-				channels[channelid]->getOffset(result_md_value), channels[channelid]->getScale(result_md_value));
+				channels[channelid]->getOffset(result_attributes), channels[channelid]->getScale(result_attributes));
 		}
 		else
 			result->blit(tile_raster.get(), ((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* ((int64_t) r_z1-z1) >> zoom*/);
@@ -488,9 +487,8 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 		result = result->flip(flipx, flipy);
 	}
 
-	result->md_value = std::move(result_md_value);
-	result->md_string = std::move(result_md_string);
-	result->md_value.set("Channel", channelid);
+	result->global_attributes = std::move(result_attributes);
+	result->global_attributes.setNumeric("Channel", channelid);
 	return result;
 }
 

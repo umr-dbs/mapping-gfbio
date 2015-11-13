@@ -45,12 +45,12 @@ class RasterDBBackend {
 
 		virtual std::string readJSON() = 0;
 
-		virtual rasterid_t createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value);
+		virtual rasterid_t createRaster(int channel, double time_start, double time_end, const AttributeMaps &global_attributes);
 		virtual void writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression);
 		virtual void linkRaster(int channelid, double time_of_reference, double time_start, double time_end);
 
 		virtual RasterDescription getClosestRaster(int channelid, double t1, double t2) = 0;
-		virtual void readAttributes(rasterid_t rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value) = 0;
+		virtual void readAttributes(rasterid_t rasterid, AttributeMaps &global_attributes) = 0;
 		virtual int getBestZoom(rasterid_t rasterid, int desiredzoom) = 0;
 		virtual const std::vector<TileDescription> enumerateTiles(int channelid, rasterid_t rasterid, int x1, int y1, int x2, int y2, int zoom = 0) = 0;
 		virtual bool hasTile(rasterid_t rasterid, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom) = 0;

@@ -64,7 +64,7 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 	return res;
 }
 
-void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value) {
+void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &attributes) {
 	auto c = COMMAND_READATTRIBUTES;
 	stream->write(c);
 	stream->write(rasterid);
@@ -76,7 +76,7 @@ void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, DirectMetadata<s
 			break;
 		std::string value;
 		stream->read(&value);
-		md_string.set(key, value);
+		attributes.setTextual(key, value);
 	}
 	// read values
 	while (true) {
@@ -86,7 +86,7 @@ void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, DirectMetadata<s
 			break;
 		double value;
 		stream->read(&value);
-		md_value.set(key, value);
+		attributes.setNumeric(key, value);
 	}
 }
 

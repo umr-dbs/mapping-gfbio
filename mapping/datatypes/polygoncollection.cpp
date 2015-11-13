@@ -22,9 +22,9 @@ std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vect
 
 	auto out = make_unique<PolygonCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
-	// copy global metadata
-	out->global_md_string = in->global_md_string;
-	out->global_md_value = in->global_md_value;
+
+	// copy global attributes
+	out->global_attributes = in->global_attributes;
 
 	// copy features
 	for (auto feature : *in) {

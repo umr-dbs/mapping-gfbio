@@ -57,8 +57,8 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	if (raster->dd.unit.getMeasurement() != "raw" || !raster->dd.unit.hasMinMax())
 		throw OperatorException("Input raster does not appear to be a raw meteosat raster");
 
-	float offset = raster->md_value.get("msg.CalibrationOffset");
-	float slope = raster->md_value.get("msg.CalibrationSlope");
+	float offset = raster->global_attributes.getNumeric("msg.CalibrationOffset");
+	float slope = raster->global_attributes.getNumeric("msg.CalibrationSlope");
 
 	raster->setRepresentation(GenericRaster::OPENCL);
 
@@ -92,8 +92,7 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	prog.addArg(conversionFactor);
 	prog.run();
 
-	raster_out->md_value = raster->md_value;
-	raster_out->md_string = raster->md_string;
+	raster_out->global_attributes = raster->global_attributes;
 
 	return raster_out;
 }

@@ -26,9 +26,9 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 
 	auto out = make_unique<PointCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
-	// copy global metadata
-	out->global_md_string = in->global_md_string;
-	out->global_md_value = in->global_md_value;
+
+	// copy global attributes
+	out->global_attributes = in->global_attributes;
 
 	// copy features
 	for (auto feature : *in) {
@@ -115,8 +115,7 @@ PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection
 	stream.read(&featureCount);
 	start_feature.reserve(featureCount);
 
-	global_md_string.fromStream(stream);
-	global_md_value.fromStream(stream);
+	global_attributes.fromStream(stream);
 	local_md_string.fromStream(stream);
 	local_md_value.fromStream(stream);
 
@@ -140,8 +139,7 @@ void PointCollection::toStream(BinaryStream &stream) {
 	size_t featureCount = start_feature.size();
 	stream.write(featureCount);
 
-	stream.write(global_md_string);
-	stream.write(global_md_value);
+	stream.write(global_attributes);
 	stream.write(local_md_string);
 	stream.write(local_md_value);
 

@@ -726,7 +726,7 @@ int main() {
 								ypos += 20;
 								overlay->print(4, ypos, 1, "Attributes:");
 								ypos += 10;
-								for (auto val : result_raster->md_value) {
+								for (auto val : result_raster->global_attributes.numeric()) {
 									std::ostringstream msg;
 									msg << "attribute " << val.first << "=" << val.second;
 									overlay->print(4, ypos, 1, msg.str().c_str());

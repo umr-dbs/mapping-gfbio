@@ -5,9 +5,9 @@
 LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
 CPATH := /usr/local/include/:$(CPATH)
 
-#CPP=g++
-CPP=clang++-3.5
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ -I/usr/include/gdal
+CPP=g++
+#CPP=clang++-3.5
+CPPFLAGS=-g3 -O0 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ -I/usr/include/gdal
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_CL=-lOpenCL
@@ -52,7 +52,7 @@ OBJ_OPERATORS_COMMON=o/operators/operator.o o/operators/queryrectangle.o o/opera
 OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALL}
 OBJ_OPERATORS_STUBS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALLSTUBS}
 
-OBJ_CACHE_COMMON=o/cache/common.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/redistribution.o o/cache/priv/cache_stats.o o/cache/priv/cache_structure.o o/cache/node/node_cache.o o/cache/manager.o o/cache/priv/caching_strategy.o o/util/nio.o
+OBJ_CACHE_COMMON=o/cache/common.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/redistribution.o o/cache/priv/cache_stats.o o/cache/priv/cache_structure.o o/cache/node/node_cache.o o/cache/manager.o o/cache/priv/caching_strategy.o o/cache/priv/cube.o o/util/nio.o
 OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
 
 #
@@ -90,7 +90,7 @@ ${EXECGI}:	o/cgi.o o/cache/client.o ${OBJ_COMMON}
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/colors.o o/raster/profiler.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 	
-${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/client.o o/test/unittests/init.o o/test/unittests/example.o o/test/unittests/simplefeaturecollections/points.o o/test/unittests/simplefeaturecollections/lines.o o/test/unittests/simplefeaturecollections/polygons.o o/test/unittests/temporal/timeshift.o o/test/unittests/cache/util.o o/test/unittests/cache/stcache.o o/test/unittests/cache/distribution.o
+${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/client.o o/test/unittests/init.o o/test/unittests/example.o o/test/unittests/simplefeaturecollections/points.o o/test/unittests/simplefeaturecollections/lines.o o/test/unittests/simplefeaturecollections/polygons.o o/test/unittests/temporal/timeshift.o o/test/unittests/cache/util.o o/test/unittests/cache/stcache.o o/test/unittests/cache/distribution.o o/test/unittests/cache/aux.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 
 ${EXEGEOMETRYTESTBED}:	o/geometrytestbed.o ${OBJ_COMMON}

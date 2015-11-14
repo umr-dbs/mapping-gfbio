@@ -110,7 +110,7 @@ PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection
 	// TODO: serialize/unserialize time array
 }
 
-void PointCollection::toStream(BinaryStream &stream) {
+void PointCollection::toStream(BinaryStream &stream) const {
 	stream.write(stref);
 	size_t coordinateCount = coordinates.size();
 	stream.write(coordinateCount);

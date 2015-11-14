@@ -16,7 +16,7 @@ Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
 	stream.read(&y);
 }
-void Coordinate::toStream(BinaryStream &stream) {
+void Coordinate::toStream(BinaryStream &stream) const {
 	stream.write(x);
 	stream.write(y);
 }

@@ -11,7 +11,7 @@
 class Coordinate {
 	private:
 		Coordinate(BinaryStream &stream);
-		void toStream(BinaryStream &stream);
+		void toStream(BinaryStream &stream) const;
 	public:
 		Coordinate(double x, double y) : x(x), y(y) {}
 

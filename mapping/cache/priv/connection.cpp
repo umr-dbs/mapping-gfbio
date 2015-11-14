@@ -187,7 +187,7 @@ void ClientConnection::send_response(const DeliveryResponse& response) {
 		state = State::WRITING_RESPONSE;
 		begin_write(
 			make_unique<NBMessageWriter>(RESP_OK,
-				make_unique<NBStreamableWriter<DeliveryResponse>>(response)));
+				make_unique<NBSimpleWriter<DeliveryResponse>>(response)));
 	}
 	else
 		throw IllegalStateException("Can only send response in state: AWAIT_RESPONSE");
@@ -330,7 +330,7 @@ void WorkerConnection::process_request(uint8_t command, const BaseRequest& reque
 	if (state == State::IDLE) {
 		state = State::SENDING_REQUEST;
 		begin_write(
-			make_unique<NBMessageWriter>(command, make_unique<NBStreamableWriter<BaseRequest>>(request, true)));
+			make_unique<NBMessageWriter>(command, make_unique<NBSimpleWriter<BaseRequest>>(request, true)));
 	}
 	else
 		throw IllegalStateException("Can only process requests when idle");
@@ -349,7 +349,7 @@ void WorkerConnection::send_hit(const CacheRef& cr) {
 	if (state == State::RASTER_QUERY_REQUESTED) {
 		state = State::SENDING_QUERY_RESPONSE;
 		begin_write(
-			make_unique<NBMessageWriter>(RESP_QUERY_HIT, make_unique<NBStreamableWriter<CacheRef>>(cr)));
+			make_unique<NBMessageWriter>(RESP_QUERY_HIT, make_unique<NBSimpleWriter<CacheRef>>(cr)));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
@@ -360,7 +360,7 @@ void WorkerConnection::send_partial_hit(const PuzzleRequest& pr) {
 		state = State::SENDING_QUERY_RESPONSE;
 		begin_write(
 			make_unique<NBMessageWriter>(RESP_QUERY_PARTIAL,
-				make_unique<NBStreamableWriter<PuzzleRequest>>(pr)));
+				make_unique<NBSimpleWriter<PuzzleRequest>>(pr)));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
@@ -369,7 +369,7 @@ void WorkerConnection::send_partial_hit(const PuzzleRequest& pr) {
 void WorkerConnection::send_miss() {
 	if (state == State::RASTER_QUERY_REQUESTED) {
 		state = State::SENDING_QUERY_RESPONSE;
-		begin_write(make_unique<NBPrimitiveWriter<uint8_t>>(RESP_QUERY_MISS));
+		begin_write(make_unique<NBSimpleWriter<uint8_t>>(RESP_QUERY_MISS));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
@@ -379,7 +379,7 @@ void WorkerConnection::send_delivery_qty(uint32_t qty) {
 	if (state == State::DONE) {
 		state = State::SENDING_DELIVERY_QTY;
 		begin_write(
-			make_unique<NBMessageWriter>(RESP_DELIVERY_QTY, make_unique<NBPrimitiveWriter<uint32_t>>(qty)));
+			make_unique<NBMessageWriter>(RESP_DELIVERY_QTY, make_unique<NBSimpleWriter<uint32_t>>(qty)));
 	}
 	else
 		throw IllegalStateException("Can only send delivery qty in state DONE");
@@ -535,7 +535,7 @@ void ControlConnection::confirm_handshake(std::shared_ptr<Node> node) {
 		state = State::SENDING_HELLO;
 		begin_write(
 			make_unique<NBMessageWriter>(CMD_HELLO,
-				make_unique<NBPrimitiveWriter<uint32_t>>(node->id)
+				make_unique<NBSimpleWriter<uint32_t>>(node->id)
 			)
 		);
 	}
@@ -547,7 +547,7 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 	if (state == State::IDLE) {
 		state = State::SENDING_REORG;
 		begin_write(
-			make_unique<NBMessageWriter>(CMD_REORG, make_unique<NBStreamableWriter<ReorgDescription>>(desc)));
+			make_unique<NBMessageWriter>(CMD_REORG, make_unique<NBSimpleWriter<ReorgDescription>>(desc)));
 	}
 	else
 		throw IllegalStateException("Can only trigger reorg in state IDLE");
@@ -556,7 +556,7 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 void ControlConnection::confirm_reorg() {
 	if (state == State::REORG_RESULT_READ) {
 		state = State::SENDING_REORG_CONFIRM;
-		begin_write(make_unique<NBPrimitiveWriter<uint8_t>>(CMD_REORG_ITEM_OK));
+		begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_REORG_ITEM_OK));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state REORG_RESULT_READ");
@@ -566,7 +566,7 @@ void ControlConnection::confirm_reorg() {
 void ControlConnection::send_get_stats() {
 	if (state == State::IDLE) {
 		state = State::SENDING_STATS_REQUEST;
-		begin_write(make_unique<NBPrimitiveWriter<uint8_t>>(CMD_GET_STATS));
+		begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_GET_STATS));
 	}
 	else
 		throw IllegalStateException("Can only request statistics in state IDLE");
@@ -754,7 +754,7 @@ void DeliveryConnection::send_raster_move( const AccessInfo &info, std::shared_p
 		state = State::SENDING_RASTER_MOVE;
 		begin_write (make_unique<NBMessageWriter>(RESP_OK,
 			make_unique<NBMultiWriter>(
-				make_unique<NBStreamableWriter<AccessInfo>>(info),
+				make_unique<NBSimpleWriter<AccessInfo>>(info),
 				make_unique<NBRasterWriter> (raster)
 			)
 		));

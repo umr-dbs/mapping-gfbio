@@ -10,6 +10,9 @@
 
 #include "util/binarystream.h"
 #include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
 
 #include <vector>
 #include <memory>
@@ -50,9 +53,7 @@ public:
 	// Tells whether this writer finished writing
 	virtual bool is_finished() const = 0;
 	// Tells the number of bytes written so far
-	virtual ssize_t get_total_written() const = 0;
-	// Tells the total number of bytes to write
-	virtual ssize_t get_total_bytes() const = 0;
+	virtual size_t get_total_written() const = 0;
 	// Returns a string-representation of this writer -- logging purposes
 	virtual std::string to_string() const = 0;
 protected:
@@ -66,58 +67,99 @@ protected:
 // and serve a pointer to the data to write
 //
 
+template<typename T>
 class NBSimpleWriter : public NBWriter {
 public:
-	NBSimpleWriter();
+	NBSimpleWriter( const T &value, bool use_dynamic_typ = false );
 	virtual ~NBSimpleWriter();
 	void write(int fd);
 	bool has_error() const;
 	bool is_finished() const;
-	ssize_t get_total_written() const;
+	size_t get_total_written() const;
 	std::string to_string() const;
-	virtual ssize_t get_total_bytes() const = 0;
-protected:
-	virtual const unsigned char *get_data() const = 0;
+	void set_data( const T &value);
+
 private:
-	ssize_t bytes_written;
+	template <typename U = T>
+	typename std::enable_if< !std::is_class<U>::value >::type set( const U &val ) {
+		if ( data == nullptr ) {
+			data = (char*) malloc(sizeof(U));
+			total_bytes = sizeof(U);
+		}
+		memcpy(data, &val, sizeof(U) );
+	}
+
+	template <typename U = T>
+	typename std::enable_if< std::is_class<U>::value && !std::is_same<U,std::string>::value >::type set( const U &val ) {
+		if ( data != nullptr )
+			free(data);
+
+		StreamBuffer buf;
+		BinaryStream &bs = buf;
+
+		if ( use_dynamic_type )
+			val.toStream(bs);
+		else
+			val.U::toStream(bs);
+
+		auto written = buf.get_content();
+		total_bytes = written.length();
+		data = (char*) malloc(total_bytes);
+		memcpy(data,written.c_str(),total_bytes);
+	}
+
+	template <typename U = T>
+	typename std::enable_if< std::is_same<U,std::string>::value >::type set( const U &val ) {
+		if ( data != nullptr )
+			free(data);
+		size_t size = val.length();
+		total_bytes = size + sizeof(size_t);
+
+		data = (char*) malloc(total_bytes);
+		memcpy(data,&size,sizeof(size_t));
+		memcpy(data+sizeof(size_t),val.c_str(), size);
+	}
+
+	size_t bytes_written;
+	size_t total_bytes;
 	bool error;
-	bool finished;
+	bool use_dynamic_type;
+	char* data;
 };
 
-
-//
-// Writer for primitive types
-//
-
-template<typename T>
-class NBPrimitiveWriter : public NBSimpleWriter {
+template<typename CType, typename ElementWriter>
+class NBContainerWriter : public NBWriter {
 public:
-	NBPrimitiveWriter( T data );
-	virtual ~NBPrimitiveWriter();
-	virtual ssize_t get_total_bytes() const;
-protected:
-	virtual const unsigned char *get_data() const;
+	NBContainerWriter( const CType &container, bool write_size = true );
+	virtual void write(int fd);
+	virtual bool has_error() const;
+	virtual bool is_finished() const;
+	virtual size_t get_total_written() const;
+	virtual std::string to_string() const;
 private:
-	T data;
+	uint64_t element_count;
+	bool write_size;
+	size_t total_written;
+	bool error;
+	typename CType::const_iterator iter;
+	typename CType::const_iterator end;
+	std::unique_ptr<ElementWriter> e_writer;
 };
 
-//
-// Simple NBWriter -- serializes the object to an internal buffer
-// and then writes it to the configured fd
-//
-
-template<typename T>
-class NBStreamableWriter : public NBSimpleWriter {
+template<typename K, typename V, typename KWriter, typename VWriter>
+class NBPairWriter : public NBWriter {
 public:
-	NBStreamableWriter( const T& item, bool use_dynamic_type = false );
-	virtual ~NBStreamableWriter();
-	virtual ssize_t get_total_bytes() const;
-protected:
-	virtual const unsigned char *get_data() const;
+	NBPairWriter( const std::pair<K,V> &p );
+	virtual void write(int fd);
+	virtual bool has_error() const;
+	virtual bool is_finished() const;
+	virtual size_t get_total_written() const;
+	virtual std::string to_string() const;
+	void set_data( const std::pair<K,V> &data );
 private:
-	std::string data;
+	std::unique_ptr<KWriter> kw;
+	std::unique_ptr<VWriter> vw;
 };
-
 
 //
 //
@@ -131,8 +173,7 @@ public:
 	virtual void write(int fd);
 	virtual bool has_error() const;
 	virtual bool is_finished() const;
-	virtual ssize_t get_total_written() const;
-	virtual ssize_t get_total_bytes() const;
+	virtual size_t get_total_written() const;
 	virtual std::string to_string() const;
 protected:
 	NBMultiWriter();
@@ -140,8 +181,7 @@ protected:
 private:
 	void check_writer( const NBWriter &writer );
 	uint current_index;
-	ssize_t total_bytes;
-	std::vector<std::unique_ptr<NBWriter>> writers;
+ 	std::vector<std::unique_ptr<NBWriter>> writers;
 };
 
 //
@@ -170,9 +210,31 @@ public:
 class NBRasterWriter : public NBMultiWriter {
 public:
 	NBRasterWriter( std::shared_ptr<GenericRaster> raster );
-private:
-	std::shared_ptr<GenericRaster> raster;
 };
+
+template<typename T>
+class NBDirectMDWriter : public NBContainerWriter<DirectMetadata<T>,
+	NBPairWriter<std::string,T,NBSimpleWriter<std::string>,NBSimpleWriter<T>>> {
+public:
+};
+
+// TODO: Serialize in a less memory consuming manner
+class NBPointsWriter : public NBSimpleWriter<PointCollection> {
+public:
+	NBPointsWriter( std::shared_ptr<PointCollection> points );
+};
+
+// TODO: Serialize in a less memory consuming manner
+//class NBLinesWriter : public NBSimpleWriter<LineCollection> {
+//public:
+//	NBLinesWriter( std::shared_ptr<LineCollection> points );
+//};
+//
+//// TODO: Serialize in a less memory consuming manner
+//class NBPolygonsWriter : public NBSimpleWriter<PolygonCollection> {
+//public:
+//	NBPolygonsWriter( std::shared_ptr<PolygonCollection> points );
+//};
 
 
 //
@@ -247,10 +309,10 @@ private:
 	bool finished;
 	bool error;
 	size_t len;
-	ssize_t len_read;
+	size_t len_read;
 
-	ssize_t data_read;
-	unsigned char* data;
+	size_t data_read;
+	char* data;
 };
 
 //
@@ -289,8 +351,8 @@ private:
 	std::unique_ptr<NBReader> element_reader;
 	uint64_t size;
 	uint64_t current_index;
-	ssize_t size_read;
-	ssize_t element_read_accum;
+	size_t size_read;
+	size_t element_read_accum;
 	StreamBuffer buffer;
 	bool error;
 };
@@ -390,6 +452,5 @@ class NBNodeHandshakeReader : public NBMultiReader {
 public:
 	NBNodeHandshakeReader();
 };
-
 
 #endif /* NIO_H_ */

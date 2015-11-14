@@ -54,26 +54,37 @@ NBWriter::NBWriter() {
 NBWriter::~NBWriter() {
 }
 
-
 //
 // Simple Writer
 //
-NBSimpleWriter::NBSimpleWriter() :
-	bytes_written(0), error(false), finished(false) {
+
+template<typename T>
+NBSimpleWriter<T>::NBSimpleWriter(const T& value, bool use_dynamic_type) :
+	bytes_written(0), total_bytes(0), error(false), use_dynamic_type(use_dynamic_type), data(nullptr){
+	set_data(value);
 }
 
-NBSimpleWriter::~NBSimpleWriter() {
+template<typename T>
+void NBSimpleWriter<T>::set_data( const T& value ) {
+	set<T>(value);
+	bytes_written = 0;
+	error = false;
 }
 
-void NBSimpleWriter::write(int fd) {
-	if ( error || finished )
-			throw IllegalStateException(concat("Illegal state for writing. Error: ", error, ", Finished: ", finished));
+template<typename T>
+NBSimpleWriter<T>::~NBSimpleWriter() {
+	if ( data != nullptr )
+		free(data);
+}
 
-	const unsigned char *data = get_data();
+template<typename T>
+void NBSimpleWriter<T>::write(int fd) {
+	if ( error || is_finished() )
+			throw IllegalStateException(concat("Illegal state for writing. Error: ", error, ", Finished: ", is_finished()));
 
 	ssize_t currently_written = 0;
-	while ( currently_written >= 0 && bytes_written < get_total_bytes() ) {
-		currently_written = ::write(fd,data+bytes_written,get_total_bytes()-bytes_written);
+	while ( currently_written >= 0 && !is_finished() ) {
+		currently_written = ::write(fd,data+bytes_written,total_bytes-bytes_written);
 		if ( currently_written >= 0 )
 			bytes_written += currently_written;
 		else if ( errno == EAGAIN || errno == EWOULDBLOCK )
@@ -84,108 +95,174 @@ void NBSimpleWriter::write(int fd) {
 			return;
 		}
 	}
-	finished = true;
 }
 
-bool NBSimpleWriter::has_error() const {
+template<typename T>
+bool NBSimpleWriter<T>::has_error() const {
 	return error;
 }
 
-bool NBSimpleWriter::is_finished() const {
-	return finished;
+template<typename T>
+bool NBSimpleWriter<T>::is_finished() const {
+	return bytes_written >= total_bytes;
 }
 
-ssize_t NBSimpleWriter::get_total_written() const {
+template<typename T>
+size_t NBSimpleWriter<T>::get_total_written() const {
 	return bytes_written;
 }
 
-std::string NBSimpleWriter::to_string() const {
-	return concat("SimpleNBWriter[ written: ", bytes_written, ", total: ", get_total_bytes(), ", finished: ", finished, ", error: ", error ,"]");
-}
-
-
-//
-// Primitive Writer
-//
 template<typename T>
-NBPrimitiveWriter<T>::NBPrimitiveWriter(T data) : data(data) {
-}
-
-template<typename T>
-NBPrimitiveWriter<T>::~NBPrimitiveWriter() {
-}
-
-template<typename T>
-ssize_t NBPrimitiveWriter<T>::get_total_bytes() const {
-	return sizeof(data);
-}
-
-template<typename T>
-const unsigned char* NBPrimitiveWriter<T>::get_data() const {
-	return (const unsigned char*) &data;
+std::string NBSimpleWriter<T>::to_string() const {
+	return concat("SimpleNBWriter[ written: ", bytes_written, ", finished: ", is_finished(), ", error: ", error ,"]");
 }
 
 //
-// Simple Writer
+// Container Writer
 //
-template<>
-NBStreamableWriter<std::string>::NBStreamableWriter(const std::string& item, bool use_dynamic_type) {
-	(void) use_dynamic_type;
-	StreamBuffer ss;
-	BinaryStream &stream = ss;
-	stream.write(item);
-	data = ss.get_content();
+template<typename CType, typename ElementWriter>
+NBContainerWriter<CType,ElementWriter>::NBContainerWriter( const CType &container, bool write_size) :
+	element_count(container.size()),
+	write_size(write_size),
+	total_written(0),
+	error(false),
+	iter(container.begin()),
+	end(container.end() ){
+
+	if ( container.size() > 0 )
+		e_writer.reset( new ElementWriter(*iter) );
 }
 
-template<typename T>
-NBStreamableWriter<T>::NBStreamableWriter(const T& item, bool use_dynamic_type) {
-	StreamBuffer ss;
-	BinaryStream &stream = ss;
-	if ( use_dynamic_type )
-		item.toStream(stream);
-	else
-		item.T::toStream(stream);
 
-	data = ss.get_content();
+template<typename CType, typename ElementWriter>
+void NBContainerWriter<CType,ElementWriter>::write(int fd) {
+	if ( error || is_finished() )
+		throw IllegalStateException(concat("Illegal state for writing. Error: ", error, ", Finished: ", is_finished()));
+
+	// Write size if required
+	if ( write_size && total_written < sizeof(element_count) ) {
+		unsigned char * data = (unsigned char*) &element_count;
+		ssize_t currently_written = 0;
+		while ( currently_written >= 0 && total_written < sizeof(element_count) ) {
+			currently_written = ::write(fd,data+total_written,sizeof(element_count)-total_written);
+			if ( currently_written >= 0 )
+				total_written += currently_written;
+			else if ( errno == EAGAIN || errno == EWOULDBLOCK )
+				return;
+			else {
+				Log::debug("ERROR after %d bytes: %s", total_written, strerror(errno));
+				error = true;
+				return;
+			}
+		}
+	}
+
+	while ( iter != end ) {
+		e_writer->write(fd);
+		if ( e_writer->is_finished() ) {
+			iter++;
+			if ( iter != end )
+				e_writer->set_data(*iter);
+		}
+		else if ( e_writer.has_error() )
+			error = true;
+		else
+			break;
+	}
 }
 
-template<typename T>
-NBStreamableWriter<T>::~NBStreamableWriter() {
+template<typename CType, typename ElementWriter>
+bool NBContainerWriter<CType,ElementWriter>::has_error() const {
+	return error;
 }
 
-template<typename T>
-ssize_t NBStreamableWriter<T>::get_total_bytes() const {
-	return data.size();
+template<typename CType, typename ElementWriter>
+bool NBContainerWriter<CType,ElementWriter>::is_finished() const {
+	return iter == end;
 }
 
-template<typename T>
-const unsigned char* NBStreamableWriter<T>::get_data() const {
-	return (const unsigned char*) data.data();
+template<typename CType, typename ElementWriter>
+size_t NBContainerWriter<CType,ElementWriter>::get_total_written() const {
+	return total_written;
 }
+
+template<typename CType, typename ElementWriter>
+std::string NBContainerWriter<CType,ElementWriter>::to_string() const {
+	return concat("NBContainerWriter[ written: ", get_total_written(), ", finished: ", is_finished(), ", error: ", has_error() ,"]");
+}
+
+//
+// PairWriter
+//
+template<typename K, typename V, typename KWriter, typename VWriter>
+NBPairWriter<K, V, KWriter, VWriter>::NBPairWriter( const std::pair<K,V> &p ) {
+	kw->reset( new KWriter(p.first) );
+	vw->reset( new KWriter(p.second) );
+}
+
+template<typename K, typename V, typename KWriter, typename VWriter>
+void NBPairWriter<K, V, KWriter, VWriter>::write(int fd) {
+	if ( has_error() || is_finished() )
+		throw IllegalStateException(concat("Illegal state for writing. Error: ", has_error, ", Finished: ", is_finished()));
+
+	if ( !kw->is_finished() ) {
+		kw->write(fd);
+		if ( !kw->is_finished() )
+			return;
+	}
+
+	vw->write(fd);
+
+}
+
+template<typename K, typename V, typename KWriter, typename VWriter>
+bool NBPairWriter<K, V, KWriter, VWriter>::has_error() const {
+	return kw->has_error() || vw->has_error();
+}
+
+template<typename K, typename V, typename KWriter, typename VWriter>
+bool NBPairWriter<K, V, KWriter, VWriter>::is_finished() const {
+	return kw->is_finished() && vw->is_finished();
+}
+
+template<typename K, typename V, typename KWriter, typename VWriter>
+size_t NBPairWriter<K, V, KWriter, VWriter>::get_total_written() const {
+	return kw->get_total_written() && vw->get_total_written();
+}
+
+template<typename K, typename V, typename KWriter, typename VWriter>
+std::string NBPairWriter<K, V, KWriter, VWriter>::to_string() const {
+	return "PairWriter";
+}
+
+template<typename K, typename V, typename KWriter, typename VWriter>
+void NBPairWriter<K, V, KWriter, VWriter>::set_data(const std::pair<K, V>& data) {
+	kw->set_data(data.first);
+	vw->set_data(data.second);
+}
+
 
 //
 // Multi Writer
 //
-NBMultiWriter::NBMultiWriter( std::unique_ptr<NBWriter> w1, std::unique_ptr<NBWriter> w2 ) : current_index(0), total_bytes(0) {
+NBMultiWriter::NBMultiWriter( std::unique_ptr<NBWriter> w1, std::unique_ptr<NBWriter> w2 ) : current_index(0) {
 	add_writer( std::move(w1) );
 	add_writer( std::move(w2) );
 }
 
 NBMultiWriter::NBMultiWriter(std::vector<std::unique_ptr<NBWriter> > writers) :
-	current_index(0), total_bytes(0), writers(std::move(writers)) {
+	current_index(0), writers(std::move(writers)) {
 	for ( auto &w : this->writers ) {
 		check_writer(*w);
-		total_bytes += w->get_total_bytes();
 	}
 }
 
 NBMultiWriter::NBMultiWriter() :
-	current_index(0), total_bytes(0) {
+	current_index(0) {
 }
 
 void NBMultiWriter::add_writer(std::unique_ptr<NBWriter> w) {
 	check_writer(*w);
-	total_bytes += w->get_total_bytes();
 	writers.push_back( std::move(w) );
 }
 
@@ -219,7 +296,7 @@ bool NBMultiWriter::is_finished() const {
 	return current_index == writers.size();
 }
 
-ssize_t NBMultiWriter::get_total_written() const {
+size_t NBMultiWriter::get_total_written() const {
 	ssize_t res(0);
 	for ( auto &w : writers ) {
 		res += w->get_total_written();
@@ -227,49 +304,94 @@ ssize_t NBMultiWriter::get_total_written() const {
 	return res;
 }
 
-ssize_t NBMultiWriter::get_total_bytes() const {
-	return total_bytes;
-}
-
 std::string NBMultiWriter::to_string() const {
-	return concat("MultiNBWriter[ #writer: ", writers.size(), ", written: ", get_total_written(), ", total: ", get_total_bytes(), ", finished: ", is_finished(), ", error: ", has_error() ,"]");
+	return concat("MultiNBWriter[ #writer: ", writers.size(), ", written: ", get_total_written(), ", finished: ", is_finished(), ", error: ", has_error() ,"]");
 }
 
 //
 // Raster-Writer
 //
 
-class NBRasterDataWriter : public NBSimpleWriter {
+class NBRasterDataWriter : public NBWriter {
 public:
 	NBRasterDataWriter( std::shared_ptr<GenericRaster> raster);
-	virtual ssize_t get_total_bytes() const;
-protected:
-	virtual const unsigned char *get_data() const;
+	void write(int fd);
+	bool has_error() const;
+	bool is_finished() const;
+	size_t get_total_written() const;
+	std::string to_string() const;
 private:
 	std::shared_ptr<GenericRaster> raster;
+	size_t bytes_written;
+	bool error;
 };
 
-NBRasterDataWriter::NBRasterDataWriter(std::shared_ptr<GenericRaster>  raster) :
-  raster(raster) {
+NBRasterDataWriter::NBRasterDataWriter( std::shared_ptr<GenericRaster>  raster) :
+  raster(raster), bytes_written(0), error(false) {
 }
 
-ssize_t NBRasterDataWriter::get_total_bytes() const {
-	return raster->getDataSize();
+void NBRasterDataWriter::write(int fd) {
+	if ( has_error() || is_finished() )
+			throw IllegalStateException(concat("Illegal state for writing. Error: ", has_error(), ", Finished: ", is_finished()));
+
+	const char *data = (const char*)raster->getData();
+
+	ssize_t currently_written = 0;
+	while ( currently_written >= 0 && !is_finished() ) {
+		currently_written = ::write(fd,data+bytes_written,raster->getDataSize()-bytes_written);
+		if ( currently_written >= 0 )
+			bytes_written += currently_written;
+		else if ( errno == EAGAIN || errno == EWOULDBLOCK )
+			return;
+		else {
+			Log::debug("ERROR after %d bytes: %s", bytes_written, strerror(errno));
+			error = true;
+			return;
+		}
+	}
 }
 
-const unsigned char* NBRasterDataWriter::get_data() const {
-	return (unsigned char*) raster->getData();
+bool NBRasterDataWriter::has_error() const {
+	return error;
 }
+
+bool NBRasterDataWriter::is_finished() const {
+	return bytes_written >= raster->getDataSize();
+}
+
+size_t NBRasterDataWriter::get_total_written() const {
+	return bytes_written;
+}
+
+std::string NBRasterDataWriter::to_string() const {
+	return "RasterDataWriter";
+}
+
 
 NBRasterWriter::NBRasterWriter( std::shared_ptr<GenericRaster> raster ) {
-	add_writer(make_unique<NBStreamableWriter<DataDescription>>( raster->dd ));
-	add_writer(make_unique<NBStreamableWriter<SpatioTemporalReference>>( raster->stref ));
-	add_writer(make_unique<NBPrimitiveWriter<uint32_t>>( raster->width ));
-	add_writer(make_unique<NBPrimitiveWriter<uint32_t>>( raster->height ));
+	add_writer(make_unique<NBSimpleWriter<DataDescription>>( raster->dd ));
+	add_writer(make_unique<NBSimpleWriter<SpatioTemporalReference>>( raster->stref ));
+	add_writer(make_unique<NBSimpleWriter<uint32_t>>( raster->width ));
+	add_writer(make_unique<NBSimpleWriter<uint32_t>>( raster->height ));
 	add_writer(make_unique<NBRasterDataWriter>( raster ));
-	add_writer(make_unique<NBStreamableWriter<DirectMetadata<std::string>>>( raster->md_string ));
-	add_writer(make_unique<NBStreamableWriter<DirectMetadata<double>>>( raster->md_value ));
+	add_writer(make_unique<NBSimpleWriter<DirectMetadata<std::string>>>( raster->md_string ));
+	add_writer(make_unique<NBSimpleWriter<DirectMetadata<double>>>( raster->md_value ));
 }
+
+
+
+NBPointsWriter::NBPointsWriter( std::shared_ptr<PointCollection> points ) :
+	NBSimpleWriter( *points ) {
+}
+
+//NBLinesWriter::NBLinesWriter(std::shared_ptr<LineCollection> lines) :
+//	NBSimpleWriter( *lines ){
+//}
+//
+//NBPolygonsWriter::NBPolygonsWriter(std::shared_ptr<PolygonCollection> polygons) :
+//	NBSimpleWriter( *polygons ){
+//}
+
 
 
 //
@@ -277,22 +399,22 @@ NBRasterWriter::NBRasterWriter( std::shared_ptr<GenericRaster> raster ) {
 //
 
 NBMessageWriter::NBMessageWriter(uint8_t code, std::unique_ptr<NBWriter> payload) {
-	add_writer(make_unique<NBPrimitiveWriter<uint8_t>>(code));
+	add_writer(make_unique<NBSimpleWriter<uint8_t>>(code));
 	add_writer(std::move(payload));
 }
 
 NBErrorWriter::NBErrorWriter(uint8_t code, const std::string& msg) :
-	NBMessageWriter(code, make_unique<NBStreamableWriter<std::string>>(msg)) {
+	NBMessageWriter(code, make_unique<NBSimpleWriter<std::string>>(msg)) {
 }
 
-template class NBPrimitiveWriter<uint8_t> ;
-template class NBPrimitiveWriter<uint32_t> ;
-template class NBStreamableWriter<DeliveryResponse> ;
-template class NBStreamableWriter<AccessInfo> ;
-template class NBStreamableWriter<ReorgDescription> ;
-template class NBStreamableWriter<CacheRef> ;
-template class NBStreamableWriter<BaseRequest> ;
-template class NBStreamableWriter<PuzzleRequest> ;
+template class NBSimpleWriter<uint8_t> ;
+template class NBSimpleWriter<uint32_t> ;
+template class NBSimpleWriter<DeliveryResponse> ;
+template class NBSimpleWriter<AccessInfo> ;
+template class NBSimpleWriter<ReorgDescription> ;
+template class NBSimpleWriter<CacheRef> ;
+template class NBSimpleWriter<BaseRequest> ;
+template class NBSimpleWriter<PuzzleRequest> ;
 
 ///////////////////////////////////////////////////////////////////
 //
@@ -395,7 +517,7 @@ void NBStringReader::read(int fd) {
 	if ( error || finished )
 			throw IllegalStateException(concat("Illegal state for reading. Error: ", error, ", Finished: ", finished));
 
-	unsigned char* lp = (unsigned char*) &len;
+	char* lp = (char*) &len;
 
 	ssize_t currently_read = 0;
 	while ( currently_read >= 0 && len_read < sizeof(len) ) {
@@ -412,7 +534,7 @@ void NBStringReader::read(int fd) {
 	}
 
 	if ( data == nullptr ) {
-		data = (unsigned char*) malloc(len);
+		data = (char*) malloc(len);
 		if ( data == nullptr) {
 			Log::error("Could not alloc space for string to read, required: %ld", len);
 			error = true;
@@ -556,7 +678,7 @@ void NBContainerReader::read(int fd) {
 	if ( has_error() || is_finished() )
 		throw IllegalStateException(concat("Illegal state for reading. Error: ", has_error(), ", Finished: ", is_finished()));
 
-	unsigned char* lp = (unsigned char*) &size;
+	char* lp = (char*) &size;
 
 	ssize_t currently_read = 0;
 	while ( currently_read >= 0 && size_read < sizeof(size) ) {
@@ -711,3 +833,4 @@ NBNodeHandshakeReader::NBNodeHandshakeReader() {
 		make_unique<NBNodeCacheRefReader>()
 	));
 }
+

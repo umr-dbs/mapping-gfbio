@@ -21,6 +21,7 @@ _CUSTOM_EXCEPTION_CLASS(ArgumentException);
 _CUSTOM_EXCEPTION_CLASS(ImporterException);
 _CUSTOM_EXCEPTION_CLASS(ExporterException);
 _CUSTOM_EXCEPTION_CLASS(MetadataException);
+_CUSTOM_EXCEPTION_CLASS(AttributeException);
 _CUSTOM_EXCEPTION_CLASS(ConverterException);
 _CUSTOM_EXCEPTION_CLASS(OperatorException);
 _CUSTOM_EXCEPTION_CLASS(SourceException, OperatorException);

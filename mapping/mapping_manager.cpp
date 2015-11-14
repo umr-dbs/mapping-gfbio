@@ -1,6 +1,6 @@
 #include "datatypes/raster.h"
+#include "datatypes/colorizer.h"
 #include "rasterdb/rasterdb.h"
-#include "raster/colors.h"
 #include "raster/opencl.h"
 #include "cache/manager.h"
 
@@ -47,9 +47,8 @@ static void convert(int argc, char *argv[]) {
 
 	try {
 		auto raster = GenericRaster::fromGDAL(argv[2], 1);
-		GreyscaleColorizer c;
-		raster->toPNG(argv[3], c);
-
+		auto c = Colorizer::make("grey");
+		raster->toPNG(argv[3], *c);
 	}
 	catch (ImporterException &e) {
 		printf("%s\n", e.what());
@@ -109,8 +108,7 @@ static void createsource(int argc, char *argv[]) {
 
 		Json::Value channel(Json::objectValue);
 		channel["datatype"] = GDALGetDataTypeName(raster->dd.datatype);
-		channel["min"] = raster->dd.min;
-		channel["max"] = raster->dd.max;
+		channel["unit"] = raster->dd.unit.toJsonObject();
 		if (raster->dd.has_no_data)
 			channel["nodata"] = raster->dd.no_data;
 

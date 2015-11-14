@@ -1,21 +1,15 @@
 
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/raster/typejuggling.h"
-#include "raster/colors.h"
+#include "datatypes/colorizer.h"
 
 #include <png.h>
 #include <stdio.h>
 #include <sstream>
+#include <cmath>
 
 template<typename T> void Raster2D<T>::toPNG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy, Raster2D<uint8_t> *overlay) {
 	this->setRepresentation(GenericRaster::Representation::CPU);
-
-	FILE *file = nullptr;
-	if (filename != nullptr) {
-		file = fopen(filename, "w");
-		if (!file)
-			throw ExporterException("Could not write to file");
-	}
 
 	if (overlay) {
 		// do not use the overlay if the size does not match
@@ -28,11 +22,62 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 		std::ostringstream msg_scale;
 		msg_scale.precision(2);
 		msg_scale << std::fixed << "scale: " << pixel_scale_x << ", " << pixel_scale_y;
-		overlay->print(4, 26, overlay->dd.max, msg_scale.str().c_str());
+		overlay->print(4, 26, 1, msg_scale.str().c_str());
+
+		std::ostringstream msg_unit;
+		msg_unit << "Unit: " << dd.unit.getMeasurement() << ", " << dd.unit.getUnit();
+		overlay->print(4, 36, 1, msg_unit.str().c_str());
 	}
 
-	T max = dd.max;
-	T min = dd.min;
+	T max = dd.unit.getMax();
+	T min = dd.unit.getMin();
+
+	T actual_min = min;
+	T actual_max = max;
+	if (colorizer.is_absolute) {
+		// calculate the actual min/max so we can include only the range we require
+		actual_min = (T) dd.getMaxByDatatype();
+		actual_max = (T) dd.getMinByDatatype();
+		bool found_pixel = false;
+		auto size = getPixelCount();
+		for (size_t i=0;i<size;i++) {
+			T v = data[i];
+			if (dd.is_no_data(v))
+				continue;
+			actual_min = std::min(actual_min, v);
+			actual_max = std::max(actual_max, v);
+			found_pixel = true;
+		}
+		if (!found_pixel) {
+			actual_min = 0;
+			actual_max = 1;
+		}
+	}
+
+	if (!std::isfinite(actual_min) || !std::isfinite(actual_max))
+		throw ExporterException("Cannot export PNG without either a known min/max or an absolute colorizer");
+
+	//auto actual_range = RasterTypeInfo<T>::getRange(actual_min, actual_max);
+
+	uint32_t colors[256];
+	colors[0] = color_from_rgba(0,0,0,0);
+	colors[1] = color_from_rgba(255,0,255,255);
+	colorizer.fillPalette(&colors[2], 254, actual_min, actual_max);
+
+	if (overlay) {
+		std::ostringstream msg;
+		msg << GDALGetDataTypeName(dd.datatype) << " (" << (double) actual_min << " - " << (double) actual_max << ")";
+		overlay->print(4, 16, 1, msg.str().c_str());
+	}
+
+
+	// start PNG output
+	FILE *file = nullptr;
+	if (filename != nullptr) {
+		file = fopen(filename, "w");
+		if (!file)
+			throw ExporterException("Could not write to file");
+	}
 
 	png_structp png_ptr = png_create_write_struct(
 			PNG_LIBPNG_VER_STRING,
@@ -64,41 +109,6 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 		8, PNG_COLOR_TYPE_PALETTE,
 		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT
 	);
-
-	T actual_min = min;
-	T actual_max = max;
-	if (colorizer.is_absolute) {
-		// calculate the actual min/max so we can include only the range we require
-		actual_min = (T) dd.getMaxByDatatype();
-		actual_max = (T) dd.getMinByDatatype();
-		bool found_pixel = false;
-		auto size = getPixelCount();
-		for (size_t i=0;i<size;i++) {
-			T v = data[i];
-			if (dd.is_no_data(v))
-				continue;
-			actual_min = std::min(actual_min, v);
-			actual_max = std::max(actual_max, v);
-			found_pixel = true;
-		}
-		if (!found_pixel) {
-			actual_min = 0;
-			actual_max = 1;
-		}
-	}
-	//auto actual_range = RasterTypeInfo<T>::getRange(actual_min, actual_max);
-
-	uint32_t colors[256];
-	colors[0] = color_from_rgba(0,0,0,0);
-	colors[1] = color_from_rgba(255,0,255,255);
-	colorizer.fillPalette(&colors[2], 254, actual_min, actual_max);
-
-	if (overlay) {
-		std::ostringstream msg;
-		msg << GDALGetDataTypeName(dd.datatype) << " (" << (double) actual_min << " - " << (double) actual_max << ")";
-		overlay->print(4, 16, 1, msg.str().c_str());
-	}
-
 
 	// transform into png_color array to set PLTE chunk
 	png_color colors_rgb[256];

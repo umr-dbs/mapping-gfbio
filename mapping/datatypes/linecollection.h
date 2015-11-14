@@ -53,6 +53,25 @@ public:
 	std::unique_ptr<LineCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<LineCollection> filter(const std::vector<char> &keep);
 
+	/**
+	 * filter collection by a given rectangle
+	 * @param x1 x of upper left coordinate of rectangle
+	 * @param y1 y of upper left coordiante of rectangle
+	 * @param x2 y of lower right coordinate of rectangle
+	 * @param y2 x of lower right coordinate of rectangle
+	 * @return new collection that contains only features that intersect with rectangle
+	 */
+	virtual std::unique_ptr<LineCollection> filterByRectangleIntersection(double x1, double y1, double x2, double y2);
+
+	/**
+	 * filter collection by a given spatial reference
+	 * @param sref spatial reference
+	 * @return new collection that contains only features that intersect with rectangle given by sref
+	 */
+	virtual std::unique_ptr<LineCollection> filterByRectangleIntersection(const SpatialReference& sref);
+
+	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
+
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
 	virtual std::string toCSV() const;
@@ -111,16 +130,16 @@ private:
 		    	return lc.calculateMBR(lc.start_line[lc.start_feature[idx]], lc.start_line[lc.start_feature[idx + 1]]);
 		    }
 
-		    inline LineLineReference<LineCollection> getLineReference(size_t lineIndex){
+		    inline LineLineReference<C> getLineReference(size_t lineIndex){
 		    	if(lineIndex >= size())
 		    		throw ArgumentException("LineIndex >= Count");
-		    	return LineLineReference<LineCollection>(lc, lc.start_feature[idx] + lineIndex);
+		    	return LineLineReference<C>(lc, lc.start_feature[idx] + lineIndex);
 			}
 
-			inline LineLineReference<const LineCollection> getLineReference(size_t lineIndex) const{
+			inline LineLineReference<const C> getLineReference(size_t lineIndex) const{
 				if(lineIndex >= size())
 					throw ArgumentException("LineIndex >= Count");
-				return LineLineReference<const LineCollection>(lc, lc.start_feature[idx] + lineIndex);
+				return LineLineReference<const C>(lc, lc.start_feature[idx] + lineIndex);
 			}
 
 		private:
@@ -152,6 +171,13 @@ private:
 		    size_t size() const {
 		    	return lc.start_line[idx+1] - lc.start_line[idx];
 		    }
+
+		    /**
+			 * return the index of the current line in the start_line array
+			 */
+			size_t getLineIndex() const {
+				return idx;
+			}
 
 		    SpatialReference getMBR() const {
 		    	return lc.calculateMBR(lc.start_line[idx], lc.start_line[idx + 1]);

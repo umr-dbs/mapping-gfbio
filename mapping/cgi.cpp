@@ -1,7 +1,7 @@
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/plot.h"
-#include "raster/colors.h"
+#include "datatypes/colorizer.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/configuration.h"
@@ -164,10 +164,17 @@ static time_t parseIso8601DateTime(std::string dateTimeString){
 
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
-	auto colorizer = Colorizer::make(colors);
-	print_debug_header();
+	// For now, always guess the colorizer, ignore any user-specified colors
+	//auto colorizer = Colorizer::make(colors);
+	auto colorizer = Colorizer::fromUnit(raster->dd.unit);
+static bool has_headers = false;
+
 #if 1
-	printf("Content-type: image/png\r\n\r\n");
+	if (!has_headers) {
+		print_debug_header();
+		printf("Content-type: image/png\r\n\r\n");
+	}
+	has_headers = true;
 
 	raster->toPNG(nullptr, *colorizer, flipx, flipy, overlay); //"/tmp/xyz.tmp.png");
 #else
@@ -691,7 +698,9 @@ int main() {
 
 						std::unique_ptr<Raster2D<uint8_t>> overlay;
 						if (debug) {
-							DataDescription dd_overlay(GDT_Byte, 0, 1);
+							Unit u = Unit::unknown();
+							u.setMinMax(0, 1);
+							DataDescription dd_overlay(GDT_Byte, u);
 							overlay.reset( (Raster2D<uint8_t> *) GenericRaster::create(dd_overlay, SpatioTemporalReference::unreferenced(), output_width, output_height).release() );
 							overlay->clear(0);
 
@@ -705,22 +714,22 @@ int main() {
 							msg_br.precision(2);
 							msg_br << std::fixed << bbox[2] << ", " << bbox[3] << " [" << result_raster->stref.x2 << ", " << result_raster->stref.y2 << "]";;
 							std::string msg_brs = msg_br.str();
-							overlay->print(overlay->width-4-8*msg_brs.length(), overlay->height-12, overlay->dd.max, msg_brs.c_str());
+							overlay->print(overlay->width-4-8*msg_brs.length(), overlay->height-12, 1, msg_brs.c_str());
 
 							if (result_raster->height >= 512) {
 								auto messages = get_debug_messages();
-								int ypos = 36;
+								int ypos = 46;
 								for (auto &msg : messages) {
-									overlay->print(4, ypos, overlay->dd.max, msg.c_str());
+									overlay->print(4, ypos, 1, msg.c_str());
 									ypos += 10;
 								}
 								ypos += 20;
-								overlay->print(4, ypos, overlay->dd.max, "Attributes:");
+								overlay->print(4, ypos, 1, "Attributes:");
 								ypos += 10;
-								for (auto val : result_raster->md_value) {
+								for (auto val : result_raster->global_attributes.numeric()) {
 									std::ostringstream msg;
 									msg << "attribute " << val.first << "=" << val.second;
-									overlay->print(4, ypos, overlay->dd.max, msg.str().c_str());
+									overlay->print(4, ypos, 1, msg.str().c_str());
 									ypos += 10;
 								}
 
@@ -734,12 +743,13 @@ int main() {
 					// Alright, something went wrong.
 					// We're still in a WMS request though, so do our best to output an image with a clear error message.
 
-					DataDescription dd(GDT_Byte, 0, 255, true, 0);
+					Unit u("errormessage", "errormessage");
+					DataDescription dd(GDT_Byte, u, true, 0);
 					auto errorraster = GenericRaster::create(dd, SpatioTemporalReference::unreferenced(), output_width, output_height);
 					errorraster->clear(0);
 
 					auto msg = e.what();
-					errorraster->printCentered(254, msg);
+					errorraster->printCentered(1, msg);
 
 					outputImage(errorraster.get(), false, false, "hsv");
 				}

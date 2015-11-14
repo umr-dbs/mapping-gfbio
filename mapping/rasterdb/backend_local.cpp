@@ -119,7 +119,7 @@ std::string LocalRasterDBBackend::readJSON() {
 	return json;
 }
 
-RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value) {
+RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, double time_start, double time_end, const AttributeMaps &attributes) {
 	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT id FROM rasters WHERE channel = ? AND ABS(time_start - ?) < 0.001 AND ABS(time_end - ?) < 0.001");
 	stmt.bind(1, channel);
@@ -145,7 +145,7 @@ RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, doub
 	stmt_attr.bind(2, 1); // isstring
 
 	// import metadata
-	for (auto attr : md_string) {
+	for (auto attr : attributes.textual()) {
 		auto key = attr.first;
 		auto value = attr.second;
 
@@ -153,11 +153,11 @@ RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, doub
 		stmt_attr.bind(4, value);
 
 		stmt_attr.exec();
-		printf("inserting string attribute: %s = %s\n", key.c_str(), value.c_str());
+		printf("inserting textual attribute: %s = %s\n", key.c_str(), value.c_str());
 	}
 	stmt_attr.bind(2, 0); // isstring
 
-	for (auto attr : md_value) {
+	for (auto attr : attributes.numeric()) {
 		auto key = attr.first;
 		auto value = attr.second;
 
@@ -165,7 +165,7 @@ RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, doub
 		stmt_attr.bind(4, value);
 
 		stmt_attr.exec();
-		printf("inserting value attribute: %s = %f\n", key.c_str(), value);
+		printf("inserting numeric attribute: %s = %f\n", key.c_str(), value);
 	}
 
 	return rasterid;
@@ -270,7 +270,7 @@ RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int ch
 	return RasterDescription{rasterid, time_start, time_end};
 }
 
-void LocalRasterDBBackend::readAttributes(rasterid_t rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value) {
+void LocalRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &attributes) {
 	SQLiteStatement stmt_md(db);
 	stmt_md.prepare("SELECT isstring, key, value FROM attributes WHERE rasterid = ?");
 	stmt_md.bind(1, rasterid);
@@ -280,10 +280,10 @@ void LocalRasterDBBackend::readAttributes(rasterid_t rasterid, DirectMetadata<st
 		const char *value = stmt_md.getString(2);
 		if (isstring == 0) {
 			double dvalue = std::strtod(value, nullptr);
-			md_value.set(key, dvalue);
+			attributes.setNumeric(key, dvalue);
 		}
 		else
-			md_string.set(key, std::string(value));
+			attributes.setTextual(key, std::string(value));
 	}
 }
 

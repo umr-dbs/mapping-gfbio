@@ -374,8 +374,7 @@ NBRasterWriter::NBRasterWriter( std::shared_ptr<GenericRaster> raster ) {
 	add_writer(make_unique<NBSimpleWriter<uint32_t>>( raster->width ));
 	add_writer(make_unique<NBSimpleWriter<uint32_t>>( raster->height ));
 	add_writer(make_unique<NBRasterDataWriter>( raster ));
-	add_writer(make_unique<NBSimpleWriter<DirectMetadata<std::string>>>( raster->md_string ));
-	add_writer(make_unique<NBSimpleWriter<DirectMetadata<double>>>( raster->md_value ));
+	add_writer(make_unique<NBSimpleWriter<AttributeMaps>>( raster->global_attributes ));
 }
 
 

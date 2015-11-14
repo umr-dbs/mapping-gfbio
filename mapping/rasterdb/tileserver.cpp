@@ -151,16 +151,15 @@ int Connection::input() {
 		case RemoteRasterDBBackend::COMMAND_READATTRIBUTES: {
 			RasterDBBackend::rasterid_t rasterid;
 			stream->read(&rasterid);
-			DirectMetadata<std::string> md_string;
-			DirectMetadata<double> md_value;
-			backend->readAttributes(rasterid, md_string, md_value);
+			AttributeMaps attributes;
+			backend->readAttributes(rasterid, attributes);
 			std::string empty("");
-			for (auto pair : md_string) {
+			for (auto pair : attributes.textual()) {
 				stream->write(pair.first);
 				stream->write(pair.second);
 			}
 			stream->write(empty);
-			for (auto pair : md_value) {
+			for (auto pair : attributes.numeric()) {
 				stream->write(pair.first);
 				stream->write(pair.second);
 			}

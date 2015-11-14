@@ -31,7 +31,7 @@ class RemoteRasterDBBackend : public RasterDBBackend {
 		virtual std::string readJSON();
 
 		virtual RasterDescription getClosestRaster(int channelid, double t1, double t2);
-		virtual void readAttributes(rasterid_t rasterid, DirectMetadata<std::string> &md_string, DirectMetadata<double> &md_value);
+		virtual void readAttributes(rasterid_t rasterid, AttributeMaps &attributes);
 		virtual int getBestZoom(rasterid_t rasterid, int desiredzoom);
 		virtual const std::vector<TileDescription> enumerateTiles(int channelid, rasterid_t rasterid, int x1, int y1, int x2, int y2, int zoom = 0);
 		virtual bool hasTile(rasterid_t rasterid, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom);

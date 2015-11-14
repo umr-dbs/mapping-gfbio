@@ -47,7 +47,7 @@ void RasterDBBackend::RasterDescription::toStream(BinaryStream &stream) const {
 
 
 
-RasterDBBackend::rasterid_t RasterDBBackend::createRaster(int channel, double time_start, double time_end, const DirectMetadata<std::string> &md_string, const DirectMetadata<double> &md_value) {
+RasterDBBackend::rasterid_t RasterDBBackend::createRaster(int channel, double time_start, double time_end, const AttributeMaps &attributes) {
 	throw std::runtime_error("RasterDBBackend::createRaster() not implemented in this backend");
 }
 

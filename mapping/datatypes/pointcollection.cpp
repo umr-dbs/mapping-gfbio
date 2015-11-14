@@ -26,9 +26,9 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 
 	auto out = make_unique<PointCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
-	// copy global metadata
-	out->global_md_string = in->global_md_string;
-	out->global_md_value = in->global_md_value;
+
+	// copy global attributes
+	out->global_attributes = in->global_attributes;
 
 	// copy features
 	for (auto feature : *in) {
@@ -84,6 +84,29 @@ std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char>
 	return ::filter<char>(this, keep);
 }
 
+bool PointCollection::featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const{
+	for(auto& c : getFeatureReference(featureIndex)){
+		if(c.x >= x1 && c.x <= x2 && c.y >= y1 && c.y <= y2){
+			return true;
+		}
+	}
+	return false;
+}
+
+std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+	std::vector<bool> keep(getFeatureCount());
+	for(auto feature : *this){
+		if(featureIntersectsRectangle(feature, x1, y1, x2, y2)){
+			keep[feature] = true;
+		}
+	}
+	return filter(keep);
+}
+
+std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(const SpatialReference& sref){
+	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
+}
+
 PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
 	size_t coordinateCount;
 	stream.read(&coordinateCount);
@@ -92,8 +115,7 @@ PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection
 	stream.read(&featureCount);
 	start_feature.reserve(featureCount);
 
-	global_md_string.fromStream(stream);
-	global_md_value.fromStream(stream);
+	global_attributes.fromStream(stream);
 	local_md_string.fromStream(stream);
 	local_md_value.fromStream(stream);
 
@@ -117,8 +139,7 @@ void PointCollection::toStream(BinaryStream &stream) const {
 	size_t featureCount = start_feature.size();
 	stream.write(featureCount);
 
-	stream.write(global_md_string);
-	stream.write(global_md_value);
+	stream.write(global_attributes);
 	stream.write(local_md_string);
 	stream.write(local_md_value);
 

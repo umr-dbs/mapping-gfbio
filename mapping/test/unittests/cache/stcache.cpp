@@ -52,7 +52,7 @@ TEST(STCacheTest,SimpleTest) {
 }
 
 std::unique_ptr<GenericRaster> createRaster( double x1, double x2, double y1, double y2 ) {
-	DataDescription dd(GDT_Byte,0,255);
+	DataDescription dd(GDT_Byte, Unit::unknown());
 	SpatioTemporalReference stref(
 		SpatialReference(EPSG_LATLON,x1,y1,x2,y2),
 		TemporalReference(TIMETYPE_UNIX,0,100)
@@ -65,7 +65,7 @@ TEST(STCacheTest,TestQuery) {
 	NodeRasterCache cache(5 * 1024 * 1024);
 	std::string sem_id = "a";
 
-	DataDescription dd(GDT_Byte,0,255);
+	DataDescription dd(GDT_Byte, Unit::unknown());
 
 
 	auto r1 = createRaster(0,1,0,1);

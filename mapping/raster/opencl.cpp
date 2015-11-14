@@ -237,8 +237,8 @@ cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster) {
 
 	ri.epsg = raster->stref.epsg;
 
-	ri.min = raster->dd.min;
-	ri.max = raster->dd.max;
+	ri.min = raster->dd.unit.getMin();
+	ri.max = raster->dd.unit.getMax();
 	ri.no_data = raster->dd.has_no_data ? raster->dd.no_data : 0.0;
 	ri.has_no_data = raster->dd.has_no_data;
 

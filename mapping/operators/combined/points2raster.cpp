@@ -62,10 +62,13 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 	auto points = getPointCollectionFromSource(0, rect_points, profiler);
 
 	if (renderattribute == "") {
-		DataDescription dd_acc(GDT_UInt16, 0, 65535, true, 0);
+		Unit unit_acc = Unit::unknown();
+		unit_acc.setMinMax(0, 65535);
+		DataDescription dd_acc(GDT_UInt16, unit_acc, true, 0);
 		auto accumulator = GenericRaster::create(dd_acc, rect_larger, rect_larger.xres, rect_larger.yres, 0, GenericRaster::Representation::CPU);
 		Raster2D<uint16_t> *acc = (Raster2D<uint16_t> *) accumulator.get();
 		acc->clear(0);
+		uint16_t acc_max = std::numeric_limits<uint16_t>::max()-1;
 
 		for (auto feature : *points) {
 			for (auto &p : feature) {
@@ -75,12 +78,15 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 					continue;
 
 				uint32_t val = acc->get(px, py);
-				val = std::min((uint32_t) acc->dd.max, val+1);
+				val = std::min((uint32_t) acc_max, val+1);
 				acc->set(px, py, val);
 			}
 		}
 
-		DataDescription dd_blur(GDT_Byte, 0, 255, true, 0);
+		Unit unit_blur = Unit("frequency", "heatmap");
+		unit_blur.setMinMax(0, 255);
+		unit_blur.setInterpolation(Unit::Interpolation::Continuous);
+		DataDescription dd_blur(GDT_Byte, unit_blur, true, 0);
 		auto blurred = GenericRaster::create(dd_blur, rect, rect.xres, rect.yres, 0, GenericRaster::Representation::OPENCL);
 
 		RasterOpenCL::CLProgram prog;
@@ -95,14 +101,17 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 	}
 	else {
 		const float MIN = 0, MAX = 10000;
-		DataDescription dd_sum(GDT_Float32, MIN, MAX, true, 0);
-		DataDescription dd_count(GDT_UInt16, 0, 65534, true, 0);
+		Unit unit_sum = Unit::unknown();
+		unit_sum.setMinMax(MIN, MAX);
+		DataDescription dd_sum(GDT_Float32, unit_sum, true, 0);
+		DataDescription dd_count(GDT_UInt16, Unit::unknown(), true, 0);
 		auto r_sum = GenericRaster::create(dd_sum, rect_larger, rect_larger.xres, rect_larger.yres, 0, GenericRaster::Representation::CPU);
 		auto r_count = GenericRaster::create(dd_count, rect_larger, rect_larger.xres, rect_larger.yres, 0, GenericRaster::Representation::CPU);
 		Raster2D<float> *sum = (Raster2D<float> *) r_sum.get();
 		sum->clear(0);
 		Raster2D<uint16_t> *count = (Raster2D<uint16_t> *) r_count.get();
 		count->clear(0);
+		uint16_t count_max = std::numeric_limits<uint16_t>::max()-1;
 
 		auto &vec = points->local_md_value.getVector(renderattribute);
 		for (auto feature : *points) {
@@ -121,12 +130,15 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 				sum->set(px, py, sval);
 
 				auto cval = count->get(px, py);
-				cval = std::min((decltype(cval+1)) count->dd.max, cval+1);
+				cval = std::min((decltype(cval+1)) count_max, cval+1);
 				count->set(px, py, cval);
 			}
 		}
 
-		DataDescription dd_blur(GDT_Float32, MIN, MAX, true, 0);
+		Unit unit_result = Unit("unknown", "heatmap"); // TODO: use measurement from the rendered attribute
+		unit_result.setMinMax(MIN, MAX);
+		unit_result.setInterpolation(Unit::Interpolation::Continuous);
+		DataDescription dd_blur(GDT_Float32, unit_result, true, 0);
 		auto blurred = GenericRaster::create(dd_blur, rect, rect.xres, rect.yres, 0, GenericRaster::Representation::OPENCL);
 
 		RasterOpenCL::CLProgram prog;

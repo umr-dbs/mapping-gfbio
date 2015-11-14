@@ -20,9 +20,9 @@ std::unique_ptr<LineCollection> filter(LineCollection *in, const std::vector<T> 
 
 	auto out = make_unique<LineCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
-	// copy global metadata
-	out->global_md_string = in->global_md_string;
-	out->global_md_value = in->global_md_value;
+
+	// copy global attributes
+	out->global_attributes = in->global_attributes;
 
 	// copy features
 	for (auto feature : *in) {
@@ -80,6 +80,44 @@ std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<bool> &
 
 std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<char> &keep) {
 	return ::filter<char>(this, keep);
+}
+
+bool LineCollection::featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const{
+	Coordinate rectP1 = Coordinate(x1, y1);
+	Coordinate rectP2 = Coordinate(x2, y1);
+	Coordinate rectP3 = Coordinate(x2, y2);
+	Coordinate rectP4 = Coordinate(x1, y2);
+
+	for(auto line : getFeatureReference(featureIndex)){
+		for(int i = start_line[line.getLineIndex()]; i < start_line[line.getLineIndex()+1] - 1; ++i){
+			const Coordinate& c1 = coordinates[i];
+			const Coordinate& c2 = coordinates[i + 1];
+			if((c1.x >= x1 && c1.x <= x2 && c1.y >= y1 && c1.y <= y2) ||
+			   lineSegmentsIntersect(c1, c2, rectP1, rectP2) ||
+			   lineSegmentsIntersect(c1, c2, rectP2, rectP3) ||
+			   lineSegmentsIntersect(c1, c2, rectP3, rectP4) ||
+			   lineSegmentsIntersect(c1, c2, rectP4, rectP1)){
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+	std::vector<bool> keep(getFeatureCount());
+
+	for(auto feature : *this){
+		if(featureIntersectsRectangle(feature, x1, y1, x2, y2)){
+			keep[feature] = true;
+		}
+	}
+
+	return filter(keep);
+}
+
+std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(const SpatialReference& sref){
+	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
 void LineCollection::addCoordinate(double x, double y){

@@ -442,3 +442,79 @@ TEST(LineCollection, WKTAddMultiFeature){
 	EXPECT_EQ(1, lines.coordinates[8].x);
 	EXPECT_EQ(1, lines.coordinates[8].y);
 }
+
+TEST(LineCollection, filterByRectangleIntersection){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+	lines.addCoordinate(1, 1);
+	lines.addCoordinate(5, 1);
+	lines.addCoordinate(8, 8);
+	lines.finishLine(); //inside
+	lines.finishFeature();
+
+	lines.addCoordinate(11, 11);
+	lines.addCoordinate(0, 11);
+	lines.addCoordinate(15, 15);
+	lines.finishLine(); //outside
+	lines.finishFeature();
+
+	lines.addCoordinate(5, 5);
+	lines.addCoordinate(11, 11);
+	lines.addCoordinate(18, 15);
+	lines.finishLine(); //crosses
+	lines.finishFeature();
+
+	lines.addCoordinate(10, 10);
+	lines.addCoordinate(11, 11);
+	lines.addCoordinate(18, 15);
+	lines.finishLine(); //touches in single point
+	lines.finishFeature();
+
+	lines.addCoordinate(0, 10);
+	lines.addCoordinate(10, 10);
+	lines.addCoordinate(15, 15);
+	lines.finishLine(); //shares line
+	lines.finishFeature();
+
+	lines.addCoordinate(0, 0);
+	lines.addCoordinate(20, 20);
+	lines.addCoordinate(25, 20);
+	lines.finishLine(); //diagonal
+	lines.finishFeature();
+
+	lines.addCoordinate(11, 11);
+	lines.addCoordinate(0, 11);
+	lines.addCoordinate(15, 15);
+	lines.finishLine();
+	lines.addCoordinate(12, 12);
+	lines.addCoordinate(12, 0);
+	lines.addCoordinate(14, 18);
+	lines.finishLine();
+	lines.finishFeature(); //outside
+
+	lines.addCoordinate(1, 1);
+	lines.addCoordinate(5, 1);
+	lines.addCoordinate(8, 8);
+	lines.finishLine();
+	lines.addCoordinate(12, 12);
+	lines.addCoordinate(12, 0);
+	lines.addCoordinate(14, 18);
+	lines.finishLine();
+	lines.finishFeature(); //one line in- & one line outside
+
+	auto filteredLines = lines.filterByRectangleIntersection(0, 0, 10, 10);
+
+	EXPECT_EQ(6, filteredLines->getFeatureCount());
+	EXPECT_EQ(1, filteredLines->getFeatureReference(0).size());
+	EXPECT_EQ(3, filteredLines->getFeatureReference(0).getLineReference(0).size());
+	EXPECT_EQ(1, filteredLines->coordinates[0].x);
+	EXPECT_EQ(1, filteredLines->coordinates[0].y);
+	EXPECT_EQ(5, filteredLines->coordinates[1].x);
+	EXPECT_EQ(1, filteredLines->coordinates[1].y);
+	EXPECT_EQ(8, filteredLines->coordinates[2].x);
+	EXPECT_EQ(8, filteredLines->coordinates[2].y);
+	EXPECT_EQ(1, filteredLines->getFeatureReference(1).size());
+	EXPECT_EQ(1, filteredLines->getFeatureReference(2).size());
+	EXPECT_EQ(1, filteredLines->getFeatureReference(3).size());
+	EXPECT_EQ(1, filteredLines->getFeatureReference(4).size());
+	EXPECT_EQ(2, filteredLines->getFeatureReference(5).size());
+}

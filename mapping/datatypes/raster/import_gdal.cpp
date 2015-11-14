@@ -113,7 +113,9 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *datas
 		SpatialReference(epsg, x1, y1, x2, y2, flipx, flipy),
 		TemporalReference::unreferenced()
 	);
-	DataDescription dd(type, minvalue, maxvalue, hasnodata, nodata);
+	Unit unit = Unit::unknown();
+	unit.setMinMax(minvalue, maxvalue);
+	DataDescription dd(type, unit, hasnodata, nodata);
 	//printf("loading raster with %g -> %g valuerange\n", adfMinMax[0], adfMinMax[1]);
 
 	auto raster = GenericRaster::create(dd, stref, pixel_width, pixel_height);
@@ -155,10 +157,10 @@ CPLErr GDALRasterBand::RasterIO( GDALRWFlag eRWFlag,
 
 			double dvalue = std::strtod(value.c_str(), nullptr);
 			if (key == "TimeStamp" || (dvalue == 0 && value != "0")) {
-				raster->md_string.set(mkey, value);
+				raster->global_attributes.setTextual(mkey, value);
 			}
 			else {
-				raster->md_value.set(mkey, dvalue);
+				raster->global_attributes.setNumeric(mkey, dvalue);
 			}
 		}
 	}

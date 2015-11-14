@@ -1,6 +1,8 @@
 #ifndef DATATYPES_SPATIOTEMPORALREFERENCE_H
 #define DATATYPES_SPATIOTEMPORALREFERENCE_H
 
+#include "datatypes/attributes.h"
+
 #include <cstdint>
 #include <cmath>
 #include <string>
@@ -211,6 +213,7 @@ class SpatioTemporalResult {
 		void replaceSTRef(const SpatioTemporalReference &stref);
 
 		const SpatioTemporalReference stref;
+		AttributeMaps global_attributes;
 
 };
 

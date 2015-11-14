@@ -17,20 +17,7 @@
 #include <sstream>
 
 
-bool DataDescription::operator==(const DataDescription &b) const {
-	return datatype == b.datatype
-		&& min == b.min && max == b.max
-		&& has_no_data == b.has_no_data && (!has_no_data || (no_data == b.no_data));
-}
-
 void DataDescription::verify() const {
-	if (!std::isfinite(min) || !std::isfinite(max))
-		throw MetadataException("ValueMetadata::verify: min or max not finite");
-	if (min >= max)
-		throw MetadataException("ValueMetadata::verify: min >= max " + std::to_string(min) + ", " + std::to_string(max));
-	if (min < getMinByDatatype() || max > getMaxByDatatype())
-		throw MetadataException("ValueMetadata::verify: min or max outside of range allowed by datatype");
-
 	if (has_no_data) {
 		if (datatype == GDT_Float32 && std::isnan(no_data)) {
 			// valid
@@ -112,7 +99,7 @@ double DataDescription::getMaxByDatatype() const {
 
 
 std::ostream& operator<< (std::ostream &out, const DataDescription &dd) {
-	out << "Datatype: " << dd.datatype << " (" << dd.min << " - " << dd.max << ")";
+	out << "Datatype: " << dd.datatype;
 	if (dd.has_no_data)
 		out << " nodata = " << dd.no_data;
 	else
@@ -133,17 +120,15 @@ void DataDescription::addNoData() {
 
 	double real_min = getMinByDatatype();
 	double real_max = getMaxByDatatype();
-	if (real_min <= min - 1) {
-		min = min - 1;
-		no_data = min;
+	if (real_min <= unit.getMin() - 1) {
+		no_data = unit.getMin() - 1;
 	}
-	else if (real_max >= max + 1) {
-		max = max + 1;
-		no_data = max;
+	else if (real_max >= unit.getMax() + 1) {
+		no_data = unit.getMax() + 1;
 	}
 	else {
 		std::ostringstream ss;
-		ss << "Cannot add value for no_data: range of datatype is exhausted. range (" << min << " - " << max << "), datatype (" << real_min << " - " << real_max << ")";
+		ss << "Cannot add value for no_data: range of datatype is exhausted.";
 		throw MetadataException(ss.str());
 	}
 
@@ -152,16 +137,16 @@ void DataDescription::addNoData() {
 
 void DataDescription::toStream(BinaryStream &stream) const {
 	stream.write(datatype);
-	stream.write(min);
-	stream.write(max);
+	stream.write(unit.toJson());
 	stream.write(has_no_data);
 	if (has_no_data)
 		stream.write(no_data);
 }
-DataDescription::DataDescription(BinaryStream &stream) {
+DataDescription::DataDescription(BinaryStream &stream) : unit{Unit::UNINITIALIZED} {
 	stream.read(&datatype);
-	stream.read(&min);
-	stream.read(&max);
+	std::string unitstr;
+	stream.read(&unitstr);
+	unit = Unit(unitstr);
 	stream.read(&has_no_data);
 	if (has_no_data)
 		stream.read(&no_data);
@@ -235,8 +220,7 @@ void GenericRaster::toStream(BinaryStream &stream) {
 	stream.write((uint32_t) width);
 	stream.write((uint32_t) height);
 	stream.write(data, len);
-	stream.write(md_string);
-	stream.write(md_value);
+	stream.write(global_attributes);
 }
 
 std::unique_ptr<GenericRaster> GenericRaster::fromStream(BinaryStream &stream) {
@@ -250,8 +234,7 @@ std::unique_ptr<GenericRaster> GenericRaster::fromStream(BinaryStream &stream) {
 	char *data = (char *) raster->getDataForWriting();
 	size_t len = raster->getDataSize();
 	stream.read(data, len);
-	raster->md_string.fromStream(stream);
-	raster->md_value.fromStream(stream);
+	raster->global_attributes.fromStream(stream);
 
 	return raster;
 }
@@ -494,9 +477,8 @@ std::unique_ptr<GenericRaster> Raster2D<T>::cut(int x1, int y1, int z1, int widt
 	}
 */
 #endif
-	// TODO: copy metadata?
-	outputraster_guard->md_string = this->md_string;
-	outputraster_guard->md_value = this->md_value;
+
+	outputraster_guard->global_attributes = this->global_attributes;
 	return outputraster_guard;
 }
 
@@ -536,9 +518,7 @@ std::unique_ptr<GenericRaster> Raster2D<T>::scale(int width, int height, int dep
 		}
 	}
 
-	// TODO: copy metadata?
-	outputraster_guard->md_string = this->md_string;
-	outputraster_guard->md_value = this->md_value;
+	outputraster_guard->global_attributes = this->global_attributes;
 	return outputraster_guard;
 }
 
@@ -556,9 +536,8 @@ std::unique_ptr<GenericRaster> Raster2D<T>::flip(bool flipx, bool flipy) {
 			r->set(x, y, get(px, py));
 		}
 	}
-	// TODO: copy metadata?
-	flipped_raster->md_string = this->md_string;
-	flipped_raster->md_value = this->md_value;
+
+	flipped_raster->global_attributes = this->global_attributes;
 	return flipped_raster;
 }
 
@@ -612,9 +591,8 @@ std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRecta
 			r->set(x, y, getSafe(px, py));
 		}
 	}
-	// TODO: copy metadata?
-	out->md_string = this->md_string;
-	out->md_value = this->md_value;
+
+	out->global_attributes = this->global_attributes;
 	return out;
 }
 

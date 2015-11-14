@@ -54,20 +54,6 @@ public:
 	void addDefaultTimestamps();
 	void addDefaultTimestamps(double min, double max);
 
-	// global MetaData (one value per SimpleFeatureCollection)
-	const std::string &getGlobalMDString(const std::string &key) const;
-	double getGlobalMDValue(const std::string &key) const;
-	DirectMetadata<double>* getGlobalMDValueIterator();
-	DirectMetadata<std::string>* getGlobalMDStringIterator();
-	std::vector<std::string> getGlobalMDValueKeys() const;
-	std::vector<std::string> getGlobalMDStringKeys() const;
-	void setGlobalMDString(const std::string &key, const std::string &value);
-	void setGlobalMDValue(const std::string &key, double value);
-
-	// global MetaData (one value per feature)
-	DirectMetadata<std::string> global_md_string;
-	DirectMetadata<double> global_md_value;
-
 	// local MetaData (one value per feature)
 	MetadataArrays<std::string> local_md_string;
 	MetadataArrays<double> local_md_value;
@@ -75,6 +61,24 @@ public:
 	// geometry
 	virtual SpatialReference getCollectionMBR() const;
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const = 0;
+
+	/**
+	 * check whether feature intersects with given rectangle
+	 * @param featureIndex index of the feate
+	 * @param x1 x of upper left coordinate of rectangle
+	 * @param y1 y of upper left coordiante of rectangle
+	 * @param x2 y of lower right coordinate of rectangle
+	 * @param y2 x of lower right coordinate of rectangle
+	 * @return true if feature with given index intersects given rectangle
+	 */
+	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const = 0;
+
+	/**
+	 * filter collection by a given spatial reference
+	 * @param sref spatial reference
+	 * @return new collection that contains only features that intersect with rectangle given by sref
+	 */
+	bool featureIntersectsRectangle(size_t featureIndex, const SpatialReference& sref) const;
 
 	// Export
 	std::string toGeoJSON(bool displayMetadata = false) const;
@@ -99,6 +103,18 @@ protected:
 
 	//calculate the MBR of the coordinates in range from start to stop (exclusive)
 	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;
+
+	//geometry helper functions
+
+	/**
+	 * check if two line segments intersect
+	 * @param p1 first point of first line
+	 * @param p2 second point of first line
+	 * @param p3 first point of first line
+	 * @param p4 second point of first line
+	 * @return true if the two line segments intersect
+	 */
+	bool lineSegmentsIntersect(const Coordinate& p1, const Coordinate& p2, const Coordinate& p3, const Coordinate& p4) const;
 
 
 	/*

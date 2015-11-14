@@ -22,9 +22,9 @@ std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vect
 
 	auto out = make_unique<PolygonCollection>(in->stref);
 	out->start_feature.reserve(kept_count);
-	// copy global metadata
-	out->global_md_string = in->global_md_string;
-	out->global_md_value = in->global_md_value;
+
+	// copy global attributes
+	out->global_attributes = in->global_attributes;
 
 	// copy features
 	for (auto feature : *in) {
@@ -85,6 +85,53 @@ std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<b
 
 std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<char> &keep) {
 	return ::filter<char>(this, keep);
+}
+
+bool PolygonCollection::featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const{
+	Coordinate rectP1 = Coordinate(x1, y1);
+	Coordinate rectP2 = Coordinate(x2, y1);
+	Coordinate rectP3 = Coordinate(x2, y2);
+	Coordinate rectP4 = Coordinate(x1, y2);
+
+	auto feature = getFeatureReference(featureIndex);
+
+	if(feature.contains(rectP1) || feature.contains(rectP2) ||
+	   feature.contains(rectP3) || feature.contains(rectP4)){
+		return true;
+	}
+	for(auto polygon : feature){
+		size_t shellIndex = polygon.getRingReference(0).getRingIndex();
+		for(int i = start_ring[shellIndex]; i < start_ring[shellIndex + 1] - 1; ++i){
+			const Coordinate& c1 = coordinates[i];
+			const Coordinate& c2 = coordinates[i + 1];
+
+			if((c1.x >= x1 && c1.x <= x2 && c1.y >= y1 && c1.y <= y2) ||
+			   lineSegmentsIntersect(c1, c2, rectP1, rectP2) ||
+			   lineSegmentsIntersect(c1, c2, rectP2, rectP3) ||
+			   lineSegmentsIntersect(c1, c2, rectP3, rectP4) ||
+			   lineSegmentsIntersect(c1, c2, rectP4, rectP1)){
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
+std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+	std::vector<bool> keep(getFeatureCount());
+
+	for(auto feature : *this){
+		if(featureIntersectsRectangle(feature, x1, y1, x2, y2)){
+			keep[feature] = true;
+		}
+	}
+
+	return filter(keep);
+}
+
+std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(const SpatialReference& sref){
+	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
 void PolygonCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const {

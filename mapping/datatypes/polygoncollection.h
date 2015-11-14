@@ -62,6 +62,25 @@ public:
 	std::unique_ptr<PolygonCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<PolygonCollection> filter(const std::vector<char> &keep);
 
+	/**
+	 * filter collection by a given rectangle
+	 * @param x1 x of upper left coordinate of rectangle
+	 * @param y1 y of upper left coordiante of rectangle
+	 * @param x2 y of lower right coordinate of rectangle
+	 * @param y2 x of lower right coordinate of rectangle
+	 * @return new collection that contains only features that intersect with rectangle
+	 */
+	virtual std::unique_ptr<PolygonCollection> filterByRectangleIntersection(double x1, double y1, double x2, double y2);
+
+	/**
+	 * filter collection by a given spatial reference
+	 * @param sref spatial reference
+	 * @return new collection that contains only features that intersect with rectangle given by sref
+	 */
+	virtual std::unique_ptr<PolygonCollection> filterByRectangleIntersection(const SpatialReference& sref);
+
+	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
+
 	virtual SpatialReference getCollectionMBR() const;
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
@@ -127,16 +146,16 @@ private:
 		    	return idx;
 		    }
 
-		    inline PolygonPolygonReference<PolygonCollection> getPolygonReference(size_t polygonIndex){
+		    inline PolygonPolygonReference<C> getPolygonReference(size_t polygonIndex){
 		    	if(polygonIndex >= size())
 		    		throw ArgumentException("polygonIndex >= Count");
-				return PolygonPolygonReference<PolygonCollection>(pc, pc.start_feature[idx] + polygonIndex);
+				return PolygonPolygonReference<C>(pc, pc.start_feature[idx] + polygonIndex);
 			}
 
-			inline PolygonPolygonReference<const PolygonCollection> getPolygonReference(size_t polygonIndex) const{
+			inline PolygonPolygonReference<const C> getPolygonReference(size_t polygonIndex) const{
 				if(polygonIndex >= size())
 					throw ArgumentException("polygonIndex >= Count");
-				return PolygonPolygonReference<const PolygonCollection>(pc, pc.start_feature[idx] + polygonIndex);
+				return PolygonPolygonReference<const C>(pc, pc.start_feature[idx] + polygonIndex);
 			}
 
 			bool contains(Coordinate& coordinate) const {
@@ -189,16 +208,16 @@ private:
 				return idx;
 			}
 
-			inline PolygonRingReference<PolygonCollection> getRingReference(size_t ringIndex){
+			inline PolygonRingReference<C> getRingReference(size_t ringIndex){
 				if(ringIndex >= size())
 					throw ArgumentException("RingIndex >= Count");
-				return PolygonRingReference<PolygonCollection>(pc, pc.start_polygon[idx] + ringIndex);
+				return PolygonRingReference<C>(pc, pc.start_polygon[idx] + ringIndex);
 			}
 
-			inline PolygonRingReference<const PolygonCollection> getRingReference(size_t ringIndex) const{
+			inline PolygonRingReference<const C> getRingReference(size_t ringIndex) const{
 				if(ringIndex >= size())
 					throw ArgumentException("RingIndex >= Count");
-				return PolygonRingReference<const PolygonCollection>(pc, pc.start_polygon[idx] + ringIndex);
+				return PolygonRingReference<const C>(pc, pc.start_polygon[idx] + ringIndex);
 			}
 
 			bool contains(Coordinate& coordinate) const {

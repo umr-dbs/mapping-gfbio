@@ -1,7 +1,7 @@
 
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/raster/typejuggling.h"
-#include "raster/colors.h"
+#include "datatypes/colorizer.h"
 
 
 #include <jpeglib.h>

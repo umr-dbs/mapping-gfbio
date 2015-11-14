@@ -24,11 +24,11 @@ class ExpressionOperator : public GenericOperator {
 	private:
 		std::string expression;
 		GDALDataType output_type;
-		double output_min, output_max;
+		Unit output_unit;
 };
 
 
-ExpressionOperator::ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
+ExpressionOperator::ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources), output_unit(Unit::UNINITIALIZED) {
 	assumeSources(1);
 	expression = params.get("expression", "value").asString();
 	std::string datatype = params.get("datatype", "input").asString();
@@ -39,13 +39,12 @@ ExpressionOperator::ExpressionOperator(int sourcecounts[], GenericOperator *sour
 		if (output_type == GDT_Unknown)
 			throw OperatorException(std::string("ExpressionOperator:: Invalid output data type ") + datatype);
 	}
-	output_min = output_max = 0.0;
-	if (params.isMember("min") && params.isMember("max")) {
-		output_min = params.get("min", 0.0).asDouble();
-		output_max = params.get("max", 0.0).asDouble();
+	if (params.isMember("unit")) {
+		output_unit = Unit(params["unit"]);
 	}
-	else
-		throw OperatorException("ExpressionOperator always required a value range");
+	else {
+		output_unit = Unit::unknown();
+	}
 }
 ExpressionOperator::~ExpressionOperator() {
 }
@@ -55,8 +54,7 @@ void ExpressionOperator::writeSemanticParameters(std::ostringstream& stream) {
 	stream << "{";
 	stream << "\"expression\":\"" << expression << "\","
 			<< "\"datatype\":\"" << (output_type == GDT_Unknown ? "input" : GDALGetDataTypeName(output_type)) << "\","
-			<< "\"min\":" << output_min << ","
-			<< "\"max\":" << output_max;
+			<< "\"unit\":" << output_unit.toJson();
 	stream << "}";
 }
 
@@ -122,7 +120,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	if (output_type == GDT_Unknown)
 		output_type = raster_in->dd.datatype;
 
-	DataDescription out_dd(output_type, output_min, output_max);
+	DataDescription out_dd(output_type, output_unit);
 	if (raster_in->dd.has_no_data)
 		out_dd.addNoData();
 

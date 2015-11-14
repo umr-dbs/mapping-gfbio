@@ -95,39 +95,44 @@ class RasterDBChannel {
 	public:
 		//friend class RasterDB;
 
-		RasterDBChannel(const DataDescription &dd) : dd(dd), has_transform(false) {}
+		RasterDBChannel(const DataDescription &dd) : dd(dd), has_transform(false), transform_unit(Unit::unknown()) {}
 		~RasterDBChannel() {}
 
-		void setTransform(GDALDataType datatype, double offset, double scale, const std::string &offset_metadata, const std::string &scale_metadata) {
+		void setTransform(GDALDataType datatype, const Unit &transformed_unit, double offset, double scale, const std::string &offset_metadata, const std::string &scale_metadata) {
 			has_transform = true;
 			transform_offset = offset;
 			transform_scale = scale;
 			transform_offset_metadata = offset_metadata;
 			transform_scale_metadata = scale_metadata;
 			transform_datatype = datatype == GDT_Unknown ? dd.datatype : datatype;
+			transform_unit = transformed_unit;
 		}
-		double getOffset(const DirectMetadata<double> &md) {
+		double getOffset(const AttributeMaps &attr) {
 			if (!has_transform)
 				return 0;
 			if (transform_offset_metadata.length() > 0)
-				return md.get(transform_offset_metadata, 0.0);
+				return attr.getNumeric(transform_offset_metadata, 0.0);
 			return transform_offset;
 		}
-		double getScale(const DirectMetadata<double> &md) {
+		double getScale(const AttributeMaps &attr) {
 			if (!has_transform)
 				return 0;
 			if (transform_scale_metadata.length() > 0)
-				return md.get(transform_scale_metadata, 1.0);
+				return attr.getNumeric(transform_scale_metadata, 1.0);
 			return transform_scale;
 		}
-		DataDescription getTransformedDD(const DirectMetadata<double> &md) {
+		DataDescription getTransformedDD(const AttributeMaps &attr) {
 			if (!has_transform)
 				return dd;
-			double offset = getOffset(md);
-			double scale = getScale(md);
-			double transformed_min = dd.min * scale + offset;
-			double transformed_max = dd.max * scale + offset;
-			DataDescription transformed_dd(transform_datatype, transformed_min, transformed_max);
+			double offset = getOffset(attr);
+			double scale = getScale(attr);
+			Unit u = transform_unit;
+			if (dd.unit.hasMinMax() && !u.hasMinMax()) {
+				double transformed_min = dd.unit.getMin() * scale + offset;
+				double transformed_max = dd.unit.getMax() * scale + offset;
+				u.setMinMax(transformed_min, transformed_max);
+			}
+			DataDescription transformed_dd(transform_datatype, u);
 			transformed_dd.addNoData();
 			transformed_dd.verify();
 			return transformed_dd;
@@ -143,6 +148,7 @@ class RasterDBChannel {
 		double transform_scale;
 		std::string transform_offset_metadata;
 		std::string transform_scale_metadata;
+		Unit transform_unit;
 
 };
 
@@ -190,7 +196,7 @@ void RasterDB::init() {
 	int dimensions = sizes.size();
 	if (dimensions != (int) origins.size() || dimensions != (int) scales.size())
 		throw SourceException("json invalid, different dimensions in data");
-	epsg_t epsg = (epsg_t) jrm.get("epsg", EPSG_UNKNOWN).asInt();
+	epsg_t epsg = (epsg_t) jrm.get("epsg", (int) EPSG_UNKNOWN).asInt();
 
 	if (dimensions == 2) {
 		crs = new GDALCRS(
@@ -228,8 +234,7 @@ void RasterDB::init() {
 
 		channels[i] = new RasterDBChannel(DataDescription(
 			GDALGetDataTypeByName(datatype.c_str()),
-			channel.get("min", 0).asDouble(),
-			channel.get("max", -1).asDouble(),
+			channel.isMember("unit") ? Unit(channel["unit"]) : Unit::unknown(),
 			has_no_data, no_data
 		));
 		if (channel.isMember("transform")) {
@@ -238,6 +243,7 @@ void RasterDB::init() {
 			Json::Value scale = transform["scale"];
 			channels[i]->setTransform(
 				GDALGetDataTypeByName(transform.get("datatype", "unknown").asString().c_str()),
+				transform.isMember("unit") ? Unit(transform["unit"]) : Unit::unknown(),
 				offset.type() != Json::stringValue ? offset.asDouble() : 0.0,
 				scale.type()  != Json::stringValue ? scale.asDouble()  : 0.0,
 				offset.type() == Json::stringValue ? offset.asString() : "",
@@ -320,7 +326,7 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 
 	printf("starting import for raster of size %d x %d, time %f -> %f\n", raster->width, raster->height, time_start, time_end);
 
-	auto rasterid = backend->createRaster(channelid, time_start, time_end, raster->md_string, raster->md_value);
+	auto rasterid = backend->createRaster(channelid, time_start, time_end, raster->global_attributes);
 
 	for (int zoom=0;;zoom++) {
 		int zoomfactor = 1 << zoom;
@@ -448,11 +454,10 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 	if (x1 > x2 || y1 > y2)
 		throw SourceException(concat("RasterDB::load(", channelid, ", ", t.t1, "-", t.t2, ", [",x1,",",y1," -> ",x2,",",y2,"]): coords swapped"));
 
-	decltype(GenericRaster::md_value) result_md_value;
-	decltype(GenericRaster::md_string) result_md_string;
-	backend->readAttributes(rasterid, result_md_string, result_md_value);
+	AttributeMaps result_attributes;
+	backend->readAttributes(rasterid, result_attributes);
 
-	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_md_value) : channels[channelid]->dd;
+	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_attributes) : channels[channelid]->dd;
 	auto result = GenericRaster::create(transformed_dd, resultstref, width, height);
 	result->clear(transformed_dd.no_data);
 
@@ -472,7 +477,7 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 			transformedBlit(
 				result.get(), tile_raster.get(),
 				((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
-				channels[channelid]->getOffset(result_md_value), channels[channelid]->getScale(result_md_value));
+				channels[channelid]->getOffset(result_attributes), channels[channelid]->getScale(result_attributes));
 		}
 		else
 			result->blit(tile_raster.get(), ((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* ((int64_t) r_z1-z1) >> zoom*/);
@@ -482,9 +487,8 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 		result = result->flip(flipx, flipy);
 	}
 
-	result->md_value = std::move(result_md_value);
-	result->md_string = std::move(result_md_string);
-	result->md_value.set("Channel", channelid);
+	result->global_attributes = std::move(result_attributes);
+	result->global_attributes.setNumeric("Channel", channelid);
 	return result;
 }
 

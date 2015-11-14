@@ -70,8 +70,10 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
 
+	// TODO: do we have any requirement for the input raster?
+
 	// get the timestamp of the MSG scene from the raster metadata
-	std::string timestamp = raster->md_string.get("TimeStamp");
+	std::string timestamp = raster->global_attributes.getTextual("TimeStamp");
 	// create and store a real time object
 	std::tm timeDate;
 
@@ -117,7 +119,9 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 	raster->setRepresentation(GenericRaster::OPENCL);
 
 	//
-	DataDescription out_dd(GDT_Float32, 0.0, 360.0); // no no_data //raster->dd.has_no_data, output_no_data);
+	Unit out_unit("solarangle", "degree");
+	out_unit.setMinMax(0.0, 360.0);
+	DataDescription out_dd(GDT_Float32, out_unit); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 

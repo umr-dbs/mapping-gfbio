@@ -70,25 +70,25 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
 
-	if (raster->dd.min != 0 && raster->dd.max != 1024)
-		throw OperatorException("Input raster does not appear to be a meteosat raster");
+	if (raster->dd.unit.getMeasurement() != "raw" || raster->dd.unit.getMin() != 0 || raster->dd.unit.getMax() != 1023)
+		throw OperatorException("Input raster does not appear to be a raw meteosat raster");
 
 	msg::Satellite satellite;
 	if(forceSatellite.length() > 0){
 		satellite = msg::getSatelliteForName(forceSatellite);
 	}
 	else{
-		int satellite_id = (int) raster->md_value.get("msg.Satellite");
+		int satellite_id = (int) raster->global_attributes.getNumeric("msg.Satellite");
 		satellite = msg::getSatelliteForMsgId(satellite_id);
 	}
 
-	int channel = (int) raster->md_value.get("msg.Channel");
+	int channel = (int) raster->global_attributes.getNumeric("msg.Channel");
 
 	if (channel < 3 || channel >10)
 		throw OperatorException("BT calculation is only valid for Channels 4-11");
 
-	float offset = raster->md_value.get("msg.CalibrationOffset");
-	float slope = raster->md_value.get("msg.CalibrationSlope");
+	float offset = raster->global_attributes.getNumeric("msg.CalibrationOffset");
+	float slope = raster->global_attributes.getNumeric("msg.CalibrationSlope");
 
 	double wavenumber = satellite.vc[channel];
 	double alpha = satellite.alpha[channel];
@@ -110,7 +110,10 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 	double newmin = 200;//table->getMinTemp();
 	double newmax = 330;//table->getMaxTemp();
 
-	DataDescription out_dd(GDT_Float32, newmin, newmax);
+	Unit out_unit("temperature", "k");
+	out_unit.setMinMax(newmin, newmax);
+	out_unit.setInterpolation(Unit::Interpolation::Continuous);
+	DataDescription out_dd(GDT_Float32, out_unit);
 	if (raster->dd.has_no_data) {
 		out_dd.addNoData();
 		int no_data = (int) raster->dd.no_data;

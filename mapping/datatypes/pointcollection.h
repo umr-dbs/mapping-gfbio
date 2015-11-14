@@ -51,6 +51,25 @@ public:
 	std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<PointCollection> filter(const std::vector<char> &keep);
 
+	/**
+	 * filter collection by a given rectangle
+	 * @param x1 x of upper left coordinate of rectangle
+	 * @param y1 y of upper left coordiante of rectangle
+	 * @param x2 y of lower right coordinate of rectangle
+	 * @param y2 x of lower right coordinate of rectangle
+	 * @return new collection that contains only features that intersect with rectangle
+	 */
+	virtual std::unique_ptr<PointCollection> filterByRectangleIntersection(double x1, double y1, double x2, double y2);
+
+	/**
+	 * filter collection by a given spatial reference
+	 * @param sref spatial reference
+	 * @return new collection that contains only features that intersect with rectangle given by sref
+	 */
+	virtual std::unique_ptr<PointCollection> filterByRectangleIntersection(const SpatialReference& sref);
+
+	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
+
 	std::string hash();
 
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;

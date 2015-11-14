@@ -54,13 +54,16 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
 
-	float offset = raster->md_value.get("msg.CalibrationOffset");
-	float slope = raster->md_value.get("msg.CalibrationSlope");
+	if (raster->dd.unit.getMeasurement() != "raw" || !raster->dd.unit.hasMinMax())
+		throw OperatorException("Input raster does not appear to be a raw meteosat raster");
+
+	float offset = raster->global_attributes.getNumeric("msg.CalibrationOffset");
+	float slope = raster->global_attributes.getNumeric("msg.CalibrationSlope");
 
 	raster->setRepresentation(GenericRaster::OPENCL);
 
-	double newmin = offset + raster->dd.min * slope;
-	double newmax = offset + raster->dd.max * slope;
+	double newmin = offset + raster->dd.unit.getMin() * slope;
+	double newmax = offset + raster->dd.unit.getMax() * slope;
 	float conversionFactor = 1.0f;
 
 	/*
@@ -70,7 +73,10 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	}
 	*/
 
-	DataDescription out_dd(GDT_Float32, newmin, newmax); // no no_data //raster->dd.has_no_data, output_no_data);
+	Unit out_unit("radiance", "W·m^(-2)·sr^(-1)·cm^(-1)");
+	out_unit.setMinMax(newmin, newmax);
+	out_unit.setInterpolation(Unit::Interpolation::Continuous);
+	DataDescription out_dd(GDT_Float32, out_unit); // no no_data //raster->dd.has_no_data, output_no_data);
 	if (raster->dd.has_no_data)
 		out_dd.addNoData();
 
@@ -86,8 +92,7 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 	prog.addArg(conversionFactor);
 	prog.run();
 
-	raster_out->md_value = raster->md_value;
-	raster_out->md_string = raster->md_string;
+	raster_out->global_attributes = raster->global_attributes;
 
 	return raster_out;
 }

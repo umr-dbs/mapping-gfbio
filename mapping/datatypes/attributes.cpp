@@ -5,66 +5,98 @@
 
 #include <limits>
 
-/*
- * DirectMetadata
- * Stores key/value-pairs directly.
- */
-template<typename T>
-DirectMetadata<T>::DirectMetadata() {
+
+AttributeMaps::AttributeMaps() {
+}
+AttributeMaps::~AttributeMaps() {
 }
 
-template<typename T>
-DirectMetadata<T>::~DirectMetadata() {
-}
-
-template<typename T>
-void DirectMetadata<T>::set(const std::string &key, const T &value) {
-	if (data.count(key) > 0)
-		throw MetadataException("Tried to set metadata '" + key + "' that's already been set.");
-	data[key] = value;
-}
-
-template<typename T>
-const T &DirectMetadata<T>::get(const std::string &key) const {
-	if (data.count(key) < 1)
-		throw MetadataException("DirectMetadata::get(): No value stored for key '" + key + "'");
-	return data.at(key);
-}
-
-template<typename T>
-const T &DirectMetadata<T>::get(const std::string &key, const T &defaultvalue) const {
-	if (data.count(key) < 1)
-		return defaultvalue;
-	return data.at(key);
-}
-
-template<typename T>
-DirectMetadata<T>::DirectMetadata(BinaryStream &stream) {
+AttributeMaps::AttributeMaps(BinaryStream &stream) {
 	fromStream(stream);
 }
 
-template<typename T>
-void DirectMetadata<T>::fromStream(BinaryStream &stream) {
+void AttributeMaps::fromStream(BinaryStream &stream) {
+	_numeric.empty();
+	_textual.empty();
 	size_t count;
 	stream.read(&count);
 	for (size_t i=0;i<count;i++) {
 		std::string key;
 		stream.read(&key);
-		T value;
+		double value;
 		stream.read(&value);
-		data[key] = value;
+		_numeric[key] = value;
+	}
+	stream.read(&count);
+	for (size_t i=0;i<count;i++) {
+		std::string key;
+		stream.read(&key);
+		std::string value;
+		stream.read(&value);
+		_textual[key] = value;
 	}
 }
 
-template<typename T>
-void DirectMetadata<T>::toStream(BinaryStream &stream) const {
-	size_t count = data.size();
+void AttributeMaps::toStream(BinaryStream &stream) const {
+	size_t count = _numeric.size();
 	stream.write(count);
-	for (auto &e : data) {
+	for (auto &e : _numeric) {
+		stream.write(e.first);
+		stream.write(e.second);
+	}
+	count = _textual.size();
+	stream.write(count);
+	for (auto &e : _textual) {
 		stream.write(e.first);
 		stream.write(e.second);
 	}
 }
+
+void AttributeMaps::setNumeric(const std::string &key, double value) {
+	if (_numeric.count(key) > 0)
+		throw AttributeException(concat("Cannot set numeric attribute ", key, " because it's already set."));
+	if (_textual.count(key) > 0)
+		throw AttributeException(concat("Cannot set numeric attribute ", key, " because a textual attribute with the same name exists"));
+	_numeric[key] = value;
+}
+
+void AttributeMaps::setTextual(const std::string &key, const std::string &value) {
+	if (_textual.count(key) > 0)
+		throw AttributeException(concat("Cannot set textual attribute ", key, " because it's already set."));
+	if (_numeric.count(key) > 0)
+		throw AttributeException(concat("Cannot set textual attribute ", key, " because a numeric attribute with the same name exists"));
+	_textual[key] = value;
+}
+
+double AttributeMaps::getNumeric(const std::string &key) const {
+	auto it = _numeric.find(key);
+	if (it == _numeric.end())
+		throw AttributeException(concat("Cannot get numeric attribute ", key, " because it does not exist"));
+	return it->second;
+}
+
+const std::string &AttributeMaps::getTextual(const std::string &key) const {
+	auto it = _textual.find(key);
+	if (it == _textual.end())
+		throw AttributeException(concat("Cannot get textual attribute ", key, " because it does not exist"));
+	return it->second;
+}
+
+double AttributeMaps::getNumeric(const std::string &key, double defaultvalue) const {
+	auto it = _numeric.find(key);
+	if (it == _numeric.end())
+		return defaultvalue;
+	return it->second;
+}
+
+const std::string &AttributeMaps::getTextual(const std::string &key, const std::string &defaultvalue) const {
+	auto it = _textual.find(key);
+	if (it == _textual.end())
+		return defaultvalue;
+	return it->second;
+}
+
+
 
 
 
@@ -202,8 +234,5 @@ std::vector<std::string> MetadataArrays<T>::getKeys() const {
 
 
 // Instantiate as required
-template class DirectMetadata<std::string>;
-template class DirectMetadata<double>;
-
 template class MetadataArrays<std::string>;
 template class MetadataArrays<double>;

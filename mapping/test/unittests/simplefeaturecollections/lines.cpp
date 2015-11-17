@@ -53,7 +53,7 @@ void checkEquality(const LineCollection& a, const LineCollection& b){
 TEST(LineCollection, GeosGeomConversion) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
 	std::string wkt = "GEOMETRYCOLLECTION(MULTILINESTRING ((10 10, 20 20, 10 40),(40 40, 30 30, 40 20, 30 10)),LINESTRING (30 10, 10 30, 40 40))";
-	auto lineCollection = WKBUtil::readLineCollection(wkt);
+	auto lineCollection = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(2, lineCollection->getFeatureCount());
 	EXPECT_EQ(10, lineCollection->coordinates.size());
@@ -402,7 +402,7 @@ TEST(LineCollection, calculateMBR){
 
 TEST(LineCollection, WKTImport){
 	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2, 3 4, 5 6))";
-	auto lines = WKBUtil::readLineCollection(wkt);
+	auto lines = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, lines->getFeatureCount());
 	EXPECT_EQ(1, lines->coordinates[0].x);
@@ -413,7 +413,7 @@ TEST(LineCollection, WKTImport){
 
 TEST(LineCollection, WKTImportMulti){
 	std::string wkt = "GEOMETRYCOLLECTION(MULTILINESTRING((1 2, 3 4, 5 6), (7 8, 9 10, 11 12, 13 14)))";
-	auto lines = WKBUtil::readLineCollection(wkt);
+	auto lines = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, lines->getFeatureCount());
 	EXPECT_EQ(1, lines->coordinates[0].x);
@@ -424,7 +424,7 @@ TEST(LineCollection, WKTImportMulti){
 
 TEST(LineCollection, WKTImportMixed){
 	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2, 3 4, 5 6), MULTILINESTRING((1 2, 3 4, 5 6), (7 8, 9 10, 11 12, 13 14)))";
-	auto lines = WKBUtil::readLineCollection(wkt);
+	auto lines = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(2, lines->getFeatureCount());
 	EXPECT_EQ(1, lines->coordinates[0].x);

@@ -10,17 +10,17 @@
 #include "util/exceptions.h"
 
 
-std::unique_ptr<PointCollection> WKBUtil::readPointCollection(std::stringstream& wkb){
+std::unique_ptr<PointCollection> WKBUtil::readPointCollection(std::stringstream& wkb, const SpatioTemporalReference& stref){
 	//TODO: implement
 	throw FeatureException("Read not yet implemented");
 }
 
-std::unique_ptr<LineCollection> WKBUtil::readLineCollection(std::stringstream& wkb){
+std::unique_ptr<LineCollection> WKBUtil::readLineCollection(std::stringstream& wkb, const SpatioTemporalReference& stref){
 	//TODO: implement
 	throw FeatureException("Read not yet implemented");
 }
 
-std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::stringstream& wkb){
+std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::stringstream& wkb, const SpatioTemporalReference& stref){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKBReader wkbreader(*gf);
 
@@ -32,46 +32,46 @@ std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(std::stringstr
 	}
 
 
-	auto polygonCollection = GeosGeomUtil::createPolygonCollection(*geom);
+	auto polygonCollection = GeosGeomUtil::createPolygonCollection(*geom, stref);
 
 	gf->destroyGeometry(geom);
 
 	return polygonCollection;
 }
 
-std::unique_ptr<PointCollection> WKBUtil::readPointCollection(const std::string& wkt){
+std::unique_ptr<PointCollection> WKBUtil::readPointCollection(const std::string& wkt, const SpatioTemporalReference& stref){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
 	geos::geom::Geometry* geom = wktreader.read(wkt);
 
-	auto pointCollection = GeosGeomUtil::createPointCollection(*geom);
+	auto pointCollection = GeosGeomUtil::createPointCollection(*geom, stref);
 
 	gf->destroyGeometry(geom);
 
 	return pointCollection;
 }
 
-std::unique_ptr<LineCollection> WKBUtil::readLineCollection(const std::string& wkt){
+std::unique_ptr<LineCollection> WKBUtil::readLineCollection(const std::string& wkt, const SpatioTemporalReference& stref){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
 	geos::geom::Geometry* geom = wktreader.read(wkt);
 
-	auto lineCollection = GeosGeomUtil::createLineCollection(*geom);
+	auto lineCollection = GeosGeomUtil::createLineCollection(*geom, stref);
 
 	gf->destroyGeometry(geom);
 
 	return lineCollection;
 }
 
-std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(const std::string& wkt){
+std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(const std::string& wkt, const SpatioTemporalReference& stref){
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
 	geos::geom::Geometry* geom = wktreader.read(wkt);
 
-	auto polygonCollection = GeosGeomUtil::createPolygonCollection(*geom);
+	auto polygonCollection = GeosGeomUtil::createPolygonCollection(*geom, stref);
 
 	gf->destroyGeometry(geom);
 

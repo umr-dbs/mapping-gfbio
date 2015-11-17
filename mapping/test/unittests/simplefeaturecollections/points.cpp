@@ -421,7 +421,7 @@ TEST(PointCollection, calulcateMBR){
 
 TEST(PointCollection, WKTImport){
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2))";
-	auto points = WKBUtil::readPointCollection(wkt);
+	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, points->getFeatureCount());
 	EXPECT_EQ(1, points->coordinates[0].x);
@@ -430,7 +430,7 @@ TEST(PointCollection, WKTImport){
 
 TEST(PointCollection, WKTImportMultiPoint){
 	std::string wkt = "GEOMETRYCOLLECTION(MULTIPOINT(1 2, 3 4))";
-	auto points = WKBUtil::readPointCollection(wkt);
+	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, points->getFeatureCount());
 	EXPECT_EQ(1, points->coordinates[0].x);
@@ -441,7 +441,7 @@ TEST(PointCollection, WKTImportMultiPoint){
 
 TEST(PointCollection, WKTImportMixed){
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), MULTIPOINT(1 2, 3 4))";
-	auto points = WKBUtil::readPointCollection(wkt);
+	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(2, points->getFeatureCount());
 	EXPECT_EQ(1, points->coordinates[0].x);

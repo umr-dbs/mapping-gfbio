@@ -119,7 +119,7 @@ std::unique_ptr<PolygonCollection> GFBioPointSourceOperator::getPolygonCollectio
 	getStringFromServer(rect, data, "WKB");
 	profiler.addIOCost( data.tellp() );
 
-	auto polygonCollection = WKBUtil::readPolygonCollection(data);
+	auto polygonCollection = WKBUtil::readPolygonCollection(data, rect);
 
 	return polygonCollection;
 }

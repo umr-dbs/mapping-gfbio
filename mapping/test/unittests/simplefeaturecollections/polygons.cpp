@@ -810,63 +810,8 @@ TEST(PolygonCollection, filterByRectangleIntersection){
 	polygons.finishFeature(); //one polygon inside, one outside
 
 	auto filteredPolygons = polygons.filterByRectangleIntersection(0, 0, 10, 10);
-	EXPECT_EQ(4, filteredPolygons->getFeatureCount());
 
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(0).getPolygonReference(0).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(0).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->coordinates[0].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[0].y);
-	EXPECT_EQ(2, filteredPolygons->coordinates[1].x);
-	EXPECT_EQ(8, filteredPolygons->coordinates[1].y);
-	EXPECT_EQ(8, filteredPolygons->coordinates[2].x);
-	EXPECT_EQ(2, filteredPolygons->coordinates[2].y);
-	EXPECT_EQ(1, filteredPolygons->coordinates[3].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[3].y);
+	auto expected = WKBUtil::readPolygonCollection("GEOMETRYCOLLECTION(POLYGON((1 1, 2 8, 8 2, 1 1)), POLYGON((1 1, 12 18, 18 12, 1 1)), POLYGON((10 10, 12 18, 18 12, 10 10)), MULTIPOLYGON(((1 1, 2 8, 8 2, 1 1)),((11 11, 12 18, 18 12, 11 11))))", SpatioTemporalReference::unreferenced());
 
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(1).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(1).getPolygonReference(0).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(1).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->coordinates[4].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[4].y);
-	EXPECT_EQ(12, filteredPolygons->coordinates[5].x);
-	EXPECT_EQ(18, filteredPolygons->coordinates[5].y);
-	EXPECT_EQ(18, filteredPolygons->coordinates[6].x);
-	EXPECT_EQ(12, filteredPolygons->coordinates[6].y);
-	EXPECT_EQ(1, filteredPolygons->coordinates[7].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[7].y);
-
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(2).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(2).getPolygonReference(0).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(2).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(10, filteredPolygons->coordinates[8].x);
-	EXPECT_EQ(10, filteredPolygons->coordinates[8].y);
-	EXPECT_EQ(12, filteredPolygons->coordinates[9].x);
-	EXPECT_EQ(18, filteredPolygons->coordinates[9].y);
-	EXPECT_EQ(18, filteredPolygons->coordinates[10].x);
-	EXPECT_EQ(12, filteredPolygons->coordinates[10].y);
-	EXPECT_EQ(10, filteredPolygons->coordinates[11].x);
-	EXPECT_EQ(10, filteredPolygons->coordinates[11].y);
-
-	EXPECT_EQ(2, filteredPolygons->getFeatureReference(3).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(3).getPolygonReference(0).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(3).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(3).getPolygonReference(1).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(3).getPolygonReference(1).getRingReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->coordinates[12].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[12].y);
-	EXPECT_EQ(2, filteredPolygons->coordinates[13].x);
-	EXPECT_EQ(8, filteredPolygons->coordinates[13].y);
-	EXPECT_EQ(8, filteredPolygons->coordinates[14].x);
-	EXPECT_EQ(2, filteredPolygons->coordinates[14].y);
-	EXPECT_EQ(1, filteredPolygons->coordinates[15].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[15].y);
-	EXPECT_EQ(11, filteredPolygons->coordinates[16].x);
-	EXPECT_EQ(11, filteredPolygons->coordinates[16].y);
-	EXPECT_EQ(12, filteredPolygons->coordinates[17].x);
-	EXPECT_EQ(18, filteredPolygons->coordinates[17].y);
-	EXPECT_EQ(18, filteredPolygons->coordinates[18].x);
-	EXPECT_EQ(12, filteredPolygons->coordinates[18].y);
-	EXPECT_EQ(11, filteredPolygons->coordinates[19].x);
-	EXPECT_EQ(11, filteredPolygons->coordinates[19].y);
+	checkEquality(*expected, *filteredPolygons);
 }

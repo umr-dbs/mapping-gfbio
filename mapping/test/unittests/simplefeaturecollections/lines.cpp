@@ -540,18 +540,7 @@ TEST(LineCollection, filterByRectangleIntersection){
 
 	auto filteredLines = lines.filterByRectangleIntersection(0, 0, 10, 10);
 
-	EXPECT_EQ(6, filteredLines->getFeatureCount());
-	EXPECT_EQ(1, filteredLines->getFeatureReference(0).size());
-	EXPECT_EQ(3, filteredLines->getFeatureReference(0).getLineReference(0).size());
-	EXPECT_EQ(1, filteredLines->coordinates[0].x);
-	EXPECT_EQ(1, filteredLines->coordinates[0].y);
-	EXPECT_EQ(5, filteredLines->coordinates[1].x);
-	EXPECT_EQ(1, filteredLines->coordinates[1].y);
-	EXPECT_EQ(8, filteredLines->coordinates[2].x);
-	EXPECT_EQ(8, filteredLines->coordinates[2].y);
-	EXPECT_EQ(1, filteredLines->getFeatureReference(1).size());
-	EXPECT_EQ(1, filteredLines->getFeatureReference(2).size());
-	EXPECT_EQ(1, filteredLines->getFeatureReference(3).size());
-	EXPECT_EQ(1, filteredLines->getFeatureReference(4).size());
-	EXPECT_EQ(2, filteredLines->getFeatureReference(5).size());
+	auto expected = WKBUtil::readLineCollection("GEOMETRYCOLLECTION(LINESTRING(1 1, 5 1, 8 8), LINESTRING(5 5, 11 11, 18 15), LINESTRING(10 10, 11 11, 18 15), LINESTRING(0 10, 10 10, 15 15), LINESTRING(0 0, 20 20, 25 20), MULTILINESTRING((1 1, 5 1, 8 8), (12 12, 12 0, 14 18)))",SpatioTemporalReference::unreferenced());
+
+	checkEquality(*expected, *filteredLines);
 }

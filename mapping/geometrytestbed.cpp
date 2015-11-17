@@ -31,7 +31,7 @@ void testGFBioInput(){
 void testGeosToMapping(){
 	geos::geom::Geometry* geometry = createGeosGeometry("GEOMETRYCOLLECTION(MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))), MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))))");
 
-	auto multiPolygonCollection = GeosGeomUtil::createPolygonCollection(*geometry);
+	auto multiPolygonCollection = GeosGeomUtil::createPolygonCollection(*geometry, SpatioTemporalReference::unreferenced());
 
 	std::cout << "points" << std::endl;
 	for(auto p = multiPolygonCollection->coordinates.begin(); p != multiPolygonCollection->coordinates.end(); ++p){
@@ -62,7 +62,7 @@ void testGeosToMapping(){
 void testTwoWay(){
 	geos::geom::Geometry* geometry = createGeosGeometry("GEOMETRYCOLLECTION(MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))))");
 
-	auto multiPolygonCollection = GeosGeomUtil::createPolygonCollection(*geometry);
+	auto multiPolygonCollection = GeosGeomUtil::createPolygonCollection(*geometry, SpatioTemporalReference::unreferenced());
 
 	auto geos = GeosGeomUtil::createGeosPolygonCollection(*multiPolygonCollection);
 
@@ -312,7 +312,7 @@ void iteratorBenchmarks() {
 
 	printf("Loading polygon data...\n");
 	geos::geom::Geometry* geometry = createGeosGeometry("GEOMETRYCOLLECTION(MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))), MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))))");
-	auto poly = GeosGeomUtil::createPolygonCollection(*geometry);
+	auto poly = GeosGeomUtil::createPolygonCollection(*geometry, SpatioTemporalReference::unreferenced());
 
 	iteratorBenchmarksPoly(*poly, 1);
 	iteratorBenchmarksPoly(*poly, 2);

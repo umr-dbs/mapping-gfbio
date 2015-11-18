@@ -6,6 +6,9 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
+#include <unistd.h>
+#include <fcntl.h>
+#include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
@@ -38,7 +41,7 @@ void checkEquality(const PolygonCollection& a, const PolygonCollection& b){
 
 		for(size_t polygon = 0; polygon < a.getFeatureReference(feature).size(); ++polygon){
 			EXPECT_EQ(a.getFeatureReference(feature).getPolygonReference(polygon).size(), b.getFeatureReference(feature).getPolygonReference(polygon).size());
-			for(size_t ring = 0; polygon < a.getFeatureReference(feature).getPolygonReference(polygon).size(); ++polygon){
+			for(size_t ring = 0; ring < a.getFeatureReference(feature).getPolygonReference(polygon).size(); ++ring){
 				EXPECT_EQ(a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).size(), b.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).size());
 
 				for(size_t point = a.start_ring[a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).getRingIndex()];
@@ -814,4 +817,58 @@ TEST(PolygonCollection, filterByRectangleIntersection){
 	auto expected = WKBUtil::readPolygonCollection("GEOMETRYCOLLECTION(POLYGON((1 1, 2 8, 8 2, 1 1)), POLYGON((1 1, 12 18, 18 12, 1 1)), POLYGON((10 10, 12 18, 18 12, 10 10)), MULTIPOLYGON(((1 1, 2 8, 8 2, 1 1)),((11 11, 12 18, 18 12, 11 11))))", SpatioTemporalReference::unreferenced());
 
 	checkEquality(*expected, *filteredPolygons);
+}
+
+TEST(PolygonCollection, StreamSerialization){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+
+	//TODO: attributes, time array
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(11,21);
+	polygons.addCoordinate(11,31);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(11,21);
+	polygons.finishRing();
+	polygons.addCoordinate(51,81);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(71,61);
+	polygons.addCoordinate(51,81);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	//create binarystream using pipe
+	int fds[2];
+	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
+	EXPECT_EQ(0, status);
+
+	UnixSocket stream(fds[0], fds[1]);
+
+	polygons.toStream(stream);
+
+	PolygonCollection polygons2(stream);
+
+	checkEquality(polygons, polygons2);
 }

@@ -19,6 +19,8 @@ public:
 		start_line.push_back(0); //start of first line
 	}
 
+	LineCollection(BinaryStream& stream);
+
 	typedef SimpleFeatureIterator<LineCollection, LineFeatureReference> iterator;
 	typedef SimpleFeatureIterator<const LineCollection, LineFeatureReference> const_iterator;
 
@@ -42,6 +44,12 @@ public:
 	//starting index of individual features in the start_line vector, last entry points to start_line entry that marks the end of the last line
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
+
+	/**
+	 * Serialize collection to stream
+	 * @param stream the stream to serialize to
+	 */
+	void toStream(BinaryStream &stream);
 
 	//add a new coordinate, to a new feature. After adding all coordinates, finishLine() has to be called
 	void addCoordinate(double x, double y);

@@ -1,7 +1,96 @@
 #include "linecollection.h"
 #include <sstream>
 #include "util/make_unique.h"
+#include "util/binarystream.h"
 
+
+LineCollection::LineCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
+	bool hasTime;
+	stream.read(&hasTime);
+
+	size_t featureCount;
+	stream.read(&featureCount);
+	start_feature.reserve(featureCount);
+
+	size_t lineCount;
+	stream.read(&lineCount);
+	start_line.reserve(lineCount);
+
+	size_t coordinateCount;
+	stream.read(&coordinateCount);
+	coordinates.reserve(coordinateCount);
+
+	global_attributes.fromStream(stream);
+	local_md_string.fromStream(stream);
+	local_md_value.fromStream(stream);
+
+	if (hasTime) {
+		time_start.reserve(featureCount);
+		time_end.reserve(featureCount);
+		double time;
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_start.push_back(time);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_end.push_back(time);
+		}
+	}
+
+	uint32_t offset;
+	for (size_t i = 0; i < featureCount; i++) {
+		stream.read(&offset);
+		start_feature.push_back(offset);
+	}
+
+	for (size_t i = 0; i < lineCount; i++) {
+		stream.read(&offset);
+		start_line.push_back(offset);
+	}
+
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates.push_back(Coordinate(stream));
+	}
+}
+
+void LineCollection::toStream(BinaryStream &stream) {
+	stream.write(stref);
+	stream.write(hasTime());
+
+	size_t featureCount = start_feature.size();
+	stream.write(featureCount);
+	size_t lineCount = start_line.size();
+	stream.write(lineCount);
+	size_t coordinateCount = coordinates.size();
+	stream.write(coordinateCount);
+
+
+	stream.write(global_attributes);
+	stream.write(local_md_string);
+	stream.write(local_md_value);
+
+	if (hasTime()) {
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_start[i]);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_end[i]);
+		}
+	}
+
+	for (size_t i = 0; i < featureCount; i++) {
+		stream.write(start_feature[i]);
+	}
+
+	for (size_t i = 0; i < lineCount; i++) {
+		stream.write(start_line[i]);
+	}
+
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates[i].toStream(stream);
+	}
+}
 
 template<typename T>
 std::unique_ptr<LineCollection> filter(LineCollection *in, const std::vector<T> &keep) {

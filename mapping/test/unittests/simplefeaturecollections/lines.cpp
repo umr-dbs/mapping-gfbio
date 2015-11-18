@@ -6,6 +6,9 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
+#include <unistd.h>
+#include <fcntl.h>
+#include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
 #include "datatypes/linecollection.h"
@@ -543,4 +546,36 @@ TEST(LineCollection, filterByRectangleIntersection){
 	auto expected = WKBUtil::readLineCollection("GEOMETRYCOLLECTION(LINESTRING(1 1, 5 1, 8 8), LINESTRING(5 5, 11 11, 18 15), LINESTRING(10 10, 11 11, 18 15), LINESTRING(0 10, 10 10, 15 15), LINESTRING(0 0, 20 20, 25 20), MULTILINESTRING((1 1, 5 1, 8 8), (12 12, 12 0, 14 18)))",SpatioTemporalReference::unreferenced());
 
 	checkEquality(*expected, *filteredLines);
+}
+
+TEST(LineCollection, StreamSerialization){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+
+	//TODO: attributes, time array
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.finishLine();
+	lines.addCoordinate(2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.finishFeature();
+
+	//create binarystream using pipe
+	int fds[2];
+	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
+	EXPECT_EQ(0, status);
+
+	UnixSocket stream(fds[0], fds[1]);
+
+	lines.toStream(stream);
+
+	LineCollection lines2(stream);
+
+	checkEquality(lines, lines2);
 }

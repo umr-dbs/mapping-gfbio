@@ -39,6 +39,10 @@ public:
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
 
+	/**
+	 * Serialize collection to stream
+	 * @param stream the stream to serialize to
+	 */
 	void toStream(BinaryStream &stream);
 
 	//add a new coordinate, to a new feature. After adding all coordinates, finishFeature() has to be called

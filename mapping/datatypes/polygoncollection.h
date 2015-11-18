@@ -16,6 +16,8 @@ private:
 	template<typename C> class PolygonPolygonReference;
 	template<typename C> class PolygonRingReference;
 public:
+	PolygonCollection(BinaryStream& stream);
+
 	PolygonCollection(const SpatioTemporalReference &stref) : SimpleFeatureCollection(stref){
 		start_feature.push_back(0); //start of first feature
 		start_polygon.push_back(0); //start of first polygon
@@ -49,6 +51,12 @@ public:
 	//starting index of individual Features in the start_polygon vector, last entry points to start_polygon entry that marks the end of the very last polygon
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
+
+	/**
+	 * Serialize collection to stream
+	 * @param stream the stream to serialize to
+	 */
+	void toStream(BinaryStream &stream);
 
 	//add a new coordinate, to a new ring. After adding all coordinates, finishRing() has to be called
 	void addCoordinate(double x, double y);

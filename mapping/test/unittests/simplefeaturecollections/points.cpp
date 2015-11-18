@@ -7,6 +7,9 @@
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
 #include <json/json.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
@@ -511,4 +514,36 @@ TEST(PointCollection, FilterByRectangleIntersection){
 	EXPECT_EQ(1, filteredPoints->getFeatureReference(2).size());
 	EXPECT_EQ(2, filteredPoints->coordinates[3].x);
 	EXPECT_EQ(3, filteredPoints->coordinates[3].y);
+}
+
+TEST(PointCollection, StreamSerialization){
+	PointCollection points(SpatioTemporalReference::unreferenced());
+
+	//TODO attributes and time
+
+	points.addSinglePointFeature(Coordinate(1,1));
+	points.addCoordinate(11, 11);
+	points.addCoordinate(12, 11);
+	points.finishFeature();
+
+	points.addCoordinate(9, 9);
+	points.addCoordinate(15, 14);
+	points.finishFeature();
+
+	points.addSinglePointFeature(Coordinate(2,3));
+
+	points.addSinglePointFeature(Coordinate(20,20));
+
+	//create binarystream using pipe
+	int fds[2];
+	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
+	EXPECT_EQ(0, status);
+
+	UnixSocket stream(fds[0], fds[1]);
+
+	points.toStream(stream);
+
+	PointCollection points2(stream);
+
+	checkEquality(points, points2);
 }

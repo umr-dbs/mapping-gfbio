@@ -62,7 +62,6 @@ EXE=mapping_manager
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
 EXEGTEST=gtest
-EXEGEOMETRYTESTBED=geometrytestbed
 EXETILESERVER=tileserver
 EXECACHEINDEX=cache_index
 EXECACHENODE=cache_node
@@ -92,9 +91,6 @@ ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/quer
 	
 ${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/client.o o/test/unittests/init.o o/test/unittests/example.o o/test/unittests/simplefeaturecollections/points.o o/test/unittests/simplefeaturecollections/lines.o o/test/unittests/simplefeaturecollections/polygons.o o/test/unittests/temporal/timeshift.o o/test/unittests/cache/util.o o/test/unittests/cache/stcache.o o/test/unittests/units.o #o/test/unittests/cache/distribution.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
-
-${EXEGEOMETRYTESTBED}:	o/geometrytestbed.o ${OBJ_COMMON}
-	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} 
 
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o 
 	${CPP} $+ -o $@  ${LDFLAGS}

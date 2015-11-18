@@ -422,3 +422,10 @@ void PolygonCollection::validateSpecifics() const {
 		throw FeatureException("Feature not finished");
 }
 
+PolygonCollection::PolygonCollection(BinaryStream& stream) {
+	// TODO
+}
+
+void PolygonCollection::toStream(BinaryStream& stream) const {
+	// TODO
+}

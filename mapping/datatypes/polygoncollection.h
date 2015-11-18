@@ -22,6 +22,8 @@ public:
 		start_ring.push_back(0); //start of first ring
 	}
 
+	PolygonCollection( BinaryStream &stream );
+
 	typedef SimpleFeatureIterator<PolygonCollection, PolygonFeatureReference> iterator;
 	typedef SimpleFeatureIterator<const PolygonCollection, PolygonFeatureReference> const_iterator;
 
@@ -49,6 +51,9 @@ public:
 	//starting index of individual Features in the start_polygon vector, last entry points to start_polygon entry that marks the end of the very last polygon
 	//thus iterating over features has to stop at start_feature.size() -2
 	std::vector<uint32_t> start_feature;
+
+
+	void toStream(BinaryStream &stream) const;
 
 	//add a new coordinate, to a new ring. After adding all coordinates, finishRing() has to be called
 	void addCoordinate(double x, double y);

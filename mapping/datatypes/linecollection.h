@@ -19,6 +19,8 @@ public:
 		start_line.push_back(0); //start of first line
 	}
 
+	LineCollection( BinaryStream &stream );
+
 	typedef SimpleFeatureIterator<LineCollection, LineFeatureReference> iterator;
 	typedef SimpleFeatureIterator<const LineCollection, LineFeatureReference> const_iterator;
 
@@ -49,6 +51,10 @@ public:
 	size_t finishLine();
 	//finishes the definition of the new feature, returns new feature index
 	size_t finishFeature();
+
+
+	void toStream(BinaryStream &stream) const;
+
 
 	std::unique_ptr<LineCollection> filter(const std::vector<bool> &keep);
 	std::unique_ptr<LineCollection> filter(const std::vector<char> &keep);

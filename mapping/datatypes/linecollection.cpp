@@ -215,3 +215,11 @@ void LineCollection::validateSpecifics() const {
 	if(start_feature.back() != start_line.size() - 1)
 		throw FeatureException("Feature not finished");
 }
+
+LineCollection::LineCollection(BinaryStream& stream) {
+	// TODO
+}
+
+void LineCollection::toStream(BinaryStream& stream) const {
+	// TODO
+}

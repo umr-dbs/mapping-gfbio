@@ -24,18 +24,37 @@ public:
 	typedef SimpleFeatureIterator<LineCollection, LineFeatureReference> iterator;
 	typedef SimpleFeatureIterator<const LineCollection, LineFeatureReference> const_iterator;
 
-    inline iterator begin() {
-    	return iterator(*this, 0);
-    }
-    inline iterator end() {
-    	return iterator(*this, getFeatureCount());
-    }
-    inline const_iterator begin() const {
-    	return const_iterator(*this, 0);
-    }
-    inline const_iterator end() const {
-    	return const_iterator(*this, getFeatureCount());
-    }
+	/**
+	 * Get iterator to beginning of features of the collection
+	 * @return iterator to beginning of features of the collection
+	 */
+	inline iterator begin() {
+		return iterator(*this, 0);
+	}
+
+	/**
+	 * Get iterator to end of features of the collection
+	 * @return iterator to end of features of the collection
+	 */
+	inline iterator end() {
+		return iterator(*this, getFeatureCount());
+	}
+
+	/**
+	 * Get const iterator to beginning of features of the collection
+	 * @return const iterator to beginning of features of the collection
+	 */
+	inline const_iterator begin() const {
+		return const_iterator(*this, 0);
+	}
+
+	/**
+	 * Get const iterator to end of features of the collection
+	 * @return const iterator to end of features of the collection
+	 */
+	inline const_iterator end() const {
+		return const_iterator(*this, getFeatureCount());
+	}
 
 	//starting index of individual lines in the coordinates vector, last entry indicates first index out of bounds of coordinates
 	//thus iterating over lines has to stop at start_line.size() -2
@@ -51,14 +70,37 @@ public:
 	 */
 	void toStream(BinaryStream &stream);
 
-	//add a new coordinate, to a new feature. After adding all coordinates, finishLine() has to be called
+	/**
+	 * add a new coordinate to the current line. After adding all coordinates, finishLine() has to be called
+	 * @param x the x value of the coordinate
+	 * @param y the y value of the coordinate
+	 */
 	void addCoordinate(double x, double y);
-	//finishes the definition of the new feature, returns new feature index
+
+	/**
+	 * finishes the definition of the new line
+	 * @return index of the new line
+	 */
 	size_t finishLine();
-	//finishes the definition of the new feature, returns new feature index
+
+	/**
+	 * finishes the definition of the new feature
+	 * @return index of the new feature
+	 */
 	size_t finishFeature();
 
+	/**
+	 * filter the features of the collections based on keep vector
+	 * @param keep the vector specifying which features to keep
+	 * @return new collection containing only the features that should be kept
+	 */
 	std::unique_ptr<LineCollection> filter(const std::vector<bool> &keep);
+
+	/**
+	 * filter the features of the collections based on keep vector
+	 * @param keep the vector specifying which features to keep
+	 * @return new collection containing only the features that should be kept
+	 */
 	std::unique_ptr<LineCollection> filter(const std::vector<char> &keep);
 
 	/**

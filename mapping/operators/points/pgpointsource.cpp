@@ -67,7 +67,7 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPointCollection(const
 
 	auto column_count = points.columns();
 	for (pqxx::result::size_type c = 2;c<column_count;c++) {
-		points_out->local_md_value.addEmptyVector(points.column_name(c));
+		points_out->feature_attributes.addNumericAttribute(points.column_name(c), Unit::unknown());
 	}
 
 	for (pqxx::result::tuple::size_type i=0; i < points.size();i++) {
@@ -78,7 +78,7 @@ std::unique_ptr<PointCollection> PGPointSourceOperator::getPointCollection(const
 
 		size_t idx = points_out->addSinglePointFeature(Coordinate(x, y));
 		for (pqxx::result::tuple::size_type c = 2;c<column_count;c++) {
-			points_out->local_md_value.set(idx, points.column_name(c), row[c].as<double>());
+			points_out->feature_attributes.numeric(points.column_name(c)).set(idx, row[c].as<double>());
 		}
 	}
 

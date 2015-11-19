@@ -96,7 +96,7 @@ ${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/c
 ${EXEGEOMETRYTESTBED}:	o/geometrytestbed.o ${OBJ_COMMON}
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} 
 
-${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o 
+${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/datatypes/unit.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o 
 	${CPP} $+ -o $@  ${LDFLAGS}
 
 ${EXECACHEINDEX}:	o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o 

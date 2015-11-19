@@ -54,9 +54,8 @@ public:
 	void addDefaultTimestamps();
 	void addDefaultTimestamps(double min, double max);
 
-	// local MetaData (one value per feature)
-	MetadataArrays<std::string> local_md_string;
-	MetadataArrays<double> local_md_value;
+	// feature attributes (one value per feature)
+	AttributeArrays feature_attributes;
 
 	// geometry
 	virtual SpatialReference getCollectionMBR() const;

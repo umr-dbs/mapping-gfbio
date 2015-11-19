@@ -285,13 +285,13 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 	for (size_t k=0;k<columns_numeric.size();k++) {
 		if (pos_numeric[k] == no_pos)
 			throw OperatorException(concat("CSVPointSource: numeric column \"", columns_numeric[k], "\" not found."));
-		collection->local_md_value.addEmptyVector(columns_numeric[k]);
+		collection->feature_attributes.addNumericAttribute(columns_numeric[k], Unit::unknown()); // TODO: units
 	}
 
 	for (size_t k=0;k<columns_textual.size();k++) {
 		if (pos_textual[k] == no_pos)
 			throw OperatorException(concat("CSVPointSource: textual column \"", columns_textual[k], "\" not found."));
-		collection->local_md_string.addEmptyVector(columns_textual[k]);
+		collection->feature_attributes.addTextualAttribute(columns_textual[k], Unit::unknown()); // TODO: units
 	}
 
 
@@ -341,10 +341,10 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 
 		// Step 3: extract the attributes
 		for (size_t k=0;k<columns_numeric.size();k++) {
-			collection->local_md_value.set(current_idx, columns_numeric[k], std::strtod(tuple[pos_numeric[k]].c_str(), nullptr));
+			collection->feature_attributes.numeric(columns_numeric[k]).set(current_idx, std::strtod(tuple[pos_numeric[k]].c_str(), nullptr));
 		}
 		for (size_t k=0;k<columns_textual.size();k++) {
-			collection->local_md_string.set(current_idx, columns_textual[k], tuple[pos_textual[k]]);
+			collection->feature_attributes.textual(columns_textual[k]).set(current_idx, tuple[pos_textual[k]]);
 		}
 
 		// Step 4: increase the current idx, since our feature is finished

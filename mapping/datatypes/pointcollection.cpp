@@ -41,24 +41,9 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 		}
 	}
 
-	// copy local MD
-	for (auto &keyValue : in->local_md_string) {
-		const auto &vec_in = in->local_md_string.getVector(keyValue.first);
-		auto &vec_out = out->local_md_string.addEmptyVector(keyValue.first, kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				vec_out.push_back(vec_in[idx]);
-		}
-	}
+	// copy feature attributes
+	out->feature_attributes = in->feature_attributes.filter(keep, kept_count);
 
-	for (auto &keyValue : in->local_md_value) {
-		const auto &vec_in = in->local_md_value.getVector(keyValue.first);
-		auto &vec_out = out->local_md_value.addEmptyVector(keyValue.first, kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				vec_out.push_back(vec_in[idx]);
-		}
-	}
 	// copy time arrays
 	if (in->hasTime()) {
 		out->time_start.reserve(kept_count);
@@ -116,8 +101,7 @@ PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection
 	start_feature.reserve(featureCount);
 
 	global_attributes.fromStream(stream);
-	local_md_string.fromStream(stream);
-	local_md_value.fromStream(stream);
+	feature_attributes.fromStream(stream);
 
 	for (size_t i=0;i<coordinateCount;i++) {
 		coordinates.push_back( Coordinate(stream) );
@@ -140,8 +124,7 @@ void PointCollection::toStream(BinaryStream &stream) {
 	stream.write(featureCount);
 
 	stream.write(global_attributes);
-	stream.write(local_md_string);
-	stream.write(local_md_value);
+	stream.write(feature_attributes);
 
 	for (size_t i=0;i<coordinateCount;i++) {
 		coordinates[i].toStream(stream);
@@ -251,8 +234,8 @@ std::string PointCollection::toCSV() const {
 	std::ostringstream csv;
 	csv << std::fixed; // std::setprecision(4);
 
-	auto string_keys = local_md_string.getKeys();
-	auto value_keys = local_md_value.getKeys();
+	auto string_keys = feature_attributes.getTextualKeys();
+	auto value_keys = feature_attributes.getNumericKeys();
 
 	bool isSimpleCollection = isSimple();
 
@@ -282,10 +265,10 @@ std::string PointCollection::toCSV() const {
 
 			//TODO: handle missing metadata values
 			for(auto &key : string_keys) {
-				csv << ",\"" << local_md_string.get(feature, key) << "\"";
+				csv << ",\"" << feature_attributes.textual(key).get(feature) << "\"";
 			}
 			for(auto &key : value_keys) {
-				csv << "," << local_md_value.get(feature, key);
+				csv << "," << feature_attributes.numeric(key).get(feature);
 			}
 			csv << std::endl;
 		}
@@ -336,8 +319,8 @@ std::string PointCollection::toARFF(std::string layerName) const {
 		arff << "@ATTRIBUTE time_end DATE" << std::endl;
 	}
 
-	auto string_keys = local_md_string.getKeys();
-	auto value_keys = local_md_value.getKeys();
+	auto string_keys = feature_attributes.getTextualKeys();
+	auto value_keys = feature_attributes.getNumericKeys();
 
 
 	//TODO: handle missing metadata values
@@ -364,10 +347,10 @@ std::string PointCollection::toARFF(std::string layerName) const {
 			}
 
 			for(auto &key : string_keys) {
-				arff << ",\"" << local_md_string.get(feature, key) << "\"";
+				arff << ",\"" << feature_attributes.textual(key).get(feature) << "\"";
 			}
 			for(auto &key : value_keys) {
-				arff << "," << local_md_value.get(feature, key);
+				arff << "," << feature_attributes.numeric(key).get(feature);
 			}
 			arff << std::endl;
 		}

@@ -305,8 +305,8 @@ void CLProgram::addPointCollectionPositions(size_t idx, bool readonly) {
 
 void CLProgram::addPointCollectionAttribute(size_t idx, const std::string &name, bool readonly) {
 	PointCollection *pc = pointcollections.at(idx);
-	auto &vec = pc->local_md_value.getVector(name);
-	addArg(vec, readonly);
+	auto &array = pc->feature_attributes.numeric(name);
+	addArg(array.array, readonly);
 }
 
 

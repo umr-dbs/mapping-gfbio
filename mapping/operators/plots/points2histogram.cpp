@@ -92,7 +92,7 @@ std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryR
 
 
 	size_t featurecount = features->getFeatureCount();
-	auto &valueVector = features->local_md_value.getVector(attributename);
+	auto &valueVector = features->feature_attributes.numeric(attributename);
 
 	// detect range automatically
 	if (autoRange) {
@@ -100,7 +100,7 @@ std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryR
 		rangeMax = std::numeric_limits<double>::min();
 
 		for (size_t i=0; i < featurecount; i++) {
-			double value = valueVector[i];
+			double value = valueVector.get(i);
 			if (!std::isnan(value)) {
 				rangeMin = std::min(value, rangeMin);
 				rangeMax = std::max(value, rangeMax);
@@ -110,7 +110,7 @@ std::unique_ptr<GenericPlot> HistogramFromFeaturesOperator::getPlot(const QueryR
 
 	auto histogram = make_unique<Histogram>(numberOfBuckets, rangeMin, rangeMax);
 	for (size_t i=0; i < featurecount; i++) {
-		double value = valueVector[i];
+		double value = valueVector.get(i);
 		if (std::isnan(value) /* is NaN */)
 			histogram->incNoData();
 		else {

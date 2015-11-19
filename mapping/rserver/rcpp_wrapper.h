@@ -206,21 +206,21 @@ namespace ***REMOVED*** {
 		auto size = points.coordinates.size();
 
 		***REMOVED***::DataFrame data;
-		auto numeric_keys = points.local_md_value.getKeys();
-		for(auto key : numeric_keys) {
+		auto numeric_keys = points.feature_attributes.getNumericKeys();
+		for(auto &key : numeric_keys) {
 			***REMOVED***::NumericVector vec(size);
 			for (decltype(size) i=0;i<size;i++) {
-				double value = points.local_md_value.get(i, key);
+				double value = points.feature_attributes.numeric(key).get(i);
 				vec[i] = value;
 			}
 			data[key] = vec;
 		}
 
-		auto string_keys = points.local_md_string.getKeys();
+		auto string_keys = points.feature_attributes.getTextualKeys();
 		for(auto key : string_keys) {
 			***REMOVED***::StringVector vec(size);
 			for (decltype(size) i=0;i<size;i++) {
-				auto &value = points.local_md_string.get(i, key);
+				auto &value = points.feature_attributes.textual(key).get(i);
 				vec[i] = value;
 			}
 			data[key] = vec;
@@ -292,15 +292,17 @@ namespace ***REMOVED*** {
 			std::string attr = ***REMOVED***::as<std::string>(a[i]);
 			try {
 				***REMOVED***::NumericVector rvec = data[attr];
-				auto & vec = points->local_md_value.addVector(attr, size);
+				auto &vec = points->feature_attributes.addNumericAttribute(attr, Unit::unknown());
+				vec.reserve(size);
 				for (size_t i=0;i<size;i++)
-					vec[i] = rvec[i];
+					vec.set(i, (double) rvec[i]);
 			}
 			catch (const ***REMOVED***::not_compatible &e) {
 				***REMOVED***::StringVector rvec = data[attr];
-				auto & vec = points->local_md_string.addVector(attr, size);
+				auto &vec = points->feature_attributes.addTextualAttribute(attr, Unit::unknown());
+				vec.reserve(size);
 				for (size_t i=0;i<size;i++)
-					vec[i] = rvec[i];
+					vec.set(i, (std::string) rvec[i]);
 			}
 
 			LOG("Attribute %d: %s", i, attr.c_str());

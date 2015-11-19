@@ -69,7 +69,7 @@ auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::uniqu
 		bool hasData = true;
 
 		for (size_t valueIndex = 0; valueIndex < size; ++valueIndex) {
-			value[valueIndex] = points.local_md_value.get(featureIndex, attributeNames[valueIndex]);
+			value[valueIndex] = points.feature_attributes.numeric(attributeNames[valueIndex]).get(featureIndex);
 
 			if(std::isnan(value[valueIndex])) {
 				hasData = false;

@@ -79,9 +79,9 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPointCollection(co
 		CSVParser parser(data, ',', '\n');
 
 		auto header = parser.readHeaders();
-		//TODO: distinguish between double and string properties
+		//TODO: distinguish between numeric and textual properties, figure out units
 		for(int i=2; i < header.size(); i++){
-			points_out->local_md_string.addEmptyVector(header[i]);
+			points_out->feature_attributes.addTextualAttribute(header[i], Unit::unknown());
 		}
 
 		while(true){
@@ -93,7 +93,7 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPointCollection(co
 			//double year = std::atof(csv[3].c_str());
 
 			for(int i=2; i < tuple.size(); i++)
-				points_out->local_md_string.set(idx, header[i], tuple[i]);
+				points_out->feature_attributes.textual(header[i]).set(idx, tuple[i]);
 		}
 		//fprintf(stderr, data.str().c_str());
 		return points_out;

@@ -28,8 +28,7 @@ PolygonCollection::PolygonCollection(BinaryStream &stream) : SimpleFeatureCollec
 	coordinates.reserve(coordinateCount);
 
 	global_attributes.fromStream(stream);
-	local_md_string.fromStream(stream);
-	local_md_value.fromStream(stream);
+	feature_attributes.fromStream(stream);
 
 	if (hasTime) {
 		time_start.reserve(featureCount);
@@ -81,8 +80,7 @@ void PolygonCollection::toStream(BinaryStream &stream) {
 
 
 	stream.write(global_attributes);
-	stream.write(local_md_string);
-	stream.write(local_md_value);
+	stream.write(feature_attributes);
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {

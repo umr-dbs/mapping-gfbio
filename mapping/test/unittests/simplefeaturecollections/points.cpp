@@ -7,10 +7,45 @@
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
 #include <json/json.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
 #include "raster/opencl.h"
+
+void checkEquality(const PointCollection& a, const PointCollection& b){
+	//TODO: check global attributes equality
+
+	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
+	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
+	EXPECT_EQ(a.stref.t1, b.stref.t1);
+	EXPECT_EQ(a.stref.t2, b.stref.t2);
+	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
+	EXPECT_EQ(a.stref.x1, b.stref.x1);
+	EXPECT_EQ(a.stref.y1, b.stref.y1);
+	EXPECT_EQ(a.stref.x2, b.stref.x2);
+	EXPECT_EQ(a.stref.y2, b.stref.y2);
+
+	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
+	EXPECT_EQ(a.hasTime(), b.hasTime());
+
+	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
+		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
+		if(a.hasTime()){
+			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
+			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
+		}
+
+		//TODO: check feature attributes equality
+
+		for(size_t point = a.start_feature[feature]; point < a.start_feature[feature + 1]; ++point){
+			EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
+			EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
+		}
+	}
+}
 
 TEST(PointCollection, AddSinglePointFeature) {
 	PointCollection points(SpatioTemporalReference::unreferenced());
@@ -389,7 +424,7 @@ TEST(PointCollection, calulcateMBR){
 
 TEST(PointCollection, WKTImport){
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2))";
-	auto points = WKBUtil::readPointCollection(wkt);
+	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, points->getFeatureCount());
 	EXPECT_EQ(1, points->coordinates[0].x);
@@ -398,7 +433,7 @@ TEST(PointCollection, WKTImport){
 
 TEST(PointCollection, WKTImportMultiPoint){
 	std::string wkt = "GEOMETRYCOLLECTION(MULTIPOINT(1 2, 3 4))";
-	auto points = WKBUtil::readPointCollection(wkt);
+	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, points->getFeatureCount());
 	EXPECT_EQ(1, points->coordinates[0].x);
@@ -409,7 +444,7 @@ TEST(PointCollection, WKTImportMultiPoint){
 
 TEST(PointCollection, WKTImportMixed){
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), MULTIPOINT(1 2, 3 4))";
-	auto points = WKBUtil::readPointCollection(wkt);
+	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(2, points->getFeatureCount());
 	EXPECT_EQ(1, points->coordinates[0].x);
@@ -479,4 +514,36 @@ TEST(PointCollection, FilterByRectangleIntersection){
 	EXPECT_EQ(1, filteredPoints->getFeatureReference(2).size());
 	EXPECT_EQ(2, filteredPoints->coordinates[3].x);
 	EXPECT_EQ(3, filteredPoints->coordinates[3].y);
+}
+
+TEST(PointCollection, StreamSerialization){
+	PointCollection points(SpatioTemporalReference::unreferenced());
+
+	//TODO attributes and time
+
+	points.addSinglePointFeature(Coordinate(1,1));
+	points.addCoordinate(11, 11);
+	points.addCoordinate(12, 11);
+	points.finishFeature();
+
+	points.addCoordinate(9, 9);
+	points.addCoordinate(15, 14);
+	points.finishFeature();
+
+	points.addSinglePointFeature(Coordinate(2,3));
+
+	points.addSinglePointFeature(Coordinate(20,20));
+
+	//create binarystream using pipe
+	int fds[2];
+	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
+	EXPECT_EQ(0, status);
+
+	UnixSocket stream(fds[0], fds[1]);
+
+	points.toStream(stream);
+
+	PointCollection points2(stream);
+
+	checkEquality(points, points2);
 }

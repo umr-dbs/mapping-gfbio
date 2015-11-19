@@ -22,19 +22,19 @@ class WKTSource : public GenericOperator {
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 			if(type != "points")
 				throw ArgumentException("WKTSource does not contain points");
-			return WKBUtil::readPointCollection(wkt);
+			return WKBUtil::readPointCollection(wkt, rect);
 		}
 
 		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 			if(type != "lines")
 				throw ArgumentException("WKTSource does not contain lines");
-			return WKBUtil::readLineCollection(wkt);
+			return WKBUtil::readLineCollection(wkt, rect);
 		}
 
 		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 			if(type != "polygons")
 				throw ArgumentException("WKTSource does not contain polygons");
-			return WKBUtil::readPolygonCollection(wkt);
+			return WKBUtil::readPolygonCollection(wkt, rect);
 		}
 #endif
 

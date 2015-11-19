@@ -6,6 +6,9 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
+#include <unistd.h>
+#include <fcntl.h>
+#include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
 #include "datatypes/linecollection.h"
@@ -13,10 +16,47 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 
+void checkEquality(const LineCollection& a, const LineCollection& b){
+	//TODO: check global attributes equality
+
+	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
+	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
+	EXPECT_EQ(a.stref.t1, b.stref.t1);
+	EXPECT_EQ(a.stref.t2, b.stref.t2);
+	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
+	EXPECT_EQ(a.stref.x1, b.stref.x1);
+	EXPECT_EQ(a.stref.y1, b.stref.y1);
+	EXPECT_EQ(a.stref.x2, b.stref.x2);
+	EXPECT_EQ(a.stref.y2, b.stref.y2);
+
+	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
+	EXPECT_EQ(a.hasTime(), b.hasTime());
+
+	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
+		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
+		if(a.hasTime()){
+			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
+			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
+		}
+
+		//TODO: check feature attributes equality
+
+		for(size_t line = 0; line < a.getFeatureReference(feature).size(); ++line){
+			EXPECT_EQ(a.getFeatureReference(feature).getLineReference(line).size(), b.getFeatureReference(feature).getLineReference(line).size());
+
+			for(size_t point = a.start_line[a.getFeatureReference(feature).getLineReference(line).getLineIndex()];
+					point < a.start_line[a.getFeatureReference(feature).getLineReference(line).getLineIndex() + 1]; ++point){
+				EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
+				EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
+			}
+		}
+	}
+}
+
 TEST(LineCollection, GeosGeomConversion) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
 	std::string wkt = "GEOMETRYCOLLECTION(MULTILINESTRING ((10 10, 20 20, 10 40),(40 40, 30 30, 40 20, 30 10)),LINESTRING (30 10, 10 30, 40 40))";
-	auto lineCollection = WKBUtil::readLineCollection(wkt);
+	auto lineCollection = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(2, lineCollection->getFeatureCount());
 	EXPECT_EQ(10, lineCollection->coordinates.size());
@@ -365,7 +405,7 @@ TEST(LineCollection, calculateMBR){
 
 TEST(LineCollection, WKTImport){
 	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2, 3 4, 5 6))";
-	auto lines = WKBUtil::readLineCollection(wkt);
+	auto lines = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, lines->getFeatureCount());
 	EXPECT_EQ(1, lines->coordinates[0].x);
@@ -376,7 +416,7 @@ TEST(LineCollection, WKTImport){
 
 TEST(LineCollection, WKTImportMulti){
 	std::string wkt = "GEOMETRYCOLLECTION(MULTILINESTRING((1 2, 3 4, 5 6), (7 8, 9 10, 11 12, 13 14)))";
-	auto lines = WKBUtil::readLineCollection(wkt);
+	auto lines = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, lines->getFeatureCount());
 	EXPECT_EQ(1, lines->coordinates[0].x);
@@ -387,7 +427,7 @@ TEST(LineCollection, WKTImportMulti){
 
 TEST(LineCollection, WKTImportMixed){
 	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2, 3 4, 5 6), MULTILINESTRING((1 2, 3 4, 5 6), (7 8, 9 10, 11 12, 13 14)))";
-	auto lines = WKBUtil::readLineCollection(wkt);
+	auto lines = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(2, lines->getFeatureCount());
 	EXPECT_EQ(1, lines->coordinates[0].x);
@@ -503,18 +543,39 @@ TEST(LineCollection, filterByRectangleIntersection){
 
 	auto filteredLines = lines.filterByRectangleIntersection(0, 0, 10, 10);
 
-	EXPECT_EQ(6, filteredLines->getFeatureCount());
-	EXPECT_EQ(1, filteredLines->getFeatureReference(0).size());
-	EXPECT_EQ(3, filteredLines->getFeatureReference(0).getLineReference(0).size());
-	EXPECT_EQ(1, filteredLines->coordinates[0].x);
-	EXPECT_EQ(1, filteredLines->coordinates[0].y);
-	EXPECT_EQ(5, filteredLines->coordinates[1].x);
-	EXPECT_EQ(1, filteredLines->coordinates[1].y);
-	EXPECT_EQ(8, filteredLines->coordinates[2].x);
-	EXPECT_EQ(8, filteredLines->coordinates[2].y);
-	EXPECT_EQ(1, filteredLines->getFeatureReference(1).size());
-	EXPECT_EQ(1, filteredLines->getFeatureReference(2).size());
-	EXPECT_EQ(1, filteredLines->getFeatureReference(3).size());
-	EXPECT_EQ(1, filteredLines->getFeatureReference(4).size());
-	EXPECT_EQ(2, filteredLines->getFeatureReference(5).size());
+	auto expected = WKBUtil::readLineCollection("GEOMETRYCOLLECTION(LINESTRING(1 1, 5 1, 8 8), LINESTRING(5 5, 11 11, 18 15), LINESTRING(10 10, 11 11, 18 15), LINESTRING(0 10, 10 10, 15 15), LINESTRING(0 0, 20 20, 25 20), MULTILINESTRING((1 1, 5 1, 8 8), (12 12, 12 0, 14 18)))",SpatioTemporalReference::unreferenced());
+
+	checkEquality(*expected, *filteredLines);
+}
+
+TEST(LineCollection, StreamSerialization){
+	LineCollection lines(SpatioTemporalReference::unreferenced());
+
+	//TODO: attributes, time array
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(1,3);
+	lines.finishLine();
+	lines.finishFeature();
+
+	lines.addCoordinate(1,2);
+	lines.addCoordinate(2,3);
+	lines.finishLine();
+	lines.addCoordinate(2,4);
+	lines.addCoordinate(5,6);
+	lines.finishLine();
+	lines.finishFeature();
+
+	//create binarystream using pipe
+	int fds[2];
+	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
+	EXPECT_EQ(0, status);
+
+	UnixSocket stream(fds[0], fds[1]);
+
+	lines.toStream(stream);
+
+	LineCollection lines2(stream);
+
+	checkEquality(lines, lines2);
 }

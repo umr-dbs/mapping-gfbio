@@ -93,48 +93,73 @@ std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(
 }
 
 PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
-	size_t coordinateCount;
-	stream.read(&coordinateCount);
-	coordinates.reserve(coordinateCount);
+	bool hasTime;
+	stream.read(&hasTime);
+
 	size_t featureCount;
 	stream.read(&featureCount);
 	start_feature.reserve(featureCount);
 
+	size_t coordinateCount;
+	stream.read(&coordinateCount);
+	coordinates.reserve(coordinateCount);
+
 	global_attributes.fromStream(stream);
 	feature_attributes.fromStream(stream);
 
-	for (size_t i=0;i<coordinateCount;i++) {
-		coordinates.push_back( Coordinate(stream) );
+	if (hasTime) {
+		time_start.reserve(featureCount);
+		time_end.reserve(featureCount);
+		double time;
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_start.push_back(time);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_end.push_back(time);
+		}
 	}
 
 	uint32_t offset;
-	for (size_t i=0;i<featureCount;i++) {
+	for (size_t i = 0; i < featureCount; i++) {
 		stream.read(&offset);
 		start_feature.push_back(offset);
 	}
 
-	// TODO: serialize/unserialize time array
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates.push_back(Coordinate(stream));
+	}
 }
 
 void PointCollection::toStream(BinaryStream &stream) {
 	stream.write(stref);
-	size_t coordinateCount = coordinates.size();
-	stream.write(coordinateCount);
+	stream.write(hasTime());
+
 	size_t featureCount = start_feature.size();
 	stream.write(featureCount);
+	size_t coordinateCount = coordinates.size();
+	stream.write(coordinateCount);
 
 	stream.write(global_attributes);
 	stream.write(feature_attributes);
 
-	for (size_t i=0;i<coordinateCount;i++) {
-		coordinates[i].toStream(stream);
+	if (hasTime()) {
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_start[i]);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_end[i]);
+		}
 	}
 
-	for (size_t i=0;i<featureCount;i++) {
+	for (size_t i = 0; i < featureCount; i++) {
 		stream.write(start_feature[i]);
 	}
 
-	// TODO: serialize/unserialize time array
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates[i].toStream(stream);
+	}
 }
 
 

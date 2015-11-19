@@ -2,8 +2,114 @@
 #include "datatypes/polygoncollection.h"
 #include "util/make_unique.h"
 #include "util/hash.h"
+#include "util/binarystream.h"
 
 #include <sstream>
+
+
+PolygonCollection::PolygonCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
+	bool hasTime;
+	stream.read(&hasTime);
+
+	size_t featureCount;
+	stream.read(&featureCount);
+	start_feature.reserve(featureCount);
+
+	size_t polygonCount;
+	stream.read(&polygonCount);
+	start_polygon.reserve(polygonCount);
+
+	size_t ringCount;
+	stream.read(&ringCount);
+	start_ring.reserve(ringCount);
+
+	size_t coordinateCount;
+	stream.read(&coordinateCount);
+	coordinates.reserve(coordinateCount);
+
+	global_attributes.fromStream(stream);
+	local_md_string.fromStream(stream);
+	local_md_value.fromStream(stream);
+
+	if (hasTime) {
+		time_start.reserve(featureCount);
+		time_end.reserve(featureCount);
+		double time;
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_start.push_back(time);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_end.push_back(time);
+		}
+	}
+
+	uint32_t offset;
+	for (size_t i = 0; i < featureCount; i++) {
+		stream.read(&offset);
+		start_feature.push_back(offset);
+	}
+
+	for (size_t i = 0; i < polygonCount; i++) {
+		stream.read(&offset);
+		start_polygon.push_back(offset);
+	}
+
+	for (size_t i = 0; i < ringCount; i++) {
+		stream.read(&offset);
+		start_ring.push_back(offset);
+	}
+
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates.push_back(Coordinate(stream));
+	}
+}
+
+void PolygonCollection::toStream(BinaryStream &stream) {
+	stream.write(stref);
+	stream.write(hasTime());
+
+	size_t featureCount = start_feature.size();
+	stream.write(featureCount);
+	size_t polygonCount = start_polygon.size();
+	stream.write(polygonCount);
+	size_t ringCount = start_ring.size();
+	stream.write(ringCount);
+	size_t coordinateCount = coordinates.size();
+	stream.write(coordinateCount);
+
+
+	stream.write(global_attributes);
+	stream.write(local_md_string);
+	stream.write(local_md_value);
+
+	if (hasTime()) {
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_start[i]);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_end[i]);
+		}
+	}
+
+	for (size_t i = 0; i < featureCount; i++) {
+		stream.write(start_feature[i]);
+	}
+
+	for (size_t i = 0; i < polygonCount; i++) {
+		stream.write(start_polygon[i]);
+	}
+
+	for (size_t i = 0; i < ringCount; i++) {
+		stream.write(start_ring[i]);
+	}
+
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates[i].toStream(stream);
+	}
+}
+
 
 template<typename T>
 std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vector<T> &keep) {

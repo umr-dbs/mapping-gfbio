@@ -32,6 +32,8 @@ class Coordinate {
 		double x, y;
 
 		friend class PointCollection;
+		friend class LineCollection;
+		friend class PolygonCollection;
 		friend class GeosGeomUtil;
 };
 

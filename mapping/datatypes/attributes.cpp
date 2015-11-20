@@ -208,12 +208,15 @@ void AttributeArrays::toStream(BinaryStream &stream) const {
 	}
 }
 
+void AttributeArrays::checkIfAttributeDoesNotExist(const std::string &key) {
+	if (_numeric.count(key) > 0)
+		throw AttributeException(concat("Cannot add attribute ", key, " because a numeric attribute with the same name exists."));
+	if (_textual.count(key) > 0)
+		throw AttributeException(concat("Cannot add attribute ", key, " because a textual attribute with the same name exists."));
+}
 
 AttributeArrays::AttributeArray<double> &AttributeArrays::addNumericAttribute(const std::string &key, const Unit &unit) {
-	if (_numeric.count(key) > 0)
-		throw AttributeException(concat("Cannot add numeric attribute ", key, " because it exists already."));
-	if (_textual.count(key) > 0)
-		throw AttributeException(concat("Cannot add numeric attribute ", key, " because a textual attribute with the same name exists."));
+	checkIfAttributeDoesNotExist(key);
 
 	auto res = _numeric.emplace(key, unit);
 	if (res.second != true)
@@ -222,11 +225,18 @@ AttributeArrays::AttributeArray<double> &AttributeArrays::addNumericAttribute(co
 	return (res.first)->second;
 }
 
+AttributeArrays::AttributeArray<double> &AttributeArrays::addNumericAttribute(const std::string &key, const Unit &unit, std::vector<double> &&values) {
+	checkIfAttributeDoesNotExist(key);
+
+	auto res = _numeric.emplace(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(unit, std::move(values)));
+	if (res.second != true)
+		throw AttributeException(concat("Cannot add numeric attribute ", key, " because it exists already."));
+
+	return (res.first)->second;
+}
+
 AttributeArrays::AttributeArray<std::string> &AttributeArrays::addTextualAttribute(const std::string &key, const Unit &unit) {
-	if (_textual.count(key) > 0)
-		throw AttributeException(concat("Cannot add textual attribute ", key, " because it exists already."));
-	if (_numeric.count(key) > 0)
-		throw AttributeException(concat("Cannot add textual attribute ", key, " because a textual attribute with the same name exists."));
+	checkIfAttributeDoesNotExist(key);
 
 	auto res = _textual.emplace(key, unit);
 	if (res.second != true)
@@ -234,6 +244,17 @@ AttributeArrays::AttributeArray<std::string> &AttributeArrays::addTextualAttribu
 
 	return (res.first)->second;
 }
+
+AttributeArrays::AttributeArray<std::string> &AttributeArrays::addTextualAttribute(const std::string &key, const Unit &unit, std::vector<std::string> &&values) {
+	checkIfAttributeDoesNotExist(key);
+
+	auto res = _textual.emplace(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(unit, std::move(values)));
+	if (res.second != true)
+		throw AttributeException(concat("Cannot add textual attribute ", key, " because it exists already."));
+
+	return (res.first)->second;
+}
+
 
 std::vector<std::string> AttributeArrays::getNumericKeys() const {
 	std::vector<std::string> keys;

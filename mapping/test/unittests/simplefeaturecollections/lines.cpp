@@ -541,9 +541,19 @@ TEST(LineCollection, filterByRectangleIntersection){
 	lines.finishLine();
 	lines.finishFeature(); //one line in- & one line outside
 
+	lines.feature_attributes.addNumericAttribute("numeric", Unit::unknown(), { 1, 2, 3, 4, 5, 6, 7, 8 });
+	lines.feature_attributes.addTextualAttribute("textual", Unit::unknown(), { "1", "2", "3", "4", "5", "6", "7", "8" });
+
+	EXPECT_NO_THROW(lines.validate());
+
 	auto filteredLines = lines.filterByRectangleIntersection(0, 0, 10, 10);
+	EXPECT_NO_THROW(filteredLines->validate());
 
 	auto expected = WKBUtil::readLineCollection("GEOMETRYCOLLECTION(LINESTRING(1 1, 5 1, 8 8), LINESTRING(5 5, 11 11, 18 15), LINESTRING(10 10, 11 11, 18 15), LINESTRING(0 10, 10 10, 15 15), LINESTRING(0 0, 20 20, 25 20), MULTILINESTRING((1 1, 5 1, 8 8), (12 12, 12 0, 14 18)))",SpatioTemporalReference::unreferenced());
+	expected->feature_attributes.addNumericAttribute("numeric", Unit::unknown(), { 1, 3, 4, 5, 6, 8 });
+	expected->feature_attributes.addTextualAttribute("textual", Unit::unknown(), { "1", "3", "4", "5", "6", "8" });
+
+	EXPECT_NO_THROW(expected->validate());
 
 	checkEquality(*expected, *filteredLines);
 }

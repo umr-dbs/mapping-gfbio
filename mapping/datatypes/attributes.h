@@ -63,6 +63,7 @@ class AttributeArrays {
 				using array_type = std::vector<T>;
 
 				AttributeArray(const Unit &unit) : unit(unit) {}
+				AttributeArray(const Unit &unit, std::vector<T> &&values) : unit(unit), array(values) {}
 				// prevent accidental copies
 				AttributeArray(const AttributeArray &) = delete;
 				AttributeArray& operator=(const AttributeArray &) = delete;
@@ -112,7 +113,9 @@ class AttributeArrays {
 		const AttributeArray<std::string> &textual(const std::string &key) const { return _textual.at(key); }
 
 		AttributeArray<double> &addNumericAttribute(const std::string &key, const Unit &unit);
+		AttributeArray<double> &addNumericAttribute(const std::string &key, const Unit &unit, std::vector<double> &&values);
 		AttributeArray<std::string> &addTextualAttribute(const std::string &key, const Unit &unit);
+		AttributeArray<std::string> &addTextualAttribute(const std::string &key, const Unit &unit, std::vector<std::string> &&values);
 
 		std::vector<std::string> getNumericKeys() const;
 		std::vector<std::string> getTextualKeys() const;
@@ -128,6 +131,8 @@ class AttributeArrays {
 		void validate(size_t expected_values) const;
 
 	private:
+		void checkIfAttributeDoesNotExist(const std::string &key);
+
 		std::map<std::string, AttributeArray<double> > _numeric;
 		std::map<std::string, AttributeArray<std::string> > _textual;
 };

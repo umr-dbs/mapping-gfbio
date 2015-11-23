@@ -7,7 +7,7 @@ CPATH := /usr/local/include/:$(CPATH)
 
 CPP=g++
 #CPP=clang++-3.5
-CPPFLAGS=-g3 -O0 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ -I/usr/include/gdal
+CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ -I/usr/include/gdal
 CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_CL=-lOpenCL

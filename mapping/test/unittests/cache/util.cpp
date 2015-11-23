@@ -119,8 +119,8 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 // Test extensions
 //
 
-TestNodeServer::TestNodeServer(std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port, size_t raster_cap)  :
-	NodeServer(my_host,my_port,index_host,index_port,1), rcm( raster_cap, my_host, my_port ) {
+TestNodeServer::TestNodeServer(std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port, size_t capacity)  :
+	NodeServer(my_host,my_port,index_host,index_port,1), rcm( my_host, my_port, capacity,capacity,capacity,capacity,capacity ) {
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -160,41 +160,32 @@ CacheManager& TestCacheMan::get_instance_mgr(int i) {
 	return instances.at(i)->rcm;
 }
 
-std::unique_ptr<GenericRaster> TestCacheMan::query_raster(const GenericOperator &op,
-	const QueryRectangle &rect) {
-	return get_current_instance().query_raster(op, rect);
+NodeHandshake TestCacheMan::get_handshake() const {
+	return get_current_instance().get_handshake();
 }
-
-const std::shared_ptr<GenericRaster> TestCacheMan::get_raster_ref(const NodeCacheKey& key) {
-	return get_current_instance().get_raster_ref(key);
-}
-
-NodeCacheRef TestCacheMan::get_raster_info( const NodeCacheKey &key) {
-	return get_current_instance().get_raster_info(key);
-}
-
-void TestCacheMan::put_raster(const std::string &semantic_id,
-	const std::unique_ptr<GenericRaster> &raster) {
-	get_current_instance().put_raster(semantic_id, raster);
-}
-
-NodeCacheRef TestCacheMan::put_raster_local(const std::string &semantic_id,
-	const std::unique_ptr<GenericRaster> &raster, const AccessInfo info) {
-	return get_current_instance().put_raster_local(semantic_id, raster,info);
-}
-
-void TestCacheMan::remove_raster_local(const NodeCacheKey &key) {
-	get_current_instance().remove_raster_local(key);
-}
-
-
-NodeHandshake TestCacheMan::get_handshake(const std::string &my_host, uint32_t my_port) const {
-	return get_current_instance().get_handshake(my_host, my_port);
-}
-
 
 NodeStats TestCacheMan::get_stats() const {
 	return get_current_instance().get_stats();
+}
+
+CacheWrapper<GenericRaster>& TestCacheMan::get_raster_cache() {
+	return get_current_instance().get_raster_cache();
+}
+
+CacheWrapper<PointCollection>& TestCacheMan::get_point_cache() {
+	return get_current_instance().get_point_cache();
+}
+
+CacheWrapper<LineCollection>& TestCacheMan::get_line_cache() {
+	return get_current_instance().get_line_cache();
+}
+
+CacheWrapper<PolygonCollection>& TestCacheMan::get_polygon_cache() {
+	return get_current_instance().get_polygon_cache();
+}
+
+CacheWrapper<GenericPlot>& TestCacheMan::get_plot_cache() {
+	return get_current_instance().get_plot_cache();
 }
 
 void TestCacheMan::add_instance(TestNodeServer *inst) {

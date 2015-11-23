@@ -13,6 +13,7 @@
 #include "datatypes/pointcollection.h"
 #include "datatypes/linecollection.h"
 #include "datatypes/polygoncollection.h"
+#include "datatypes/plot.h"
 
 #include <vector>
 #include <memory>
@@ -209,32 +210,32 @@ public:
 
 class NBRasterWriter : public NBMultiWriter {
 public:
-	NBRasterWriter( std::shared_ptr<GenericRaster> raster );
-};
-
-template<typename T>
-class NBDirectMDWriter : public NBContainerWriter<DirectMetadata<T>,
-	NBPairWriter<std::string,T,NBSimpleWriter<std::string>,NBSimpleWriter<T>>> {
-public:
+	NBRasterWriter( std::shared_ptr<const GenericRaster> raster );
 };
 
 // TODO: Serialize in a less memory consuming manner
 class NBPointsWriter : public NBSimpleWriter<PointCollection> {
 public:
-	NBPointsWriter( std::shared_ptr<PointCollection> points );
+	NBPointsWriter( std::shared_ptr<const PointCollection> points );
 };
 
 // TODO: Serialize in a less memory consuming manner
-//class NBLinesWriter : public NBSimpleWriter<LineCollection> {
-//public:
-//	NBLinesWriter( std::shared_ptr<LineCollection> points );
-//};
-//
-//// TODO: Serialize in a less memory consuming manner
-//class NBPolygonsWriter : public NBSimpleWriter<PolygonCollection> {
-//public:
-//	NBPolygonsWriter( std::shared_ptr<PolygonCollection> points );
-//};
+class NBLinesWriter : public NBSimpleWriter<LineCollection> {
+public:
+	NBLinesWriter( std::shared_ptr<const LineCollection> lines );
+};
+
+// TODO: Serialize in a less memory consuming manner
+class NBPolygonsWriter : public NBSimpleWriter<PolygonCollection> {
+public:
+	NBPolygonsWriter( std::shared_ptr<const PolygonCollection> polys );
+};
+
+// TODO: Serialize in a less memory consuming manner
+class NBPlotWriter : public NBSimpleWriter<GenericPlot> {
+public:
+	NBPlotWriter( std::shared_ptr<const GenericPlot> plot );
+};
 
 
 //
@@ -376,6 +377,11 @@ public:
 	NBNodeCacheKeyReader();
 };
 
+class NBTypedNodeCacheKeyReader : public NBMultiReader {
+public:
+	NBTypedNodeCacheKeyReader();
+};
+
 ///////////////////////////////
 //
 // CLIENT CONNECTION
@@ -423,7 +429,7 @@ public:
 	NBNodeEntryStatsReader();
 };
 
-class NBCacheStatsReader : public NBContainerReader {
+class NBCacheStatsReader : public NBMultiReader {
 public:
 	NBCacheStatsReader();
 };
@@ -438,9 +444,9 @@ public:
 	NBAccessInfoReader();
 };
 
-class NBCacheBoundsReader : public NBFixedSizeReader {
+class NBCacheCubeReader : public NBFixedSizeReader {
 public:
-	NBCacheBoundsReader();
+	NBCacheCubeReader();
 };
 
 class NBNodeCacheRefReader : public NBMultiReader {

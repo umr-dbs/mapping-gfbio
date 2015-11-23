@@ -13,6 +13,10 @@
 #include "operators/queryrectangle.h"
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
+#include "datatypes/plot.h"
 #include "util/binarystream.h"
 
 #include <geos/geom/Polygon.h>
@@ -45,7 +49,9 @@ public:
 template<typename EType>
 class NodeCache {
 public:
-	NodeCache( size_t max_size );
+	NodeCache( CacheType type, size_t max_size );
+	NodeCache() = delete;
+	NodeCache( const NodeCache& ) = delete;
 	virtual ~NodeCache();
 
 	// Adds an entry for the given semantic_id to the cache.
@@ -77,6 +83,8 @@ public:
 	size_t get_max_size() const { return max_size; }
 	// Returns the current size (in bytes) of all entries stored in the cache
 	size_t get_current_size() const { return current_size; }
+
+	const CacheType type;
 protected:
 	// Copies the content of the entry
 	virtual std::unique_ptr<EType> copy(const EType &content) const = 0;
@@ -118,11 +126,56 @@ private:
 class NodeRasterCache : public NodeCache<GenericRaster> {
 public:
 	NodeRasterCache() = delete;
+	NodeRasterCache( const NodeRasterCache& ) = delete;
+	NodeRasterCache( NodeRasterCache&& ) = delete;
 	NodeRasterCache( size_t size );
-	virtual ~NodeRasterCache();
 protected:
-	virtual std::unique_ptr<GenericRaster> copy(const GenericRaster &content) const;
-	virtual size_t get_data_size(const GenericRaster &content) const ;
+	std::unique_ptr<GenericRaster> copy(const GenericRaster &content) const;
+	size_t get_data_size(const GenericRaster &content) const ;
+};
+
+class NodePointCache : public NodeCache<PointCollection> {
+public:
+	NodePointCache() = delete;
+	NodePointCache( const NodePointCache& ) = delete;
+	NodePointCache( NodePointCache&& ) = delete;
+	NodePointCache( size_t size );
+protected:
+	std::unique_ptr<PointCollection> copy(const PointCollection &content) const;
+	size_t get_data_size(const PointCollection &content) const ;
+};
+
+class NodeLineCache : public NodeCache<LineCollection> {
+public:
+	NodeLineCache() = delete;
+	NodeLineCache( const NodeLineCache& ) = delete;
+	NodeLineCache( NodeLineCache&& ) = delete;
+	NodeLineCache( size_t size );
+protected:
+	std::unique_ptr<LineCollection> copy(const LineCollection &content) const;
+	size_t get_data_size(const LineCollection &content) const ;
+};
+
+class NodePolygonCache : public NodeCache<PolygonCollection> {
+public:
+	NodePolygonCache() = delete;
+	NodePolygonCache( const NodePolygonCache& ) = delete;
+	NodePolygonCache( NodePolygonCache&& ) = delete;
+	NodePolygonCache( size_t size );
+protected:
+	std::unique_ptr<PolygonCollection> copy(const PolygonCollection &content) const;
+	size_t get_data_size(const PolygonCollection &content) const ;
+};
+
+class NodePlotCache : public NodeCache<GenericPlot> {
+public:
+	NodePlotCache() = delete;
+	NodePlotCache( const NodePlotCache& ) = delete;
+	NodePlotCache( NodePlotCache&& ) = delete;
+	NodePlotCache( size_t size );
+protected:
+	std::unique_ptr<GenericPlot> copy(const GenericPlot &content) const;
+	size_t get_data_size(const GenericPlot &content) const ;
 };
 
 #endif /* NODE_CACHE_H_ */

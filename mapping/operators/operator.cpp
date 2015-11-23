@@ -169,7 +169,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	std::unique_ptr<GenericRaster> result;
 	{
 		try {
-			result = CacheManager::getInstance().query_raster(
+			result = CacheManager::get_instance().get_raster_cache().query(
 					*this,
 					rect);
 		} catch ( NoSuchElementException &nse ) {
@@ -179,7 +179,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 				result = getRaster(rect,profiler);
 			}
 			if ( CacheManager::get_strategy().do_cache(profiler,result->getDataSize()) )
-				CacheManager::getInstance().put_raster(semantic_id,result);
+				CacheManager::get_instance().get_raster_cache().put(semantic_id,result);
 		}
 	}
 	//d_profile(depth, type, "raster", profiler, result->getDataSize());

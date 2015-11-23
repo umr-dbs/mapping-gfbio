@@ -191,7 +191,7 @@ void CapacityReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &
 
 	for ( auto &e : overflow ) {
 		result.at(e->node_id).add_removal(
-			ReorgRemoveItem( cache.get_reorg_type(), e->semantic_id, e->entry_id )
+			TypedNodeCacheKey( cache.get_reorg_type(), e->semantic_id, e->entry_id )
 		);
 	}
 }
@@ -224,21 +224,22 @@ public:
 	double x;
 	double y;
 	std::vector<std::shared_ptr<IndexCacheEntry>> entries;
-	double dist_to( const SpatialReference& sref );
+	double dist_to( epsg_t epsg, const Cube<3>& cube );
 };
 
 NodePos::NodePos(uint32_t node_id, double x, double y) :
 	node_id(node_id), x(x), y(y) {
 }
 
-double NodePos::dist_to(const SpatialReference& sref) {
-	double ex = sref.x1 + (sref.x2-sref.x1)/2;
-	double ey = sref.y1 + (sref.y2-sref.y1)/2;
+double NodePos::dist_to( epsg_t epsg, const Cube<3>& cube) {
+	Point<3> com = cube.get_centre_of_mass();
+	double ex = com.get_value(0);
+	double ey = com.get_value(1);
 
-	if ( sref.epsg == EPSG_GEOSMSG ) {
+	if ( epsg == EPSG_GEOSMSG ) {
 		GeographicReorgStrategy::geosmsg_trans.transform(ex,ey);
 	}
-	else if ( sref.epsg == EPSG_WEBMERCATOR ) {
+	else if ( epsg == EPSG_WEBMERCATOR ) {
 		GeographicReorgStrategy::webmercator_trans.transform(ex,ey);
 	}
 
@@ -298,7 +299,7 @@ void GeographicReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription>
 	// Redistribute entries;
 	for ( auto &kv : result ) {
 		for ( auto &e : cache.get_node_entries(kv.first) ) {
-			uint32_t node_id = get_closest_node( e->bounds );
+			uint32_t node_id = get_closest_node( e->bounds.epsg, e->bounds );
 			n_pos.at(node_id).entries.push_back(e);
 		}
 	}
@@ -333,7 +334,7 @@ void GeographicReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription>
 
 	for ( auto &e : overflow ) {
 		result.at(e->node_id).add_removal(
-			ReorgRemoveItem( cache.get_reorg_type(), e->semantic_id, e->entry_id )
+			TypedNodeCacheKey( cache.get_reorg_type(), e->semantic_id, e->entry_id )
 		);
 	}
 }
@@ -343,7 +344,7 @@ uint32_t GeographicReorgStrategy::get_node_for_job(const QueryRectangle& query,
 
 	// Get closest node according to last reorg
 	if ( !n_pos.empty() )
-		return get_closest_node(query);
+		return get_closest_node(query.epsg, QueryCube(query));
 	// If no positions have been calculated yet
 	else
 		return nodes.begin()->first;
@@ -362,10 +363,10 @@ std::map<uint32_t,NodePos> GeographicReorgStrategy::calculate_node_pos(
 		for ( auto &e : cache.get_node_entries(node.id) ) {
 			auto &b = e->bounds;
 
-			double x1 = b.x1;
-			double x2 = b.x2;
-			double y1 = b.y1;
-			double y2 = b.y2;
+			double x1 = b.get_dimension(0).a;
+			double x2 = b.get_dimension(0).b;
+			double y1 = b.get_dimension(1).a;
+			double y2 = b.get_dimension(1).b;
 
 			// Transform dimension if required
 			if ( b.epsg == EPSG_GEOSMSG ) {
@@ -412,11 +413,11 @@ std::map<uint32_t,NodePos> GeographicReorgStrategy::calculate_node_pos(
 	return n_pos;
 }
 
-uint32_t GeographicReorgStrategy::get_closest_node( const SpatialReference &sref ) const {
+uint32_t GeographicReorgStrategy::get_closest_node(  epsg_t epsg, const Cube<3> &cube ) const {
 	double min_dist = DoubleInfinity;
 	uint32_t min_id = 0;
 	for ( auto &np : n_pos ) {
-		double d = np.second.dist_to(sref);
+		double d = np.second.dist_to(epsg, cube);
 		if ( d < min_dist ) {
 			min_dist = d;
 			min_id = np.first;

@@ -12,8 +12,6 @@
 #include "util/exceptions.h"
 #include "operators/operator.h"
 #include "datatypes/raster.h"
-#include "cache/priv/transfer.h"
-#include "cache/manager.h"
 #include <memory>
 
 #include <sstream>
@@ -32,6 +30,9 @@
 //
 // Provides helper functions for common tasks.
 //
+
+enum class CacheType : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT, UNKNOWN };
+
 class CacheCommon {
 public:
 

@@ -8,40 +8,59 @@
 #include "cache/priv/cache_stats.h"
 #include "util/concat.h"
 
-Capacity::Capacity(size_t raster_cache_size, size_t raster_cache_used) :
-	raster_cache_total(raster_cache_size), raster_cache_used(raster_cache_used) {
+Capacity::Capacity(uint64_t raster_cache_total, uint64_t raster_cache_used,
+	  uint64_t point_cache_total, uint64_t point_cache_used,
+	  uint64_t line_cache_total, uint64_t line_cache_used,
+	  uint64_t polygon_cache_total, uint64_t polygon_cache_used,
+	  uint64_t plot_cache_total, uint64_t plot_cache_used) :
+	raster_cache_total(raster_cache_total), raster_cache_used(raster_cache_used),
+	point_cache_total(point_cache_total), point_cache_used(point_cache_used),
+	line_cache_total(line_cache_total), line_cache_used(line_cache_used),
+	polygon_cache_total(polygon_cache_total), polygon_cache_used(polygon_cache_used),
+	plot_cache_total(plot_cache_total), plot_cache_used(plot_cache_used) {
 }
 
 Capacity::Capacity(BinaryStream& stream) {
-	uint64_t tmp;
-	stream.read(&tmp);
-	raster_cache_total = tmp;
-	stream.read(&tmp);
-	raster_cache_used = tmp;
-}
-
-Capacity::~Capacity() {
-}
-
-double Capacity::get_raster_usage() const {
-	return (double) raster_cache_used / (double) raster_cache_total;
+	stream.read(&raster_cache_total);
+	stream.read(&raster_cache_used);
+	stream.read(&point_cache_total);
+	stream.read(&point_cache_used);
+	stream.read(&line_cache_total);
+	stream.read(&line_cache_used);
+	stream.read(&polygon_cache_total);
+	stream.read(&polygon_cache_used);
+	stream.read(&plot_cache_total);
+	stream.read(&plot_cache_used);
 }
 
 void Capacity::toStream(BinaryStream& stream) const {
-	stream.write( static_cast<uint64_t>(raster_cache_total) );
-	stream.write( static_cast<uint64_t>(raster_cache_used) );
+	stream.write( raster_cache_total );
+	stream.write( raster_cache_used );
+	stream.write( point_cache_total );
+	stream.write( point_cache_used );
+	stream.write( line_cache_total );
+	stream.write( line_cache_used );
+	stream.write( polygon_cache_total );
+	stream.write( polygon_cache_used );
+	stream.write( plot_cache_total );
+	stream.write( plot_cache_used );
 }
 
 std::string Capacity::to_string() const {
-	return concat("Capacity[ Raster: ", raster_cache_used, "/", raster_cache_total, "]");
+	return concat("Capacity[ ", "",
+		"Raster: ", raster_cache_used, "/", raster_cache_total,
+		", Point: ", point_cache_used, "/", point_cache_total,
+		", Line: ", line_cache_used, "/", line_cache_total,
+		", Polygon: ", polygon_cache_used, "/", polygon_cache_total,
+		", Plot: ", plot_cache_used, "/", plot_cache_total, "]");
 }
 
 //
 // Handshake
 //
 
-NodeHandshake::NodeHandshake( const std::string &host, uint32_t port, const Capacity &cap, std::vector<NodeCacheRef> raster_entries ) :
-	Capacity(cap), host(host), port(port), raster_entries(raster_entries) {
+NodeHandshake::NodeHandshake( const std::string &host, uint32_t port, const Capacity &cap, std::vector<NodeCacheRef> entries ) :
+	Capacity(cap), host(host), port(port), entries(entries) {
 }
 
 NodeHandshake::NodeHandshake(BinaryStream& stream) : Capacity(stream) {
@@ -50,30 +69,27 @@ NodeHandshake::NodeHandshake(BinaryStream& stream) : Capacity(stream) {
 	stream.read(&port);
 
 	stream.read(&r_size);
-	raster_entries.reserve(r_size);
+	entries.reserve(r_size);
 	for ( uint64_t i = 0; i < r_size; i++ )
-		raster_entries.push_back( NodeCacheRef(stream) );
-}
-
-NodeHandshake::~NodeHandshake() {
+		entries.push_back( NodeCacheRef(stream) );
 }
 
 void NodeHandshake::toStream(BinaryStream& stream) const {
 	Capacity::toStream(stream);
 	stream.write(host);
 	stream.write(port);
-	stream.write( static_cast<uint64_t>(raster_entries.size()) );
-	for ( auto &e : raster_entries )
+	stream.write( static_cast<uint64_t>(entries.size()) );
+	for ( auto &e : entries )
 		e.toStream(stream);
 }
 
-const std::vector<NodeCacheRef>& NodeHandshake::get_raster_entries() const {
-	return raster_entries;
+const std::vector<NodeCacheRef>& NodeHandshake::get_entries() const {
+	return entries;
 }
 
 std::string NodeHandshake::to_string() const {
 	return concat("NodeHandshake[host: ", host, ", port: ", port, ", "
-		"capacity: ", Capacity::to_string(), ", rasters: ", raster_entries.size(), "]");
+		"capacity: ", Capacity::to_string(), ", entries: ", entries.size(), "]");
 }
 
 //
@@ -96,10 +112,11 @@ void NodeEntryStats::toStream(BinaryStream& stream) const {
 	stream.write(access_count);
 }
 
-CacheStats::CacheStats() {
+CacheStats::CacheStats(CacheType type) : type(type) {
 }
 
 CacheStats::CacheStats(BinaryStream& stream) {
+	stream.read(&type);
 	uint64_t size;
 	uint64_t v_size;
 	stream.read(&size);
@@ -121,6 +138,7 @@ CacheStats::CacheStats(BinaryStream& stream) {
 }
 
 void CacheStats::toStream(BinaryStream& stream) const {
+	stream.write(type);
 	stream.write(static_cast<uint64_t>(stats.size()));
 	for ( auto &e : stats ) {
 		stream.write(e.first);
@@ -144,18 +162,23 @@ const std::unordered_map<std::string, std::vector<NodeEntryStats> >& CacheStats:
 	return stats;
 }
 
-NodeStats::NodeStats(const Capacity &capacity, CacheStats raster_stats) :
-	Capacity(capacity), raster_stats(raster_stats) {
+NodeStats::NodeStats(const Capacity &capacity, std::vector<CacheStats> stats) :
+	Capacity(capacity), stats(stats) {
 }
 
-NodeStats::NodeStats(BinaryStream& stream) : Capacity(stream), raster_stats(stream) {
-}
-
-NodeStats::~NodeStats() {
+NodeStats::NodeStats(BinaryStream& stream) : Capacity(stream) {
+	uint64_t ssize;
+	stream.read(&ssize);
+	stats.reserve(ssize);
+	for ( uint64_t i = 0; i < ssize; i++ )
+		stats.push_back( CacheStats(stream) );
 }
 
 void NodeStats::toStream(BinaryStream& stream) const {
 	Capacity::toStream(stream);
-	raster_stats.toStream(stream);
+	stream.write(static_cast<uint64_t>(stats.size()));
+	for ( auto &e : stats ) {
+		e.toStream(stream);
+	}
 }
 

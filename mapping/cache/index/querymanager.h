@@ -11,6 +11,7 @@
 #include "cache/index/index_cache.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/connection.h"
+#include "cache/common.h"
 
 #include <string>
 #include <unordered_map>
@@ -23,19 +24,14 @@
 // plus the basic data required to process the query
 //
 
-class QueryInfo {
+class QueryInfo : public BaseRequest {
 public:
-	enum class Type : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT };
-
-	QueryInfo( Type type, const BaseRequest &request );
-	QueryInfo( Type type, const QueryRectangle &query, const std::string &semantic_id );
-	bool satisfies( Type type, const BaseRequest &req ) const;
+	QueryInfo( const BaseRequest &request );
+	QueryInfo( CacheType type, const QueryRectangle &query, const std::string &semantic_id );
+	bool satisfies( const BaseRequest &req ) const;
 	void add_client( uint64_t client );
 	void add_clients( const std::vector<uint64_t> &clients );
 	const std::vector<uint64_t>& get_clients() const;
-	const Type type;
-	QueryRectangle query;
-	const std::string semantic_id;
 private:
 	std::vector<uint64_t> clients;
 };
@@ -47,15 +43,21 @@ private:
 //
 class JobDescription : public QueryInfo {
 public:
-	virtual ~JobDescription();
+	virtual ~JobDescription() = default;
+	JobDescription( const JobDescription& ) = default;
+	JobDescription( JobDescription&& ) = default;
+
+	JobDescription& operator=(JobDescription&&) = default;
+	JobDescription& operator=(const JobDescription&) = default;
+
 	// Extends this job by the given request
 	// -> Enlarges the result to satisfy more than the original query
-	virtual bool extend( Type type, const BaseRequest &req );
+	virtual bool extend( const BaseRequest &req );
 	// Schedules this job on one of the given worker-connections
 	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
 	virtual bool is_affected_by_node( uint32_t node_id ) = 0;
 protected:
-	JobDescription( Type type, std::unique_ptr<BaseRequest> request );
+	JobDescription( std::unique_ptr<BaseRequest> request );
 	std::unique_ptr<BaseRequest> request;
 
 };
@@ -65,12 +67,11 @@ protected:
 //
 class CreateJob : public JobDescription {
 public:
-	CreateJob( Type type, std::unique_ptr<BaseRequest> &request,
-		const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const IndexCache &cache );
-	virtual ~CreateJob();
-	virtual bool extend( Type type, const BaseRequest &req );
-	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
-	virtual bool is_affected_by_node( uint32_t node_id );
+	CreateJob( std::unique_ptr<BaseRequest> &request,
+	const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const IndexCache &cache );
+	bool extend( const BaseRequest &req );
+	uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+	bool is_affected_by_node( uint32_t node_id );
 private:
 	// The original query (before any calls to extends
 	const QueryRectangle orig_query;
@@ -84,10 +85,9 @@ private:
 //
 class DeliverJob : public JobDescription {
 public:
-	DeliverJob( Type type, std::unique_ptr<DeliveryRequest> &request, uint32_t node );
-	virtual ~DeliverJob();
-	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
-	virtual bool is_affected_by_node( uint32_t node_id );
+	DeliverJob( std::unique_ptr<DeliveryRequest> &request, uint32_t node );
+	uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+	bool is_affected_by_node( uint32_t node_id );
 private:
 	uint32_t node;
 };
@@ -97,10 +97,9 @@ private:
 //
 class PuzzleJob : public JobDescription {
 public:
-	PuzzleJob( Type type, std::unique_ptr<PuzzleRequest> &request, std::vector<uint32_t> &nodes );
-	virtual ~PuzzleJob();
-	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
-	virtual bool is_affected_by_node( uint32_t node_id );
+	PuzzleJob( std::unique_ptr<PuzzleRequest> &request, std::vector<uint32_t> &nodes );
+	uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
+	bool is_affected_by_node( uint32_t node_id );
 private:
 	std::vector<uint32_t> nodes;
 };
@@ -112,13 +111,12 @@ private:
 //
 class QueryManager {
 public:
-	QueryManager( const IndexCache &raster_cache, const std::map<uint32_t,std::shared_ptr<Node>> &nodes);
-	virtual ~QueryManager();
+	QueryManager(IndexCaches &caches, const std::map<uint32_t,std::shared_ptr<Node>> &nodes);
 
 	// Adds a new raster-request to the job queue
 	// Might extend a pending request or consume the result
 	// of an already running job.
-	void add_request( QueryInfo::Type type, uint64_t client_id, const BaseRequest &req );
+	void add_request( uint64_t client_id, const BaseRequest &req );
 
 	// Schedules pending jobs on the given worker-connections
 	// It is not promised that all pending jobs are scheduled.
@@ -138,11 +136,11 @@ public:
 	std::vector<uint64_t> release_worker( uint64_t worker_id );
 
 private:
-	std::unique_ptr<JobDescription> create_raster_job( const BaseRequest &req );
+	std::unique_ptr<JobDescription> create_job( const BaseRequest &req );
 
 	std::unique_ptr<JobDescription> recreate_job( const QueryInfo &query );
 
-	const IndexCache &raster_cache;
+	IndexCaches &caches;
 	const std::map<uint32_t,std::shared_ptr<Node>> &nodes;
 	std::unordered_map<uint64_t,QueryInfo> queries;
 	std::unordered_map<uint64_t,QueryInfo> finished_queries;

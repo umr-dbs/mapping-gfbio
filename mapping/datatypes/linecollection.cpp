@@ -216,7 +216,7 @@ void LineCollection::validateSpecifics() const {
 		throw FeatureException("Feature not finished");
 }
 
-LineCollection::LineCollection(BinaryStream& stream) {
+LineCollection::LineCollection(BinaryStream& stream) : SimpleFeatureCollection(stream) {
 	// TODO
 }
 

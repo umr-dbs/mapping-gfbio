@@ -10,14 +10,6 @@
 #include "cache/priv/cube.h"
 
 
-class Cube2 : public Cube<2> {
-public:
-	Cube2( double x1, double x2, double y1, double y2 ) {
-		set_dimension( 0, x1, x2 );
-		set_dimension( 1, y1, y2 );
-	};
-};
-
 TEST(CubeTest,TestCube2_1) {
 
 	Cube2 query( 5,10,5,10 );
@@ -36,20 +28,30 @@ TEST(CubeTest, TestCube2_2) {
 		printf("  %s\n", r.to_string().c_str() );
 	}
 
-	if ( res.size() != 2 )
-		throw std::runtime_error("test2: should have 2 remainders");
+	ASSERT_EQ( res.size(), 2 );
 
-	ASSERT_DOUBLE_EQ( res.at(0).get_dimension(0).a, 9 );
-	ASSERT_DOUBLE_EQ( res.at(0).get_dimension(0).b, 10 );
-	ASSERT_DOUBLE_EQ( res.at(0).get_dimension(1).a, 0 );
-	ASSERT_DOUBLE_EQ( res.at(0).get_dimension(1).b, 10 );
-
-
-	ASSERT_DOUBLE_EQ( res.at(1).get_dimension(0).a, 0 );
-	ASSERT_DOUBLE_EQ( res.at(1).get_dimension(0).b, 9 );
-	ASSERT_DOUBLE_EQ( res.at(1).get_dimension(1).a, 9 );
-	ASSERT_DOUBLE_EQ( res.at(1).get_dimension(1).b, 10 );
+	ASSERT_EQ( res.at(0), Cube2(9,10,0,10));
+	ASSERT_EQ( res.at(1), Cube2(0,9,9,10));
 }
 
+TEST(CubeTest, TestCube3) {
+	Cube3 query( 0, 10, 0, 10, 0, 10 );
+	auto res = query.dissect_by( Cube3(1,9,1,9,1,9) );
 
+	printf("Test3 remainder:\n");
+		for ( auto &r : res ) {
+			printf("  %s\n", r.to_string().c_str() );
+		}
+
+	ASSERT_EQ( res.size(), 6 );
+
+	ASSERT_EQ( res.at(0), Cube3(0,1,0,10,0,10));
+	ASSERT_EQ( res.at(1), Cube3(9,10,0,10,0,10));
+
+	ASSERT_EQ( res.at(2), Cube3(1,9,0,1,0,10));
+	ASSERT_EQ( res.at(3), Cube3(1,9,9,10,0,10));
+
+	ASSERT_EQ( res.at(4), Cube3(1,9,1,9,0,1));
+	ASSERT_EQ( res.at(5), Cube3(1,9,1,9,9,10));
+}
 

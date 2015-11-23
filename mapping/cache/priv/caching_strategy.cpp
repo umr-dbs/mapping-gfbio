@@ -22,21 +22,10 @@ std::unique_ptr<CachingStrategy> CachingStrategy::by_name(const std::string& nam
 	throw ArgumentException(concat("Unknown Caching-Strategy: ", name));
 }
 
-CachingStrategy::CachingStrategy() {
-}
-
-CachingStrategy::~CachingStrategy() {
-}
 
 //
 // Cache All
 //
-
-CacheAll::CacheAll() {
-}
-
-CacheAll::~CacheAll() {
-}
 
 bool CacheAll::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	(void) profiler;
@@ -48,12 +37,6 @@ bool CacheAll::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 // Cache None
 //
 
-CacheNone::CacheNone() {
-}
-
-CacheNone::~CacheNone() {
-}
-
 bool CacheNone::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	(void) profiler;
 	(void) bytes;
@@ -63,12 +46,6 @@ bool CacheNone::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 //
 // Authmann Heuristik
 //
-
-AuthmannStrategy::AuthmannStrategy() {
-}
-
-AuthmannStrategy::~AuthmannStrategy() {
-}
 
 bool AuthmannStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	double cache_cpu = 0.000000005 * bytes;
@@ -83,9 +60,6 @@ bool AuthmannStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) con
 
 TwoStepStrategy::TwoStepStrategy(double stacked_threshold, double immediate_threshold, uint stack_depth) :
   stacked_threshold(stacked_threshold), immediate_threshold(immediate_threshold), stack_depth(stack_depth) {
-}
-
-TwoStepStrategy::~TwoStepStrategy() {
 }
 
 bool TwoStepStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {

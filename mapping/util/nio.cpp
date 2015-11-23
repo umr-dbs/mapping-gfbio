@@ -13,6 +13,7 @@
 #include "cache/priv/cache_structure.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
+#include "cache/common.h"
 
 #include <errno.h>
 #include <unistd.h>
@@ -203,7 +204,7 @@ NBPairWriter<K, V, KWriter, VWriter>::NBPairWriter( const std::pair<K,V> &p ) {
 template<typename K, typename V, typename KWriter, typename VWriter>
 void NBPairWriter<K, V, KWriter, VWriter>::write(int fd) {
 	if ( has_error() || is_finished() )
-		throw IllegalStateException(concat("Illegal state for writing. Error: ", has_error, ", Finished: ", is_finished()));
+		throw IllegalStateException(concat("Illegal state for writing. Error: ", has_error(), ", Finished: ", is_finished()));
 
 	if ( !kw->is_finished() ) {
 		kw->write(fd);
@@ -314,19 +315,19 @@ std::string NBMultiWriter::to_string() const {
 
 class NBRasterDataWriter : public NBWriter {
 public:
-	NBRasterDataWriter( std::shared_ptr<GenericRaster> raster);
+	NBRasterDataWriter( std::shared_ptr<const GenericRaster> raster);
 	void write(int fd);
 	bool has_error() const;
 	bool is_finished() const;
 	size_t get_total_written() const;
 	std::string to_string() const;
 private:
-	std::shared_ptr<GenericRaster> raster;
+	std::shared_ptr<const GenericRaster> raster;
 	size_t bytes_written;
 	bool error;
 };
 
-NBRasterDataWriter::NBRasterDataWriter( std::shared_ptr<GenericRaster>  raster) :
+NBRasterDataWriter::NBRasterDataWriter( std::shared_ptr<const GenericRaster>  raster) :
   raster(raster), bytes_written(0), error(false) {
 }
 
@@ -334,7 +335,7 @@ void NBRasterDataWriter::write(int fd) {
 	if ( has_error() || is_finished() )
 			throw IllegalStateException(concat("Illegal state for writing. Error: ", has_error(), ", Finished: ", is_finished()));
 
-	const char *data = (const char*)raster->getData();
+	const char *data = (const char*)const_cast<GenericRaster*>(raster.get())->getData();
 
 	ssize_t currently_written = 0;
 	while ( currently_written >= 0 && !is_finished() ) {
@@ -368,7 +369,7 @@ std::string NBRasterDataWriter::to_string() const {
 }
 
 
-NBRasterWriter::NBRasterWriter( std::shared_ptr<GenericRaster> raster ) {
+NBRasterWriter::NBRasterWriter( std::shared_ptr<const GenericRaster> raster ) {
 	add_writer(make_unique<NBSimpleWriter<DataDescription>>( raster->dd ));
 	add_writer(make_unique<NBSimpleWriter<SpatioTemporalReference>>( raster->stref ));
 	add_writer(make_unique<NBSimpleWriter<uint32_t>>( raster->width ));
@@ -379,18 +380,21 @@ NBRasterWriter::NBRasterWriter( std::shared_ptr<GenericRaster> raster ) {
 
 
 
-NBPointsWriter::NBPointsWriter( std::shared_ptr<PointCollection> points ) :
+NBPointsWriter::NBPointsWriter( std::shared_ptr<const PointCollection> points ) :
 	NBSimpleWriter( *points ) {
 }
 
-//NBLinesWriter::NBLinesWriter(std::shared_ptr<LineCollection> lines) :
-//	NBSimpleWriter( *lines ){
-//}
-//
-//NBPolygonsWriter::NBPolygonsWriter(std::shared_ptr<PolygonCollection> polygons) :
-//	NBSimpleWriter( *polygons ){
-//}
+NBLinesWriter::NBLinesWriter(std::shared_ptr<const LineCollection> lines) :
+	NBSimpleWriter(*lines) {
+}
 
+NBPolygonsWriter::NBPolygonsWriter(std::shared_ptr<const PolygonCollection> polys) :
+	NBSimpleWriter(*polys) {
+}
+
+NBPlotWriter::NBPlotWriter(std::shared_ptr<const GenericPlot> plot) :
+	NBSimpleWriter(*plot){
+}
 
 
 //
@@ -760,6 +764,11 @@ NBNodeCacheKeyReader::NBNodeCacheKeyReader() {
 	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t)) );
 }
 
+NBTypedNodeCacheKeyReader::NBTypedNodeCacheKeyReader() {
+	add_reader( make_unique<NBStringReader>() );
+	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t) + sizeof(CacheType)) );
+}
+
 //
 // QueryRectangle
 //
@@ -774,54 +783,64 @@ NBQueryRectangleReader::NBQueryRectangleReader() :
 NBBaseRequestReader::NBBaseRequestReader() {
 	add_reader( make_unique<NBQueryRectangleReader>() );
 	add_reader( make_unique<NBStringReader>() );
+	add_reader( make_unique<NBFixedSizeReader>(sizeof(CacheType)) );
 }
 
 //
 // ReorgMoveResultReader
 //
 NBReorgMoveResultReader::NBReorgMoveResultReader() {
-	add_reader( make_unique<NBNodeCacheKeyReader>() );
-	add_reader( make_unique<NBFixedSizeReader>(sizeof(ReorgMoveResult::Type) + 2*sizeof(uint32_t) + sizeof(uint64_t)) );
+	add_reader( make_unique<NBTypedNodeCacheKeyReader>() );
+	add_reader( make_unique<NBFixedSizeReader>(2*sizeof(uint32_t) + sizeof(uint64_t)) );
 }
 
-NBCapacityReader::NBCapacityReader() : NBFixedSizeReader(2*sizeof(uint64_t)){
+NBCapacityReader::NBCapacityReader() : NBFixedSizeReader(10*sizeof(uint64_t)){
 }
 
 NBNodeEntryStatsReader::NBNodeEntryStatsReader()
 	: NBFixedSizeReader(sizeof(uint64_t) + sizeof(time_t) + sizeof(uint32_t) ){
 }
 
-NBCacheStatsReader::NBCacheStatsReader() :
-	NBContainerReader( make_unique<NBKVReader>(
+NBCacheStatsReader::NBCacheStatsReader() {
+	add_reader( make_unique<NBFixedSizeReader>(sizeof(CacheType)));
+	add_reader( make_unique<NBContainerReader>( make_unique<NBKVReader>(
 		make_unique<NBStringReader>(),
-		make_unique<NBContainerReader>(make_unique<NBNodeEntryStatsReader>()) ) ) {
+		make_unique<NBContainerReader>(make_unique<NBNodeEntryStatsReader>()) ) ) );
 }
 
 NBNodeStatsReader::NBNodeStatsReader() {
 	add_reader( make_unique<NBCapacityReader>() );
-	add_reader( make_unique<NBCacheStatsReader>() );
+	add_reader( make_unique<NBContainerReader>(
+					make_unique<NBCacheStatsReader>()
+			  ) );
 }
 
 
 NBAccessInfoReader::NBAccessInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t)) {
 }
 
-NBCacheBoundsReader::NBCacheBoundsReader() :
+NBCacheCubeReader::NBCacheCubeReader() :
 	NBFixedSizeReader(
-		//SREF:
-		sizeof( uint32_t ) + 4*sizeof(double) +
-		//TREF:
-		sizeof( uint32_t ) + 2*sizeof(double) +
+		//x,y,t,xres,yres intervals:
+		10*sizeof(double) +
+		// Actual resolution
+		2 *sizeof(double) +
+		//EPSG:
+		sizeof( epsg_t ) +
+		// TIMETYPE
+		sizeof( timetype_t ) +
 		//RES:
-		sizeof( QueryResolution::Type ) + 4*sizeof(double)
+		sizeof( QueryResolution::Type )
 	) {
 }
 
 NBNodeCacheRefReader::NBNodeCacheRefReader() {
-	add_reader( make_unique<NBNodeCacheKeyReader>() );
+	add_reader( make_unique<NBTypedNodeCacheKeyReader>() );
 	add_reader( make_unique<NBAccessInfoReader>() );
-	add_reader( make_unique<NBCacheBoundsReader>() );
+	add_reader( make_unique<NBCacheCubeReader>() );
+	// size
 	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t)) );
+
 }
 
 NBNodeHandshakeReader::NBNodeHandshakeReader() {
@@ -832,4 +851,3 @@ NBNodeHandshakeReader::NBNodeHandshakeReader() {
 		make_unique<NBNodeCacheRefReader>()
 	));
 }
-

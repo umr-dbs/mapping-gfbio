@@ -1,8 +1,12 @@
 #ifndef PLOT_PLOT_H
 #define PLOT_PLOT_H
 
-#include <string>
 #include "util/exceptions.h"
+#include "util/binarystream.h"
+
+#include <string>
+#include <memory>
+
 
 /**
  * Abstract base class for all output data vector types.

@@ -422,7 +422,7 @@ void PolygonCollection::validateSpecifics() const {
 		throw FeatureException("Feature not finished");
 }
 
-PolygonCollection::PolygonCollection(BinaryStream& stream) {
+PolygonCollection::PolygonCollection(BinaryStream& stream) : SimpleFeatureCollection(stream) {
 	// TODO
 }
 

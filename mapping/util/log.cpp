@@ -110,5 +110,5 @@ void Log::trace(const char* msg, ...) {}
 void Log::log(LogLevel level, const char *msg, va_list vargs) {}
 #endif
 
-Log::LogLevel Log::level = LogLevel::INFO;
+Log::LogLevel Log::level = LogLevel::TRACE;
 FILE* Log::fd = stderr;

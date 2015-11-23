@@ -11,6 +11,7 @@
 #include "cache/index/indexserver.h"
 #include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
+#include "cache/manager.h"
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/log.h"
@@ -77,11 +78,24 @@ void NodeServer::worker_loop() {
 void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
 	Log::debug("Processing command: %d", cmd);
 	switch (cmd) {
-		case WorkerConnection::CMD_CREATE_RASTER:
-		case WorkerConnection::CMD_PUZZLE_RASTER:
-		case WorkerConnection::CMD_DELIVER_RASTER:
-			process_raster_request(cmd, stream);
+		case WorkerConnection::CMD_CREATE: {
+			BaseRequest cr(stream);
+			Log::debug("Processing create-request: %s", cr.to_string().c_str());
+			process_create_request(stream,cr);
 			break;
+		}
+		case WorkerConnection::CMD_PUZZLE: {
+			PuzzleRequest pr(stream);
+			Log::debug("Processing puzzle-request: %s", pr.to_string().c_str());
+			process_puzzle_request(stream,pr);
+			break;
+		}
+		case WorkerConnection::CMD_DELIVER: {
+			DeliveryRequest dr(stream);
+			Log::debug("Processing delivery-request: %s", dr.to_string().c_str());
+			process_delivery_request(stream,dr);
+			break;
+		}
 		default: {
 			Log::error("Unknown command from index-server: %d. Dropping connection.", cmd);
 			throw NetworkException(concat("Unknown command from index-server", cmd));
@@ -90,36 +104,111 @@ void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
 	Log::debug("Finished processing command: %d", cmd);
 }
 
-void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
-	std::shared_ptr<GenericRaster> result;
-	switch (cmd) {
-		case WorkerConnection::CMD_CREATE_RASTER: {
-			BaseRequest rr(stream);
-			QueryProfiler profiler;
-			Log::debug("Processing request: %s", rr.to_string().c_str());
-			auto tmp = GenericOperator::fromJSON(rr.semantic_id)->getCachedRaster(rr.query, profiler,
-				GenericOperator::RasterQM::LOOSE);
-			result = std::shared_ptr<GenericRaster>(tmp.release());
-			break;
-		}
-		case WorkerConnection::CMD_PUZZLE_RASTER: {
-			PuzzleRequest rr(stream);
-			Log::debug("Processing request: %s", rr.to_string().c_str());
-			auto tmp = CacheManager::process_raster_puzzle(rr, my_host, my_port);
-			Log::debug("Adding puzzled raster to cache.");
-			CacheManager::getInstance().put_raster(rr.semantic_id, tmp);
-			result = std::shared_ptr<GenericRaster>(tmp.release());
-			break;
-		}
+void NodeServer::process_create_request(BinaryStream& index_stream,
+		const BaseRequest& request) {
 
-		case WorkerConnection::CMD_DELIVER_RASTER: {
-			DeliveryRequest rr(stream);
-			Log::debug("Processing request: %s", rr.to_string().c_str());
-			NodeCacheKey key(rr.semantic_id, rr.entry_id);
-			result = CacheManager::getInstance().get_raster_ref(key);
+	auto op = GenericOperator::fromJSON(request.semantic_id);
+
+	QueryProfiler profiler;
+	switch ( request.type ) {
+		case CacheType::RASTER: {
+			auto res = op->getCachedRaster( request.query, profiler );
+			finish_request( index_stream, std::shared_ptr<const GenericRaster>(res.release()) );
 			break;
 		}
+		case CacheType::POINT: {
+			auto res = op->getCachedPointCollection( request.query, profiler );
+			finish_request( index_stream, std::shared_ptr<const PointCollection>(res.release()) );
+			break;
+		}
+		case CacheType::LINE: {
+			auto res = op->getCachedLineCollection(request.query, profiler );
+			finish_request( index_stream, std::shared_ptr<const LineCollection>(res.release()) );
+			break;
+		}
+		case CacheType::POLYGON: {
+			auto res = op->getCachedPolygonCollection(request.query, profiler );
+			finish_request( index_stream, std::shared_ptr<const PolygonCollection>(res.release()) );
+			break;
+		}
+		case CacheType::PLOT: {
+			auto res = op->getCachedPlot(request.query, profiler );
+			finish_request( index_stream, std::shared_ptr<const GenericPlot>(res.release()) );
+			break;
+		}
+		default:
+			throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));
 	}
+}
+
+void NodeServer::process_puzzle_request(BinaryStream& index_stream,
+		const PuzzleRequest& request) {
+	// TODO: Cache puzzles?
+	auto &cm = CacheManager::get_instance();
+
+	switch ( request.type ) {
+		case CacheType::RASTER: {
+			auto res = cm.get_raster_cache().process_puzzle(request);
+			finish_request( index_stream, std::shared_ptr<const GenericRaster>(res.release()) );
+			break;
+		}
+		case CacheType::POINT: {
+			auto res = cm.get_point_cache().process_puzzle(request);
+			finish_request( index_stream, std::shared_ptr<const PointCollection>(res.release()) );
+			break;
+		}
+		case CacheType::LINE: {
+			auto res = cm.get_line_cache().process_puzzle(request);
+			finish_request( index_stream, std::shared_ptr<const LineCollection>(res.release()) );
+			break;
+		}
+		case CacheType::POLYGON: {
+			auto res = cm.get_polygon_cache().process_puzzle(request);
+			finish_request( index_stream, std::shared_ptr<const PolygonCollection>(res.release()) );
+			break;
+		}
+		case CacheType::PLOT: {
+			auto res = cm.get_plot_cache().process_puzzle(request);
+			finish_request( index_stream, std::shared_ptr<const GenericPlot>(res.release()) );
+			break;
+		}
+		default:
+			throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));
+	}
+}
+
+void NodeServer::process_delivery_request(BinaryStream& index_stream,
+		const DeliveryRequest& request) {
+
+	auto &cm = CacheManager::get_instance();
+	NodeCacheKey key(request.semantic_id,request.entry_id);
+
+	switch ( request.type ) {
+		case CacheType::RASTER:
+			finish_request( index_stream, cm.get_raster_cache().get_ref(key) );
+			break;
+		case CacheType::POINT:
+			finish_request( index_stream, cm.get_point_cache().get_ref(key) );
+			break;
+		case CacheType::LINE:
+			finish_request( index_stream, cm.get_line_cache().get_ref(key) );
+			break;
+		case CacheType::POLYGON:
+			finish_request( index_stream, cm.get_polygon_cache().get_ref(key) );
+			break;
+		case CacheType::PLOT:
+			finish_request( index_stream, cm.get_plot_cache().get_ref(key) );
+			break;
+		default:
+			throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));
+	}
+}
+
+
+template<typename T>
+void NodeServer::finish_request(BinaryStream& stream,
+		const std::shared_ptr<const T>& item) {
+
 	Log::debug("Processing request finished. Asking for delivery-qty");
 	stream.write(WorkerConnection::RESP_RESULT_READY);
 	uint8_t cmd_qty;
@@ -130,7 +219,7 @@ void NodeServer::process_raster_request(uint8_t cmd, BinaryStream& stream) {
 		throw ArgumentException(
 			concat("Expected command ", WorkerConnection::RESP_DELIVERY_QTY, " but received ", cmd_qty));
 
-	uint64_t delivery_id = delivery_manager.add_raster_delivery(result, qty);
+	uint64_t delivery_id = delivery_manager.add_delivery(item, qty);
 	Log::debug("Sending delivery_id.");
 	stream.write(WorkerConnection::RESP_DELIVERY_READY);
 	stream.write(delivery_id);
@@ -183,6 +272,10 @@ void NodeServer::run() {
 	Log::info("Node-Server done.");
 }
 
+//
+// Constrol connection
+//
+
 void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 	switch (cmd) {
 		case ControlConnection::CMD_REORG: {
@@ -199,7 +292,7 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 		}
 		case ControlConnection::CMD_GET_STATS: {
 			Log::debug("Received stats-request.");
-			NodeStats stats = CacheManager::getInstance().get_stats();
+			NodeStats stats = CacheManager::get_instance().get_stats();
 			stream.write(ControlConnection::RESP_STATS);
 			stats.toStream(stream);
 			break;
@@ -211,11 +304,23 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 	}
 }
 
-void NodeServer::handle_reorg_remove_item(const ReorgRemoveItem &item) {
-//	Log::debug("Removing item from cache. Key: %s:%d",item.semantic_id.c_str(), item.entry_id);
+void NodeServer::handle_reorg_remove_item(const TypedNodeCacheKey &item) {
+	Log::debug("Removing item from cache. Key: %s", item.to_string().c_str() );
 	switch (item.type) {
-		case ReorgMoveItem::Type::RASTER:
-			CacheManager::getInstance().remove_raster_local(item);
+		case CacheType::RASTER:
+			CacheManager::get_instance().get_raster_cache().remove_local(item);
+			break;
+		case CacheType::POINT:
+			CacheManager::get_instance().get_point_cache().remove_local(item);
+			break;
+		case CacheType::LINE:
+			CacheManager::get_instance().get_line_cache().remove_local(item);
+			break;
+		case CacheType::POLYGON:
+			CacheManager::get_instance().get_polygon_cache().remove_local(item);
+			break;
+		case CacheType::PLOT:
+			CacheManager::get_instance().get_plot_cache().remove_local(item);
 			break;
 		default:
 			throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
@@ -223,14 +328,13 @@ void NodeServer::handle_reorg_remove_item(const ReorgRemoveItem &item) {
 }
 
 void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream &index_stream) {
-	uint32_t new_cache_id;
+	uint64_t new_cache_id;
 
 	Log::debug("Moving item from node %d to node %d. Key: %s:%d ", item.from_node_id, my_id,
 		item.semantic_id.c_str(), item.entry_id);
 
 
 	std::unique_ptr<BinaryStream> del_stream;
-
 
 	// Send move request
 	try {
@@ -241,10 +345,22 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 			case DeliveryConnection::RESP_OK: {
 				AccessInfo ai(*del_stream);
 				switch (item.type) {
-					case ReorgMoveItem::Type::RASTER:
-						new_cache_id = CacheManager::getInstance().put_raster_local(item.semantic_id,
-							GenericRaster::fromStream(*del_stream), ai).entry_id;
+					case CacheType::RASTER:
+						new_cache_id = CacheManager::get_instance().get_raster_cache().put_local(
+							item.semantic_id, GenericRaster::fromStream(*del_stream), ai).entry_id;
 						break;
+					case CacheType::POINT:
+						new_cache_id = CacheManager::get_instance().get_point_cache().put_local(
+							item.semantic_id, make_unique<PointCollection>(*del_stream), ai).entry_id;
+					case CacheType::LINE:
+						new_cache_id = CacheManager::get_instance().get_line_cache().put_local(
+							item.semantic_id, make_unique<LineCollection>(*del_stream), ai).entry_id;
+					case CacheType::POLYGON:
+						new_cache_id = CacheManager::get_instance().get_polygon_cache().put_local(
+							item.semantic_id, make_unique<PolygonCollection>(*del_stream), ai).entry_id;
+					case CacheType::PLOT:
+						new_cache_id = CacheManager::get_instance().get_plot_cache().put_local(
+							item.semantic_id, GenericPlot::fromStream(*del_stream), ai).entry_id;
 					default:
 						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
 				}
@@ -271,17 +387,8 @@ std::unique_ptr<BinaryStream> NodeServer::initiate_move(const ReorgMoveItem &ite
 	std::unique_ptr<BinaryStream> result = make_unique<UnixSocket>(item.from_host.c_str(), item.from_port);
 	result->write(DeliveryConnection::MAGIC_NUMBER);
 
-	uint8_t cmd;
-	switch (item.type) {
-		case ReorgMoveItem::Type::RASTER:
-			cmd = DeliveryConnection::CMD_MOVE_RASTER;
-			break;
-		default:
-			throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
-	}
-
-	result->write(cmd);
-	item.NodeCacheKey::toStream(*result);
+	result->write(DeliveryConnection::CMD_MOVE_ITEM);
+	item.TypedNodeCacheKey::toStream(*result);
 	return result;
 }
 
@@ -317,7 +424,7 @@ void NodeServer::setup_control_connection() {
 	// Establish connection
 	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
 	BinaryStream &stream = *this->control_connection;
-	NodeHandshake hs = CacheManager::getInstance().get_handshake(my_host, my_port);
+	NodeHandshake hs = CacheManager::get_instance().get_handshake();
 
 	Log::debug("Sending hello to index-server");
 	// Say hello

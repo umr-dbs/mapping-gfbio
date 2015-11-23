@@ -24,13 +24,15 @@
 // as a timestamp representing its expiration-time.
 //
 class Delivery {
-private:
-	enum class Type { RASTER };
 public:
-	Delivery( uint64_t id, unsigned int count, std::shared_ptr<GenericRaster> raster );
+	Delivery( uint64_t id, unsigned int count, std::shared_ptr<const GenericRaster> raster );
+	Delivery( uint64_t id, unsigned int count, std::shared_ptr<const PointCollection> points );
+	Delivery( uint64_t id, unsigned int count, std::shared_ptr<const LineCollection> lines );
+	Delivery( uint64_t id, unsigned int count, std::shared_ptr<const PolygonCollection> polygons );
+	Delivery( uint64_t id, unsigned int count, std::shared_ptr<const GenericPlot> plot );
 
 	Delivery( const Delivery &d ) = delete;
-	Delivery( Delivery &&d );
+	Delivery( Delivery &&d ) = default;
 
 	Delivery& operator=(const Delivery &d) = delete;
 	Delivery& operator=(Delivery &&d) = delete;
@@ -40,8 +42,12 @@ public:
 	unsigned int count;
 	void send( DeliveryConnection &connection );
 private:
-	Type type;
-	std::shared_ptr<GenericRaster> raster;
+	CacheType type;
+	std::shared_ptr<const GenericRaster> raster;
+	std::shared_ptr<const PointCollection> points;
+	std::shared_ptr<const LineCollection> lines;
+	std::shared_ptr<const PolygonCollection> polygons;
+	std::shared_ptr<const GenericPlot> plot;
 };
 
 //
@@ -62,7 +68,8 @@ public:
 	// The returned id must be used by clients fetching
 	// the stored result.
 	//
-	uint64_t add_raster_delivery(std::shared_ptr<GenericRaster> result, unsigned int count = 1);
+	template <typename T>
+	uint64_t add_delivery(std::shared_ptr<const T> result, unsigned int count = 1);
 	// Fires up the delivery-manager and will return after
 	// stop() is invoked by another thread
 	void run();
@@ -81,6 +88,13 @@ private:
 	// Processes the active connections:
 	// Checks for data to read/write and takes the corresponding actions
 	void process_connections(fd_set *readfds, fd_set* write_fds);
+
+
+	void handle_cache_request( DeliveryConnection &con );
+
+	void handle_move_request( DeliveryConnection &con );
+
+	void handle_move_done( DeliveryConnection &con );
 
 	// Fetches the delivery with the given id from the internal
 	// map and sends it. Throws std::out_of_range if no delivery is present

@@ -9,15 +9,13 @@
 #include "util/exceptions.h"
 #include "util/concat.h"
 #include <sstream>
+#include <limits>
+#include <cstring>
 
 Interval::Interval() : a(0), b(0) {
 }
 
 Interval::Interval(double a, double b) : a(a), b(b) {
-}
-
-Interval::Interval(const Interval& i) :
-	a(i.a), b(i.b) {
 }
 
 Interval::Interval(BinaryStream& stream) {
@@ -34,12 +32,23 @@ bool Interval::intersects(const Interval& other) const {
 }
 
 bool Interval::contains(const Interval& other) const {
-	return a <= other.a && b >= other.b;
+	return a - std::numeric_limits<double>::epsilon() <= other.a && b + std::numeric_limits<double>::epsilon() >= other.b;
+}
+
+bool Interval::contains(double value) const {
+	return a - std::numeric_limits<double>::epsilon() <= value && b + std::numeric_limits<double>::epsilon() >= value;
 }
 
 Interval Interval::combine(const Interval& other) const {
 	return Interval( std::min(a, other.a), std::max(b, other.b) );
 }
+
+Interval Interval::intersect(const Interval& other) const {
+	if ( !intersects(other) )
+		throw ArgumentException("Cannot intersect disjunct intervals");
+	return Interval( std::max(a, other.a), std::min(b, other.b) );
+}
+
 
 double Interval::distance() const {
 	return b-a;
@@ -50,8 +59,67 @@ void Interval::toStream(BinaryStream& stream) const {
 	stream.write(b);
 }
 
+bool Interval::operator ==(const Interval& o) const {
+	return std::abs(a - o.a) < std::numeric_limits<double>::epsilon() &&
+		   std::abs(b - o.b) < std::numeric_limits<double>::epsilon();
+}
+
+bool Interval::operator !=(const Interval& o) const {
+	return !(*this == o);
+}
+
 std::string Interval::to_string() const {
 	return concat("[",a,", ",b,"]");
+}
+
+//
+// Point
+//
+
+template<int DIM>
+Point<DIM>::Point() {
+	values.fill(0);
+}
+
+template<int DIM>
+double Point<DIM>::get_value(int dim) const {
+	if ( dim < 0 || dim >= DIM )
+		throw ArgumentException(concat("Cannot get value for dimension ",dim, " from point with ", DIM, " dimensions"));
+	return values[dim];
+}
+
+template<int DIM>
+void Point<DIM>::set_value(int dim, double value) {
+	if ( dim < 0 || dim >= DIM )
+		throw ArgumentException(concat("Cannot set value for dimension ",dim, " in point with ", DIM, " dimensions"));
+	values[dim] = value;
+}
+
+template<int DIM>
+bool Point<DIM>::operator ==(const Point<DIM>& o) const {
+	bool res = true;
+	for ( int i = 0; res && i < DIM; i++ ) {
+		res &= std::abs(values[i] - o.values[i]) < std::numeric_limits<double>::epsilon();
+	}
+	return res;
+}
+
+template<int DIM>
+bool Point<DIM>::operator !=(const Point<DIM>& o) const {
+	return !(*this == o);
+}
+
+template<int DIM>
+std::string Point<DIM>::to_string() const {
+	std::ostringstream ss;
+	ss << "Point: (";
+	for ( int i = 0; i < DIM; i++ ) {
+		if ( i > 0 )
+			ss << ",";
+		ss << values[i];
+	}
+	ss << ")";
+	return ss.str();
 }
 
 //
@@ -60,17 +128,9 @@ std::string Interval::to_string() const {
 
 template<int DIM>
 Cube<DIM>::Cube() {
-	std::fill_n( dims, DIM, Interval() );
+	dims.fill( Interval() );
 }
 
-
-template<int DIM>
-Cube<DIM>::Cube(const Cube<DIM>& c) {
-	for ( int i = 0; i < DIM; i++ ) {
-		dims[i].a = c.dims[i].a;
-		dims[i].b = c.dims[i].b;
-	}
-}
 
 template<int DIM>
 Cube<DIM>::Cube(BinaryStream& stream) {
@@ -94,7 +154,6 @@ void Cube<DIM>::set_dimension(int dim, double a, double b) {
 	dims[dim].a = a;
 	dims[dim].b = b;
 }
-
 
 template<int DIM>
 void Cube<DIM>::set_dimension(int dim, const Interval& i) {
@@ -129,6 +188,21 @@ bool Cube<DIM>::contains(const Cube<DIM>& other) const {
 }
 
 template<int DIM>
+bool Cube<DIM>::operator ==(const Cube<DIM>& o) const {
+	bool res = true;
+	for ( int i = 0; res && i < DIM; i++ ) {
+		res &= (dims[i] == o.dims[i]);
+	}
+	return res;
+}
+
+template<int DIM>
+bool Cube<DIM>::operator !=(const Cube<DIM>& o) const {
+	return !(*this == o);
+}
+
+
+template<int DIM>
 double Cube<DIM>::volume() const {
 	double res = 1.0;
 	for ( int i = 0; i < DIM; i++ ) {
@@ -139,12 +213,22 @@ double Cube<DIM>::volume() const {
 
 template<int DIM>
 Cube<DIM> Cube<DIM>::combine(const Cube<DIM>& other) const {
-	Cube res;
+	Cube<DIM> res;
 	for ( int i = 0; i < DIM; i++ ) {
 		res.set_dimension( i, dims[i].combine( other.dims[i] ) );
 	}
 	return res;
 }
+
+template<int DIM>
+Cube<DIM> Cube<DIM>::intersect(const Cube<DIM>& other) const {
+	Cube<DIM> res;
+	for ( int i = 0; i < DIM; i++ ) {
+		res.set_dimension( i, dims[i].intersect( other.dims[i] ) );
+	}
+	return res;
+}
+
 
 template<int DIM>
 std::vector<Cube<DIM> > Cube<DIM>::dissect_by(const Cube<DIM>& fill) const {
@@ -182,6 +266,15 @@ std::vector<Cube<DIM> > Cube<DIM>::dissect_by(const Cube<DIM>& fill) const {
 }
 
 template<int DIM>
+Point<DIM> Cube<DIM>::get_centre_of_mass() const {
+	Point<DIM> res;
+	for ( int i = 0; i < DIM; i++ ) {
+		res.set_value(i, dims[i].a + (dims[i].distance() / 2) );
+	}
+	return res;
+}
+
+template<int DIM>
 void Cube<DIM>::toStream(BinaryStream& stream) const {
 	for ( int i = 0; i < DIM; i++ ) {
 		dims[i].toStream(stream);
@@ -201,5 +294,7 @@ std::string Cube<DIM>::to_string() const {
 	return ss.str();
 }
 
+template class Point<2>;
+template class Point<3> ;
 template class Cube<2>;
-template class Cube<3>;
+template class Cube<3> ;

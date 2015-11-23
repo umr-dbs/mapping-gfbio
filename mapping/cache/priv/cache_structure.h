@@ -9,43 +9,59 @@
 #define CACHE_STRUCTURE_H_
 
 #include "operators/queryrectangle.h"
+#include "datatypes/spatiotemporal.h"
+#include "cache/priv/cube.h"
 #include "util/binarystream.h"
-
-#include <geos/geom/Polygon.h>
+#include "cache/common.h"
 
 #include <map>
 #include <queue>
 #include <memory>
 #include <mutex>
 
-
-//
-// Describes the bounds of an raster-cache-entry.
-// Additionally stores the resolution
-//
-class CacheEntryBounds : public SpatioTemporalReference {
+class ResolutionInfo {
 public:
-	CacheEntryBounds( SpatialReference sref, TemporalReference tref,
-		QueryResolution::Type res_type = QueryResolution::Type::NONE,
-		double x_res_from = 0, double x_res_to = 0, double y_res_from = 0, double y_res_to = 0 );
-	CacheEntryBounds( const SpatioTemporalResult &result );
-	CacheEntryBounds( const GridSpatioTemporalResult &result );
-	CacheEntryBounds( BinaryStream &stream );
+	ResolutionInfo();
+	ResolutionInfo( const GridSpatioTemporalResult &result );
+	ResolutionInfo(BinaryStream &stream);
 
-	// Checks if the bounds fully cover the given query-rectangle
-	bool matches( const QueryRectangle &query ) const;
-	// returns the spatial coverage if this entry for the given query-rectangle
-	double get_coverage( const QueryRectangle &query ) const;
+	bool matches( const QueryRectangle &query );
 
-	// Serializes the bounds
+	void toStream(BinaryStream &stream) const;
+
+	QueryResolution::Type restype;
+	Interval pixel_scale_x;
+	Interval pixel_scale_y;
+	double  actual_pixel_scale_x;
+	double  actual_pixel_scale_y;
+};
+
+
+class QueryCube : public Cube3 {
+public:
+	QueryCube( const QueryRectangle &rect );
+	QueryCube( const SpatialReference &sref, const TemporalReference &tref );
+	QueryCube( BinaryStream &stream );
+
 	void toStream( BinaryStream &stream ) const;
 
-	// returns a string representation
-	std::string to_string() const;
+	epsg_t epsg;
+	timetype_t timetype;
+};
 
-	QueryResolution::Type res_type;
+class CacheCube : public QueryCube {
+public:
+	CacheCube( const SpatialReference &sref, const TemporalReference &tref );
+	CacheCube( const SpatioTemporalResult &result );
+	CacheCube( const GridSpatioTemporalResult & result );
+	CacheCube( const GenericPlot &result );
+	CacheCube( BinaryStream & stream );
 
-	double x_res_from, x_res_to, y_res_from, y_res_to;
+	const Interval& get_timespan() const;
+
+	void toStream( BinaryStream &stream ) const;
+
+	ResolutionInfo resolution_info;
 };
 
 // Information about data-access
@@ -66,15 +82,15 @@ public:
 //
 class CacheEntry : public AccessInfo {
 public:
-	CacheEntry(CacheEntryBounds bounds, uint64_t size);
-	CacheEntry(CacheEntryBounds bounds, uint64_t size, time_t last_access, uint32_t access_count);
+	CacheEntry(CacheCube bounds, uint64_t size);
+	CacheEntry(CacheCube bounds, uint64_t size, time_t last_access, uint32_t access_count);
 	CacheEntry( BinaryStream &stream );
 
 	void toStream( BinaryStream &stream ) const;
 
 	std::string to_string() const;
 
-	CacheEntryBounds bounds;
+	CacheCube bounds;
 	uint64_t size;
 };
 
@@ -84,17 +100,17 @@ public:
 template<typename KType>
 class CacheQueryInfo {
 public:
-	CacheQueryInfo( double coverage, double x1, double x2, double y1, double y2, KType key);
+	CacheQueryInfo( double score, CacheCube cube, KType key);
 	bool operator <(const CacheQueryInfo &b) const;
-	// the score of the entry
-	double get_score() const;
+
 	// a string representation
 	std::string to_string() const;
 
-	// coverage of issued query in [0,1]
-	double coverage;
+	// scoring
+	double score;
+
 	// BBox of entry
-	double x1, x2, y1, y2;
+	CacheCube cube;
 
 	KType key;
 };
@@ -107,28 +123,18 @@ public:
 template<typename KType>
 class CacheQueryResult {
 public:
-	typedef geos::geom::Geometry Geom;
-	typedef std::unique_ptr<Geom> GeomP;
 
 	// Constructs an empty result with the given query-rectangle as remainder
 	CacheQueryResult( const QueryRectangle &query );
-	CacheQueryResult( GeomP &covered, GeomP &remainder, double coverage, std::vector<KType> keys );
-
-	CacheQueryResult( const CacheQueryResult &r );
-	CacheQueryResult( CacheQueryResult &&r );
-
-	CacheQueryResult& operator=( const CacheQueryResult &r );
-	CacheQueryResult& operator=( CacheQueryResult &&r );
+	CacheQueryResult( const QueryRectangle &query, std::vector<Cube<3>> remainder, std::vector<KType> keys );
 
 	bool has_hit() const;
 	bool has_remainder() const;
 	std::string to_string() const;
 
-	GeomP covered;
-	GeomP remainder;
-	double coverage;
-
 	std::vector<KType> keys;
+	std::vector<Cube<3>> remainder;
+	double coverage;
 };
 
 //
@@ -147,13 +153,26 @@ public:
 	uint64_t entry_id;
 };
 
+class TypedNodeCacheKey : public NodeCacheKey {
+public:
+	TypedNodeCacheKey( CacheType type, const std::string &semantic_id, uint64_t entry_id );
+	TypedNodeCacheKey( BinaryStream &stream );
+
+	void toStream( BinaryStream &stream ) const;
+
+	std::string to_string() const;
+
+	CacheType type;
+};
+
 //
 // Reference to a cache-entry on the node
 //
-class NodeCacheRef : public NodeCacheKey, public CacheEntry {
+class NodeCacheRef : public TypedNodeCacheKey, public CacheEntry {
 public:
-	NodeCacheRef( const NodeCacheKey &key, const CacheEntry &entry );
-	NodeCacheRef( const std::string semantic_id, uint64_t entry_id, const CacheEntry &entry );
+	NodeCacheRef( const TypedNodeCacheKey &key, const CacheEntry &entry );
+	NodeCacheRef( CacheType type, const NodeCacheKey &key, const CacheEntry &entry );
+	NodeCacheRef( CacheType type, const std::string semantic_id, uint64_t entry_id, const CacheEntry &entry );
 	NodeCacheRef( BinaryStream &stream );
 
 	void toStream(BinaryStream &stream) const;
@@ -183,6 +202,8 @@ public:
 	std::vector<std::shared_ptr<EType>> get_all() const;
 
 private:
+	std::string key_to_string( uint64_t key ) const;
+	std::string key_to_string( const std::pair<uint32_t,uint64_t> &key ) const;
 	std::map<KType, std::shared_ptr<EType>> entries;
 	std::priority_queue<CacheQueryInfo<KType>> get_query_candidates( const QueryRectangle &spec ) const;
 	mutable std::mutex mtx;

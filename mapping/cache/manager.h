@@ -18,132 +18,229 @@
 #include <unordered_set>
 #include <memory>
 
+
 //
 // The cache-manager provides uniform access to the cache
 // Currently used by the node-server process and the getCached*-Methods of GenericOperator
 //
+template<typename T>
+class CacheWrapper {
+public:
+	virtual ~CacheWrapper() = default;
+
+	// Inserts an item into the cache
+	virtual void put(const std::string &semantic_id, const std::unique_ptr<T> &item) = 0;
+
+	// Queries for an item satisfying the given request
+	// The result is a copy of the cached version and may be modified
+	virtual std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect) = 0;
+
+	// Inserts an element into the local cache -- omitting any communication
+	// to the remote server
+	virtual NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &raster, const AccessInfo info = AccessInfo() ) = 0;
+
+	// Removes the element with the given key from the cache,
+	// not notifying the index (if applicable)
+	virtual void remove_local(const NodeCacheKey &key) = 0;
+
+	// Gets a reference to the cached element for the given key
+	// The result is not a copy and may only be used for delivery purposes
+	virtual const std::shared_ptr<const T> get_ref(const NodeCacheKey &key) = 0;
+
+	virtual NodeCacheRef get_entry_info( const NodeCacheKey &key) = 0;
+
+	virtual std::unique_ptr<T> process_puzzle( const PuzzleRequest& request ) = 0;
+};
+
+template<typename T>
+class NopCacheWrapper : public CacheWrapper<T> {
+public:
+	NopCacheWrapper();
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item);
+	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, const AccessInfo info = AccessInfo() );
+	void remove_local(const NodeCacheKey &key);
+	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
+	NodeCacheRef get_entry_info( const NodeCacheKey &key);
+	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request );
+};
+
+
+
+template<typename T>
+class RemoteCacheWrapper : public CacheWrapper<T> {
+public:
+	RemoteCacheWrapper( NodeCache<T> &cache, const std::string &my_host, int my_port );
+	virtual ~RemoteCacheWrapper() = default;
+
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item);
+	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, const AccessInfo info = AccessInfo() );
+	void remove_local(const NodeCacheKey &key);
+	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
+	NodeCacheRef get_entry_info( const NodeCacheKey &key);
+	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request );
+protected:
+	virtual std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items) = 0;
+	virtual std::unique_ptr<T> read_item( BinaryStream &stream ) = 0;
+	virtual std::unique_ptr<T> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) = 0;
+private:
+	std::unique_ptr<T> fetch_item( const std::string &semantic_id, const CacheRef &ref );
+	SpatioTemporalReference enlarge_puzzle( const QueryRectangle &query, const std::vector<std::shared_ptr<const T>>& items);
+	std::vector<std::unique_ptr<T>> compute_remainders( const std::string &semantic_id, const T& ref_result, const PuzzleRequest &request );
+	NodeCache<T> &cache;
+	std::string my_host;
+	uint32_t my_port;
+};
+
+class RasterCacheWrapper : public RemoteCacheWrapper<GenericRaster> {
+public:
+	RasterCacheWrapper( NodeCache<GenericRaster> &cache, const std::string &my_host, int my_port );
+
+	std::unique_ptr<GenericRaster> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericRaster>>& items);
+	std::unique_ptr<GenericRaster> read_item( BinaryStream &stream );
+	std::unique_ptr<GenericRaster> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
+};
+
+class PlotCacheWrapper : public RemoteCacheWrapper<GenericPlot> {
+public:
+	PlotCacheWrapper( NodeCache<GenericPlot> &cache, const std::string &my_host, int my_port );
+	std::unique_ptr<GenericPlot> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericPlot>>& items);
+	std::unique_ptr<GenericPlot> read_item( BinaryStream &stream );
+	std::unique_ptr<GenericPlot> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
+};
+
+template<typename T>
+class FeatureCollectionCacheWrapper : public RemoteCacheWrapper<T> {
+public:
+	FeatureCollectionCacheWrapper( NodeCache<T> &cache, const std::string &my_host, int my_port );
+	virtual ~FeatureCollectionCacheWrapper<T>() = default;
+	std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items);
+	std::unique_ptr<T> read_item( BinaryStream &stream );
+	virtual std::unique_ptr<T> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) = 0;
+	virtual size_t add_feature( T &dest, const T &src, size_t src_idx ) = 0;
+};
+
+class PointCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PointCollection> {
+public:
+	PointCollectionCacheWrapper( NodeCache<PointCollection> &cache, const std::string &my_host, int my_port );
+	std::unique_ptr<PointCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
+	size_t add_feature( PointCollection &dest, const PointCollection &src, size_t src_idx );
+};
+
+class LineCollectionCacheWrapper : public FeatureCollectionCacheWrapper<LineCollection> {
+public:
+	LineCollectionCacheWrapper( NodeCache<LineCollection> &cache, const std::string &my_host, int my_port );
+	std::unique_ptr<LineCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
+	size_t add_feature( LineCollection& dest, const LineCollection&src, size_t src_idx );
+};
+
+class PolygonCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PolygonCollection> {
+public:
+	PolygonCollectionCacheWrapper( NodeCache<PolygonCollection> &cache, const std::string &my_host, int my_port );
+	std::unique_ptr<PolygonCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
+	size_t add_feature( PolygonCollection& dest, const PolygonCollection&src, size_t src_idx );
+};
+
+
 
 class CacheManager {
 public:
-	// The current instance
-	static CacheManager& getInstance();
 	// The strategy deciding whether to cache a result or not
 	static CachingStrategy& get_strategy();
+
+	static CacheManager& get_instance();
+
 	// Inititalizes the manager with the given implementation and strategy
-	static void init(std::unique_ptr<CacheManager> impl, std::unique_ptr<CachingStrategy> strategy);
+	static void init( std::unique_ptr<CacheManager> instance,
+			std::unique_ptr<CachingStrategy> strategy );
 
 	// Index-connection -- set per worker DO NOT TOUCH
 	static thread_local UnixSocket *remote_connection;
 
-	// Processes the given puzzle-request
-	static std::unique_ptr<GenericRaster> process_raster_puzzle(const PuzzleRequest& req, std::string my_host,
-				uint32_t my_port);
+	//
+	// INSTANCE METHODS
+	//
 
-	virtual ~CacheManager();
-
-	// Queries for a raster satisfying the given request
-	// The result is a copy of the cached version and may be modified
-	virtual std::unique_ptr<GenericRaster> query_raster(const GenericOperator &op,
-		const QueryRectangle &rect) = 0;
-
-	// Inserts a raster into the local cache -- omitting any communication
-	// to the remote server (if applicable)
-	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
-		const std::unique_ptr<GenericRaster> &raster, const AccessInfo info = AccessInfo() ) = 0;
-
-	// Removes the raster with the given key from the cache,
-	// not notifying the index (if applicable)
-	virtual void remove_raster_local(const NodeCacheKey &key) = 0;
-
-	// Gets a reference to the cached raster for the given key
-	// The result is not a copy and may only be used for delivery purposes
-	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key) = 0;
-
-	virtual NodeCacheRef get_raster_info( const NodeCacheKey &key) = 0;
-
-	// Inserts a raster into the cache
-	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster) = 0;
+	virtual ~CacheManager() = default;
 
 	// Creates a handshake message for the index-server
-	virtual NodeHandshake get_handshake( const std::string &my_host, uint32_t my_port ) const = 0;
+	virtual NodeHandshake get_handshake() const = 0;
 
 	// Retrieves statistics for this cache
 	virtual NodeStats get_stats() const = 0;
 
-protected:
+	virtual CacheWrapper<GenericRaster>& get_raster_cache() = 0;
+	virtual CacheWrapper<PointCollection>& get_point_cache() = 0;
+	virtual CacheWrapper<LineCollection>& get_line_cache() = 0;
+	virtual CacheWrapper<PolygonCollection>& get_polygon_cache() = 0;
+	virtual CacheWrapper<GenericPlot>& get_plot_cache() = 0;
 
-	// Fetches the raster with the given key from the given remote-node
-	static std::unique_ptr<GenericRaster> fetch_raster(const std::string & host, uint32_t port,
-		const NodeCacheKey &key);
-
-	// Puzzles a new raster from the given items and query-rectangle
-	static std::unique_ptr<GenericRaster> do_puzzle(const QueryRectangle &query,
-			const geos::geom::Geometry &covered, const std::vector<std::shared_ptr<GenericRaster> >& items);
 private:
-	// Holds the actual cache-manager implementation
-	static std::unique_ptr<CacheManager> impl;
 	// Holds the actual caching-strategy to use
 	static std::unique_ptr<CachingStrategy> strategy;
+	static std::unique_ptr<CacheManager> instance;
 };
 
-//
-// Implementation using only the local cache
-//
-class LocalCacheManager: public CacheManager {
+class DefaultCacheManager : public CacheManager {
 public:
-	LocalCacheManager(size_t rasterCacheSize);
-	virtual ~LocalCacheManager();
-	virtual std::unique_ptr<GenericRaster> query_raster(const GenericOperator &op,
-		const QueryRectangle &rect);
-	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
+	DefaultCacheManager( const std::string &my_host, int my_port,
+			size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
+			size_t polygon_cache_size, size_t plot_cache_size );
 
-	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
-	virtual NodeCacheRef get_raster_info( const NodeCacheKey &key);
-	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
-		const std::unique_ptr<GenericRaster> &raster, const AccessInfo info = AccessInfo());
-	virtual void remove_raster_local(const NodeCacheKey &key);
+	// Creates a handshake message for the index-server
+	NodeHandshake get_handshake() const;
 
-	virtual NodeHandshake get_handshake( const std::string &my_host, uint32_t my_port ) const;
-	virtual NodeStats get_stats() const;
-protected:
-	NodeRasterCache raster_cache;
-};
+	// Retrieves statistics for this cache
+	NodeStats get_stats() const;
 
-//
-// Null-Implementation -> used if caching is disabled
-//
-class NopCacheManager: public CacheManager {
-public:
-	virtual ~NopCacheManager();
-	virtual std::unique_ptr<GenericRaster> query_raster(const GenericOperator &op,
-		const QueryRectangle &rect);
-	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
+	CacheWrapper<GenericRaster>& get_raster_cache();
+	CacheWrapper<PointCollection>& get_point_cache();
+	CacheWrapper<LineCollection>& get_line_cache();
+	CacheWrapper<PolygonCollection>& get_polygon_cache();
+	CacheWrapper<GenericPlot>& get_plot_cache();
 
-	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
-	virtual NodeCacheRef get_raster_info( const NodeCacheKey &key);
-	virtual NodeCacheRef put_raster_local(const std::string &semantic_id,
-		const std::unique_ptr<GenericRaster> &raster, const AccessInfo info = AccessInfo());
-	virtual void remove_raster_local(const NodeCacheKey &key);
-
-	virtual NodeHandshake get_handshake( const std::string &my_host, uint32_t my_port ) const;
-	virtual NodeStats get_stats() const;
-};
-
-//
-// Hybrid implementation. Always looks up the local-cache
-// first, before asking the index-server.
-// To be used in cache-nodes
-//
-class RemoteCacheManager: public LocalCacheManager {
-public:
-	RemoteCacheManager(size_t rasterCacheSize, const std::string &my_host, uint32_t my_port);
-	virtual ~RemoteCacheManager();
-	virtual std::unique_ptr<GenericRaster> query_raster(const GenericOperator &op,
-		const QueryRectangle &rect);
-	virtual void put_raster(const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster);
 private:
 	std::string my_host;
-	uint32_t my_port;
+	int my_port;
+
+	NodeRasterCache raster_cache;
+	NodePointCache point_cache;
+	NodeLineCache line_cache;
+	NodePolygonCache polygon_cache;
+	NodePlotCache plot_cache;
+
+	RasterCacheWrapper raster_wrapper;
+	PointCollectionCacheWrapper point_wrapper;
+	LineCollectionCacheWrapper line_wrapper;
+	PolygonCollectionCacheWrapper polygon_wrapper;
+	PlotCacheWrapper plot_wrapper;
+};
+
+class NopCacheManager : public CacheManager {
+public:
+	NopCacheManager(const std::string &my_host, int my_port);
+
+	// Creates a handshake message for the index-server
+	NodeHandshake get_handshake() const;
+
+	// Retrieves statistics for this cache
+	NodeStats get_stats() const;
+
+	CacheWrapper<GenericRaster>& get_raster_cache();
+	CacheWrapper<PointCollection>& get_point_cache();
+	CacheWrapper<LineCollection>& get_line_cache();
+	CacheWrapper<PolygonCollection>& get_polygon_cache();
+	CacheWrapper<GenericPlot>& get_plot_cache();
+private:
+	std::string my_host;
+	int my_port;
+
+	NopCacheWrapper<GenericRaster> raster_cache;
+	NopCacheWrapper<PointCollection> point_cache;
+	NopCacheWrapper<LineCollection> line_cache;
+	NopCacheWrapper<PolygonCollection> poly_cache;
+	NopCacheWrapper<GenericPlot> plot_cache;
 };
 
 #endif /* MANAGER_H_ */

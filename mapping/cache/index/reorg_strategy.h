@@ -96,7 +96,7 @@ public:
 	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 private:
 	std::map<uint32_t,NodePos> calculate_node_pos(const std::map<uint32_t,NodeReorgDescription> &result) const;
-	uint32_t get_closest_node( const SpatialReference &sref ) const;
+	uint32_t get_closest_node( epsg_t epsg, const Cube<3> &cube ) const;
 
 	mutable std::map<uint32_t,NodePos> n_pos;
 	static GDAL::CRSTransformer geosmsg_trans;

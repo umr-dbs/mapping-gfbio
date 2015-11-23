@@ -6,10 +6,53 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
+#include <unistd.h>
+#include <fcntl.h>
+#include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
 #include "raster/opencl.h"
+
+void checkEquality(const PolygonCollection& a, const PolygonCollection& b){
+	//TODO: check global attributes equality
+
+	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
+	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
+	EXPECT_EQ(a.stref.t1, b.stref.t1);
+	EXPECT_EQ(a.stref.t2, b.stref.t2);
+	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
+	EXPECT_EQ(a.stref.x1, b.stref.x1);
+	EXPECT_EQ(a.stref.y1, b.stref.y1);
+	EXPECT_EQ(a.stref.x2, b.stref.x2);
+	EXPECT_EQ(a.stref.y2, b.stref.y2);
+
+	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
+	EXPECT_EQ(a.hasTime(), b.hasTime());
+
+	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
+		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
+		if(a.hasTime()){
+			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
+			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
+		}
+
+		//TODO: check feature attributes equality
+
+		for(size_t polygon = 0; polygon < a.getFeatureReference(feature).size(); ++polygon){
+			EXPECT_EQ(a.getFeatureReference(feature).getPolygonReference(polygon).size(), b.getFeatureReference(feature).getPolygonReference(polygon).size());
+			for(size_t ring = 0; ring < a.getFeatureReference(feature).getPolygonReference(polygon).size(); ++ring){
+				EXPECT_EQ(a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).size(), b.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).size());
+
+				for(size_t point = a.start_ring[a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).getRingIndex()];
+						point < a.start_ring[a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).getRingIndex() + 1]; ++point){
+					EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
+					EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
+				}
+			}
+		}
+	}
+}
 
 TEST(PolygonCollection, AddSinglePolygonFeature) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
@@ -144,7 +187,7 @@ TEST(PolygonCollection, directReferenceAccess){
 
 TEST(PolygonCollection, filter) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
-	polygons.local_md_value.addEmptyVector("test");
+	auto &test = polygons.feature_attributes.addNumericAttribute("test", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -153,7 +196,7 @@ TEST(PolygonCollection, filter) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(0, "test", 5.1);
+	test.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -168,7 +211,7 @@ TEST(PolygonCollection, filter) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(1, "test", 4.1);
+	test.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -183,7 +226,7 @@ TEST(PolygonCollection, filter) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(2, "test", 3.1);
+	test.set(2, 3.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -192,7 +235,7 @@ TEST(PolygonCollection, filter) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(3, "test", 2.1);
+	test.set(3, 2.1);
 
 	std::vector<bool> keep {false, true, true};
 
@@ -201,15 +244,15 @@ TEST(PolygonCollection, filter) {
 	keep.push_back(false);
 	auto polygonsFiltered = polygons.filter(keep);
 
+	EXPECT_NO_THROW(polygonsFiltered->validate());
 	EXPECT_EQ(2, polygonsFiltered->getFeatureCount());
 	EXPECT_EQ(16, polygonsFiltered->coordinates.size());
-	EXPECT_EQ(2, polygonsFiltered->local_md_value.getVector("test").size());
-	EXPECT_DOUBLE_EQ(3.1, polygonsFiltered->local_md_value.get(1, "test"));
+	EXPECT_DOUBLE_EQ(3.1, polygonsFiltered->feature_attributes.numeric("test").get(1));
 }
 
 TEST(PolygonCollection, toWKT) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
-	polygons.local_md_value.addEmptyVector("test");
+	auto &test = polygons.feature_attributes.addNumericAttribute("test", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -218,7 +261,7 @@ TEST(PolygonCollection, toWKT) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(0, "test", 5.1);
+	test.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -233,7 +276,7 @@ TEST(PolygonCollection, toWKT) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(1, "test", 4.1);
+	test.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -247,7 +290,7 @@ TEST(PolygonCollection, toWKT) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(2, "test", 3.1);
+	test.set(2, 3.1);
 
 	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((1 2,1 3,2 3,1 2)),MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8))),POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81)))";
 	EXPECT_EQ(wkt, polygons.toWKT());
@@ -257,8 +300,8 @@ TEST(PolygonCollection, toGeoJSON) {
 	//TODO: test missing metadata value
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
 
-	polygons.local_md_string.addEmptyVector("test");
-	polygons.local_md_value.addEmptyVector("test2");
+	auto &test = polygons.feature_attributes.addTextualAttribute("test", Unit::unknown());
+	auto &test2 = polygons.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -267,8 +310,8 @@ TEST(PolygonCollection, toGeoJSON) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(0, "test", "test");
-	polygons.local_md_value.set(0, "test2", 5.1);
+	test.set(0, "test");
+	test2.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -283,8 +326,8 @@ TEST(PolygonCollection, toGeoJSON) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(1, "test", "test2");
-	polygons.local_md_value.set(1, "test2", 4.1);
+	test.set(1, "test2");
+	test2.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -298,8 +341,8 @@ TEST(PolygonCollection, toGeoJSON) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(2, "test", "test3");
-	polygons.local_md_value.set(2, "test2", 3.1);
+	test.set(2, "test3");
+	test2.set(2, 3.1);
 
 	polygons.addDefaultTimestamps();
 
@@ -321,8 +364,8 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	//TODO: test missing metadata value
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
 
-	polygons.local_md_string.addEmptyVector("test");
-	polygons.local_md_value.addEmptyVector("test2");
+	auto &test = polygons.feature_attributes.addTextualAttribute("test", Unit::unknown());
+	auto &test2 = polygons.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -331,8 +374,8 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(0, "test", "test");
-	polygons.local_md_value.set(0, "test2", 5.1);
+	test.set(0, "test");
+	test2.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -347,8 +390,8 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(1, "test", "test2");
-	polygons.local_md_value.set(1, "test2", 4.1);
+	test.set(1, "test2");
+	test2.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -362,8 +405,8 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(2, "test", "test3");
-	polygons.local_md_value.set(2, "test2", 3.1);
+	test.set(2, "test3");
+	test2.set(2, 3.1);
 
 	polygons.addDefaultTimestamps(0,1);
 
@@ -379,8 +422,8 @@ TEST(PolygonCollection, toARFF) {
 		TemporalReference(TIMETYPE_UNIX)
 	));
 
-	polygons.local_md_string.addEmptyVector("test");
-	polygons.local_md_value.addEmptyVector("test2");
+	auto &test = polygons.feature_attributes.addTextualAttribute("test", Unit::unknown());
+	auto &test2 = polygons.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -389,8 +432,8 @@ TEST(PolygonCollection, toARFF) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(0, "test", "test");
-	polygons.local_md_value.set(0, "test2", 5.1);
+	test.set(0, "test");
+	test2.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -405,8 +448,8 @@ TEST(PolygonCollection, toARFF) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(1, "test", "test2");
-	polygons.local_md_value.set(1, "test2", 4.1);
+	test.set(1, "test2");
+	test2.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -420,8 +463,8 @@ TEST(PolygonCollection, toARFF) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(2, "test", "test3");
-	polygons.local_md_value.set(2, "test2", 3.1);
+	test.set(2, "test3");
+	test2.set(2, 3.1);
 
 
 	polygons.addDefaultTimestamps();
@@ -645,7 +688,7 @@ TEST(PolygonCollection, bulkPointInPolygon){
 
 TEST(PolygonCollection, WKTImport){
 	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((10 20, 30 30, 0 30, 10 20), (2 2, 5 2, 1 1, 2 2)))";
-	auto polygons = WKBUtil::readPolygonCollection(wkt);
+	auto polygons = WKBUtil::readPolygonCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, polygons->getFeatureCount());
 	EXPECT_EQ(1, polygons->getFeatureReference(0).size());
@@ -654,7 +697,7 @@ TEST(PolygonCollection, WKTImport){
 
 TEST(PolygonCollection, WKTImportMultiPolygon){
 	std::string wkt = "GEOMETRYCOLLECTION(MULTIPOLYGON(((1 2, 3 3, 0 3, 1 2)), ((7 8, 9 10, 11 12, 13 14, 7 8))))";
-	auto polygons = WKBUtil::readPolygonCollection(wkt);
+	auto polygons = WKBUtil::readPolygonCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(1, polygons->getFeatureCount());
 	EXPECT_EQ(2, polygons->getFeatureReference(0).size());
@@ -662,7 +705,7 @@ TEST(PolygonCollection, WKTImportMultiPolygon){
 
 TEST(PolygonCollection, WKTImportMixed){
 	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((10 20, 30 30, 0 30, 10 20), (2 2, 5 2, 1 1, 2 2)), MULTIPOLYGON(((1 2, 3 3, 0 3, 1 2)), ((7 8, 9 10, 11 12, 13 14, 7 8))))";
-	auto polygons = WKBUtil::readPolygonCollection(wkt);
+	auto polygons = WKBUtil::readPolygonCollection(wkt, SpatioTemporalReference::unreferenced());
 
 	EXPECT_EQ(2, polygons->getFeatureCount());
 	EXPECT_EQ(2, polygons->getFeatureReference(0).getPolygonReference(0).size());
@@ -770,63 +813,62 @@ TEST(PolygonCollection, filterByRectangleIntersection){
 	polygons.finishFeature(); //one polygon inside, one outside
 
 	auto filteredPolygons = polygons.filterByRectangleIntersection(0, 0, 10, 10);
-	EXPECT_EQ(4, filteredPolygons->getFeatureCount());
 
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(0).getPolygonReference(0).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(0).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->coordinates[0].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[0].y);
-	EXPECT_EQ(2, filteredPolygons->coordinates[1].x);
-	EXPECT_EQ(8, filteredPolygons->coordinates[1].y);
-	EXPECT_EQ(8, filteredPolygons->coordinates[2].x);
-	EXPECT_EQ(2, filteredPolygons->coordinates[2].y);
-	EXPECT_EQ(1, filteredPolygons->coordinates[3].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[3].y);
+	auto expected = WKBUtil::readPolygonCollection("GEOMETRYCOLLECTION(POLYGON((1 1, 2 8, 8 2, 1 1)), POLYGON((1 1, 12 18, 18 12, 1 1)), POLYGON((10 10, 12 18, 18 12, 10 10)), MULTIPOLYGON(((1 1, 2 8, 8 2, 1 1)),((11 11, 12 18, 18 12, 11 11))))", SpatioTemporalReference::unreferenced());
 
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(1).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(1).getPolygonReference(0).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(1).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->coordinates[4].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[4].y);
-	EXPECT_EQ(12, filteredPolygons->coordinates[5].x);
-	EXPECT_EQ(18, filteredPolygons->coordinates[5].y);
-	EXPECT_EQ(18, filteredPolygons->coordinates[6].x);
-	EXPECT_EQ(12, filteredPolygons->coordinates[6].y);
-	EXPECT_EQ(1, filteredPolygons->coordinates[7].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[7].y);
+	checkEquality(*expected, *filteredPolygons);
+}
 
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(2).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(2).getPolygonReference(0).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(2).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(10, filteredPolygons->coordinates[8].x);
-	EXPECT_EQ(10, filteredPolygons->coordinates[8].y);
-	EXPECT_EQ(12, filteredPolygons->coordinates[9].x);
-	EXPECT_EQ(18, filteredPolygons->coordinates[9].y);
-	EXPECT_EQ(18, filteredPolygons->coordinates[10].x);
-	EXPECT_EQ(12, filteredPolygons->coordinates[10].y);
-	EXPECT_EQ(10, filteredPolygons->coordinates[11].x);
-	EXPECT_EQ(10, filteredPolygons->coordinates[11].y);
+TEST(PolygonCollection, StreamSerialization){
+	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
 
-	EXPECT_EQ(2, filteredPolygons->getFeatureReference(3).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(3).getPolygonReference(0).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(3).getPolygonReference(0).getRingReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->getFeatureReference(3).getPolygonReference(1).size());
-	EXPECT_EQ(4, filteredPolygons->getFeatureReference(3).getPolygonReference(1).getRingReference(0).size());
-	EXPECT_EQ(1, filteredPolygons->coordinates[12].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[12].y);
-	EXPECT_EQ(2, filteredPolygons->coordinates[13].x);
-	EXPECT_EQ(8, filteredPolygons->coordinates[13].y);
-	EXPECT_EQ(8, filteredPolygons->coordinates[14].x);
-	EXPECT_EQ(2, filteredPolygons->coordinates[14].y);
-	EXPECT_EQ(1, filteredPolygons->coordinates[15].x);
-	EXPECT_EQ(1, filteredPolygons->coordinates[15].y);
-	EXPECT_EQ(11, filteredPolygons->coordinates[16].x);
-	EXPECT_EQ(11, filteredPolygons->coordinates[16].y);
-	EXPECT_EQ(12, filteredPolygons->coordinates[17].x);
-	EXPECT_EQ(18, filteredPolygons->coordinates[17].y);
-	EXPECT_EQ(18, filteredPolygons->coordinates[18].x);
-	EXPECT_EQ(12, filteredPolygons->coordinates[18].y);
-	EXPECT_EQ(11, filteredPolygons->coordinates[19].x);
-	EXPECT_EQ(11, filteredPolygons->coordinates[19].y);
+	//TODO: attributes, time array
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(1,2);
+	polygons.addCoordinate(1,3);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(1,2);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.addCoordinate(5,8);
+	polygons.addCoordinate(2,3);
+	polygons.addCoordinate(7,6);
+	polygons.addCoordinate(5,8);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	polygons.addCoordinate(11,21);
+	polygons.addCoordinate(11,31);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(11,21);
+	polygons.finishRing();
+	polygons.addCoordinate(51,81);
+	polygons.addCoordinate(21,31);
+	polygons.addCoordinate(71,61);
+	polygons.addCoordinate(51,81);
+	polygons.finishRing();
+	polygons.finishPolygon();
+	polygons.finishFeature();
+
+	//create binarystream using pipe
+	int fds[2];
+	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
+	EXPECT_EQ(0, status);
+
+	UnixSocket stream(fds[0], fds[1]);
+
+	polygons.toStream(stream);
+
+	PolygonCollection polygons2(stream);
+
+	checkEquality(polygons, polygons2);
 }

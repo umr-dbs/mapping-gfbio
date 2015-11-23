@@ -10,7 +10,7 @@
 #include <cmath>
 
 template<typename T>
-std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T> &keep) {
+std::unique_ptr<PointCollection> filter(const PointCollection *in, const std::vector<T> &keep) {
 	size_t count = in->getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
@@ -41,24 +41,9 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 		}
 	}
 
-	// copy local MD
-	for (auto &keyValue : in->local_md_string) {
-		const auto &vec_in = in->local_md_string.getVector(keyValue.first);
-		auto &vec_out = out->local_md_string.addEmptyVector(keyValue.first, kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				vec_out.push_back(vec_in[idx]);
-		}
-	}
+	// copy feature attributes
+	out->feature_attributes = in->feature_attributes.filter(keep, kept_count);
 
-	for (auto &keyValue : in->local_md_value) {
-		const auto &vec_in = in->local_md_value.getVector(keyValue.first);
-		auto &vec_out = out->local_md_value.addEmptyVector(keyValue.first, kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				vec_out.push_back(vec_in[idx]);
-		}
-	}
 	// copy time arrays
 	if (in->hasTime()) {
 		out->time_start.reserve(kept_count);
@@ -76,11 +61,11 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 	return out;
 }
 
-std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) {
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) const {
 	return ::filter<bool>(this, keep);
 }
 
-std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) {
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) const {
 	return ::filter<char>(this, keep);
 }
 
@@ -93,7 +78,7 @@ bool PointCollection::featureIntersectsRectangle(size_t featureIndex, double x1,
 	return false;
 }
 
-std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2) const{
 	std::vector<bool> keep(getFeatureCount());
 	for(auto feature : *this){
 		if(featureIntersectsRectangle(feature, x1, y1, x2, y2)){
@@ -103,55 +88,78 @@ std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(
 	return filter(keep);
 }
 
-std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(const SpatialReference& sref){
+std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(const SpatialReference& sref) const{
 	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
 PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
-	size_t coordinateCount;
-	stream.read(&coordinateCount);
-	coordinates.reserve(coordinateCount);
+	bool hasTime;
+	stream.read(&hasTime);
+
 	size_t featureCount;
 	stream.read(&featureCount);
 	start_feature.reserve(featureCount);
 
-	global_attributes.fromStream(stream);
-	local_md_string.fromStream(stream);
-	local_md_value.fromStream(stream);
+	size_t coordinateCount;
+	stream.read(&coordinateCount);
+	coordinates.reserve(coordinateCount);
 
-	for (size_t i=0;i<coordinateCount;i++) {
-		coordinates.push_back( Coordinate(stream) );
+	global_attributes.fromStream(stream);
+	feature_attributes.fromStream(stream);
+
+	if (hasTime) {
+		time_start.reserve(featureCount);
+		time_end.reserve(featureCount);
+		double time;
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_start.push_back(time);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_end.push_back(time);
+		}
 	}
 
 	uint32_t offset;
-	for (size_t i=0;i<featureCount;i++) {
+	for (size_t i = 0; i < featureCount; i++) {
 		stream.read(&offset);
 		start_feature.push_back(offset);
 	}
 
-	// TODO: serialize/unserialize time array
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates.push_back(Coordinate(stream));
+	}
 }
 
 void PointCollection::toStream(BinaryStream &stream) const {
 	stream.write(stref);
-	size_t coordinateCount = coordinates.size();
-	stream.write(coordinateCount);
+	stream.write(hasTime());
+
 	size_t featureCount = start_feature.size();
 	stream.write(featureCount);
+	size_t coordinateCount = coordinates.size();
+	stream.write(coordinateCount);
 
 	stream.write(global_attributes);
-	stream.write(local_md_string);
-	stream.write(local_md_value);
+	stream.write(feature_attributes);
 
-	for (size_t i=0;i<coordinateCount;i++) {
-		coordinates[i].toStream(stream);
+	if (hasTime()) {
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_start[i]);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_end[i]);
+		}
 	}
 
-	for (size_t i=0;i<featureCount;i++) {
+	for (size_t i = 0; i < featureCount; i++) {
 		stream.write(start_feature[i]);
 	}
 
-	// TODO: serialize/unserialize time array
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates[i].toStream(stream);
+	}
 }
 
 
@@ -251,8 +259,8 @@ std::string PointCollection::toCSV() const {
 	std::ostringstream csv;
 	csv << std::fixed; // std::setprecision(4);
 
-	auto string_keys = local_md_string.getKeys();
-	auto value_keys = local_md_value.getKeys();
+	auto string_keys = feature_attributes.getTextualKeys();
+	auto value_keys = feature_attributes.getNumericKeys();
 
 	bool isSimpleCollection = isSimple();
 
@@ -282,10 +290,10 @@ std::string PointCollection::toCSV() const {
 
 			//TODO: handle missing metadata values
 			for(auto &key : string_keys) {
-				csv << ",\"" << local_md_string.get(feature, key) << "\"";
+				csv << ",\"" << feature_attributes.textual(key).get(feature) << "\"";
 			}
 			for(auto &key : value_keys) {
-				csv << "," << local_md_value.get(feature, key);
+				csv << "," << feature_attributes.numeric(key).get(feature);
 			}
 			csv << std::endl;
 		}
@@ -336,8 +344,8 @@ std::string PointCollection::toARFF(std::string layerName) const {
 		arff << "@ATTRIBUTE time_end DATE" << std::endl;
 	}
 
-	auto string_keys = local_md_string.getKeys();
-	auto value_keys = local_md_value.getKeys();
+	auto string_keys = feature_attributes.getTextualKeys();
+	auto value_keys = feature_attributes.getNumericKeys();
 
 
 	//TODO: handle missing metadata values
@@ -364,10 +372,10 @@ std::string PointCollection::toARFF(std::string layerName) const {
 			}
 
 			for(auto &key : string_keys) {
-				arff << ",\"" << local_md_string.get(feature, key) << "\"";
+				arff << ",\"" << feature_attributes.textual(key).get(feature) << "\"";
 			}
 			for(auto &key : value_keys) {
-				arff << "," << local_md_value.get(feature, key);
+				arff << "," << feature_attributes.numeric(key).get(feature);
 			}
 			arff << std::endl;
 		}
@@ -411,4 +419,10 @@ SpatialReference PointCollection::getFeatureMBR(size_t featureIndex) const{
 void PointCollection::validateSpecifics() const {
 	if(start_feature.back() != coordinates.size())
 		throw FeatureException("Feature not finished");
+}
+
+PointCollection& PointCollection::operator +=(const PointCollection& other) {
+	append( other );
+	append_idx_vector(start_feature, other.start_feature);
+	return *this;
 }

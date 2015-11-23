@@ -396,44 +396,21 @@ std::unique_ptr<T> FeatureCollectionCacheWrapper<T>::do_puzzle(const SpatioTempo
 	auto result = make_unique<T>(bbox);
 
 	T& target = *result;
+	target.global_attributes = items.at(0)->global_attributes;
 
-	const T& ref = *items.at(0);
+	for ( auto &src_ptr : items ) {
+		const T& src = *src_ptr;
+		std::vector<bool> keep;
+		keep.reserve( src.getFeatureCount() );
 
-	target.global_attributes = ref.global_attributes;
-	// create local MD
-	for (auto &keyValue : ref.local_md_string) {
-		target.local_md_string.addEmptyVector(keyValue.first);
-	}
-	for (auto &keyValue : ref.local_md_value) {
-		target.local_md_value.addEmptyVector(keyValue.first);
-	}
-
-
-	for ( auto &fcp : items ) {
-		const T& fc = *fcp;
-		for ( auto f : fc ) {
-			if ( fc.featureIntersectsRectangle( f, bbox.x1,bbox.y1,bbox.x2,bbox.y2 ) &&
-				 !(fc.time_start[f] > bbox.t2 || fc.time_end[f] < bbox.t1) ) {
-				add_feature(target,fc,f);
-
-				// copy local MD
-				for (auto &keyValue : fc.local_md_string) {
-					auto &vec_out = target.local_md_string.getVector(keyValue.first);
-					const auto &vec_in = fc.local_md_string.getVector(keyValue.first);
-					vec_out.push_back(vec_in[f]);
-				}
-
-				for (auto &keyValue : fc.local_md_value) {
-					auto &vec_out = target.local_md_value.getVector(keyValue.first);
-					const auto &vec_in = fc.local_md_value.getVector(keyValue.first);
-					vec_out.push_back(vec_in[f]);
-				}
-
-				// copy time arrays
-				target.time_start.push_back(fc.time_start[f]);
-				target.time_end.push_back(fc.time_end[f]);
-			}
+		for ( auto feature : src ) {
+			keep.push_back(
+				src.featureIntersectsRectangle( feature, bbox.x1,bbox.y1,bbox.x2,bbox.y2 ) &&
+				!(src.time_start[feature] > bbox.t2 || src.time_end[feature] < bbox.t1)
+			);
 		}
+		std::unique_ptr<T> filtered = src.filter(keep);
+		target += *filtered;
 	}
 	return result;
 }
@@ -452,14 +429,6 @@ std::unique_ptr<PointCollection> PointCollectionCacheWrapper::compute_item(Gener
 	return op.getCachedPointCollection(query,qp);
 }
 
-size_t PointCollectionCacheWrapper::add_feature(PointCollection& dest, const PointCollection& src, size_t src_idx) {
-	for (auto & c : src.getFeatureReference(src_idx)) {
-		dest.addCoordinate(c.x, c.y);
-	}
-	return dest.finishFeature();
-}
-
-
 LineCollectionCacheWrapper::LineCollectionCacheWrapper(NodeCache<LineCollection>& cache,
 	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port) {
 }
@@ -469,18 +438,6 @@ std::unique_ptr<LineCollection> LineCollectionCacheWrapper::compute_item(Generic
 	return op.getCachedLineCollection(query,qp);
 }
 
-size_t LineCollectionCacheWrapper::add_feature(LineCollection& dest, const LineCollection& src, size_t src_idx) {
-	for ( auto line : src.getFeatureReference(src_idx) ) {
-		//copy coordinates
-		for (auto & c : line) {
-			dest.addCoordinate(c.x, c.y);
-		}
-		dest.finishLine();
-	}
-	return dest.finishFeature();
-}
-
-
 PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(NodeCache<PolygonCollection>& cache,
 	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port) {
 }
@@ -488,21 +445,6 @@ PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(NodeCache<PolygonCo
 std::unique_ptr<PolygonCollection> PolygonCollectionCacheWrapper::compute_item(GenericOperator& op,
 	const QueryRectangle& query, QueryProfiler &qp) {
 	return op.getCachedPolygonCollection(query,qp);
-}
-
-size_t PolygonCollectionCacheWrapper::add_feature(PolygonCollection& dest, const PolygonCollection& src,
-size_t src_idx) {
-	for( auto polygon : src.getFeatureReference(src_idx) ){
-		for(auto ring : polygon){
-			//copy coordinates
-			for (auto & c : ring) {
-				dest.addCoordinate(c.x, c.y);
-			}
-			dest.finishRing();
-		}
-		dest.finishPolygon();
-	}
-	return dest.finishFeature();
 }
 
 //

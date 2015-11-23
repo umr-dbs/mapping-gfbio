@@ -201,7 +201,8 @@ NodePointCache::NodePointCache(size_t size) : NodeCache<PointCollection>(CacheTy
 }
 
 std::unique_ptr<PointCollection> NodePointCache::copy(const PointCollection& content) const {
-	return make_unique<PointCollection>( content );
+	std::vector<bool> keep(content.getFeatureCount(),true);
+	return content.filter(keep);
 }
 
 size_t NodePointCache::get_data_size(const PointCollection& content) const {
@@ -213,7 +214,8 @@ NodeLineCache::NodeLineCache(size_t size) : NodeCache<LineCollection>(CacheType:
 }
 
 std::unique_ptr<LineCollection> NodeLineCache::copy(const LineCollection& content) const {
-	return make_unique<LineCollection>( content );
+	std::vector<bool> keep(content.getFeatureCount(),true);
+	return content.filter(keep);
 }
 
 size_t NodeLineCache::get_data_size(const LineCollection& content) const {
@@ -225,7 +227,8 @@ NodePolygonCache::NodePolygonCache(size_t size) : NodeCache<PolygonCollection>(C
 }
 
 std::unique_ptr<PolygonCollection> NodePolygonCache::copy(const PolygonCollection& content) const {
-	return make_unique<PolygonCollection>( content );
+	std::vector<bool> keep(content.getFeatureCount(),true);
+	return content.filter(keep);
 }
 
 size_t NodePolygonCache::get_data_size(const PolygonCollection& content) const {

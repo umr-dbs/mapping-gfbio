@@ -54,15 +54,7 @@ void SimpleFeatureCollection::validate() const {
 			throw ArgumentException("SimpleFeatureCollection: size of the time-arrays doesn't match feature count");
 	}
 
-	for (auto key : local_md_string.getKeys()) {
-		if (local_md_string.getVector(key).size() != fcount)
-			throw ArgumentException(concat("SimpleFeatureCollection: size of string attribute vector \"", key, "\" doesn't match feature count"));
-	}
-
-	for (auto key : local_md_value.getKeys()) {
-		if (local_md_value.getVector(key).size() != fcount)
-			throw ArgumentException(concat("SimpleFeatureCollection: size of value attribute vector \"", key, "\" doesn't match feature count"));
-	}
+	feature_attributes.validate(fcount);
 
 	validateSpecifics();
 }
@@ -77,8 +69,8 @@ std::string SimpleFeatureCollection::toGeoJSON(bool displayMetadata) const {
 
 	json << "{\"type\":\"FeatureCollection\",\"crs\":{\"type\":\"name\",\"properties\":{\"name\":\"EPSG:" << (int) stref.epsg <<"\"}},\"features\":[";
 
-	auto value_keys = local_md_value.getKeys();
-	auto string_keys = local_md_string.getKeys();
+	auto value_keys = feature_attributes.getNumericKeys();
+	auto string_keys = feature_attributes.getTextualKeys();
 	bool isSimpleCollection = isSimple();
 	for (size_t feature = 0; feature < getFeatureCount(); ++feature) {
 		json << "{\"type\":\"Feature\",\"geometry\":";
@@ -89,11 +81,11 @@ std::string SimpleFeatureCollection::toGeoJSON(bool displayMetadata) const {
 
 			//TODO: handle missing metadata values
 			for (auto &key : string_keys) {
-				json << "\"" << key << "\":" << Json::valueToQuotedString(local_md_string.get(feature, key).c_str()) << ",";
+				json << "\"" << key << "\":" << Json::valueToQuotedString(feature_attributes.textual(key).get(feature).c_str()) << ",";
 			}
 
 			for (auto &key : value_keys) {
-				double value = local_md_value.get(feature, key);
+				double value = feature_attributes.numeric(key).get(feature);
 				json << "\"" << key << "\":";
 				if (std::isfinite(value)) {
 					json << value;
@@ -159,8 +151,8 @@ std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 		arff << "@ATTRIBUTE time_end DATE" << std::endl;
 	}
 
-	auto string_keys = local_md_string.getKeys();
-	auto value_keys = local_md_value.getKeys();
+	auto string_keys = feature_attributes.getTextualKeys();
+	auto value_keys = feature_attributes.getNumericKeys();
 
 	for(auto &key : string_keys) {
 		arff << "@ATTRIBUTE" << " " << key << " " << "STRING" << std::endl;
@@ -183,10 +175,10 @@ std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 
 		//TODO: handle missing metadata values
 		for(auto &key : string_keys) {
-			arff << ",\"" << local_md_string.get(featureIndex, key) << "\"";
+			arff << ",\"" << feature_attributes.textual(key).get(featureIndex) << "\"";
 		}
 		for(auto &key : value_keys) {
-			arff << "," << local_md_value.get(featureIndex, key);
+			arff << "," << feature_attributes.numeric(key).get(featureIndex);
 		}
 		arff << std::endl;
 	}
@@ -296,3 +288,25 @@ bool SimpleFeatureCollection::featureIntersectsRectangle(size_t featureIndex, co
 	return featureIntersectsRectangle(featureIndex, sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
+void SimpleFeatureCollection::append(const SimpleFeatureCollection& other) {
+	feature_attributes += other.feature_attributes;
+
+	coordinates.reserve(coordinates.size() + other.coordinates.size());
+	time_start.reserve(time_start.size() + other.time_start.size());
+	time_end.reserve(time_end.size() + other.time_end.size());
+
+	coordinates.insert(coordinates.end(), other.coordinates.begin(),other.coordinates.end());
+	time_start.insert(time_start.end(), other.time_start.begin(),other.time_start.end());
+	time_end.insert(time_end.end(), other.time_end.begin(),other.time_end.end());
+}
+
+void SimpleFeatureCollection::append_idx_vector(std::vector<uint32_t>& dest,
+		const std::vector<uint32_t>& src) {
+
+	dest.reserve( dest.size() + src.size() - 1 );
+	size_t ext = dest.back();
+	dest.pop_back();
+
+	for ( auto sf : src )
+		dest.push_back( sf + ext );
+}

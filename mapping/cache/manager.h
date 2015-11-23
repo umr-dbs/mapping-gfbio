@@ -118,28 +118,24 @@ public:
 	std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items);
 	std::unique_ptr<T> read_item( BinaryStream &stream );
 	virtual std::unique_ptr<T> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) = 0;
-	virtual size_t add_feature( T &dest, const T &src, size_t src_idx ) = 0;
 };
 
 class PointCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PointCollection> {
 public:
 	PointCollectionCacheWrapper( NodeCache<PointCollection> &cache, const std::string &my_host, int my_port );
 	std::unique_ptr<PointCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
-	size_t add_feature( PointCollection &dest, const PointCollection &src, size_t src_idx );
 };
 
 class LineCollectionCacheWrapper : public FeatureCollectionCacheWrapper<LineCollection> {
 public:
 	LineCollectionCacheWrapper( NodeCache<LineCollection> &cache, const std::string &my_host, int my_port );
 	std::unique_ptr<LineCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
-	size_t add_feature( LineCollection& dest, const LineCollection&src, size_t src_idx );
 };
 
 class PolygonCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PolygonCollection> {
 public:
 	PolygonCollectionCacheWrapper( NodeCache<PolygonCollection> &cache, const std::string &my_host, int my_port );
 	std::unique_ptr<PolygonCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
-	size_t add_feature( PolygonCollection& dest, const PolygonCollection&src, size_t src_idx );
 };
 
 

@@ -76,19 +76,20 @@ struct PointDataEnhancement {
 	static void execute(Raster2D<T>* raster, PointCollection *points, const std::string &name) {
 		raster->setRepresentation(GenericRaster::Representation::CPU);
 
-		auto &md_vec = points->local_md_value.getVector(name);
+		auto &attr_vec = points->feature_attributes.numeric(name);
+		size_t attr_idx = 0;
 
 		for (auto &point : points->coordinates) {
 			size_t rasterCoordinateX = floor(raster->lcrs.WorldToPixelX(point.x));
 			size_t rasterCoordinateY = floor(raster->lcrs.WorldToPixelY(point.y));
 
-			double md = std::numeric_limits<double>::quiet_NaN();
+			double attr = std::numeric_limits<double>::quiet_NaN();
 			if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->lcrs.size[0] && rasterCoordinateY < raster->lcrs.size[1]) {
 				T value = raster->get(rasterCoordinateX, rasterCoordinateY);
 				if (!raster->dd.is_no_data(value))
-					md = (double) value;
+					attr = (double) value;
 			}
-			md_vec.push_back(md);
+			attr_vec.set(attr_idx++, attr);
 		}
 	}
 };
@@ -97,12 +98,14 @@ struct PointDataEnhancement {
 
 static void enhance(PointCollection &points, GenericRaster &raster, const std::string name, QueryProfiler &profiler) {
 #ifdef MAPPING_NO_OPENCL
-	points.local_md_value.addEmptyVector(name, points.getFeatureCount());
+	auto &attr = points.feature_attributes.addNumericAttribute(name);
+	attr.reserve(points.getFeatureCount());
 	callUnaryOperatorFunc<PointDataEnhancement>(&raster, &points, name);
 #else
 	RasterOpenCL::init();
 
-	points.local_md_value.addVector(name, points.getFeatureCount());
+	auto &vec = points.feature_attributes.addNumericAttribute(name, raster.dd.unit);
+	vec.resize(points.getFeatureCount());
 	try {
 		RasterOpenCL::CLProgram prog;
 		prog.setProfiler(profiler);
@@ -140,7 +143,8 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 		auto rasters = getRasterSourceCount();
 		TemporalReference tref = TemporalReference::unreferenced();
 		for (int r=0;r<rasters;r++) {
-			auto &attributevector = points->local_md_value.addVector(names.at(r), featurecount);
+			auto &attributevector = points->feature_attributes.addNumericAttribute(names.at(r), Unit::unknown()); // TODO: unit
+			attributevector.resize(featurecount);
 			// iterate over time
 			size_t current_idx = 0;
 			while (current_idx < featurecount) {
@@ -160,7 +164,7 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 						if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->width && rasterCoordinateY < raster->height) {
 							double value = raster->getAsDouble(rasterCoordinateX, rasterCoordinateY);
 							if (!raster->dd.is_no_data(value))
-								attributevector[featureidx] = value;
+								attributevector.set(featureidx, value);
 						}
 
 						current_idx++;

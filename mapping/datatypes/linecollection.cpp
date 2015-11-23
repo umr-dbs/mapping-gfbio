@@ -1,10 +1,97 @@
 #include "linecollection.h"
 #include <sstream>
 #include "util/make_unique.h"
+#include "util/binarystream.h"
 
+
+LineCollection::LineCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
+	bool hasTime;
+	stream.read(&hasTime);
+
+	size_t featureCount;
+	stream.read(&featureCount);
+	start_feature.reserve(featureCount);
+
+	size_t lineCount;
+	stream.read(&lineCount);
+	start_line.reserve(lineCount);
+
+	size_t coordinateCount;
+	stream.read(&coordinateCount);
+	coordinates.reserve(coordinateCount);
+
+	global_attributes.fromStream(stream);
+	feature_attributes.fromStream(stream);
+
+	if (hasTime) {
+		time_start.reserve(featureCount);
+		time_end.reserve(featureCount);
+		double time;
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_start.push_back(time);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.read(&time);
+			time_end.push_back(time);
+		}
+	}
+
+	uint32_t offset;
+	for (size_t i = 0; i < featureCount; i++) {
+		stream.read(&offset);
+		start_feature.push_back(offset);
+	}
+
+	for (size_t i = 0; i < lineCount; i++) {
+		stream.read(&offset);
+		start_line.push_back(offset);
+	}
+
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates.push_back(Coordinate(stream));
+	}
+}
+
+void LineCollection::toStream(BinaryStream &stream) const {
+	stream.write(stref);
+	stream.write(hasTime());
+
+	size_t featureCount = start_feature.size();
+	stream.write(featureCount);
+	size_t lineCount = start_line.size();
+	stream.write(lineCount);
+	size_t coordinateCount = coordinates.size();
+	stream.write(coordinateCount);
+
+
+	stream.write(global_attributes);
+	stream.write(feature_attributes);
+
+	if (hasTime()) {
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_start[i]);
+		}
+		for (size_t i = 0; i < featureCount; i++) {
+			stream.write(time_end[i]);
+		}
+	}
+
+	for (size_t i = 0; i < featureCount; i++) {
+		stream.write(start_feature[i]);
+	}
+
+	for (size_t i = 0; i < lineCount; i++) {
+		stream.write(start_line[i]);
+	}
+
+	for (size_t i = 0; i < coordinateCount; i++) {
+		coordinates[i].toStream(stream);
+	}
+}
 
 template<typename T>
-std::unique_ptr<LineCollection> filter(LineCollection *in, const std::vector<T> &keep) {
+std::unique_ptr<LineCollection> filter( const LineCollection *in, const std::vector<T> &keep) {
 	size_t count = in->getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
@@ -39,24 +126,9 @@ std::unique_ptr<LineCollection> filter(LineCollection *in, const std::vector<T> 
 		}
 	}
 
-	// copy local MD
-	for (auto &keyValue : in->local_md_string) {
-		const auto &vec_in = in->local_md_string.getVector(keyValue.first);
-		auto &vec_out = out->local_md_string.addEmptyVector(keyValue.first, kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				vec_out.push_back(vec_in[idx]);
-		}
-	}
+	// copy feature attributes
+	out->feature_attributes = in->feature_attributes.filter(keep, kept_count);
 
-	for (auto &keyValue : in->local_md_value) {
-		const auto &vec_in = in->local_md_value.getVector(keyValue.first);
-		auto &vec_out = out->local_md_value.addEmptyVector(keyValue.first, kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				vec_out.push_back(vec_in[idx]);
-		}
-	}
 	// copy time arrays
 	if (in->hasTime()) {
 		out->time_start.reserve(kept_count);
@@ -74,11 +146,11 @@ std::unique_ptr<LineCollection> filter(LineCollection *in, const std::vector<T> 
 	return out;
 }
 
-std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<bool> &keep) {
+std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<bool> &keep) const {
 	return ::filter<bool>(this, keep);
 }
 
-std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<char> &keep) {
+std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<char> &keep) const {
 	return ::filter<char>(this, keep);
 }
 
@@ -104,7 +176,7 @@ bool LineCollection::featureIntersectsRectangle(size_t featureIndex, double x1, 
 	return false;
 }
 
-std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2) const{
 	std::vector<bool> keep(getFeatureCount());
 
 	for(auto feature : *this){
@@ -116,7 +188,7 @@ std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(do
 	return filter(keep);
 }
 
-std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(const SpatialReference& sref){
+std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(const SpatialReference& sref) const{
 	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
@@ -216,10 +288,10 @@ void LineCollection::validateSpecifics() const {
 		throw FeatureException("Feature not finished");
 }
 
-LineCollection::LineCollection(BinaryStream& stream) : SimpleFeatureCollection(stream) {
-	// TODO
-}
+LineCollection& LineCollection::operator +=(const LineCollection& other) {
+	append( other );
+	append_idx_vector(start_feature, other.start_feature);
+	append_idx_vector(start_line, other.start_line);
 
-void LineCollection::toStream(BinaryStream& stream) const {
-	// TODO
+	return *this;
 }

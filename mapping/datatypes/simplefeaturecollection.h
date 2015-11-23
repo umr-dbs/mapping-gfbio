@@ -32,6 +32,8 @@ class Coordinate {
 		double x, y;
 
 		friend class PointCollection;
+		friend class LineCollection;
+		friend class PolygonCollection;
 		friend class GeosGeomUtil;
 };
 
@@ -54,9 +56,8 @@ public:
 	void addDefaultTimestamps();
 	void addDefaultTimestamps(double min, double max);
 
-	// local MetaData (one value per feature)
-	MetadataArrays<std::string> local_md_string;
-	MetadataArrays<double> local_md_value;
+	// feature attributes (one value per feature)
+	AttributeArrays feature_attributes;
 
 	// geometry
 	virtual SpatialReference getCollectionMBR() const;
@@ -100,6 +101,14 @@ protected:
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const = 0;
 
 	virtual void validateSpecifics() const = 0;
+
+	/*
+	 * Helper for implementing += in concrete classes
+	 * Appends time_start, time_end, feature_attributes and coordinates
+	 */
+	void append( const SimpleFeatureCollection &other );
+
+	void append_idx_vector( std::vector<uint32_t> &dest, const std::vector<uint32_t> &src );
 
 	//calculate the MBR of the coordinates in range from start to stop (exclusive)
 	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;

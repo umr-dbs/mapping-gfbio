@@ -36,9 +36,10 @@ public:
 	/**
 	 * Convert a geos geometry(collection) into a PointCollection
 	 * @param geometry the geometry collection
+	 * @param stref the SpatioTemporalReference for the resulting collection
 	 * @return the PointCollection converted from geos Geometry
 	 */
-	static std::unique_ptr<PointCollection> createPointCollection(const geos::geom::Geometry& geometry);
+	static std::unique_ptr<PointCollection> createPointCollection(const geos::geom::Geometry& geometry, const SpatioTemporalReference& stref);
 
 	/**
 	 * Convert a PointCollection into a geos Geometry
@@ -50,9 +51,10 @@ public:
 	/**
 	 * Convert a geos geometry(collection) into a LineCollection
 	 * @param geometry the geos Geometry
+	 * @param stref the SpatioTemporalReference for the resulting collection
 	 * @return LineCollection converted from geos Geometry
 	 */
-	static std::unique_ptr<LineCollection> createLineCollection(const geos::geom::Geometry& geometry);
+	static std::unique_ptr<LineCollection> createLineCollection(const geos::geom::Geometry& geometry, const SpatioTemporalReference& stref);
 
 	/**
 	 * Convert a LineCollection into a geos Geometry
@@ -65,16 +67,18 @@ public:
 	/**
 	 * Convert a geos multipolygon into a PolygonCollection
 	 * @param multiPolygon the geos MultiPolygon
+	 * @param stref the SpatioTemporalReference for the resulting collection
 	 * @return the PolygonCollection converted from geos MultiPolygon
 	 */
-	static std::unique_ptr<PolygonCollection> createPolygonCollection(const geos::geom::MultiPolygon& multiPolygon);
+	static std::unique_ptr<PolygonCollection> createPolygonCollection(const geos::geom::MultiPolygon& multiPolygon, const SpatioTemporalReference& stref);
 
 	/**
 	 * Convert a geos geometry(collection) into a PolygonCollection of polygons
 	 * @param geometry the geos Geometry
+	 * @param stref the SpatioTemporalReference for the resulting collection
 	 * @return the PolygonCollection converted from geos Geometry
 	 */
-	static std::unique_ptr<PolygonCollection> createPolygonCollection(const geos::geom::Geometry& geometry);
+	static std::unique_ptr<PolygonCollection> createPolygonCollection(const geos::geom::Geometry& geometry, const SpatioTemporalReference& stref);
 
 	/**
 	 * Convert a PolygonCollection into a geos Geometry

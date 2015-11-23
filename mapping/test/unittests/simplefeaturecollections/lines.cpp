@@ -67,7 +67,7 @@ TEST(LineCollection, GeosGeomConversion) {
 }
 
 TEST(LineCollection, Invalid){
-	LineCollection lines = LineCollection(SpatioTemporalReference::unreferenced());
+	LineCollection lines(SpatioTemporalReference::unreferenced());
 
 	EXPECT_THROW(lines.finishLine(), FeatureException);
 	EXPECT_THROW(lines.finishFeature(), FeatureException);
@@ -167,13 +167,13 @@ TEST(LineCollection, directReferenceAccess){
 
 TEST(LineCollection, filter) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
-	lines.local_md_value.addEmptyVector("test");
+	auto &test = lines.feature_attributes.addNumericAttribute("test", Unit::unknown());
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(1,3);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_value.set(0, "test", 5.1);
+	test.set(0, 5.1);
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(2,3);
@@ -182,7 +182,7 @@ TEST(LineCollection, filter) {
 	lines.addCoordinate(5,6);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_value.set(1, "test", 4.1);
+	test.set(1, 4.1);
 
 	lines.addCoordinate(7,8);
 	lines.addCoordinate(6,5);
@@ -192,13 +192,13 @@ TEST(LineCollection, filter) {
 	lines.addCoordinate(12,6);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_value.set(2, "test", 3.1);
+	test.set(2, 3.1);
 
 	lines.addCoordinate(5,6);
 	lines.addCoordinate(6,7);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_value.set(3, "test", 2.1);
+	test.set(3, 2.1);
 
 	std::vector<bool> keep {false, true, true};
 
@@ -207,21 +207,21 @@ TEST(LineCollection, filter) {
 	keep.push_back(false);
 	auto linesFiltered = lines.filter(keep);
 
+	EXPECT_NO_THROW(linesFiltered->validate());
 	EXPECT_EQ(2, linesFiltered->getFeatureCount());
 	EXPECT_EQ(9, linesFiltered->coordinates.size());
-	EXPECT_EQ(2, linesFiltered->local_md_value.getVector("test").size());
-	EXPECT_DOUBLE_EQ(3.1, linesFiltered->local_md_value.get(1, "test"));
+	EXPECT_DOUBLE_EQ(3.1, linesFiltered->feature_attributes.numeric("test").get(1));
 }
 
 TEST(LineCollection, toGeoJSON){
 	LineCollection lines(SpatioTemporalReference::unreferenced());
-	lines.local_md_value.addEmptyVector("test");
+	auto &test = lines.feature_attributes.addNumericAttribute("test", Unit::unknown());
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(1,3);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_value.set(0, "test", 5.1);
+	test.set(0, 5.1);
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(2,3);
@@ -230,7 +230,7 @@ TEST(LineCollection, toGeoJSON){
 	lines.addCoordinate(5,6);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_value.set(1, "test", 4.1);
+	test.set(1, 4.1);
 
 	lines.addDefaultTimestamps();
 
@@ -249,15 +249,15 @@ TEST(LineCollection, toGeoJSONEmptyCollection){
 
 TEST(LineCollection, toGeoJSONMetadata){
 	LineCollection lines(SpatioTemporalReference::unreferenced());
-	lines.local_md_string.addEmptyVector("test");
-	lines.local_md_value.addEmptyVector("test2");
+	auto &test = lines.feature_attributes.addTextualAttribute("test", Unit::unknown());
+	auto &test2 = lines.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(1,3);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_string.set(0, "test", "test");
-	lines.local_md_value.set(0, "test2", 5.1);
+	test.set(0, "test");
+	test2.set(0, 5.1);
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(2,3);
@@ -266,8 +266,8 @@ TEST(LineCollection, toGeoJSONMetadata){
 	lines.addCoordinate(5,6);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_string.set(1, "test", "test123");
-	lines.local_md_value.set(1, "test2", 4.1);
+	test.set(1, "test123");
+	test2.set(1, 4.1);
 
 	lines.addDefaultTimestamps(0,1);
 
@@ -279,13 +279,13 @@ TEST(LineCollection, toGeoJSONMetadata){
 
 TEST(LineCollection, toWKT){
 	LineCollection lines(SpatioTemporalReference::unreferenced());
-	lines.local_md_value.addEmptyVector("test");
+	auto &test = lines.feature_attributes.addNumericAttribute("test", Unit::unknown());
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(1,3);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_value.set(0, "test", 5.1);
+	test.set(0, 5.1);
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(2,3);
@@ -294,7 +294,7 @@ TEST(LineCollection, toWKT){
 	lines.addCoordinate(5,6);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_value.set(1, "test", 4.1);
+	test.set(1, 4.1);
 
 	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2,1 3),MULTILINESTRING((1 2,2 3),(2 4,5 6)))";
 	EXPECT_EQ(wkt, lines.toWKT());
@@ -306,15 +306,15 @@ TEST(LineCollection, toARFF){
 	SpatioTemporalReference stref(SpatialReference::unreferenced(), tref);
 	LineCollection lines(stref);//is there a better way to initialize?
 
-	lines.local_md_string.addEmptyVector("test");
-	lines.local_md_value.addEmptyVector("test2");
+	auto &test = lines.feature_attributes.addTextualAttribute("test", Unit::unknown());
+	auto &test2 = lines.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(1,3);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_string.set(0, "test", "test");
-	lines.local_md_value.set(0, "test2", 5.1);
+	test.set(0, "test");
+	test2.set(0, 5.1);
 
 	lines.addCoordinate(1,2);
 	lines.addCoordinate(2,3);
@@ -323,8 +323,8 @@ TEST(LineCollection, toARFF){
 	lines.addCoordinate(5,6);
 	lines.finishLine();
 	lines.finishFeature();
-	lines.local_md_string.set(1, "test", "test2");
-	lines.local_md_value.set(1, "test2", 4.1);
+	test.set(1, "test2");
+	test2.set(1, 4.1);
 
 	lines.addDefaultTimestamps();
 
@@ -541,9 +541,19 @@ TEST(LineCollection, filterByRectangleIntersection){
 	lines.finishLine();
 	lines.finishFeature(); //one line in- & one line outside
 
+	lines.feature_attributes.addNumericAttribute("numeric", Unit::unknown(), { 1, 2, 3, 4, 5, 6, 7, 8 });
+	lines.feature_attributes.addTextualAttribute("textual", Unit::unknown(), { "1", "2", "3", "4", "5", "6", "7", "8" });
+
+	EXPECT_NO_THROW(lines.validate());
+
 	auto filteredLines = lines.filterByRectangleIntersection(0, 0, 10, 10);
+	EXPECT_NO_THROW(filteredLines->validate());
 
 	auto expected = WKBUtil::readLineCollection("GEOMETRYCOLLECTION(LINESTRING(1 1, 5 1, 8 8), LINESTRING(5 5, 11 11, 18 15), LINESTRING(10 10, 11 11, 18 15), LINESTRING(0 10, 10 10, 15 15), LINESTRING(0 0, 20 20, 25 20), MULTILINESTRING((1 1, 5 1, 8 8), (12 12, 12 0, 14 18)))",SpatioTemporalReference::unreferenced());
+	expected->feature_attributes.addNumericAttribute("numeric", Unit::unknown(), { 1, 3, 4, 5, 6, 8 });
+	expected->feature_attributes.addTextualAttribute("textual", Unit::unknown(), { "1", "3", "4", "5", "6", "8" });
+
+	EXPECT_NO_THROW(expected->validate());
 
 	checkEquality(*expected, *filteredLines);
 }

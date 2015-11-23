@@ -187,7 +187,7 @@ TEST(PolygonCollection, directReferenceAccess){
 
 TEST(PolygonCollection, filter) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
-	polygons.local_md_value.addEmptyVector("test");
+	auto &test = polygons.feature_attributes.addNumericAttribute("test", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -196,7 +196,7 @@ TEST(PolygonCollection, filter) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(0, "test", 5.1);
+	test.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -211,7 +211,7 @@ TEST(PolygonCollection, filter) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(1, "test", 4.1);
+	test.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -226,7 +226,7 @@ TEST(PolygonCollection, filter) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(2, "test", 3.1);
+	test.set(2, 3.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -235,7 +235,7 @@ TEST(PolygonCollection, filter) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(3, "test", 2.1);
+	test.set(3, 2.1);
 
 	std::vector<bool> keep {false, true, true};
 
@@ -244,15 +244,15 @@ TEST(PolygonCollection, filter) {
 	keep.push_back(false);
 	auto polygonsFiltered = polygons.filter(keep);
 
+	EXPECT_NO_THROW(polygonsFiltered->validate());
 	EXPECT_EQ(2, polygonsFiltered->getFeatureCount());
 	EXPECT_EQ(16, polygonsFiltered->coordinates.size());
-	EXPECT_EQ(2, polygonsFiltered->local_md_value.getVector("test").size());
-	EXPECT_DOUBLE_EQ(3.1, polygonsFiltered->local_md_value.get(1, "test"));
+	EXPECT_DOUBLE_EQ(3.1, polygonsFiltered->feature_attributes.numeric("test").get(1));
 }
 
 TEST(PolygonCollection, toWKT) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
-	polygons.local_md_value.addEmptyVector("test");
+	auto &test = polygons.feature_attributes.addNumericAttribute("test", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -261,7 +261,7 @@ TEST(PolygonCollection, toWKT) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(0, "test", 5.1);
+	test.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -276,7 +276,7 @@ TEST(PolygonCollection, toWKT) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(1, "test", 4.1);
+	test.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -290,7 +290,7 @@ TEST(PolygonCollection, toWKT) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_value.set(2, "test", 3.1);
+	test.set(2, 3.1);
 
 	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((1 2,1 3,2 3,1 2)),MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8))),POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81)))";
 	EXPECT_EQ(wkt, polygons.toWKT());
@@ -300,8 +300,8 @@ TEST(PolygonCollection, toGeoJSON) {
 	//TODO: test missing metadata value
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
 
-	polygons.local_md_string.addEmptyVector("test");
-	polygons.local_md_value.addEmptyVector("test2");
+	auto &test = polygons.feature_attributes.addTextualAttribute("test", Unit::unknown());
+	auto &test2 = polygons.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -310,8 +310,8 @@ TEST(PolygonCollection, toGeoJSON) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(0, "test", "test");
-	polygons.local_md_value.set(0, "test2", 5.1);
+	test.set(0, "test");
+	test2.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -326,8 +326,8 @@ TEST(PolygonCollection, toGeoJSON) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(1, "test", "test2");
-	polygons.local_md_value.set(1, "test2", 4.1);
+	test.set(1, "test2");
+	test2.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -341,8 +341,8 @@ TEST(PolygonCollection, toGeoJSON) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(2, "test", "test3");
-	polygons.local_md_value.set(2, "test2", 3.1);
+	test.set(2, "test3");
+	test2.set(2, 3.1);
 
 	polygons.addDefaultTimestamps();
 
@@ -364,8 +364,8 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	//TODO: test missing metadata value
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
 
-	polygons.local_md_string.addEmptyVector("test");
-	polygons.local_md_value.addEmptyVector("test2");
+	auto &test = polygons.feature_attributes.addTextualAttribute("test", Unit::unknown());
+	auto &test2 = polygons.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -374,8 +374,8 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(0, "test", "test");
-	polygons.local_md_value.set(0, "test2", 5.1);
+	test.set(0, "test");
+	test2.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -390,8 +390,8 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(1, "test", "test2");
-	polygons.local_md_value.set(1, "test2", 4.1);
+	test.set(1, "test2");
+	test2.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -405,8 +405,8 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(2, "test", "test3");
-	polygons.local_md_value.set(2, "test2", 3.1);
+	test.set(2, "test3");
+	test2.set(2, 3.1);
 
 	polygons.addDefaultTimestamps(0,1);
 
@@ -422,8 +422,8 @@ TEST(PolygonCollection, toARFF) {
 		TemporalReference(TIMETYPE_UNIX)
 	));
 
-	polygons.local_md_string.addEmptyVector("test");
-	polygons.local_md_value.addEmptyVector("test2");
+	auto &test = polygons.feature_attributes.addTextualAttribute("test", Unit::unknown());
+	auto &test2 = polygons.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -432,8 +432,8 @@ TEST(PolygonCollection, toARFF) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(0, "test", "test");
-	polygons.local_md_value.set(0, "test2", 5.1);
+	test.set(0, "test");
+	test2.set(0, 5.1);
 
 	polygons.addCoordinate(1,2);
 	polygons.addCoordinate(1,3);
@@ -448,8 +448,8 @@ TEST(PolygonCollection, toARFF) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(1, "test", "test2");
-	polygons.local_md_value.set(1, "test2", 4.1);
+	test.set(1, "test2");
+	test2.set(1, 4.1);
 
 	polygons.addCoordinate(11,21);
 	polygons.addCoordinate(11,31);
@@ -463,8 +463,8 @@ TEST(PolygonCollection, toARFF) {
 	polygons.finishRing();
 	polygons.finishPolygon();
 	polygons.finishFeature();
-	polygons.local_md_string.set(2, "test", "test3");
-	polygons.local_md_value.set(2, "test2", 3.1);
+	test.set(2, "test3");
+	test2.set(2, 3.1);
 
 
 	polygons.addDefaultTimestamps();

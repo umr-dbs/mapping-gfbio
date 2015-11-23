@@ -28,8 +28,7 @@ PolygonCollection::PolygonCollection(BinaryStream &stream) : SimpleFeatureCollec
 	coordinates.reserve(coordinateCount);
 
 	global_attributes.fromStream(stream);
-	local_md_string.fromStream(stream);
-	local_md_value.fromStream(stream);
+	feature_attributes.fromStream(stream);
 
 	if (hasTime) {
 		time_start.reserve(featureCount);
@@ -81,8 +80,7 @@ void PolygonCollection::toStream(BinaryStream &stream) {
 
 
 	stream.write(global_attributes);
-	stream.write(local_md_string);
-	stream.write(local_md_value);
+	stream.write(feature_attributes);
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {
@@ -150,24 +148,9 @@ std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vect
 		}
 	}
 
-	// copy local MD
-	for (auto &keyValue : in->local_md_string) {
-		const auto &vec_in = in->local_md_string.getVector(keyValue.first);
-		auto &vec_out = out->local_md_string.addEmptyVector(keyValue.first, kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				vec_out.push_back(vec_in[idx]);
-		}
-	}
+	// copy feature attributes
+	out->feature_attributes = in->feature_attributes.filter(keep, kept_count);
 
-	for (auto &keyValue : in->local_md_value) {
-		const auto &vec_in = in->local_md_value.getVector(keyValue.first);
-		auto &vec_out = out->local_md_value.addEmptyVector(keyValue.first, kept_count);
-		for (size_t idx=0;idx<count;idx++) {
-			if (keep[idx])
-				vec_out.push_back(vec_in[idx]);
-		}
-	}
 	// copy time arrays
 	if (in->hasTime()) {
 		out->time_start.reserve(kept_count);

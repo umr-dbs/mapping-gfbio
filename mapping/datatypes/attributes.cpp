@@ -98,141 +98,238 @@ const std::string &AttributeMaps::getTextual(const std::string &key, const std::
 
 
 
-
-
 /**
- * MetadataArrays
+ * AttributeArrays
+ *
+ * for SimpleFeatureCollections
  */
-template<typename T>
-MetadataArrays<T>::MetadataArrays() {
-}
-
-template<typename T>
-MetadataArrays<T>::~MetadataArrays() {
-}
-
-template<typename T>
-void MetadataArrays<T>::set(size_t idx, const std::string &key, const T &value) {
-	if (data.count(key) == 0) {
-		//data[key] = std::vector<T>();
-		throw MetadataException("Metadata with key "+key+" does not exist. Call addVector() first.");
-	}
-
-	auto &vec = data[key];
-	if (idx == vec.size()) {
-		vec.push_back(value);
+template <typename T>
+void AttributeArrays::AttributeArray<T>::set(size_t idx, const T &value) {
+	if (idx == array.size()) {
+		array.push_back(value);
 		return;
 	}
-	if (vec.size() < idx+1)
-		vec.resize(idx+1);
-	vec[idx] = value;
+	if (array.size() < idx+1)
+		array.resize(idx+1);
+	array[idx] = value;
 }
 
-template<typename T>
-const T &MetadataArrays<T>::get(size_t idx, const std::string &key) const {
-	return data.at(key).at(idx);
-}
-
-template<typename T>
-const T &MetadataArrays<T>::get(size_t idx, const std::string &key, const T &defaultvalue) const {
-	try {
-		return data.at(key).at(idx);
-	}
-	catch (std::out_of_range &e) {
-		return defaultvalue;
-	}
-}
-
-template<typename T> struct defaultvalue {
-};
-
-template <> struct defaultvalue<double> {
-	static const double value;
-};
-const double defaultvalue<double>::value = std::numeric_limits<double>::quiet_NaN();
-
-template <> struct defaultvalue<std::string> {
-	static const std::string value;
-};
-const std::string defaultvalue<std::string>::value = "";
-
-template<typename T>
-std::vector<T> &MetadataArrays<T>::addVector(const std::string &key, size_t capacity) {
-	if (data.count(key) > 0)
-		throw MetadataException("Metadata with key "+key+" already exists");
-	data[key] = std::vector<T>(capacity, defaultvalue<T>::value);
-	return data.at(key);
-}
-template<typename T>
-std::vector<T> &MetadataArrays<T>::addEmptyVector(const std::string &key, size_t reserve) {
-	if (data.count(key) > 0)
-		throw MetadataException("Metadata with key "+key+" already exists");
-	data[key] = std::vector<T>();
-	auto &vec = data.at(key);
-	if (reserve > 0)
-		vec.reserve(reserve);
-	return vec;
-}
-
-template<typename T>
-std::vector<T> &MetadataArrays<T>::getVector(const std::string &key) {
-	return data.at(key);
-}
-
-template<typename T>
-const std::vector<T> &MetadataArrays<T>::getVector(const std::string &key) const {
-	return data.at(key);
-}
-
-template<typename T>
-MetadataArrays<T>::MetadataArrays(BinaryStream &stream) {
+template <typename T>
+AttributeArrays::AttributeArray<T>::AttributeArray(BinaryStream &stream) : unit(Unit::UNINITIALIZED) {
 	fromStream(stream);
 }
 
-template<typename T>
-void MetadataArrays<T>::fromStream(BinaryStream &stream) {
+template <typename T>
+void AttributeArrays::AttributeArray<T>::fromStream(BinaryStream &stream) {
+	std::string unit_json;
+	stream.read(&unit_json);
+	unit = Unit(unit_json);
+	size_t size;
+	stream.read(&size);
+	array.reserve(size);
+	for (size_t i=0;i<size;i++) {
+		T value;
+		stream.read(&value);
+		array.push_back(value);
+	}
+
+}
+
+template <typename T>
+void AttributeArrays::AttributeArray<T>::toStream(BinaryStream &stream) const {
+	std::string unit_json = unit.toJson();
+	stream.write(unit_json);
+	stream.write(array.size());
+	for (const auto &v : array)
+		stream.write(&v);
+}
+
+template<typename T> struct defaultvalue {
+	static const T value;
+};
+template<>
+const double defaultvalue<double>::value = std::numeric_limits<double>::quiet_NaN();
+template<>
+const std::string defaultvalue<std::string>::value = "";
+
+template <typename T>
+void AttributeArrays::AttributeArray<T>::resize(size_t size) {
+	array.resize(size, defaultvalue<T>::value);
+}
+
+
+AttributeArrays::AttributeArrays() {
+}
+AttributeArrays::AttributeArrays(BinaryStream &stream) {
+	fromStream(stream);
+}
+
+AttributeArrays::~AttributeArrays() {
+}
+
+void AttributeArrays::fromStream(BinaryStream &stream) {
 	size_t keycount;
 	stream.read(&keycount);
-	for (size_t k=0;k<keycount;k++) {
+	for (size_t i=0;i<keycount;i++) {
 		std::string key;
 		stream.read(&key);
-		size_t vecsize;
-		stream.read(&vecsize);
-		std::vector<T> vec(vecsize);
-		for (size_t i=0;i<vecsize;i++) {
-			T value;
-			stream.read(&value);
-			vec.push_back(value);
-		}
-		data[key] = std::move(vec);
+		auto res = _numeric.emplace(key, stream);
+		if (res.second != true)
+			throw AttributeException("Cannot deserialize AttributeArrays");
+	}
+
+	stream.read(&keycount);
+	for (size_t i=0;i<keycount;i++) {
+		std::string key;
+		stream.read(&key);
+		auto res = _textual.emplace(key, stream);
+		if (res.second != true)
+			throw AttributeException("Cannot deserialize AttributeArrays");
 	}
 }
 
-template<typename T>
-void MetadataArrays<T>::toStream(BinaryStream &stream) const {
-	size_t keycount = data.size();
+void AttributeArrays::toStream(BinaryStream &stream) const {
+	size_t keycount = _numeric.size();
 	stream.write(keycount);
-	for (auto &e : data) {
-		auto &key = e.first;
+	for (const auto &e : _numeric) {
+		const auto &key = e.first;
 		stream.write(key);
-		auto &vec = e.second;
-		auto vecsize = vec.size();
-		stream.write(vecsize);
-		for (size_t i=0;i<vecsize;i++)
-			stream.write(vec[i]);
+		const auto &vec = e.second;
+		stream.write(vec);
+	}
+
+	keycount = _textual.size();
+	stream.write(keycount);
+	for (const auto &e : _textual) {
+		const auto &key = e.first;
+		stream.write(key);
+		const auto &vec = e.second;
+		stream.write(vec);
 	}
 }
 
-template<typename T>
-std::vector<std::string> MetadataArrays<T>::getKeys() const {
+void AttributeArrays::checkIfAttributeDoesNotExist(const std::string &key) {
+	if (_numeric.count(key) > 0)
+		throw AttributeException(concat("Cannot add attribute ", key, " because a numeric attribute with the same name exists."));
+	if (_textual.count(key) > 0)
+		throw AttributeException(concat("Cannot add attribute ", key, " because a textual attribute with the same name exists."));
+}
+
+AttributeArrays::AttributeArray<double> &AttributeArrays::addNumericAttribute(const std::string &key, const Unit &unit) {
+	checkIfAttributeDoesNotExist(key);
+
+	auto res = _numeric.emplace(key, unit);
+	if (res.second != true)
+		throw AttributeException(concat("Cannot add numeric attribute ", key, " because it exists already."));
+
+	return (res.first)->second;
+}
+
+AttributeArrays::AttributeArray<double> &AttributeArrays::addNumericAttribute(const std::string &key, const Unit &unit, std::vector<double> &&values) {
+	checkIfAttributeDoesNotExist(key);
+
+	auto res = _numeric.emplace(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(unit, std::move(values)));
+	if (res.second != true)
+		throw AttributeException(concat("Cannot add numeric attribute ", key, " because it exists already."));
+
+	return (res.first)->second;
+}
+
+AttributeArrays::AttributeArray<std::string> &AttributeArrays::addTextualAttribute(const std::string &key, const Unit &unit) {
+	checkIfAttributeDoesNotExist(key);
+
+	auto res = _textual.emplace(key, unit);
+	if (res.second != true)
+		throw AttributeException(concat("Cannot add textual attribute ", key, " because it exists already."));
+
+	return (res.first)->second;
+}
+
+AttributeArrays::AttributeArray<std::string> &AttributeArrays::addTextualAttribute(const std::string &key, const Unit &unit, std::vector<std::string> &&values) {
+	checkIfAttributeDoesNotExist(key);
+
+	auto res = _textual.emplace(std::piecewise_construct, std::forward_as_tuple(key), std::forward_as_tuple(unit, std::move(values)));
+	if (res.second != true)
+		throw AttributeException(concat("Cannot add textual attribute ", key, " because it exists already."));
+
+	return (res.first)->second;
+}
+
+
+std::vector<std::string> AttributeArrays::getNumericKeys() const {
 	std::vector<std::string> keys;
-	for (auto keyValue : data)
-		keys.push_back(keyValue.first);
+	for (auto &p : _numeric) {
+		keys.push_back(p.first);
+	}
+	return keys;
+}
+std::vector<std::string> AttributeArrays::getTextualKeys() const {
+	std::vector<std::string> keys;
+	for (auto &p : _textual) {
+		keys.push_back(p.first);
+	}
 	return keys;
 }
 
+template<typename T>
+AttributeArrays AttributeArrays::filter_impl(const std::vector<T> &keep, size_t kept_count) const {
+	// If the kept_count wasn't provided, start counting
+	if (kept_count == 0) {
+		for (auto b : keep) {
+			if (b)
+				kept_count++;
+		}
+	}
+
+	AttributeArrays out;
+
+	for (auto &p : _numeric) {
+		const auto &in_array = p.second;
+		if (in_array.array.size() != keep.size())
+			throw AttributeException("Cannot filter Attributes when the keep vector has a different size than the attribute vectors");
+		auto &out_array = out.addNumericAttribute(p.first, in_array.unit);
+		out_array.array.reserve(kept_count);
+
+		for (size_t in_idx = 0; in_idx < keep.size(); in_idx++) {
+			if (keep[in_idx])
+				out_array.array.push_back(in_array.array[in_idx]);
+		}
+	}
+	for (auto &p : _textual) {
+		const auto &in_array = p.second;
+		if (in_array.array.size() != keep.size())
+			throw AttributeException("Cannot filter Attributes when the keep vector has a different size than the attribute vectors");
+		auto &out_array = out.addTextualAttribute(p.first, in_array.unit);
+		out_array.array.reserve(kept_count);
+
+		for (size_t in_idx = 0; in_idx < keep.size(); in_idx++) {
+			if (keep[in_idx])
+				out_array.array.push_back(in_array.array[in_idx]);
+		}
+	}
+
+	return out;
+}
+
+AttributeArrays AttributeArrays::filter(const std::vector<bool> &keep, size_t kept_count) const {
+	return filter_impl<bool>(keep, kept_count);
+}
+AttributeArrays AttributeArrays::filter(const std::vector<char> &keep, size_t kept_count) const {
+	return filter_impl<char>(keep, kept_count);
+}
+
+void AttributeArrays::validate(size_t expected_values) const {
+	for (auto &n : _numeric) {
+		if (n.second.array.size() != expected_values)
+			throw AttributeException(concat("Numeric attribute array ", n.first, " does not contain the expected amount of values"));
+	}
+	for (auto &n : _textual) {
+		if (n.second.array.size() != expected_values)
+			throw AttributeException(concat("Numeric attribute array ", n.first, " does not contain the expected amount of values"));
+	}
+}
 
 
 // Instantiate as required
-template class MetadataArrays<std::string>;
-template class MetadataArrays<double>;
+template class AttributeArrays::AttributeArray<double>;
+template class AttributeArrays::AttributeArray<std::string>;

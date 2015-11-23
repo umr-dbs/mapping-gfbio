@@ -58,10 +58,10 @@ std::vector<bool> filter(const SimpleFeatureCollection &collection, const std::s
 	size_t count = collection.getFeatureCount();
 	std::vector<bool> keep(count, false);
 
-	auto &attributes = collection.local_md_value.getVector(name);
+	auto &attributes = collection.feature_attributes.numeric(name);
 
 	for (size_t i=0;i<count;i++) {
-		double value = attributes[i];
+		double value = attributes.get(i);
 		bool copy = false;
 
 		if (std::isnan(value)) {

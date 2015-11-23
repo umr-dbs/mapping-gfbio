@@ -113,7 +113,7 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 		count->clear(0);
 		uint16_t count_max = std::numeric_limits<uint16_t>::max()-1;
 
-		auto &vec = points->local_md_value.getVector(renderattribute);
+		auto &vec = points->feature_attributes.numeric(renderattribute);
 		for (auto feature : *points) {
 			for (auto &p : feature) {
 				auto px = sum->WorldToPixelX(p.x);
@@ -121,7 +121,7 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 				if (px < 0 || py < 0 || px >= sum->width || py >= sum->height)
 					continue;
 
-				auto attr = vec[feature];
+				auto attr = vec.get(feature);
 				if (std::isnan(attr))
 					continue;
 

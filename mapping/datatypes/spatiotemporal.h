@@ -210,6 +210,12 @@ class SpatioTemporalResult {
 	public:
 		SpatioTemporalResult() = delete;
 		SpatioTemporalResult(const SpatioTemporalReference &stref) : stref(stref) {};
+		// Globally disable copying and moves. SpatioTemporalResults are usually large data structures and we want to avoid accidental copies.
+		SpatioTemporalResult(const SpatioTemporalResult &other) = delete;
+		SpatioTemporalResult& operator=(const SpatioTemporalResult &) = delete;
+		SpatioTemporalResult(SpatioTemporalResult &&) = default;
+		SpatioTemporalResult& operator=(SpatioTemporalResult &&) = default;
+
 		void replaceSTRef(const SpatioTemporalReference &stref);
 
 		const SpatioTemporalReference stref;

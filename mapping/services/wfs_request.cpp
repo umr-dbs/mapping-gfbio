@@ -128,16 +128,15 @@ auto WFSRequest::getFeature() -> std::string {
 		// TYPENAMES=ns1:F1,ns1:F1&ALIASES=C,D&FILTER=<Filter>…for C,D…</Filter>
 
 		auto circles = clusterer.getCircles();
-		clusteredPoints->local_md_value.addEmptyVector("radius", circles.size());
-		clusteredPoints->local_md_value.addEmptyVector("numberOfPoints",
-				circles.size());
+		auto &attr_radius = clusteredPoints->feature_attributes.addNumericAttribute("radius", Unit::unknown());
+		auto &attr_number = clusteredPoints->feature_attributes.addNumericAttribute("numberOfPoints", Unit::unknown());
+		attr_radius.reserve(circles.size());
+		attr_number.reserve(circles.size());
 		for (auto& circle : circles) {
 			size_t idx = clusteredPoints->addSinglePointFeature(Coordinate(circle->getX() * xres,
 					circle->getY() * yres));
-			clusteredPoints->local_md_value.set(idx, "radius",
-					circle->getRadius());
-			clusteredPoints->local_md_value.set(idx, "numberOfPoints",
-					circle->getNumberOfPoints());
+			attr_radius.set(idx, circle->getRadius());
+			attr_number.set(idx, circle->getNumberOfPoints());
 		}
 
 		points.swap(clusteredPoints);

@@ -84,15 +84,21 @@ const std::string &AttributeMaps::getTextual(const std::string &key) const {
 
 double AttributeMaps::getNumeric(const std::string &key, double defaultvalue) const {
 	auto it = _numeric.find(key);
-	if (it == _numeric.end())
+	if (it == _numeric.end()) {
+		if (_textual.count("key"))
+			throw AttributeException(concat("Cannot get numeric attribute ", key, " when a textual attribute with the same name exists"));
 		return defaultvalue;
+	}
 	return it->second;
 }
 
 const std::string &AttributeMaps::getTextual(const std::string &key, const std::string &defaultvalue) const {
 	auto it = _textual.find(key);
-	if (it == _textual.end())
+	if (it == _textual.end()) {
+		if (_numeric.count("key"))
+			throw AttributeException(concat("Cannot get textual attribute ", key, " when a numeric attribute with the same name exists"));
 		return defaultvalue;
+	}
 	return it->second;
 }
 
@@ -110,7 +116,7 @@ void AttributeArrays::AttributeArray<T>::set(size_t idx, const T &value) {
 		return;
 	}
 	if (array.size() < idx+1)
-		array.resize(idx+1);
+		resize(idx+1);
 	array[idx] = value;
 }
 

@@ -287,26 +287,3 @@ bool SimpleFeatureCollection::lineSegmentsIntersect(const Coordinate& p1, const 
 bool SimpleFeatureCollection::featureIntersectsRectangle(size_t featureIndex, const SpatialReference& sref) const{
 	return featureIntersectsRectangle(featureIndex, sref.x1, sref.y1, sref.x2, sref.y2);
 }
-
-void SimpleFeatureCollection::append(const SimpleFeatureCollection& other) {
-	feature_attributes += other.feature_attributes;
-
-	coordinates.reserve(coordinates.size() + other.coordinates.size());
-	time_start.reserve(time_start.size() + other.time_start.size());
-	time_end.reserve(time_end.size() + other.time_end.size());
-
-	coordinates.insert(coordinates.end(), other.coordinates.begin(),other.coordinates.end());
-	time_start.insert(time_start.end(), other.time_start.begin(),other.time_start.end());
-	time_end.insert(time_end.end(), other.time_end.begin(),other.time_end.end());
-}
-
-void SimpleFeatureCollection::append_idx_vector(std::vector<uint32_t>& dest,
-		const std::vector<uint32_t>& src) {
-
-	dest.reserve( dest.size() + src.size() - 1 );
-	size_t ext = dest.back();
-	dest.pop_back();
-
-	for ( auto sf : src )
-		dest.push_back( sf + ext );
-}

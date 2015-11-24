@@ -11,6 +11,31 @@
 #include "node/puzzletracer.h"
 #include "util/log.h"
 
+class AttributeArraysHelper {
+public:
+	static void append( AttributeArrays &dest, const AttributeArrays &src );
+private:
+	template <typename T>
+	static void append_arr( AttributeArrays::AttributeArray<T> &dest, const AttributeArrays::AttributeArray<T> &src );
+};
+
+void AttributeArraysHelper::append( AttributeArrays &dest, const AttributeArrays &src ) {
+	for (auto &n : dest._numeric) {
+		append_arr( n.second, src._numeric.at(n.first) );
+	}
+	for (auto &n : dest._textual) {
+		append_arr( n.second, src._textual.at(n.first) );
+	}
+}
+
+template<typename T>
+void AttributeArraysHelper::append_arr(
+		AttributeArrays::AttributeArray<T>& dest,
+		const AttributeArrays::AttributeArray<T>& src) {
+	dest.reserve(dest.array.size() + src.array.size() );
+	dest.array.insert(dest.array.end(), src.array.begin(), src.array.end() );
+}
+
 //
 // NOP-Wrapper
 //
@@ -398,21 +423,47 @@ std::unique_ptr<T> FeatureCollectionCacheWrapper<T>::do_puzzle(const SpatioTempo
 	T& target = *result;
 	target.global_attributes = items.at(0)->global_attributes;
 
-	for ( auto &src_ptr : items ) {
-		const T& src = *src_ptr;
+	for ( auto &src : items ) {
 		std::vector<bool> keep;
-		keep.reserve( src.getFeatureCount() );
+		keep.reserve( src->getFeatureCount() );
 
-		for ( auto feature : src ) {
+		for ( auto feature : *src ) {
 			keep.push_back(
-				src.featureIntersectsRectangle( feature, bbox.x1,bbox.y1,bbox.x2,bbox.y2 ) &&
-				!(src.time_start[feature] > bbox.t2 || src.time_end[feature] < bbox.t1)
+				src->featureIntersectsRectangle( feature, bbox.x1,bbox.y1,bbox.x2,bbox.y2 ) &&
+				!(src->time_start[feature] > bbox.t2 || src->time_end[feature] < bbox.t1)
 			);
 		}
-		std::unique_ptr<T> filtered = src.filter(keep);
-		target += *filtered;
+		std::unique_ptr<T> filtered = src->filter(keep);
+
+		AttributeArraysHelper::append(target.feature_attributes, filtered->feature_attributes);
+
+		target.coordinates.reserve(target.coordinates.size() + filtered->coordinates.size());
+		target.time_start.reserve(target.time_start.size() + filtered->time_start.size());
+		target.time_end.reserve(target.time_end.size() + filtered->time_end.size());
+
+		target.coordinates.insert(target.coordinates.end(), filtered->coordinates.begin(),filtered->coordinates.end());
+		target.time_start.insert(target.time_start.end(), filtered->time_start.begin(),filtered->time_start.end());
+		target.time_end.insert(target.time_end.end(), filtered->time_end.begin(),filtered->time_end.end());
+
+		append_idxs(target,*filtered);
 	}
 	return result;
+}
+
+template<typename T>
+void FeatureCollectionCacheWrapper<T>::append_idx_vec(
+		std::vector<uint32_t>& dest, const std::vector<uint32_t>& src) {
+	dest.reserve( dest.size() + src.size() - 1 );
+	size_t ext = dest.back();
+	dest.pop_back();
+
+	for ( auto sf : src )
+		dest.push_back( sf + ext );
+}
+
+template<typename T>
+void FeatureCollectionCacheWrapper<T>::combine_feature_attributes(
+		AttributeArrays& dest, const AttributeArrays src) {
 }
 
 template<typename T>
@@ -429,6 +480,11 @@ std::unique_ptr<PointCollection> PointCollectionCacheWrapper::compute_item(Gener
 	return op.getCachedPointCollection(query,qp);
 }
 
+void PointCollectionCacheWrapper::append_idxs(PointCollection& dest,
+		const PointCollection& src) {
+	append_idx_vec(dest.start_feature, src.start_feature);
+}
+
 LineCollectionCacheWrapper::LineCollectionCacheWrapper(NodeCache<LineCollection>& cache,
 	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port) {
 }
@@ -438,6 +494,12 @@ std::unique_ptr<LineCollection> LineCollectionCacheWrapper::compute_item(Generic
 	return op.getCachedLineCollection(query,qp);
 }
 
+void LineCollectionCacheWrapper::append_idxs(LineCollection& dest,
+		const LineCollection& src) {
+	append_idx_vec(dest.start_feature, src.start_feature);
+	append_idx_vec(dest.start_line, src.start_line);
+}
+
 PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(NodeCache<PolygonCollection>& cache,
 	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port) {
 }
@@ -445,6 +507,13 @@ PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(NodeCache<PolygonCo
 std::unique_ptr<PolygonCollection> PolygonCollectionCacheWrapper::compute_item(GenericOperator& op,
 	const QueryRectangle& query, QueryProfiler &qp) {
 	return op.getCachedPolygonCollection(query,qp);
+}
+
+void PolygonCollectionCacheWrapper::append_idxs(PolygonCollection& dest,
+		const PolygonCollection& src) {
+	append_idx_vec(dest.start_feature, src.start_feature);
+	append_idx_vec(dest.start_polygon, src.start_polygon);
+	append_idx_vec(dest.start_ring, src.start_ring);
 }
 
 //

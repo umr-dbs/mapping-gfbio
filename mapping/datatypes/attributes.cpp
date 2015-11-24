@@ -144,15 +144,6 @@ void AttributeArrays::AttributeArray<T>::toStream(BinaryStream &stream) const {
 		stream.write(&v);
 }
 
-template<typename T>
-AttributeArrays::AttributeArray<T>& AttributeArrays::AttributeArray<T>::operator +=(
-		const AttributeArray<T>& other) {
-
-	reserve(array.size() + other.array.size() );
-	array.insert(array.end(), other.array.begin(), other.array.end() );
-	return *this;
-}
-
 template<typename T> struct defaultvalue {
 	static const T value;
 };
@@ -337,17 +328,6 @@ void AttributeArrays::validate(size_t expected_values) const {
 			throw AttributeException(concat("Numeric attribute array ", n.first, " does not contain the expected amount of values"));
 	}
 }
-
-AttributeArrays& AttributeArrays::operator +=(const AttributeArrays& other) {
-	for (auto &n : _numeric) {
-		n.second += other._numeric.at(n.first);
-	}
-	for (auto &n : _textual) {
-		n.second += other._textual.at(n.first);
-	}
-	return *this;
-}
-
 
 // Instantiate as required
 template class AttributeArrays::AttributeArray<double>;

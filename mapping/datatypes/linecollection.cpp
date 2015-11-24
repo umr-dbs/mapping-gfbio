@@ -287,11 +287,3 @@ void LineCollection::validateSpecifics() const {
 	if(start_feature.back() != start_line.size() - 1)
 		throw FeatureException("Feature not finished");
 }
-
-LineCollection& LineCollection::operator +=(const LineCollection& other) {
-	append( other );
-	append_idx_vector(start_feature, other.start_feature);
-	append_idx_vector(start_line, other.start_line);
-
-	return *this;
-}

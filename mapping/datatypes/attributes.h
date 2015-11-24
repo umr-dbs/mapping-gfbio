@@ -85,11 +85,10 @@ class AttributeArrays {
 
 				Unit unit;
 			private:
-				AttributeArray<T>& operator+=( const AttributeArray<T> &other );
-
 				// to map the array to a GPU, direct access to the std::vector is required
 				friend class RasterOpenCL::CLProgram;
 				friend AttributeArrays;
+				friend class AttributeArraysHelper;
 
 				array_type array;
 		};
@@ -124,8 +123,6 @@ class AttributeArrays {
 
 		AttributeArrays filter(const std::vector<bool> &keep, size_t kept_count = 0) const;
 		AttributeArrays filter(const std::vector<char> &keep, size_t kept_count = 0) const;
-
-		AttributeArrays& operator+=( const AttributeArrays &other );
 	private:
 		template<typename T>
 			AttributeArrays filter_impl(const std::vector<T> &keep, size_t kept_count) const;
@@ -138,6 +135,7 @@ class AttributeArrays {
 
 		std::map<std::string, AttributeArray<double> > _numeric;
 		std::map<std::string, AttributeArray<std::string> > _textual;
+		friend class AttributeArraysHelper;
 };
 
 #endif

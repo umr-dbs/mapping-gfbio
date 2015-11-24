@@ -420,9 +420,3 @@ void PointCollection::validateSpecifics() const {
 	if(start_feature.back() != coordinates.size())
 		throw FeatureException("Feature not finished");
 }
-
-PointCollection& PointCollection::operator +=(const PointCollection& other) {
-	append( other );
-	append_idx_vector(start_feature, other.start_feature);
-	return *this;
-}

@@ -134,8 +134,6 @@ public:
 
 	virtual ~LineCollection(){};
 
-	LineCollection& operator+=( const LineCollection &other );
-
 protected:
 	virtual void featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const;
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const;

@@ -102,14 +102,6 @@ protected:
 
 	virtual void validateSpecifics() const = 0;
 
-	/*
-	 * Helper for implementing += in concrete classes
-	 * Appends time_start, time_end, feature_attributes and coordinates
-	 */
-	void append( const SimpleFeatureCollection &other );
-
-	void append_idx_vector( std::vector<uint32_t> &dest, const std::vector<uint32_t> &src );
-
 	//calculate the MBR of the coordinates in range from start to stop (exclusive)
 	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;
 

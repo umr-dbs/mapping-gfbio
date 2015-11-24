@@ -170,8 +170,6 @@ public:
 
 	virtual ~PolygonCollection(){};
 
-	PolygonCollection& operator+=( const PolygonCollection &other );
-
 	std::string getAsString();
 
 protected:

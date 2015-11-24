@@ -510,13 +510,3 @@ void PolygonCollection::validateSpecifics() const {
 	if(start_feature.back() != start_polygon.size() - 1)
 		throw FeatureException("Feature not finished");
 }
-
-PolygonCollection& PolygonCollection::operator +=(
-		const PolygonCollection& other) {
-	append( other );
-	append_idx_vector(start_feature, other.start_feature);
-	append_idx_vector(start_polygon, other.start_polygon);
-	append_idx_vector(start_ring, other.start_ring);
-
-	return *this;
-}

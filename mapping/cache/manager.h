@@ -18,7 +18,6 @@
 #include <unordered_set>
 #include <memory>
 
-
 //
 // The cache-manager provides uniform access to the cache
 // Currently used by the node-server process and the getCached*-Methods of GenericOperator
@@ -118,24 +117,32 @@ public:
 	std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items);
 	std::unique_ptr<T> read_item( BinaryStream &stream );
 	virtual std::unique_ptr<T> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) = 0;
+	virtual void append_idxs( T &dest, const T &src ) = 0;
+protected:
+	void append_idx_vec( std::vector<uint32_t> &dest, const std::vector<uint32_t> &src );
+private:
+	void combine_feature_attributes( AttributeArrays &dest, const AttributeArrays src );
 };
 
 class PointCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PointCollection> {
 public:
 	PointCollectionCacheWrapper( NodeCache<PointCollection> &cache, const std::string &my_host, int my_port );
 	std::unique_ptr<PointCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
+	void append_idxs( PointCollection &dest, const PointCollection &src );
 };
 
 class LineCollectionCacheWrapper : public FeatureCollectionCacheWrapper<LineCollection> {
 public:
 	LineCollectionCacheWrapper( NodeCache<LineCollection> &cache, const std::string &my_host, int my_port );
 	std::unique_ptr<LineCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
+	void append_idxs( LineCollection &dest, const LineCollection &src );
 };
 
 class PolygonCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PolygonCollection> {
 public:
 	PolygonCollectionCacheWrapper( NodeCache<PolygonCollection> &cache, const std::string &my_host, int my_port );
 	std::unique_ptr<PolygonCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
+	void append_idxs( PolygonCollection &dest, const PolygonCollection &src );
 };
 
 

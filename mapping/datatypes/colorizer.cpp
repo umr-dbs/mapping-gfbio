@@ -272,24 +272,24 @@ class GlobalLandCoverColorizer : public Colorizer {
 
 std::unique_ptr<Colorizer> Colorizer::fromUnit(const Unit &unit) {
 	if (unit.getMeasurement() == "temperature" && unit.getUnit() == "c")
-		return make("temperature");
+		return create("temperature");
 	if (unit.getMeasurement() == "elevation" && unit.getUnit() == "m")
-		return make("height");
+		return create("height");
 	if (unit.getMeasurement() == "frequency" && unit.getUnit() == "heatmap")
-		return make("heatmap");
+		return create("heatmap");
 	if (unit.getMeasurement() == "radiation" && unit.getUnit() == "cpm")
-		return make("cpm");
+		return create("cpm");
 	if (unit.getUnit() == "errormessage")
-		return make("error");
+		return create("error");
 	if (unit.getUnit() == "classification")
-		return make("glc"); // TODO: we need a better default colorizer, optimized for contrast
+		return create("glc"); // TODO: we need a better default colorizer, optimized for contrast
 
 	// TODO: if we have a min/max, we can do a proper scaling. If we don't, what do we do?
-	return make("grey");
+	return create("grey");
 }
 
 
-std::unique_ptr<Colorizer> Colorizer::make(const std::string &name) {
+std::unique_ptr<Colorizer> Colorizer::create(const std::string &name) {
 	if (name == "hsv")
 		return make_unique<HSVColorizer>();
 	if (name == "heatmap")

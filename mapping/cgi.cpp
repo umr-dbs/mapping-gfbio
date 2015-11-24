@@ -165,7 +165,7 @@ static time_t parseIso8601DateTime(std::string dateTimeString){
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
 	// For now, always guess the colorizer, ignore any user-specified colors
-	//auto colorizer = Colorizer::make(colors);
+	//auto colorizer = Colorizer::create(colors);
 	auto colorizer = Colorizer::fromUnit(raster->dd.unit);
 static bool has_headers = false;
 

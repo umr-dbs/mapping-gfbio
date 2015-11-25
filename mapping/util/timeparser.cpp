@@ -32,7 +32,7 @@ public:
 	TimeParserDMYHM() : TimeParser(timetype_t::TIMETYPE_UNIX){}
 
 	virtual double parse(const std::string& timeString) const{
-		std::tm tm;
+		std::tm tm = {};
 		if (strptime(timeString.c_str(), "%d-%B-%Y  %H:%M", &tm))
 			return timegm(&tm);
 		throw TimeParseException("Could not parse time string");
@@ -49,7 +49,7 @@ public:
 
 	virtual double parse(const std::string& timeString) const{
 		//TODO: support entirety of ISO8601 compatible formats https://en.wikipedia.org/wiki/ISO_8601
-		std::tm tm;
+		std::tm tm = {};
 		if (strptime(timeString.c_str(), "%Y-%m-%dT%H:%M:%S", &tm))
 			return timegm(&tm);
 		throw TimeParseException("Could not parse time string");
@@ -65,7 +65,7 @@ public:
 	TimeParserCustom(const std::string format) : TimeParser(timetype_t::TIMETYPE_UNIX), format(format){}
 
 	virtual double parse(const std::string& timeString) const{
-		std::tm tm;
+		std::tm tm = {};
 		if (strptime(timeString.c_str(), format.c_str(), &tm))
 			return timegm(&tm);
 		throw TimeParseException("Could not parse time string");

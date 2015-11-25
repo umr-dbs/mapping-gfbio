@@ -261,15 +261,12 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 	if (pos_x == no_pos || (geometry_specification == GeometrySpecification::XY && pos_y == no_pos))
 		throw OperatorException("CSVPointSource: the given columns containing the geometry could not be found.");
 
-	if (time_specification != TimeSpecification::NONE) {
-		if (pos_time1 == no_pos || (time_specification != TimeSpecification::START && pos_time2 == no_pos))
-			throw OperatorException("CSVPointSource: the given columns containing time information could not be found.");
+	if((time1Parser != nullptr && pos_time1 == no_pos) || (time2Parser != nullptr && pos_time2 == no_pos))
+		throw OperatorException("CSVPointSource: the given column containing time information could not be found.");
 
-		if(time1Parser->getTimeType() != rect.timetype || (time_specification != TimeSpecification::START && time2Parser->getTimeType() != rect.timetype))
-			throw OperatorException("CSVPointSource: Invalid time specification for given query rectangle");
+	if((time1Parser != nullptr && time1Parser->getTimeType() != rect.timetype) || (time2Parser != nullptr && time2Parser->getTimeType() != rect.timetype))
+		throw OperatorException("CSVPointSource: Invalid time specification for given query rectangle");
 
-
-	}
 	for (size_t k=0;k<columns_numeric.size();k++) {
 		if (pos_numeric[k] == no_pos)
 			throw OperatorException(concat("CSVPointSource: numeric column \"", columns_numeric[k], "\" not found."));

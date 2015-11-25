@@ -5,6 +5,8 @@
  *      Author: mika
  */
 
+#if 0
+
 #include <gtest/gtest.h>
 #include <vector>
 #include "test/unittests/cache/util.h"
@@ -333,3 +335,4 @@ TEST(DistributionTest,TestStatsAndReorg) {
 		t->join();
 }
 
+#endif

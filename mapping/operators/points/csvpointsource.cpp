@@ -5,6 +5,7 @@
 #include "util/make_unique.h"
 #include "util/csvparser.h"
 #include "util/enumconverter.h"
+#include "util/timeparser.h"
 
 #include <string>
 #include <fstream>
@@ -54,18 +55,6 @@ const std::vector< std::pair<TimeSpecification, std::string> > TimeSpecification
 
 EnumConverter<TimeSpecification> TimeSpecificationConverter(TimeSpecificationMap);
 
-enum class TimeFormat {
-	SECONDS,
-	DMYHM // for hanna's data
-};
-
-const std::vector< std::pair<TimeFormat, std::string> > TimeFormatMap = {
-	std::make_pair(TimeFormat::SECONDS, "seconds"),
-	std::make_pair(TimeFormat::DMYHM, "dmyhm")
-};
-
-EnumConverter<TimeFormat> TimeFormatConverter(TimeFormatMap);
-
 
 /*
  * Now define the operator
@@ -96,8 +85,8 @@ class CSVPointSource : public GenericOperator {
 		std::string column_y;
 		std::string column_time1;
 		std::string column_time2;
-		TimeFormat format_time1;
-		TimeFormat format_time2;
+		std::unique_ptr<TimeParser> time1Parser;
+		std::unique_ptr<TimeParser> time2Parser;
 		std::vector<std::string> columns_numeric;
 		std::vector<std::string> columns_textual;
 		char field_separator;
@@ -138,10 +127,21 @@ CSVPointSource::CSVPointSource(int sourcecounts[], GenericOperator *sources[], J
 	if (time_specification == TimeSpecification::START)
 		time_duration = params.get("duration", 1.0).asDouble();
 
-	column_time1 = columns.get("time1", "time1").asString();
-	format_time1 = TimeFormatConverter.from_json(columns, "time1_format");
-	column_time2 = columns.get("time2", "time2").asString();
-	format_time2 = TimeFormatConverter.from_json(columns, "time2_format");
+	if(time_specification != TimeSpecification::NONE){
+		column_time1 = columns.get("time1", "time1").asString();
+
+		const Json::Value& time1Format = params.get("time1_format", Json::Value::null);
+		time1Parser = TimeParser::createFromJson(time1Format);
+	}
+
+	if(time_specification == TimeSpecification::START_DURATION || time_specification == TimeSpecification::START_END){
+		//TODO: check that time2 can be used as interval (e.g. format::seconds)
+		column_time2 = columns.get("time2", "time2").asString();
+
+		const Json::Value& time2Format = params.get("time2_format", Json::Value::null);
+		time2Parser = TimeParser::createFromJson(time2Format);
+	}
+
 
 	auto textual = columns.get("textual", Json::Value(Json::ValueType::arrayValue));
     for (auto &name : textual)
@@ -177,10 +177,10 @@ void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
 		columns["y"] = column_y;
 	if (time_specification != TimeSpecification::NONE) {
 		columns["time1"] = column_time1;
-		columns["time1_format"] = TimeFormatConverter.to_string(format_time1);;
+		params["time1_format"] = time1Parser->toJsonObject();
 		if (time_specification != TimeSpecification::START) {
 			columns["time2"] = column_time2;
-			columns["time2_format"] = TimeFormatConverter.to_string(format_time2);
+			params["time2_format"] = time2Parser->toJsonObject();
 		}
 	}
 
@@ -205,23 +205,6 @@ static uint64_t getFilesize(const char *filename) {
     if (stat(filename, &st) == 0)
         return st.st_size;
     return -1;
-}
-
-static double parseTime(const std::string &str, TimeFormat format) {
-	if (format == TimeFormat::SECONDS) {
-		return std::stod(str);
-	}
-	if (format == TimeFormat::DMYHM) {
-		std::tm tm;
-		// 13-Jul-2010  17:35
-		time_t t = 0;
-		if (strptime(str.c_str(), "%d-%B-%Y  %H:%M", &tm)) {
-			t = mktime(&tm);
-		}
-		return (double) t;
-	}
-
-	throw ArgumentException("parseTime: unknown TimeFormat");
 }
 
 void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, const QueryRectangle &rect, QueryProfiler &profiler,
@@ -281,6 +264,11 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 	if (time_specification != TimeSpecification::NONE) {
 		if (pos_time1 == no_pos || (time_specification != TimeSpecification::START && pos_time2 == no_pos))
 			throw OperatorException("CSVPointSource: the given columns containing time information could not be found.");
+
+		if(time1Parser->getTimeType() != rect.timetype || (time_specification != TimeSpecification::START && time2Parser->getTimeType() != rect.timetype))
+			throw OperatorException("CSVPointSource: Invalid time specification for given query rectangle");
+
+
 	}
 	for (size_t k=0;k<columns_numeric.size();k++) {
 		if (pos_numeric[k] == no_pos)
@@ -322,16 +310,16 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 		if (time_specification != TimeSpecification::NONE) {
 			double t1, t2;
 			if (time_specification == TimeSpecification::START) {
-				t1 = parseTime(tuple[pos_time1], format_time1);
+				t1 = time1Parser->parse(tuple[pos_time1]);
 				t2 = t1+time_duration;
 			}
 			else if (time_specification == TimeSpecification::START_END) {
-				t1 = parseTime(tuple[pos_time1], format_time1);
-				t2 = parseTime(tuple[pos_time2], format_time2);
+				t1 = time1Parser->parse(tuple[pos_time1]);
+				t2 = time2Parser->parse(tuple[pos_time2]);
 			}
 			else if (time_specification == TimeSpecification::START_DURATION) {
-				t1 = parseTime(tuple[pos_time1], format_time1);
-				t2 = t1 + parseTime(tuple[pos_time2], format_time2);
+				t1 = time1Parser->parse(tuple[pos_time1]);
+				t2 = t1 + time2Parser->parse(tuple[pos_time2]);
 			}
 			collection->time_start.push_back(t1);
 			collection->time_end.push_back(t2);

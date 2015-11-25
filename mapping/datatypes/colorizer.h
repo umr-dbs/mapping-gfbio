@@ -18,7 +18,7 @@ class Colorizer {
 		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const = 0;
 		const bool is_absolute;
 
-		static std::unique_ptr<Colorizer> make(const std::string &name);
+		static std::unique_ptr<Colorizer> create(const std::string &name);
 		static std::unique_ptr<Colorizer> fromUnit(const Unit &unit);
 };
 

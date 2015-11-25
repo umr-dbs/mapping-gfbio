@@ -10,7 +10,7 @@
 #include <cmath>
 
 template<typename T>
-std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T> &keep) {
+std::unique_ptr<PointCollection> filter(const PointCollection *in, const std::vector<T> &keep) {
 	size_t count = in->getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
@@ -61,11 +61,11 @@ std::unique_ptr<PointCollection> filter(PointCollection *in, const std::vector<T
 	return out;
 }
 
-std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) {
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) const {
 	return ::filter<bool>(this, keep);
 }
 
-std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) {
+std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) const {
 	return ::filter<char>(this, keep);
 }
 
@@ -78,7 +78,7 @@ bool PointCollection::featureIntersectsRectangle(size_t featureIndex, double x1,
 	return false;
 }
 
-std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2) const{
 	std::vector<bool> keep(getFeatureCount());
 	for(auto feature : *this){
 		if(featureIntersectsRectangle(feature, x1, y1, x2, y2)){
@@ -88,7 +88,7 @@ std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(
 	return filter(keep);
 }
 
-std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(const SpatialReference& sref){
+std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(const SpatialReference& sref) const{
 	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
@@ -132,7 +132,7 @@ PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection
 	}
 }
 
-void PointCollection::toStream(BinaryStream &stream) {
+void PointCollection::toStream(BinaryStream &stream) const {
 	stream.write(stref);
 	stream.write(hasTime());
 

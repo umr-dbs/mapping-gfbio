@@ -45,9 +45,9 @@ class TestNodeServer : public NodeServer {
 public:
 	static void run_node_thread(TestNodeServer *ns);
 
-	TestNodeServer( std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port, size_t raster_capacity = 5 * 1024 * 1024 );
+	TestNodeServer( std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port, size_t capacity = 5 * 1024 * 1024 );
 	bool owns_current_thread();
-	RemoteCacheManager rcm;
+	DefaultCacheManager rcm;
 	std::thread::id my_id;
 };
 
@@ -58,16 +58,17 @@ public:
 	CacheManager& get_instance_mgr( int i );
 
 
-	virtual std::unique_ptr<GenericRaster> query_raster( const GenericOperator &op, const QueryRectangle &rect );
-	virtual const std::shared_ptr<GenericRaster> get_raster_ref(const NodeCacheKey &key);
-	virtual NodeCacheRef get_raster_info( const NodeCacheKey &key);
-	virtual void put_raster( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster );
-	virtual NodeCacheRef put_raster_local( const std::string &semantic_id, const std::unique_ptr<GenericRaster> &raster, const AccessInfo info = AccessInfo() );
-	virtual void remove_raster_local( const NodeCacheKey &key );
+	// Creates a handshake message for the index-server
+	NodeHandshake get_handshake() const;
 
-	virtual NodeHandshake get_handshake( const std::string &my_host, uint32_t my_port ) const;
+	// Retrieves statistics for this cache
+	NodeStats get_stats() const;
 
-	virtual NodeStats get_stats() const;
+	CacheWrapper<GenericRaster>& get_raster_cache();
+	CacheWrapper<PointCollection>& get_point_cache();
+	CacheWrapper<LineCollection>& get_line_cache();
+	CacheWrapper<PolygonCollection>& get_polygon_cache();
+	CacheWrapper<GenericPlot>& get_plot_cache();
 private:
 	CacheManager& get_current_instance() const;
 	std::vector<TestNodeServer*> instances;

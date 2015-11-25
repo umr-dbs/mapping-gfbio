@@ -65,9 +65,14 @@ int main(void) {
 
 	std::string cs = Configuration::get("nodeserver.cache.strategy");
 	size_t raster_size = atoi(Configuration::get("nodeserver.cache.raster.size").c_str());
+	size_t point_size = atoi(Configuration::get("nodeserver.cache.points.size").c_str());
+	size_t line_size = atoi(Configuration::get("nodeserver.cache.lines.size").c_str());
+	size_t polygon_size = atoi(Configuration::get("nodeserver.cache.polygons.size").c_str());
+	size_t plot_size = atoi(Configuration::get("nodeserver.cache.plots.size").c_str());
 
 	// Inititalize cache
-	std::unique_ptr<CacheManager> cache_impl = make_unique<RemoteCacheManager>(raster_size,hoststr,portnr);
+	std::unique_ptr<CacheManager> cache_impl = make_unique<DefaultCacheManager>(
+			hoststr,portnr,raster_size, point_size, line_size, polygon_size, plot_size);
 	auto caching_strategy = CachingStrategy::by_name(cs);
 	CacheManager::init(std::move(cache_impl), std::move(caching_strategy));
 

@@ -21,18 +21,27 @@
 
 class Capacity {
 public:
-	Capacity( size_t raster_cache_size, size_t raster_cache_used );
+	Capacity( uint64_t raster_cache_total, uint64_t raster_cache_used,
+			  uint64_t point_cache_total, uint64_t point_cache_used,
+			  uint64_t line_cache_total, uint64_t line_cache_used,
+			  uint64_t polygon_cache_total, uint64_t polygon_cache_used,
+			  uint64_t plot_cache_total, uint64_t plot_cache_used );
 	Capacity( BinaryStream &stream );
-	virtual ~Capacity();
-
-	double get_raster_usage() const;
 
 	void toStream( BinaryStream &stream ) const;
 
-	virtual std::string to_string() const;
+	std::string to_string() const;
 
-	size_t raster_cache_total;
-	size_t raster_cache_used;
+	uint64_t raster_cache_total;
+	uint64_t raster_cache_used;
+	uint64_t point_cache_total;
+	uint64_t point_cache_used;
+	uint64_t line_cache_total;
+	uint64_t line_cache_used;
+	uint64_t polygon_cache_total;
+	uint64_t polygon_cache_used;
+	uint64_t plot_cache_total;
+	uint64_t plot_cache_used;
 };
 
 //
@@ -43,20 +52,19 @@ public:
 
 class NodeHandshake : public Capacity {
 public:
-	NodeHandshake( const std::string &host, uint32_t port, const Capacity &capacity, std::vector<NodeCacheRef> raster_entries );
+	NodeHandshake( const std::string &host, uint32_t port, const Capacity &capacity, std::vector<NodeCacheRef> entries );
 	NodeHandshake( BinaryStream &stream );
-	virtual ~NodeHandshake();
 
-	const std::vector<NodeCacheRef>& get_raster_entries() const;
+	const std::vector<NodeCacheRef>& get_entries() const;
 
 	void toStream( BinaryStream &stream ) const;
-	virtual std::string to_string() const;
+	std::string to_string() const;
 
 	std::string host;
 	uint32_t port;
 
 private:
-	std::vector<NodeCacheRef> raster_entries;
+	std::vector<NodeCacheRef> entries;
 };
 
 //
@@ -79,7 +87,7 @@ public:
 //
 class CacheStats {
 public:
-	CacheStats();
+	CacheStats( CacheType type );
 	CacheStats( BinaryStream &stream );
 
 	void toStream( BinaryStream &stream ) const;
@@ -87,6 +95,8 @@ public:
 	void add_stats( const std::string &semantic_id, NodeEntryStats stats );
 
 	const std::unordered_map<std::string,std::vector<NodeEntryStats>>& get_stats() const;
+
+	CacheType type;
 private:
 	std::unordered_map<std::string,std::vector<NodeEntryStats>> stats;
 };
@@ -98,13 +108,10 @@ private:
 
 class NodeStats : public Capacity {
 public:
-	NodeStats( const Capacity &capacity, CacheStats raster_stats );
+	NodeStats( const Capacity &capacity, std::vector<CacheStats> stats );
 	NodeStats( BinaryStream &stream );
-	virtual ~NodeStats();
-
 	void toStream( BinaryStream &stream ) const;
-
-	CacheStats raster_stats;
+	std::vector<CacheStats> stats;
 };
 
 

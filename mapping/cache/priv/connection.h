@@ -13,6 +13,7 @@
 #include "cache/priv/cache_stats.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
+#include "cache/common.h"
 #include "util/nio.h"
 
 #include <map>
@@ -69,17 +70,14 @@ public:
 	enum class State {
 		IDLE, READING_REQUEST, AWAIT_RESPONSE, WRITING_RESPONSE
 	};
-	enum class RequestType {
-		NONE, RASTER, POINT, LINE, POLY, PLOT
-	};
 
 	static const uint32_t MAGIC_NUMBER = 0x22345678;
 
 	//
 	// Expected data on stream is:
-	// RasterBaseRequest
+	// BaseRequest
 	//
-	static const uint8_t CMD_GET_RASTER = 1;
+	static const uint8_t CMD_GET = 1;
 
 	//
 	// Response from index-server after successfully
@@ -103,7 +101,6 @@ public:
 	// Sends the given error and resets the state to IDLE
 	void send_error(const std::string &message);
 
-	RequestType get_request_type() const;
 	const BaseRequest& get_request() const;
 
 protected:
@@ -113,7 +110,6 @@ protected:
 private:
 	void reset();
 	State state;
-	RequestType request_type;
 	std::unique_ptr<BaseRequest> request;
 };
 
@@ -121,8 +117,8 @@ class WorkerConnection: public BaseConnection {
 public:
 	enum class State {
 		IDLE,
-		SENDING_REQUEST, PROCESSING, READING_RASTER_ENTRY, NEW_RASTER_ENTRY,
-		READING_RASTER_QUERY, RASTER_QUERY_REQUESTED, SENDING_QUERY_RESPONSE,
+		SENDING_REQUEST, PROCESSING, READING_ENTRY, NEW_ENTRY,
+		READING_QUERY, QUERY_REQUESTED, SENDING_QUERY_RESPONSE,
 		DONE,
 		SENDING_DELIVERY_QTY, WAITING_DELIVERY, READING_DELIVERY_ID, DELIVERY_READY,
 		READING_ERROR, ERROR
@@ -133,25 +129,25 @@ public:
 	// Expected data on stream is:
 	// request:BaseRequest
 	//
-	static const uint8_t CMD_CREATE_RASTER = 20;
+	static const uint8_t CMD_CREATE = 20;
 
 	//
 	// Expected data on stream is:
 	// request:DeliveryRequest
 	//
-	static const uint8_t CMD_DELIVER_RASTER = 21;
+	static const uint8_t CMD_DELIVER = 21;
 
 	//
 	// Expected data on stream is:
 	// request:PuzzleRequest
 	//
-	static const uint8_t CMD_PUZZLE_RASTER = 22;
+	static const uint8_t CMD_PUZZLE = 22;
 
 	//
 	// Expected data on stream is:
 	// BaseRequest
 	//
-	static const uint8_t CMD_QUERY_RASTER_CACHE = 23;
+	static const uint8_t CMD_QUERY_CACHE = 23;
 
 	//
 	// Response from worker to signal finished computation
@@ -171,7 +167,7 @@ public:
 	// key:STCacheKey
 	// cube:RasterCacheCube
 	//
-	static const uint8_t RESP_NEW_RASTER_CACHE_ENTRY = 32;
+	static const uint8_t RESP_NEW_CACHE_ENTRY = 32;
 
 	//
 	// Response from index-server after successfully
@@ -212,15 +208,15 @@ public:
 	State get_state() const;
 
 	void process_request(uint8_t command, const BaseRequest &request);
-	void raster_cached();
+	void entry_cached();
 	void send_hit( const CacheRef &cr );
 	void send_partial_hit( const PuzzleRequest &pr );
 	void send_miss();
 	void send_delivery_qty(uint32_t qty);
 	void release();
 
-	const NodeCacheRef& get_new_raster_entry() const;
-	const BaseRequest& get_raster_query() const;
+	const NodeCacheRef& get_new_entry() const;
+	const BaseRequest& get_query() const;
 
 	const DeliveryResponse &get_result() const;
 	const std::string &get_error_message() const;
@@ -236,8 +232,8 @@ private:
 
 	State state;
 	std::unique_ptr<DeliveryResponse> result;
-	std::unique_ptr<NodeCacheRef> new_raster_entry;
-	std::unique_ptr<BaseRequest> raster_query;
+	std::unique_ptr<NodeCacheRef> new_entry;
+	std::unique_ptr<BaseRequest> query;
 	std::string error_msg;
 };
 
@@ -335,10 +331,10 @@ public:
 	enum class State {
 		IDLE,
 		READING_DELIVERY_REQUEST, DELIVERY_REQUEST_READ,
-		READING_RASTER_CACHE_REQUEST, RASTER_CACHE_REQUEST_READ,
-		READING_RASTER_MOVE_REQUEST, RASTER_MOVE_REQUEST_READ,
+		READING_CACHE_REQUEST, CACHE_REQUEST_READ,
+		READING_MOVE_REQUEST, MOVE_REQUEST_READ,
 		AWAITING_MOVE_CONFIRM, MOVE_DONE,
-		SENDING_RASTER, SENDING_RASTER_MOVE, SENDING_ERROR
+		SENDING, SENDING_MOVE, SENDING_ERROR
 	};
 
 	static const uint32_t MAGIC_NUMBER = 0x52345678;
@@ -353,16 +349,16 @@ public:
 	//
 	// Command to pick up a delivery.
 	// Expected data on stream is:
-	// key:STCacheKey
+	// TypedNodeCacheKey
 	//
-	static const uint8_t CMD_GET_CACHED_RASTER = 61;
+	static const uint8_t CMD_GET_CACHED_ITEM = 61;
 
 	//
 	// Command to pick up a delivery.
 	// Expected data on stream is:
-	// key:STCacheKey
+	// TypedNodeCacheKey
 	//
-	static const uint8_t CMD_MOVE_RASTER = 62;
+	static const uint8_t CMD_MOVE_ITEM = 62;
 
 	//
 	// Command to pick up a delivery.
@@ -388,13 +384,15 @@ public:
 
 	State get_state() const;
 
-	const NodeCacheKey& get_key() const;
+	const TypedNodeCacheKey& get_key() const;
 
 	uint64_t get_delivery_id() const;
 
-	void send_raster( std::shared_ptr<GenericRaster> raster );
+	template <typename T>
+	void send( std::shared_ptr<const T> item );
 
-	void send_raster_move( const AccessInfo &info, std::shared_ptr<GenericRaster> raster );
+	template <typename T>
+	void send_move( const AccessInfo &info, std::shared_ptr<const T> item );
 
 	void send_error( const std::string &msg );
 
@@ -405,9 +403,12 @@ protected:
 	virtual void write_finished();
 	virtual void read_finished( NBReader& reader);
 private:
+template<typename T>
+std::unique_ptr<NBWriter> get_data_writer( std::shared_ptr<const T> item );
+
 	State state;
 	uint64_t delivery_id;
-	NodeCacheKey cache_key;
+	TypedNodeCacheKey cache_key;
 };
 
 #endif /* CONNECTION_H_ */

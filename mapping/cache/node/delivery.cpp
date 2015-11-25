@@ -7,14 +7,31 @@
 
 #include "cache/node/delivery.h"
 #include "cache/common.h"
+#include "cache/manager.h"
 #include "util/make_unique.h"
 #include "util/log.h"
 
 #include <sys/select.h>
 #include <sys/socket.h>
 
-Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<GenericRaster> raster) :
-	id(id), creation_time(time(0)), count(count), type(Type::RASTER), raster(raster) {
+Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const GenericRaster> raster) :
+	id(id), creation_time(time(0)), count(count), type(CacheType::RASTER), raster(raster) {
+}
+
+Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const PointCollection> points) :
+	id(id), creation_time(time(0)), count(count), type(CacheType::POINT), points(points) {
+}
+
+Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const LineCollection> lines) :
+	id(id), creation_time(time(0)), count(count), type(CacheType::LINE), lines(lines) {
+}
+
+Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const PolygonCollection> polygons):
+	id(id), creation_time(time(0)), count(count), type(CacheType::POLYGON), polygons(polygons) {
+}
+
+Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const GenericPlot> plot):
+	id(id), creation_time(time(0)), count(count), type(CacheType::PLOT), plot(plot) {
 }
 
 void Delivery::send(DeliveryConnection& connection) {
@@ -22,17 +39,14 @@ void Delivery::send(DeliveryConnection& connection) {
 		throw DeliveryException(concat("Cannot send deliver: ", id, ". Delivery count reached."));
 	count--;
 	switch ( type ) {
-		case Type::RASTER:
-			connection.send_raster( raster );
-			break;
+		case CacheType::RASTER: connection.send( raster ); break;
+		case CacheType::POINT: connection.send( points ); break;
+		case CacheType::LINE: connection.send( lines ); break;
+		case CacheType::POLYGON: connection.send( polygons ); break;
+		case CacheType::PLOT: connection.send( plot ); break;
 		default:
 			throw ArgumentException("Cannot send other types than raster.");
 	}
-}
-
-Delivery::Delivery(Delivery&& d) :
-	id(d.id), creation_time(d.creation_time),
-	count(d.count), type(d.type), raster(std::move(d.raster)) {
 }
 
 ////////////////////////////////////////////////////////////
@@ -45,10 +59,11 @@ DeliveryManager::DeliveryManager(uint32_t listen_port) :
 	shutdown(false), listen_port(listen_port), delivery_id(1) {
 }
 
-uint64_t DeliveryManager::add_raster_delivery(std::shared_ptr<GenericRaster> result, unsigned int count) {
+template <typename T>
+uint64_t DeliveryManager::add_delivery(std::shared_ptr<const T> result, unsigned int count) {
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
 	uint64_t res = delivery_id++;
-	deliveries.emplace(res, Delivery(res,count,result) );
+	deliveries.emplace( res, Delivery(res,count,result) );
 	Log::trace("Added delivery with id: %d", res);
 	return res;
 }
@@ -191,40 +206,82 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 					}
 					break;
 				}
-				case DeliveryConnection::State::RASTER_CACHE_REQUEST_READ: {
-					auto &key = dc->get_key();
-					try {
-						Log::debug("Sending cache-entry: %s", key.to_string().c_str());
-						dc->send_raster( CacheManager::getInstance().get_raster_ref(key) );
-					} catch (const NoSuchElementException &nse) {
-						dc->send_error(concat("No cache-entry found for key: ", key.to_string()));
-					}
+				case DeliveryConnection::State::CACHE_REQUEST_READ:
+					handle_cache_request(*dc);
 					break;
-				}
-				case DeliveryConnection::State::RASTER_MOVE_REQUEST_READ: {
-					auto &key = dc->get_key();
-					try {
-						Log::debug("Moving cache-entry: %s", key.to_string().c_str());
-						dc->send_raster_move( CacheManager::getInstance().get_raster_info(key),
-							CacheManager::getInstance().get_raster_ref(key) );
-					} catch (const NoSuchElementException &nse) {
-						dc->send_error(concat("No cache-entry found for key: ", key.semantic_id, ":", key.entry_id));
-					}
+				case DeliveryConnection::State::MOVE_REQUEST_READ:
+					handle_move_request(*dc);
 					break;
-				}
-				case DeliveryConnection::State::MOVE_DONE: {
-					auto &key = dc->get_key();
-					Log::debug("Move of entry: %s confirmed. Dropping.", key.to_string().c_str());
-					CacheManager::getInstance().remove_raster_local(key);
-					dc->release();
+				case DeliveryConnection::State::MOVE_DONE:
+					handle_move_done(*dc);
 					break;
-				}
-				default: {
+				default:
 					Log::trace("Nothing todo on delivery connection: %d", dc->id);
-				}
 			}
 		}
 	}
+}
+
+void DeliveryManager::handle_cache_request(DeliveryConnection& dc) {
+	auto &key = dc.get_key();
+	auto &cm = CacheManager::get_instance();
+	try {
+		Log::debug("Sending cache-entry: %s", key.to_string().c_str());
+		switch ( key.type ) {
+			case CacheType::RASTER: dc.send( cm.get_raster_cache().get_ref(key) ); break;
+			case CacheType::POINT: dc.send( cm.get_point_cache().get_ref(key) ); break;
+			case CacheType::LINE: dc.send( cm.get_line_cache().get_ref(key) ); break;
+			case CacheType::POLYGON: dc.send( cm.get_polygon_cache().get_ref(key) ); break;
+			case CacheType::PLOT: dc.send( cm.get_plot_cache().get_ref(key) ); break;
+			default: throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
+		}
+	} catch (const NoSuchElementException &nse) {
+		dc.send_error(concat("No cache-entry found for key: ", key.to_string()));
+	}
+}
+
+void DeliveryManager::handle_move_request(DeliveryConnection& dc) {
+	auto &key = dc.get_key();
+	auto &cm = CacheManager::get_instance();
+	try {
+		Log::debug("Moving cache-entry: %s", key.to_string().c_str());
+		switch ( key.type ) {
+			case CacheType::RASTER:
+				dc.send_move( cm.get_raster_cache().get_entry_info(key), cm.get_raster_cache().get_ref(key) );
+				break;
+			case CacheType::POINT:
+				dc.send_move( cm.get_point_cache().get_entry_info(key), cm.get_point_cache().get_ref(key) );
+				break;
+			case CacheType::LINE:
+				dc.send_move( cm.get_line_cache().get_entry_info(key), cm.get_line_cache().get_ref(key) );
+				break;
+			case CacheType::POLYGON:
+				dc.send_move( cm.get_polygon_cache().get_entry_info(key), cm.get_polygon_cache().get_ref(key) );
+				break;
+			case CacheType::PLOT:
+				dc.send_move( cm.get_plot_cache().get_entry_info(key), cm.get_plot_cache().get_ref(key) );
+				break;
+			default:
+				throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
+		}
+	} catch (const NoSuchElementException &nse) {
+		dc.send_error(concat("No cache-entry found for key: ", key.to_string()));
+	}
+}
+
+void DeliveryManager::handle_move_done(DeliveryConnection& dc) {
+	auto &key = dc.get_key();
+	auto &cm = CacheManager::get_instance();
+	Log::debug("Move of entry: %s confirmed. Dropping.", key.to_string().c_str());
+	switch ( key.type ) {
+		case CacheType::RASTER: cm.get_raster_cache().remove_local(key); break;
+		case CacheType::POINT: cm.get_point_cache().remove_local(key); break;
+		case CacheType::LINE: cm.get_line_cache().remove_local(key); break;
+		case CacheType::POLYGON: cm.get_polygon_cache().remove_local(key); break;
+		case CacheType::PLOT: cm.get_plot_cache().remove_local(key); break;
+		default: throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
+	}
+	dc.release();
 }
 
 std::unique_ptr<std::thread> DeliveryManager::run_async() {
@@ -240,3 +297,8 @@ DeliveryManager::~DeliveryManager() {
 	stop();
 }
 
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const GenericRaster>, unsigned int);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const PointCollection>, unsigned int);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const LineCollection>, unsigned int);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const PolygonCollection>, unsigned int);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const GenericPlot>, unsigned int);

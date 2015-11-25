@@ -42,8 +42,8 @@ Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &
 ////////////////////////////////////////////////////////////
 
 IndexServer::IndexServer(int port, const std::string &reorg_strategy) :
-	raster_cache(reorg_strategy), port(port), shutdown(false), next_node_id(1), query_manager(raster_cache,
-		nodes), last_reorg(time(nullptr)) {
+	caches(reorg_strategy), port(port), shutdown(false), next_node_id(1),
+	query_manager(caches,nodes), last_reorg(time(nullptr)) {
 }
 
 IndexServer::~IndexServer() {
@@ -125,7 +125,7 @@ void IndexServer::run() {
 		}
 
 		// Reorganize
-		if (oldest_stats > last_reorg && all_idle && raster_cache.requires_reorg(nodes)) {
+		if (oldest_stats > last_reorg && all_idle && caches.require_reorg(nodes) ) {
 			std::map<uint32_t, NodeReorgDescription> reorgs;
 			for (auto &kv : nodes) {
 				reorgs.emplace(kv.first, NodeReorgDescription(kv.second));
@@ -134,22 +134,12 @@ void IndexServer::run() {
 			// Remember time of this reorg
 			time(&last_reorg);
 
-			if (raster_cache.requires_reorg(nodes)) {
-				Log::info("Calculating reorganization of raster cache.");
-				raster_cache.reorganize(reorgs);
-				Log::info("Finished calculating reorganization of raster cache.");
-			}
+			caches.reorganize(nodes,reorgs);
 
 			for (auto &d : reorgs) {
 				Log::debug("Processing removals locally and sending reorg-commands to nodes.");
 				for (auto &rm : d.second.get_removals()) {
-					switch (rm.type) {
-						case ReorgRemoveItem::Type::RASTER:
-							raster_cache.remove(IndexCacheKey(d.first, rm.semantic_id, rm.entry_id));
-							break;
-						default:
-							Log::error("Not implemented yet.");
-					}
+					caches.get_cache(rm.type).remove(IndexCacheKey(d.first, rm.semantic_id, rm.entry_id));
 				}
 
 				auto &cc = control_connections.at(d.second.node->control_connection);
@@ -189,7 +179,7 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	while (ccit != control_connections.end()) {
 		ControlConnection &cc = *ccit->second;
 		if (cc.is_faulty()) {
-			raster_cache.remove_all_by_node(cc.node->id);
+			caches.remove_all_by_node(cc.node->id);
 			nodes.erase(cc.node->id);
 			query_manager.node_failed(cc.node->id);
 			control_connections.erase(ccit++);
@@ -291,8 +281,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					node->control_connection = cc.id;
 					nodes.emplace(node->id, node);
 					Log::info("New node registered. ID: %d, control-connection: %d", node->id, cc.id);
-					for (auto &raster : hs.get_raster_entries())
-						raster_cache.put(IndexCacheEntry(node->id, raster));
+					caches.process_handshake(node->id,hs);
 					cc.confirm_handshake(node);
 					break;
 				}
@@ -310,7 +299,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					auto &stats = cc.get_stats();
 					cc.node->capacity = stats;
 					time(&cc.node->last_stat_update);
-					raster_cache.update_stats(cc.node->id, stats.raster_stats);
+					caches.update_stats(cc.node->id, stats);
 					cc.release();
 					break;
 				}
@@ -323,16 +312,9 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 }
 
 void IndexServer::handle_reorg_result(const ReorgMoveResult& res) {
-	switch (res.type) {
-		case ReorgMoveResult::Type::RASTER: {
-			IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
-			IndexCacheKey new_key(res.to_node_id, res.semantic_id, res.to_cache_id);
-			raster_cache.move(old, new_key);
-			break;
-		}
-		default:
-			throw ArgumentException(concat("Type: ", (int) res.type, " not supported yet."));
-	}
+	IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
+	IndexCacheKey new_key(res.to_node_id, res.semantic_id, res.to_cache_id);
+	caches.get_cache(res.type).move(old,new_key);
 }
 
 void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) {
@@ -351,7 +333,7 @@ void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) 
 			// Handle state-changes
 			switch (cc.get_state()) {
 				case ClientConnection::State::AWAIT_RESPONSE:
-					process_client_request(cc);
+					query_manager.add_request(cc.id, cc.get_request());
 					break;
 				default:
 					throw IllegalStateException(
@@ -410,15 +392,16 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 					wc.release();
 					break;
 				}
-				case WorkerConnection::State::NEW_RASTER_ENTRY: {
+				case WorkerConnection::State::NEW_ENTRY: {
 					Log::debug("Worker added new raster-entry");
-					raster_cache.put(IndexCacheEntry(wc.node->id, wc.get_new_raster_entry()));
-					wc.raster_cached();
+					caches.get_cache( wc.get_new_entry().type )
+						.put(IndexCacheEntry(wc.node->id, wc.get_new_entry()));
+					wc.entry_cached();
 					break;
 				}
-				case WorkerConnection::State::RASTER_QUERY_REQUESTED: {
-					Log::debug("Worker issued raster-query: %s", wc.get_raster_query().to_string().c_str());
-					process_worker_raster_query(wc);
+				case WorkerConnection::State::QUERY_REQUESTED: {
+					Log::debug("Worker issued cache-query: %s", wc.get_query().to_string().c_str());
+					process_worker_query(wc);
 					break;
 				}
 				default: {
@@ -430,41 +413,32 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 	}
 }
 
-void IndexServer::process_client_request(ClientConnection& con) {
-	switch (con.get_request_type()) {
-		case ClientConnection::RequestType::RASTER:
-			query_manager.add_request(QueryInfo::Type::RASTER, con.id, con.get_request());
-			break;
-		default:
-			throw std::runtime_error("Request-type not implemented yet.");
-	}
-}
-
-void IndexServer::process_worker_raster_query(WorkerConnection& con) {
-	auto &req = con.get_raster_query();
-	auto res = raster_cache.query(req.semantic_id, req.query);
+void IndexServer::process_worker_query(WorkerConnection& con) {
+	auto &req = con.get_query();
+	auto &cache = caches.get_cache(req.type);
+	auto res = cache.query(req.semantic_id, req.query);
 	Log::debug("QueryResult: %s", res.to_string().c_str());
 
 	// Full single hit
 	if (res.keys.size() == 1 && !res.has_remainder()) {
 		Log::debug("Full HIT. Sending reference.");
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
-		auto ref = raster_cache.get(key);
+		auto ref = cache.get(key);
 		auto node = nodes.at(ref.node_id);
 		CacheRef cr(node->host, node->port, ref.entry_id);
 		con.send_hit(cr);
 	}
 	// Puzzle
-	else if (res.has_hit() && res.coverage > 0.1) {
+	else if (res.has_hit() && res.coverage > 0.1 ) {
 		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f", res.coverage);
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
 			IndexCacheKey key(req.semantic_id, id);
-			auto ref = raster_cache.get(key);
+			auto ref = cache.get(key);
 			auto &node = nodes.at(ref.node_id);
 			entries.push_back(CacheRef(node->host, node->port, ref.entry_id));
 		}
-		PuzzleRequest pr(req.semantic_id, req.query, res.covered, res.remainder, entries);
+		PuzzleRequest pr( req.type, req.semantic_id, req.query, res.remainder, entries);
 		con.send_partial_hit(pr);
 	}
 	// Full miss

@@ -47,7 +47,7 @@ static void convert(int argc, char *argv[]) {
 
 	try {
 		auto raster = GenericRaster::fromGDAL(argv[2], 1);
-		auto c = Colorizer::make("grey");
+		auto c = Colorizer::create("grey");
 		raster->toPNG(argv[3], *c);
 	}
 	catch (ImporterException &e) {
@@ -316,7 +316,7 @@ static void runquery(int argc, char *argv[]) {
 			}
 			{
 				Profiler::Profiler p("TO_PNG");
-				auto colors = Colorizer::make("grey");
+				auto colors = Colorizer::create("grey");
 				raster->toPNG((std::string(out_filename) + ".png").c_str(), *colors);
 			}
 		}
@@ -509,8 +509,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	Configuration::loadFromDefaultPaths();
-
-	CacheManager::init(make_unique<NopCacheManager>(), make_unique<CacheAll>());
+	// FIXME
+	CacheManager::init(make_unique<NopCacheManager>("localhost",12345), make_unique<CacheAll>());
 
 	const char *command = argv[1];
 

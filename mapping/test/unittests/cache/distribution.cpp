@@ -28,7 +28,7 @@ TEST(DistributionTest,TestRedistibution) {
 
 	CacheManager::init(std::move(cm), make_unique<CacheAll>());
 
-	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::getInstance());
+	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::get_instance());
 
 	std::vector<TP> ts;
 	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
@@ -61,13 +61,13 @@ TEST(DistributionTest,TestRedistibution) {
 	NodeCacheKey key1(sem_id, 2);
 
 	try {
-		tcm.get_instance_mgr(0).get_raster_ref(key1);
+		tcm.get_instance_mgr(0).get_raster_cache().get_ref(key1);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
 
 	ReorgDescription rod;
-	ReorgMoveItem ri(ReorgMoveItem::Type::RASTER, sem_id, 2, 1, "localhost", 12347);
+	ReorgMoveItem ri(CacheType::RASTER, sem_id, 2, 1, "localhost", 12347);
 	rod.add_move(ri);
 
 	is.trigger_reorg(2, rod);
@@ -76,14 +76,14 @@ TEST(DistributionTest,TestRedistibution) {
 
 	// Assert moved
 	try {
-		tcm.get_instance_mgr(0).get_raster_ref(key1);
+		tcm.get_instance_mgr(0).get_raster_cache().get_ref(key1);
 		FAIL();
 	} catch (NoSuchElementException &nse) {
 	}
 
 	NodeCacheKey key_new(sem_id, 1);
 	try {
-		tcm.get_instance_mgr(1).get_raster_ref(key_new);
+		tcm.get_instance_mgr(1).get_raster_cache().get_ref(key_new);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
@@ -150,8 +150,8 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 
 TEST(DistributionTest,TestCapacityReorg) {
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 0)));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0)));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 0,0,0,0,0,0,0,0,0)));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0,0,0,0,0,0,0,0,0)));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);
@@ -161,17 +161,16 @@ TEST(DistributionTest,TestCapacityReorg) {
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
-	CacheEntryBounds b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c1(b1, 10);
-	NodeCacheRef r1(k1, c1);
+	NodeCacheRef r1(CacheType::RASTER, k1, c1);
 	IndexCacheEntry e1(1, r1);
 
 	// Entry 2
 	NodeCacheKey k2("key", 2);
-	CacheEntryBounds b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45),
-		TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c2(b2, 10);
-	NodeCacheRef r2(k2, c2);
+	NodeCacheRef r2(CacheType::RASTER, k2, c2);
 	IndexCacheEntry e2(1, r2);
 
 	// Increase count
@@ -201,8 +200,8 @@ TEST(DistributionTest,TestCapacityReorg) {
 
 TEST(DistributionTest,TestGeographicReorg) {
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 0)));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(40, 0)));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 0,0,0,0,0,0,0,0,0)));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(40, 0,0,0,0,0,0,0,0,0)));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);
@@ -212,17 +211,17 @@ TEST(DistributionTest,TestGeographicReorg) {
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
-	CacheEntryBounds b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c1(b1, 10);
-	NodeCacheRef r1(k1, c1);
+	NodeCacheRef r1(CacheType::RASTER, k1, c1);
 	IndexCacheEntry e1(1, r1);
 
 	// Entry 2
 	NodeCacheKey k2("key", 2);
-	CacheEntryBounds b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45),
+	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45),
 		TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c2(b2, 10);
-	NodeCacheRef r2(k2, c2);
+	NodeCacheRef r2(CacheType::RASTER, k2, c2);
 	IndexCacheEntry e2(1, r2);
 
 	// Increase count
@@ -266,7 +265,7 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	CacheManager::init(std::move(cm), make_unique<CacheAll>());
 
-	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::getInstance());
+	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::get_instance());
 
 	std::vector<TP> ts;
 	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
@@ -306,7 +305,7 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	// Assert moved
 	try {
 		NodeCacheKey k(op->getSemanticId(),1);
-		tcm.get_instance_mgr(0).get_raster_ref(k);
+		tcm.get_instance_mgr(0).get_raster_cache().get_ref(k);
 		Log::debug("FAILED on get 1");
 		FAIL();
 	} catch (NoSuchElementException &nse) {
@@ -314,14 +313,14 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	try {
 		NodeCacheKey k(op->getSemanticId(),2);
-		tcm.get_instance_mgr(0).get_raster_ref(k);
+		tcm.get_instance_mgr(0).get_raster_cache().get_ref(k);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
 
 	try {
 		NodeCacheKey k(op->getSemanticId(),1);
-		tcm.get_instance_mgr(1).get_raster_ref(k);
+		tcm.get_instance_mgr(1).get_raster_cache().get_ref(k);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}

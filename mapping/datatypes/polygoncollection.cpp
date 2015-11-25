@@ -65,7 +65,7 @@ PolygonCollection::PolygonCollection(BinaryStream &stream) : SimpleFeatureCollec
 	}
 }
 
-void PolygonCollection::toStream(BinaryStream &stream) {
+void PolygonCollection::toStream(BinaryStream &stream) const {
 	stream.write(stref);
 	stream.write(hasTime());
 
@@ -110,7 +110,7 @@ void PolygonCollection::toStream(BinaryStream &stream) {
 
 
 template<typename T>
-std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vector<T> &keep) {
+std::unique_ptr<PolygonCollection> filter( const PolygonCollection *in, const std::vector<T> &keep) {
 	size_t count = in->getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
@@ -168,11 +168,11 @@ std::unique_ptr<PolygonCollection> filter(PolygonCollection *in, const std::vect
 	return out;
 }
 
-std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<bool> &keep) {
+std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<bool> &keep) const {
 	return ::filter<bool>(this, keep);
 }
 
-std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<char> &keep) {
+std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<char> &keep) const {
 	return ::filter<char>(this, keep);
 }
 
@@ -207,7 +207,7 @@ bool PolygonCollection::featureIntersectsRectangle(size_t featureIndex, double x
 	return false;
 }
 
-std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2) const{
 	std::vector<bool> keep(getFeatureCount());
 
 	for(auto feature : *this){
@@ -219,7 +219,7 @@ std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersect
 	return filter(keep);
 }
 
-std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(const SpatialReference& sref){
+std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(const SpatialReference& sref) const{
 	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
@@ -510,4 +510,3 @@ void PolygonCollection::validateSpecifics() const {
 	if(start_feature.back() != start_polygon.size() - 1)
 		throw FeatureException("Feature not finished");
 }
-

@@ -20,8 +20,7 @@
 class CachingStrategy {
 public:
 	static std::unique_ptr<CachingStrategy> by_name( const std::string &name );
-	CachingStrategy();
-	virtual ~CachingStrategy();
+	virtual ~CachingStrategy() = default;
 	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const = 0;
 };
 
@@ -30,9 +29,7 @@ public:
 //
 class CacheAll : public CachingStrategy {
 public:
-	CacheAll();
-	virtual ~CacheAll();
-	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
+	bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
 };
 
 //
@@ -40,9 +37,7 @@ public:
 //
 class CacheNone : public CachingStrategy {
 public:
-	CacheNone();
-	virtual ~CacheNone();
-	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
+	bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
 };
 
 //
@@ -50,9 +45,7 @@ public:
 //
 class AuthmannStrategy : public CachingStrategy {
 public:
-	AuthmannStrategy();
-	virtual ~AuthmannStrategy();
-	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
+	bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
 };
 
 //
@@ -65,8 +58,7 @@ class TwoStepStrategy : public CachingStrategy {
 public:
 	// TODO: Figure out good values!
 	TwoStepStrategy(double stacked_threshold = 3, double immediate_threshold = 2, uint stack_depth = 3);
-	virtual ~TwoStepStrategy();
-	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
+	bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
 private:
 	const double stacked_threshold;
 	const double immediate_threshold;

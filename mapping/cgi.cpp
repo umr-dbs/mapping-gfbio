@@ -165,7 +165,7 @@ static time_t parseIso8601DateTime(std::string dateTimeString){
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
 	// For now, always guess the colorizer, ignore any user-specified colors
-	//auto colorizer = Colorizer::make(colors);
+	//auto colorizer = Colorizer::create(colors);
 	auto colorizer = Colorizer::fromUnit(raster->dd.unit);
 static bool has_headers = false;
 
@@ -359,12 +359,11 @@ int getWfsParameterInteger(const std::string &wfsParameterString){
 //
 //
 //}
-std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJson, const QueryRectangle &rect, bool cache_enabled ) {
+std::unique_ptr<GenericRaster> processRasterRequest( GenericOperator &graph, const QueryRectangle &rect, bool cache_enabled ) {
 	// normal behavior
 	if ( !cache_enabled ) {
 		QueryProfiler profiler;
-		auto graph = GenericOperator::fromJSON(graphJson);
-		return graph->getCachedRaster(rect, profiler, GenericOperator::RasterQM::EXACT);
+		return graph.getCachedRaster(rect, profiler, GenericOperator::RasterQM::EXACT);
 	}
 	// Request cache-server
 	else {
@@ -372,7 +371,55 @@ std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJso
 		int port = atoi( Configuration::get("indexserver.port").c_str() );
 		CacheClient client(host,port);
 		// Normalize json
-		return client.get_raster(GenericOperator::fromJSON(graphJson)->getSemanticId(), rect, GenericOperator::RasterQM::EXACT);
+		return client.get_raster(graph.getSemanticId(), rect, GenericOperator::RasterQM::EXACT);
+	}
+}
+
+std::unique_ptr<PointCollection> processPointRequest( GenericOperator &graph, const QueryRectangle &rect, bool cache_enabled ) {
+	// normal behavior
+	if ( !cache_enabled ) {
+		QueryProfiler profiler;
+		return graph.getCachedPointCollection(rect, profiler);
+	}
+	// Request cache-server
+	else {
+		std::string host = Configuration::get("indexserver.host");
+		int port = atoi( Configuration::get("indexserver.port").c_str() );
+		CacheClient client(host,port);
+		// Normalize json
+		return client.get_pointcollection(graph.getSemanticId(), rect);
+	}
+}
+
+std::unique_ptr<LineCollection> processLineRequest( GenericOperator &graph, const QueryRectangle &rect, bool cache_enabled ) {
+	// normal behavior
+	if ( !cache_enabled ) {
+		QueryProfiler profiler;
+		return graph.getCachedLineCollection(rect, profiler);
+	}
+	// Request cache-server
+	else {
+		std::string host = Configuration::get("indexserver.host");
+		int port = atoi( Configuration::get("indexserver.port").c_str() );
+		CacheClient client(host,port);
+		// Normalize json
+		return client.get_linecollection(graph.getSemanticId(), rect);
+	}
+}
+
+std::unique_ptr<PolygonCollection> processPolygonRequest( GenericOperator &graph, const QueryRectangle &rect, bool cache_enabled ) {
+	// normal behavior
+	if ( !cache_enabled ) {
+		QueryProfiler profiler;
+		return graph.getCachedPolygonCollection(rect, profiler);
+	}
+	// Request cache-server
+	else {
+		std::string host = Configuration::get("indexserver.host");
+		int port = atoi( Configuration::get("indexserver.port").c_str() );
+		CacheClient client(host,port);
+		// Normalize json
+		return client.get_polygoncollection(graph.getSemanticId(), rect);
 	}
 }
 
@@ -382,7 +429,7 @@ std::unique_ptr<GenericRaster> processRasterRequest( const std::string &graphJso
  * @param params the parameter map
  * @return 0/1 indicating success or failure
  */
-int processWCS(std::map<std::string, std::string> &params) {
+int processWCS(std::map<std::string, std::string> &params, bool cache_enabled) {
 
 	/*http://www.myserver.org:port/path?
 	 * service=WCS &version=2.0
@@ -433,8 +480,7 @@ int processWCS(std::map<std::string, std::string> &params) {
 			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 			QueryResolution::pixels(sizeX, sizeY)
 		);
-		QueryProfiler profiler;
-		auto result_raster = graph->getCachedRaster(query_rect, profiler, GenericOperator::RasterQM::EXACT);
+		auto result_raster = processRasterRequest(*graph,query_rect,cache_enabled);
 		// TODO: Raster flippen?
 
 		//setup the output parameters
@@ -482,7 +528,7 @@ int main() {
 
 		// Plug in Cache-Dummy if cache is disabled
 		if ( !cache_enabled ) {
-			CacheManager::init( make_unique<NopCacheManager>(), make_unique<CacheAll>() );
+			CacheManager::init( make_unique<NopCacheManager>("localhost",12345), make_unique<CacheAll>() );
 		}
 
 		const char *query_string = getenv("QUERY_STRING");
@@ -519,13 +565,13 @@ int main() {
 			if (params.count("colors") > 0)
 				colorizer = params["colors"];
 
-			QueryProfiler profiler;
 			QueryRectangle rect(
 				SpatialReference::extent(EPSG_WEBMERCATOR),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::pixels(1024, 1024)
 			);
-			auto raster = graph->getCachedRaster(rect, profiler);
+			//auto raster = graph->getCachedRaster(rect, profiler);
+			auto raster = processRasterRequest(*graph,rect,cache_enabled);
 
 			outputImage(raster.get(), false, false, colorizer);
 			return 0;
@@ -535,13 +581,12 @@ int main() {
 		if (params.count("pointquery") > 0) {
 			auto graph = GenericOperator::fromJSON(params["pointquery"]);
 
-			QueryProfiler profiler;
 			QueryRectangle rect(
 				SpatialReference::extent(query_epsg),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
-			auto points = graph->getCachedPointCollection(rect, profiler);
+			auto points = processPointRequest(*graph,rect, cache_enabled);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
@@ -566,13 +611,12 @@ int main() {
 
 			auto graph = GenericOperator::fromJSON(params["linequery"]);
 
-			QueryProfiler profiler;
 			QueryRectangle rect(
 				SpatialReference::extent(query_epsg),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
-			auto lines = graph->getCachedLineCollection(rect, profiler);
+			auto lines = processLineRequest(*graph,rect, cache_enabled);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
@@ -596,13 +640,12 @@ int main() {
 
 			auto graph = GenericOperator::fromJSON(params["polygonquery"]);
 
-			QueryProfiler profiler;
 			QueryRectangle rect(
 				SpatialReference::extent(query_epsg),
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
-			auto polygons = graph->getCachedPolygonCollection(rect, profiler);
+			auto polygons = processPolygonRequest(*graph,rect, cache_enabled);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
@@ -630,7 +673,7 @@ int main() {
 
 		// WCS-Requests
 		if (params.count("service") > 0 && params["service"] == "WCS") {
-			return processWCS(params);
+			return processWCS(params,cache_enabled);
 		}
 
 
@@ -692,7 +735,8 @@ int main() {
 						printf(dataVector->toJSON().c_str());
 					}
 					else {
-						auto result_raster = processRasterRequest(params["layers"],qrect,cache_enabled);
+						auto graph = GenericOperator::fromJSON(params["layers"]);
+						auto result_raster = processRasterRequest(*graph,qrect,cache_enabled);
 						bool flipx = (bbox[2] > bbox[0]) != (result_raster->pixel_scale_x > 0);
 						bool flipy = (bbox[3] > bbox[1]) == (result_raster->pixel_scale_y > 0);
 

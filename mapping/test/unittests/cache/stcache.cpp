@@ -27,7 +27,7 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
-	CacheManager::init( make_unique<NopCacheManager>(), make_unique<CacheAll>() );
+	CacheManager::init( make_unique<NopCacheManager>("abc",123), make_unique<CacheAll>() );
 
 	NodeRasterCache cache(114508*2 + 17);
 
@@ -86,26 +86,10 @@ TEST(STCacheTest,TestQuery) {
 	ASSERT_TRUE( qr.has_remainder() );
 
 
+	auto &rem = qr.remainder.at(0);
+	printf("Remainder:\n%s\n", rem.to_string().c_str());
 
-	geos::geom::CoordinateSequence *coords = qr.remainder->getEnvelope()->getCoordinates();
-
-	double x1 = DoubleInfinity,
-		   x2 = DoubleNegInfinity,
-		   y1 = DoubleInfinity,
-		   y2 = DoubleNegInfinity;
-
-	for ( size_t i = 0; i < coords->size(); i++ ) {
-		auto c = coords->getAt(i);
-		x1 = std::min(c.x,x1);
-		y1 = std::min(c.y,y1);
-		x2 = std::max(c.x,x2);
-		y2 = std::max(c.y,y2);
-	}
-
-	ASSERT_DOUBLE_EQ( 1.01, x1 );
-	ASSERT_DOUBLE_EQ( 1.01, y1 );
-	ASSERT_DOUBLE_EQ( 2.0 , x2 );
-	ASSERT_DOUBLE_EQ( 2.0 , y2 );
+	ASSERT_EQ( rem, Cube3( 1,2,1,2,10,10.25) );
 
 	auto r4 = createRaster(1,2,1,2);
 	cache.put(sem_id,r4);

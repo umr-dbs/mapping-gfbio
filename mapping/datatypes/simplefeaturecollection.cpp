@@ -16,7 +16,7 @@ Coordinate::Coordinate(BinaryStream &stream) {
 	stream.read(&x);
 	stream.read(&y);
 }
-void Coordinate::toStream(BinaryStream &stream) {
+void Coordinate::toStream(BinaryStream &stream) const {
 	stream.write(x);
 	stream.write(y);
 }
@@ -287,4 +287,3 @@ bool SimpleFeatureCollection::lineSegmentsIntersect(const Coordinate& p1, const 
 bool SimpleFeatureCollection::featureIntersectsRectangle(size_t featureIndex, const SpatialReference& sref) const{
 	return featureIntersectsRectangle(featureIndex, sref.x1, sref.y1, sref.x2, sref.y2);
 }
-

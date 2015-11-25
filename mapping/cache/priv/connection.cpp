@@ -132,7 +132,7 @@ uint64_t BaseConnection::next_id = 1;
 /////////////////////////////////////////////////
 
 ClientConnection::ClientConnection(std::unique_ptr<UnixSocket> socket) :
-	BaseConnection(std::move(socket)), state(State::IDLE), request_type(RequestType::NONE) {
+	BaseConnection(std::move(socket)), state(State::IDLE) {
 }
 
 ClientConnection::~ClientConnection() {
@@ -143,17 +143,13 @@ void ClientConnection::process_command(uint8_t cmd) {
 		throw IllegalStateException("Can only accept input in state IDLE");
 
 	switch (cmd) {
-		case CMD_GET_RASTER: {
-			request_type = RequestType::RASTER;
+		case CMD_GET:
 			state = State::READING_REQUEST;
-			Log::debug("Reading BaseRequest for raster.");
+			Log::debug("Reading request from client");
 			begin_read(make_unique<NBBaseRequestReader>());
 			break;
-		}
-			// More to come
-		default: {
+		default:
 			throw NetworkException(concat("Unknown command on client connection: ", cmd));
-		}
 	}
 }
 
@@ -187,7 +183,7 @@ void ClientConnection::send_response(const DeliveryResponse& response) {
 		state = State::WRITING_RESPONSE;
 		begin_write(
 			make_unique<NBMessageWriter>(RESP_OK,
-				make_unique<NBStreamableWriter<DeliveryResponse>>(response)));
+				make_unique<NBSimpleWriter<DeliveryResponse>>(response)));
 	}
 	else
 		throw IllegalStateException("Can only send response in state: AWAIT_RESPONSE");
@@ -202,26 +198,19 @@ void ClientConnection::send_error(const std::string& message) {
 		throw IllegalStateException("Can only send error in state: AWAIT_RESPONSE");
 }
 
-ClientConnection::RequestType ClientConnection::get_request_type() const {
-	if (state == State::AWAIT_RESPONSE)
-		return request_type;
-	throw IllegalStateException("Can only tell type in state AWAIT_RESPONSE");
-}
-
 const BaseRequest& ClientConnection::get_request() const {
-	if (state == State::AWAIT_RESPONSE && request_type == RequestType::RASTER)
+	if (state == State::AWAIT_RESPONSE)
 		return *request;
-	throw IllegalStateException("Can only return raster_request in state AWAIT_RESPONSE and type was RASTER");
+	throw IllegalStateException("Can only return request in state AWAIT_RESPONSE and type != UNKNOWN");
 }
 
 void ClientConnection::reset() {
 	request.reset();
-	request_type = RequestType::NONE;
 	state = State::IDLE;
 }
 
 const uint32_t ClientConnection::MAGIC_NUMBER;
-const uint8_t ClientConnection::CMD_GET_RASTER;
+const uint8_t ClientConnection::CMD_GET;
 const uint8_t ClientConnection::RESP_OK;
 const uint8_t ClientConnection::RESP_ERROR;
 
@@ -259,14 +248,14 @@ void WorkerConnection::process_command(uint8_t cmd) {
 			begin_read( make_unique<NBFixedSizeReader>( sizeof(uint64_t) ) );
 			break;
 		}
-		case CMD_QUERY_RASTER_CACHE: {
-			state = State::READING_RASTER_QUERY;
+		case CMD_QUERY_CACHE: {
+			state = State::READING_QUERY;
 			Log::debug("Worker requested raster cache query.");
 			begin_read( make_unique<NBBaseRequestReader>() );
 			break;
 		}
-		case RESP_NEW_RASTER_CACHE_ENTRY: {
-			state = State::READING_RASTER_ENTRY;
+		case RESP_NEW_CACHE_ENTRY: {
+			state = State::READING_ENTRY;
 			Log::debug("Worker returned new result to raster-cache");
 			begin_read( make_unique<NBNodeCacheRefReader>() );
 			break;
@@ -292,13 +281,13 @@ void WorkerConnection::read_finished(NBReader& reader) {
 			state = State::DELIVERY_READY;
 			break;
 		}
-		case State::READING_RASTER_QUERY:
-			raster_query.reset(new BaseRequest(*reader.get_stream()));
-			state = State::RASTER_QUERY_REQUESTED;
+		case State::READING_QUERY:
+			query.reset(new BaseRequest(*reader.get_stream()));
+			state = State::QUERY_REQUESTED;
 			break;
-		case State::READING_RASTER_ENTRY:
-			new_raster_entry.reset(new NodeCacheRef(*reader.get_stream()));
-			state = State::NEW_RASTER_ENTRY;
+		case State::READING_ENTRY:
+			new_entry.reset(new NodeCacheRef(*reader.get_stream()));
+			state = State::NEW_ENTRY;
 			break;
 		case State::READING_ERROR:
 			reader.get_stream()->read(&error_msg);
@@ -330,46 +319,46 @@ void WorkerConnection::process_request(uint8_t command, const BaseRequest& reque
 	if (state == State::IDLE) {
 		state = State::SENDING_REQUEST;
 		begin_write(
-			make_unique<NBMessageWriter>(command, make_unique<NBStreamableWriter<BaseRequest>>(request, true)));
+			make_unique<NBMessageWriter>(command, make_unique<NBSimpleWriter<BaseRequest>>(request, true)));
 	}
 	else
 		throw IllegalStateException("Can only process requests when idle");
 }
 
-void WorkerConnection::raster_cached() {
-	if (state == State::NEW_RASTER_ENTRY) {
+void WorkerConnection::entry_cached() {
+	if (state == State::NEW_ENTRY) {
 		// TODO: Do we need a confirmation of this
 		state = State::PROCESSING;
 	}
 	else
-		throw IllegalStateException("Can only ack new raster entry in state NEW_RASTER_ENTRY");
+		throw IllegalStateException("Can only ack new entry in state NEW_ENTRY");
 }
 
 void WorkerConnection::send_hit(const CacheRef& cr) {
-	if (state == State::RASTER_QUERY_REQUESTED) {
+	if (state == State::QUERY_REQUESTED) {
 		state = State::SENDING_QUERY_RESPONSE;
 		begin_write(
-			make_unique<NBMessageWriter>(RESP_QUERY_HIT, make_unique<NBStreamableWriter<CacheRef>>(cr)));
+			make_unique<NBMessageWriter>(RESP_QUERY_HIT, make_unique<NBSimpleWriter<CacheRef>>(cr)));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
 }
 
 void WorkerConnection::send_partial_hit(const PuzzleRequest& pr) {
-	if (state == State::RASTER_QUERY_REQUESTED) {
+	if (state == State::QUERY_REQUESTED) {
 		state = State::SENDING_QUERY_RESPONSE;
 		begin_write(
 			make_unique<NBMessageWriter>(RESP_QUERY_PARTIAL,
-				make_unique<NBStreamableWriter<PuzzleRequest>>(pr)));
+				make_unique<NBSimpleWriter<PuzzleRequest>>(pr)));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
 }
 
 void WorkerConnection::send_miss() {
-	if (state == State::RASTER_QUERY_REQUESTED) {
+	if (state == State::QUERY_REQUESTED) {
 		state = State::SENDING_QUERY_RESPONSE;
-		begin_write(make_unique<NBPrimitiveWriter<uint8_t>>(RESP_QUERY_MISS));
+		begin_write(make_unique<NBSimpleWriter<uint8_t>>(RESP_QUERY_MISS));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
@@ -379,7 +368,7 @@ void WorkerConnection::send_delivery_qty(uint32_t qty) {
 	if (state == State::DONE) {
 		state = State::SENDING_DELIVERY_QTY;
 		begin_write(
-			make_unique<NBMessageWriter>(RESP_DELIVERY_QTY, make_unique<NBPrimitiveWriter<uint32_t>>(qty)));
+			make_unique<NBMessageWriter>(RESP_DELIVERY_QTY, make_unique<NBSimpleWriter<uint32_t>>(qty)));
 	}
 	else
 		throw IllegalStateException("Can only send delivery qty in state DONE");
@@ -397,15 +386,15 @@ void WorkerConnection::release() {
 // GETTER
 //
 
-const NodeCacheRef& WorkerConnection::get_new_raster_entry() const {
-	if (state == State::NEW_RASTER_ENTRY)
-		return *new_raster_entry;
+const NodeCacheRef& WorkerConnection::get_new_entry() const {
+	if (state == State::NEW_ENTRY)
+		return *new_entry;
 	throw IllegalStateException("Can only return new raster entry in state NEW_RASTER_ENTRY");
 }
 
-const BaseRequest& WorkerConnection::get_raster_query() const {
-	if (state == State::RASTER_QUERY_REQUESTED)
-		return *raster_query;
+const BaseRequest& WorkerConnection::get_query() const {
+	if (state == State::QUERY_REQUESTED)
+		return *query;
 	throw IllegalStateException("Can only return raster query in state RASTER_QUERY_REQUESTED");
 }
 
@@ -424,19 +413,19 @@ const std::string& WorkerConnection::get_error_message() const {
 void WorkerConnection::reset() {
 	error_msg = "";
 	result.reset();
-	new_raster_entry.reset();
-	raster_query.reset();
+	new_entry.reset();
+	query.reset();
 	state = State::IDLE;
 }
 
 const uint32_t WorkerConnection::MAGIC_NUMBER;
-const uint8_t WorkerConnection::CMD_CREATE_RASTER;
-const uint8_t WorkerConnection::CMD_DELIVER_RASTER;
-const uint8_t WorkerConnection::CMD_PUZZLE_RASTER;
+const uint8_t WorkerConnection::CMD_CREATE;
+const uint8_t WorkerConnection::CMD_DELIVER;
+const uint8_t WorkerConnection::CMD_PUZZLE;
 const uint8_t WorkerConnection::RESP_RESULT_READY;
 const uint8_t WorkerConnection::RESP_DELIVERY_READY;
-const uint8_t WorkerConnection::RESP_NEW_RASTER_CACHE_ENTRY;
-const uint8_t WorkerConnection::CMD_QUERY_RASTER_CACHE;
+const uint8_t WorkerConnection::RESP_NEW_CACHE_ENTRY;
+const uint8_t WorkerConnection::CMD_QUERY_CACHE;
 const uint8_t WorkerConnection::RESP_ERROR;
 const uint8_t WorkerConnection::RESP_QUERY_HIT;
 const uint8_t WorkerConnection::RESP_QUERY_MISS;
@@ -535,7 +524,7 @@ void ControlConnection::confirm_handshake(std::shared_ptr<Node> node) {
 		state = State::SENDING_HELLO;
 		begin_write(
 			make_unique<NBMessageWriter>(CMD_HELLO,
-				make_unique<NBPrimitiveWriter<uint32_t>>(node->id)
+				make_unique<NBSimpleWriter<uint32_t>>(node->id)
 			)
 		);
 	}
@@ -547,7 +536,7 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 	if (state == State::IDLE) {
 		state = State::SENDING_REORG;
 		begin_write(
-			make_unique<NBMessageWriter>(CMD_REORG, make_unique<NBStreamableWriter<ReorgDescription>>(desc)));
+			make_unique<NBMessageWriter>(CMD_REORG, make_unique<NBSimpleWriter<ReorgDescription>>(desc)));
 	}
 	else
 		throw IllegalStateException("Can only trigger reorg in state IDLE");
@@ -556,7 +545,7 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 void ControlConnection::confirm_reorg() {
 	if (state == State::REORG_RESULT_READ) {
 		state = State::SENDING_REORG_CONFIRM;
-		begin_write(make_unique<NBPrimitiveWriter<uint8_t>>(CMD_REORG_ITEM_OK));
+		begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_REORG_ITEM_OK));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state REORG_RESULT_READ");
@@ -566,7 +555,7 @@ void ControlConnection::confirm_reorg() {
 void ControlConnection::send_get_stats() {
 	if (state == State::IDLE) {
 		state = State::SENDING_STATS_REQUEST;
-		begin_write(make_unique<NBPrimitiveWriter<uint8_t>>(CMD_GET_STATS));
+		begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_GET_STATS));
 	}
 	else
 		throw IllegalStateException("Can only request statistics in state IDLE");
@@ -629,7 +618,7 @@ const uint8_t ControlConnection::RESP_STATS;
 /////////////////////////////////////////////////
 
 DeliveryConnection::DeliveryConnection(std::unique_ptr<UnixSocket> socket) :
-	BaseConnection(std::move(socket)), state(State::IDLE), delivery_id(0), cache_key("", 0) {
+	BaseConnection(std::move(socket)), state(State::IDLE), delivery_id(0), cache_key(CacheType::UNKNOWN,"", 0) {
 }
 
 DeliveryConnection::~DeliveryConnection() {
@@ -646,16 +635,16 @@ void DeliveryConnection::process_command(uint8_t cmd) {
 			begin_read(make_unique<NBFixedSizeReader>(sizeof(delivery_id)));
 			break;
 		}
-		case CMD_GET_CACHED_RASTER: {
-			state = State::READING_RASTER_CACHE_REQUEST;
-			Log::debug("Reading NodeCacheKey for direct delivery.");
-			begin_read(make_unique<NBNodeCacheKeyReader>());
+		case CMD_GET_CACHED_ITEM: {
+			state = State::READING_CACHE_REQUEST;
+			Log::debug("Reading TypedNodeCacheKey for direct delivery.");
+			begin_read(make_unique<NBTypedNodeCacheKeyReader>());
 			break;
 		}
-		case CMD_MOVE_RASTER: {
-			state = State::READING_RASTER_MOVE_REQUEST;
-			Log::debug("Reading NodeCacheKey for move delivery.");
-			begin_read(make_unique<NBNodeCacheKeyReader>());
+		case CMD_MOVE_ITEM: {
+			state = State::READING_MOVE_REQUEST;
+			Log::debug("Reading TypedNodeCacheKey for move delivery.");
+			begin_read(make_unique<NBTypedNodeCacheKeyReader>());
 			break;
 		}
 		case CMD_MOVE_DONE: {
@@ -675,14 +664,14 @@ void DeliveryConnection::read_finished(NBReader& reader) {
 			state = State::DELIVERY_REQUEST_READ;
 			break;
 		}
-		case State::READING_RASTER_CACHE_REQUEST: {
-			cache_key = NodeCacheKey(*reader.get_stream());
-			state = State::RASTER_CACHE_REQUEST_READ;
+		case State::READING_CACHE_REQUEST: {
+			cache_key = TypedNodeCacheKey(*reader.get_stream());
+			state = State::CACHE_REQUEST_READ;
 			break;
 		}
-		case State::READING_RASTER_MOVE_REQUEST: {
-			cache_key = NodeCacheKey(*reader.get_stream());
-			state = State::RASTER_MOVE_REQUEST_READ;
+		case State::READING_MOVE_REQUEST: {
+			cache_key = TypedNodeCacheKey(*reader.get_stream());
+			state = State::MOVE_REQUEST_READ;
 			break;
 		}
 		default:
@@ -692,12 +681,12 @@ void DeliveryConnection::read_finished(NBReader& reader) {
 
 void DeliveryConnection::write_finished() {
 	switch (state) {
-		case State::SENDING_RASTER: {
+		case State::SENDING: {
 			state = State::IDLE;
 			break;
 		}
 
-		case State::SENDING_RASTER_MOVE: {
+		case State::SENDING_MOVE: {
 			state = State::AWAITING_MOVE_CONFIRM;
 			break;
 		}
@@ -714,8 +703,8 @@ DeliveryConnection::State DeliveryConnection::get_state() const {
 	return state;
 }
 
-const NodeCacheKey& DeliveryConnection::get_key() const {
-	if (state == State::RASTER_CACHE_REQUEST_READ || state == State::RASTER_MOVE_REQUEST_READ
+const TypedNodeCacheKey& DeliveryConnection::get_key() const {
+	if (state == State::CACHE_REQUEST_READ || state == State::MOVE_REQUEST_READ
 		|| state == State::AWAITING_MOVE_CONFIRM || state == State::MOVE_DONE)
 		return cache_key;
 	throw IllegalStateException("Can only return cache-key if in state RASTER_CACHE_REQUEST_READ");
@@ -727,19 +716,39 @@ uint64_t DeliveryConnection::get_delivery_id() const {
 	throw IllegalStateException("Can only return cache-key if in state DELIVERY_REQUEST_READ");
 }
 
-void DeliveryConnection::send_raster(std::shared_ptr<GenericRaster> raster) {
-	if (state == State::RASTER_CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ) {
-		state = State::SENDING_RASTER;
-		begin_write (make_unique<NBMessageWriter>(RESP_OK, make_unique<NBRasterWriter> (raster)) );}
-		else
-		throw IllegalStateException(
-			"Can only send raster in state DELIVERY_REQUEST_READ or RASTER_CACHE_REQUEST_READ");
+template<typename T>
+void DeliveryConnection::send(std::shared_ptr<const T> item) {
+	if (state == State::CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ) {
+		state = State::SENDING;
+		begin_write (make_unique<NBMessageWriter>(RESP_OK, get_data_writer(item)) );
 	}
+	else
+		throw IllegalStateException(
+			"Can only send item in state DELIVERY_REQUEST_READ or CACHE_REQUEST_READ");
+}
+
+template<typename T>
+void DeliveryConnection::send_move(const AccessInfo& info,
+		std::shared_ptr<const T> item) {
+
+	if (state == State::MOVE_REQUEST_READ) {
+		state = State::SENDING_MOVE;
+		begin_write( make_unique<NBMessageWriter>(RESP_OK,
+			make_unique<NBMultiWriter>(
+				make_unique<NBSimpleWriter<AccessInfo>>(info),
+				get_data_writer(item)
+			)
+		));
+	}
+	else
+		throw IllegalStateException("Can only move item in state MOVE_REQUEST_READ");
+}
+
 
 void DeliveryConnection::send_error(const std::string& msg) {
-	if (state == State::RASTER_CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ
-		|| state == State::RASTER_MOVE_REQUEST_READ || state == State::SENDING_RASTER
-		|| state == State::SENDING_RASTER_MOVE) {
+	if (state == State::CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ
+		|| state == State::MOVE_REQUEST_READ || state == State::SENDING
+		|| state == State::SENDING_MOVE) {
 
 		state = State::SENDING_ERROR;
 		begin_write(make_unique<NBErrorWriter>(RESP_ERROR, msg));
@@ -749,20 +758,6 @@ void DeliveryConnection::send_error(const std::string& msg) {
 			"Can only send error in state DELIVERY_REQUEST_READ or RASTER_CACHE_REQUEST_READ");
 }
 
-void DeliveryConnection::send_raster_move( const AccessInfo &info, std::shared_ptr<GenericRaster> raster) {
-	if (state == State::RASTER_MOVE_REQUEST_READ) {
-		state = State::SENDING_RASTER_MOVE;
-		begin_write (make_unique<NBMessageWriter>(RESP_OK,
-			make_unique<NBMultiWriter>(
-				make_unique<NBStreamableWriter<AccessInfo>>(info),
-				make_unique<NBRasterWriter> (raster)
-			)
-		));
-	}
-	else
-		throw IllegalStateException("Can only move raster in state RASTER_MOVE_REQUEST_READ");
-}
-
 void DeliveryConnection::release() {
 	if (state == State::MOVE_DONE)
 		state = State::IDLE;
@@ -770,11 +765,59 @@ void DeliveryConnection::release() {
 		throw IllegalStateException("Can only release connection in state MOVE_DONE");
 }
 
+template<typename T>
+std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
+		std::shared_ptr<const T> item) {
+	throw ArgumentException("No writer present for given type");
+}
+
+template<>
+std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
+		std::shared_ptr<const PointCollection> item) {
+	return make_unique<NBPointsWriter>( item );
+}
+
+template<>
+std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
+		std::shared_ptr<const LineCollection> item) {
+	return make_unique<NBLinesWriter>( item );
+}
+
+template<>
+std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
+		std::shared_ptr<const PolygonCollection> item) {
+	return make_unique<NBPolygonsWriter>( item );
+}
+
+template<>
+std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
+		std::shared_ptr<const GenericPlot> item) {
+	return make_unique<NBPlotWriter>( item );
+}
+
+template<>
+std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
+		std::shared_ptr<const GenericRaster> item) {
+	return make_unique<NBRasterWriter>( item );
+}
+
 const uint32_t DeliveryConnection::MAGIC_NUMBER;
 const uint8_t DeliveryConnection::CMD_GET;
-const uint8_t DeliveryConnection::CMD_GET_CACHED_RASTER;
-const uint8_t DeliveryConnection::CMD_MOVE_RASTER;
+const uint8_t DeliveryConnection::CMD_GET_CACHED_ITEM;
+const uint8_t DeliveryConnection::CMD_MOVE_ITEM;
 const uint8_t DeliveryConnection::CMD_MOVE_DONE;
 const uint8_t DeliveryConnection::RESP_OK;
 const uint8_t DeliveryConnection::RESP_ERROR;
+
+template void DeliveryConnection::send(std::shared_ptr<const GenericRaster>);
+template void DeliveryConnection::send(std::shared_ptr<const PointCollection>);
+template void DeliveryConnection::send(std::shared_ptr<const LineCollection>);
+template void DeliveryConnection::send(std::shared_ptr<const PolygonCollection>);
+template void DeliveryConnection::send(std::shared_ptr<const GenericPlot>);
+
+template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const GenericRaster> );
+template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const PointCollection> );
+template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const LineCollection> );
+template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const PolygonCollection> );
+template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const GenericPlot> );
 

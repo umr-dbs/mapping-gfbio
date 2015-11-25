@@ -10,6 +10,7 @@
 
 #include "cache/priv/cache_structure.h"
 #include "util/binarystream.h"
+#include "cache/common.h"
 
 #include <vector>
 
@@ -17,30 +18,13 @@
 // Classes used to organize the redistribution of entries among the cache-nodes
 //
 
-
-//
-// Describes an item to remove from the cache
-//
-class ReorgRemoveItem : public NodeCacheKey {
-public:
-	enum class Type : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT };
-
-	ReorgRemoveItem( Type type, const std::string &semantic_id, uint64_t cache_id);
-	ReorgRemoveItem( BinaryStream &stream );
-
-	void toStream( BinaryStream &stream ) const;
-
-	// The type
-	Type type;
-};
-
 //
 // Notification about successful movement of an item
 // for the index
 //
-class ReorgMoveResult : public ReorgRemoveItem {
+class ReorgMoveResult : public TypedNodeCacheKey {
 public:
-	ReorgMoveResult( Type type, const std::string &semantic_id,
+	ReorgMoveResult( CacheType type, const std::string &semantic_id,
 		uint64_t from_cache_id, uint32_t from_node_id, uint32_t to_node_id, uint64_t to_cache_id );
 
 	ReorgMoveResult( BinaryStream &stream );
@@ -58,9 +42,9 @@ public:
 // Describes an item which should be moved from the given to_node
 // to the executing node
 //
-class ReorgMoveItem : public ReorgRemoveItem {
+class ReorgMoveItem : public TypedNodeCacheKey {
 public:
-	ReorgMoveItem( Type type, const std::string &semantic_id, uint64_t from_cache_id,
+	ReorgMoveItem( CacheType type, const std::string &semantic_id, uint64_t from_cache_id,
 		uint32_t from_node_id, const std::string &from_host, uint32_t from_port );
 
 	ReorgMoveItem( BinaryStream &stream );
@@ -82,19 +66,18 @@ class ReorgDescription {
 public:
 	ReorgDescription();
 	ReorgDescription( BinaryStream &stream );
-	virtual ~ReorgDescription();
 
 	void add_move( ReorgMoveItem item );
-	void add_removal( ReorgRemoveItem item );
+	void add_removal( TypedNodeCacheKey item );
 	const std::vector<ReorgMoveItem>& get_moves() const;
-	const std::vector<ReorgRemoveItem>& get_removals() const;
+	const std::vector<TypedNodeCacheKey>& get_removals() const;
 
 	bool is_empty() const;
 
 	void toStream( BinaryStream &stream ) const;
 private:
 	std::vector<ReorgMoveItem> moves;
-	std::vector<ReorgRemoveItem> removals;
+	std::vector<TypedNodeCacheKey> removals;
 
 };
 

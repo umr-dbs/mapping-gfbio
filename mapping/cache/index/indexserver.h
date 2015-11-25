@@ -29,7 +29,7 @@
 
 class Node {
 public:
-	Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &cap = Capacity(0,0));
+	Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &cap = Capacity(0,0,0,0,0,0,0,0,0,0));
 	// The unique id of this node
 	const uint32_t id;
 	// The hostname of this node
@@ -77,8 +77,8 @@ protected:
 	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
 
-	// Cache
-	IndexRasterCache raster_cache;
+	IndexCaches caches;
+
 private:
 	// Adds the fds of all connections to the read-set
 	// and kills faulty connections
@@ -96,11 +96,8 @@ private:
 	// Processes actions on client-connections
 	void process_client_connections(fd_set *readfds, fd_set* writefds);
 
-	// Handles requests from the client
-	void process_client_request( ClientConnection &con );
-
 	// Handles a raster-request issued by a worker
-	void process_worker_raster_query( WorkerConnection &con );
+	void process_worker_query( WorkerConnection &con );
 
 	// Adjusts the cache according to the given reorg
 	void handle_reorg_result( const ReorgMoveResult &res );

@@ -13,10 +13,11 @@
 // and responses between cache-client, index- and node-server
 //
 
+#include "cache/priv/cube.h"
+#include "cache/common.h"
 #include "operators/operator.h"
 #include "util/binarystream.h"
 
-#include <geos/geom/Geometry.h>
 #include <string>
 #include <sstream>
 #include <memory>
@@ -30,17 +31,16 @@ protected:
 	ForeignRef( const std::string &host, uint32_t port );
 	ForeignRef( BinaryStream &stream );
 
-	ForeignRef( const ForeignRef &r ) = default;
-	ForeignRef( ForeignRef &&r ) = default;
-	virtual ~ForeignRef();
+	ForeignRef(const ForeignRef&) = default;
+	ForeignRef(ForeignRef&&) = default;
+
+	ForeignRef& operator=(ForeignRef&&) = default;
+	ForeignRef& operator=(const ForeignRef&) = default;
 
 public:
-	ForeignRef& operator=( const ForeignRef &r ) = default;
-	ForeignRef& operator=( ForeignRef &&r ) = default;
-
-	void toStream( BinaryStream &stream ) const;
-	virtual std::string to_string()  const = 0;
-
+	virtual ~ForeignRef() = default;
+	virtual void toStream( BinaryStream &stream ) const;
+	virtual std::string to_string() const = 0;
 	std::string host;
 	uint32_t port;
 };
@@ -53,15 +53,8 @@ public:
 	DeliveryResponse(std::string host, uint32_t port, uint64_t delivery_id );
 	DeliveryResponse( BinaryStream &stream );
 
-	DeliveryResponse( const DeliveryResponse &r ) = default;
-	DeliveryResponse( DeliveryResponse &&r ) = default;
-	virtual ~DeliveryResponse();
-
-	DeliveryResponse& operator=( const DeliveryResponse &r ) = default;
-	DeliveryResponse& operator=( DeliveryResponse &&r ) = default;
-
 	void toStream( BinaryStream &stream ) const;
-	virtual std::string to_string() const;
+	std::string to_string() const;
 
 	uint64_t delivery_id;
 };
@@ -76,15 +69,8 @@ public:
 	CacheRef( const std::string &host, uint32_t port, uint64_t entry_id );
 	CacheRef( BinaryStream &stream );
 
-	CacheRef( const CacheRef &r ) = default;
-	CacheRef( CacheRef &&r ) = default;
-	virtual ~CacheRef();
-
-	CacheRef& operator=( const CacheRef &r ) = default;
-	CacheRef& operator=( CacheRef &&r ) = default;
-
 	void toStream( BinaryStream &stream ) const;
-	virtual std::string to_string() const;
+	std::string to_string() const;
 
 	uint64_t entry_id;
 };
@@ -97,14 +83,21 @@ public:
 //
 class BaseRequest {
 public:
-	BaseRequest( const std::string &sem_id, const QueryRectangle &rect );
+	BaseRequest( CacheType type, const std::string &sem_id, const QueryRectangle &rect );
 	BaseRequest( BinaryStream &stream );
 
-	virtual ~BaseRequest();
+	BaseRequest(const BaseRequest&) = default;
+	BaseRequest(BaseRequest&&) = default;
+
+	virtual ~BaseRequest() = default;
+
+	BaseRequest& operator=(BaseRequest&&) = default;
+	BaseRequest& operator=(const BaseRequest&) = default;
 
 	virtual void toStream( BinaryStream &stream ) const;
 	virtual std::string to_string() const;
 
+	CacheType type;
 	std::string semantic_id;
 	QueryRectangle query;
 };
@@ -116,13 +109,11 @@ public:
 //
 class DeliveryRequest : public BaseRequest {
 public:
-	DeliveryRequest( const std::string &sem_id, const QueryRectangle &rect, uint64_t entry_id );
+	DeliveryRequest( CacheType type, const std::string &sem_id, const QueryRectangle &rect, uint64_t entry_id );
 	DeliveryRequest( BinaryStream &stream );
 
-	virtual ~DeliveryRequest();
-
-	virtual void toStream( BinaryStream &stream ) const;
-	virtual std::string to_string() const;
+	void toStream( BinaryStream &stream ) const;
+	std::string to_string() const;
 
 	uint64_t entry_id;
 };
@@ -134,27 +125,16 @@ public:
 //
 class PuzzleRequest : public BaseRequest {
 public:
-	typedef geos::geom::Geometry Geom;
-	typedef std::unique_ptr<Geom> GeomP;
-
-	PuzzleRequest( const std::string &sem_id, const QueryRectangle &rect, const GeomP &covered, const GeomP &remainder, const std::vector<CacheRef> &parts );
+	PuzzleRequest( CacheType type, const std::string &sem_id, const QueryRectangle &rect, const std::vector<Cube<3>> &remainder, const std::vector<CacheRef> &parts );
 	PuzzleRequest( BinaryStream &stream );
 
-	PuzzleRequest( const PuzzleRequest &r );
-	PuzzleRequest( PuzzleRequest &&r );
-	virtual ~PuzzleRequest();
+	void toStream( BinaryStream &stream ) const;
+	std::string to_string() const;
 
-	PuzzleRequest& operator=( const PuzzleRequest & r );
-	PuzzleRequest& operator=( PuzzleRequest &&r );
-
-	virtual void toStream( BinaryStream &stream ) const;
-	virtual std::string to_string() const;
-	virtual QueryRectangle get_remainder_query(const GridSpatioTemporalResult &ref) const;
-
-	GeomP covered;
-	GeomP remainder;
+	std::vector<QueryRectangle> get_remainder_queries(double pixel_scale_x = 0, double pixel_scale_y = 0, double xref = 0, double yref = 0) const;
 	std::vector<CacheRef> parts;
 private:
+	std::vector<Cube<3>>  remainder;
 	void snap_to_pixel_grid( double &v1, double &v2, double ref, double scale ) const;
 };
 

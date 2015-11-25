@@ -38,131 +38,130 @@ std::string NodeCacheKey::to_string() const {
 	return concat( "NodeCacheKey[ semantic_id: ", semantic_id, ", id: ", entry_id, "]");
 }
 
+TypedNodeCacheKey::TypedNodeCacheKey(CacheType type, const std::string& semantic_id, uint64_t entry_id) :
+	NodeCacheKey(semantic_id,entry_id), type(type) {
+}
+
+TypedNodeCacheKey::TypedNodeCacheKey(BinaryStream& stream) : NodeCacheKey(stream) {
+	stream.read(&type);
+}
+
+void TypedNodeCacheKey::toStream(BinaryStream& stream) const {
+	NodeCacheKey::toStream(stream);
+	stream.write(type);
+}
+
+std::string TypedNodeCacheKey::to_string() const {
+	return concat( "TypedNodeCacheKey[ type: ", (int)type, ", semantic_id: ", semantic_id, ", id: ", entry_id, "]");
+}
+
 //
 // Bounds
 //
 
-CacheEntryBounds::CacheEntryBounds(SpatialReference sref, TemporalReference tref, QueryResolution::Type res_type,
-	double x_res_from, double x_res_to, double y_res_from, double y_res_to ) :
-  SpatioTemporalReference(sref,tref), res_type(res_type),
-  x_res_from(x_res_from), x_res_to(x_res_to), y_res_from(y_res_from), y_res_to(y_res_to) {
+ResolutionInfo::ResolutionInfo() :
+	restype(QueryResolution::Type::NONE),
+	actual_pixel_scale_x(0),
+	actual_pixel_scale_y(0) {
 }
 
-CacheEntryBounds::CacheEntryBounds(const SpatioTemporalResult& result) :
-	SpatioTemporalReference(result.stref), res_type(QueryResolution::Type::NONE),
-	x_res_from(0), x_res_to(0), y_res_from(0), y_res_to(0) {
+ResolutionInfo::ResolutionInfo(const GridSpatioTemporalResult& result) :
+	restype(QueryResolution::Type::PIXELS),
+	pixel_scale_x( result.pixel_scale_x, result.pixel_scale_x*2 ),
+	pixel_scale_y( result.pixel_scale_y, result.pixel_scale_y*2 ),
+	actual_pixel_scale_x(result.pixel_scale_x),
+	actual_pixel_scale_y(result.pixel_scale_y) {
 }
 
-CacheEntryBounds::CacheEntryBounds(const GridSpatioTemporalResult& result) :
-	SpatioTemporalReference(result.stref), res_type(QueryResolution::Type::PIXELS) {
-	double ohspan = x2 - x1;
-	double ovspan = y2 - y1;
-
-	// Enlarge result by degrees of 1/100 a pixel in each direction
-	double h_spacing = ohspan / result.width / 100.0;
-	double v_spacing = ovspan / result.height / 100.0;
-
-	x1 = x1 - h_spacing;
-	x2 = x2 + h_spacing;
-	y1 = y1 - v_spacing;
-	y2 = y2 + v_spacing;
-
-	// Calc resolution bounds: (res*.5, res]
-	double h_pixel_per_deg = result.width / ohspan;
-	double v_pixel_per_deg = result.height / ovspan;
-
-	x_res_from = h_pixel_per_deg * 0.5;
-	x_res_to = h_pixel_per_deg;
-
-	y_res_from = v_pixel_per_deg * 0.5;
-	y_res_to = v_pixel_per_deg;
+ResolutionInfo::ResolutionInfo(BinaryStream& stream) :
+	pixel_scale_x(stream), pixel_scale_y(stream) {
+	stream.read(&restype);
+	stream.read(&actual_pixel_scale_x);
+	stream.read(&actual_pixel_scale_y);
 }
 
-CacheEntryBounds::CacheEntryBounds(BinaryStream& stream) :
-	SpatioTemporalReference(stream) {
-	stream.read(&res_type);
-	stream.read(&x_res_from);
-	stream.read(&x_res_to);
-	stream.read(&y_res_from);
-	stream.read(&y_res_to);
+void ResolutionInfo::toStream(BinaryStream& stream) const {
+	pixel_scale_x.toStream(stream);
+	pixel_scale_y.toStream(stream);
+	stream.write(restype);
+	stream.write(actual_pixel_scale_x);
+	stream.write(actual_pixel_scale_y);
 }
 
-void CacheEntryBounds::toStream(BinaryStream& stream) const {
-	SpatialReference::toStream(stream);
-	TemporalReference::toStream(stream);
-	stream.write(res_type);
-	stream.write(x_res_from);
-	stream.write(x_res_to);
-	stream.write(y_res_from);
-	stream.write(y_res_to);
+bool ResolutionInfo::matches(const QueryRectangle& query) {
+	return query.restype == restype &&
+	// No resolution --> matches
+    (restype == QueryResolution::Type::NONE ||
+    	// Check res
+	    (pixel_scale_x.contains((query.x2-query.x1) / query.xres) &&
+		 pixel_scale_y.contains((query.y2-query.y1) / query.yres))
+    );
 }
 
-bool CacheEntryBounds::matches(const QueryRectangle& query) const {
-	if ( SpatialReference::contains(query) &&
-		 TemporalReference::contains(query) ) {
 
-		if ( res_type == QueryResolution::Type::NONE )
-			return true;
-		else if ( res_type == QueryResolution::Type::PIXELS ) {
-
-			double q_x_res = (double) query.xres / (query.x2 - query.x1);
-			double q_y_res = (double) query.yres / (query.y2 - query.y1);
-
-			return x_res_from <  q_x_res &&
-				   x_res_to   >= q_x_res &&
-				   y_res_from <  q_y_res &&
-				   y_res_to   >= q_y_res;
-		}
-		else
-			throw ArgumentException("Unknown QueryResolution::Type in QueryRectangle");
-	}
-	return false;
+QueryCube::QueryCube(const QueryRectangle& rect) : QueryCube(rect,rect) {
 }
 
-double CacheEntryBounds::get_coverage(const QueryRectangle& query) const {
-	if ( x1 > query.x2 || x2 < query.x1 ||
-		 y1 > query.y2 || y2 < query.y1 )
-			return 0.0;
-
-	double ix1 = std::max(x1,query.x1),
-		   ix2 = std::min(x2,query.x2),
-		   iy1 = std::max(y1,query.y1),
-		   iy2 = std::min(y2,query.y2);
-
-	double iarea    = std::abs((ix2-ix1) * (iy2-iy1));
-	double qarea    = std::abs((query.x2-query.x1) * (query.y2-query.y1));
-	double coverage = iarea / qarea;
-
-	if ( res_type == QueryResolution::Type::NONE )
-		return coverage;
-	else if ( res_type == QueryResolution::Type::PIXELS ) {
-		double q_x_res = (double) query.xres / (query.x2 - query.x1);
-		double q_y_res = (double) query.yres / (query.y2 - query.y1);
-
-		if ( x_res_from <  q_x_res &&
-			 x_res_to   >= q_x_res &&
-			 y_res_from <  q_y_res &&
-			 y_res_to   >= q_y_res )
-			return coverage;
-		else
-			return 0.0;
-	}
-	throw ArgumentException("Unknown QueryResolution::Type in QueryRectangle");
+QueryCube::QueryCube(const SpatialReference& sref, const TemporalReference& tref) :
+	Cube3( sref.x1, sref.x2, sref.y1, sref.y2, tref.t1,
+	// Always make timespan an interval -- otherwise the volume function of cube returns 0
+	// Currently only works for unix timestamps
+	std::max( tref.t2, tref.t1 + 0.25 ) ), epsg(sref.epsg), timetype(tref.timetype) {
 }
 
-std::string CacheEntryBounds::to_string() const {
-	return concat("CacheEntryBounds[",
-		   "x1: ", x1,
-		   ", x2: ", x2,
-		   ", y1: ", y1,
-		   ", y2: ", y2,
-		   ", t1: ", t1,
-		   ", t2: ", t2,
-		   ", res_type: ", (int) res_type,
-		   ", x_res_from: ", x_res_from,
-		   ", x_res_to: ", x_res_to,
-		   ", y_res_from: ", y_res_from,
-		   ", y_res_to: ", y_res_to, "]");
+QueryCube::QueryCube(BinaryStream& stream) : Cube3(stream) {
+	stream.read(&epsg);
+	stream.read(&timetype);
+}
+
+void QueryCube::toStream(BinaryStream& stream) const {
+	Cube3::toStream(stream);
+	stream.write(epsg);
+	stream.write(timetype);
+}
+
+CacheCube::CacheCube(const SpatialReference& sref, const TemporalReference& tref) :
+	QueryCube( sref, tref ) {
+}
+
+CacheCube::CacheCube(const SpatioTemporalResult& result) : CacheCube( result.stref, result.stref ) {
+}
+
+CacheCube::CacheCube(const GridSpatioTemporalResult& result) :
+	QueryCube(result.stref,result.stref), resolution_info(result) {
+//	double ohspan = result.stref.x2 - result.stref.x1;
+//	double ovspan = result.stref.y2 - result.stref.y1;
+//
+//	// Enlarge result by degrees of 1/100 a pixel in each direction
+//	double h_spacing = ohspan / result.width / 100.0;
+//	double v_spacing = ovspan / result.height / 100.0;
+//
+//	double x1 = result.stref.x1 - h_spacing;
+//	double x2 = result.stref.x2 + h_spacing;
+//	double y1 = result.stref.y1 - v_spacing;
+//	double y2 = result.stref.y2 + v_spacing;
+//
+//	set_dimension( 0, x1, x2 );
+//	set_dimension( 1, y1, y2 );
+}
+
+CacheCube::CacheCube(const GenericPlot& result) :
+	QueryCube( SpatialReference(EPSG_UNREFERENCED,DoubleNegInfinity,DoubleNegInfinity,DoubleInfinity,DoubleInfinity),
+		       TemporalReference(TIMETYPE_UNREFERENCED, DoubleNegInfinity,DoubleInfinity) ) {
+	(void) result;
+}
+
+
+CacheCube::CacheCube(BinaryStream& stream) : QueryCube(stream), resolution_info(stream) {
+}
+
+const Interval& CacheCube::get_timespan() const {
+	return get_dimension(2);
+}
+
+void CacheCube::toStream(BinaryStream& stream) const {
+	QueryCube::toStream(stream);
+	resolution_info.toStream(stream);
 }
 
 //
@@ -189,11 +188,11 @@ void AccessInfo::toStream( BinaryStream &stream ) const {
 //
 // CacheEntry
 //
-CacheEntry::CacheEntry(CacheEntryBounds bounds, uint64_t size) : AccessInfo(),
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size) : AccessInfo(),
 	bounds(bounds), size(size) {
 }
 
-CacheEntry::CacheEntry(CacheEntryBounds bounds, uint64_t size, time_t last_access, uint32_t access_count) :
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, time_t last_access, uint32_t access_count) :
 	AccessInfo(last_access,access_count),
 	bounds(bounds), size(size) {
 }
@@ -217,24 +216,18 @@ std::string CacheEntry::to_string() const {
 //
 
 template<typename KType>
-CacheQueryInfo<KType>::CacheQueryInfo(double coverage, double x1, double x2, double y1, double y2, KType key) :
-	coverage(coverage), x1(x1), x2(x2), y1(y1), y2(y2), key(key) {
+CacheQueryInfo<KType>::CacheQueryInfo(double score, CacheCube cube, KType key) :
+	score(score), cube(cube), key(key) {
 }
 
 template<typename KType>
 bool CacheQueryInfo<KType>::operator <(const CacheQueryInfo& b) const {
-	return get_score() < b.get_score();
+	return score < b.score;
 }
 
 template<typename KType>
 std::string CacheQueryInfo<KType>::to_string() const {
-	return concat("CacheQueryInfo: [", x1, ",", x2, "]x[", y1, ",", y2, "], coverage: ", coverage);
-}
-
-template<typename KType>
-double CacheQueryInfo<KType>::get_score() const {
-	// Scoring over coverage and area
-	return coverage / ((x2-x1)*(y2-y1));
+	return concat("CacheQueryInfo: ", cube, ", score: ", score);
 }
 
 //
@@ -242,63 +235,31 @@ double CacheQueryInfo<KType>::get_score() const {
 //
 template<typename KType>
 CacheQueryResult<KType>::CacheQueryResult(const QueryRectangle& query) :
-	covered( CacheCommon::empty_geom() ),
-	remainder( CacheCommon::create_square(query.x1,query.y1,query.x2,query.y2) ),
 	coverage(0) {
+	remainder.push_back( Cube3(query.x1,query.x2,query.y1,query.y2,query.t1,query.t2) );
 }
 
 template<typename KType>
-CacheQueryResult<KType>::CacheQueryResult( GeomP& covered, GeomP& remainder, double coverage, std::vector<KType> keys) :
-	covered( std::move(covered) ),
-	remainder( std::move(remainder) ),
-	coverage(coverage),
-	keys(keys) {
-	if ( !this->remainder->isEmpty() && !this->remainder->isRectangle() )
-		throw ArgumentException("Remainder must be a rectangle");
-}
+CacheQueryResult<KType>::CacheQueryResult( const QueryRectangle &query, std::vector<Cube<3>> remainder, std::vector<KType> keys) :
+	keys(keys),
+	remainder( remainder ) {
 
-template<typename KType>
-CacheQueryResult<KType>::CacheQueryResult(const CacheQueryResult& r) :
-	covered( GeomP( r.covered->clone() ) ),
-	remainder( GeomP( r.remainder->clone() ) ),
-	coverage(r.coverage),
-	keys(r.keys) {
-}
-
-template<typename KType>
-CacheQueryResult<KType>::CacheQueryResult(CacheQueryResult&& r) :
-	covered( std::move(r.covered) ),
-	remainder( std::move(r.remainder) ),
-	coverage(r.coverage),
-	keys(std::move(keys)) {
-}
-
-template<typename KType>
-CacheQueryResult<KType>& CacheQueryResult<KType>::operator =(const CacheQueryResult& r) {
-	covered.reset( r.covered->clone() );
-	remainder.reset( r.remainder->clone() );
-	coverage = r.coverage;
-	keys = r.keys;
-	return *this;
-}
-
-template<typename KType>
-CacheQueryResult<KType>& CacheQueryResult<KType>::operator =(CacheQueryResult&& r) {
-	covered = std::move(r.covered);
-	remainder = std::move(r.remainder);
-	coverage = r.coverage;
-	keys = std::move(r.keys);
-	return *this;
+	QueryCube qc(query);
+	double v = 0;
+	for ( auto &rem : this->remainder) {
+		v += rem.volume();
+	}
+	coverage = 1-(v/qc.volume());
 }
 
 template<typename KType>
 bool CacheQueryResult<KType>::has_remainder() const {
-	return !remainder->isEmpty();
+	return !remainder.empty();
 }
 
 template<typename KType>
 bool CacheQueryResult<KType>::has_hit() const {
-	return !covered->isEmpty();
+	return !keys.empty();
 }
 
 template<typename KType>
@@ -306,9 +267,7 @@ std::string CacheQueryResult<KType>::to_string() const {
 	return concat( "CacheQueryResult[",
 	"has_hit: ", has_hit(),
 	",  has_remainder: ", has_remainder(),
-	",  coverage: ", coverage,
-	",  covered: ", covered->toString(),
-	",  remainder: ", remainder->toString(),
+	",  num remainders: ", remainder.size(),
 	",  num keys: ", keys.size(),
 	"]");
 }
@@ -318,25 +277,29 @@ std::string CacheQueryResult<KType>::to_string() const {
 // CacheRef
 //
 
-NodeCacheRef::NodeCacheRef(const NodeCacheKey& key, const CacheEntry& entry) :
-	NodeCacheKey(key), CacheEntry(entry) {
+NodeCacheRef::NodeCacheRef(const TypedNodeCacheKey& key, const CacheEntry& entry) :
+	TypedNodeCacheKey(key), CacheEntry(entry) {
 }
 
-NodeCacheRef::NodeCacheRef(const std::string semantic_id, uint64_t entry_id, const CacheEntry& entry) :
-	NodeCacheKey(semantic_id,entry_id), CacheEntry(entry) {
+NodeCacheRef::NodeCacheRef(CacheType type, const NodeCacheKey& key, const CacheEntry& entry) :
+	TypedNodeCacheKey(type,key.semantic_id,key.entry_id), CacheEntry(entry) {
+}
+
+NodeCacheRef::NodeCacheRef(CacheType type, const std::string semantic_id, uint64_t entry_id, const CacheEntry& entry) :
+	TypedNodeCacheKey(type,semantic_id,entry_id), CacheEntry(entry) {
 }
 
 NodeCacheRef::NodeCacheRef(BinaryStream& stream) :
-	NodeCacheKey(stream), CacheEntry(stream) {
+	TypedNodeCacheKey(stream), CacheEntry(stream) {
 }
 
 void NodeCacheRef::toStream(BinaryStream& stream) const {
-	NodeCacheKey::toStream(stream);
+	TypedNodeCacheKey::toStream(stream);
 	CacheEntry::toStream(stream);
 }
 
 std::string NodeCacheRef::to_string() const {
-	return concat("CacheRef[ key: ", NodeCacheKey::to_string(), ", entry: ", CacheEntry::to_string(), "]");
+	return concat("CacheRef[ key: ", TypedNodeCacheKey::to_string(), ", entry: ", CacheEntry::to_string(), "]");
 }
 
 //////////////////////////////////////////////////////////////
@@ -392,53 +355,36 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 	}
 
 	std::vector<KType> ids;
-	std::unique_ptr<geos::geom::Geometry> remainder;
-	std::unique_ptr<geos::geom::Geometry> p_union = CacheCommon::empty_geom();
-	std::unique_ptr<geos::geom::Geometry> qbox    = CacheCommon::create_square(spec.x1,spec.y1,spec.x2,spec.y2);
+	std::vector<CacheQueryInfo<KType>> used_entries;
+	std::vector<Cube<3>> remainders;
+	remainders.push_back( QueryCube(spec) );
 
-	// Add entries until we cover the whole area or nothing is left
-	while (!partials.empty() && !p_union->contains( qbox.get() )) {
-		auto qi = partials.top();
-		Log::trace("Candidate: %s", qi.to_string().c_str());
+	while ( !partials.empty() && !remainders.empty() ) {
+		bool used   = false;
+		auto &entry = partials.top();
 
-		// Create the intersection and check if it enhances the covered area
-		std::unique_ptr<geos::geom::Polygon> box = CacheCommon::create_square(
-			std::max(spec.x1,qi.x1),
-			std::max(spec.y1,qi.y1),
-			std::min(spec.x2,qi.x2),
-			std::min(spec.y2,qi.y2)
-		);
-		if ( !p_union->contains( box.get() ) ) {
-			p_union = CacheCommon::union_geom( p_union, box );
-			Log::trace("Added candidate. Covered area is now: %s", p_union->toString().c_str());
-			ids.push_back(qi.key);
+		std::vector<Cube<3>> new_remainders;
+		for ( auto & rem : remainders ) {
+			if ( entry.cube.intersects(rem) ) {
+				used = true;
+				auto split = rem.dissect_by(entry.cube);
+				// Insert new remainders
+				if ( !split.empty() )
+					new_remainders.insert(new_remainders.end(),split.begin(),split.end());
+			}
+			else
+				new_remainders.push_back(rem);
 		}
-		else {
-			Log::trace("Omitting candidate, does not enlarge covered area");
+		remainders = new_remainders;
+
+		if ( used ) {
+			used_entries.push_back(entry);
+			ids.push_back( entry.key );
 		}
 		partials.pop();
 	}
 
-	double coverage;
-	// Full coverage
-	if ( p_union->contains( qbox.get() ) ) {
-		Log::trace("Query can be fully answered from cache.");
-		remainder = CacheCommon::empty_geom();
-		coverage = 1;
-	}
-	// Calculate remainder
-	else {
-		geos::geom::Geometry *isect = qbox->intersection( p_union.get() );
-		geos::geom::Geometry *rem_poly = qbox->difference(isect);
-		coverage = isect->getArea() / qbox->getArea();
-		remainder.reset(rem_poly->getEnvelope());
-		delete rem_poly;
-		delete isect;
-		Log::trace("Query can be partially answered from cache. Remainder rectangle: %s", remainder->toString().c_str());
-	}
-	return CacheQueryResult<KType>( p_union, remainder, coverage, ids);
-
-
+	return CacheQueryResult<KType>( spec, remainders, ids );
 }
 
 template<typename KType, typename EType>
@@ -447,12 +393,27 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 
 	Log::trace("Fetching candidates for query: %s", CacheCommon::qr_to_string(spec).c_str() );
 	std::priority_queue<CacheQueryInfo<KType>> partials;
+
+	QueryCube qc( spec );
+
 	for (auto &e : entries) {
-		auto &bounds = e.second->bounds;
-		double coverage = bounds.get_coverage(spec);
-		Log::trace("Coverage for entry %d: %f", e.first, coverage);
-		if ( coverage > 0 )
-			partials.push(CacheQueryInfo<KType>( coverage, bounds.x1, bounds.x2, bounds.y1, bounds.y2, e.first ));
+		CacheCube &bounds = e.second->bounds;
+
+		if ( spec.epsg == bounds.epsg &&
+			 spec.timetype == bounds.timetype &&
+			 bounds.resolution_info.matches(spec) &&
+			 bounds.intersects(qc) ) {
+
+			// Raster
+			if ( spec.restype == QueryResolution::Type::PIXELS &&
+				!bounds.get_timespan().contains( Interval( spec.t1, spec.t2) ) )
+				continue;
+
+			// Coverage = score for now
+			double score = bounds.intersect(qc).volume() / qc.volume();
+			Log::trace("Score for entry %s: %f", key_to_string(e.first).c_str(), score);
+			partials.push(CacheQueryInfo<KType>( score, bounds, e.first ));
+		}
 	}
 	Log::trace("Found %d candidates for query: %s", partials.size(), CacheCommon::qr_to_string(spec).c_str() );
 	return partials;
@@ -467,8 +428,22 @@ std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() con
 	return result;
 }
 
+template<typename KType, typename EType>
+std::string CacheStructure<KType, EType>::key_to_string(uint64_t key) const {
+	return std::to_string(key);
+}
+
+template<typename KType, typename EType>
+std::string CacheStructure<KType, EType>::key_to_string(const std::pair<uint32_t, uint64_t> &key) const {
+	return concat("(",key.first,":",key.second,")");
+}
+
 template class CacheQueryResult<uint64_t>;
 template class CacheStructure<uint64_t, NodeCacheEntry<GenericRaster>>;
+template class CacheStructure<uint64_t, NodeCacheEntry<PointCollection>>;
+template class CacheStructure<uint64_t, NodeCacheEntry<LineCollection>>;
+template class CacheStructure<uint64_t, NodeCacheEntry<PolygonCollection>>;
+template class CacheStructure<uint64_t, NodeCacheEntry<GenericPlot>>;
 
 template class CacheQueryResult<std::pair<uint32_t,uint64_t>>;
 template class CacheStructure<std::pair<uint32_t, uint64_t>, IndexCacheEntry> ;

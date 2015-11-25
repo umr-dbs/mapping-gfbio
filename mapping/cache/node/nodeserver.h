@@ -66,8 +66,14 @@ private:
 	// Separation of command-processing for the workers
 	void process_worker_command(uint8_t cmd, BinaryStream &stream);
 
-	// Handles a raster-request received from the index
-	void process_raster_request(uint8_t cmd, BinaryStream &stream);
+	// Handles a create-request received from the index
+	void process_create_request(BinaryStream &index_stream, const BaseRequest &request );
+
+	// Handles a puzzle-request received from the index
+	void process_puzzle_request(BinaryStream &index_stream, const PuzzleRequest &request );
+
+	// Handles a delivery-request received from the index
+	void process_delivery_request(BinaryStream &index_stream, const DeliveryRequest &request );
 
 	// Process a command received on the control-connection
 	void process_control_command(uint8_t cmd, BinaryStream &stream);
@@ -76,7 +82,11 @@ private:
 	void handle_reorg_move_item( const ReorgMoveItem &item, BinaryStream &index_stream );
 
 	// Removes the given item from the local cache of this node
-	void handle_reorg_remove_item( const ReorgRemoveItem &item );
+	void handle_reorg_remove_item( const TypedNodeCacheKey &item );
+
+
+	template <typename T>
+	void finish_request( BinaryStream &index_stream, const std::shared_ptr<const T> &item );
 
 	// Creates a connection to the appropriate delivery-process
 	// of the target node and requests the delivery of the given item

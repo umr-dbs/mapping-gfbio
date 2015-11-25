@@ -53,7 +53,7 @@ LineCollection::LineCollection(BinaryStream &stream) : SimpleFeatureCollection(s
 	}
 }
 
-void LineCollection::toStream(BinaryStream &stream) {
+void LineCollection::toStream(BinaryStream &stream) const {
 	stream.write(stref);
 	stream.write(hasTime());
 
@@ -91,7 +91,7 @@ void LineCollection::toStream(BinaryStream &stream) {
 }
 
 template<typename T>
-std::unique_ptr<LineCollection> filter(LineCollection *in, const std::vector<T> &keep) {
+std::unique_ptr<LineCollection> filter( const LineCollection *in, const std::vector<T> &keep) {
 	size_t count = in->getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
@@ -146,11 +146,11 @@ std::unique_ptr<LineCollection> filter(LineCollection *in, const std::vector<T> 
 	return out;
 }
 
-std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<bool> &keep) {
+std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<bool> &keep) const {
 	return ::filter<bool>(this, keep);
 }
 
-std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<char> &keep) {
+std::unique_ptr<LineCollection> LineCollection::filter(const std::vector<char> &keep) const {
 	return ::filter<char>(this, keep);
 }
 
@@ -176,7 +176,7 @@ bool LineCollection::featureIntersectsRectangle(size_t featureIndex, double x1, 
 	return false;
 }
 
-std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2){
+std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2) const{
 	std::vector<bool> keep(getFeatureCount());
 
 	for(auto feature : *this){
@@ -188,7 +188,7 @@ std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(do
 	return filter(keep);
 }
 
-std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(const SpatialReference& sref){
+std::unique_ptr<LineCollection> LineCollection::filterByRectangleIntersection(const SpatialReference& sref) const{
 	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 

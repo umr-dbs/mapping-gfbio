@@ -71,7 +71,7 @@ public:
 	 * Serialize collection to stream
 	 * @param stream the stream to serialize to
 	 */
-	void toStream(BinaryStream &stream);
+	void toStream(BinaryStream &stream) const;
 
 	/**
 	 * add a new coordinate to the current feature. After adding all coordinates, finishFeature() has to be called
@@ -98,14 +98,14 @@ public:
 	 * @param keep the vector specifying which features to keep
 	 * @return new collection containing only the features that should be kept
 	 */
-	std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep);
+	std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep) const;
 
 	/**
 	 * filter the features of the collections based on keep vector
 	 * @param keep the vector specifying which features to keep
 	 * @return new collection containing only the features that should be kept
 	 */
-	std::unique_ptr<PointCollection> filter(const std::vector<char> &keep);
+	std::unique_ptr<PointCollection> filter(const std::vector<char> &keep) const;
 
 	/**
 	 * filter collection by a given rectangle
@@ -115,14 +115,14 @@ public:
 	 * @param y2 x of lower right coordinate of rectangle
 	 * @return new collection that contains only features that intersect with rectangle
 	 */
-	virtual std::unique_ptr<PointCollection> filterByRectangleIntersection(double x1, double y1, double x2, double y2);
+	virtual std::unique_ptr<PointCollection> filterByRectangleIntersection(double x1, double y1, double x2, double y2) const;
 
 	/**
 	 * filter collection by a given spatial reference
 	 * @param sref spatial reference
 	 * @return new collection that contains only features that intersect with rectangle given by sref
 	 */
-	virtual std::unique_ptr<PointCollection> filterByRectangleIntersection(const SpatialReference& sref);
+	virtual std::unique_ptr<PointCollection> filterByRectangleIntersection(const SpatialReference& sref) const;
 
 	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
 

@@ -152,7 +152,6 @@ class AttributeArrays {
 
 				/**
 				 * Sets an attribute value.
-				 * Throws an exception if the value was previously set.
 				 *
 				 * @param idx index of the attribute to set
 				 * @param value value to set

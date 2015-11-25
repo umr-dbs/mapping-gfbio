@@ -2,8 +2,10 @@
 #define UTIL_TIMEPARSER_H_
 
 #include <ctime>
+#include <json/json.h>
 #include "util/make_unique.h"
 #include "datatypes/spatiotemporal.h"
+
 
 /**
  * This class provides methods to parse dates and datetimes from different
@@ -34,12 +36,32 @@ public:
 	static std::unique_ptr<TimeParser> createCustom(const std::string& customFormat);
 
 	/**
+	 * Creates a parser from json (from operator params)
+	 * @param json the json value that describes the time format
+	 * @return a parser for the timeFormat given by the json value
+	 */
+	static std::unique_ptr<TimeParser> createFromJson(const Json::Value& json);
+
+	/**
 	 * Get the timetype for the resulting timestamps
 	 * @return the timetype for the resulting timestamps
 	 */
 	timetype_t getTimeType(){
 		return timeType;
 	}
+
+	/**
+	 * get a json representation of the format for serialization
+	 * @return json representation of the format for serialization
+	 */
+	virtual Json::Value toJsonObject() const;
+
+
+	/**
+	 * get a json representation as string of the format for serialization
+	 * @return json representation as string of the format for serialization
+	 */
+	std::string toJson() const;
 
 	/**
 	 * parse the given time string and return a corresponding value
@@ -51,9 +73,10 @@ public:
 	virtual ~TimeParser() = default;
 
 protected:
-	TimeParser(const timetype_t timeType);
+	TimeParser(const timetype_t timeType, Format format);
 
 	timetype_t timeType;
+	Format format;
 };
 
 

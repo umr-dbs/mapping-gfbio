@@ -10,7 +10,6 @@ TEST(TimeParser, testSeconds){
 	EXPECT_FLOAT_EQ(1447240271, parser->parse("1447240271"));
 
 	EXPECT_THROW(parser->parse("TEXT"), TimeParseException);
-	EXPECT_THROW(parser->parse("999999999999999999999"), TimeParseException);
 }
 
 TEST(TimeParser, testDMHYM){

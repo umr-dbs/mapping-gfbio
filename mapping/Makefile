@@ -5,6 +5,9 @@
 LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
 CPATH := /usr/local/include/:$(CPATH)
 
+# this is the default path when installing libgtest-dev on ubuntu
+GTEST_DIR=/usr/src/gtest/
+
 #CPP=g++
 CPP=clang++-3.5
 CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ -I/usr/include/gdal
@@ -89,7 +92,7 @@ ${EXECGI}:	o/cgi.o o/cache/client.o ${OBJ_COMMON}
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 	
-${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/client.o o/test/unittests/init.o o/test/unittests/example.o o/test/unittests/simplefeaturecollections/points.o o/test/unittests/simplefeaturecollections/lines.o o/test/unittests/simplefeaturecollections/polygons.o o/test/unittests/temporal/timeshift.o o/test/unittests/cache/util.o o/test/unittests/cache/stcache.o o/test/unittests/units.o o/test/unittests/temporal/timeparser.o o/test/unittests/cache/misc.o #o/test/unittests/cache/distribution.o
+${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/client.o o/test/unittests/init.o o/test/unittests/example.o o/test/unittests/simplefeaturecollections/points.o o/test/unittests/simplefeaturecollections/lines.o o/test/unittests/simplefeaturecollections/polygons.o o/test/unittests/temporal/timeshift.o o/test/unittests/cache/util.o o/test/unittests/cache/stcache.o o/test/unittests/units.o o/test/unittests/temporal/timeparser.o o/test/unittests/cache/misc.o o/libgtest.a #o/test/unittests/cache/distribution.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/datatypes/unit.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o 
@@ -100,6 +103,16 @@ ${EXECACHEINDEX}:	o/cache/index/indexserver_main.o o/cache/index/indexserver.o o
 
 ${EXECACHENODE}:	o/cache/node/nodeserver_main.o o/cache/node/nodeserver.o o/cache/node/delivery.o ${OBJ_COMMON}
 	${CPP}  $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
+
+#
+# gtest library
+# instructions taken from https://github.com/google/googletest/blob/master/googletest/README.md
+#
+o/gtest-all.o: ${GTEST_DIR}/src/gtest-all.cc
+	${CPP} ${CPPFLAGS} -I${GTEST_DIR} -pthread -o $@ -c ${GTEST_DIR}/src/gtest-all.cc
+
+o/libgtest.a: o/gtest-all.o
+	ar -rv o/libgtest.a o/gtest-all.o
 
 
 
@@ -210,3 +223,4 @@ clean:
 	rm -f $(CL_HEADERS)
 	find o/ -type f -name '*.o' -delete
 	find o/ -type f -name '*.d' -delete
+	find o/ -type f -name '*.a' -delete

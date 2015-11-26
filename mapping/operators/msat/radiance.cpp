@@ -27,8 +27,6 @@ class MSATRadianceOperator : public GenericOperator {
 };
 
 
-#include "operators/msat/radiance.cl.h"
-
 
 
 MSATRadianceOperator::MSATRadianceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -50,6 +48,14 @@ void MSATRadianceOperator::writeSemanticParameters(std::ostringstream& stream) {
 
 
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("MSATRadianceOperator: cannot be executed without OpenCL support");
+}
+#else
+
+#include "operators/msat/radiance.cl.h"
+
 std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
@@ -96,4 +102,5 @@ std::unique_ptr<GenericRaster> MSATRadianceOperator::getRaster(const QueryRectan
 
 	return raster_out;
 }
+#endif
 #endif

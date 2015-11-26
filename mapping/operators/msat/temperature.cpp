@@ -40,12 +40,19 @@ MSATTemperatureOperator::~MSATTemperatureOperator() {
 }
 REGISTER_OPERATOR(MSATTemperatureOperator, "msattemperature");
 
+void MSATTemperatureOperator::writeSemanticParameters(std::ostringstream& stream) {
+	stream << "{\"forceSatellite\":" << "\"" << forceSatellite << "\"}";
+}
+
 
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("MSATTemperatureOperator: cannot be executed without OpenCL support");
+}
+#else
 
 #include "operators/msat/temperature.cl.h"
-
-
 
 /**
  * This function uses the approximation method published by Eumetsat to calculate BTs from Radiance.
@@ -60,10 +67,6 @@ static double calculateTempFromEffectiveRadiance(double wavenumber, double alpha
 	double temp = (msg::c1 * 1.0e6 * wavenumber*wavenumber*wavenumber) / (1.0e-5 * radiance);
 	temp = ((msg::c2* 100. * wavenumber / std::log(temp + 1)) - beta) / alpha;
 	return temp;
-}
-
-void MSATTemperatureOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "{\"forceSatellite\":" << "\"" << forceSatellite << "\"}";
 }
 
 std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
@@ -133,4 +136,5 @@ std::unique_ptr<GenericRaster> MSATTemperatureOperator::getRaster(const QueryRec
 
 	return raster_out;
 }
+#endif
 #endif

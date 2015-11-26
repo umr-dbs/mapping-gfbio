@@ -16,6 +16,9 @@ mapping/tileserver
 mapping/cache_index
 mapping/cache_node
 
+# machine specific configuration
+mapping/Makefile.local
+
 # generated documentation
 docs/waveDoc/*
 htdocs/doc/wave/*

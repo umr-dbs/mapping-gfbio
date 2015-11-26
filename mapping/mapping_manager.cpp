@@ -552,11 +552,13 @@ int main(int argc, char *argv[]) {
 		f(11, -36);
 		f(36, -16);
 	}
+#ifndef MAPPING_NO_OPENCL
 	else if (strcmp(command, "clinfo") == 0) {
 		RasterOpenCL::init();
 		auto mbs = RasterOpenCL::getMaxAllocSize();
 		printf("maximum buffer size is %ud (%d MB)\n", mbs, mbs/1024/1024);
 	}
+#endif
 	else {
 		usage();
 	}

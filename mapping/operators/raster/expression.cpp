@@ -59,6 +59,12 @@ void ExpressionOperator::writeSemanticParameters(std::ostringstream& stream) {
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
+
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("ExpressionOperator: cannot be executed without OpenCL support");
+}
+#else
 std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	int rastercount = getRasterSourceCount();
 	if (rastercount < 1 || rastercount > 26)
@@ -145,4 +151,5 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 
 	return raster_out;
 }
+#endif
 #endif

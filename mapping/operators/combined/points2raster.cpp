@@ -47,6 +47,12 @@ void PointsToRasterOperator::writeSemanticParameters(std::ostringstream& stream)
 
 
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("PointsToRasterOperator: cannot be executed without OpenCL support");
+}
+#else
+
 #include "operators/combined/points2raster_frequency.cl.h"
 #include "operators/combined/points2raster_value.cl.h"
 
@@ -153,4 +159,5 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 		return blurred;
 	}
 }
+#endif
 #endif

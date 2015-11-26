@@ -61,6 +61,12 @@ void MSG_Pansharpening_Operator::writeSemanticParameters(std::ostringstream& str
 
 
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> MSG_Pansharpening_Operator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("MSG_Pansharpening_Operator: cannot be executed without OpenCL support");
+}
+#else
+
 
 #include "operators/msat/pansharpening_degenerate.cl.h"
 #include "operators/msat/pansharpening_regression.cl.h"
@@ -160,4 +166,5 @@ std::unique_ptr<GenericRaster> MSG_Pansharpening_Operator::getRaster(const Query
 
 	return raster_out;
 }
+#endif
 #endif

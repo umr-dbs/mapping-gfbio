@@ -27,8 +27,6 @@ class MSATCo2CorrectionOperator : public GenericOperator {
 };
 
 
-#include "operators/msat/co2correction.cl.h"
-
 
 
 MSATCo2CorrectionOperator::MSATCo2CorrectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
@@ -38,7 +36,16 @@ MSATCo2CorrectionOperator::~MSATCo2CorrectionOperator() {
 }
 REGISTER_OPERATOR(MSATCo2CorrectionOperator, "msatco2correction");
 
+
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> MSATCo2CorrectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("MSATCo2CorrectionOperator: cannot be executed without OpenCL support");
+}
+#else
+
+#include "operators/msat/co2correction.cl.h"
+
 std::unique_ptr<GenericRaster> MSATCo2CorrectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
 	auto raster_bt039 = getRasterFromSource(0, rect, profiler, RasterQM::LOOSE);
@@ -67,4 +74,5 @@ std::unique_ptr<GenericRaster> MSATCo2CorrectionOperator::getRaster(const QueryR
 
 	return raster_out;
 }
+#endif
 #endif

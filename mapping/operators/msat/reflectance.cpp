@@ -60,6 +60,11 @@ void MSATReflectanceOperator::writeSemanticParameters(std::ostringstream& stream
 
 
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("MSATReflectanceOperator: cannot be executed without OpenCL support");
+}
+#else
 
 /**
  * This function calculates the earth sun distance for a given day of year
@@ -173,3 +178,5 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	return raster_out;
 }
 #endif
+#endif
+

@@ -69,12 +69,12 @@ struct matrixkernel{
 		auto raster_dest_guard = GenericRaster::create(raster_src->dd, *raster_src, GenericRaster::Representation::CPU);
 		Raster2D<T> *raster_dest = (Raster2D<T> *) raster_dest_guard.get();
 
-		T max = (T) raster_src->valuemeta.max;
-		T min = (T) raster_src->valuemeta.min;
+		auto max = raster_src->dd.unit.getMin();
+		auto min = raster_src->dd.unit.getMax();
 
 		int matrix_offset = matrix_size / 2;
-		int width = raster_src->rastermeta.size[0];
-		int height = raster_src->rastermeta.size[1];
+		int width = raster_src->width;
+		int height = raster_src->height;
 
 		// TODO: Rand getrennt verarbeiten, in der mitte ist kein cap nötig
 		for (int y=0;y<height;y++) {

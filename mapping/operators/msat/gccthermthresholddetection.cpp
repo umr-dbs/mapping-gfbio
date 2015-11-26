@@ -50,6 +50,15 @@ REGISTER_OPERATOR(MSATGccThermThresholdDetectionOperator, "msatgccthermthreshold
 
 
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> MSATGccThermThresholdDetectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("MSATGccThermThresholdDetectionOperator: cannot be executed without OpenCL support");
+}
+std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("MSATGccThermThresholdDetectionOperator: cannot be executed without OpenCL support");
+}
+#else
+
 template<typename T1, typename T2>
 struct RasterClassification{
 	static void execute(Raster2D<T1> *sza_raster, Raster2D<T2> *out_raster, std::vector<float> classification_bounds_lower, std::vector<float> classification_bounds_upper, std::vector<float> classification_classes) {
@@ -351,4 +360,5 @@ std::unique_ptr<GenericPlot> MSATGccThermThresholdDetectionOperator::getPlot(con
 	//return the histogram as plot
 	return (std::unique_ptr<GenericPlot>(std::move(histogram_ptr)));;
 }
+#endif
 #endif

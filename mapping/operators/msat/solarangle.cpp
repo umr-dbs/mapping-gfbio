@@ -37,9 +37,6 @@ class MSATSolarAngleOperator : public GenericOperator {
 };
 
 
-#include "operators/msat/solarangle.cl.h"
-
-
 MSATSolarAngleOperator::MSATSolarAngleOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(1);
 
@@ -66,6 +63,14 @@ void MSATSolarAngleOperator::writeSemanticParameters(std::ostringstream& stream)
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("MSATSolarAngleOperator: cannot be executed without OpenCL support");
+}
+#else
+
+#include "operators/msat/solarangle.cl.h"
+
 std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
@@ -148,4 +153,5 @@ std::unique_ptr<GenericRaster> MSATSolarAngleOperator::getRaster(const QueryRect
 
 	return raster_out;
 }
+#endif
 #endif

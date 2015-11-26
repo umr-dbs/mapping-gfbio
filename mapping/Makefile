@@ -1,17 +1,30 @@
 #
 # General configuration
+# These variables are for system-specific settings and can be overwritten in Makefile.local
+# TODO: maybe we should use autotools or cmake or something..
 #
+
+# this is the default path when installing libgtest-dev on ubuntu
+GTEST_DIR=/usr/src/gtest/
+GDAL_INCLUDE_DIR=/usr/include/gdal/
+JSONCPP_INCLUDE_DIR=/usr/include/jsoncpp/
+
+#CPP=g++
+CPP=clang++-3.5
+
+USE_R=true
+USE_OPENCL=true
 
 LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
 CPATH := /usr/local/include/:$(CPATH)
 
-# this is the default path when installing libgtest-dev on ubuntu
-GTEST_DIR=/usr/src/gtest/
 
-#CPP=g++
-CPP=clang++-3.5
-CPPFLAGS=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I/usr/include/jsoncpp/ -I/usr/include/gdal
-CPPFLAGS_R=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
+# to override any of these options, create Makefile.local and set them there
+-include Makefile.local
+
+
+CPPFLAGS:=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I${JSONCPP_INCLUDE_DIR} -I${GDAL_INCLUDE_DIR}
+CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
@@ -26,6 +39,13 @@ TEST_MODE=run
 TEST_QUERIES:=$(wildcard test/systemtests/queries/*.json)
 TEST_LOGS:=$(TEST_QUERIES:.json=.log)
 
+
+ifneq (${USE_OPENCL},true)
+	CPPFLAGS := ${CPPFLAGS} -DMAPPING_NO_OPENCL=1
+	CPPFLAGS_R := ${CPPFLAGS_R} -DMAPPING_NO_OPENCL=1
+	LDFLAGS_CL := 
+endif
+
 #
 # All object files, grouped by subsystem
 #
@@ -39,7 +59,7 @@ OBJ_PLOT=o/datatypes/plots/histogram.o o/datatypes/plots/text.o o/datatypes/plot
 OBJ_UTIL=o/util/gdal.o o/util/hash.o o/util/curl.o o/util/sqlite.o o/util/sunpos.o o/util/binarystream.o o/util/csvparser.o o/util/base64.o o/util/configuration.o o/util/debug.o o/util/timemodification.o o/util/log.o o/util/timeparser.o
 OBJ_POINTVISUALIZATION=o/pointvisualization/BoundingBox.o o/pointvisualization/Circle.o o/pointvisualization/Coordinate.o o/pointvisualization/Dimension.o o/pointvisualization/FindResult.o o/pointvisualization/QuadTreeNode.o o/pointvisualization/CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters/converter.o o/converters/raw.o
-OBJ_OPERATORS_RASTER=o/operators/raster/matrixkernel.o o/operators/raster/opencl.o o/operators/raster/expression.o o/operators/raster/projections.o o/operators/raster/rastersource.o o/operators/raster/r.o o/operators/raster/classification.o
+OBJ_OPERATORS_RASTER=o/operators/raster/matrixkernel.o o/operators/raster/expression.o o/operators/raster/projections.o o/operators/raster/rastersource.o o/operators/raster/r.o o/operators/raster/classification.o
 OBJ_OPERATORS_POINTS=o/operators/points/pgpointsource.o o/operators/points/gfbiopointsource.o o/operators/points/points_filter_by_range.o o/operators/points/points_difference.o o/operators/points/points_cluster.o o/operators/points/csvpointsource.o
 OBJ_OPERATORS_GEOMETRY=o/operators/geometry/wktsource.o
 OBJ_OPERATORS_COMBINED=o/operators/combined/points2raster.o o/operators/combined/raster_metadata_to_points.o o/operators/combined/points2cluster_raster.o o/operators/combined/filterpointsbygeometry.o
@@ -72,6 +92,12 @@ EXETILESERVER=tileserver
 EXECACHEINDEX=cache_index
 EXECACHENODE=cache_node
 
+ifeq (${USE_R},true)
+	TARGET_EXERSERVER:=${EXERSERVER}
+else
+	TARGET_EXERSERVER:=
+endif
+
 
 .PHONY: clean systemtest system_testenvironment system_testcases unittest doc
 
@@ -79,8 +105,7 @@ EXECACHENODE=cache_node
 
 .SECONDEXPANSION:
 
-all: $(CL_HEADERS) ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED}
-without-rserver: $(CL_HEADERS) ${EXE} ${EXECGI} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED}
+all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED}
 
 #
 # Dependencies and compiler flags of all executables

@@ -80,11 +80,11 @@ struct PointDataEnhancement {
 		size_t attr_idx = 0;
 
 		for (auto &point : points->coordinates) {
-			size_t rasterCoordinateX = floor(raster->lcrs.WorldToPixelX(point.x));
-			size_t rasterCoordinateY = floor(raster->lcrs.WorldToPixelY(point.y));
+			size_t rasterCoordinateX = floor(raster->WorldToPixelX(point.x));
+			size_t rasterCoordinateY = floor(raster->WorldToPixelY(point.y));
 
 			double attr = std::numeric_limits<double>::quiet_NaN();
-			if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->lcrs.size[0] && rasterCoordinateY < raster->lcrs.size[1]) {
+			if (rasterCoordinateX >= 0 && rasterCoordinateY >= 0 &&	rasterCoordinateX < raster->width && rasterCoordinateY < raster->height) {
 				T value = raster->get(rasterCoordinateX, rasterCoordinateY);
 				if (!raster->dd.is_no_data(value))
 					attr = (double) value;
@@ -98,7 +98,7 @@ struct PointDataEnhancement {
 
 static void enhance(PointCollection &points, GenericRaster &raster, const std::string name, QueryProfiler &profiler) {
 #ifdef MAPPING_NO_OPENCL
-	auto &attr = points.feature_attributes.addNumericAttribute(name);
+	auto &attr = points.feature_attributes.addNumericAttribute(name, raster.dd.unit);
 	attr.reserve(points.getFeatureCount());
 	callUnaryOperatorFunc<PointDataEnhancement>(&raster, &points, name);
 #else

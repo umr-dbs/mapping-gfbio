@@ -85,6 +85,12 @@ void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream)
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
+#ifdef MAPPING_NO_OPENCL
+std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+	throw OperatorException("ClassificationOperator: cannot be executed without OpenCL support");
+}
+#else
+
 #include "operators/raster/classification_kernels.cl.h"
 
 std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
@@ -122,4 +128,5 @@ std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRect
 
 	return (raster_out);
 }
+#endif
 #endif

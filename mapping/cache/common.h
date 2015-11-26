@@ -19,19 +19,13 @@
 #include <sys/select.h>
 #include <errno.h>
 
-#include <geos/geom/Coordinate.h>
-#include <geos/geom/CoordinateSequence.h>
-#include <geos/geom/CoordinateArraySequence.h>
-#include <geos/geom/GeometryFactory.h>
-#include <geos/geom/Geometry.h>
-#include <geos/geom/LinearRing.h>
-#include <geos/geom/Polygon.h>
-
 //
 // Provides helper functions for common tasks.
 //
 
 enum class CacheType : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT, UNKNOWN };
+
+class CacheCube;
 
 class CacheCommon {
 public:
@@ -59,6 +53,12 @@ public:
 	static void set_uncaught_exception_handler();
 
 	static std::string get_stacktrace();
+
+	static bool resolution_matches( const GridSpatioTemporalResult &r1, const GridSpatioTemporalResult &r2 );
+
+	static bool resolution_matches( const CacheCube &c1, const CacheCube &c2 );
+
+	static bool resolution_matches( double scalex1, double scaley1, double scalex2, double scaley2 );
 
 	//
 	// Helper to read from a stream with a given timeout. Basically wraps
@@ -88,17 +88,7 @@ public:
 		}
 	}
 
-	//
-	// Geos Helper functions used by the caches query function
-	//
-	static std::unique_ptr<geos::geom::Geometry> empty_geom();
-	static std::unique_ptr<geos::geom::Polygon> create_square( double lx, double ly, double ux, double uy );
-	static std::unique_ptr<geos::geom::Geometry> union_geom( const std::unique_ptr<geos::geom::Geometry> &p1,
-															   const std::unique_ptr<geos::geom::Polygon> &p2);
-
-
 private:
-	static geos::geom::GeometryFactory gf;
 	CacheCommon() {};
 	~CacheCommon() {};
 };

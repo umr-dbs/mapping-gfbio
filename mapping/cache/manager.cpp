@@ -596,11 +596,8 @@ std::vector<std::unique_ptr<GenericRaster>> NodeCacheWrapper<GenericRaster>::com
 		try {
 			QueryProfiler qp;
 			qp.startTimer();
-			// FIXME: Do sth. on rasterdb to make this work with RasterQM::LOOSE
 			auto rem = compute_item(*graph,rqr,qp);
-
-			if ( std::abs(1.0 - ref_result.pixel_scale_x / rem->pixel_scale_x) > 0.01 ||
-				 std::abs(1.0 - ref_result.pixel_scale_y / rem->pixel_scale_y) > 0.01 ) {
+			if ( !CacheCommon::resolution_matches( ref_result, *rem ) ) {
 				Log::warn(
 					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s, result-dimension: %dx%d. Fitting result!",
 					ref_result.pixel_scale_x, ref_result.pixel_scale_y, rem->pixel_scale_x, rem->pixel_scale_y,

@@ -382,7 +382,7 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
 
 	// Get intersecting entries
-	auto partials = get_query_candidates( spec );
+	std::priority_queue<CacheQueryInfo<KType>> partials = get_query_candidates( spec );
 
 	// No candidates found
 	if ( partials.empty() ) {
@@ -397,7 +397,16 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 
 	while ( !partials.empty() && !remainders.empty() ) {
 		bool used   = false;
-		auto &entry = partials.top();
+		const CacheQueryInfo<KType> &entry = partials.top();
+
+		// Skip incompatible resolutions
+		if ( spec.restype == QueryResolution::Type::PIXELS &&
+			 !used_entries.empty() &&
+			 !CacheCommon::resolution_matches(
+				 entry.cube, used_entries.front().cube)	) {
+			partials.pop();
+			continue;
+		}
 
 		std::vector<Cube<3>> new_remainders;
 		for ( auto & rem : remainders ) {

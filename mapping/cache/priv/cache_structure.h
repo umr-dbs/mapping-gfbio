@@ -132,6 +132,7 @@ public:
 	bool has_remainder() const;
 	std::string to_string() const;
 
+	QueryRectangle covered;
 	std::vector<KType> keys;
 	std::vector<Cube<3>> remainder;
 	double coverage;
@@ -204,8 +205,12 @@ public:
 private:
 	std::string key_to_string( uint64_t key ) const;
 	std::string key_to_string( const std::pair<uint32_t,uint64_t> &key ) const;
-	std::map<KType, std::shared_ptr<EType>> entries;
+
 	std::priority_queue<CacheQueryInfo<KType>> get_query_candidates( const QueryRectangle &spec ) const;
+	std::vector<Cube<3>> union_remainders( const std::vector<Cube<3>> &remainders ) const;
+	CacheQueryResult<KType> enlarge_expected_result( const QueryRectangle &orig, const std::vector<CacheQueryInfo<KType>> &hits, std::vector<Cube<3>> &remainders ) const;
+
+	std::map<KType, std::shared_ptr<EType>> entries;
 	mutable std::mutex mtx;
 };
 

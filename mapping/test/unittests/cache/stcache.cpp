@@ -89,7 +89,7 @@ TEST(STCacheTest,TestQuery) {
 	auto &rem = qr.remainder.at(0);
 	printf("Remainder:\n%s\n", rem.to_string().c_str());
 
-	ASSERT_EQ( rem, Cube3( 1,2,1,2,10,10.25) );
+	ASSERT_EQ( rem, Cube3( 1,2,1,2,0,100) );
 
 	auto r4 = createRaster(1,2,1,2);
 	cache.put(sem_id,r4);

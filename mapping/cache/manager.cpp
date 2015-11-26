@@ -247,10 +247,50 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle(const PuzzleRequest& re
 template<typename T>
 SpatioTemporalReference RemoteCacheWrapper<T>::enlarge_puzzle(const QueryRectangle& query,
 	const std::vector<std::shared_ptr<const T> >& items) {
-	// TODO
+
+	// Calculated maximum covered rectangle
+	double x1 = DoubleNegInfinity,
+		   x2 = DoubleInfinity,
+		   y1 = DoubleNegInfinity,
+		   y2 = DoubleInfinity;
+
+	// Also stretch timestamp to smallest
+	// interval covered by all puzzle parts
+	double t1 = DoubleNegInfinity, t2 = DoubleInfinity;
+
+	for ( auto &item : items ) {
+		const SpatioTemporalReference &stref = item->stref;
+
+		t1 = std::max(t1,stref.t1);
+		t2 = std::min(t2,stref.t2);
+
+		if ( stref.x1 <= query.x1 )
+			x1 = std::max(x1,stref.x1);
+
+		if ( stref.x2 >= query.x2 )
+			x2 = std::min(x2,stref.x2);
+
+		if ( stref.y1 <= query.y1 )
+			y1 = std::max(y1,stref.y1);
+
+		if ( stref.y2 >= query.y2 )
+			y2 = std::min(y2,stref.y2);
+	}
+
+	return SpatioTemporalReference(
+		SpatialReference(query.epsg, x1, y1, x2, y2),
+		TemporalReference(query.timetype, t1, t2 )
+	);
+}
+
+// TODO: Hack for plots
+template<>
+SpatioTemporalReference RemoteCacheWrapper<GenericPlot>::enlarge_puzzle(const QueryRectangle& query,
+	const std::vector<std::shared_ptr<const GenericPlot> >& items) {
 	(void) items;
 	return SpatioTemporalReference(query,query);
 }
+
 
 template<typename T>
 std::unique_ptr<T> RemoteCacheWrapper<T>::fetch_item(const std::string& semantic_id, const CacheRef& ref) {

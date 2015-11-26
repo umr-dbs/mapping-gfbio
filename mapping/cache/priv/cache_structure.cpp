@@ -235,7 +235,7 @@ std::string CacheQueryInfo<KType>::to_string() const {
 //
 template<typename KType>
 CacheQueryResult<KType>::CacheQueryResult(const QueryRectangle& query) :
-	covered(query), coverage(0) {
+	covered(query) {
 	remainder.push_back( Cube3(query.x1,query.x2,query.y1,query.y2,query.t1,query.t2) );
 }
 
@@ -250,7 +250,6 @@ CacheQueryResult<KType>::CacheQueryResult( const QueryRectangle &query, std::vec
 	for ( auto &rem : this->remainder) {
 		v += rem.volume();
 	}
-	coverage = 1-(v/qc.volume());
 }
 
 template<typename KType>
@@ -471,8 +470,11 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 	// Tells which dimensions may be extended
 	bool do_check[4] = {true,true,true,true};
 
+	double rem_volume = 0;
+	// Calculate coverage and check which edges may be extended
 	// Only extend edges untouched by a remainder (spatial dimensions only)
 	for ( auto &rem : remainders ) {
+		rem_volume += rem.volume();
 		auto &dimx = rem.get_dimension(0);
 		auto &dimy = rem.get_dimension(1);
 		do_check[0] &= dimx.a > orig.x1;
@@ -480,6 +482,12 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 		do_check[2] &= dimy.a > orig.y1;
 		do_check[3] &= dimy.b < orig.y2;
 	}
+
+	// Return miss if we have a low coverage (<10%)
+	QueryCube qc(orig);
+	if ( 1-(rem_volume/qc.volume()) < 0.1 )
+		return CacheQueryResult<KType>( orig );
+
 
 	// Calculated maximum covered rectangle
 	double x1 = do_check[0] ? DoubleNegInfinity : orig.x1,

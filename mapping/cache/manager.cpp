@@ -892,3 +892,5 @@ CacheWrapper<GenericPlot>& NodeCacheManager::get_plot_cache() {
 CachingStrategy& NodeCacheManager::get_strategy() {
 	return *strategy;
 }
+
+template class ClientCacheWrapper<GenericRaster>;

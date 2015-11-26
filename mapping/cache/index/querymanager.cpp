@@ -119,8 +119,8 @@ std::unique_ptr<JobDescription> QueryManager::create_job(const BaseRequest& req)
 		return make_unique<DeliverJob>(jreq, ref.node_id);
 	}
 	// Puzzle
-	else if (res.has_hit() && res.coverage >  0.1) {
-		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f", res.coverage);
+	else if (res.has_hit()) {
+		Log::debug("Partial HIT. Sending puzzle-request.");
 		std::vector<uint32_t> node_ids;
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {

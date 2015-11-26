@@ -135,7 +135,6 @@ public:
 	QueryRectangle covered;
 	std::vector<KType> keys;
 	std::vector<Cube<3>> remainder;
-	double coverage;
 };
 
 //

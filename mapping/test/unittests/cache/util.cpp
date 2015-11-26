@@ -119,8 +119,9 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 // Test extensions
 //
 
-TestNodeServer::TestNodeServer(std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port, size_t capacity)  :
-	NodeServer(my_host,my_port,index_host,index_port,1), rcm( my_host, my_port, capacity,capacity,capacity,capacity,capacity ) {
+TestNodeServer::TestNodeServer(const std::string &my_host, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity)  :
+	NodeServer(my_host,my_port,index_host,index_port,1),
+	rcm( my_host, my_port, CachingStrategy::by_name(strategy), capacity,capacity,capacity,capacity,capacity ) {
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -186,6 +187,10 @@ CacheWrapper<PolygonCollection>& TestCacheMan::get_polygon_cache() {
 
 CacheWrapper<GenericPlot>& TestCacheMan::get_plot_cache() {
 	return get_current_instance().get_plot_cache();
+}
+
+CachingStrategy& TestCacheMan::get_strategy() {
+	return get_current_instance().get_strategy();
 }
 
 void TestCacheMan::add_instance(TestNodeServer *inst) {

@@ -114,13 +114,13 @@ all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXEC
 ${EXE}:	o/mapping_manager.o ${OBJ_COMMON}
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
-${EXECGI}:	o/cgi.o o/cache/client.o ${OBJ_COMMON}
+${EXECGI}:	o/cgi.o ${OBJ_COMMON}
 	${CPP} $+ -o $@  ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_CGI}
 
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 	
-${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/client.o ${OBJ_UNITTEST} o/libgtest.a
+${EXEGTEST}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o ${OBJ_UNITTEST} o/libgtest.a
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/datatypes/unit.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o 

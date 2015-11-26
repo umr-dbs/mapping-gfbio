@@ -123,7 +123,8 @@ void GenericOperator::validateResult(const QueryRectangle &rect, SpatioTemporalR
 		throw OperatorException(concat("Operator ", type, " returned result with TIMETYPE_UNREFERENCED"));
 
 	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
-		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle. \nQuery: ",
+				CacheCommon::qr_to_string(rect), "\nResult: ", CacheCommon::stref_to_string(result->stref)));
 }
 
 
@@ -178,7 +179,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 				QueryProfilerRunningGuard guard(parent_profiler, profiler);
 				result = getRaster(rect,profiler);
 			}
-			if ( CacheManager::get_strategy().do_cache(profiler,result->getDataSize()) )
+			if ( CacheManager::get_instance().get_strategy().do_cache(profiler,result->getDataSize()) )
 				CacheManager::get_instance().get_raster_cache().put(semantic_id,result);
 		}
 	}

@@ -27,7 +27,7 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
-	CacheManager::init( make_unique<NopCacheManager>("abc",123), make_unique<CacheAll>() );
+	CacheManager::init( make_unique<NopCacheManager>("abc",123) );
 
 	NodeRasterCache cache(114508*2 + 17);
 

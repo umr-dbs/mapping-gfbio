@@ -510,7 +510,7 @@ int main(int argc, char *argv[]) {
 
 	Configuration::loadFromDefaultPaths();
 	// FIXME
-	CacheManager::init(make_unique<NopCacheManager>("localhost",12345), make_unique<CacheAll>());
+	CacheManager::init(make_unique<NopCacheManager>("localhost",12345));
 
 	const char *command = argv[1];
 

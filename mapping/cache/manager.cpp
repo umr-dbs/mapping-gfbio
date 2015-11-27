@@ -71,9 +71,10 @@ NopCacheWrapper<T>::NopCacheWrapper() {
 
 template<typename T>
 void NopCacheWrapper<T>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item) {
+		const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
+	(void) profiler;
 }
 
 template<typename T>
@@ -87,8 +88,8 @@ std::unique_ptr<T> NopCacheWrapper<T>::query(const GenericOperator& op,
 template<typename T>
 NodeCacheRef NopCacheWrapper<T>::put_local(
 		const std::string& semantic_id, const std::unique_ptr<T>& item,
-		const AccessInfo info) {
-	CacheEntry ce( CacheCube(*item), sizeof(T), info.last_access, info.access_count );
+		double costs, const AccessInfo info) {
+	CacheEntry ce( CacheCube(*item), sizeof(T), costs, info.last_access, info.access_count );
 	return NodeCacheRef( CacheType::UNKNOWN, semantic_id, 0, ce );
 }
 
@@ -113,8 +114,9 @@ NodeCacheRef NopCacheWrapper<T>::get_entry_info(
 
 template<typename T>
 std::unique_ptr<T> NopCacheWrapper<T>::process_puzzle(
-		const PuzzleRequest& request) {
+		const PuzzleRequest& request, QueryProfiler &profiler) {
 	(void) request;
+	(void) profiler;
 	throw NoSuchElementException("NOP-Cache has no entries");
 }
 
@@ -154,11 +156,6 @@ CacheWrapper<GenericPlot>& NopCacheManager::get_plot_cache() {
 	return plot_cache;
 }
 
-CachingStrategy& NopCacheManager::get_strategy() {
-	return strategy;
-}
-
-
 //
 // Client Implementation
 //
@@ -171,9 +168,10 @@ ClientCacheWrapper<T>::ClientCacheWrapper(CacheType type, const std::string& idx
 
 template<typename T>
 void ClientCacheWrapper<T>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item) {
+		const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
+	(void) profiler;
 	throw CacheException("ClientWrapper only support the query-method");
 }
 
@@ -258,9 +256,10 @@ std::unique_ptr<GenericPlot> ClientCacheWrapper<GenericPlot>::read_result(
 template<typename T>
 NodeCacheRef ClientCacheWrapper<T>::put_local(
 		const std::string& semantic_id, const std::unique_ptr<T>& item,
-		const AccessInfo info) {
+		double costs, const AccessInfo info) {
 	(void) semantic_id;
 	(void) item;
+	(void) costs;
 	(void) info;
 	throw CacheException("ClientWrapper only support the query-method");
 }
@@ -287,8 +286,9 @@ NodeCacheRef ClientCacheWrapper<T>::get_entry_info(
 
 template<typename T>
 std::unique_ptr<T> ClientCacheWrapper<T>::process_puzzle(
-		const PuzzleRequest& request) {
+		const PuzzleRequest& request, QueryProfiler &profiler) {
 	(void) request;
+	(void) profiler;
 	throw CacheException("ClientWrapper only support the query-method");
 }
 
@@ -334,10 +334,6 @@ CacheWrapper<GenericPlot>& ClientCacheManager::get_plot_cache() {
 	return plot_cache;
 }
 
-CachingStrategy& ClientCacheManager::get_strategy() {
-	return strategy;
-}
-
 
 //
 // Node Wrapper
@@ -345,16 +341,17 @@ CachingStrategy& ClientCacheManager::get_strategy() {
 
 
 template<typename T>
-NodeCacheWrapper<T>::NodeCacheWrapper(NodeCache<T>& cache, const std::string &my_host, int my_port) :
-	cache(cache), my_host(my_host), my_port(my_port) {
+NodeCacheWrapper<T>::NodeCacheWrapper(NodeCache<T>& cache, const std::string &my_host, int my_port, const CachingStrategy &strategy) :
+	cache(cache), my_host(my_host), my_port(my_port), strategy(strategy) {
 }
 
 template<typename T>
-void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item) {
+void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
+
 	if (CacheManager::remote_connection == nullptr)
 		throw NetworkException("No connection to remote-index.");
 
-	auto ref = put_local(semantic_id, item);
+	auto ref = put_local(semantic_id, item, strategy.get_costs(profiler));
 	BinaryStream &stream = *CacheManager::remote_connection;
 
 	Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
@@ -364,9 +361,9 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 
 template<typename T>
 NodeCacheRef NodeCacheWrapper<T>::put_local(const std::string& semantic_id,
-	const std::unique_ptr<T>& item, const AccessInfo info) {
+	const std::unique_ptr<T>& item, double costs, const AccessInfo info) {
 	Log::debug("Adding item to local cache");
-	return cache.put(semantic_id, item, info);
+	return cache.put(semantic_id, item, costs, info);
 }
 
 template<typename T>
@@ -409,8 +406,9 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 			refs.push_back( CacheRef(my_host,my_port,id) );
 
 		PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
-		std::unique_ptr<T> result = process_puzzle(pr);
-		put( op.getSemanticId(), result );
+		QueryProfiler qp;
+		std::unique_ptr<T> result = process_puzzle(pr,qp);
+		put( op.getSemanticId(), result, qp );
 		return result;
 	}
 	// Check index (if we aren't on depth = 0 )
@@ -440,8 +438,9 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 			case WorkerConnection::RESP_QUERY_PARTIAL: {
 				PuzzleRequest pr(stream);
 				Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
-				auto res = process_puzzle(pr);
-				put(op.getSemanticId(),res);
+				QueryProfiler qp;
+				auto res = process_puzzle(pr,qp);
+				put(op.getSemanticId(),res,qp);
 				return res;
 				break;
 			}
@@ -457,7 +456,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 }
 
 template<typename T>
-std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request) {
+std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler) {
 	Log::trace("Processing puzzle-request: %s", request.to_string().c_str());
 
 	std::vector<std::shared_ptr<const T>> items;
@@ -472,7 +471,10 @@ std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& requ
 		}
 		else {
 			Log::debug("Fetching puzzle-piece from %s:%d, key: %d", cr.host.c_str(), cr.port, cr.entry_id);
+
 			auto raster = fetch_item( request.semantic_id, cr );
+			// TODO: Estimate size
+			//profiler.addIOCost();
 			items.push_back( std::shared_ptr<const T>(raster.release()) );
 		}
 	}
@@ -480,7 +482,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& requ
 	// Create remainder
 	Log::trace("Creating remainder queries.");
 	auto ref = items.front();
-	auto remainders = compute_remainders(request.semantic_id,*ref,request);
+	auto remainders = compute_remainders(request.semantic_id,*ref,request, profiler);
 
 	for ( auto &r : remainders )
 		items.push_back( std::shared_ptr<T>(r.release()));
@@ -570,21 +572,20 @@ std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_i
 
 template<typename T>
 std::vector<std::unique_ptr<T>> NodeCacheWrapper<T>::compute_remainders(const std::string& semantic_id,
-	const T& ref_result, const PuzzleRequest &request ) {
+	const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler ) {
 	(void) ref_result;
 	std::vector<std::unique_ptr<T>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
 
 	for ( auto &rqr : request.get_remainder_queries() ) {
-		QueryProfiler qp;
-		result.push_back( compute_item(*graph,rqr,qp) );
+		result.push_back( compute_item(*graph,rqr,profiler) );
 	}
 	return result;
 }
 
 template<>
 std::vector<std::unique_ptr<GenericRaster>> NodeCacheWrapper<GenericRaster>::compute_remainders(
-	const std::string& semantic_id, const GenericRaster& ref_result, const PuzzleRequest &request) {
+	const std::string& semantic_id, const GenericRaster& ref_result, const PuzzleRequest &request, QueryProfiler &profiler) {
 
 	std::vector<std::unique_ptr<GenericRaster>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
@@ -594,9 +595,7 @@ std::vector<std::unique_ptr<GenericRaster>> NodeCacheWrapper<GenericRaster>::com
 
 	for ( auto &rqr : remainders ) {
 		try {
-			QueryProfiler qp;
-			qp.startTimer();
-			auto rem = compute_item(*graph,rqr,qp);
+			auto rem = compute_item(*graph,rqr,profiler);
 			if ( !CacheCommon::resolution_matches( ref_result, *rem ) ) {
 				Log::warn(
 					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s, result-dimension: %dx%d. Fitting result!",
@@ -620,7 +619,7 @@ std::vector<std::unique_ptr<GenericRaster>> NodeCacheWrapper<GenericRaster>::com
 }
 
 RasterCacheWrapper::RasterCacheWrapper(NodeCache<GenericRaster>& cache, const std::string& my_host,
-	int my_port) : NodeCacheWrapper(cache,my_host,my_port) {
+	int my_port, const CachingStrategy &strategy) : NodeCacheWrapper(cache,my_host,my_port,strategy) {
 }
 
 std::unique_ptr<GenericRaster> RasterCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
@@ -673,8 +672,8 @@ std::unique_ptr<GenericRaster> RasterCacheWrapper::compute_item(GenericOperator&
 	return op.getCachedRaster(query, qp );
 }
 
-PlotCacheWrapper::PlotCacheWrapper(NodeCache<GenericPlot>& cache, const std::string& my_host, int my_port) :
-	NodeCacheWrapper(cache,my_host,my_port) {
+PlotCacheWrapper::PlotCacheWrapper(NodeCache<GenericPlot>& cache, const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+	NodeCacheWrapper(cache,my_host,my_port,strategy) {
 }
 
 std::unique_ptr<GenericPlot> PlotCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
@@ -695,7 +694,8 @@ std::unique_ptr<GenericPlot> PlotCacheWrapper::compute_item(GenericOperator& op,
 
 template<typename T>
 FeatureCollectionCacheWrapper<T>::FeatureCollectionCacheWrapper(NodeCache<T>& cache,
-	const std::string& my_host, int my_port) : NodeCacheWrapper<T>(cache,my_host,my_port) {
+	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+	NodeCacheWrapper<T>(cache,my_host,my_port,strategy) {
 }
 
 template<typename T>
@@ -755,7 +755,8 @@ std::unique_ptr<T> FeatureCollectionCacheWrapper<T>::read_item(BinaryStream &str
 }
 
 PointCollectionCacheWrapper::PointCollectionCacheWrapper(NodeCache<PointCollection>& cache,
-	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port)  {
+	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,my_host,my_port,strategy)  {
 }
 
 std::unique_ptr<PointCollection> PointCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -769,7 +770,8 @@ void PointCollectionCacheWrapper::append_idxs(PointCollection& dest,
 }
 
 LineCollectionCacheWrapper::LineCollectionCacheWrapper(NodeCache<LineCollection>& cache,
-	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port) {
+	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,my_host,my_port, strategy) {
 }
 
 std::unique_ptr<LineCollection> LineCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -784,7 +786,8 @@ void LineCollectionCacheWrapper::append_idxs(LineCollection& dest,
 }
 
 PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(NodeCache<PolygonCollection>& cache,
-	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port) {
+	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,my_host,my_port,strategy) {
 }
 
 std::unique_ptr<PolygonCollection> PolygonCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -813,9 +816,9 @@ NodeCacheManager::NodeCacheManager(const std::string &my_host, int my_port,
 	raster_cache(raster_cache_size), point_cache(point_cache_size),
 	line_cache(line_cache_size), polygon_cache(polygon_cache_size),
 	plot_cache(plot_cache_size),
-	raster_wrapper(raster_cache, my_host, my_port), point_wrapper(point_cache, my_host, my_port),
-	line_wrapper(line_cache, my_host, my_port), polygon_wrapper(polygon_cache, my_host, my_port),
-	plot_wrapper(plot_cache, my_host, my_port),
+	raster_wrapper(raster_cache, my_host, my_port, *strategy), point_wrapper(point_cache, my_host, my_port, *strategy),
+	line_wrapper(line_cache, my_host, my_port, *strategy), polygon_wrapper(polygon_cache, my_host, my_port, *strategy),
+	plot_wrapper(plot_cache, my_host, my_port, *strategy),
 	strategy(std::move(strategy)) {
 }
 
@@ -884,10 +887,6 @@ CacheWrapper<PolygonCollection>& NodeCacheManager::get_polygon_cache() {
 
 CacheWrapper<GenericPlot>& NodeCacheManager::get_plot_cache() {
 	return plot_wrapper;
-}
-
-CachingStrategy& NodeCacheManager::get_strategy() {
-	return *strategy;
 }
 
 template class ClientCacheWrapper<GenericRaster>;

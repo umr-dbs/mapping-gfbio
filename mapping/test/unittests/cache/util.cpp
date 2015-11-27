@@ -189,10 +189,6 @@ CacheWrapper<GenericPlot>& TestCacheMan::get_plot_cache() {
 	return get_current_instance().get_plot_cache();
 }
 
-CachingStrategy& TestCacheMan::get_strategy() {
-	return get_current_instance().get_strategy();
-}
-
 void TestCacheMan::add_instance(TestNodeServer *inst) {
 	instances.push_back(inst);
 }

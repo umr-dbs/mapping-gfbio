@@ -22,6 +22,9 @@ std::unique_ptr<CachingStrategy> CachingStrategy::by_name(const std::string& nam
 	throw ArgumentException(concat("Unknown Caching-Strategy: ", name));
 }
 
+double CachingStrategy::get_costs(const QueryProfiler& profiler, size_t bytes) const {
+	return 0.0;
+}
 
 //
 // Cache All

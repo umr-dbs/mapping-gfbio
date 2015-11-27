@@ -88,9 +88,6 @@ private:
 	template <typename T>
 	void finish_request( BinaryStream &index_stream, const std::shared_ptr<const T> &item );
 
-	// Creates a connection to the appropriate delivery-process
-	// of the target node and requests the delivery of the given item
-	std::unique_ptr<BinaryStream> initiate_move( const ReorgMoveItem &item );
 
 	// Confirms the movement of the given item to the index as well
 	// as to the Node it was requested from

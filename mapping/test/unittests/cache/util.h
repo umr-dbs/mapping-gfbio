@@ -69,7 +69,6 @@ public:
 	CacheWrapper<LineCollection>& get_line_cache();
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
-	CachingStrategy& get_strategy();
 private:
 	CacheManager& get_current_instance() const;
 	std::vector<TestNodeServer*> instances;

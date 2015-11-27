@@ -60,9 +60,8 @@ bool ReorgStrategy::entry_greater(const std::shared_ptr<IndexCacheEntry> &a, con
 
 double ReorgStrategy::get_score(const IndexCacheEntry& entry) {
 	double hit_factor = 1.0 + std::min( entry.access_count / 1000.0, 1.0);
-	return
 	// Treat all the same within 10 seconds
-	(entry.last_access / 10) * hit_factor;
+	return (entry.last_access / 10) * hit_factor;
 }
 
 //

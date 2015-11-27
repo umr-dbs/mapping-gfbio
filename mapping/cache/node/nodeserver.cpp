@@ -145,30 +145,31 @@ void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 		const PuzzleRequest& request) {
 	// TODO: Cache puzzles?
 	auto &cm = CacheManager::get_instance();
+	QueryProfiler profiler;
 
 	switch ( request.type ) {
 		case CacheType::RASTER: {
-			auto res = cm.get_raster_cache().process_puzzle(request);
+			auto res = cm.get_raster_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const GenericRaster>(res.release()) );
 			break;
 		}
 		case CacheType::POINT: {
-			auto res = cm.get_point_cache().process_puzzle(request);
+			auto res = cm.get_point_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const PointCollection>(res.release()) );
 			break;
 		}
 		case CacheType::LINE: {
-			auto res = cm.get_line_cache().process_puzzle(request);
+			auto res = cm.get_line_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const LineCollection>(res.release()) );
 			break;
 		}
 		case CacheType::POLYGON: {
-			auto res = cm.get_polygon_cache().process_puzzle(request);
+			auto res = cm.get_polygon_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const PolygonCollection>(res.release()) );
 			break;
 		}
 		case CacheType::PLOT: {
-			auto res = cm.get_plot_cache().process_puzzle(request);
+			auto res = cm.get_plot_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const GenericPlot>(res.release()) );
 			break;
 		}
@@ -334,33 +335,37 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 		item.semantic_id.c_str(), item.entry_id);
 
 
-	std::unique_ptr<BinaryStream> del_stream;
-
 	// Send move request
 	try {
 		uint8_t del_resp;
-		del_stream = initiate_move(item);
-		del_stream->read(&del_resp);
+
+		UnixSocket us(item.from_host.c_str(), item.from_port);
+		BinaryStream &del_stream = us;
+
+		del_stream.write(DeliveryConnection::MAGIC_NUMBER);
+		del_stream.write(DeliveryConnection::CMD_MOVE_ITEM);
+		item.TypedNodeCacheKey::toStream(del_stream);
+		del_stream.read(&del_resp);
 		switch (del_resp) {
 			case DeliveryConnection::RESP_OK: {
-				AccessInfo ai(*del_stream);
+				MoveInfo mi(del_stream);
 				switch (item.type) {
 					case CacheType::RASTER:
 						new_cache_id = CacheManager::get_instance().get_raster_cache().put_local(
-							item.semantic_id, GenericRaster::fromStream(*del_stream), ai).entry_id;
+							item.semantic_id, GenericRaster::fromStream(del_stream), mi.costs, mi).entry_id;
 						break;
 					case CacheType::POINT:
 						new_cache_id = CacheManager::get_instance().get_point_cache().put_local(
-							item.semantic_id, make_unique<PointCollection>(*del_stream), ai).entry_id;
+							item.semantic_id, make_unique<PointCollection>(del_stream), mi.costs, mi).entry_id;
 					case CacheType::LINE:
 						new_cache_id = CacheManager::get_instance().get_line_cache().put_local(
-							item.semantic_id, make_unique<LineCollection>(*del_stream), ai).entry_id;
+							item.semantic_id, make_unique<LineCollection>(del_stream), mi.costs, mi).entry_id;
 					case CacheType::POLYGON:
 						new_cache_id = CacheManager::get_instance().get_polygon_cache().put_local(
-							item.semantic_id, make_unique<PolygonCollection>(*del_stream), ai).entry_id;
+							item.semantic_id, make_unique<PolygonCollection>(del_stream), mi.costs, mi).entry_id;
 					case CacheType::PLOT:
 						new_cache_id = CacheManager::get_instance().get_plot_cache().put_local(
-							item.semantic_id, GenericPlot::fromStream(*del_stream), ai).entry_id;
+							item.semantic_id, GenericPlot::fromStream(del_stream), mi.costs, mi).entry_id;
 					default:
 						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
 				}
@@ -368,7 +373,7 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 			}
 			case DeliveryConnection::RESP_ERROR: {
 				std::string msg;
-				del_stream->read(&msg);
+				del_stream.read(&msg);
 				throw NetworkException(
 					concat("Could not move item", item.semantic_id, ":", item.entry_id, " from ",
 						item.from_host, ":", item.from_port, ": ", msg));
@@ -376,20 +381,11 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 			default:
 				throw NetworkException(concat("Received illegal response from delivery-node: ", del_resp));
 		}
+		confirm_move(item, new_cache_id, index_stream, del_stream);
 	} catch (const NetworkException &ne) {
-		Log::error("Could not initiate move: %s", ne.what());
+		Log::error("Could not process move: %s", ne.what());
 		return;
 	}
-	confirm_move(item, new_cache_id, index_stream, *del_stream);
-}
-
-std::unique_ptr<BinaryStream> NodeServer::initiate_move(const ReorgMoveItem &item) {
-	std::unique_ptr<BinaryStream> result = make_unique<UnixSocket>(item.from_host.c_str(), item.from_port);
-	result->write(DeliveryConnection::MAGIC_NUMBER);
-
-	result->write(DeliveryConnection::CMD_MOVE_ITEM);
-	item.TypedNodeCacheKey::toStream(*result);
-	return result;
 }
 
 void NodeServer::confirm_move(const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream,

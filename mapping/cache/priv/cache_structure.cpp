@@ -186,29 +186,48 @@ void AccessInfo::toStream( BinaryStream &stream ) const {
 }
 
 //
+// MoveInfo
+//
+MoveInfo::MoveInfo(double costs) : costs(costs) {
+}
+
+MoveInfo::MoveInfo(time_t last_access, uint32_t access_count, double costs) :
+	AccessInfo(last_access,access_count), costs(costs) {
+}
+
+MoveInfo::MoveInfo(BinaryStream& stream) : AccessInfo(stream) {
+	stream.read(&costs);
+}
+
+void MoveInfo::toStream(BinaryStream& stream) const {
+	AccessInfo::toStream(stream);
+	stream.write(costs);
+}
+
+//
 // CacheEntry
 //
-CacheEntry::CacheEntry(CacheCube bounds, uint64_t size) : AccessInfo(),
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs) : MoveInfo(costs),
 	bounds(bounds), size(size) {
 }
 
-CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, time_t last_access, uint32_t access_count) :
-	AccessInfo(last_access,access_count),
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs, time_t last_access, uint32_t access_count) :
+	MoveInfo(last_access,access_count,costs),
 	bounds(bounds), size(size) {
 }
 
-CacheEntry::CacheEntry(BinaryStream& stream) : AccessInfo(stream), bounds(stream) {
+CacheEntry::CacheEntry(BinaryStream& stream) : MoveInfo(stream), bounds(stream) {
 	stream.read(&size);
 }
 
 void CacheEntry::toStream(BinaryStream& stream) const {
-	AccessInfo::toStream(stream);
+	MoveInfo::toStream(stream);
 	bounds.toStream(stream);
 	stream.write(size);
 }
 
 std::string CacheEntry::to_string() const {
-	return concat("CacheEntry[size: ", size, ", last_access: ", last_access, ", access_count: ", access_count, ", bounds: ", bounds.to_string(), "]");
+	return concat("CacheEntry[size: ", size, ",costs: ", costs, ", last_access: ", last_access, ", access_count: ", access_count, ", bounds: ", bounds.to_string(), "]");
 }
 
 //
@@ -314,7 +333,6 @@ void CacheStructure<KType, EType>::put(const KType& key, const std::shared_ptr<E
 	std::lock_guard<std::mutex> guard(mtx);
 //	Log::trace("Inserting new entry. Id: %d", key );
 	entries.emplace(key, result);
-
 }
 
 template<typename KType, typename EType>
@@ -431,9 +449,9 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 
 	std::vector<Cube<3>> u_rems = union_remainders(remainders);
 	if ( u_rems.size() != remainders.size() )
-		Log::info("Union produced %ld instead of %ld remainders", u_rems.size(), remainders.size());
+		Log::trace("Union produced %ld instead of %ld remainders", u_rems.size(), remainders.size());
 	else
-		Log::info("Union had no effect, remainders: %ld", remainders.size() );
+		Log::trace("Union had no effect, remainders: %ld", remainders.size() );
 
 
 	return enlarge_expected_result(spec, used_entries, u_rems);
@@ -549,7 +567,7 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 		qr
 	);
 
-	Log::info("Extended Query:\norig: %s\nnew : %s", CacheCommon::qr_to_string(orig).c_str(),CacheCommon::qr_to_string(new_query).c_str());
+	Log::trace("Extended Query:\norig: %s\nnew : %s", CacheCommon::qr_to_string(orig).c_str(),CacheCommon::qr_to_string(new_query).c_str());
 
 	return CacheQueryResult<KType>( new_query, remainders, ids );
 }

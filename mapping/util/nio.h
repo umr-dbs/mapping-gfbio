@@ -444,9 +444,19 @@ public:
 	NBAccessInfoReader();
 };
 
+class NBMoveInfoReader : public NBFixedSizeReader {
+public:
+	NBMoveInfoReader();
+};
+
 class NBCacheCubeReader : public NBFixedSizeReader {
 public:
 	NBCacheCubeReader();
+};
+
+class NBCacheEntryReader : public NBMultiReader {
+public:
+	NBCacheEntryReader();
 };
 
 class NBNodeCacheRefReader : public NBMultiReader {

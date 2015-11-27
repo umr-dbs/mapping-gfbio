@@ -17,7 +17,7 @@
 
 template<typename EType>
 NodeCacheEntry<EType>::NodeCacheEntry(uint64_t entry_id, std::shared_ptr<EType> result,
-	uint64_t size) : CacheEntry( CacheCube(*result), size ), entry_id(entry_id), data(result) {
+	uint64_t size, double costs) : CacheEntry( CacheCube(*result), size, costs ), entry_id(entry_id), data(result) {
 }
 
 template<typename EType>
@@ -44,12 +44,12 @@ NodeCache<EType>::~NodeCache() {
 }
 
 template<typename EType>
-std::shared_ptr<NodeCacheEntry<EType> > NodeCache<EType>::create_entry(uint64_t id, const EType& data) {
+std::shared_ptr<NodeCacheEntry<EType> > NodeCache<EType>::create_entry(uint64_t id, const EType& data, double costs) {
 
 	auto cpy = copy( data );
 	size_t size = get_data_size(data);
 
-	return std::shared_ptr<NodeCacheEntry<EType>>( new NodeCacheEntry<EType>(id, std::shared_ptr<EType>(cpy.release()), size) );
+	return std::shared_ptr<NodeCacheEntry<EType>>( new NodeCacheEntry<EType>(id, std::shared_ptr<EType>(cpy.release()), size, costs) );
 }
 
 template<typename EType>
@@ -95,10 +95,10 @@ void NodeCache<EType>::remove(const NodeCacheKey& key) {
 }
 
 template<typename EType>
-const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const std::unique_ptr<EType> &item, const AccessInfo info) {
+const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const std::unique_ptr<EType> &item, double costs, const AccessInfo info) {
 	uint64_t id = next_id++;
 	auto cache = get_structure(semantic_id, true);
-	auto entry = create_entry( id, *item  );
+	auto entry = create_entry( id, *item, costs  );
 	entry->last_access = info.last_access;
 	entry->access_count = info.access_count;
 	cache->put( id, entry );
@@ -110,7 +110,7 @@ template<typename EType>
 const std::shared_ptr<EType> NodeCache<EType>::get(const NodeCacheKey& key) const {
 	auto cache = get_structure(key.semantic_id);
 	if (cache != nullptr) {
-		std::shared_ptr<NodeCacheEntry<EType>> e = cache->get(key.entry_id);
+		auto e = cache->get(key.entry_id);
 		track_access( key, *e );
 		return e->data;
 	}

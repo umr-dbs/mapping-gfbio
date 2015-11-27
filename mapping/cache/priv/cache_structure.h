@@ -77,13 +77,24 @@ public:
 	uint32_t access_count;
 };
 
+class MoveInfo : public AccessInfo {
+public:
+	MoveInfo( double costs );
+	MoveInfo( time_t last_access, uint32_t access_count, double costs );
+	MoveInfo( BinaryStream &stream );
+
+	void toStream( BinaryStream &stream ) const;
+
+	double costs;
+};
+
 //
 // Basic information about cached data
 //
-class CacheEntry : public AccessInfo {
+class CacheEntry : public MoveInfo {
 public:
-	CacheEntry(CacheCube bounds, uint64_t size);
-	CacheEntry(CacheCube bounds, uint64_t size, time_t last_access, uint32_t access_count);
+	CacheEntry(CacheCube bounds, uint64_t size, double costs);
+	CacheEntry(CacheCube bounds, uint64_t size, double costs, time_t last_access, uint32_t access_count);
 	CacheEntry( BinaryStream &stream );
 
 	void toStream( BinaryStream &stream ) const;

@@ -28,7 +28,7 @@ public:
 	virtual ~CacheWrapper() = default;
 
 	// Inserts an item into the cache
-	virtual void put(const std::string &semantic_id, const std::unique_ptr<T> &item) = 0;
+	virtual void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler) = 0;
 
 	// Queries for an item satisfying the given request
 	// The result is a copy of the cached version and may be modified
@@ -36,7 +36,7 @@ public:
 
 	// Inserts an element into the local cache -- omitting any communication
 	// to the remote server
-	virtual NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &raster, const AccessInfo info = AccessInfo() ) = 0;
+	virtual NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &raster, double costs, const AccessInfo info = AccessInfo() ) = 0;
 
 	// Removes the element with the given key from the cache,
 	// not notifying the index (if applicable)
@@ -48,7 +48,7 @@ public:
 
 	virtual NodeCacheRef get_entry_info( const NodeCacheKey &key) = 0;
 
-	virtual std::unique_ptr<T> process_puzzle( const PuzzleRequest& request ) = 0;
+	virtual std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler ) = 0;
 };
 
 //
@@ -81,8 +81,6 @@ public:
 	virtual CacheWrapper<LineCollection>& get_line_cache() = 0;
 	virtual CacheWrapper<PolygonCollection>& get_polygon_cache() = 0;
 	virtual CacheWrapper<GenericPlot>& get_plot_cache() = 0;
-	virtual CachingStrategy& get_strategy() = 0;
-
 private:
 	static std::unique_ptr<CacheManager> instance;
 };
@@ -99,13 +97,13 @@ template<typename T>
 class NopCacheWrapper : public CacheWrapper<T> {
 public:
 	NopCacheWrapper();
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item);
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, double costs, const AccessInfo info = AccessInfo() );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
-	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request );
+	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler );
 };
 
 class NopCacheManager : public CacheManager {
@@ -123,7 +121,6 @@ public:
 	CacheWrapper<LineCollection>& get_line_cache();
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
-	CachingStrategy& get_strategy();
 private:
 	std::string my_host;
 	int my_port;
@@ -133,7 +130,6 @@ private:
 	NopCacheWrapper<LineCollection> line_cache;
 	NopCacheWrapper<PolygonCollection> poly_cache;
 	NopCacheWrapper<GenericPlot> plot_cache;
-	CacheNone strategy;
 };
 
 
@@ -150,13 +146,13 @@ template<typename T>
 class ClientCacheWrapper : public CacheWrapper<T> {
 public:
 	ClientCacheWrapper( CacheType type, const std::string &idx_host, int idx_port );
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item);
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, double costs, const AccessInfo info = AccessInfo() );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
-	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request );
+	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler );
 protected:
 	std::unique_ptr<T> read_result( BinaryStream &stream );
 private:
@@ -180,7 +176,6 @@ public:
 	CacheWrapper<LineCollection>& get_line_cache();
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
-	CachingStrategy& get_strategy();
 private:
 	std::string idx_host;
 	int idx_port;
@@ -190,7 +185,6 @@ private:
 	ClientCacheWrapper<LineCollection> line_cache;
 	ClientCacheWrapper<PolygonCollection> poly_cache;
 	ClientCacheWrapper<GenericPlot> plot_cache;
-	CacheNone strategy;
 };
 
 //
@@ -202,16 +196,16 @@ private:
 template<typename T>
 class NodeCacheWrapper : public CacheWrapper<T> {
 public:
-	NodeCacheWrapper( NodeCache<T> &cache, const std::string &my_host, int my_port );
+	NodeCacheWrapper( NodeCache<T> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
 	virtual ~NodeCacheWrapper() = default;
 
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item);
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, double costs, const AccessInfo info = AccessInfo() );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
-	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request );
+	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler );
 protected:
 	virtual std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items) = 0;
 	virtual std::unique_ptr<T> read_item( BinaryStream &stream ) = 0;
@@ -219,15 +213,16 @@ protected:
 private:
 	std::unique_ptr<T> fetch_item( const std::string &semantic_id, const CacheRef &ref );
 	SpatioTemporalReference enlarge_puzzle( const QueryRectangle &query, const std::vector<std::shared_ptr<const T>>& items);
-	std::vector<std::unique_ptr<T>> compute_remainders( const std::string &semantic_id, const T& ref_result, const PuzzleRequest &request );
+	std::vector<std::unique_ptr<T>> compute_remainders( const std::string &semantic_id, const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler );
 	NodeCache<T> &cache;
-	std::string my_host;
-	uint32_t my_port;
+	const std::string my_host;
+	const uint32_t my_port;
+	const CachingStrategy &strategy;
 };
 
 class RasterCacheWrapper : public NodeCacheWrapper<GenericRaster> {
 public:
-	RasterCacheWrapper( NodeCache<GenericRaster> &cache, const std::string &my_host, int my_port );
+	RasterCacheWrapper( NodeCache<GenericRaster> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
 
 	std::unique_ptr<GenericRaster> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericRaster>>& items);
 	std::unique_ptr<GenericRaster> read_item( BinaryStream &stream );
@@ -236,7 +231,7 @@ public:
 
 class PlotCacheWrapper : public NodeCacheWrapper<GenericPlot> {
 public:
-	PlotCacheWrapper( NodeCache<GenericPlot> &cache, const std::string &my_host, int my_port );
+	PlotCacheWrapper( NodeCache<GenericPlot> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
 	std::unique_ptr<GenericPlot> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericPlot>>& items);
 	std::unique_ptr<GenericPlot> read_item( BinaryStream &stream );
 	std::unique_ptr<GenericPlot> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
@@ -245,7 +240,7 @@ public:
 template<typename T>
 class FeatureCollectionCacheWrapper : public NodeCacheWrapper<T> {
 public:
-	FeatureCollectionCacheWrapper( NodeCache<T> &cache, const std::string &my_host, int my_port );
+	FeatureCollectionCacheWrapper( NodeCache<T> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
 	virtual ~FeatureCollectionCacheWrapper<T>() = default;
 	std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items);
 	std::unique_ptr<T> read_item( BinaryStream &stream );
@@ -259,21 +254,21 @@ private:
 
 class PointCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PointCollection> {
 public:
-	PointCollectionCacheWrapper( NodeCache<PointCollection> &cache, const std::string &my_host, int my_port );
+	PointCollectionCacheWrapper( NodeCache<PointCollection> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
 	std::unique_ptr<PointCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
 	void append_idxs( PointCollection &dest, const PointCollection &src );
 };
 
 class LineCollectionCacheWrapper : public FeatureCollectionCacheWrapper<LineCollection> {
 public:
-	LineCollectionCacheWrapper( NodeCache<LineCollection> &cache, const std::string &my_host, int my_port );
+	LineCollectionCacheWrapper( NodeCache<LineCollection> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
 	std::unique_ptr<LineCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
 	void append_idxs( LineCollection &dest, const LineCollection &src );
 };
 
 class PolygonCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PolygonCollection> {
 public:
-	PolygonCollectionCacheWrapper( NodeCache<PolygonCollection> &cache, const std::string &my_host, int my_port );
+	PolygonCollectionCacheWrapper( NodeCache<PolygonCollection> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
 	std::unique_ptr<PolygonCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
 	void append_idxs( PolygonCollection &dest, const PolygonCollection &src );
 };
@@ -296,7 +291,6 @@ public:
 	CacheWrapper<LineCollection>& get_line_cache();
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
-	CachingStrategy& get_strategy();
 private:
 	std::string my_host;
 	int my_port;

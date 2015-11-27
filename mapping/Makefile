@@ -18,12 +18,14 @@ USE_OPENCL=true
 LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
 CPATH := /usr/local/include/:$(CPATH)
 
+DBG_FLAGS=-g
+OPT_FLAGS=-O2
 
 # to override any of these options, create Makefile.local and set them there
 -include Makefile.local
 
 
-CPPFLAGS:=-g -O2 -Wall -Wextra -pedantic-errors -std=c++11 -I. -I${JSONCPP_INCLUDE_DIR} -I${GDAL_INCLUDE_DIR}
+CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. -I${JSONCPP_INCLUDE_DIR} -I${GDAL_INCLUDE_DIR}
 CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_CL=-lOpenCL

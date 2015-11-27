@@ -146,6 +146,19 @@ bool TemporalReference::contains(const TemporalReference &other) const {
 	return t1 <= other.t1 && t2 >= other.t2;
 }
 
+bool TemporalReference::intersects(const TemporalReference &other) const {
+	if (timetype != other.timetype)
+		throw ArgumentException("TemporalReference::contains(): timetypes don't match");
+
+	return intersects(other.t1, other.t2);
+}
+
+bool TemporalReference::intersects(double t_start, double t_end) const {
+	return t_start <= this->t2 && t_end >= this->t1;
+}
+
+
+
 void TemporalReference::intersect(const TemporalReference &other) {
 	if (timetype != other.timetype)
 		throw ArgumentException("Cannot intersect() TemporalReferences with different timetype");

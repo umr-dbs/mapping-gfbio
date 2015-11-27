@@ -1,11 +1,12 @@
 #ifndef DATATYPES_COLLECTION_H_
 #define DATATYPES_COLLECTION_H_
 
+#include "datatypes/spatiotemporal.h"
+#include "datatypes/attributes.h"
+
 #include <vector>
 #include <string>
 #include <limits>
-#include "datatypes/spatiotemporal.h"
-#include "datatypes/attributes.h"
 
 
 class Coordinate {
@@ -16,7 +17,7 @@ class Coordinate {
 		Coordinate(double x, double y) : x(x), y(y) {}
 
 		Coordinate() = delete;
-		~Coordinate() {}
+		~Coordinate() = default;
 
 		// Copy
 		Coordinate(const Coordinate &p) = default;
@@ -44,6 +45,10 @@ class Coordinate {
 class SimpleFeatureCollection : public SpatioTemporalResult {
 public:
 	SimpleFeatureCollection(const SpatioTemporalReference &stref) : SpatioTemporalResult(stref) {}
+
+	// allow move construction and move assignment
+	SimpleFeatureCollection(SimpleFeatureCollection &&) = default;
+	SimpleFeatureCollection& operator=(SimpleFeatureCollection &&) = default;
 
 	virtual ~SimpleFeatureCollection() {}
 
@@ -104,6 +109,9 @@ protected:
 
 	//calculate the MBR of the coordinates in range from start to stop (exclusive)
 	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;
+
+	// helper for filterBySpatioTemporalReferenceIntersection() implemented in the child classes
+	std::vector<bool> getKeepVectorForFilterBySpatioTemporalReferenceIntersection(const SpatioTemporalReference& stref) const;
 
 	//geometry helper functions
 

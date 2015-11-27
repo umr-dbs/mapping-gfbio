@@ -28,6 +28,11 @@ public:
 		start_feature.push_back(0); //start of first feature
 	}
 
+	// allow move construction and move assignment
+	PointCollection(PointCollection &&other) = default;
+	PointCollection& operator=(PointCollection &&) = default;
+
+
 	typedef SimpleFeatureIterator<PointCollection, PointFeatureReference> iterator;
 	typedef SimpleFeatureIterator<const PointCollection, PointFeatureReference> const_iterator;
 
@@ -94,35 +99,66 @@ public:
 	size_t addSinglePointFeature(const Coordinate coordinate);
 
 	/**
-	 * filter the features of the collections based on keep vector
+	 * filter the features of the collection based on keep vector
 	 * @param keep the vector specifying which features to keep
-	 * @return new collection containing only the features that should be kept
+	 * @return a new collection containing only the features that should be kept
 	 */
 	std::unique_ptr<PointCollection> filter(const std::vector<bool> &keep) const;
 
 	/**
-	 * filter the features of the collections based on keep vector
+	 * filter the features of the collection based on keep vector
 	 * @param keep the vector specifying which features to keep
-	 * @return new collection containing only the features that should be kept
+	 * @return a new collection containing only the features that should be kept
 	 */
 	std::unique_ptr<PointCollection> filter(const std::vector<char> &keep) const;
 
 	/**
-	 * filter collection by a given rectangle
-	 * @param x1 x of upper left coordinate of rectangle
-	 * @param y1 y of upper left coordiante of rectangle
-	 * @param x2 y of lower right coordinate of rectangle
-	 * @param y2 x of lower right coordinate of rectangle
-	 * @return new collection that contains only features that intersect with rectangle
+	 * filter the features of the collection based on a predicate
+	 * @param predicate a functor or lambda returning true for all features that should be kept
+	 * @return a new collection containing only the features that should be kept
 	 */
-	virtual std::unique_ptr<PointCollection> filterByRectangleIntersection(double x1, double y1, double x2, double y2) const;
+	template<typename Predicate, typename ...Args>
+	std::unique_ptr<PointCollection> filter(const Predicate &predicate, Args... args) const {
+		std::vector<bool> keep(this->getFeatureCount());
+		for (auto feature : *this)
+			keep[feature] = predicate(*this, (size_t) feature, std::forward<Args>(args)...);
+		return filter(keep);
+	}
 
 	/**
-	 * filter collection by a given spatial reference
-	 * @param sref spatial reference
-	 * @return new collection that contains only features that intersect with rectangle given by sref
+	 * filter the features of the collection based on keep vector, changing the collection.
+	 * @param keep the vector specifying which features to keep
 	 */
-	virtual std::unique_ptr<PointCollection> filterByRectangleIntersection(const SpatialReference& sref) const;
+	void filterInPlace(const std::vector<bool> &keep);
+
+	/**
+	 * filter the features of the collection based on keep vector, changing the collection.
+	 * @param keep the vector specifying which features to keep
+	 */
+	void filterInPlace(const std::vector<char> &keep);
+
+	/**
+	 * filter the features of the collection based on a predicate, changing the collection.
+	 * @param predicate a functor or lambda returning true for all features that should be kept
+	 */
+	template<typename Predicate, typename ...Args>
+	void filterInPlace(const Predicate &predicate, Args... args) {
+		std::vector<bool> keep(this->getFeatureCount());
+		for (auto feature : *this)
+			keep[feature] = predicate(*this, (size_t) feature, std::forward<Args>(args)...);
+		filterInPlace(keep);
+	}
+
+	/**
+	 * filter collection by a given spatiotemporal reference. If the collection has no time information, the
+	 * temporal aspect is ignored.
+	 * @param stref spatiotemporal reference
+	 * @return new collection that contains only features that intersect with the stref
+	 */
+	std::unique_ptr<PointCollection> filterBySpatioTemporalReferenceIntersection(const SpatioTemporalReference& stref) const;
+
+	void filterBySpatioTemporalReferenceIntersectionInPlace(const SpatioTemporalReference& stref);
+
 
 	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
 
@@ -145,7 +181,7 @@ public:
 
 	std::string getAsString();
 
-	virtual ~PointCollection(){};
+	virtual ~PointCollection() = default;
 
 protected:
 	virtual void featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const;

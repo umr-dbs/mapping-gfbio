@@ -287,3 +287,25 @@ bool SimpleFeatureCollection::lineSegmentsIntersect(const Coordinate& p1, const 
 bool SimpleFeatureCollection::featureIntersectsRectangle(size_t featureIndex, const SpatialReference& sref) const{
 	return featureIntersectsRectangle(featureIndex, sref.x1, sref.y1, sref.x2, sref.y2);
 }
+
+
+std::vector<bool> SimpleFeatureCollection::getKeepVectorForFilterBySpatioTemporalReferenceIntersection(const SpatioTemporalReference& stref) const {
+	if (stref.epsg != this->stref.epsg)
+		throw ArgumentException("Cannot filter a SimpleFeatureCollection with a SpatialReference in a different epsg.");
+	if (stref.timetype != this->stref.timetype)
+		throw ArgumentException("Cannot filter a SimpleFeatureCollection with a SpatialReference in a different timetype.");
+
+	auto size = this->getFeatureCount();
+	std::vector<bool> keep(size);
+
+	if (!hasTime()) {
+		for (size_t feature=0;feature<size;feature++)
+			keep[feature] = this->featureIntersectsRectangle(feature, stref.x1, stref.y1, stref.x2, stref.y2);
+	}
+	else {
+		for (size_t feature=0;feature<size;feature++)
+			keep[feature] = this->featureIntersectsRectangle(feature, stref.x1, stref.y1, stref.x2, stref.y2)
+				&& stref.intersects(this->time_start[feature], this->time_end[feature]);
+	}
+	return keep;
+}

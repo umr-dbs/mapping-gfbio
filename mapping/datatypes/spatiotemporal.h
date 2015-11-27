@@ -128,6 +128,23 @@ class TemporalReference {
 		 * Throws an exception if the timetypes don't match.
 		 */
 		bool contains(const TemporalReference &other) const;
+
+		/*
+		 * Returns whether the other TemporalReference intersects this
+		 * Throws an exception if the timetypes don't match.
+		 * @param other the other TemporalReference
+		 * @return whether the intervals intersect
+		 */
+		bool intersects(const TemporalReference &other) const;
+		/*
+		 * Returns whether the given interval intersects this.
+		 * The interval is assumed to have the same timetype as this
+		 * @param t_start beginning of the interval
+		 * @param t_end end of the interval
+		 * @return whether the intervals intersect
+		 */
+		bool intersects(double t_start, double t_end) const;
+
 		/*
 		 * Sets this reference to the intersection of the two references.
 		 */
@@ -210,11 +227,15 @@ class SpatioTemporalResult {
 	public:
 		SpatioTemporalResult() = delete;
 		SpatioTemporalResult(const SpatioTemporalReference &stref) : stref(stref) {};
-		// Globally disable copying and moves. SpatioTemporalResults are usually large data structures and we want to avoid accidental copies.
-		SpatioTemporalResult(const SpatioTemporalResult &other) = delete;
+		// Globally disable copying. SpatioTemporalResults are usually large data structures and we want to avoid accidental copies.
+		SpatioTemporalResult(const SpatioTemporalResult &) = delete;
 		SpatioTemporalResult& operator=(const SpatioTemporalResult &) = delete;
 		SpatioTemporalResult(SpatioTemporalResult &&) = default;
-		SpatioTemporalResult& operator=(SpatioTemporalResult &&) = default;
+		SpatioTemporalResult& operator=(SpatioTemporalResult &&other) {
+			replaceSTRef(other.stref);
+			global_attributes = std::move(other.global_attributes);
+			return *this;
+		}
 
 		void replaceSTRef(const SpatioTemporalReference &stref);
 

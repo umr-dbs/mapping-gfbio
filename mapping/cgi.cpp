@@ -364,7 +364,7 @@ int getWfsParameterInteger(const std::string &wfsParameterString){
  * @param params the parameter map
  * @return 0/1 indicating success or failure
  */
-int processWCS(std::map<std::string, std::string> &params, bool cache_enabled) {
+int processWCS(std::map<std::string, std::string> &params) {
 
 	/*http://www.myserver.org:port/path?
 	 * service=WCS &version=2.0
@@ -618,7 +618,7 @@ int main() {
 
 		// WCS-Requests
 		if (params.count("service") > 0 && params["service"] == "WCS") {
-			return processWCS(params,cache_enabled);
+			return processWCS(params);
 		}
 
 

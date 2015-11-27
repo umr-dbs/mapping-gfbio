@@ -484,7 +484,7 @@ TEST(PointCollection, WKTAddMultiFeature){
 	EXPECT_EQ(5, points.coordinates[2].x);
 	EXPECT_EQ(6, points.coordinates[2].y);
 }
-
+/*
 TEST(PointCollection, FilterByRectangleIntersection){
 	PointCollection points(SpatioTemporalReference::unreferenced());
 	points.addSinglePointFeature(Coordinate(1,1));
@@ -515,7 +515,7 @@ TEST(PointCollection, FilterByRectangleIntersection){
 	EXPECT_EQ(2, filteredPoints->coordinates[3].x);
 	EXPECT_EQ(3, filteredPoints->coordinates[3].y);
 }
-
+*/
 TEST(PointCollection, StreamSerialization){
 	PointCollection points(SpatioTemporalReference::unreferenced());
 

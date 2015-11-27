@@ -33,7 +33,7 @@ RServe? http://rforge.net/Rserve/ - LGPL, weniger startup-overhead, aber eigener
 
 
 apt-get install clang-3.5
-apt-get install gcc
+apt-get install g++
 apt-get install make
 
 apt-get install libjsoncpp-dev
@@ -45,11 +45,24 @@ apt-get install libbz2-dev
 apt-get install libcurl3-dev
 apt-get install libboost-date-time-dev
 apt-get install libsqlite3-dev
+apt-get install liburiparser-dev
+apt-get install libgtest-dev
 
 apt-get install libproj-dev
 apt-get install git
 apt-get install valgrind
 
 apt-get install r-cran-***REMOVED***
-apt-get install libgdal-dev
 apt-get install libpqxx-dev
+
+GDAL from packages:
+apt-get install libgdal-dev
+
+GDAL from sources:
+apt-get install unixodbc-dev
+./configure --with-msg=yes --prefix=/home/<someone>gdal
+or
+./configure --with-msg=yes --prefix=/usr/local
+make && make install
+
+

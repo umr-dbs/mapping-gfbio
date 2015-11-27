@@ -10,18 +10,25 @@
 #include <cmath>
 
 template<typename T>
-std::unique_ptr<PointCollection> filter(const PointCollection *in, const std::vector<T> &keep) {
+size_t calculate_kept_count(const std::vector<T> &keep, size_t feature_count) {
+	if (keep.size() != feature_count)
+		throw ArgumentException(concat("PointCollection::filter(): size of filter does not match (", keep.size(), " != ", feature_count, ")"));
+
+	size_t kept_count = 0;
+	for (size_t idx=0;idx<feature_count;idx++) {
+		if (keep[idx])
+			kept_count++;
+	}
+	return kept_count;
+}
+
+template<typename T>
+std::unique_ptr<PointCollection> filter(const PointCollection *in, const std::vector<T> &keep, size_t kept_count) {
 	size_t count = in->getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
 		msg << "PointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
 		throw ArgumentException(msg.str());
-	}
-
-	size_t kept_count = 0;
-	for (size_t idx=0;idx<count;idx++) {
-		if (keep[idx])
-			kept_count++;
 	}
 
 	auto out = make_unique<PointCollection>(in->stref);
@@ -62,12 +69,41 @@ std::unique_ptr<PointCollection> filter(const PointCollection *in, const std::ve
 }
 
 std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) const {
-	return ::filter<bool>(this, keep);
+	auto kept_count = calculate_kept_count(keep, this->getFeatureCount());
+	return ::filter<bool>(this, keep, kept_count);
 }
 
 std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) const {
-	return ::filter<char>(this, keep);
+	auto kept_count = calculate_kept_count(keep, this->getFeatureCount());
+	return ::filter<char>(this, keep, kept_count);
 }
+
+void PointCollection::filterInPlace(const std::vector<bool> &keep) {
+	auto kept_count = calculate_kept_count(keep, this->getFeatureCount());
+	if (kept_count == getFeatureCount())
+		return;
+	auto other = ::filter<bool>(this, keep, kept_count);
+	*this = std::move(*other);
+}
+
+void PointCollection::filterInPlace(const std::vector<char> &keep) {
+	auto kept_count = calculate_kept_count(keep, this->getFeatureCount());
+	if (kept_count == getFeatureCount())
+		return;
+	auto other = ::filter<char>(this, keep, kept_count);
+	*this = std::move(*other);
+}
+
+std::unique_ptr<PointCollection> PointCollection::filterBySpatioTemporalReferenceIntersection(const SpatioTemporalReference& stref) const{
+	auto keep = getKeepVectorForFilterBySpatioTemporalReferenceIntersection(stref);
+	return filter(keep);
+}
+
+void PointCollection::filterBySpatioTemporalReferenceIntersectionInPlace(const SpatioTemporalReference& stref) {
+	auto keep = getKeepVectorForFilterBySpatioTemporalReferenceIntersection(stref);
+	filterInPlace(keep);
+}
+
 
 bool PointCollection::featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const{
 	for(auto& c : getFeatureReference(featureIndex)){
@@ -78,19 +114,6 @@ bool PointCollection::featureIntersectsRectangle(size_t featureIndex, double x1,
 	return false;
 }
 
-std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2) const{
-	std::vector<bool> keep(getFeatureCount());
-	for(auto feature : *this){
-		if(featureIntersectsRectangle(feature, x1, y1, x2, y2)){
-			keep[feature] = true;
-		}
-	}
-	return filter(keep);
-}
-
-std::unique_ptr<PointCollection> PointCollection::filterByRectangleIntersection(const SpatialReference& sref) const{
-	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
-}
 
 PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
 	bool hasTime;

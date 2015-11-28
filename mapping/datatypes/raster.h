@@ -46,6 +46,12 @@ class DataDescription {
 		double getMinByDatatype() const;
 		double getMaxByDatatype() const;
 
+		/**
+		 * the size of this object in memory (in bytes)
+		 * @return the size of this object in bytes
+		 */
+		size_t get_byte_size() const;
+
 		template<typename T> bool is_no_data(T val) const {
 			return (has_no_data && val == (T) no_data);
 		}
@@ -130,6 +136,8 @@ class GenericRaster : public GridSpatioTemporalResult {
 
 		virtual void print(int x, int y, double value, const char *text, int maxlen = -1) = 0;
 		virtual void printCentered(double value, const char *text);
+
+		virtual size_t get_byte_size() const;
 
 		std::string hash();
 

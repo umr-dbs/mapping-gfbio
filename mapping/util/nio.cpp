@@ -13,6 +13,7 @@
 #include "cache/priv/cache_structure.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
+#include "cache/priv/cache_stats.h"
 #include "cache/common.h"
 
 #include <errno.h>
@@ -819,7 +820,7 @@ NBNodeStatsReader::NBNodeStatsReader() {
 NBAccessInfoReader::NBAccessInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t)) {
 }
 
-NBMoveInfoReader::NBMoveInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t) + sizeof(double)) {
+NBMoveInfoReader::NBMoveInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(double)) {
 }
 
 NBCacheCubeReader::NBCacheCubeReader() :
@@ -840,8 +841,6 @@ NBCacheCubeReader::NBCacheCubeReader() :
 NBCacheEntryReader::NBCacheEntryReader() {
 	add_reader( make_unique<NBMoveInfoReader>() );
 	add_reader( make_unique<NBCacheCubeReader>() );
-	// size
-	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t)) );
 }
 
 NBNodeCacheRefReader::NBNodeCacheRefReader() {

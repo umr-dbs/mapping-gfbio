@@ -154,6 +154,9 @@ DataDescription::DataDescription(BinaryStream &stream) : unit{Unit::UNINITIALIZE
 		no_data = 0.0;
 }
 
+size_t DataDescription::get_byte_size() const {
+	return sizeof(GDALDataType) + sizeof(double) + sizeof(bool) + unit.get_byte_size();
+}
 
 
 
@@ -660,5 +663,8 @@ void GenericRaster::printCentered(double dvalue, const char *text) {
 	}
 }
 
+size_t GenericRaster::get_byte_size() const {
+	return GridSpatioTemporalResult::get_byte_size() + sizeof(Representation) + dd.get_byte_size();
+}
 
 RASTER_PRIV_INSTANTIATE_ALL

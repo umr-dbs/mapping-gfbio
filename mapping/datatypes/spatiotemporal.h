@@ -76,6 +76,12 @@ class SpatialReference {
 		 */
 		bool contains(const SpatialReference &other) const;
 
+		/**
+		 * the size of this object in memory (in bytes)
+		 * @return the size of this object in bytes
+		 */
+		size_t get_byte_size() const;
+
 		/*
 		 * Named constructor for returning a reference that returns a valid reference which does not reference any
 		 * point in space.
@@ -155,6 +161,12 @@ class TemporalReference {
 		 */
 		std::string toIsoString(double time) const ;
 
+		/**
+		 * the size of this object in memory (in bytes)
+		 * @return the size of this object in bytes
+		 */
+		size_t get_byte_size() const;
+
 		/*
 		 * Named constructor for returning a reference that returns a valid reference which does not reference any
 		 * point in time.
@@ -209,6 +221,12 @@ class SpatioTemporalReference : public SpatialReference, public TemporalReferenc
 		 */
 		void validate() const;
 
+		/**
+		 * the size of this object in memory (in bytes)
+		 * @return the size of this object in bytes
+		 */
+		size_t get_byte_size() const;
+
 		/*
 		 * Named constructor for returning a reference that returns a valid reference which does not reference any
 		 * point in space or time.
@@ -231,6 +249,9 @@ class SpatioTemporalResult {
 		SpatioTemporalResult(const SpatioTemporalResult &) = delete;
 		SpatioTemporalResult& operator=(const SpatioTemporalResult &) = delete;
 		SpatioTemporalResult(SpatioTemporalResult &&) = default;
+
+		virtual ~SpatioTemporalResult() = default;
+
 		SpatioTemporalResult& operator=(SpatioTemporalResult &&other) {
 			replaceSTRef(other.stref);
 			global_attributes = std::move(other.global_attributes);
@@ -238,6 +259,8 @@ class SpatioTemporalResult {
 		}
 
 		void replaceSTRef(const SpatioTemporalReference &stref);
+
+		virtual size_t get_byte_size() const;
 
 		const SpatioTemporalReference stref;
 		AttributeMaps global_attributes;
@@ -254,6 +277,8 @@ class GridSpatioTemporalResult : public SpatioTemporalResult {
 			: SpatioTemporalResult(stref), width(width), height(height), pixel_scale_x((stref.x2 - stref.x1) / width), pixel_scale_y((stref.y2 - stref.y1) / height) {
 		};
 
+		virtual ~GridSpatioTemporalResult() = default;
+
 		uint64_t getPixelCount() const { return (uint64_t) width * height; }
 
 		double PixelToWorldX(int px) const { return stref.x1 + (px+0.5) * pixel_scale_x; }
@@ -261,6 +286,8 @@ class GridSpatioTemporalResult : public SpatioTemporalResult {
 
 		int64_t WorldToPixelX(double wx) const { return floor((wx - stref.x1) / pixel_scale_x); }
 		int64_t WorldToPixelY(double wy) const { return floor((wy - stref.y1) / pixel_scale_y); }
+
+		virtual size_t get_byte_size() const;
 
 		const uint32_t width, height;
 		const double pixel_scale_x, pixel_scale_y;

@@ -132,6 +132,11 @@ public:
 		return start_feature.size() - 1;
 	}
 
+	size_t get_byte_size() const {
+		return SimpleFeatureCollection::get_byte_size() +
+			   SizeUtil::get_byte_size(start_feature) +
+			   SizeUtil::get_byte_size(start_line); };
+
 	virtual ~LineCollection(){};
 
 protected:

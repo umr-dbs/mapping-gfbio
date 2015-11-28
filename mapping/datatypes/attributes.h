@@ -2,6 +2,7 @@
 #define RASTER_METADATA_H
 
 #include "datatypes/unit.h"
+#include "util/sizeutil.h"
 
 #include <vector>
 #include <map>
@@ -115,6 +116,13 @@ class AttributeMaps {
 		 * @return the iterable object
 		 */
 		ConstIterableMapReference<std::string> textual() const { return ConstIterableMapReference<std::string>(_textual); }
+
+		/**
+		 * the size of this object in memory (in bytes)
+		 * @return the size of this object in bytes
+		 */
+		size_t get_byte_size() const { return SizeUtil::get_byte_size(_numeric) + SizeUtil::get_byte_size(_textual ); }
+
 	private:
 		std::map<std::string, double> _numeric;
 		std::map<std::string, std::string> _textual;
@@ -180,6 +188,12 @@ class AttributeArrays {
 				 * @param size desired size
 				 */
 				void resize(size_t size);
+
+				/**
+				 * the size of this object in memory (in bytes)
+				 * @return the size of this object in bytes
+				 */
+				size_t get_byte_size() const;
 
 				Unit unit;
 			private:
@@ -309,6 +323,12 @@ class AttributeArrays {
 		 */
 		void validate(size_t expected_values) const;
 
+
+		/**
+		 * the size of this object in memory (in bytes)
+		 * @return the size of this object in bytes
+		 */
+		size_t get_byte_size() const;
 	private:
 		void checkIfAttributeDoesNotExist(const std::string &key);
 

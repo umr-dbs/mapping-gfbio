@@ -36,7 +36,7 @@ public:
 
 	// Inserts an element into the local cache -- omitting any communication
 	// to the remote server
-	virtual NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &raster, double costs, const AccessInfo info = AccessInfo() ) = 0;
+	virtual NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &raster, size_t size, double costs, const AccessInfo info = AccessInfo() ) = 0;
 
 	// Removes the element with the given key from the cache,
 	// not notifying the index (if applicable)
@@ -99,7 +99,7 @@ public:
 	NopCacheWrapper();
 	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, double costs, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, size_t size, double costs, const AccessInfo info = AccessInfo() );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
@@ -148,7 +148,7 @@ public:
 	ClientCacheWrapper( CacheType type, const std::string &idx_host, int idx_port );
 	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, double costs, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, size_t size, double costs, const AccessInfo info = AccessInfo() );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
@@ -201,7 +201,7 @@ public:
 
 	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, double costs, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, size_t size, double costs, const AccessInfo info = AccessInfo() );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);

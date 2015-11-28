@@ -10,6 +10,7 @@
 #include "cache/priv/connection.h"
 #include "node/puzzletracer.h"
 #include "util/log.h"
+#include "util/sizeutil.h"
 
 class AttributeArraysHelper {
 public:
@@ -88,8 +89,8 @@ std::unique_ptr<T> NopCacheWrapper<T>::query(const GenericOperator& op,
 template<typename T>
 NodeCacheRef NopCacheWrapper<T>::put_local(
 		const std::string& semantic_id, const std::unique_ptr<T>& item,
-		double costs, const AccessInfo info) {
-	CacheEntry ce( CacheCube(*item), sizeof(T), costs, info.last_access, info.access_count );
+		size_t size, double costs, const AccessInfo info) {
+	CacheEntry ce( CacheCube(*item), size, costs, info.last_access, info.access_count );
 	return NodeCacheRef( CacheType::UNKNOWN, semantic_id, 0, ce );
 }
 
@@ -256,9 +257,10 @@ std::unique_ptr<GenericPlot> ClientCacheWrapper<GenericPlot>::read_result(
 template<typename T>
 NodeCacheRef ClientCacheWrapper<T>::put_local(
 		const std::string& semantic_id, const std::unique_ptr<T>& item,
-		double costs, const AccessInfo info) {
+		size_t size, double costs, const AccessInfo info) {
 	(void) semantic_id;
 	(void) item;
+	(void) size;
 	(void) costs;
 	(void) info;
 	throw CacheException("ClientWrapper only support the query-method");
@@ -351,19 +353,25 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 	if (CacheManager::remote_connection == nullptr)
 		throw NetworkException("No connection to remote-index.");
 
-	auto ref = put_local(semantic_id, item, strategy.get_costs(profiler));
-	BinaryStream &stream = *CacheManager::remote_connection;
+	size_t size = SizeUtil::get_byte_size(*item);
 
-	Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
-	stream.write(WorkerConnection::RESP_NEW_CACHE_ENTRY);
-	ref.toStream(stream);
+	if ( strategy.do_cache(profiler,size) ) {
+		auto ref = put_local(semantic_id, item, size, strategy.get_costs(profiler,size));
+		BinaryStream &stream = *CacheManager::remote_connection;
+
+		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
+		stream.write(WorkerConnection::RESP_NEW_CACHE_ENTRY);
+		ref.toStream(stream);
+	}
+	else
+		Log::debug("Item will not be cached according to strategy");
 }
 
 template<typename T>
 NodeCacheRef NodeCacheWrapper<T>::put_local(const std::string& semantic_id,
-	const std::unique_ptr<T>& item, double costs, const AccessInfo info) {
+	const std::unique_ptr<T>& item, size_t size, double costs, const AccessInfo info) {
 	Log::debug("Adding item to local cache");
-	return cache.put(semantic_id, item, costs, info);
+	return cache.put(semantic_id, item, size, costs, info);
 }
 
 template<typename T>

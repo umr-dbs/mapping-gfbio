@@ -150,3 +150,11 @@ void Unit::setMinMax(double _min, double _max) {
 	min = _min;
 	max = _max;
 }
+
+size_t Unit::get_byte_size() const {
+	return SizeUtil::get_byte_size(measurement) +
+		   SizeUtil::get_byte_size(unit) +
+		   sizeof(interpolation) +
+		   2 * sizeof(double) +
+		   SizeUtil::get_byte_size( classes );
+}

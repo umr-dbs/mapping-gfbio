@@ -9,7 +9,7 @@
 /*
  * QueryProfiler class
  */
-QueryProfiler::QueryProfiler() : self_cpu(0), all_cpu(0), self_gpu(0), all_gpu(0), self_io(0), all_io(0), t_start(0), uncached_depth(1) {
+QueryProfiler::QueryProfiler() : self_cpu(0), all_cpu(0), self_gpu(0), all_gpu(0), self_io(0), all_io(0), uncached_depth(1), t_start(0) {
 
 }
 

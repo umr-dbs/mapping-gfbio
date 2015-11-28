@@ -79,12 +79,13 @@ public:
 
 class MoveInfo : public AccessInfo {
 public:
-	MoveInfo( double costs );
-	MoveInfo( time_t last_access, uint32_t access_count, double costs );
+	MoveInfo( uint64_t size, double costs );
+	MoveInfo( time_t last_access, uint32_t access_count, uint64_t size, double costs );
 	MoveInfo( BinaryStream &stream );
 
 	void toStream( BinaryStream &stream ) const;
 
+	uint64_t size;
 	double costs;
 };
 
@@ -102,7 +103,6 @@ public:
 	std::string to_string() const;
 
 	CacheCube bounds;
-	uint64_t size;
 };
 
 //

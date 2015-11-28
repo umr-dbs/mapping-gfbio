@@ -101,6 +101,12 @@ public:
 
 	void validate() const;
 
+	/**
+	 * the size of this object in memory (in bytes)
+	 * @return the size of this object in bytes
+	 */
+	virtual size_t get_byte_size() const;
+
 protected:
 	virtual void featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const = 0;
 	virtual void featureToWKT(size_t featureIndex, std::ostringstream& wkt) const = 0;

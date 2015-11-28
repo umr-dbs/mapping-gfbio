@@ -188,42 +188,42 @@ void AccessInfo::toStream( BinaryStream &stream ) const {
 //
 // MoveInfo
 //
-MoveInfo::MoveInfo(double costs) : costs(costs) {
+MoveInfo::MoveInfo(uint64_t size, double costs) : size(size), costs(costs) {
 }
 
-MoveInfo::MoveInfo(time_t last_access, uint32_t access_count, double costs) :
-	AccessInfo(last_access,access_count), costs(costs) {
+MoveInfo::MoveInfo(time_t last_access, uint32_t access_count, uint64_t size, double costs) :
+	AccessInfo(last_access,access_count), size(size), costs(costs) {
 }
 
 MoveInfo::MoveInfo(BinaryStream& stream) : AccessInfo(stream) {
+	stream.read(&size);
 	stream.read(&costs);
 }
 
 void MoveInfo::toStream(BinaryStream& stream) const {
 	AccessInfo::toStream(stream);
+	stream.write(size);
 	stream.write(costs);
 }
 
 //
 // CacheEntry
 //
-CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs) : MoveInfo(costs),
-	bounds(bounds), size(size) {
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs) : MoveInfo(size, costs),
+	bounds(bounds) {
 }
 
 CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs, time_t last_access, uint32_t access_count) :
-	MoveInfo(last_access,access_count,costs),
-	bounds(bounds), size(size) {
+	MoveInfo(last_access,access_count,size,costs),
+	bounds(bounds) {
 }
 
 CacheEntry::CacheEntry(BinaryStream& stream) : MoveInfo(stream), bounds(stream) {
-	stream.read(&size);
 }
 
 void CacheEntry::toStream(BinaryStream& stream) const {
 	MoveInfo::toStream(stream);
 	bounds.toStream(stream);
-	stream.write(size);
 }
 
 std::string CacheEntry::to_string() const {

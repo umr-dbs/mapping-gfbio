@@ -438,8 +438,8 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 //
 /////////////////////////////////////////////////
 
-ControlConnection::ControlConnection(std::unique_ptr<UnixSocket> socket) :
-	BaseConnection(std::move(socket)), state(State::READING_HANDSHAKE) {
+ControlConnection::ControlConnection(std::unique_ptr<UnixSocket> socket, const std::string &hostname) :
+	BaseConnection(std::move(socket)), hostname(hostname), state(State::READING_HANDSHAKE) {
 	begin_read( make_unique<NBNodeHandshakeReader>() );
 }
 
@@ -523,9 +523,7 @@ void ControlConnection::confirm_handshake(std::shared_ptr<Node> node) {
 		this->node = node;
 		state = State::SENDING_HELLO;
 		begin_write(
-			make_unique<NBMessageWriter>(CMD_HELLO,
-				make_unique<NBSimpleWriter<uint32_t>>(node->id)
-			)
+			make_unique<NBHelloWriter>( node->id, hostname )
 		);
 	}
 	else

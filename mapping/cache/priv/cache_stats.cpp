@@ -59,13 +59,12 @@ std::string Capacity::to_string() const {
 // Handshake
 //
 
-NodeHandshake::NodeHandshake( const std::string &host, uint32_t port, const Capacity &cap, std::vector<NodeCacheRef> entries ) :
-	Capacity(cap), host(host), port(port), entries(entries) {
+NodeHandshake::NodeHandshake( uint32_t port, const Capacity &cap, std::vector<NodeCacheRef> entries ) :
+	Capacity(cap), port(port), entries(entries) {
 }
 
 NodeHandshake::NodeHandshake(BinaryStream& stream) : Capacity(stream) {
 	uint64_t r_size;
-	stream.read(&host);
 	stream.read(&port);
 
 	stream.read(&r_size);
@@ -76,7 +75,6 @@ NodeHandshake::NodeHandshake(BinaryStream& stream) : Capacity(stream) {
 
 void NodeHandshake::toStream(BinaryStream& stream) const {
 	Capacity::toStream(stream);
-	stream.write(host);
 	stream.write(port);
 	stream.write( static_cast<uint64_t>(entries.size()) );
 	for ( auto &e : entries )
@@ -88,7 +86,7 @@ const std::vector<NodeCacheRef>& NodeHandshake::get_entries() const {
 }
 
 std::string NodeHandshake::to_string() const {
-	return concat("NodeHandshake[host: ", host, ", port: ", port, ", "
+	return concat("NodeHandshake[port: ", port, ", "
 		"capacity: ", Capacity::to_string(), ", entries: ", entries.size(), "]");
 }
 

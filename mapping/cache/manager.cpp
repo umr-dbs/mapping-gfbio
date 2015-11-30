@@ -60,6 +60,21 @@ void CacheManager::init(std::unique_ptr<CacheManager> instance) {
 
 
 
+CacheRef CacheManager::create_self_ref(uint64_t id) {
+	return CacheRef( my_host, my_port, id );
+}
+
+bool CacheManager::is_self_ref(const CacheRef& ref) {
+	return ref.host == my_host && ref.port == my_port;
+}
+
+void CacheManager::set_self_port(uint32_t port) {
+	my_port = port;
+}
+
+void CacheManager::set_self_host(const std::string& host) {
+	my_host = host;
+}
 
 
 //
@@ -125,12 +140,11 @@ std::unique_ptr<T> NopCacheWrapper<T>::process_puzzle(
 // NOP-Cache
 //
 
-NopCacheManager::NopCacheManager(const std::string &my_host, int my_port) :
-	my_host(my_host), my_port(my_port) {
+NopCacheManager::NopCacheManager() {
 }
 
-NodeHandshake NopCacheManager::get_handshake() const {
-	return NodeHandshake(my_host, my_port, Capacity(0,0,0,0,0,0,0,0,0,0), std::vector<NodeCacheRef>() );
+NodeHandshake NopCacheManager::get_handshake(uint32_t my_port) const {
+	return NodeHandshake(my_port, Capacity(0,0,0,0,0,0,0,0,0,0), std::vector<NodeCacheRef>() );
 }
 
 NodeStats NopCacheManager::get_stats() const {
@@ -308,7 +322,8 @@ ClientCacheManager::ClientCacheManager(const std::string& idx_host, int idx_port
 	plot_cache(CacheType::PLOT, idx_host, idx_port){
 }
 
-NodeHandshake ClientCacheManager::get_handshake() const {
+NodeHandshake ClientCacheManager::get_handshake(uint32_t my_port) const {
+	(void) my_port;
 	throw CacheException("ClientCacheManager only supports the queries");
 }
 
@@ -343,8 +358,8 @@ CacheWrapper<GenericPlot>& ClientCacheManager::get_plot_cache() {
 
 
 template<typename T>
-NodeCacheWrapper<T>::NodeCacheWrapper(NodeCache<T>& cache, const std::string &my_host, int my_port, const CachingStrategy &strategy) :
-	cache(cache), my_host(my_host), my_port(my_port), strategy(strategy) {
+NodeCacheWrapper<T>::NodeCacheWrapper(NodeCache<T>& cache, const CachingStrategy &strategy) :
+	cache(cache), strategy(strategy) {
 }
 
 template<typename T>
@@ -411,7 +426,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 		Log::trace("Full local HIT for query: %s on %s. Puzzling result.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 		std::vector<CacheRef> refs;
 		for ( auto &id : qres.keys )
-			refs.push_back( CacheRef(my_host,my_port,id) );
+			refs.push_back( CacheManager::get_instance().create_self_ref(id) );
 
 		PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
 		QueryProfiler qp;
@@ -473,7 +488,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& requ
 	// Fetch puzzle parts
 	Log::trace("Fetching all puzzle-parts");
 	for (const CacheRef &cr : request.parts) {
-		if (cr.host == my_host && cr.port == my_port) {
+		if ( CacheManager::get_instance().is_self_ref(cr) ) {
 			Log::trace("Fetching puzzle-piece from local cache, key: %d", cr.entry_id);
 			items.push_back(get_ref( NodeCacheKey(request.semantic_id, cr.entry_id) ));
 		}
@@ -630,8 +645,8 @@ std::vector<std::unique_ptr<GenericRaster>> NodeCacheWrapper<GenericRaster>::com
 	return result;
 }
 
-RasterCacheWrapper::RasterCacheWrapper(NodeCache<GenericRaster>& cache, const std::string& my_host,
-	int my_port, const CachingStrategy &strategy) : NodeCacheWrapper(cache,my_host,my_port,strategy) {
+RasterCacheWrapper::RasterCacheWrapper(NodeCache<GenericRaster>& cache, const CachingStrategy &strategy) :
+		NodeCacheWrapper(cache,strategy) {
 }
 
 std::unique_ptr<GenericRaster> RasterCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
@@ -684,8 +699,8 @@ std::unique_ptr<GenericRaster> RasterCacheWrapper::compute_item(GenericOperator&
 	return op.getCachedRaster(query, qp );
 }
 
-PlotCacheWrapper::PlotCacheWrapper(NodeCache<GenericPlot>& cache, const std::string& my_host, int my_port, const CachingStrategy &strategy) :
-	NodeCacheWrapper(cache,my_host,my_port,strategy) {
+PlotCacheWrapper::PlotCacheWrapper(NodeCache<GenericPlot>& cache, const CachingStrategy &strategy) :
+	NodeCacheWrapper(cache,strategy) {
 }
 
 std::unique_ptr<GenericPlot> PlotCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
@@ -705,9 +720,8 @@ std::unique_ptr<GenericPlot> PlotCacheWrapper::compute_item(GenericOperator& op,
 }
 
 template<typename T>
-FeatureCollectionCacheWrapper<T>::FeatureCollectionCacheWrapper(NodeCache<T>& cache,
-	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
-	NodeCacheWrapper<T>(cache,my_host,my_port,strategy) {
+FeatureCollectionCacheWrapper<T>::FeatureCollectionCacheWrapper(NodeCache<T>& cache, const CachingStrategy &strategy) :
+	NodeCacheWrapper<T>(cache,strategy) {
 }
 
 template<typename T>
@@ -766,9 +780,8 @@ std::unique_ptr<T> FeatureCollectionCacheWrapper<T>::read_item(BinaryStream &str
 	return make_unique<T>( stream );
 }
 
-PointCollectionCacheWrapper::PointCollectionCacheWrapper(NodeCache<PointCollection>& cache,
-	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
-		FeatureCollectionCacheWrapper(cache,my_host,my_port,strategy)  {
+PointCollectionCacheWrapper::PointCollectionCacheWrapper(NodeCache<PointCollection>& cache, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,strategy)  {
 }
 
 std::unique_ptr<PointCollection> PointCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -781,9 +794,8 @@ void PointCollectionCacheWrapper::append_idxs(PointCollection& dest,
 	append_idx_vec(dest.start_feature, src.start_feature);
 }
 
-LineCollectionCacheWrapper::LineCollectionCacheWrapper(NodeCache<LineCollection>& cache,
-	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
-		FeatureCollectionCacheWrapper(cache,my_host,my_port, strategy) {
+LineCollectionCacheWrapper::LineCollectionCacheWrapper(NodeCache<LineCollection>& cache, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,strategy) {
 }
 
 std::unique_ptr<LineCollection> LineCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -797,9 +809,8 @@ void LineCollectionCacheWrapper::append_idxs(LineCollection& dest,
 	append_idx_vec(dest.start_line, src.start_line);
 }
 
-PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(NodeCache<PolygonCollection>& cache,
-	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
-		FeatureCollectionCacheWrapper(cache,my_host,my_port,strategy) {
+PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(NodeCache<PolygonCollection>& cache, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,strategy) {
 }
 
 std::unique_ptr<PolygonCollection> PolygonCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -820,21 +831,19 @@ void PolygonCollectionCacheWrapper::append_idxs(PolygonCollection& dest,
 //
 
 
-NodeCacheManager::NodeCacheManager(const std::string &my_host, int my_port,
-	std::unique_ptr<CachingStrategy> strategy,
+NodeCacheManager::NodeCacheManager( std::unique_ptr<CachingStrategy> strategy,
 	size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
 	size_t polygon_cache_size, size_t plot_cache_size) :
-	my_host(my_host), my_port(my_port),
 	raster_cache(raster_cache_size), point_cache(point_cache_size),
 	line_cache(line_cache_size), polygon_cache(polygon_cache_size),
 	plot_cache(plot_cache_size),
-	raster_wrapper(raster_cache, my_host, my_port, *strategy), point_wrapper(point_cache, my_host, my_port, *strategy),
-	line_wrapper(line_cache, my_host, my_port, *strategy), polygon_wrapper(polygon_cache, my_host, my_port, *strategy),
-	plot_wrapper(plot_cache, my_host, my_port, *strategy),
+	raster_wrapper(raster_cache, *strategy), point_wrapper(point_cache, *strategy),
+	line_wrapper(line_cache, *strategy), polygon_wrapper(polygon_cache, *strategy),
+	plot_wrapper(plot_cache, *strategy),
 	strategy(std::move(strategy)) {
 }
 
-NodeHandshake NodeCacheManager::get_handshake() const {
+NodeHandshake NodeCacheManager::get_handshake(uint32_t my_port) const {
 
 	Capacity cap(
 		raster_cache.get_max_size(), raster_cache.get_current_size(),
@@ -857,7 +866,7 @@ NodeHandshake NodeCacheManager::get_handshake() const {
 	tmp = plot_cache.get_all();
 	entries.insert(entries.end(), tmp.begin(), tmp.end() );
 
-	return NodeHandshake(my_host, my_port, cap, entries );
+	return NodeHandshake(my_port, cap, entries );
 }
 
 NodeStats NodeCacheManager::get_stats() const {
@@ -901,4 +910,4 @@ CacheWrapper<GenericPlot>& NodeCacheManager::get_plot_cache() {
 	return plot_wrapper;
 }
 
-template class ClientCacheWrapper<GenericRaster>;
+template class ClientCacheWrapper<GenericRaster> ;

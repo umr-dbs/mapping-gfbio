@@ -32,7 +32,7 @@
 class NodeServer {
 	friend class std::thread;
 public:
-	NodeServer(std::string my_host, uint32_t my_port, std::string index_host,
+	NodeServer(uint32_t my_port, std::string index_host,
 			uint32_t index_port, int num_threads);
 	virtual ~NodeServer();
 
@@ -100,8 +100,6 @@ private:
 	bool workers_up;
 	// This node's id -- provided by the index-server
 	uint32_t my_id;
-	// This node's host-name
-	std::string my_host;
 	// This node's listen-port (for delivery-connections)
 	uint32_t my_port;
 	// The hostname of the index-server

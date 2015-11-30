@@ -26,9 +26,9 @@
 //
 ////////////////////////////////////////////////////////////
 
-NodeServer::NodeServer(std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port,
+NodeServer::NodeServer(uint32_t my_port, std::string index_host, uint32_t index_port,
 	int num_threads) :
-	shutdown(false), workers_up(false), my_id(-1), my_host(my_host), my_port(my_port), index_host(index_host), index_port(
+	shutdown(false), workers_up(false), my_id(-1), my_port(my_port), index_host(index_host), index_port(
 		index_port), num_treads(num_threads), delivery_manager(my_port) {
 }
 
@@ -420,7 +420,7 @@ void NodeServer::setup_control_connection() {
 	// Establish connection
 	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
 	BinaryStream &stream = *this->control_connection;
-	NodeHandshake hs = CacheManager::get_instance().get_handshake();
+	NodeHandshake hs = CacheManager::get_instance().get_handshake(my_port);
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
@@ -433,7 +433,11 @@ void NodeServer::setup_control_connection() {
 	uint8_t resp;
 	stream.read(&resp);
 	if (resp == ControlConnection::CMD_HELLO) {
+		std::string my_host;
+
 		stream.read(&my_id);
+		stream.read(&my_host);
+		CacheManager::get_instance().set_self_host(my_host);
 		Log::info("Successfuly connected to index-server. My Id is: %d", my_id);
 	}
 	else {

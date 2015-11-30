@@ -50,7 +50,6 @@ int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 	auto portstr = Configuration::get("nodeserver.port");
-	auto hoststr = Configuration::get("nodeserver.host");
 	auto portnr = atoi(portstr.c_str());
 
 	auto iportstr = Configuration::get("indexserver.port");
@@ -72,12 +71,14 @@ int main(void) {
 
 	// Inititalize cache
 	std::unique_ptr<CacheManager> cache_impl = make_unique<NodeCacheManager>(
-			hoststr,portnr,CachingStrategy::by_name(cs),
-			raster_size, point_size, line_size, polygon_size, plot_size);
+			CachingStrategy::by_name(cs), raster_size, point_size, line_size, polygon_size, plot_size);
 	CacheManager::init(std::move(cache_impl));
 
+	// Set self port
+	CacheManager::get_instance().set_self_port(portnr);
+
 	// Fire it up
-	instance = new NodeServer(hoststr,portnr,ihoststr,iportnr,num_threads);
+	instance = new NodeServer(portnr,ihoststr,iportnr,num_threads);
 	instance->run();
 	return 0;
 }

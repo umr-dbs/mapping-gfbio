@@ -23,6 +23,13 @@
 #include <deque>
 
 
+class NewConnection {
+public:
+	NewConnection( const std::string &hostname, int fd ) : hostname(hostname), fd(fd) {}
+	std::string hostname;
+	int fd;
+};
+
 //
 // Represents a cache-node.
 //
@@ -85,7 +92,7 @@ private:
 	int setup_fdset( fd_set *readfds, fd_set *writefds);
 
 	// Processes the handshake on newly established connections
-	void process_handshake( std::vector<int> &new_fds, fd_set *readfds);
+	void process_handshake( std::vector<NewConnection> &new_fds, fd_set *readfds);
 
 	// Processes actions on control-connections
 	void process_control_connections(fd_set *readfds, fd_set* writefds);

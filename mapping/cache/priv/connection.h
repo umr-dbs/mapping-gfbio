@@ -305,9 +305,10 @@ public:
 	const NodeStats& get_stats();
 
 
-	ControlConnection(std::unique_ptr<UnixSocket> socket);
+	ControlConnection(std::unique_ptr<UnixSocket> socket, const std::string &hostname);
 	virtual ~ControlConnection();
 	std::shared_ptr<Node> node;
+	const std::string hostname;
 protected:
 	virtual void process_command( uint8_t cmd );
 	virtual void write_finished();

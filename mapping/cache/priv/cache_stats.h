@@ -52,7 +52,7 @@ public:
 
 class NodeHandshake : public Capacity {
 public:
-	NodeHandshake( const std::string &host, uint32_t port, const Capacity &capacity, std::vector<NodeCacheRef> entries );
+	NodeHandshake( uint32_t port, const Capacity &capacity, std::vector<NodeCacheRef> entries );
 	NodeHandshake( BinaryStream &stream );
 
 	const std::vector<NodeCacheRef>& get_entries() const;
@@ -60,7 +60,6 @@ public:
 	void toStream( BinaryStream &stream ) const;
 	std::string to_string() const;
 
-	std::string host;
 	uint32_t port;
 
 private:

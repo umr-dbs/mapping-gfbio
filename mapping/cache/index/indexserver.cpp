@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <errno.h>
 
+
 ////////////////////////////////////////////////////////////
 //
 // NODE
@@ -58,7 +59,7 @@ void IndexServer::run() {
 	int listen_socket = CacheCommon::get_listening_socket(port);
 	Log::info("index-server: listening on node-port: %d", port);
 
-	std::vector<int> new_fds;
+	std::vector<NewConnection> new_cons;
 
 	while (!shutdown) {
 		struct timeval tv { 2, 0 };
@@ -72,9 +73,9 @@ void IndexServer::run() {
 		int maxfd = listen_socket;
 
 		// Add newly accepted sockets
-		for (auto &fd : new_fds) {
-			FD_SET(fd, &readfds);
-			maxfd = std::max(maxfd, fd);
+		for (auto &nc : new_cons) {
+			FD_SET(nc.fd, &readfds);
+			maxfd = std::max(maxfd, nc.fd);
 		}
 
 		// Setup existing connections
@@ -89,7 +90,7 @@ void IndexServer::run() {
 			process_control_connections(&readfds, &writefds);
 			process_client_connections(&readfds, &writefds);
 
-			process_handshake(new_fds, &readfds);
+			process_handshake(new_cons, &readfds);
 
 			// Accept new connections
 			if (FD_ISSET(listen_socket, &readfds)) {
@@ -100,8 +101,15 @@ void IndexServer::run() {
 					Log::error("Accept failed: %d", strerror(errno));
 				}
 				else if (new_fd > 0) {
-					Log::debug("New connection established on fd: %d", new_fd);
-					new_fds.push_back(new_fd);
+					char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+
+					getnameinfo ((struct sockaddr *) &remote_addr, sin_size,
+					             hbuf, sizeof hbuf,
+					             sbuf, sizeof sbuf,
+					             NI_NUMERICHOST | NI_NUMERICSERV);
+
+					Log::info("New connection established host: %s, service: %s, fd: %d", hbuf, sbuf, new_fd);
+					new_cons.push_back( NewConnection(hbuf,new_fd) );
 				}
 			}
 		}
@@ -216,12 +224,12 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	return maxfd;
 }
 
-void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) {
+void IndexServer::process_handshake(std::vector<NewConnection> &new_fds, fd_set* readfds) {
 	auto it = new_fds.begin();
 	while (it != new_fds.end()) {
-		if (FD_ISSET(*it, readfds)) {
+		if (FD_ISSET(it->fd, readfds)) {
 			try {
-				std::unique_ptr<UnixSocket> us = make_unique<UnixSocket>(*it, *it);
+				std::unique_ptr<UnixSocket> us = make_unique<UnixSocket>(it->fd, it->fd);
 				BinaryStream &s = *us;
 
 				uint32_t magic;
@@ -243,7 +251,7 @@ void IndexServer::process_handshake(std::vector<int> &new_fds, fd_set* readfds) 
 						break;
 					}
 					case ControlConnection::MAGIC_NUMBER: {
-						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us));
+						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us),it->hostname);
 						control_connections.emplace(cc->id, std::move(cc));
 						break;
 					}
@@ -277,7 +285,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 			switch (cc.get_state()) {
 				case ControlConnection::State::HANDSHAKE_READ: {
 					auto &hs = cc.get_handshake();
-					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, hs.host, hs.port);
+					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, cc.hostname, hs.port);
 					node->control_connection = cc.id;
 					nodes.emplace(node->id, node);
 					Log::info("New node registered. ID: %d, control-connection: %d", node->id, cc.id);

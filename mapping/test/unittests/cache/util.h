@@ -45,7 +45,7 @@ class TestNodeServer : public NodeServer {
 public:
 	static void run_node_thread(TestNodeServer *ns);
 
-	TestNodeServer(const std::string &my_host, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity = 5 * 1024 * 1024 );
+	TestNodeServer(uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity = 5 * 1024 * 1024 );
 	bool owns_current_thread();
 	NodeCacheManager rcm;
 	std::thread::id my_id;
@@ -57,9 +57,17 @@ public:
 	void add_instance( TestNodeServer *inst );
 	CacheManager& get_instance_mgr( int i );
 
+	void set_self_port(uint32_t port);
+
+	void set_self_host( const std::string &host );
+
+	CacheRef create_self_ref(uint64_t id);
+
+	bool is_self_ref(const CacheRef& ref);
+
 
 	// Creates a handshake message for the index-server
-	NodeHandshake get_handshake() const;
+	NodeHandshake get_handshake(uint32_t my_port) const;
 
 	// Retrieves statistics for this cache
 	NodeStats get_stats() const;

@@ -63,15 +63,28 @@ public:
 
 	// Index-connection -- set per worker DO NOT TOUCH
 	static thread_local UnixSocket *remote_connection;
+private:
+	static std::unique_ptr<CacheManager> instance;
 
+public:
 	//
 	// INSTANCE METHODS
 	//
 
+	CacheManager() : my_host(""), my_port(0) {}
+
+	virtual void set_self_port(uint32_t port);
+
+	virtual void set_self_host( const std::string &host );
+
+	virtual CacheRef create_self_ref(uint64_t id);
+
+	virtual bool is_self_ref(const CacheRef& ref);
+
 	virtual ~CacheManager() = default;
 
 	// Creates a handshake message for the index-server
-	virtual NodeHandshake get_handshake() const = 0;
+	virtual NodeHandshake get_handshake(uint32_t my_port) const = 0;
 
 	// Retrieves statistics for this cache
 	virtual NodeStats get_stats() const = 0;
@@ -82,7 +95,8 @@ public:
 	virtual CacheWrapper<PolygonCollection>& get_polygon_cache() = 0;
 	virtual CacheWrapper<GenericPlot>& get_plot_cache() = 0;
 private:
-	static std::unique_ptr<CacheManager> instance;
+	std::string my_host;
+	uint32_t my_port;
 };
 
 
@@ -108,10 +122,10 @@ public:
 
 class NopCacheManager : public CacheManager {
 public:
-	NopCacheManager(const std::string &my_host, int my_port);
+	NopCacheManager();
 
 	// Creates a handshake message for the index-server
-	NodeHandshake get_handshake() const;
+	NodeHandshake get_handshake(uint32_t my_port) const;
 
 	// Retrieves statistics for this cache
 	NodeStats get_stats() const;
@@ -122,9 +136,6 @@ public:
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
 private:
-	std::string my_host;
-	int my_port;
-
 	NopCacheWrapper<GenericRaster> raster_cache;
 	NopCacheWrapper<PointCollection> point_cache;
 	NopCacheWrapper<LineCollection> line_cache;
@@ -166,7 +177,7 @@ public:
 	ClientCacheManager(const std::string &idx_host, int idx_port);
 
 	// Creates a handshake message for the index-server
-	NodeHandshake get_handshake() const;
+	NodeHandshake get_handshake(uint32_t my_port) const;
 
 	// Retrieves statistics for this cache
 	NodeStats get_stats() const;
@@ -196,7 +207,7 @@ private:
 template<typename T>
 class NodeCacheWrapper : public CacheWrapper<T> {
 public:
-	NodeCacheWrapper( NodeCache<T> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
+	NodeCacheWrapper( NodeCache<T> &cache, const CachingStrategy &strategy );
 	virtual ~NodeCacheWrapper() = default;
 
 	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
@@ -215,14 +226,12 @@ private:
 	SpatioTemporalReference enlarge_puzzle( const QueryRectangle &query, const std::vector<std::shared_ptr<const T>>& items);
 	std::vector<std::unique_ptr<T>> compute_remainders( const std::string &semantic_id, const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler );
 	NodeCache<T> &cache;
-	const std::string my_host;
-	const uint32_t my_port;
 	const CachingStrategy &strategy;
 };
 
 class RasterCacheWrapper : public NodeCacheWrapper<GenericRaster> {
 public:
-	RasterCacheWrapper( NodeCache<GenericRaster> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
+	RasterCacheWrapper( NodeCache<GenericRaster> &cache, const CachingStrategy &strategy );
 
 	std::unique_ptr<GenericRaster> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericRaster>>& items);
 	std::unique_ptr<GenericRaster> read_item( BinaryStream &stream );
@@ -231,7 +240,7 @@ public:
 
 class PlotCacheWrapper : public NodeCacheWrapper<GenericPlot> {
 public:
-	PlotCacheWrapper( NodeCache<GenericPlot> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
+	PlotCacheWrapper( NodeCache<GenericPlot> &cache, const CachingStrategy &strategy );
 	std::unique_ptr<GenericPlot> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericPlot>>& items);
 	std::unique_ptr<GenericPlot> read_item( BinaryStream &stream );
 	std::unique_ptr<GenericPlot> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
@@ -240,7 +249,7 @@ public:
 template<typename T>
 class FeatureCollectionCacheWrapper : public NodeCacheWrapper<T> {
 public:
-	FeatureCollectionCacheWrapper( NodeCache<T> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
+	FeatureCollectionCacheWrapper( NodeCache<T> &cache, const CachingStrategy &strategy );
 	virtual ~FeatureCollectionCacheWrapper<T>() = default;
 	std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items);
 	std::unique_ptr<T> read_item( BinaryStream &stream );
@@ -254,21 +263,21 @@ private:
 
 class PointCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PointCollection> {
 public:
-	PointCollectionCacheWrapper( NodeCache<PointCollection> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
+	PointCollectionCacheWrapper( NodeCache<PointCollection> &cache, const CachingStrategy &strategy );
 	std::unique_ptr<PointCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
 	void append_idxs( PointCollection &dest, const PointCollection &src );
 };
 
 class LineCollectionCacheWrapper : public FeatureCollectionCacheWrapper<LineCollection> {
 public:
-	LineCollectionCacheWrapper( NodeCache<LineCollection> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
+	LineCollectionCacheWrapper( NodeCache<LineCollection> &cache, const CachingStrategy &strategy );
 	std::unique_ptr<LineCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
 	void append_idxs( LineCollection &dest, const LineCollection &src );
 };
 
 class PolygonCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PolygonCollection> {
 public:
-	PolygonCollectionCacheWrapper( NodeCache<PolygonCollection> &cache, const std::string &my_host, int my_port, const CachingStrategy &strategy );
+	PolygonCollectionCacheWrapper( NodeCache<PolygonCollection> &cache, const CachingStrategy &strategy );
 	std::unique_ptr<PolygonCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
 	void append_idxs( PolygonCollection &dest, const PolygonCollection &src );
 };
@@ -276,12 +285,12 @@ public:
 
 class NodeCacheManager : public CacheManager {
 public:
-	NodeCacheManager( const std::string &my_host, int my_port, std::unique_ptr<CachingStrategy> strategy,
+	NodeCacheManager( std::unique_ptr<CachingStrategy> strategy,
 			size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
 			size_t polygon_cache_size, size_t plot_cache_size );
 
 	// Creates a handshake message for the index-server
-	NodeHandshake get_handshake() const;
+	NodeHandshake get_handshake(uint32_t my_port) const;
 
 	// Retrieves statistics for this cache
 	NodeStats get_stats() const;
@@ -292,9 +301,6 @@ public:
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
 private:
-	std::string my_host;
-	int my_port;
-
 	NodeRasterCache raster_cache;
 	NodePointCache point_cache;
 	NodeLineCache line_cache;

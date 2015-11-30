@@ -21,8 +21,8 @@ TEST(DistributionTest,TestRedistibution) {
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1("localhost", 12347, "localhost", 12346, "always");
-	TestNodeServer ns2("localhost", 12348, "localhost", 12346, "always");
+	TestNodeServer ns1(12347, "localhost", 12346, "always");
+	TestNodeServer ns2(12348, "localhost", 12346, "always");
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
@@ -104,8 +104,8 @@ TEST(DistributionTest,TestRedistibution) {
 TEST(DistributionTest,TestRemoteNodeFetch) {
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1("localhost", 12347, "localhost", 12346, "always");
-	TestNodeServer ns2("localhost", 12348, "localhost", 12346, "always");
+	TestNodeServer ns1(12347, "localhost", 12346, "always");
+	TestNodeServer ns2(12348, "localhost", 12346, "always");
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
@@ -167,14 +167,14 @@ TEST(DistributionTest,TestCapacityReorg) {
 	// Entry 1
 	NodeCacheKey k1("key", 1);
 	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
-	CacheEntry c1(b1, 10);
+	CacheEntry c1(b1, 10, 3.0);
 	NodeCacheRef r1(CacheType::RASTER, k1, c1);
 	IndexCacheEntry e1(1, r1);
 
 	// Entry 2
 	NodeCacheKey k2("key", 2);
 	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
-	CacheEntry c2(b2, 10);
+	CacheEntry c2(b2, 10, 3.0);
 	NodeCacheRef r2(CacheType::RASTER, k2, c2);
 	IndexCacheEntry e2(1, r2);
 
@@ -217,7 +217,7 @@ TEST(DistributionTest,TestGeographicReorg) {
 	// Entry 1
 	NodeCacheKey k1("key", 1);
 	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
-	CacheEntry c1(b1, 10);
+	CacheEntry c1(b1, 10, 3.0);
 	NodeCacheRef r1(CacheType::RASTER, k1, c1);
 	IndexCacheEntry e1(1, r1);
 
@@ -225,7 +225,7 @@ TEST(DistributionTest,TestGeographicReorg) {
 	NodeCacheKey k2("key", 2);
 	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45),
 		TemporalReference(TIMETYPE_UNIX, 0, 10));
-	CacheEntry c2(b2, 10);
+	CacheEntry c2(b2, 10, 3.0);
 	NodeCacheRef r2(CacheType::RASTER, k2, c2);
 	IndexCacheEntry e2(1, r2);
 
@@ -262,8 +262,8 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1("localhost", 12347, "localhost", 12346, "always", 204800 );
-	TestNodeServer ns2("localhost", 12348, "localhost", 12346, "always", 204800 );
+	TestNodeServer ns1(12347, "localhost", 12346, "always", 204800 );
+	TestNodeServer ns2(12348, "localhost", 12346, "always", 204800 );
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
@@ -309,15 +309,15 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	// Assert moved
 	try {
-		NodeCacheKey k(op->getSemanticId(),1);
+		NodeCacheKey k(op->getSemanticId(),2);
 		tcm.get_instance_mgr(0).get_raster_cache().get_ref(k);
-		Log::debug("FAILED on get 1");
+		Log::debug("FAILED on get 2");
 		FAIL();
 	} catch (NoSuchElementException &nse) {
 	}
 
 	try {
-		NodeCacheKey k(op->getSemanticId(),2);
+		NodeCacheKey k(op->getSemanticId(),1);
 		tcm.get_instance_mgr(0).get_raster_cache().get_ref(k);
 	} catch (NoSuchElementException &nse) {
 		FAIL();

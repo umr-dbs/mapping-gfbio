@@ -119,9 +119,10 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 // Test extensions
 //
 
-TestNodeServer::TestNodeServer(const std::string &my_host, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity)  :
-	NodeServer(my_host,my_port,index_host,index_port,1),
-	rcm( my_host, my_port, CachingStrategy::by_name(strategy), capacity,capacity,capacity,capacity,capacity ) {
+TestNodeServer::TestNodeServer(uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity)  :
+	NodeServer(my_port,index_host,index_port,1),
+	rcm( CachingStrategy::by_name(strategy), capacity,capacity,capacity,capacity,capacity ) {
+	rcm.set_self_port(my_port);
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -161,8 +162,8 @@ CacheManager& TestCacheMan::get_instance_mgr(int i) {
 	return instances.at(i)->rcm;
 }
 
-NodeHandshake TestCacheMan::get_handshake() const {
-	return get_current_instance().get_handshake();
+NodeHandshake TestCacheMan::get_handshake(uint32_t my_port) const {
+	return get_current_instance().get_handshake(my_port);
 }
 
 NodeStats TestCacheMan::get_stats() const {
@@ -191,6 +192,22 @@ CacheWrapper<GenericPlot>& TestCacheMan::get_plot_cache() {
 
 void TestCacheMan::add_instance(TestNodeServer *inst) {
 	instances.push_back(inst);
+}
+
+void TestCacheMan::set_self_port(uint32_t port) {
+	get_current_instance().set_self_port(port);
+}
+
+void TestCacheMan::set_self_host(const std::string& host) {
+	get_current_instance().set_self_host(host);
+}
+
+CacheRef TestCacheMan::create_self_ref(uint64_t id) {
+	return get_current_instance().create_self_ref(id);
+}
+
+bool TestCacheMan::is_self_ref(const CacheRef& ref) {
+	return get_current_instance().is_self_ref(ref);
 }
 
 CacheManager& TestCacheMan::get_current_instance() const {

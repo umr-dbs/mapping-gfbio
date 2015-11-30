@@ -14,6 +14,7 @@
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
 #include "cache/priv/cache_stats.h"
+#include "cache/priv/connection.h"
 #include "cache/common.h"
 
 #include <errno.h>
@@ -410,6 +411,13 @@ NBMessageWriter::NBMessageWriter(uint8_t code, std::unique_ptr<NBWriter> payload
 NBErrorWriter::NBErrorWriter(uint8_t code, const std::string& msg) :
 	NBMessageWriter(code, make_unique<NBSimpleWriter<std::string>>(msg)) {
 }
+
+NBHelloWriter::NBHelloWriter(uint32_t hostid, const std::string& hostname) {
+	add_writer(make_unique<NBSimpleWriter<uint8_t>>(ControlConnection::CMD_HELLO));
+	add_writer(make_unique<NBSimpleWriter<uint32_t>>(hostid) );
+	add_writer(make_unique<NBSimpleWriter<std::string>>(hostname) );
+}
+
 
 template class NBSimpleWriter<uint8_t> ;
 template class NBSimpleWriter<uint32_t> ;
@@ -850,7 +858,6 @@ NBNodeCacheRefReader::NBNodeCacheRefReader() {
 
 NBNodeHandshakeReader::NBNodeHandshakeReader() {
 	add_reader( make_unique<NBCapacityReader>() );
-	add_reader( make_unique<NBStringReader>() );
 	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint32_t)) );
 	add_reader( make_unique<NBContainerReader>(
 		make_unique<NBNodeCacheRefReader>()

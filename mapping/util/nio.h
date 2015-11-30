@@ -203,6 +203,11 @@ public:
 	NBErrorWriter( uint8_t code, const std::string &msg );
 };
 
+class NBHelloWriter : public NBMultiWriter {
+public:
+	NBHelloWriter( uint32_t hostid, const std::string &hostname );
+};
+
 
 //
 // Writer for sending raster-data

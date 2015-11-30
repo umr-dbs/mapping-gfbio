@@ -464,7 +464,7 @@ int main() {
 
 		// Plug in Cache-Dummy if cache is disabled
 		if ( !cache_enabled ) {
-			CacheManager::init( make_unique<NopCacheManager>("localhost",12345) );
+			CacheManager::init( make_unique<NopCacheManager>() );
 		}
 		else {
 			std::string host = Configuration::get("indexserver.host");

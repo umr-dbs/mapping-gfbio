@@ -27,7 +27,7 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
-	CacheManager::init( make_unique<NopCacheManager>("abc",123) );
+	CacheManager::init( make_unique<NopCacheManager>() );
 
 	NodeRasterCache cache(114508*2 + 17);
 
@@ -62,6 +62,7 @@ std::unique_ptr<GenericRaster> createRaster( double x1, double x2, double y1, do
 
 
 TEST(STCacheTest,TestQuery) {
+	CacheManager::init( make_unique<NopCacheManager>() );
 	NodeRasterCache cache(5 * 1024 * 1024);
 	std::string sem_id = "a";
 

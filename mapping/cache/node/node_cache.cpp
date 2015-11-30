@@ -10,6 +10,8 @@
 #include "util/make_unique.h"
 #include "util/sizeutil.h"
 
+#include <cstring>
+
 //////////////////////////////////////////////////////////////
 //
 // Value objects
@@ -186,9 +188,10 @@ NodeRasterCache::NodeRasterCache(size_t size) : NodeCache<GenericRaster>(CacheTy
 }
 
 std::unique_ptr<GenericRaster> NodeRasterCache::copy(const GenericRaster& content) const {
-	auto copy = GenericRaster::create(content.dd, content, content.getRepresentation());
-	copy->blit(&content, 0);
-	copy->setRepresentation(GenericRaster::Representation::CPU);
+	auto copy = GenericRaster::create(content.dd, content, GenericRaster::Representation::CPU);
+	GenericRaster *cp = const_cast<GenericRaster*>(&content);
+	memcpy(copy->getDataForWriting(), cp->getData(), content.getDataSize() );
+	//copy->blit(&content, 0);
 	return copy;
 }
 

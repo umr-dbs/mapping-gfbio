@@ -1,6 +1,7 @@
 
 #include "rasterdb/backend_local.h"
 #include "util/configuration.h"
+#include "util/make_unique.h"
 
 
 #include <sys/file.h> // flock()
@@ -11,8 +12,8 @@
 #include <iostream>
 #include <fstream>
 
-#include "util/make_unique.h"
 
+#include "dirent.h"
 
 LocalRasterDBBackend::LocalRasterDBBackend() : lockedfile(-1) {
 }
@@ -21,14 +22,47 @@ LocalRasterDBBackend::~LocalRasterDBBackend() {
 	cleanup();
 }
 
+static bool has_suffix(const std::string &str, const std::string &suffix) {
+	if (suffix.length() > str.length())
+		return false;
+	return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
+}
+
 std::vector<std::string> LocalRasterDBBackend::enumerateSources() {
 	std::vector<std::string> sourcenames;
-	// TODO: implement this
+
+	auto path = Configuration::get("rasterdb.local.path", "");
+
+	std::string suffix = ".json";
+
+	DIR *dir = opendir(path.c_str());
+	struct dirent *ent;
+	if (dir == nullptr)
+		throw ArgumentException(concat("Could not open path for enumerating: ", path));
+
+	while ((ent = readdir(dir)) != nullptr) {
+		std::string name = ent->d_name;
+		if (has_suffix(name, suffix))
+			sourcenames.push_back(name.substr(0, name.length() - suffix.length()));
+	}
+	closedir(dir);
+
 	return sourcenames;
 }
 std::string LocalRasterDBBackend::readJSON(const std::string &sourcename) {
-	// TODO: implement this
-	return "";
+	std::string basepath = Configuration::get("rasterdb.local.path", "") + sourcename;
+	filename_json = basepath + ".json";
+	std::ifstream file(filename_json.c_str());
+	if (!file.is_open())
+		throw SourceException("unable to open .json file");
+
+	std::string json;
+	file.seekg(0, std::ios::end);
+	json.resize(file.tellg());
+	file.seekg(0, std::ios::beg);
+	file.read(&json[0], json.size());
+	file.close();
+	return json;
 }
 
 void LocalRasterDBBackend::open(const std::string &_sourcename, bool writeable) {

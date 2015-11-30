@@ -71,7 +71,15 @@ bool SpatialReference::contains(const SpatialReference &other) const {
 	if (epsg != other.epsg)
 		throw ArgumentException("SpatialReference::contains(): epsg don't match");
 
-	return x1 <= other.x1 && y1 <= other.y1 && x2 >= other.x2 && y2 >= other.y2;
+	//TODO: Talk about this
+	auto ex = SpatialReference::extent(epsg);
+	double xeps = ex.x2*std::numeric_limits<double>::epsilon();
+	double yeps = ex.y2*std::numeric_limits<double>::epsilon();
+
+	return ( (x1 - other.x1) < xeps  ) &&
+		   ( (other.x2 - x2) < xeps ) &&
+		   ( (y1 - other.y1) < yeps ) &&
+		   ( (other.y2 - y2) < yeps );
 }
 
 

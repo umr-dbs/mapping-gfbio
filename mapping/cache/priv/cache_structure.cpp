@@ -492,83 +492,83 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 		const QueryRectangle& orig, const std::vector<CacheQueryInfo<KType>>& hits,
 		std::vector<Cube<3> >& remainders) const {
 
+	// Extract ids for the result;
 	std::vector<KType> ids;
 
 	// Tells which dimensions may be extended
-	bool do_check[4] = {true,true,true,true};
+	bool do_check[6] = {true,true,true,true,true,true};
 
+	const QueryCube qc(orig);
 	double rem_volume = 0;
+	// If we have a raster, we extend it in spatial dimensions and
+	// enlarge time-interval to t1 = max(hits.t1) and t2 = min(hits.t2)
+	// since there MUST NOT be two results with different time-intervals
+	int check_dims = (orig.restype == QueryResolution::Type::PIXELS) ? 2 : 3;
+
 	// Calculate coverage and check which edges may be extended
-	// Only extend edges untouched by a remainder (spatial dimensions only)
+	// Only extend edges untouched by a remainder
 	for ( auto &rem : remainders ) {
 		rem_volume += rem.volume();
-		auto &dimx = rem.get_dimension(0);
-		auto &dimy = rem.get_dimension(1);
-		do_check[0] &= dimx.a > orig.x1;
-		do_check[1] &= dimx.b < orig.x2;
-		do_check[2] &= dimy.a > orig.y1;
-		do_check[3] &= dimy.b < orig.y2;
+		for ( int i = 0; i < check_dims; i++ ) {
+			auto &rdim = rem.get_dimension(i);
+			auto &qdim = qc.get_dimension(i);
+			// Extend if it not touches to borders of the query
+			do_check[2*i] &= rdim.a > qdim.a;
+			do_check[2*i+1] &= rdim.b < qdim.b;
+		}
 	}
 
 	// Return miss if we have a low coverage (<10%)
-	QueryCube qc(orig);
-	if ( 1-(rem_volume/qc.volume()) < 0.1 )
+	if ( rem_volume/qc.volume() > 0.9 )
 		return CacheQueryResult<KType>( orig );
 
 
-	// Calculated maximum covered rectangle
-	double x1 = do_check[0] ? DoubleNegInfinity : orig.x1,
-		   x2 = do_check[1] ? DoubleInfinity : orig.x2,
-		   y1 = do_check[2] ? DoubleNegInfinity : orig.y1,
-		   y2 = do_check[3] ? DoubleInfinity : orig.y2;
+	// Calculated maximum covered cube
+	double values[6] = { do_check[0] ? DoubleNegInfinity : orig.x1,
+				   	     do_check[1] ? DoubleInfinity : orig.x2,
+				   	     do_check[2] ? DoubleNegInfinity : orig.y1,
+				   	     do_check[3] ? DoubleInfinity : orig.y2,
+				   	     do_check[4] ? DoubleNegInfinity : orig.t1,
+				   	     do_check[5] ? DoubleInfinity : orig.t2 };
 
-	// Also stretch timestamp of remainders
-	// to smallest interval covered by all puzzle parts
-	double t1 = DoubleNegInfinity, t2 = DoubleInfinity;
+
 
 	for ( auto &cqi : hits ) {
 		ids.push_back( cqi.key );
-		auto &dimx = cqi.cube.get_dimension(0);
-		auto &dimy = cqi.cube.get_dimension(1);
-		auto &dimt = cqi.cube.get_dimension(2);
+		for ( int i = 0; i < 3; i++ ) {
+			auto &cdim = cqi.cube.get_dimension(i);
+			auto &qdim = qc.get_dimension(i);
+			int idx_l = 2*i;
+			int idx_r = idx_l + 1;
 
-		t1 = std::max(t1,dimt.a);
-		t2 = std::min(t2,dimt.b);
+			// If this item touches the bounds of the query.... extend
+			if ( do_check[idx_l] && cdim.a <= qdim.a )
+				values[idx_l] = std::max(values[idx_l],cdim.a);
 
-		if ( do_check[0] && dimx.a <= orig.x1 )
-			x1 = std::max(x1,dimx.a);
-
-		if ( do_check[1] && dimx.b >= orig.x2 )
-			x2 = std::min(x2,dimx.b);
-
-		if ( do_check[2] && dimy.a <= orig.y1 )
-			y1 = std::max(y1,dimy.a);
-
-		if ( do_check[3] && dimy.b >= orig.y2 )
-			y2 = std::min(y2,dimy.b);
+			if ( do_check[idx_r] && cdim.b >= qdim.b )
+				values[idx_r] = std::min(values[idx_r],cdim.b);
+		}
 	}
 
-	// Set time on remainders
-	for ( auto &rem : remainders )
-		rem.set_dimension(2,t1,t2);
-
-
-	// Construct new query
 	QueryResolution qr = QueryResolution::none();
+
+	// RASTER ONLY
+	// Set time on remainders and calculate resolution
 	if ( orig.restype == QueryResolution::Type::PIXELS ) {
-		int w = std::ceil(orig.xres / (orig.x2-orig.x1) * (x2-x1));
-		int h = std::ceil(orig.yres / (orig.y2-orig.y1) * (y2-y1));
+		for ( auto &rem : remainders )
+			rem.set_dimension(2,values[4],values[5]);
+		int w = std::ceil(orig.xres / (orig.x2-orig.x1) * (values[1]-values[0]));
+		int h = std::ceil(orig.yres / (orig.y2-orig.y1) * (values[3]-values[2]));
 		qr = QueryResolution::pixels(w,h);
 	}
 
 	QueryRectangle new_query(
-		SpatialReference( orig.epsg, x1, y1, x2, y2 ),
-		TemporalReference( orig.timetype, t1, t2 ),
+		SpatialReference( orig.epsg, values[0], values[2], values[1], values[3] ),
+		TemporalReference( orig.timetype, values[4], values[5] ),
 		qr
 	);
 
 	Log::trace("Extended Query:\norig: %s\nnew : %s", CacheCommon::qr_to_string(orig).c_str(),CacheCommon::qr_to_string(new_query).c_str());
-
 	return CacheQueryResult<KType>( new_query, remainders, ids );
 }
 

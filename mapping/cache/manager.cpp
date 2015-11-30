@@ -505,37 +505,33 @@ SpatioTemporalReference NodeCacheWrapper<T>::enlarge_puzzle(const QueryRectangle
 	const std::vector<std::shared_ptr<const T> >& items) {
 
 	// Calculated maximum covered rectangle
-	double x1 = DoubleNegInfinity,
-		   x2 = DoubleInfinity,
-		   y1 = DoubleNegInfinity,
-		   y2 = DoubleInfinity;
-
-	// Also stretch timestamp to smallest
-	// interval covered by all puzzle parts
-	double t1 = DoubleNegInfinity, t2 = DoubleInfinity;
-
+	double values[6] = { DoubleNegInfinity, DoubleInfinity,
+						 DoubleNegInfinity, DoubleInfinity,
+						 DoubleNegInfinity, DoubleInfinity };
+	QueryCube qc(query);
 	for ( auto &item : items ) {
-		const SpatioTemporalReference &stref = item->stref;
+		Cube3 ic( item->stref.x1, item->stref.x2,
+				  item->stref.y1, item->stref.y2,
+				  item->stref.t1, item->stref.t2 );
 
-		t1 = std::max(t1,stref.t1);
-		t2 = std::min(t2,stref.t2);
+		for ( int i = 0; i < 3; i++ ) {
+			auto &cdim = ic.get_dimension(i);
+			auto &qdim = qc.get_dimension(i);
+			int idx_l = 2*i;
+			int idx_r = idx_l + 1;
 
-		if ( stref.x1 <= query.x1 )
-			x1 = std::max(x1,stref.x1);
+			// If this item touches the bounds of the query.... extend
+			if ( cdim.a <= qdim.a )
+				values[idx_l] = std::max(values[idx_l],cdim.a);
 
-		if ( stref.x2 >= query.x2 )
-			x2 = std::min(x2,stref.x2);
-
-		if ( stref.y1 <= query.y1 )
-			y1 = std::max(y1,stref.y1);
-
-		if ( stref.y2 >= query.y2 )
-			y2 = std::min(y2,stref.y2);
+			if ( cdim.b >= qdim.b )
+				values[idx_r] = std::min(values[idx_r],cdim.b);
+		}
 	}
 
 	return SpatioTemporalReference(
-		SpatialReference(query.epsg, x1, y1, x2, y2),
-		TemporalReference(query.timetype, t1, t2 )
+		SpatialReference( query.epsg, values[0], values[2], values[1], values[3] ),
+		TemporalReference( query.timetype, values[4], values[5] )
 	);
 }
 

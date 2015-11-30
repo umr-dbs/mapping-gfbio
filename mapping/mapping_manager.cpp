@@ -36,6 +36,7 @@ static void usage() {
 		printf("%s query <queryname> <png_filename>\n", program_name);
 		printf("%s testquery <queryname>\n", program_name);
 		printf("%s testsemantic <queryname>\n", program_name);
+		printf("%s enumeratesources [verbose]\n", program_name);
 		exit(5);
 }
 
@@ -537,6 +538,21 @@ int main(int argc, char *argv[]) {
 	}
 	else if (strcmp(command, "testsemantic") == 0) {
 		return testsemantic(argc, argv);
+	}
+	else if (strcmp(command, "enumeratesources") == 0) {
+		bool verbose = false;
+		if (argc > 2)
+			verbose = true;
+		auto names = RasterDB::getSourceNames();
+		for (const auto &name : names) {
+			printf("Source: %s\n", name.c_str());
+			if (verbose) {
+				printf("----------------------------------------------------------------------\n");
+				auto json = RasterDB::getSourceDescription(name);
+				printf("JSON: %s\n", json.c_str());
+				printf("----------------------------------------------------------------------\n");
+			}
+		}
 	}
 	else if (strcmp(command, "msgcoord") == 0) {
 		GDAL::CRSTransformer t(EPSG_LATLON, EPSG_GEOSMSG);

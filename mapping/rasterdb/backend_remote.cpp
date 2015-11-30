@@ -10,11 +10,7 @@
 #include <sstream>
 #include <fstream>
 
-RemoteRasterDBBackend::RemoteRasterDBBackend(const char *sourcename, bool writeable)
-	: RasterDBBackend(writeable), sourcename(sourcename) {
-	if (writeable)
-		throw ArgumentException("RemoteRasterDBBackend cannot be opened writeable");
-
+RemoteRasterDBBackend::RemoteRasterDBBackend() {
 	auto servername = Configuration::get("rasterdb.remote.host");
 	auto serverport = Configuration::get("rasterdb.remote.port");
 	cache_directory = Configuration::get("rasterdb.remote.cache", "");
@@ -24,6 +20,43 @@ RemoteRasterDBBackend::RemoteRasterDBBackend(const char *sourcename, bool writea
 	//printf("Connecting to %s port %d\n", servername.c_str(), portnr);
 
 	stream.reset( new UnixSocket(servername.c_str(), portnr) );
+}
+
+RemoteRasterDBBackend::~RemoteRasterDBBackend() {
+	// TODO: send "end"-command?
+}
+
+std::vector<std::string> RemoteRasterDBBackend::enumerateSources() {
+	auto c = COMMAND_ENUMERATESOURCES;
+	stream->write(c);
+	std::vector<std::string> sourcenames;
+	size_t count;
+	stream->read(&count);
+	for (size_t i=0;i<count;i++) {
+		std::string name;
+		stream->read(&name);
+		sourcenames.push_back(name);
+	}
+	return sourcenames;
+}
+std::string RemoteRasterDBBackend::readJSON(const std::string &sourcename) {
+	auto c = COMMAND_READANYJSON;
+	stream->write(c);
+	stream->write(sourcename);
+	std::string json;
+	stream->read(&json);
+	return json;
+}
+
+
+void RemoteRasterDBBackend::open(const std::string &_sourcename, bool writeable) {
+	if (this->is_opened)
+		throw ArgumentException("Cannot open RemoteRasterDBBackend twice");
+	if (writeable)
+		throw ArgumentException("RemoteRasterDBBackend cannot be opened writeable");
+
+	sourcename = _sourcename;
+	is_writeable = writeable;
 
 	auto c = COMMAND_OPEN;
 	stream->write(c);
@@ -32,14 +65,15 @@ RemoteRasterDBBackend::RemoteRasterDBBackend(const char *sourcename, bool writea
 	stream->read(&response);
 	if (response != 48)
 		throw NetworkException("RemoteRasterDBBackend: COMMAND_OPEN failed");
-}
 
-RemoteRasterDBBackend::~RemoteRasterDBBackend() {
-	// TODO: send "end"-command?
+	is_opened = true;
 }
 
 
 std::string RemoteRasterDBBackend::readJSON() {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call readJSON() before open() on a RasterDBBackend");
+
 	if (json.size() == 0) {
 		auto cmd = this->COMMAND_READJSON;
 		stream->write( cmd );
@@ -50,6 +84,9 @@ std::string RemoteRasterDBBackend::readJSON() {
 
 
 RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int channelid, double t1, double t2) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call getClosestRaster() before open() on a RasterDBBackend");
+
 	auto c = COMMAND_GETCLOSESTRASTER;
 	stream->write(c);
 	stream->write(channelid);
@@ -65,6 +102,9 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 }
 
 void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &attributes) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call readAttributes() before open() on a RasterDBBackend");
+
 	auto c = COMMAND_READATTRIBUTES;
 	stream->write(c);
 	stream->write(rasterid);
@@ -91,6 +131,9 @@ void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &a
 }
 
 int RemoteRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call getBestZoom() before open() on a RasterDBBackend");
+
 	auto c = COMMAND_GETBESTZOOM;
 	stream->write(c);
 	stream->write(rasterid);
@@ -101,6 +144,9 @@ int RemoteRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 }
 
 const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enumerateTiles(int channelid, rasterid_t rasterid, int x1, int y1, int x2, int y2, int zoom) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call enumerateTiles() before open() on a RasterDBBackend");
+
 	auto c = COMMAND_ENUMERATETILES;
 	stream->write(c);
 	stream->write(channelid);
@@ -123,6 +169,9 @@ bool RemoteRasterDBBackend::hasTile(rasterid_t rasterid, uint32_t width, uint32_
 }
 
 std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescription &tiledesc) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call readTile() before open() on a RasterDBBackend");
+
 	std::string cachepath;
 	if (cache_directory != "") {
 		std::ostringstream pathss;

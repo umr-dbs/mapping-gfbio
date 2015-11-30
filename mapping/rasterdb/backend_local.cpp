@@ -14,22 +14,30 @@
 #include "util/make_unique.h"
 
 
-LocalRasterDBBackend::LocalRasterDBBackend(const char *filename, bool writeable)
-	: RasterDBBackend(writeable), lockedfile(-1), sourcename(filename) {
-	try {
-		init();
-	}
-	catch (...) {
-		cleanup();
-		throw;
-	}
+LocalRasterDBBackend::LocalRasterDBBackend() : lockedfile(-1) {
 }
 
 LocalRasterDBBackend::~LocalRasterDBBackend() {
 	cleanup();
 }
 
-void LocalRasterDBBackend::init() {
+std::vector<std::string> LocalRasterDBBackend::enumerateSources() {
+	std::vector<std::string> sourcenames;
+	// TODO: implement this
+	return sourcenames;
+}
+std::string LocalRasterDBBackend::readJSON(const std::string &sourcename) {
+	// TODO: implement this
+	return "";
+}
+
+void LocalRasterDBBackend::open(const std::string &_sourcename, bool writeable) {
+	if (this->is_opened)
+		throw ArgumentException("Cannot open LocalRasterDBBackend twice");
+
+	sourcename = _sourcename;
+	is_writeable = writeable;
+
 	std::string basepath = Configuration::get("rasterdb.local.path", "") + sourcename;
 
 	filename_json = basepath + ".json";
@@ -58,7 +66,7 @@ void LocalRasterDBBackend::init() {
 		perror("error: ");
 		throw SourceException("open() before flock() failed");
 	}
-	if (flock(lockedfile, writeable ? LOCK_EX : LOCK_SH) != 0) {
+	if (flock(lockedfile, is_writeable ? LOCK_EX : LOCK_SH) != 0) {
 		fprintf(stderr, "Unable to flock() rastersource\n");
 		throw SourceException("flock() failed");
 	}
@@ -106,6 +114,8 @@ void LocalRasterDBBackend::init() {
 		);
 		db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rik ON attributes (rasterid, isstring, key)");
 	}
+
+	is_opened = true;
 }
 
 void LocalRasterDBBackend::cleanup() {
@@ -116,10 +126,15 @@ void LocalRasterDBBackend::cleanup() {
 }
 
 std::string LocalRasterDBBackend::readJSON() {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call readJSON() before open() on a RasterDBBackend");
 	return json;
 }
 
 RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, double time_start, double time_end, const AttributeMaps &attributes) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call createRaster() before open() on a RasterDBBackend");
+
 	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT id FROM rasters WHERE channel = ? AND ABS(time_start - ?) < 0.001 AND ABS(time_end - ?) < 0.001");
 	stmt.bind(1, channel);
@@ -172,6 +187,9 @@ RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, doub
 }
 
 void LocalRasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call writeTile() before open() on a RasterDBBackend");
+
 	int zoomfactor = 1 << zoom;
 
 	// Step 1: write data to disk
@@ -220,6 +238,9 @@ void LocalRasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, ui
 }
 
 void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call linkRaster() before open() on a RasterDBBackend");
+
 	auto rd = getClosestRaster(channelid, time_of_reference, time_of_reference);
 
 	if (time_end > rd.time_start && time_start < rd.time_end)
@@ -254,6 +275,9 @@ void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, d
 
 
 RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int channelid, double t1, double t2) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call getClosestRaster() before open() on a RasterDBBackend");
+
 	// find a raster that's valid during the given timestamp
 	SQLiteStatement stmt(db);
 	stmt.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end >= ? ORDER BY time_start DESC limit 1");
@@ -271,6 +295,9 @@ RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int ch
 }
 
 void LocalRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &attributes) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call readAttributes() before open() on a RasterDBBackend");
+
 	SQLiteStatement stmt_md(db);
 	stmt_md.prepare("SELECT isstring, key, value FROM attributes WHERE rasterid = ?");
 	stmt_md.bind(1, rasterid);
@@ -288,6 +315,9 @@ void LocalRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &at
 }
 
 int LocalRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call getBestZoom() before open() on a RasterDBBackend");
+
 	SQLiteStatement stmt_z(db);
 	stmt_z.prepare("SELECT MAX(zoom) FROM tiles WHERE rasterid = ? AND zoom <= ?");
 	stmt_z.bind(1, rasterid);
@@ -305,6 +335,9 @@ int LocalRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 }
 
 const std::vector<RasterDBBackend::TileDescription> LocalRasterDBBackend::enumerateTiles(int channelid, rasterid_t rasterid, int x1, int y1, int x2, int y2, int zoom) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call enumerateTiles() before open() on a RasterDBBackend");
+
 	std::vector<TileDescription> result;
 
 	// find all overlapping rasters in DB
@@ -345,6 +378,9 @@ const std::vector<RasterDBBackend::TileDescription> LocalRasterDBBackend::enumer
 }
 
 bool LocalRasterDBBackend::hasTile(rasterid_t rasterid, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call hasTile() before open() on a RasterDBBackend");
+
 	int zoomfactor = 1 << zoom;
 
 	SQLiteStatement stmt(db);
@@ -369,6 +405,9 @@ bool LocalRasterDBBackend::hasTile(rasterid_t rasterid, uint32_t width, uint32_t
 }
 
 std::unique_ptr<ByteBuffer> LocalRasterDBBackend::readTile(const TileDescription &tiledesc) {
+	if (!this->is_opened)
+		throw ArgumentException("Cannot call readTile() before open() on a RasterDBBackend");
+
 #define USE_POSIX_IO true
 #if USE_POSIX_IO
 	int f = ::open(filename_data.c_str(), O_RDONLY | O_CLOEXEC); // | O_NOATIME

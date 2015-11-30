@@ -4,7 +4,7 @@
 #include "rasterdb/backend_remote.h"
 #include "util/binarystream.h"
 #include "util/configuration.h"
-
+#include "util/make_unique.h"
 
 // socket() etc
 #include <sys/types.h>
@@ -91,6 +91,7 @@ Connection::Connection(int fd) : fd(fd) {
 	id = connection_id++;
 	stream.reset( new UnixSocket(fd,fd) );
 	printf("%d: connected\n", id);
+	backend = make_unique<LocalRasterDBBackend>();
 }
 
 int Connection::input() {
@@ -105,7 +106,7 @@ int Connection::input() {
 	printf("%d: got command %d\n", id, c);
 
 
-	if (backend.get() == nullptr && (c != RemoteRasterDBBackend::COMMAND_EXIT && c != RemoteRasterDBBackend::COMMAND_OPEN))
+	if (backend == nullptr && c >= RemoteRasterDBBackend::FIRST_SOURCE_SPECIFIC_COMMAND)
 		return -1;
 
 	switch (c) {
@@ -113,12 +114,27 @@ int Connection::input() {
 			return -1;
 			break;
 		}
+		case RemoteRasterDBBackend::COMMAND_ENUMERATESOURCES: {
+			std::vector<std::string> sourcenames = backend->enumerateSources();
+			size_t size = sourcenames.size();
+			stream->write(size);
+			for (const auto &name : sourcenames)
+				stream->write(name);
+			break;
+		}
+		case RemoteRasterDBBackend::COMMAND_READANYJSON: {
+			std::string name;
+			stream->read(&name);
+			auto json = backend->readJSON(name);
+			stream->write(json);
+			break;
+		}
 		case RemoteRasterDBBackend::COMMAND_OPEN: {
-			if (backend.get() != nullptr)
+			if (backend->isOpen())
 				throw NetworkException("Cannot call open() twice!");
 			std::string path;
 			stream->read(&path);
-			backend.reset( new LocalRasterDBBackend(path.c_str(), false) );
+			backend->open(path, false);
 			stream->write(OK);
 			break;
 		}

@@ -8,6 +8,7 @@
 #include "converters/converter.h"
 #include "util/sqlite.h"
 #include "util/configuration.h"
+#include "util/make_unique.h"
 #include "operators/operator.h"
 
 
@@ -153,17 +154,21 @@ class RasterDBChannel {
 };
 
 
+std::unique_ptr<RasterDBBackend> instantiate_backend() {
+	auto backendtype = Configuration::get("rasterdb.backend", "local");
+
+	if (backendtype == "remote")
+		return make_unique<RemoteRasterDBBackend>();
+	else
+		return make_unique<LocalRasterDBBackend>();
+}
+
 
 RasterDB::RasterDB(const char *sourcename, bool writeable)
 	: writeable(writeable), crs(nullptr), channelcount(0), channels(nullptr) {
 	try {
-		auto backendtype = Configuration::get("rasterdb.backend", "local");
-
-		if (backendtype == "remote")
-			backend.reset( new RemoteRasterDBBackend(sourcename, writeable) );
-		else
-			backend.reset( new LocalRasterDBBackend(sourcename, writeable) );
-
+		backend = instantiate_backend();
+		backend->open(sourcename, writeable);
 		init();
 	}
 	catch (const std::exception &e) {
@@ -174,6 +179,16 @@ RasterDB::RasterDB(const char *sourcename, bool writeable)
 
 RasterDB::~RasterDB() {
 	cleanup();
+}
+
+std::vector<std::string> RasterDB::getSourceNames() {
+	auto backend = instantiate_backend();
+	return backend->enumerateSources();
+}
+
+std::string RasterDB::getSourceDescription(const std::string &sourcename) {
+	auto backend = instantiate_backend();
+	return backend->readJSON(sourcename);
 }
 
 

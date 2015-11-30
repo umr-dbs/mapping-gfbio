@@ -8,6 +8,7 @@
 #include "cache/node/node_cache.h"
 #include "util/log.h"
 #include "util/make_unique.h"
+#include "util/sizeutil.h"
 
 //////////////////////////////////////////////////////////////
 //
@@ -17,7 +18,7 @@
 
 template<typename EType>
 NodeCacheEntry<EType>::NodeCacheEntry(uint64_t entry_id, std::shared_ptr<EType> result,
-	uint64_t size) : CacheEntry( CacheCube(*result), size ), entry_id(entry_id), data(result) {
+	uint64_t size, double costs) : CacheEntry( CacheCube(*result), size, costs ), entry_id(entry_id), data(result) {
 }
 
 template<typename EType>
@@ -44,12 +45,10 @@ NodeCache<EType>::~NodeCache() {
 }
 
 template<typename EType>
-std::shared_ptr<NodeCacheEntry<EType> > NodeCache<EType>::create_entry(uint64_t id, const EType& data) {
+std::shared_ptr<NodeCacheEntry<EType> > NodeCache<EType>::create_entry(uint64_t id, const EType& data, size_t size, double costs) {
 
 	auto cpy = copy( data );
-	size_t size = get_data_size(data);
-
-	return std::shared_ptr<NodeCacheEntry<EType>>( new NodeCacheEntry<EType>(id, std::shared_ptr<EType>(cpy.release()), size) );
+	return std::shared_ptr<NodeCacheEntry<EType>>( new NodeCacheEntry<EType>(id, std::shared_ptr<EType>(cpy.release()), size, costs) );
 }
 
 template<typename EType>
@@ -95,10 +94,10 @@ void NodeCache<EType>::remove(const NodeCacheKey& key) {
 }
 
 template<typename EType>
-const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const std::unique_ptr<EType> &item, const AccessInfo info) {
+const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const std::unique_ptr<EType> &item, size_t size, double costs, const AccessInfo info) {
 	uint64_t id = next_id++;
 	auto cache = get_structure(semantic_id, true);
-	auto entry = create_entry( id, *item  );
+	auto entry = create_entry( id, *item, size, costs  );
 	entry->last_access = info.last_access;
 	entry->access_count = info.access_count;
 	cache->put( id, entry );
@@ -110,7 +109,7 @@ template<typename EType>
 const std::shared_ptr<EType> NodeCache<EType>::get(const NodeCacheKey& key) const {
 	auto cache = get_structure(key.semantic_id);
 	if (cache != nullptr) {
-		std::shared_ptr<NodeCacheEntry<EType>> e = cache->get(key.entry_id);
+		auto e = cache->get(key.entry_id);
 		track_access( key, *e );
 		return e->data;
 	}
@@ -193,47 +192,49 @@ std::unique_ptr<GenericRaster> NodeRasterCache::copy(const GenericRaster& conten
 	return copy;
 }
 
-size_t NodeRasterCache::get_data_size(const GenericRaster& content) const {
-	return sizeof(content) + content.getDataSize();
-}
-
 NodePointCache::NodePointCache(size_t size) : NodeCache<PointCollection>(CacheType::POINT,size) {
 }
 
 std::unique_ptr<PointCollection> NodePointCache::copy(const PointCollection& content) const {
-	std::vector<bool> keep(content.getFeatureCount(),true);
-	return content.filter(keep);
-}
-
-size_t NodePointCache::get_data_size(const PointCollection& content) const {
-	// TODO
-	return content.getFeatureCount();
+	std::unique_ptr<PointCollection> result = make_unique<PointCollection>( content.stref );
+	result->global_attributes = content.global_attributes;
+	result->coordinates = content.coordinates;
+	result->time_start = content.time_start;
+	result->time_end = content.time_end;
+	result->feature_attributes = content.feature_attributes.copy();
+	result->start_feature = content.start_feature;
+	return result;
 }
 
 NodeLineCache::NodeLineCache(size_t size) : NodeCache<LineCollection>(CacheType::LINE,size) {
 }
 
 std::unique_ptr<LineCollection> NodeLineCache::copy(const LineCollection& content) const {
-	std::vector<bool> keep(content.getFeatureCount(),true);
-	return content.filter(keep);
-}
-
-size_t NodeLineCache::get_data_size(const LineCollection& content) const {
-	// TODO
-	return content.getFeatureCount();
+	std::unique_ptr<LineCollection> result = make_unique<LineCollection>( content.stref );
+	result->global_attributes = content.global_attributes;
+	result->coordinates = content.coordinates;
+	result->time_start = content.time_start;
+	result->time_end = content.time_end;
+	result->feature_attributes = content.feature_attributes.copy();
+	result->start_feature = content.start_feature;
+	result->start_line = content.start_line;
+	return result;
 }
 
 NodePolygonCache::NodePolygonCache(size_t size) : NodeCache<PolygonCollection>(CacheType::POLYGON,size) {
 }
 
 std::unique_ptr<PolygonCollection> NodePolygonCache::copy(const PolygonCollection& content) const {
-	std::vector<bool> keep(content.getFeatureCount(),true);
-	return content.filter(keep);
-}
-
-size_t NodePolygonCache::get_data_size(const PolygonCollection& content) const {
-	// TODO
-	return content.getFeatureCount();
+	std::unique_ptr<PolygonCollection> result = make_unique<PolygonCollection>( content.stref );
+	result->global_attributes = content.global_attributes;
+	result->coordinates = content.coordinates;
+	result->time_start = content.time_start;
+	result->time_end = content.time_end;
+	result->feature_attributes = content.feature_attributes.copy();
+	result->start_feature = content.start_feature;
+	result->start_polygon = content.start_polygon;
+	result->start_ring = content.start_ring;
+	return result;
 }
 
 NodePlotCache::NodePlotCache(size_t size) : NodeCache<GenericPlot>(CacheType::PLOT,size) {
@@ -243,12 +244,6 @@ std::unique_ptr<GenericPlot> NodePlotCache::copy(const GenericPlot& content) con
 	// TODO
 	(void) content;
 	return std::unique_ptr<GenericPlot>();
-}
-
-size_t NodePlotCache::get_data_size(const GenericPlot& content) const {
-	// TODO
-	(void) content;
-	return 1;
 }
 
 // Instantiate all

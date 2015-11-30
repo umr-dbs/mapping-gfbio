@@ -35,7 +35,7 @@
 template<typename EType>
 class NodeCacheEntry : public CacheEntry {
 public:
-	NodeCacheEntry( uint64_t entry_id, std::shared_ptr<EType> result, uint64_t size );
+	NodeCacheEntry( uint64_t entry_id, std::shared_ptr<EType> result, uint64_t size, double costs );
 	const uint64_t entry_id;
 	const std::shared_ptr<EType> data;
 
@@ -55,7 +55,7 @@ public:
 	virtual ~NodeCache();
 
 	// Adds an entry for the given semantic_id to the cache.
-	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item, const AccessInfo info = AccessInfo());
+	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item, size_t size, double costs, const AccessInfo info = AccessInfo());
 
 	// Removes the entry with the given key from the cache
 	void remove( const NodeCacheKey &key );
@@ -88,13 +88,11 @@ public:
 protected:
 	// Copies the content of the entry
 	virtual std::unique_ptr<EType> copy(const EType &content) const = 0;
-	// Retrieves the size of content in bytes
-	virtual size_t get_data_size(const EType &content) const = 0;
 private:
 	typedef CacheStructure<uint64_t,NodeCacheEntry<EType>> Struct;
 
 	// Creates an entry for the given data
-	std::shared_ptr<NodeCacheEntry<EType>> create_entry( uint64_t id, const EType &data );
+	std::shared_ptr<NodeCacheEntry<EType>> create_entry( uint64_t id, const EType &data, size_t size, double costs );
 
 	// Retrieves the cache-structure for the given semantic_id.
 	Struct* get_structure( const std::string &semantic_id, bool create = false) const;
@@ -131,7 +129,6 @@ public:
 	NodeRasterCache( size_t size );
 protected:
 	std::unique_ptr<GenericRaster> copy(const GenericRaster &content) const;
-	size_t get_data_size(const GenericRaster &content) const ;
 };
 
 class NodePointCache : public NodeCache<PointCollection> {
@@ -142,7 +139,6 @@ public:
 	NodePointCache( size_t size );
 protected:
 	std::unique_ptr<PointCollection> copy(const PointCollection &content) const;
-	size_t get_data_size(const PointCollection &content) const ;
 };
 
 class NodeLineCache : public NodeCache<LineCollection> {
@@ -153,7 +149,6 @@ public:
 	NodeLineCache( size_t size );
 protected:
 	std::unique_ptr<LineCollection> copy(const LineCollection &content) const;
-	size_t get_data_size(const LineCollection &content) const ;
 };
 
 class NodePolygonCache : public NodeCache<PolygonCollection> {
@@ -164,7 +159,6 @@ public:
 	NodePolygonCache( size_t size );
 protected:
 	std::unique_ptr<PolygonCollection> copy(const PolygonCollection &content) const;
-	size_t get_data_size(const PolygonCollection &content) const ;
 };
 
 class NodePlotCache : public NodeCache<GenericPlot> {
@@ -175,7 +169,6 @@ public:
 	NodePlotCache( size_t size );
 protected:
 	std::unique_ptr<GenericPlot> copy(const GenericPlot &content) const;
-	size_t get_data_size(const GenericPlot &content) const ;
 };
 
 #endif /* NODE_CACHE_H_ */

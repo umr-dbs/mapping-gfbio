@@ -123,7 +123,8 @@ void GenericOperator::validateResult(const QueryRectangle &rect, SpatioTemporalR
 		throw OperatorException(concat("Operator ", type, " returned result with TIMETYPE_UNREFERENCED"));
 
 	if (!result->stref.SpatialReference::contains(rect) || !result->stref.TemporalReference::contains(rect))
-		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle"));
+		throw OperatorException(concat("Operator ", type, " returned a result which did not contain the given query rectangle. \nQuery: ",
+				CacheCommon::qr_to_string(rect), "\nResult: ", CacheCommon::stref_to_string(result->stref)));
 }
 
 
@@ -167,20 +168,17 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::REQUIRED);
 	std::unique_ptr<GenericRaster> result;
-	{
-		try {
-			result = CacheManager::get_instance().get_raster_cache().query(
-					*this,
-					rect);
-		} catch ( NoSuchElementException &nse ) {
-			QueryProfiler profiler;
-			{
-				QueryProfilerRunningGuard guard(parent_profiler, profiler);
-				result = getRaster(rect,profiler);
-			}
-			if ( CacheManager::get_strategy().do_cache(profiler,result->getDataSize()) )
-				CacheManager::get_instance().get_raster_cache().put(semantic_id,result);
+	try {
+		result = CacheManager::get_instance().get_raster_cache().query(
+				*this,
+				rect);
+	} catch ( NoSuchElementException &nse ) {
+		QueryProfiler profiler;
+		{
+			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			result = getRaster(rect,profiler);
 		}
+		CacheManager::get_instance().get_raster_cache().put(semantic_id,result,profiler);
 	}
 	//d_profile(depth, type, "raster", profiler, result->getDataSize());
 
@@ -194,13 +192,20 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
 
-	QueryProfiler profiler;
 	std::unique_ptr<PointCollection> result;
-	{
-		QueryProfilerRunningGuard guard(parent_profiler, profiler);
-		result = getPointCollection(rect, profiler);
+	try {
+		result = CacheManager::get_instance().get_point_cache().query(
+				*this,
+				rect);
+	} catch ( NoSuchElementException &nse ) {
+		QueryProfiler profiler;
+		{
+			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			result = getPointCollection(rect,profiler);
+		}
+		CacheManager::get_instance().get_point_cache().put(semantic_id,result,profiler);
 	}
-	d_profile(depth, type, "points", profiler);
+	//d_profile(depth, type, "points", profiler);
 
 	// validate the SimpleFeature data structure
 	result->validate();
@@ -216,11 +221,19 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 
 	QueryProfiler profiler;
 	std::unique_ptr<LineCollection> result;
-	{
-		QueryProfilerRunningGuard guard(parent_profiler, profiler);
-		result = getLineCollection(rect, profiler);
+	try {
+		result = CacheManager::get_instance().get_line_cache().query(
+				*this,
+				rect);
+	} catch ( NoSuchElementException &nse ) {
+		QueryProfiler profiler;
+		{
+			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			result = getLineCollection(rect,profiler);
+		}
+		CacheManager::get_instance().get_line_cache().put(semantic_id,result,profiler);
 	}
-	d_profile(depth, type, "lines", profiler);
+	//d_profile(depth, type, "lines", profiler);
 
 	// validate the SimpleFeature data structure
 	result->validate();
@@ -236,11 +249,19 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 
 	QueryProfiler profiler;
 	std::unique_ptr<PolygonCollection> result;
-	{
-		QueryProfilerRunningGuard guard(parent_profiler, profiler);
-		result = getPolygonCollection(rect, profiler);
+	try {
+		result = CacheManager::get_instance().get_polygon_cache().query(
+				*this,
+				rect);
+	} catch ( NoSuchElementException &nse ) {
+		QueryProfiler profiler;
+		{
+			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			result = getPolygonCollection(rect,profiler);
+		}
+		CacheManager::get_instance().get_polygon_cache().put(semantic_id,result,profiler);
 	}
-	d_profile(depth, type, "polygons", profiler);
+	//d_profile(depth, type, "polygons", profiler);
 
 	// validate the SimpleFeature data structure
 	result->validate();
@@ -255,6 +276,7 @@ std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle
 	//	TODO: do we want plots to allow resolutions?
 	validateQRect(rect, ResolutionRequirement::OPTIONAL);
 
+	// TODO: Plug plots into cache
 	QueryProfiler profiler;
 	std::unique_ptr<GenericPlot> result;
 	{

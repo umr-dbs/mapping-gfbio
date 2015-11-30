@@ -728,14 +728,14 @@ void DeliveryConnection::send(std::shared_ptr<const T> item) {
 }
 
 template<typename T>
-void DeliveryConnection::send_move(const AccessInfo& info,
+void DeliveryConnection::send_move(const MoveInfo& info,
 		std::shared_ptr<const T> item) {
 
 	if (state == State::MOVE_REQUEST_READ) {
 		state = State::SENDING_MOVE;
 		begin_write( make_unique<NBMessageWriter>(RESP_OK,
 			make_unique<NBMultiWriter>(
-				make_unique<NBSimpleWriter<AccessInfo>>(info),
+				make_unique<NBSimpleWriter<MoveInfo>>(info),
 				get_data_writer(item)
 			)
 		));
@@ -815,9 +815,9 @@ template void DeliveryConnection::send(std::shared_ptr<const LineCollection>);
 template void DeliveryConnection::send(std::shared_ptr<const PolygonCollection>);
 template void DeliveryConnection::send(std::shared_ptr<const GenericPlot>);
 
-template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const GenericRaster> );
-template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const PointCollection> );
-template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const LineCollection> );
-template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const PolygonCollection> );
-template void DeliveryConnection::send_move( const AccessInfo&, std::shared_ptr<const GenericPlot> );
+template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const GenericRaster> );
+template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const PointCollection> );
+template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const LineCollection> );
+template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const PolygonCollection> );
+template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const GenericPlot> );
 

@@ -13,6 +13,7 @@
 #include "cache/priv/cache_structure.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
+#include "cache/priv/cache_stats.h"
 #include "cache/common.h"
 
 #include <errno.h>
@@ -413,7 +414,7 @@ NBErrorWriter::NBErrorWriter(uint8_t code, const std::string& msg) :
 template class NBSimpleWriter<uint8_t> ;
 template class NBSimpleWriter<uint32_t> ;
 template class NBSimpleWriter<DeliveryResponse> ;
-template class NBSimpleWriter<AccessInfo> ;
+template class NBSimpleWriter<MoveInfo> ;
 template class NBSimpleWriter<ReorgDescription> ;
 template class NBSimpleWriter<CacheRef> ;
 template class NBSimpleWriter<BaseRequest> ;
@@ -819,6 +820,9 @@ NBNodeStatsReader::NBNodeStatsReader() {
 NBAccessInfoReader::NBAccessInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t)) {
 }
 
+NBMoveInfoReader::NBMoveInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(double)) {
+}
+
 NBCacheCubeReader::NBCacheCubeReader() :
 	NBFixedSizeReader(
 		//x,y,t,xres,yres intervals:
@@ -834,13 +838,14 @@ NBCacheCubeReader::NBCacheCubeReader() :
 	) {
 }
 
+NBCacheEntryReader::NBCacheEntryReader() {
+	add_reader( make_unique<NBMoveInfoReader>() );
+	add_reader( make_unique<NBCacheCubeReader>() );
+}
+
 NBNodeCacheRefReader::NBNodeCacheRefReader() {
 	add_reader( make_unique<NBTypedNodeCacheKeyReader>() );
-	add_reader( make_unique<NBAccessInfoReader>() );
-	add_reader( make_unique<NBCacheCubeReader>() );
-	// size
-	add_reader( make_unique<NBFixedSizeReader>(sizeof(uint64_t)) );
-
+	add_reader( make_unique<NBCacheEntryReader>() );
 }
 
 NBNodeHandshakeReader::NBNodeHandshakeReader() {

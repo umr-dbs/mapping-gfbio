@@ -163,6 +163,21 @@ void AttributeArrays::AttributeArray<T>::resize(size_t size) {
 	array.resize(size, defaultvalue<T>::value);
 }
 
+template<typename T>
+size_t AttributeArrays::AttributeArray<T>::get_byte_size() const {
+	return unit.get_byte_size() + SizeUtil::get_byte_size(array);
+}
+
+template<typename T>
+AttributeArrays::AttributeArray<T> AttributeArrays::AttributeArray<T>::copy() const {
+	AttributeArray<T> res(unit);
+	res.array = array;
+	return res;
+}
+
+
+
+
 
 AttributeArrays::AttributeArrays() {
 }
@@ -335,8 +350,21 @@ void AttributeArrays::validate(size_t expected_values) const {
 	}
 }
 
+size_t AttributeArrays::get_byte_size() const {
+	return SizeUtil::get_byte_size(_textual) + SizeUtil::get_byte_size(_numeric);
+}
+
+
+AttributeArrays AttributeArrays::copy() const {
+	AttributeArrays res;
+	for ( auto &e : _numeric )
+		res._numeric.emplace(e.first,e.second.copy());
+	for ( auto &e : _textual )
+		res._textual.emplace(e.first,e.second.copy());
+	return res;
+}
+
 // Instantiate as required
 template class AttributeArrays::AttributeArray<double>;
 template class AttributeArrays::AttributeArray<std::string>;
-
 

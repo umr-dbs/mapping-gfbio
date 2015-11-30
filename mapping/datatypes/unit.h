@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include "util/sizeutil.h"
 
 namespace Json {
 	class Value;
@@ -36,6 +37,7 @@ class Unit {
 			public:
 				Class(const std::string &name) : name(name) {}
 				const std::string &getName() const { return name; }
+				size_t get_byte_size() const { return SizeUtil::get_byte_size(name); }
 			private:
 				std::string name;
 				// TODO: color?
@@ -149,6 +151,12 @@ class Unit {
 		 * @return the unit
 		 */
 		const std::string &getUnit() const { return unit; }
+
+		/**
+		 * the size of this object in memory (in bytes)
+		 * @return the size of this object in bytes
+		 */
+		size_t get_byte_size() const;
 
 		//const Class &getClass(size_t idx) const { return classes.at(idx); }
 		//const std::string &getParam(const std::string &key) { return params.at(key); }

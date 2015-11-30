@@ -45,9 +45,9 @@ class TestNodeServer : public NodeServer {
 public:
 	static void run_node_thread(TestNodeServer *ns);
 
-	TestNodeServer( std::string my_host, uint32_t my_port, std::string index_host, uint32_t index_port, size_t capacity = 5 * 1024 * 1024 );
+	TestNodeServer(const std::string &my_host, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity = 5 * 1024 * 1024 );
 	bool owns_current_thread();
-	DefaultCacheManager rcm;
+	NodeCacheManager rcm;
 	std::thread::id my_id;
 };
 

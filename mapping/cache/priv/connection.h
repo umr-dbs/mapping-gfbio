@@ -392,7 +392,7 @@ public:
 	void send( std::shared_ptr<const T> item );
 
 	template <typename T>
-	void send_move( const AccessInfo &info, std::shared_ptr<const T> item );
+	void send_move( const MoveInfo &info, std::shared_ptr<const T> item );
 
 	void send_error( const std::string &msg );
 

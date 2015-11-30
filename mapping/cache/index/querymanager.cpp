@@ -111,13 +111,16 @@ std::unique_ptr<JobDescription> QueryManager::create_job(const BaseRequest& req)
 
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
 		auto ref = cache.get(key);
-		std::unique_ptr<DeliveryRequest> jreq = make_unique<DeliveryRequest>(req.type, req.semantic_id, req.query,
-			ref.entry_id);
+		std::unique_ptr<DeliveryRequest> jreq = make_unique<DeliveryRequest>(
+				req.type,
+				req.semantic_id,
+				res.covered,
+				ref.entry_id);
 		return make_unique<DeliverJob>(jreq, ref.node_id);
 	}
 	// Puzzle
-	else if (res.has_hit() && res.coverage >  0.1) {
-		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f", res.coverage);
+	else if (res.has_hit()) {
+		Log::debug("Partial HIT. Sending puzzle-request.");
 		std::vector<uint32_t> node_ids;
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
@@ -127,8 +130,11 @@ std::unique_ptr<JobDescription> QueryManager::create_job(const BaseRequest& req)
 			node_ids.push_back(ref.node_id);
 			entries.push_back(CacheRef(node->host, node->port, ref.entry_id));
 		}
-		std::unique_ptr<PuzzleRequest> jreq = make_unique<PuzzleRequest>(req.type, req.semantic_id, req.query,
-			res.remainder, entries);
+		std::unique_ptr<PuzzleRequest> jreq = make_unique<PuzzleRequest>(
+				req.type,
+				req.semantic_id,
+				res.covered,
+				res.remainder, entries);
 		return make_unique<PuzzleJob>(jreq, node_ids);
 	}
 	// Full miss

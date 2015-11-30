@@ -4,6 +4,7 @@
 #include "util/binarystream.h"
 #include "util/hash.h"
 #include "util/make_unique.h"
+#include "util/sizeutil.h"
 
 #include <sstream>
 #include <iomanip>
@@ -252,6 +253,15 @@ Orientation orientation(const Coordinate& p1, const Coordinate& p2, const Coordi
     if (val == 0) return ON;  // colinear
 
     return (val > 0)? RIGHT: LEFT;
+}
+
+size_t SimpleFeatureCollection::get_byte_size() const {
+	return SpatioTemporalResult::get_byte_size() +
+		   SizeUtil::get_byte_size(coordinates) +
+		   SizeUtil::get_byte_size(time_start) +
+		   SizeUtil::get_byte_size(time_end) +
+		   feature_attributes.get_byte_size();
+
 }
 
 bool SimpleFeatureCollection::lineSegmentsIntersect(const Coordinate& p1, const Coordinate& p2, const Coordinate& p3, const Coordinate& p4) const {

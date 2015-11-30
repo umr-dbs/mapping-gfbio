@@ -8,7 +8,6 @@
 #include "util/debug.h"
 #include "services/wfs_request.h"
 #include "util/binarystream.h"
-#include "cache/client.h"
 #include "cache/manager.h"
 
 #include <cstdio>
@@ -359,77 +358,13 @@ int getWfsParameterInteger(const std::string &wfsParameterString){
 //
 //
 //}
-std::unique_ptr<GenericRaster> processRasterRequest( GenericOperator &graph, const QueryRectangle &rect, bool cache_enabled ) {
-	// normal behavior
-	if ( !cache_enabled ) {
-		QueryProfiler profiler;
-		return graph.getCachedRaster(rect, profiler, GenericOperator::RasterQM::EXACT);
-	}
-	// Request cache-server
-	else {
-		std::string host = Configuration::get("indexserver.host");
-		int port = atoi( Configuration::get("indexserver.port").c_str() );
-		CacheClient client(host,port);
-		// Normalize json
-		return client.get_raster(graph.getSemanticId(), rect, GenericOperator::RasterQM::EXACT);
-	}
-}
-
-std::unique_ptr<PointCollection> processPointRequest( GenericOperator &graph, const QueryRectangle &rect, bool cache_enabled ) {
-	// normal behavior
-	if ( !cache_enabled ) {
-		QueryProfiler profiler;
-		return graph.getCachedPointCollection(rect, profiler);
-	}
-	// Request cache-server
-	else {
-		std::string host = Configuration::get("indexserver.host");
-		int port = atoi( Configuration::get("indexserver.port").c_str() );
-		CacheClient client(host,port);
-		// Normalize json
-		return client.get_pointcollection(graph.getSemanticId(), rect);
-	}
-}
-
-std::unique_ptr<LineCollection> processLineRequest( GenericOperator &graph, const QueryRectangle &rect, bool cache_enabled ) {
-	// normal behavior
-	if ( !cache_enabled ) {
-		QueryProfiler profiler;
-		return graph.getCachedLineCollection(rect, profiler);
-	}
-	// Request cache-server
-	else {
-		std::string host = Configuration::get("indexserver.host");
-		int port = atoi( Configuration::get("indexserver.port").c_str() );
-		CacheClient client(host,port);
-		// Normalize json
-		return client.get_linecollection(graph.getSemanticId(), rect);
-	}
-}
-
-std::unique_ptr<PolygonCollection> processPolygonRequest( GenericOperator &graph, const QueryRectangle &rect, bool cache_enabled ) {
-	// normal behavior
-	if ( !cache_enabled ) {
-		QueryProfiler profiler;
-		return graph.getCachedPolygonCollection(rect, profiler);
-	}
-	// Request cache-server
-	else {
-		std::string host = Configuration::get("indexserver.host");
-		int port = atoi( Configuration::get("indexserver.port").c_str() );
-		CacheClient client(host,port);
-		// Normalize json
-		return client.get_polygoncollection(graph.getSemanticId(), rect);
-	}
-}
-
 
 /**
  * Function to process WCS requests.
  * @param params the parameter map
  * @return 0/1 indicating success or failure
  */
-int processWCS(std::map<std::string, std::string> &params, bool cache_enabled) {
+int processWCS(std::map<std::string, std::string> &params) {
 
 	/*http://www.myserver.org:port/path?
 	 * service=WCS &version=2.0
@@ -480,7 +415,8 @@ int processWCS(std::map<std::string, std::string> &params, bool cache_enabled) {
 			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 			QueryResolution::pixels(sizeX, sizeY)
 		);
-		auto result_raster = processRasterRequest(*graph,query_rect,cache_enabled);
+		QueryProfiler profiler;
+		auto result_raster = graph->getCachedRaster(query_rect,profiler);
 		// TODO: Raster flippen?
 
 		//setup the output parameters
@@ -528,7 +464,12 @@ int main() {
 
 		// Plug in Cache-Dummy if cache is disabled
 		if ( !cache_enabled ) {
-			CacheManager::init( make_unique<NopCacheManager>("localhost",12345), make_unique<CacheAll>() );
+			CacheManager::init( make_unique<NopCacheManager>("localhost",12345) );
+		}
+		else {
+			std::string host = Configuration::get("indexserver.host");
+			int port = atoi( Configuration::get("indexserver.port").c_str() );
+			CacheManager::init( make_unique<ClientCacheManager>(host,port) );
 		}
 
 		const char *query_string = getenv("QUERY_STRING");
@@ -570,8 +511,8 @@ int main() {
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::pixels(1024, 1024)
 			);
-			//auto raster = graph->getCachedRaster(rect, profiler);
-			auto raster = processRasterRequest(*graph,rect,cache_enabled);
+			QueryProfiler profiler;
+			auto raster = graph->getCachedRaster(rect, profiler);
 
 			outputImage(raster.get(), false, false, colorizer);
 			return 0;
@@ -586,7 +527,8 @@ int main() {
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
-			auto points = processPointRequest(*graph,rect, cache_enabled);
+			QueryProfiler profiler;
+			auto points = graph->getCachedPointCollection(rect, profiler);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
@@ -616,7 +558,9 @@ int main() {
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
-			auto lines = processLineRequest(*graph,rect, cache_enabled);
+
+			QueryProfiler profiler;
+			auto lines = graph->getCachedLineCollection(rect, profiler);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
@@ -645,7 +589,8 @@ int main() {
 				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 				QueryResolution::none()
 			);
-			auto polygons = processPolygonRequest(*graph,rect, cache_enabled);
+			QueryProfiler profiler;
+			auto polygons = graph->getCachedPolygonCollection(rect, profiler);
 
 			std::string format("geojson");
 			if(params.count("format") > 0)
@@ -673,7 +618,7 @@ int main() {
 
 		// WCS-Requests
 		if (params.count("service") > 0 && params["service"] == "WCS") {
-			return processWCS(params,cache_enabled);
+			return processWCS(params);
 		}
 
 
@@ -736,7 +681,8 @@ int main() {
 					}
 					else {
 						auto graph = GenericOperator::fromJSON(params["layers"]);
-						auto result_raster = processRasterRequest(*graph,qrect,cache_enabled);
+						QueryProfiler profiler;
+						auto result_raster = graph->getCachedRaster(qrect,profiler,GenericOperator::RasterQM::EXACT);
 						bool flipx = (bbox[2] > bbox[0]) != (result_raster->pixel_scale_x > 0);
 						bool flipy = (bbox[3] > bbox[1]) == (result_raster->pixel_scale_y > 0);
 

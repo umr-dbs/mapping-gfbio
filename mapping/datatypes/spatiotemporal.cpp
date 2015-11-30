@@ -83,6 +83,10 @@ void SpatialReference::validate() const {
 	}
 }
 
+size_t TemporalReference::get_byte_size() const {
+	return sizeof(TemporalReference);
+}
+
 SpatialReference SpatialReference::extent(epsg_t epsg) {
 	if (epsg == EPSG_WEBMERCATOR)
 		return SpatialReference(EPSG_WEBMERCATOR, -20037508.34,-20037508.34,20037508.34,20037508.34);
@@ -182,6 +186,10 @@ std::string TemporalReference::toIsoString(double time) const {
 }
 
 
+size_t SpatialReference::get_byte_size() const {
+	return sizeof(SpatialReference);
+}
+
 /**
  * SpatioTemporalReference
  */
@@ -201,12 +209,26 @@ void SpatioTemporalReference::validate() const {
 	TemporalReference::validate();
 }
 
+size_t SpatioTemporalReference::get_byte_size() const {
+	return sizeof(SpatioTemporalReference);
+}
+
+
 /**
  * SpatioTemporalResult
  */
 void SpatioTemporalResult::replaceSTRef(const SpatioTemporalReference &newstref) {
 	const_cast<SpatioTemporalReference&>(this->stref) = newstref;
 }
+
+size_t SpatioTemporalResult::get_byte_size() const {
+	return stref.get_byte_size() + global_attributes.get_byte_size();
+}
+
+size_t GridSpatioTemporalResult::get_byte_size() const {
+	return SpatioTemporalResult::get_byte_size() + 2 * sizeof(double) + 2 * sizeof(uint32_t);
+}
+
 
 /**
  * helper functions
@@ -218,5 +240,3 @@ epsg_t epsgCodeFromSrsString(const std::string &srsString, epsg_t def) {
 		return (epsg_t) std::stoi(srsString.substr(5, std::string::npos));
 	throw ArgumentException("Unknown CRS specified");
 }
-
-

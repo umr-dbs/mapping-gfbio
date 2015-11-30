@@ -19,6 +19,10 @@ template<typename T, int dimensions> class Raster : public GenericRaster {
 		virtual cl::Buffer *getCLBuffer() { return clbuffer; };
 		virtual cl::Buffer *getCLInfoBuffer() { return clbuffer_info; };
 
+		virtual size_t get_byte_size() const {
+			return GenericRaster::get_byte_size() + getDataSize() + sizeof(T*) + sizeof(void*) + 2*sizeof(cl::Buffer*);
+		}
+
 	protected:
 		T *data;
 		void *clhostptr;

@@ -10,6 +10,7 @@
 #include "cache/priv/connection.h"
 #include "node/puzzletracer.h"
 #include "util/log.h"
+#include "util/sizeutil.h"
 
 class AttributeArraysHelper {
 public:
@@ -37,6 +38,31 @@ void AttributeArraysHelper::append_arr(
 }
 
 //
+// STATICS
+//
+//
+// Cache-Manager
+//
+std::unique_ptr<CacheManager> CacheManager::instance;
+thread_local UnixSocket* CacheManager::remote_connection = nullptr;
+
+CacheManager& CacheManager::get_instance() {
+	if ( CacheManager::instance )
+		return *instance;
+	else
+		throw NotInitializedException(
+			"CacheManager was not initialized. Please use CacheManager::init first.");
+}
+
+void CacheManager::init(std::unique_ptr<CacheManager> instance) {
+	CacheManager::instance.reset(instance.release());
+}
+
+
+
+
+
+//
 // NOP-Wrapper
 //
 
@@ -46,9 +72,10 @@ NopCacheWrapper<T>::NopCacheWrapper() {
 
 template<typename T>
 void NopCacheWrapper<T>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item) {
+		const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
+	(void) profiler;
 }
 
 template<typename T>
@@ -62,8 +89,8 @@ std::unique_ptr<T> NopCacheWrapper<T>::query(const GenericOperator& op,
 template<typename T>
 NodeCacheRef NopCacheWrapper<T>::put_local(
 		const std::string& semantic_id, const std::unique_ptr<T>& item,
-		const AccessInfo info) {
-	CacheEntry ce( CacheCube(*item), sizeof(T), info.last_access, info.access_count );
+		size_t size, double costs, const AccessInfo info) {
+	CacheEntry ce( CacheCube(*item), size, costs, info.last_access, info.access_count );
 	return NodeCacheRef( CacheType::UNKNOWN, semantic_id, 0, ce );
 }
 
@@ -88,60 +115,284 @@ NodeCacheRef NopCacheWrapper<T>::get_entry_info(
 
 template<typename T>
 std::unique_ptr<T> NopCacheWrapper<T>::process_puzzle(
-		const PuzzleRequest& request) {
+		const PuzzleRequest& request, QueryProfiler &profiler) {
 	(void) request;
+	(void) profiler;
 	throw NoSuchElementException("NOP-Cache has no entries");
 }
 
 //
-// Remote Wrapper
+// NOP-Cache
+//
+
+NopCacheManager::NopCacheManager(const std::string &my_host, int my_port) :
+	my_host(my_host), my_port(my_port) {
+}
+
+NodeHandshake NopCacheManager::get_handshake() const {
+	return NodeHandshake(my_host, my_port, Capacity(0,0,0,0,0,0,0,0,0,0), std::vector<NodeCacheRef>() );
+}
+
+NodeStats NopCacheManager::get_stats() const {
+	return NodeStats(Capacity(0,0,0,0,0,0,0,0,0,0), std::vector<CacheStats>() );
+}
+
+CacheWrapper<GenericRaster>& NopCacheManager::get_raster_cache() {
+	return raster_cache;
+}
+
+CacheWrapper<PointCollection>& NopCacheManager::get_point_cache() {
+	return point_cache;
+}
+
+CacheWrapper<LineCollection>& NopCacheManager::get_line_cache() {
+	return line_cache;
+}
+
+CacheWrapper<PolygonCollection>& NopCacheManager::get_polygon_cache() {
+	return poly_cache;
+}
+
+CacheWrapper<GenericPlot>& NopCacheManager::get_plot_cache() {
+	return plot_cache;
+}
+
+//
+// Client Implementation
 //
 
 
 template<typename T>
-RemoteCacheWrapper<T>::RemoteCacheWrapper(NodeCache<T>& cache, const std::string &my_host, int my_port) :
-	cache(cache), my_host(my_host), my_port(my_port) {
+ClientCacheWrapper<T>::ClientCacheWrapper(CacheType type, const std::string& idx_host,
+		int idx_port) : type(type), idx_host(idx_host), idx_port(idx_port) {
 }
 
 template<typename T>
-void RemoteCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item) {
+void ClientCacheWrapper<T>::put(const std::string& semantic_id,
+		const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
+	(void) semantic_id;
+	(void) item;
+	(void) profiler;
+	throw CacheException("ClientWrapper only support the query-method");
+}
+
+template<typename T>
+std::unique_ptr<T> ClientCacheWrapper<T>::query(
+		const GenericOperator& op, const QueryRectangle& rect) {
+
+	UnixSocket idx_con(idx_host.c_str(), idx_port);
+	BinaryStream &stream = idx_con;
+	uint32_t magic = ClientConnection::MAGIC_NUMBER;
+	stream.write(magic);
+
+	BaseRequest rr(type,op.getSemanticId(),rect);
+	stream.write(ClientConnection::CMD_GET);
+	rr.toStream( stream );
+
+	uint8_t idx_resp;
+	stream.read(&idx_resp);
+	switch (idx_resp) {
+		case ClientConnection::RESP_OK: {
+			DeliveryResponse dr(idx_con);
+			Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
+			UnixSocket dsock(dr.host.c_str(),dr.port);
+			BinaryStream &dstream = dsock;
+
+			dstream.write(DeliveryConnection::MAGIC_NUMBER);
+			dstream.write(DeliveryConnection::CMD_GET);
+			dstream.write(dr.delivery_id);
+
+			uint8_t resp;
+			dstream.read(&resp);
+			switch (resp) {
+				case DeliveryConnection::RESP_OK: {
+					Log::debug("Delivery responded OK.");
+					return read_result(dstream);
+				}
+				case DeliveryConnection::RESP_ERROR: {
+					std::string err_msg;
+					dstream.read(&err_msg);
+					Log::error("Delivery returned error: %s", err_msg.c_str());
+					throw DeliveryException(err_msg);
+				}
+				default: {
+					Log::error("Delivery returned unknown code: %d", resp);
+					throw DeliveryException("Delivery returned unknown code");
+				}
+			}
+			break;
+		}
+		case ClientConnection::RESP_ERROR: {
+			std::string err_msg;
+			stream.read(&err_msg);
+			Log::error("Cache returned error: %s", err_msg.c_str());
+			throw OperatorException(err_msg);
+		}
+		default: {
+			Log::error("Cache returned unknown code: %d", idx_resp);
+			throw OperatorException("Cache returned unknown code");
+		}
+	}
+}
+
+template<typename T>
+std::unique_ptr<T> ClientCacheWrapper<T>::read_result(
+		BinaryStream& stream) {
+	return make_unique<T>(stream);
+}
+
+template<>
+std::unique_ptr<GenericRaster> ClientCacheWrapper<GenericRaster>::read_result(
+		BinaryStream& stream) {
+	return GenericRaster::fromStream(stream);
+}
+
+template<>
+std::unique_ptr<GenericPlot> ClientCacheWrapper<GenericPlot>::read_result(
+		BinaryStream& stream) {
+	return GenericPlot::fromStream(stream);
+}
+
+
+template<typename T>
+NodeCacheRef ClientCacheWrapper<T>::put_local(
+		const std::string& semantic_id, const std::unique_ptr<T>& item,
+		size_t size, double costs, const AccessInfo info) {
+	(void) semantic_id;
+	(void) item;
+	(void) size;
+	(void) costs;
+	(void) info;
+	throw CacheException("ClientWrapper only support the query-method");
+}
+
+template<typename T>
+void ClientCacheWrapper<T>::remove_local(const NodeCacheKey& key) {
+	(void) key;
+	throw CacheException("ClientWrapper only support the query-method");
+}
+
+template<typename T>
+const std::shared_ptr<const T> ClientCacheWrapper<T>::get_ref(
+		const NodeCacheKey& key) {
+	(void) key;
+	throw CacheException("ClientWrapper only support the query-method");
+}
+
+template<typename T>
+NodeCacheRef ClientCacheWrapper<T>::get_entry_info(
+		const NodeCacheKey& key) {
+	(void) key;
+	throw CacheException("ClientWrapper only support the query-method");
+}
+
+template<typename T>
+std::unique_ptr<T> ClientCacheWrapper<T>::process_puzzle(
+		const PuzzleRequest& request, QueryProfiler &profiler) {
+	(void) request;
+	(void) profiler;
+	throw CacheException("ClientWrapper only support the query-method");
+}
+
+//
+// Client-cache
+//
+
+
+ClientCacheManager::ClientCacheManager(const std::string& idx_host, int idx_port) :
+	idx_host(idx_host), idx_port(idx_port),
+	raster_cache(CacheType::RASTER, idx_host, idx_port),
+	point_cache(CacheType::POINT, idx_host, idx_port),
+	line_cache(CacheType::LINE, idx_host, idx_port),
+	poly_cache(CacheType::POLYGON, idx_host, idx_port),
+	plot_cache(CacheType::PLOT, idx_host, idx_port){
+}
+
+NodeHandshake ClientCacheManager::get_handshake() const {
+	throw CacheException("ClientCacheManager only supports the queries");
+}
+
+NodeStats ClientCacheManager::get_stats() const {
+	throw CacheException("ClientCacheManager only supports the queries");
+}
+
+CacheWrapper<GenericRaster>& ClientCacheManager::get_raster_cache() {
+	return raster_cache;
+}
+
+CacheWrapper<PointCollection>& ClientCacheManager::get_point_cache() {
+	return point_cache;
+}
+
+CacheWrapper<LineCollection>& ClientCacheManager::get_line_cache() {
+	return line_cache;
+}
+
+CacheWrapper<PolygonCollection>& ClientCacheManager::get_polygon_cache() {
+	return poly_cache;
+}
+
+CacheWrapper<GenericPlot>& ClientCacheManager::get_plot_cache() {
+	return plot_cache;
+}
+
+
+//
+// Node Wrapper
+//
+
+
+template<typename T>
+NodeCacheWrapper<T>::NodeCacheWrapper(NodeCache<T>& cache, const std::string &my_host, int my_port, const CachingStrategy &strategy) :
+	cache(cache), my_host(my_host), my_port(my_port), strategy(strategy) {
+}
+
+template<typename T>
+void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
+
 	if (CacheManager::remote_connection == nullptr)
 		throw NetworkException("No connection to remote-index.");
 
-	auto ref = put_local(semantic_id, item);
-	BinaryStream &stream = *CacheManager::remote_connection;
+	size_t size = SizeUtil::get_byte_size(*item);
 
-	Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
-	stream.write(WorkerConnection::RESP_NEW_CACHE_ENTRY);
-	ref.toStream(stream);
+	if ( strategy.do_cache(profiler,size) ) {
+		auto ref = put_local(semantic_id, item, size, strategy.get_costs(profiler,size));
+		BinaryStream &stream = *CacheManager::remote_connection;
+
+		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
+		stream.write(WorkerConnection::RESP_NEW_CACHE_ENTRY);
+		ref.toStream(stream);
+	}
+	else
+		Log::debug("Item will not be cached according to strategy");
 }
 
 template<typename T>
-NodeCacheRef RemoteCacheWrapper<T>::put_local(const std::string& semantic_id,
-	const std::unique_ptr<T>& item, const AccessInfo info) {
+NodeCacheRef NodeCacheWrapper<T>::put_local(const std::string& semantic_id,
+	const std::unique_ptr<T>& item, size_t size, double costs, const AccessInfo info) {
 	Log::debug("Adding item to local cache");
-	return cache.put(semantic_id, item, info);
+	return cache.put(semantic_id, item, size, costs, info);
 }
 
 template<typename T>
-void RemoteCacheWrapper<T>::remove_local(const NodeCacheKey& key) {
+void NodeCacheWrapper<T>::remove_local(const NodeCacheKey& key) {
 	Log::debug("Removing item from local cache. Key: %s", key.to_string().c_str());
 	cache.remove(key);
 }
 
 template<typename T>
-const std::shared_ptr<const T> RemoteCacheWrapper<T>::get_ref(const NodeCacheKey& key) {
+const std::shared_ptr<const T> NodeCacheWrapper<T>::get_ref(const NodeCacheKey& key) {
 	Log::debug("Getting item from local cache. Key: %s", key.to_string().c_str());
 	return cache.get(key);
 }
 
 template<typename T>
-NodeCacheRef RemoteCacheWrapper<T>::get_entry_info(const NodeCacheKey& key) {
+NodeCacheRef NodeCacheWrapper<T>::get_entry_info(const NodeCacheKey& key) {
 	return cache.get_entry_metadata(key);
 }
 
 template<typename T>
-std::unique_ptr<T> RemoteCacheWrapper<T>::query(const GenericOperator& op, const QueryRectangle& rect) {
+std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const QueryRectangle& rect) {
 	Log::debug("Querying item: %s on %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str() );
 
 	// Local lookup
@@ -163,8 +414,9 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(const GenericOperator& op, const
 			refs.push_back( CacheRef(my_host,my_port,id) );
 
 		PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
-		std::unique_ptr<T> result = process_puzzle(pr);
-		put( op.getSemanticId(), result );
+		QueryProfiler qp;
+		std::unique_ptr<T> result = process_puzzle(pr,qp);
+		put( op.getSemanticId(), result, qp );
 		return result;
 	}
 	// Check index (if we aren't on depth = 0 )
@@ -194,8 +446,9 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(const GenericOperator& op, const
 			case WorkerConnection::RESP_QUERY_PARTIAL: {
 				PuzzleRequest pr(stream);
 				Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
-				auto res = process_puzzle(pr);
-				put(op.getSemanticId(),res);
+				QueryProfiler qp;
+				auto res = process_puzzle(pr,qp);
+				put(op.getSemanticId(),res,qp);
 				return res;
 				break;
 			}
@@ -211,7 +464,7 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(const GenericOperator& op, const
 }
 
 template<typename T>
-std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle(const PuzzleRequest& request) {
+std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler) {
 	Log::trace("Processing puzzle-request: %s", request.to_string().c_str());
 
 	std::vector<std::shared_ptr<const T>> items;
@@ -226,7 +479,10 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle(const PuzzleRequest& re
 		}
 		else {
 			Log::debug("Fetching puzzle-piece from %s:%d, key: %d", cr.host.c_str(), cr.port, cr.entry_id);
+
 			auto raster = fetch_item( request.semantic_id, cr );
+			// TODO: Estimate size
+			//profiler.addIOCost();
 			items.push_back( std::shared_ptr<const T>(raster.release()) );
 		}
 	}
@@ -234,7 +490,7 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle(const PuzzleRequest& re
 	// Create remainder
 	Log::trace("Creating remainder queries.");
 	auto ref = items.front();
-	auto remainders = compute_remainders(request.semantic_id,*ref,request);
+	auto remainders = compute_remainders(request.semantic_id,*ref,request, profiler);
 
 	for ( auto &r : remainders )
 		items.push_back( std::shared_ptr<T>(r.release()));
@@ -245,15 +501,51 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle(const PuzzleRequest& re
 }
 
 template<typename T>
-SpatioTemporalReference RemoteCacheWrapper<T>::enlarge_puzzle(const QueryRectangle& query,
+SpatioTemporalReference NodeCacheWrapper<T>::enlarge_puzzle(const QueryRectangle& query,
 	const std::vector<std::shared_ptr<const T> >& items) {
-	// TODO
+
+	// Calculated maximum covered rectangle
+	double values[6] = { DoubleNegInfinity, DoubleInfinity,
+						 DoubleNegInfinity, DoubleInfinity,
+						 DoubleNegInfinity, DoubleInfinity };
+	QueryCube qc(query);
+	for ( auto &item : items ) {
+		Cube3 ic( item->stref.x1, item->stref.x2,
+				  item->stref.y1, item->stref.y2,
+				  item->stref.t1, item->stref.t2 );
+
+		for ( int i = 0; i < 3; i++ ) {
+			auto &cdim = ic.get_dimension(i);
+			auto &qdim = qc.get_dimension(i);
+			int idx_l = 2*i;
+			int idx_r = idx_l + 1;
+
+			// If this item touches the bounds of the query.... extend
+			if ( cdim.a <= qdim.a )
+				values[idx_l] = std::max(values[idx_l],cdim.a);
+
+			if ( cdim.b >= qdim.b )
+				values[idx_r] = std::min(values[idx_r],cdim.b);
+		}
+	}
+
+	return SpatioTemporalReference(
+		SpatialReference( query.epsg, values[0], values[2], values[1], values[3] ),
+		TemporalReference( query.timetype, values[4], values[5] )
+	);
+}
+
+// TODO: Hack for plots
+template<>
+SpatioTemporalReference NodeCacheWrapper<GenericPlot>::enlarge_puzzle(const QueryRectangle& query,
+	const std::vector<std::shared_ptr<const GenericPlot> >& items) {
 	(void) items;
 	return SpatioTemporalReference(query,query);
 }
 
+
 template<typename T>
-std::unique_ptr<T> RemoteCacheWrapper<T>::fetch_item(const std::string& semantic_id, const CacheRef& ref) {
+std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_id, const CacheRef& ref) {
 	TypedNodeCacheKey key(cache.type,semantic_id,ref.entry_id);
 	Log::debug("Fetching cache-entry from: %s:%d, key: %d", ref.host.c_str(), ref.port, ref.entry_id );
 	UnixSocket sock(ref.host.c_str(), ref.port);
@@ -283,22 +575,21 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::fetch_item(const std::string& semantic
 }
 
 template<typename T>
-std::vector<std::unique_ptr<T>> RemoteCacheWrapper<T>::compute_remainders(const std::string& semantic_id,
-	const T& ref_result, const PuzzleRequest &request ) {
+std::vector<std::unique_ptr<T>> NodeCacheWrapper<T>::compute_remainders(const std::string& semantic_id,
+	const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler ) {
 	(void) ref_result;
 	std::vector<std::unique_ptr<T>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
 
 	for ( auto &rqr : request.get_remainder_queries() ) {
-		QueryProfiler qp;
-		result.push_back( compute_item(*graph,rqr,qp) );
+		result.push_back( compute_item(*graph,rqr,profiler) );
 	}
 	return result;
 }
 
 template<>
-std::vector<std::unique_ptr<GenericRaster>> RemoteCacheWrapper<GenericRaster>::compute_remainders(
-	const std::string& semantic_id, const GenericRaster& ref_result, const PuzzleRequest &request) {
+std::vector<std::unique_ptr<GenericRaster>> NodeCacheWrapper<GenericRaster>::compute_remainders(
+	const std::string& semantic_id, const GenericRaster& ref_result, const PuzzleRequest &request, QueryProfiler &profiler) {
 
 	std::vector<std::unique_ptr<GenericRaster>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
@@ -308,13 +599,8 @@ std::vector<std::unique_ptr<GenericRaster>> RemoteCacheWrapper<GenericRaster>::c
 
 	for ( auto &rqr : remainders ) {
 		try {
-			QueryProfiler qp;
-			qp.startTimer();
-			// FIXME: Do sth. on rasterdb to make this work with RasterQM::LOOSE
-			auto rem = compute_item(*graph,rqr,qp);
-
-			if ( std::abs(1.0 - ref_result.pixel_scale_x / rem->pixel_scale_x) > 0.01 ||
-				 std::abs(1.0 - ref_result.pixel_scale_y / rem->pixel_scale_y) > 0.01 ) {
+			auto rem = compute_item(*graph,rqr,profiler);
+			if ( !CacheCommon::resolution_matches( ref_result, *rem ) ) {
 				Log::warn(
 					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s, result-dimension: %dx%d. Fitting result!",
 					ref_result.pixel_scale_x, ref_result.pixel_scale_y, rem->pixel_scale_x, rem->pixel_scale_y,
@@ -337,7 +623,7 @@ std::vector<std::unique_ptr<GenericRaster>> RemoteCacheWrapper<GenericRaster>::c
 }
 
 RasterCacheWrapper::RasterCacheWrapper(NodeCache<GenericRaster>& cache, const std::string& my_host,
-	int my_port) : RemoteCacheWrapper(cache,my_host,my_port) {
+	int my_port, const CachingStrategy &strategy) : NodeCacheWrapper(cache,my_host,my_port,strategy) {
 }
 
 std::unique_ptr<GenericRaster> RasterCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
@@ -390,8 +676,8 @@ std::unique_ptr<GenericRaster> RasterCacheWrapper::compute_item(GenericOperator&
 	return op.getCachedRaster(query, qp );
 }
 
-PlotCacheWrapper::PlotCacheWrapper(NodeCache<GenericPlot>& cache, const std::string& my_host, int my_port) :
-	RemoteCacheWrapper(cache,my_host,my_port) {
+PlotCacheWrapper::PlotCacheWrapper(NodeCache<GenericPlot>& cache, const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+	NodeCacheWrapper(cache,my_host,my_port,strategy) {
 }
 
 std::unique_ptr<GenericPlot> PlotCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
@@ -412,7 +698,8 @@ std::unique_ptr<GenericPlot> PlotCacheWrapper::compute_item(GenericOperator& op,
 
 template<typename T>
 FeatureCollectionCacheWrapper<T>::FeatureCollectionCacheWrapper(NodeCache<T>& cache,
-	const std::string& my_host, int my_port) : RemoteCacheWrapper<T>(cache,my_host,my_port) {
+	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+	NodeCacheWrapper<T>(cache,my_host,my_port,strategy) {
 }
 
 template<typename T>
@@ -472,7 +759,8 @@ std::unique_ptr<T> FeatureCollectionCacheWrapper<T>::read_item(BinaryStream &str
 }
 
 PointCollectionCacheWrapper::PointCollectionCacheWrapper(NodeCache<PointCollection>& cache,
-	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port)  {
+	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,my_host,my_port,strategy)  {
 }
 
 std::unique_ptr<PointCollection> PointCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -486,7 +774,8 @@ void PointCollectionCacheWrapper::append_idxs(PointCollection& dest,
 }
 
 LineCollectionCacheWrapper::LineCollectionCacheWrapper(NodeCache<LineCollection>& cache,
-	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port) {
+	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,my_host,my_port, strategy) {
 }
 
 std::unique_ptr<LineCollection> LineCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -501,7 +790,8 @@ void LineCollectionCacheWrapper::append_idxs(LineCollection& dest,
 }
 
 PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(NodeCache<PolygonCollection>& cache,
-	const std::string& my_host, int my_port) : FeatureCollectionCacheWrapper(cache,my_host,my_port) {
+	const std::string& my_host, int my_port, const CachingStrategy &strategy) :
+		FeatureCollectionCacheWrapper(cache,my_host,my_port,strategy) {
 }
 
 std::unique_ptr<PolygonCollection> PolygonCollectionCacheWrapper::compute_item(GenericOperator& op,
@@ -516,53 +806,27 @@ void PolygonCollectionCacheWrapper::append_idxs(PolygonCollection& dest,
 	append_idx_vec(dest.start_ring, src.start_ring);
 }
 
-//
-// Cache-Manager
-//
-std::unique_ptr<CachingStrategy> CacheManager::strategy;
-std::unique_ptr<CacheManager> CacheManager::instance;
-thread_local UnixSocket* CacheManager::remote_connection = nullptr;
-
-CachingStrategy& CacheManager::get_strategy() {
-	if (CacheManager::strategy)
-		return *strategy;
-	else
-		throw NotInitializedException(
-			"CacheManager was not initialized. Please use CacheManager::init first.");
-}
-
-CacheManager& CacheManager::get_instance() {
-	if ( CacheManager::instance )
-		return *instance;
-	else
-		throw NotInitializedException(
-			"CacheManager was not initialized. Please use CacheManager::init first.");
-}
-
-void CacheManager::init(std::unique_ptr<CacheManager> instance,std::unique_ptr<CachingStrategy> strategy) {
-	CacheManager::strategy.reset(strategy.release());
-	CacheManager::instance.reset(instance.release());
-}
-
 
 //
 // Default Manager
 //
 
 
-DefaultCacheManager::DefaultCacheManager(const std::string &my_host, int my_port,
+NodeCacheManager::NodeCacheManager(const std::string &my_host, int my_port,
+	std::unique_ptr<CachingStrategy> strategy,
 	size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
 	size_t polygon_cache_size, size_t plot_cache_size) :
 	my_host(my_host), my_port(my_port),
 	raster_cache(raster_cache_size), point_cache(point_cache_size),
 	line_cache(line_cache_size), polygon_cache(polygon_cache_size),
 	plot_cache(plot_cache_size),
-	raster_wrapper(raster_cache, my_host, my_port), point_wrapper(point_cache, my_host, my_port),
-	line_wrapper(line_cache, my_host, my_port), polygon_wrapper(polygon_cache, my_host, my_port),
-	plot_wrapper(plot_cache, my_host, my_port) {
+	raster_wrapper(raster_cache, my_host, my_port, *strategy), point_wrapper(point_cache, my_host, my_port, *strategy),
+	line_wrapper(line_cache, my_host, my_port, *strategy), polygon_wrapper(polygon_cache, my_host, my_port, *strategy),
+	plot_wrapper(plot_cache, my_host, my_port, *strategy),
+	strategy(std::move(strategy)) {
 }
 
-NodeHandshake DefaultCacheManager::get_handshake() const {
+NodeHandshake NodeCacheManager::get_handshake() const {
 
 	Capacity cap(
 		raster_cache.get_max_size(), raster_cache.get_current_size(),
@@ -588,7 +852,7 @@ NodeHandshake DefaultCacheManager::get_handshake() const {
 	return NodeHandshake(my_host, my_port, cap, entries );
 }
 
-NodeStats DefaultCacheManager::get_stats() const {
+NodeStats NodeCacheManager::get_stats() const {
 
 	Capacity cap(
 		raster_cache.get_max_size(), raster_cache.get_current_size(),
@@ -609,58 +873,24 @@ NodeStats DefaultCacheManager::get_stats() const {
 	return NodeStats( cap, stats );
 }
 
-CacheWrapper<GenericRaster>& DefaultCacheManager::get_raster_cache() {
+CacheWrapper<GenericRaster>& NodeCacheManager::get_raster_cache() {
 	return raster_wrapper;
 }
 
-CacheWrapper<PointCollection>& DefaultCacheManager::get_point_cache() {
+CacheWrapper<PointCollection>& NodeCacheManager::get_point_cache() {
 	return point_wrapper;
 }
 
-CacheWrapper<LineCollection>& DefaultCacheManager::get_line_cache() {
+CacheWrapper<LineCollection>& NodeCacheManager::get_line_cache() {
 	return line_wrapper;
 }
 
-CacheWrapper<PolygonCollection>& DefaultCacheManager::get_polygon_cache() {
+CacheWrapper<PolygonCollection>& NodeCacheManager::get_polygon_cache() {
 	return polygon_wrapper;
 }
 
-CacheWrapper<GenericPlot>& DefaultCacheManager::get_plot_cache() {
+CacheWrapper<GenericPlot>& NodeCacheManager::get_plot_cache() {
 	return plot_wrapper;
 }
 
-//
-// NOP-Cache
-//
-
-NopCacheManager::NopCacheManager(const std::string &my_host, int my_port) :
-	my_host(my_host), my_port(my_port) {
-}
-
-NodeHandshake NopCacheManager::get_handshake() const {
-	return NodeHandshake(my_host, my_port, Capacity(0,0,0,0,0,0,0,0,0,0), std::vector<NodeCacheRef>() );
-}
-
-NodeStats NopCacheManager::get_stats() const {
-	return NodeStats(Capacity(0,0,0,0,0,0,0,0,0,0), std::vector<CacheStats>() );
-}
-
-CacheWrapper<GenericRaster>& NopCacheManager::get_raster_cache() {
-	return raster_cache;
-}
-
-CacheWrapper<PointCollection>& NopCacheManager::get_point_cache() {
-	return point_cache;
-}
-
-CacheWrapper<LineCollection>& NopCacheManager::get_line_cache() {
-	return line_cache;
-}
-
-CacheWrapper<PolygonCollection>& NopCacheManager::get_polygon_cache() {
-	return poly_cache;
-}
-
-CacheWrapper<GenericPlot>& NopCacheManager::get_plot_cache() {
-	return plot_cache;
-}
+template class ClientCacheWrapper<GenericRaster>;

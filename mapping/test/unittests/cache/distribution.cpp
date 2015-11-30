@@ -15,20 +15,19 @@
 #include "cache/node/nodeserver.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
-#include "cache/client.h"
 #include "cache/index/reorg_strategy.h"
 
 TEST(DistributionTest,TestRedistibution) {
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1("localhost", 12347, "localhost", 12346);
-	TestNodeServer ns2("localhost", 12348, "localhost", 12346);
+	TestNodeServer ns1("localhost", 12347, "localhost", 12346, "always");
+	TestNodeServer ns2("localhost", 12348, "localhost", 12346, "always");
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
 
-	CacheManager::init(std::move(cm), make_unique<CacheAll>());
+	CacheManager::init(std::move(cm));
 
 	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::get_instance());
 
@@ -49,7 +48,7 @@ TEST(DistributionTest,TestRedistibution) {
 	time_t timestamp = parseIso8601DateTime(timestr);
 	double bbox[4];
 
-	CacheClient cc("localhost", 12346);
+	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER, "localhost", 12346);
 
 	parseBBOX(bbox, bbox_str, epsg, false);
 	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
@@ -58,7 +57,9 @@ TEST(DistributionTest,TestRedistibution) {
 	std::string sem_id = GenericOperator::fromJSON(json)->getSemanticId();
 
 	//Should hit 1st node
-	cc.get_raster(json, qr, GenericOperator::RasterQM::EXACT);
+	auto op = GenericOperator::fromJSON(json);
+
+	cc.query(*op, qr);
 
 	NodeCacheKey key1(sem_id, 2);
 
@@ -103,13 +104,13 @@ TEST(DistributionTest,TestRedistibution) {
 TEST(DistributionTest,TestRemoteNodeFetch) {
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1("localhost", 12347, "localhost", 12346);
-	TestNodeServer ns2("localhost", 12348, "localhost", 12346);
+	TestNodeServer ns1("localhost", 12347, "localhost", 12346, "always");
+	TestNodeServer ns2("localhost", 12348, "localhost", 12346, "always");
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
 
-	CacheManager::init(std::move(cm), make_unique<CacheAll>());
+	CacheManager::init(std::move(cm));
 
 	std::vector<TP> ts;
 	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
@@ -128,19 +129,21 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 	time_t timestamp = parseIso8601DateTime(timestr);
 	double bbox[4];
 
-	CacheClient cc("localhost", 12346);
+	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER, "localhost", 12346);
 
 	parseBBOX(bbox, bbox_str, epsg, false);
 	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
 		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), QueryResolution::pixels(width, height));
 
+
+	auto op = GenericOperator::fromJSON(json);
 	//Should hit 1st node
-	cc.get_raster(json, qr, GenericOperator::RasterQM::EXACT);
+	cc.query(*op, qr);
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
 	//Should hit 2nd node
-	cc.get_raster(json, qr, GenericOperator::RasterQM::EXACT);
+	cc.query(*op, qr);
 
 	ns2.stop();
 	ns1.stop();
@@ -259,13 +262,13 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
 	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1("localhost", 12347, "localhost", 12346, 204800 );
-	TestNodeServer ns2("localhost", 12348, "localhost", 12346, 204800 );
+	TestNodeServer ns1("localhost", 12347, "localhost", 12346, "always", 204800 );
+	TestNodeServer ns2("localhost", 12348, "localhost", 12346, "always", 204800 );
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
 
-	CacheManager::init(std::move(cm), make_unique<CacheAll>());
+	CacheManager::init(std::move(cm));
 
 	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::get_instance());
 
@@ -283,7 +286,9 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	time_t timestamp = parseIso8601DateTime(timestr);
 
-	CacheClient cc("localhost", 12346);
+	auto op = GenericOperator::fromJSON(json);
+
+	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER, "localhost", 12346);
 
 	TemporalReference tr(TIMETYPE_UNIX, timestamp, timestamp);
 	QueryResolution   qres = QueryResolution::pixels(256, 256);
@@ -293,16 +298,14 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	QueryRectangle qr2( SpatialReference(epsg, 45,0,90,45), tr, qres );
 
 	//Should hit 1st node
-	cc.get_raster(json, qr1, GenericOperator::RasterQM::EXACT);
-	cc.get_raster(json, qr2, GenericOperator::RasterQM::EXACT);
-	cc.get_raster(json, qr2, GenericOperator::RasterQM::EXACT);
+	cc.query(*op, qr1);
+	cc.query(*op, qr2);
+	cc.query(*op, qr2);
 
 	is.force_stat_update();
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
 	// Reorg should be finished at this point
-
-	auto op = GenericOperator::fromJSON(json);
 
 	// Assert moved
 	try {

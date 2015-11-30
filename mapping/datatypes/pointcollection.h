@@ -181,6 +181,12 @@ public:
 
 	std::string getAsString();
 
+	/**
+	 * the size of this object in memory (in bytes)
+	 * @return the size of this object in bytes
+	 */
+	size_t get_byte_size() const { return SimpleFeatureCollection::get_byte_size() + SizeUtil::get_byte_size(start_feature); };
+
 	virtual ~PointCollection() = default;
 
 protected:

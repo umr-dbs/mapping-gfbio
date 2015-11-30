@@ -22,6 +22,17 @@ std::unique_ptr<CachingStrategy> CachingStrategy::by_name(const std::string& nam
 	throw ArgumentException(concat("Unknown Caching-Strategy: ", name));
 }
 
+double CachingStrategy::get_costs(const QueryProfiler& profiler, size_t bytes, bool use_all) const {
+	double io = use_all ? profiler.all_io : profiler.self_io;
+	double proc = use_all ? (profiler.all_cpu + profiler.all_gpu) : (profiler.self_cpu + profiler.self_gpu);
+	// TODO: Check this factor;
+	double cache_cpu = 0.000000005 * bytes;
+
+	return std::max(
+		io / (double) bytes,
+		proc / cache_cpu
+	);
+}
 
 //
 // Cache All
@@ -48,10 +59,7 @@ bool CacheNone::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 //
 
 bool AuthmannStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
-	double cache_cpu = 0.000000005 * bytes;
-	return bytes > 0 &&
-			(2 * cache_cpu < (profiler.all_cpu + profiler.all_gpu) ||
-			 2 * bytes < profiler.all_io );
+	return get_costs(profiler, bytes, true) > 2;
 }
 
 //
@@ -63,9 +71,7 @@ TwoStepStrategy::TwoStepStrategy(double stacked_threshold, double immediate_thre
 }
 
 bool TwoStepStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
-	double v = profiler.self_cpu + profiler.self_gpu + profiler.self_io * 0.0000001 + 0.000000005 * bytes;
-	double av = profiler.all_cpu + profiler.all_gpu + profiler.all_io * 0.0000001 + 0.000000005 * bytes;
-	return v >= immediate_threshold ||
-		   (profiler.uncached_depth >= stack_depth && av >= stacked_threshold);
+	return get_costs(profiler,bytes, false) > immediate_threshold ||
+		   (profiler.uncached_depth >= stack_depth && get_costs(profiler,bytes,true) > stacked_threshold );
 }
 

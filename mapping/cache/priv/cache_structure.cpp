@@ -186,29 +186,48 @@ void AccessInfo::toStream( BinaryStream &stream ) const {
 }
 
 //
+// MoveInfo
+//
+MoveInfo::MoveInfo(uint64_t size, double costs) : size(size), costs(costs) {
+}
+
+MoveInfo::MoveInfo(time_t last_access, uint32_t access_count, uint64_t size, double costs) :
+	AccessInfo(last_access,access_count), size(size), costs(costs) {
+}
+
+MoveInfo::MoveInfo(BinaryStream& stream) : AccessInfo(stream) {
+	stream.read(&size);
+	stream.read(&costs);
+}
+
+void MoveInfo::toStream(BinaryStream& stream) const {
+	AccessInfo::toStream(stream);
+	stream.write(size);
+	stream.write(costs);
+}
+
+//
 // CacheEntry
 //
-CacheEntry::CacheEntry(CacheCube bounds, uint64_t size) : AccessInfo(),
-	bounds(bounds), size(size) {
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs) : MoveInfo(size, costs),
+	bounds(bounds) {
 }
 
-CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, time_t last_access, uint32_t access_count) :
-	AccessInfo(last_access,access_count),
-	bounds(bounds), size(size) {
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs, time_t last_access, uint32_t access_count) :
+	MoveInfo(last_access,access_count,size,costs),
+	bounds(bounds) {
 }
 
-CacheEntry::CacheEntry(BinaryStream& stream) : AccessInfo(stream), bounds(stream) {
-	stream.read(&size);
+CacheEntry::CacheEntry(BinaryStream& stream) : MoveInfo(stream), bounds(stream) {
 }
 
 void CacheEntry::toStream(BinaryStream& stream) const {
-	AccessInfo::toStream(stream);
+	MoveInfo::toStream(stream);
 	bounds.toStream(stream);
-	stream.write(size);
 }
 
 std::string CacheEntry::to_string() const {
-	return concat("CacheEntry[size: ", size, ", last_access: ", last_access, ", access_count: ", access_count, ", bounds: ", bounds.to_string(), "]");
+	return concat("CacheEntry[size: ", size, ",costs: ", costs, ", last_access: ", last_access, ", access_count: ", access_count, ", bounds: ", bounds.to_string(), "]");
 }
 
 //
@@ -235,12 +254,13 @@ std::string CacheQueryInfo<KType>::to_string() const {
 //
 template<typename KType>
 CacheQueryResult<KType>::CacheQueryResult(const QueryRectangle& query) :
-	coverage(0) {
+	covered(query) {
 	remainder.push_back( Cube3(query.x1,query.x2,query.y1,query.y2,query.t1,query.t2) );
 }
 
 template<typename KType>
 CacheQueryResult<KType>::CacheQueryResult( const QueryRectangle &query, std::vector<Cube<3>> remainder, std::vector<KType> keys) :
+	covered(query),
 	keys(keys),
 	remainder( remainder ) {
 
@@ -249,7 +269,6 @@ CacheQueryResult<KType>::CacheQueryResult( const QueryRectangle &query, std::vec
 	for ( auto &rem : this->remainder) {
 		v += rem.volume();
 	}
-	coverage = 1-(v/qc.volume());
 }
 
 template<typename KType>
@@ -314,7 +333,6 @@ void CacheStructure<KType, EType>::put(const KType& key, const std::shared_ptr<E
 	std::lock_guard<std::mutex> guard(mtx);
 //	Log::trace("Inserting new entry. Id: %d", key );
 	entries.emplace(key, result);
-
 }
 
 template<typename KType, typename EType>
@@ -339,53 +357,9 @@ std::shared_ptr<EType> CacheStructure<KType, EType>::remove(const KType& key) {
 	throw NoSuchElementException("No cache-entry found");
 }
 
-template<typename KType, typename EType>
-const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRectangle& spec) const {
-	std::lock_guard<std::mutex> guard(mtx);
-
-	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
-
-	// Get intersecting entries
-	auto partials = get_query_candidates( spec );
-
-	// No candidates found
-	if ( partials.empty() ) {
-		Log::trace("No candidates cached.");
-		return CacheQueryResult<KType>(spec);
-	}
-
-	std::vector<KType> ids;
-	std::vector<CacheQueryInfo<KType>> used_entries;
-	std::vector<Cube<3>> remainders;
-	remainders.push_back( QueryCube(spec) );
-
-	while ( !partials.empty() && !remainders.empty() ) {
-		bool used   = false;
-		auto &entry = partials.top();
-
-		std::vector<Cube<3>> new_remainders;
-		for ( auto & rem : remainders ) {
-			if ( entry.cube.intersects(rem) ) {
-				used = true;
-				auto split = rem.dissect_by(entry.cube);
-				// Insert new remainders
-				if ( !split.empty() )
-					new_remainders.insert(new_remainders.end(),split.begin(),split.end());
-			}
-			else
-				new_remainders.push_back(rem);
-		}
-		remainders = new_remainders;
-
-		if ( used ) {
-			used_entries.push_back(entry);
-			ids.push_back( entry.key );
-		}
-		partials.pop();
-	}
-
-	return CacheQueryResult<KType>( spec, remainders, ids );
-}
+//
+// QUERY STUFF
+//
 
 template<typename KType, typename EType>
 std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_query_candidates(
@@ -418,6 +392,192 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 	Log::trace("Found %d candidates for query: %s", partials.size(), CacheCommon::qr_to_string(spec).c_str() );
 	return partials;
 }
+
+template<typename KType, typename EType>
+const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRectangle& spec) const {
+	std::lock_guard<std::mutex> guard(mtx);
+
+	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
+
+	// Get intersecting entries
+	std::priority_queue<CacheQueryInfo<KType>> partials = get_query_candidates( spec );
+
+	// No candidates found
+	if ( partials.empty() ) {
+		Log::trace("No candidates cached.");
+		return CacheQueryResult<KType>(spec);
+	}
+
+	//std::vector<KType> ids;
+	std::vector<CacheQueryInfo<KType>> used_entries;
+	std::vector<Cube<3>> remainders;
+	remainders.push_back( QueryCube(spec) );
+
+	while ( !partials.empty() && !remainders.empty() ) {
+		bool used   = false;
+		const CacheQueryInfo<KType> &entry = partials.top();
+
+		// Skip incompatible resolutions
+		if ( spec.restype == QueryResolution::Type::PIXELS &&
+			 !used_entries.empty() &&
+			 !CacheCommon::resolution_matches(
+				 entry.cube, used_entries.front().cube)	) {
+			partials.pop();
+			continue;
+		}
+
+		std::vector<Cube<3>> new_remainders;
+		for ( auto & rem : remainders ) {
+			if ( entry.cube.intersects(rem) ) {
+				used = true;
+				auto split = rem.dissect_by(entry.cube);
+				// Insert new remainders
+				if ( !split.empty() )
+					new_remainders.insert(new_remainders.end(),split.begin(),split.end());
+			}
+			else
+				new_remainders.push_back(rem);
+		}
+		remainders = new_remainders;
+
+		if ( used ) {
+			used_entries.push_back(entry);
+			//ids.push_back( entry.key );
+		}
+		partials.pop();
+	}
+
+	std::vector<Cube<3>> u_rems = union_remainders(remainders);
+	if ( u_rems.size() != remainders.size() )
+		Log::trace("Union produced %ld instead of %ld remainders", u_rems.size(), remainders.size());
+	else
+		Log::trace("Union had no effect, remainders: %ld", remainders.size() );
+
+
+	return enlarge_expected_result(spec, used_entries, u_rems);
+}
+
+template<typename KType, typename EType>
+std::vector<Cube<3> > CacheStructure<KType, EType>::union_remainders(
+		const std::vector<Cube<3> >& remainders) const {
+
+	std::vector<Cube<3>> result;
+	std::vector<Cube<3>> work = remainders;
+
+	while ( !work.empty() ) {
+		// Take one cube
+		auto current = work.back();
+		work.pop_back();
+
+		// See if it can be combined with any of the remaining cubes
+		// If so: start over since we maybe can add more now
+		auto i = work.begin();
+		while ( i != work.end() ) {
+			auto tmp = current.combine(*i);
+			if ( tmp.volume() < (current.volume() + i->volume()) * 1.01 ) {
+				current = tmp;
+				work.erase(i);
+				i = work.begin();
+			}
+			else
+				i++;
+		}
+		result.push_back(current);
+	}
+	return result;
+}
+
+template<typename KType, typename EType>
+CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
+		const QueryRectangle& orig, const std::vector<CacheQueryInfo<KType>>& hits,
+		std::vector<Cube<3> >& remainders) const {
+
+	// Extract ids for the result;
+	std::vector<KType> ids;
+
+	// Tells which dimensions may be extended
+	bool do_check[6] = {true,true,true,true,true,true};
+
+	const QueryCube qc(orig);
+	double rem_volume = 0;
+	// If we have a raster, we extend it in spatial dimensions and
+	// enlarge time-interval to t1 = max(hits.t1) and t2 = min(hits.t2)
+	// since there MUST NOT be two results with different time-intervals
+	int check_dims = (orig.restype == QueryResolution::Type::PIXELS) ? 2 : 3;
+
+	// Calculate coverage and check which edges may be extended
+	// Only extend edges untouched by a remainder
+	for ( auto &rem : remainders ) {
+		rem_volume += rem.volume();
+		for ( int i = 0; i < check_dims; i++ ) {
+			auto &rdim = rem.get_dimension(i);
+			auto &qdim = qc.get_dimension(i);
+			// Extend if it not touches to borders of the query
+			do_check[2*i] &= rdim.a > qdim.a;
+			do_check[2*i+1] &= rdim.b < qdim.b;
+		}
+	}
+
+	// Return miss if we have a low coverage (<10%)
+	if ( rem_volume/qc.volume() > 0.9 )
+		return CacheQueryResult<KType>( orig );
+
+
+	// Calculated maximum covered cube
+	double values[6] = { do_check[0] ? DoubleNegInfinity : orig.x1,
+				   	     do_check[1] ? DoubleInfinity : orig.x2,
+				   	     do_check[2] ? DoubleNegInfinity : orig.y1,
+				   	     do_check[3] ? DoubleInfinity : orig.y2,
+				   	     do_check[4] ? DoubleNegInfinity : orig.t1,
+				   	     do_check[5] ? DoubleInfinity : orig.t2 };
+
+
+
+	for ( auto &cqi : hits ) {
+		ids.push_back( cqi.key );
+		for ( int i = 0; i < 3; i++ ) {
+			auto &cdim = cqi.cube.get_dimension(i);
+			auto &qdim = qc.get_dimension(i);
+			int idx_l = 2*i;
+			int idx_r = idx_l + 1;
+
+			// If this item touches the bounds of the query.... extend
+			if ( do_check[idx_l] && cdim.a <= qdim.a )
+				values[idx_l] = std::max(values[idx_l],cdim.a);
+
+			if ( do_check[idx_r] && cdim.b >= qdim.b )
+				values[idx_r] = std::min(values[idx_r],cdim.b);
+		}
+	}
+
+	QueryResolution qr = QueryResolution::none();
+
+	// RASTER ONLY
+	// Set time on remainders and calculate resolution
+	if ( orig.restype == QueryResolution::Type::PIXELS ) {
+		for ( auto &rem : remainders )
+			rem.set_dimension(2,values[4],values[5]);
+		int w = std::ceil(orig.xres / (orig.x2-orig.x1) * (values[1]-values[0]));
+		int h = std::ceil(orig.yres / (orig.y2-orig.y1) * (values[3]-values[2]));
+		qr = QueryResolution::pixels(w,h);
+	}
+
+	QueryRectangle new_query(
+		SpatialReference( orig.epsg, values[0], values[2], values[1], values[3] ),
+		TemporalReference( orig.timetype, values[4], values[5] ),
+		qr
+	);
+
+	Log::trace("Extended Query:\norig: %s\nnew : %s", CacheCommon::qr_to_string(orig).c_str(),CacheCommon::qr_to_string(new_query).c_str());
+	return CacheQueryResult<KType>( new_query, remainders, ids );
+}
+
+
+//
+// END QUERY STUFF
+//
+
+
 
 template<typename KType, typename EType>
 std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() const {

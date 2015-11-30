@@ -429,8 +429,8 @@ void IndexServer::process_worker_query(WorkerConnection& con) {
 		con.send_hit(cr);
 	}
 	// Puzzle
-	else if (res.has_hit() && res.coverage > 0.1 ) {
-		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f", res.coverage);
+	else if (res.has_hit() ) {
+		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f");
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
 			IndexCacheKey key(req.semantic_id, id);

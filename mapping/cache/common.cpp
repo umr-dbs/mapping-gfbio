@@ -6,6 +6,7 @@
  */
 
 #include "cache/common.h"
+#include "cache/priv/cache_structure.h"
 #include "cache/priv/connection.h"
 #include "util/log.h"
 #include "util/exceptions.h"
@@ -39,8 +40,6 @@ void ex_handler() {
 	Log::error("%s\n%s",out.str().c_str(), CacheCommon::get_stacktrace().c_str() );
 	exit(1);
 }
-
-geos::geom::GeometryFactory CacheCommon::gf;
 
 std::string CacheCommon::qr_to_string(const QueryRectangle &rect) {
 	std::ostringstream os;
@@ -114,24 +113,6 @@ int CacheCommon::get_listening_socket(int port, bool nonblock, int backlog) {
 	return sock;
 }
 
-std::unique_ptr<geos::geom::Polygon> CacheCommon::create_square(double lx, double ly, double ux, double uy) {
-	geos::geom::CoordinateSequence *coords = new geos::geom::CoordinateArraySequence();
-
-	coords->add(geos::geom::Coordinate(lx, ly));
-	coords->add(geos::geom::Coordinate(ux, ly));
-	coords->add(geos::geom::Coordinate(ux, uy));
-	coords->add(geos::geom::Coordinate(lx, uy));
-	coords->add(geos::geom::Coordinate(lx, ly));
-
-	geos::geom::LinearRing *shell = gf.createLinearRing(coords);
-	std::vector<geos::geom::Geometry*> *empty = new std::vector<geos::geom::Geometry*>;
-	return std::unique_ptr<geos::geom::Polygon>(gf.createPolygon(shell, empty));
-}
-
-std::unique_ptr<geos::geom::Geometry> CacheCommon::empty_geom() {
-	return std::unique_ptr<geos::geom::Geometry>(gf.createEmptyGeometry());
-}
-
 void CacheCommon::set_uncaught_exception_handler() {
 	std::set_terminate(ex_handler);
 }
@@ -148,7 +129,21 @@ std::string CacheCommon::get_stacktrace() {
 	return out.str();
 }
 
-std::unique_ptr<geos::geom::Geometry> CacheCommon::union_geom(const std::unique_ptr<geos::geom::Geometry>& p1,
-	const std::unique_ptr<geos::geom::Polygon>& p2) {
-	return std::unique_ptr<geos::geom::Geometry>(p1->Union(p2.get()));
+bool CacheCommon::resolution_matches(const GridSpatioTemporalResult& r1,
+		const GridSpatioTemporalResult& r2) {
+	return resolution_matches(r1.pixel_scale_x, r1.pixel_scale_y, r2.pixel_scale_x, r2.pixel_scale_y );
+}
+
+bool CacheCommon::resolution_matches(const CacheCube &c1, const CacheCube &c2) {
+	return resolution_matches( c1.resolution_info.actual_pixel_scale_x,
+		c1.resolution_info.actual_pixel_scale_y,
+		c2.resolution_info.actual_pixel_scale_x,
+		c2.resolution_info.actual_pixel_scale_y);
+}
+
+bool CacheCommon::resolution_matches(double scalex1, double scaley1,
+		double scalex2, double scaley2) {
+
+	return std::abs( 1.0 - scalex1 / scalex2) < 0.01 &&
+		   std::abs( 1.0 - scaley1 / scaley2) < 0.01;
 }

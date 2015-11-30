@@ -77,13 +77,25 @@ public:
 	uint32_t access_count;
 };
 
+class MoveInfo : public AccessInfo {
+public:
+	MoveInfo( uint64_t size, double costs );
+	MoveInfo( time_t last_access, uint32_t access_count, uint64_t size, double costs );
+	MoveInfo( BinaryStream &stream );
+
+	void toStream( BinaryStream &stream ) const;
+
+	uint64_t size;
+	double costs;
+};
+
 //
 // Basic information about cached data
 //
-class CacheEntry : public AccessInfo {
+class CacheEntry : public MoveInfo {
 public:
-	CacheEntry(CacheCube bounds, uint64_t size);
-	CacheEntry(CacheCube bounds, uint64_t size, time_t last_access, uint32_t access_count);
+	CacheEntry(CacheCube bounds, uint64_t size, double costs);
+	CacheEntry(CacheCube bounds, uint64_t size, double costs, time_t last_access, uint32_t access_count);
 	CacheEntry( BinaryStream &stream );
 
 	void toStream( BinaryStream &stream ) const;
@@ -91,7 +103,6 @@ public:
 	std::string to_string() const;
 
 	CacheCube bounds;
-	uint64_t size;
 };
 
 //
@@ -132,9 +143,9 @@ public:
 	bool has_remainder() const;
 	std::string to_string() const;
 
+	QueryRectangle covered;
 	std::vector<KType> keys;
 	std::vector<Cube<3>> remainder;
-	double coverage;
 };
 
 //
@@ -204,8 +215,12 @@ public:
 private:
 	std::string key_to_string( uint64_t key ) const;
 	std::string key_to_string( const std::pair<uint32_t,uint64_t> &key ) const;
-	std::map<KType, std::shared_ptr<EType>> entries;
+
 	std::priority_queue<CacheQueryInfo<KType>> get_query_candidates( const QueryRectangle &spec ) const;
+	std::vector<Cube<3>> union_remainders( const std::vector<Cube<3>> &remainders ) const;
+	CacheQueryResult<KType> enlarge_expected_result( const QueryRectangle &orig, const std::vector<CacheQueryInfo<KType>> &hits, std::vector<Cube<3>> &remainders ) const;
+
+	std::map<KType, std::shared_ptr<EType>> entries;
 	mutable std::mutex mtx;
 };
 

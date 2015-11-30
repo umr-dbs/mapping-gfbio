@@ -550,6 +550,16 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 		}
 	}
 
+
+	// Final check... stupid floating point stuff
+	for ( int i = 0; i < 6; i++ ) {
+		if ( !std::isfinite(values[i]) ) {
+			auto &d = qc.get_dimension(i/2);
+			values[i] = (i%2) == 0 ? d.a : d.b;
+		}
+	}
+
+
 	QueryResolution qr = QueryResolution::none();
 
 	// RASTER ONLY

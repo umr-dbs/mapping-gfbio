@@ -529,6 +529,14 @@ SpatioTemporalReference NodeCacheWrapper<T>::enlarge_puzzle(const QueryRectangle
 		}
 	}
 
+	// Final check... stupid floating point stuff
+	for ( int i = 0; i < 6; i++ ) {
+		if ( !std::isfinite(values[i]) ) {
+			auto &d = qc.get_dimension(i/2);
+			values[i] = (i%2) == 0 ? d.a : d.b;
+		}
+	}
+
 	return SpatioTemporalReference(
 		SpatialReference( query.epsg, values[0], values[2], values[1], values[3] ),
 		TemporalReference( query.timetype, values[4], values[5] )

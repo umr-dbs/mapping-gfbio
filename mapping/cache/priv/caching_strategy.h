@@ -22,7 +22,7 @@ public:
 	static std::unique_ptr<CachingStrategy> by_name( const std::string &name );
 	virtual ~CachingStrategy() = default;
 	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const = 0;
-	double get_costs( const QueryProfiler &profiler, size_t bytes ) const;
+	double get_costs( const QueryProfiler &profiler, size_t bytes, bool use_all = false ) const;
 };
 
 //

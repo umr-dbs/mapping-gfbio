@@ -196,24 +196,45 @@ NodePointCache::NodePointCache(size_t size) : NodeCache<PointCollection>(CacheTy
 }
 
 std::unique_ptr<PointCollection> NodePointCache::copy(const PointCollection& content) const {
-	std::vector<bool> keep(content.getFeatureCount(),true);
-	return content.filter(keep);
+	std::unique_ptr<PointCollection> result = make_unique<PointCollection>( content.stref );
+	result->global_attributes = content.global_attributes;
+	result->coordinates = content.coordinates;
+	result->time_start = content.time_start;
+	result->time_end = content.time_end;
+	result->feature_attributes = content.feature_attributes.copy();
+	result->start_feature = content.start_feature;
+	return result;
 }
 
 NodeLineCache::NodeLineCache(size_t size) : NodeCache<LineCollection>(CacheType::LINE,size) {
 }
 
 std::unique_ptr<LineCollection> NodeLineCache::copy(const LineCollection& content) const {
-	std::vector<bool> keep(content.getFeatureCount(),true);
-	return content.filter(keep);
+	std::unique_ptr<LineCollection> result = make_unique<LineCollection>( content.stref );
+	result->global_attributes = content.global_attributes;
+	result->coordinates = content.coordinates;
+	result->time_start = content.time_start;
+	result->time_end = content.time_end;
+	result->feature_attributes = content.feature_attributes.copy();
+	result->start_feature = content.start_feature;
+	result->start_line = content.start_line;
+	return result;
 }
 
 NodePolygonCache::NodePolygonCache(size_t size) : NodeCache<PolygonCollection>(CacheType::POLYGON,size) {
 }
 
 std::unique_ptr<PolygonCollection> NodePolygonCache::copy(const PolygonCollection& content) const {
-	std::vector<bool> keep(content.getFeatureCount(),true);
-	return content.filter(keep);
+	std::unique_ptr<PolygonCollection> result = make_unique<PolygonCollection>( content.stref );
+	result->global_attributes = content.global_attributes;
+	result->coordinates = content.coordinates;
+	result->time_start = content.time_start;
+	result->time_end = content.time_end;
+	result->feature_attributes = content.feature_attributes.copy();
+	result->start_feature = content.start_feature;
+	result->start_polygon = content.start_polygon;
+	result->start_ring = content.start_ring;
+	return result;
 }
 
 NodePlotCache::NodePlotCache(size_t size) : NodeCache<GenericPlot>(CacheType::PLOT,size) {

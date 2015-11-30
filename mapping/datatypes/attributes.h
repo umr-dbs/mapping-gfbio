@@ -197,6 +197,8 @@ class AttributeArrays {
 
 				Unit unit;
 			private:
+				AttributeArray<T> copy() const;
+
 				// to map the array to a GPU, direct access to the std::vector is required
 				friend class RasterOpenCL::CLProgram;
 				friend AttributeArrays;
@@ -329,6 +331,9 @@ class AttributeArrays {
 		 * @return the size of this object in bytes
 		 */
 		size_t get_byte_size() const;
+
+		AttributeArrays copy() const;
+
 	private:
 		void checkIfAttributeDoesNotExist(const std::string &key);
 

@@ -11,13 +11,17 @@ class BinaryStream;
 
 class RemoteRasterDBBackend : public RasterDBBackend {
 	public:
-		RemoteRasterDBBackend(const char *filename, bool writeable = false);
+		RemoteRasterDBBackend();
 		virtual ~RemoteRasterDBBackend();
 
 		static const uint8_t COMMAND_EXIT = 1;
-		static const uint8_t COMMAND_OPEN = 2;
-		static const uint8_t COMMAND_READJSON = 10;
+		static const uint8_t COMMAND_ENUMERATESOURCES = 2;
+		static const uint8_t COMMAND_READANYJSON = 3;
 
+		static const uint8_t COMMAND_OPEN = 9;
+		static const uint8_t FIRST_SOURCE_SPECIFIC_COMMAND = 10;
+
+		static const uint8_t COMMAND_READJSON = 10;
 		static const uint8_t COMMAND_CREATERASTER = 11;
 		static const uint8_t COMMAND_WRITETILE = 12;
 
@@ -28,6 +32,10 @@ class RemoteRasterDBBackend : public RasterDBBackend {
 		static const uint8_t COMMAND_HASTILE = 17;
 		static const uint8_t COMMAND_READTILE = 18;
 
+		virtual std::vector<std::string> enumerateSources();
+		virtual std::string readJSON(const std::string &sourcename);
+
+		virtual void open(const std::string &sourcename, bool writeable);
 		virtual std::string readJSON();
 
 		virtual RasterDescription getClosestRaster(int channelid, double t1, double t2);

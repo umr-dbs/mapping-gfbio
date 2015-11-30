@@ -10,10 +10,13 @@
 
 class LocalRasterDBBackend : public RasterDBBackend {
 	public:
-		LocalRasterDBBackend(const char *filename, bool writeable = false);
+		LocalRasterDBBackend();
 		virtual ~LocalRasterDBBackend();
 
+		virtual std::vector<std::string> enumerateSources();
+		virtual std::string readJSON(const std::string &sourcename);
 
+		virtual void open(const std::string &sourcename, bool writeable);
 		virtual std::string readJSON();
 		virtual rasterid_t createRaster(int channel, double time_start, double time_end, const AttributeMaps &attributes);
 		virtual void writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression);

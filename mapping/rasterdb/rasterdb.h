@@ -101,6 +101,9 @@ class RasterDB {
 
 		bool isWriteable() const { return writeable; }
 
+		static std::vector<std::string> getSourceNames();
+		static std::string getSourceDescription(const std::string &sourcename);
+
 	private:
 		void import(GenericRaster *raster, int channelid, double time_start, double time_end, RasterConverter::Compression compression = RasterConverter::Compression::GZIP);
 		std::unique_ptr<GenericRaster> load(int channelid, const TemporalReference &t, int x1, int y1, int x2, int y2, int zoom = 0, bool transform = true, size_t *io_cost = nullptr);

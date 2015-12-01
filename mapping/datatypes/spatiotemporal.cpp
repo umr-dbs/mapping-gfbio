@@ -166,7 +166,7 @@ bool TemporalReference::intersects(const TemporalReference &other) const {
 }
 
 bool TemporalReference::intersects(double t_start, double t_end) const {
-	return t_start <= this->t2 && t_end >= this->t1;
+	return t_start < this->t2 && t_end > this->t1;
 }
 
 

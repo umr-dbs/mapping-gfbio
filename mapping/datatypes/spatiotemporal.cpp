@@ -3,6 +3,7 @@
 #include "operators/operator.h"
 #include "util/binarystream.h"
 #include "util/debug.h"
+#include "cache/common.h"
 
 #include "boost/date_time/posix_time/posix_time.hpp"
 #include <math.h>
@@ -145,7 +146,7 @@ void TemporalReference::toStream(BinaryStream &stream) const {
 void TemporalReference::validate() const {
 	if (t1 > t2) {
 		std::stringstream msg;
-		msg << "TemporalReference invalid, requires t1:" << t1 << " <= t2:" << t2;
+		msg << "TemporalReference invalid, requires t1:" << t1 << " <= t2:" << t2 << std::endl << CacheCommon::get_stacktrace();
 		throw ArgumentException(msg.str());
 	}
 }

@@ -381,7 +381,7 @@ static int testquery(int argc, char *argv[]) {
 		 * Step #2: run the query and see if the results match
 		 */
 		std::string result = root.get("query_result", "raster").asString();
-		std::string real_hash;
+		std::string real_hash, real_hash2;
 
 		bool flipx, flipy;
 		auto qrect = qrect_from_json(root, flipx, flipy);
@@ -404,19 +404,27 @@ static int testquery(int argc, char *argv[]) {
 			if (flipx || flipy)
 				raster = raster->flip(flipx, flipy);
 			real_hash = raster->hash();
+			real_hash2 = raster->clone()->hash();
 		}
 		else if (result == "points") {
 			QueryProfiler profiler;
 			auto points = graph->getCachedPointCollection(qrect, profiler);
 			real_hash = points->hash();
+			real_hash2 = points->clone()->hash();
 		}
 		else if (result == "polygons") {
 			QueryProfiler profiler;
 			auto polygons = graph->getCachedPolygonCollection(qrect, profiler);
 			real_hash = polygons->hash();
+			real_hash2 = polygons->clone()->hash();
 		}
 		else {
 			printf("Unknown result type: %s\n", result.c_str());
+			return 5;
+		}
+
+		if (real_hash != real_hash2) {
+			printf("Hashes of result and its clone differ, probably a bug in clone():original: %s\ncopy:      %s\n", real_hash.c_str(), real_hash2.c_str());
 			return 5;
 		}
 

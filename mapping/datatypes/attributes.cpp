@@ -229,6 +229,21 @@ void AttributeArrays::toStream(BinaryStream &stream) const {
 	}
 }
 
+AttributeArrays AttributeArrays::clone() const {
+	AttributeArrays copy;
+	// The Array's copy constructor is neither callable from std::pair nor std::map.
+	// Thus, we need to make sure the copying takes place right here, because we're friends.
+	for (auto &pair : _numeric) {
+		auto arraycopy = pair.second;
+		copy._numeric.emplace(pair.first, std::move(arraycopy));
+	}
+	for (auto &pair : _textual) {
+		auto arraycopy = pair.second;
+		copy._textual.emplace(pair.first, std::move(arraycopy));
+	}
+	return copy;
+}
+
 void AttributeArrays::checkIfAttributeDoesNotExist(const std::string &key) {
 	if (_numeric.count(key) > 0)
 		throw AttributeException(concat("Cannot add attribute ", key, " because a numeric attribute with the same name exists."));

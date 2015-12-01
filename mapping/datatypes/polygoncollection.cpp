@@ -7,6 +7,20 @@
 #include <sstream>
 
 
+std::unique_ptr<PolygonCollection> PolygonCollection::clone() const {
+	auto copy = make_unique<PolygonCollection>(stref);
+	copy->global_attributes = global_attributes;
+	copy->feature_attributes = feature_attributes.clone();
+	copy->coordinates = coordinates;
+	copy->time_start = time_start;
+	copy->time_end = time_end;
+	copy->start_ring = start_ring;
+	copy->start_polygon = start_polygon;
+	copy->start_feature = start_feature;
+	return copy;
+}
+
+
 PolygonCollection::PolygonCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
 	bool hasTime;
 	stream.read(&hasTime);

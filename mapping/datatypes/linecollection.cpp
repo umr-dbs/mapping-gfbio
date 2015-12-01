@@ -4,6 +4,19 @@
 #include "util/binarystream.h"
 
 
+std::unique_ptr<LineCollection> LineCollection::clone() const {
+	auto copy = make_unique<LineCollection>(stref);
+	copy->global_attributes = global_attributes;
+	copy->feature_attributes = feature_attributes.clone();
+	copy->coordinates = coordinates;
+	copy->time_start = time_start;
+	copy->time_end = time_end;
+	copy->start_line = start_line;
+	copy->start_feature = start_feature;
+	return copy;
+}
+
+
 LineCollection::LineCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
 	bool hasTime;
 	stream.read(&hasTime);

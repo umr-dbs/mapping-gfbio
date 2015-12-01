@@ -243,6 +243,17 @@ std::unique_ptr<GenericRaster> GenericRaster::fromStream(BinaryStream &stream) {
 }
 
 
+std::unique_ptr<GenericRaster> GenericRaster::clone() {
+	setRepresentation(GenericRaster::Representation::CPU);
+
+	auto copy = GenericRaster::create(dd, *this, GenericRaster::Representation::CPU);
+	copy->global_attributes = global_attributes;
+	memcpy(copy->getDataForWriting(), getData(), getDataSize() );
+
+	return copy;
+}
+
+
 
 static void * alloc_aligned_buffer(size_t size) {
 	const size_t ALIGN = 4096;

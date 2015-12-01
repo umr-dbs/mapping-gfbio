@@ -24,6 +24,12 @@ public:
 
 	PolygonCollection( BinaryStream &stream );
 
+	/**
+	 * Clone the collection, including all its features and attributes
+	 * @return the cloned collection
+	 */
+	std::unique_ptr<PolygonCollection> clone() const;
+
 	typedef SimpleFeatureIterator<PolygonCollection, PolygonFeatureReference> iterator;
 	typedef SimpleFeatureIterator<const PolygonCollection, PolygonFeatureReference> const_iterator;
 

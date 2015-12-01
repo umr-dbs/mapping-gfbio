@@ -148,8 +148,10 @@ class AttributeArrays {
 				AttributeArray(const Unit &unit) : unit(unit) {}
 				AttributeArray(const Unit &unit, std::vector<T> &&values) : unit(unit), array(values) {}
 				// prevent accidental copies
-				AttributeArray(const AttributeArray &) = delete;
-				AttributeArray& operator=(const AttributeArray &) = delete;
+			private:
+				AttributeArray(const AttributeArray &) = default;
+				AttributeArray& operator=(const AttributeArray &) = default;
+			public:
 				// moves are OK
 				AttributeArray(AttributeArray &&) = default;
 				AttributeArray& operator=(AttributeArray &&) = default;
@@ -211,12 +213,14 @@ class AttributeArrays {
 		AttributeArrays(BinaryStream &stream);
 		~AttributeArrays();
 
-		// explicitely mark this class as movable, but not copyable. It should be exactly that,
-		// because AttributeArray<T> is only movable, but the compiler doesn't seem to figure that out on its own.
+		// explicitely mark this class as movable, but not copyable.
 		AttributeArrays(const AttributeArrays &) = delete;
 		AttributeArrays& operator=(const AttributeArrays &) = delete;
 		AttributeArrays(AttributeArrays &&) = default;
 		AttributeArrays& operator=(AttributeArrays &&) = default;
+
+		// if you must have a copy, create one explicitely via clone
+		AttributeArrays clone() const;
 
 		void fromStream(BinaryStream &stream);
 		void toStream(BinaryStream &stream) const;

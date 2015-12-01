@@ -9,6 +9,21 @@
 #include <iostream>
 #include <cmath>
 
+
+
+std::unique_ptr<PointCollection> PointCollection::clone() const {
+	auto copy = make_unique<PointCollection>(stref);
+	copy->global_attributes = global_attributes;
+	copy->feature_attributes = feature_attributes.clone();
+	copy->coordinates = coordinates;
+	copy->time_start = time_start;
+	copy->time_end = time_end;
+	copy->start_feature = start_feature;
+	return copy;
+}
+
+
+
 template<typename T>
 size_t calculate_kept_count(const std::vector<T> &keep, size_t feature_count) {
 	if (keep.size() != feature_count)

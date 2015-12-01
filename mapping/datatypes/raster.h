@@ -112,6 +112,8 @@ class GenericRaster : public GridSpatioTemporalResult {
 		void toStream(BinaryStream &stream);
 		static std::unique_ptr<GenericRaster> fromStream(BinaryStream &stream);
 
+		std::unique_ptr<GenericRaster> clone();
+
 		virtual void toPGM(const char *filename, bool avg = false) = 0;
 		virtual void toYUV(const char *filename) = 0;
 		virtual void toPNG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false, Raster2D<uint8_t> *overlay = nullptr) = 0;

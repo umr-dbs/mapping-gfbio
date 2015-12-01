@@ -21,6 +21,12 @@ public:
 
 	LineCollection(BinaryStream& stream);
 
+	/**
+	 * Clone the collection, including all its features and attributes
+	 * @return the cloned collection
+	 */
+	std::unique_ptr<LineCollection> clone() const;
+
 	typedef SimpleFeatureIterator<LineCollection, LineFeatureReference> iterator;
 	typedef SimpleFeatureIterator<const LineCollection, LineFeatureReference> const_iterator;
 

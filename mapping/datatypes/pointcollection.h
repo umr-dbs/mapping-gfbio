@@ -32,6 +32,11 @@ public:
 	PointCollection(PointCollection &&other) = default;
 	PointCollection& operator=(PointCollection &&) = default;
 
+	/**
+	 * Clone the collection, including all its features and attributes
+	 * @return the cloned collection
+	 */
+	std::unique_ptr<PointCollection> clone() const;
 
 	typedef SimpleFeatureIterator<PointCollection, PointFeatureReference> iterator;
 	typedef SimpleFeatureIterator<const PointCollection, PointFeatureReference> const_iterator;

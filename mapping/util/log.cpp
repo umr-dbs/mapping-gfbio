@@ -6,16 +6,31 @@
  */
 
 #include "util/log.h"
+#include "util/concat.h"
+#include "util/exceptions.h"
 #include <thread>
 #include <sstream>
 #include <iomanip>
 #include <chrono>
+#include <algorithm>
 
 void Log::setLogFd(FILE *fd) {
 	Log::fd = fd;
 }
 void Log::setLevel(LogLevel level) {
 	Log::level = level;
+}
+
+void Log::setLevel(const std::string& level) {
+	std::string lower;
+	lower.resize( level.size() );
+	std::transform(level.begin(),level.end(),lower.begin(),::tolower);
+	if      ( level == "trace" ) setLevel(LogLevel::TRACE);
+	else if ( level == "debug" ) setLevel(LogLevel::DEBUG);
+	else if ( level == "info" ) setLevel(LogLevel::INFO);
+	else if ( level == "warn" ) setLevel(LogLevel::WARN);
+	else if ( level == "error" ) setLevel(LogLevel::ERROR);
+	else throw ArgumentException(concat("Illegal LogLevel",level));
 }
 
 #ifndef DISABLE_LOGGING
@@ -110,5 +125,5 @@ void Log::trace(const char* msg, ...) {}
 void Log::log(LogLevel level, const char *msg, va_list vargs) {}
 #endif
 
-Log::LogLevel Log::level = LogLevel::INFO;
+Log::LogLevel Log::level = LogLevel::WARN;
 FILE* Log::fd = stderr;

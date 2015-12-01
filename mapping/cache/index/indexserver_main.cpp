@@ -9,6 +9,7 @@
 #include "cache/index/reorg_strategy.h"
 #include "cache/common.h"
 #include "util/configuration.h"
+#include "util/log.h"
 #include <signal.h>
 
 IndexServer *instance = nullptr;
@@ -49,6 +50,8 @@ int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 	auto portstr = Configuration::get("indexserver.port");
+
+	Log::setLevel(Configuration::get("log.level","info"));
 
 	auto portnr = atoi(portstr.c_str());
 

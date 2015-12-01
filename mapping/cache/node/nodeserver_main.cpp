@@ -10,6 +10,7 @@
 #include "cache/common.h"
 #include "cache/node/puzzletracer.h"
 #include "util/configuration.h"
+#include "util/log.h"
 #include <signal.h>
 
 NodeServer *instance = nullptr;
@@ -49,6 +50,9 @@ int main(void) {
 	CacheCommon::set_uncaught_exception_handler();
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
+
+	Log::setLevel(Configuration::get("log.level","info"));
+
 	auto portstr = Configuration::get("nodeserver.port");
 	auto portnr = atoi(portstr.c_str());
 

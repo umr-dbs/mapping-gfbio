@@ -9,6 +9,7 @@
 #define LOG_H_
 //#define DISABLE_LOGGING
 
+#include <string>
 #include <cstdio>
 #include <stdarg.h>
 
@@ -19,6 +20,7 @@ public:
 	};
 
 	static void setLogFd(FILE *fd);
+	static void setLevel( const std::string &level );
 	static void setLevel(LogLevel level);
 	static void error(const char *msg, ...);
 	static void warn(const char *msg, ...);

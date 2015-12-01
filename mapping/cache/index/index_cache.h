@@ -64,7 +64,7 @@ public:
 	void put( const IndexCacheEntry &entry );
 
 	// Retrieves the entry with the given key.
-	const IndexCacheEntry& get( const IndexCacheKey &key ) const;
+	std::shared_ptr<const IndexCacheEntry> get( const IndexCacheKey &key ) const;
 
 	// Queries the cache with the given query-rectangle
 	CacheQueryResult<std::pair<uint32_t,uint64_t>> query( const std::string &semantic_id, const QueryRectangle &qr ) const;

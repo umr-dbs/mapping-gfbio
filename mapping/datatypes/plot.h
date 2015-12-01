@@ -20,6 +20,10 @@ public:
 	 */
 	virtual std::string toJSON() = 0;
 
+	virtual std::unique_ptr<GenericPlot> clone() const {
+		return std::unique_ptr<GenericPlot>();
+	}
+
 	virtual void toStream(BinaryStream &stream) const {
 		// TODO
 	}

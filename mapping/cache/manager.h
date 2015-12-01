@@ -301,11 +301,11 @@ public:
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
 private:
-	NodeRasterCache raster_cache;
-	NodePointCache point_cache;
-	NodeLineCache line_cache;
-	NodePolygonCache polygon_cache;
-	NodePlotCache plot_cache;
+	NodeCache<GenericRaster> raster_cache;
+	NodeCache<PointCollection> point_cache;
+	NodeCache<LineCollection> line_cache;
+	NodeCache<PolygonCollection> polygon_cache;
+	NodeCache<GenericPlot> plot_cache;
 
 	RasterCacheWrapper raster_wrapper;
 	PointCollectionCacheWrapper point_wrapper;

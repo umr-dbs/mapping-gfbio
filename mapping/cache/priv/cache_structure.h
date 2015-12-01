@@ -200,8 +200,7 @@ public:
 	// Inserts the given result into the cache. The cache copies the content of the result.
 	void put( const KType &key, const std::shared_ptr<EType> &result );
 
-	// Fetches the entry by the given id. The result is read-only
-	// and not copied.
+	// Fetches the entry by the given id. Careful when manipulating entries...
 	std::shared_ptr<EType> get( const KType &key ) const;
 
 	// Queries the cache with the given query-rectangle

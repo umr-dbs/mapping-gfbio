@@ -387,6 +387,10 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 			double score = bounds.intersect(qc).volume() / qc.volume();
 			Log::trace("Score for entry %s: %f", key_to_string(e.first).c_str(), score);
 			partials.push(CacheQueryInfo<KType>( score, bounds, e.first ));
+
+			// Short circuit full hits
+			if ( (1.0-score) <= std::numeric_limits<double>::epsilon() )
+				break;
 		}
 	}
 	Log::trace("Found %d candidates for query: %s", partials.size(), CacheCommon::qr_to_string(spec).c_str() );

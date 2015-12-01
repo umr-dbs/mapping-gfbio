@@ -29,7 +29,7 @@ TEST(STCacheTest,SimpleTest) {
 
 	CacheManager::init( make_unique<NopCacheManager>() );
 
-	NodeRasterCache cache(114508*2 + 17);
+	NodeCache<GenericRaster> cache(CacheType::RASTER, 114508*2 + 17);
 
 
 	for ( int i = 0; i < 4; i++ ) {
@@ -63,7 +63,7 @@ std::unique_ptr<GenericRaster> createRaster( double x1, double x2, double y1, do
 
 TEST(STCacheTest,TestQuery) {
 	CacheManager::init( make_unique<NopCacheManager>() );
-	NodeRasterCache cache(5 * 1024 * 1024);
+	NodeCache<GenericRaster> cache(CacheType::RASTER, 5 * 1024 * 1024);
 	std::string sem_id = "a";
 
 	DataDescription dd(GDT_Byte, Unit::unknown());

@@ -48,8 +48,7 @@ NodeCache<EType>::~NodeCache() {
 
 template<typename EType>
 std::shared_ptr<NodeCacheEntry<EType> > NodeCache<EType>::create_entry(uint64_t id, const EType& data, size_t size, double costs) {
-
-	auto cpy = copy( data );
+	auto cpy = const_cast<EType*>( &data )->clone();
 	return std::shared_ptr<NodeCacheEntry<EType>>( new NodeCacheEntry<EType>(id, std::shared_ptr<EType>(cpy.release()), size, costs) );
 }
 
@@ -108,7 +107,7 @@ const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const s
 }
 
 template<typename EType>
-const std::shared_ptr<EType> NodeCache<EType>::get(const NodeCacheKey& key) const {
+const std::shared_ptr<const EType> NodeCache<EType>::get(const NodeCacheKey& key) const {
 	auto cache = get_structure(key.semantic_id);
 	if (cache != nullptr) {
 		auto e = cache->get(key.entry_id);
@@ -122,7 +121,7 @@ const std::shared_ptr<EType> NodeCache<EType>::get(const NodeCacheKey& key) cons
 
 template<typename EType>
 std::unique_ptr<EType> NodeCache<EType>::get_copy(const NodeCacheKey& key) const {
-	return copy( *get(key) );
+	return const_cast<EType*>( get(key).get() )->clone();
 }
 
 template<typename EType>
@@ -176,77 +175,6 @@ void NodeCache<EType>::track_access(const NodeCacheKey& key, NodeCacheEntry<ETyp
 		ids.insert(key.entry_id);
 		access_tracker.emplace( key.semantic_id, ids );
 	}
-}
-
-///////////////////////////////////////////////////////////////////
-//
-// RASTER CACHE-IMPLEMENTATION
-//
-///////////////////////////////////////////////////////////////////
-
-NodeRasterCache::NodeRasterCache(size_t size) : NodeCache<GenericRaster>(CacheType::RASTER,size) {
-}
-
-std::unique_ptr<GenericRaster> NodeRasterCache::copy(const GenericRaster& content) const {
-	auto copy = GenericRaster::create(content.dd, content, GenericRaster::Representation::CPU);
-	GenericRaster *cp = const_cast<GenericRaster*>(&content);
-	memcpy(copy->getDataForWriting(), cp->getData(), content.getDataSize() );
-	//copy->blit(&content, 0);
-	return copy;
-}
-
-NodePointCache::NodePointCache(size_t size) : NodeCache<PointCollection>(CacheType::POINT,size) {
-}
-
-std::unique_ptr<PointCollection> NodePointCache::copy(const PointCollection& content) const {
-	std::unique_ptr<PointCollection> result = make_unique<PointCollection>( content.stref );
-	result->global_attributes = content.global_attributes;
-	result->coordinates = content.coordinates;
-	result->time_start = content.time_start;
-	result->time_end = content.time_end;
-	result->feature_attributes = content.feature_attributes.copy();
-	result->start_feature = content.start_feature;
-	return result;
-}
-
-NodeLineCache::NodeLineCache(size_t size) : NodeCache<LineCollection>(CacheType::LINE,size) {
-}
-
-std::unique_ptr<LineCollection> NodeLineCache::copy(const LineCollection& content) const {
-	std::unique_ptr<LineCollection> result = make_unique<LineCollection>( content.stref );
-	result->global_attributes = content.global_attributes;
-	result->coordinates = content.coordinates;
-	result->time_start = content.time_start;
-	result->time_end = content.time_end;
-	result->feature_attributes = content.feature_attributes.copy();
-	result->start_feature = content.start_feature;
-	result->start_line = content.start_line;
-	return result;
-}
-
-NodePolygonCache::NodePolygonCache(size_t size) : NodeCache<PolygonCollection>(CacheType::POLYGON,size) {
-}
-
-std::unique_ptr<PolygonCollection> NodePolygonCache::copy(const PolygonCollection& content) const {
-	std::unique_ptr<PolygonCollection> result = make_unique<PolygonCollection>( content.stref );
-	result->global_attributes = content.global_attributes;
-	result->coordinates = content.coordinates;
-	result->time_start = content.time_start;
-	result->time_end = content.time_end;
-	result->feature_attributes = content.feature_attributes.copy();
-	result->start_feature = content.start_feature;
-	result->start_polygon = content.start_polygon;
-	result->start_ring = content.start_ring;
-	return result;
-}
-
-NodePlotCache::NodePlotCache(size_t size) : NodeCache<GenericPlot>(CacheType::PLOT,size) {
-}
-
-std::unique_ptr<GenericPlot> NodePlotCache::copy(const GenericPlot& content) const {
-	// TODO
-	(void) content;
-	return std::unique_ptr<GenericPlot>();
 }
 
 // Instantiate all

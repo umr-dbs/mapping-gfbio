@@ -53,11 +53,11 @@ void IndexCache::put( const IndexCacheEntry& entry) {
 	get_node_entries(entry.node_id).push_back(e);
 }
 
-const IndexCacheEntry& IndexCache::get(const IndexCacheKey& key) const {
+std::shared_ptr<const IndexCacheEntry> IndexCache::get(const IndexCacheKey& key) const {
 	auto cache = get_structure(key.semantic_id);
 	if (cache != nullptr) {
 		std::pair<uint32_t,uint64_t> id(key.node_id,key.entry_id);
-		return *cache->get(id);
+		return cache->get(id);
 	}
 	throw NoSuchElementException("Entry not found");
 }

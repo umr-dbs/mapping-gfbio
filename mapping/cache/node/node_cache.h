@@ -52,7 +52,7 @@ public:
 	NodeCache( CacheType type, size_t max_size );
 	NodeCache() = delete;
 	NodeCache( const NodeCache& ) = delete;
-	virtual ~NodeCache();
+	~NodeCache();
 
 	// Adds an entry for the given semantic_id to the cache.
 	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item, size_t size, double costs, const AccessInfo info = AccessInfo());
@@ -64,7 +64,7 @@ public:
 	std::unique_ptr<EType> get_copy( const NodeCacheKey &key ) const;
 
 	// Retrieves the entry with the given key. Cannot be modified.
-	const std::shared_ptr<EType> get( const NodeCacheKey &key ) const;
+	const std::shared_ptr<const EType> get( const NodeCacheKey &key ) const;
 
 	// returns meta-information about the entry for the given key
 	const NodeCacheRef get_entry_metadata(const NodeCacheKey& key) const;
@@ -85,9 +85,6 @@ public:
 	size_t get_current_size() const { return current_size; }
 
 	const CacheType type;
-protected:
-	// Copies the content of the entry
-	virtual std::unique_ptr<EType> copy(const EType &content) const = 0;
 private:
 	typedef CacheStructure<uint64_t,NodeCacheEntry<EType>> Struct;
 
@@ -115,60 +112,6 @@ private:
 	mutable std::mutex access_mtx;
 	// Collects the ids of all accessed entries
 	mutable std::unordered_map<std::string,std::set<uint64_t>> access_tracker;
-};
-
-//
-// Raster Cache
-//
-
-class NodeRasterCache : public NodeCache<GenericRaster> {
-public:
-	NodeRasterCache() = delete;
-	NodeRasterCache( const NodeRasterCache& ) = delete;
-	NodeRasterCache( NodeRasterCache&& ) = delete;
-	NodeRasterCache( size_t size );
-protected:
-	std::unique_ptr<GenericRaster> copy(const GenericRaster &content) const;
-};
-
-class NodePointCache : public NodeCache<PointCollection> {
-public:
-	NodePointCache() = delete;
-	NodePointCache( const NodePointCache& ) = delete;
-	NodePointCache( NodePointCache&& ) = delete;
-	NodePointCache( size_t size );
-protected:
-	std::unique_ptr<PointCollection> copy(const PointCollection &content) const;
-};
-
-class NodeLineCache : public NodeCache<LineCollection> {
-public:
-	NodeLineCache() = delete;
-	NodeLineCache( const NodeLineCache& ) = delete;
-	NodeLineCache( NodeLineCache&& ) = delete;
-	NodeLineCache( size_t size );
-protected:
-	std::unique_ptr<LineCollection> copy(const LineCollection &content) const;
-};
-
-class NodePolygonCache : public NodeCache<PolygonCollection> {
-public:
-	NodePolygonCache() = delete;
-	NodePolygonCache( const NodePolygonCache& ) = delete;
-	NodePolygonCache( NodePolygonCache&& ) = delete;
-	NodePolygonCache( size_t size );
-protected:
-	std::unique_ptr<PolygonCollection> copy(const PolygonCollection &content) const;
-};
-
-class NodePlotCache : public NodeCache<GenericPlot> {
-public:
-	NodePlotCache() = delete;
-	NodePlotCache( const NodePlotCache& ) = delete;
-	NodePlotCache( NodePlotCache&& ) = delete;
-	NodePlotCache( size_t size );
-protected:
-	std::unique_ptr<GenericPlot> copy(const GenericPlot &content) const;
 };
 
 #endif /* NODE_CACHE_H_ */

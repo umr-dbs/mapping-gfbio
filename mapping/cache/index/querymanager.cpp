@@ -115,8 +115,8 @@ std::unique_ptr<JobDescription> QueryManager::create_job(const BaseRequest& req)
 				req.type,
 				req.semantic_id,
 				res.covered,
-				ref.entry_id);
-		return make_unique<DeliverJob>(jreq, ref.node_id);
+				ref->entry_id);
+		return make_unique<DeliverJob>(jreq, ref->node_id);
 	}
 	// Puzzle
 	else if (res.has_hit()) {
@@ -126,9 +126,9 @@ std::unique_ptr<JobDescription> QueryManager::create_job(const BaseRequest& req)
 		for (auto id : res.keys) {
 			IndexCacheKey key(req.semantic_id, id);
 			auto ref = cache.get(key);
-			auto &node = nodes.at(ref.node_id);
-			node_ids.push_back(ref.node_id);
-			entries.push_back(CacheRef(node->host, node->port, ref.entry_id));
+			auto &node = nodes.at(ref->node_id);
+			node_ids.push_back(ref->node_id);
+			entries.push_back(CacheRef(node->host, node->port, ref->entry_id));
 		}
 		std::unique_ptr<PuzzleRequest> jreq = make_unique<PuzzleRequest>(
 				req.type,

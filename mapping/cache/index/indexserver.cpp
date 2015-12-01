@@ -432,8 +432,8 @@ void IndexServer::process_worker_query(WorkerConnection& con) {
 		Log::debug("Full HIT. Sending reference.");
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
 		auto ref = cache.get(key);
-		auto node = nodes.at(ref.node_id);
-		CacheRef cr(node->host, node->port, ref.entry_id);
+		auto node = nodes.at(ref->node_id);
+		CacheRef cr(node->host, node->port, ref->entry_id);
 		con.send_hit(cr);
 	}
 	// Puzzle
@@ -443,8 +443,8 @@ void IndexServer::process_worker_query(WorkerConnection& con) {
 		for (auto id : res.keys) {
 			IndexCacheKey key(req.semantic_id, id);
 			auto ref = cache.get(key);
-			auto &node = nodes.at(ref.node_id);
-			entries.push_back(CacheRef(node->host, node->port, ref.entry_id));
+			auto &node = nodes.at(ref->node_id);
+			entries.push_back(CacheRef(node->host, node->port, ref->entry_id));
 		}
 		PuzzleRequest pr( req.type, req.semantic_id, req.query, res.remainder, entries);
 		con.send_partial_hit(pr);

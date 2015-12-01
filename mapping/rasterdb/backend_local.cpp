@@ -12,8 +12,8 @@
 #include <iostream>
 #include <fstream>
 
+#include <dirent.h>
 
-#include "dirent.h"
 
 LocalRasterDBBackend::LocalRasterDBBackend() : lockedfile(-1) {
 }

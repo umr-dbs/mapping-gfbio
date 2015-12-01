@@ -13,7 +13,6 @@
 
 
 #include <unordered_map>
-#include <mutex>
 #include <limits.h>
 #include <stdio.h>
 #include <cstdlib>
@@ -289,6 +288,9 @@ void RasterDB::cleanup() {
 void RasterDB::import(const char *filename, int sourcechannel, int channelid, double time_start, double time_end, RasterConverter::Compression compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
+
+	std::lock_guard<std::mutex> guard(mutex);
+
 	bool raster_flipx, raster_flipy;
 	auto raster = GenericRaster::fromGDAL(filename, sourcechannel, raster_flipx, raster_flipy, crs->epsg);
 
@@ -390,6 +392,7 @@ void RasterDB::linkRaster(int channelid, double time_of_reference, double time_s
 	if (!isWriteable())
 		throw SourceException("Cannot link rasters in a source opened as read-only");
 
+	std::lock_guard<std::mutex> guard(mutex);
 	backend->linkRaster(channelid, time_of_reference, time_start, time_end);
 }
 
@@ -525,6 +528,8 @@ static inline int round_down_to_multiple(const int i, const int m) {
 std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform) {
 	if (crs->epsg != rect.epsg)
 		throw OperatorException(concat("SourceOperator: wrong epsg requested. Source is ", (int) crs->epsg, ", requested ", (int) rect.epsg));
+
+	std::lock_guard<std::mutex> guard(mutex);
 
 	// Get all pixel coordinates that need to be returned. The endpoints of the QueryRectangle are inclusive.
 	double px1 = crs->WorldToPixelX(rect.x1);

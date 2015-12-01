@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <exception>
 #include <memory>
+#include <mutex>
 
 #include "datatypes/raster.h"
 #include "converters/converter.h"
@@ -116,6 +117,7 @@ class RasterDB {
 		GDALCRS *crs;
 		int channelcount;
 		RasterDBChannel **channels;
+		std::mutex mutex;
 };
 
 #endif

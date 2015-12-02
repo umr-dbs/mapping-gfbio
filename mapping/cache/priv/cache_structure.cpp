@@ -596,6 +596,7 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 template<typename KType, typename EType>
 std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() const {
 	std::vector<std::shared_ptr<EType> > result;
+	result.reserve(entries.size());
 	for (auto &e : entries) {
 		result.push_back(e.second);
 	}

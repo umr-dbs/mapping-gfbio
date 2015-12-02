@@ -155,8 +155,12 @@ CacheStats NodeCache<EType>::get_stats() const {
 			continue;
 
 		for ( auto &id : kv.second ) {
-			auto e = cache->get( id );
-			result.add_stats( kv.first, NodeEntryStats( id, e->last_access, e->access_count ) );
+			try {
+				auto e = cache->get( id );
+				result.add_stats( kv.first, NodeEntryStats( id, e->last_access, e->access_count ) );
+			} catch ( const NoSuchElementException &nse ) {
+				// Nothing to do... entry gone due to reorg
+			}
 		}
 	}
 	access_tracker.clear();

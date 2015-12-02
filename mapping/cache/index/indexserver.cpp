@@ -108,7 +108,7 @@ void IndexServer::run() {
 					             sbuf, sizeof sbuf,
 					             NI_NUMERICHOST | NI_NUMERICSERV);
 
-					Log::info("New connection established host: %s, service: %s, fd: %d", hbuf, sbuf, new_fd);
+					Log::debug("New connection established host: %s, service: %s, fd: %d", hbuf, sbuf, new_fd);
 					new_cons.push_back( NewConnection(hbuf,new_fd) );
 				}
 			}
@@ -237,16 +237,16 @@ void IndexServer::process_handshake(std::vector<NewConnection> &new_fds, fd_set*
 				switch (magic) {
 					case ClientConnection::MAGIC_NUMBER: {
 						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(std::move(us));
-						Log::debug("New client connections established");
+						Log::trace("New client connections established");
 						client_connections.emplace(cc->id, std::move(cc));
 						break;
 					}
 					case WorkerConnection::MAGIC_NUMBER: {
 						uint32_t node_id;
 						s.read(&node_id);
-						Log::info("New worker registered for node: %d", node_id);
 						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(std::move(us),
 							nodes.at(node_id));
+						Log::info("New worker registered for node: %d, id: %d", node_id, wc->id);
 						worker_connections.emplace(wc->id, std::move(wc));
 						break;
 					}
@@ -288,7 +288,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, cc.hostname, hs.port);
 					node->control_connection = cc.id;
 					nodes.emplace(node->id, node);
-					Log::info("New node registered. ID: %d, control-connection: %d", node->id, cc.id);
+					Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, cc.hostname.c_str(), cc.id);
 					caches.process_handshake(node->id,hs);
 					cc.confirm_handshake(node);
 					break;
@@ -341,6 +341,8 @@ void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) 
 			// Handle state-changes
 			switch (cc.get_state()) {
 				case ClientConnection::State::AWAIT_RESPONSE:
+					Log::info("Client-request read: %s", cc.get_request().to_string().c_str() );
+
 					query_manager.add_request(cc.id, cc.get_request());
 					break;
 				default:

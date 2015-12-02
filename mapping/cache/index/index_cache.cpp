@@ -63,6 +63,7 @@ std::shared_ptr<const IndexCacheEntry> IndexCache::get(const IndexCacheKey& key)
 }
 
 CacheQueryResult<std::pair<uint32_t,uint64_t>> IndexCache::query(const std::string& semantic_id, const QueryRectangle& qr) const {
+	ExecTimer t("IndexCache.query");
 	auto cache = get_structure(semantic_id);
 	if (cache != nullptr)
 		return cache->query(qr);

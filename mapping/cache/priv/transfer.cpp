@@ -101,9 +101,9 @@ void BaseRequest::toStream(BinaryStream& stream) const {
 std::string BaseRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "BaseRequest:" << std::endl;
+	ss << "  type: " << (int) type << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
-	ss << "  query: " << CacheCommon::qr_to_string(query) << std::endl;
-	ss << "  type: " << (int) type;
+	ss << "  query: " << CacheCommon::qr_to_string(query);
 	return ss.str();
 }
 
@@ -128,9 +128,9 @@ void DeliveryRequest::toStream(BinaryStream& stream) const {
 std::string DeliveryRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "DeliveryRequest:" << std::endl;
+	ss << "  type: " << (int) type << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
 	ss << "  query: " << CacheCommon::qr_to_string(query) << std::endl;
-	ss << "  type: " << (int) type << std::endl;
 	ss << "  entry_id: " << entry_id;
 	return ss.str();
 }
@@ -181,8 +181,8 @@ void PuzzleRequest::toStream(BinaryStream& stream) const {
 std::string PuzzleRequest::to_string() const {
 	std::ostringstream ss;
 	ss << "PuzzleRequest:" << std::endl;
+	ss << "  type: " << (int) type << std::endl;
 	ss << "  semantic_id: " << semantic_id << std::endl;
-	ss << "  Type: " << (int) type << std::endl;
 	ss << "  query: " << CacheCommon::qr_to_string(query) << std::endl;
 	ss << "  #remainder: " << remainder.size() << std::endl;
 	ss << "  parts: [";

@@ -10,6 +10,7 @@
 
 #include "util/binarystream.h"
 #include "util/exceptions.h"
+#include "util/log.h"
 #include "operators/operator.h"
 #include "datatypes/raster.h"
 #include <memory>
@@ -18,6 +19,8 @@
 #include <cstring>
 #include <sys/select.h>
 #include <errno.h>
+#include <chrono>
+#include <iostream>
 
 //
 // Provides helper functions for common tasks.
@@ -26,6 +29,22 @@
 enum class CacheType : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT, UNKNOWN };
 
 class CacheCube;
+
+
+class ExecTimer {
+public:
+	ExecTimer( std::string &&name );
+	ExecTimer() = delete;
+	ExecTimer( const ExecTimer& ) = delete;
+	ExecTimer( ExecTimer&& ) = delete;
+	ExecTimer& operator=(const ExecTimer& ) = delete;
+	ExecTimer& operator=( ExecTimer&& ) = delete;
+	~ExecTimer();
+private:
+	std::string name;
+	std::chrono::time_point<std::chrono::system_clock> start;
+};
+
 
 class CacheCommon {
 public:

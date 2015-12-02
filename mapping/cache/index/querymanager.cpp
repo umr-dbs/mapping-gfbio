@@ -21,6 +21,7 @@ QueryManager::QueryManager(IndexCaches &caches, const std::map<uint32_t, std::sh
 }
 
 void QueryManager::add_request(uint64_t client_id, const BaseRequest &req ) {
+	ExecTimer t("QueryManager.add_request");
 	// Check if running jobs satisfy the given query
 	for (auto &qi : queries) {
 		if (qi.second.satisfies(req)) {
@@ -58,6 +59,7 @@ void QueryManager::schedule_pending_jobs(
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
 			queries.emplace(con_id, QueryInfo(**it));
+			Log::info("Scheduled request: %s\non worker: %d", (*it)->to_string().c_str(), con_id);
 			it = pending_jobs.erase(it);
 		}
 		else
@@ -100,7 +102,7 @@ void QueryManager::worker_failed(uint64_t worker_id) {
 //
 
 std::unique_ptr<JobDescription> QueryManager::create_job(const BaseRequest& req) {
-
+	ExecTimer t("QueryManager.create_job");
 	auto &cache = caches.get_cache(req.type);
 	auto res = cache.query(req.semantic_id, req.query);
 	Log::debug("QueryResult: %s", res.to_string().c_str());

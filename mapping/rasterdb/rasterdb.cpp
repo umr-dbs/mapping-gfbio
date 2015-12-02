@@ -481,8 +481,10 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 
 	// Load all overlapping parts and blit them onto the empty raster
 	auto tiles = backend->enumerateTiles(channelid, rasterid, x1, y1, x2, y2, zoom);
-	if (tiles.size() <= 0)
-		throw SourceException("RasterDB::load(): No matching tiles found in DB");
+
+	// If no tiles were found, that's ok. return a raster filled with nodata.
+	//if (tiles.size() <= 0)
+	//	throw SourceException("RasterDB::load(): No matching tiles found in DB");
 
 	for (auto &tile : tiles) {
 		auto tile_buffer = backend->readTile(tile);
@@ -561,7 +563,7 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 	pixel_y2 = round_down_to_multiple(pixel_y2 - 1, zoomfactor) + zoomfactor;
 
 	size_t io_costs = 0;
-	auto result = load(channelid, (TemporalReference &) rect, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
+	auto result = load(channelid, (const TemporalReference &) rect, pixel_x1, pixel_y1, pixel_x2, pixel_y2, zoom, transform, &io_costs);
 	profiler.addIOCost(io_costs);
 	return result;
 }

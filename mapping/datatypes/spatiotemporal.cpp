@@ -112,8 +112,8 @@ SpatialReference SpatialReference::extent(epsg_t epsg) {
  */
 
 TemporalReference::TemporalReference(timetype_t timetype) : timetype(timetype) {
-	t1 = -std::numeric_limits<double>::infinity();
-	t2 = std::numeric_limits<double>::infinity();
+	t1 = beginning_of_time();
+	t2 = end_of_time();
 
 	validate();
 }
@@ -144,12 +144,32 @@ void TemporalReference::toStream(BinaryStream &stream) const {
 
 
 void TemporalReference::validate() const {
-	if (t1 > t2) {
-		std::stringstream msg;
-		msg << "TemporalReference invalid, requires t1:" << t1 << " <= t2:" << t2 << std::endl << CacheCommon::get_stacktrace();
-		throw ArgumentException(msg.str());
-	}
+	if (t1 > t2)
+		throw ArgumentException(concat("TemporalReference invalid, requires t1:", t1, " <= t2:", t2, "\n", CacheCommon::get_stacktrace()));
+	if (t1 < beginning_of_time())
+		throw ArgumentException(concat("TemporalReference invalid, requires t1:", t1, " >= bot:", beginning_of_time()));
+	if (t2 > end_of_time())
+		throw ArgumentException(concat("TemporalReference invalid, requires t2:", t2, " <= eot:", end_of_time()));
 }
+
+double TemporalReference::beginning_of_time() const {
+	if (timetype == TIMETYPE_UNIX) {
+		// TODO: find a sensible value. Big Bang? Creation of earth?
+		return -std::numeric_limits<double>::infinity();
+	}
+	// The default for other timetypes is -infinity
+	return -std::numeric_limits<double>::infinity();
+}
+
+double TemporalReference::end_of_time() const {
+	if (timetype == TIMETYPE_UNIX) {
+		// TODO: find a sensible value. When the sun turns supernova in a couple billion years, that'd probably mark the end of earth-based geography.
+		return std::numeric_limits<double>::infinity();
+	}
+	// The default for other timetypes is infinity
+	return std::numeric_limits<double>::infinity();
+}
+
 
 
 bool TemporalReference::contains(const TemporalReference &other) const {

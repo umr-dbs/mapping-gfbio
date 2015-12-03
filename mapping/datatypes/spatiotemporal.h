@@ -130,6 +130,15 @@ class TemporalReference {
 		void validate() const;
 
 		/*
+		 * Returns the smallest valid timestamp based on the timetype
+		 */
+		double beginning_of_time() const;
+		/*
+		 * Returns the highest valid timestamp based on the timetype
+		 */
+		double end_of_time() const;
+
+		/*
 		 * Returns whether the other TemporalReference is contained (smaller or equal) within this.
 		 * Throws an exception if the timetypes don't match.
 		 */

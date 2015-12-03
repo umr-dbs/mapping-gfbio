@@ -6,6 +6,7 @@
 
 #include "operators/operator.h"
 #include "cache/manager.h"
+#include "cache/common.h"
 
 
 #include <unordered_map>
@@ -176,6 +177,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 		QueryProfiler profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			ExecTimer t("Operator.getRaster");
 			result = getRaster(rect,profiler);
 		}
 		CacheManager::get_instance().get_raster_cache().put(semantic_id,result,profiler);
@@ -201,6 +203,7 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 		QueryProfiler profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			ExecTimer t("Operator.getPointCollection");
 			result = getPointCollection(rect,profiler);
 		}
 		CacheManager::get_instance().get_point_cache().put(semantic_id,result,profiler);
@@ -229,6 +232,7 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 		QueryProfiler profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			ExecTimer t("Operator.getLineCollection");
 			result = getLineCollection(rect,profiler);
 		}
 		CacheManager::get_instance().get_line_cache().put(semantic_id,result,profiler);
@@ -257,6 +261,7 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 		QueryProfiler profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			ExecTimer t("Operator.getPolygonCollection");
 			result = getPolygonCollection(rect,profiler);
 		}
 		CacheManager::get_instance().get_polygon_cache().put(semantic_id,result,profiler);
@@ -281,6 +286,7 @@ std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle
 	std::unique_ptr<GenericPlot> result;
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
+		ExecTimer t("Operator.getPlot");
 		result = getPlot(rect, profiler);
 	}
 	d_profile(depth, type, "plot", profiler);

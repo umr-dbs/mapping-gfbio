@@ -76,6 +76,7 @@ void NodeServer::worker_loop() {
 }
 
 void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
+	ExecTimer t("RequestProcessing");
 	Log::debug("Processing command: %d", cmd);
 	switch (cmd) {
 		case WorkerConnection::CMD_CREATE: {
@@ -106,7 +107,7 @@ void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
 
 void NodeServer::process_create_request(BinaryStream& index_stream,
 		const BaseRequest& request) {
-
+	ExecTimer t("RequestProcessing.create");
 	auto op = GenericOperator::fromJSON(request.semantic_id);
 
 	QueryProfiler profiler;
@@ -143,7 +144,7 @@ void NodeServer::process_create_request(BinaryStream& index_stream,
 
 void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 		const PuzzleRequest& request) {
-	// TODO: Cache puzzles?
+	ExecTimer t("RequestProcessing.create");
 	auto &cm = CacheManager::get_instance();
 	QueryProfiler profiler;
 
@@ -180,7 +181,7 @@ void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 
 void NodeServer::process_delivery_request(BinaryStream& index_stream,
 		const DeliveryRequest& request) {
-
+	ExecTimer t("RequestProcessing.delivery");
 	auto &cm = CacheManager::get_instance();
 	NodeCacheKey key(request.semantic_id,request.entry_id);
 
@@ -209,6 +210,7 @@ void NodeServer::process_delivery_request(BinaryStream& index_stream,
 template<typename T>
 void NodeServer::finish_request(BinaryStream& stream,
 		const std::shared_ptr<const T>& item) {
+	ExecTimer t("RequestProcessing.finish");
 
 	Log::debug("Processing request finished. Asking for delivery-qty");
 	stream.write(WorkerConnection::RESP_RESULT_READY);

@@ -41,6 +41,8 @@ public:
 	ExecTimer& operator=( ExecTimer&& ) = delete;
 	~ExecTimer();
 private:
+	static thread_local uint depth;
+	static thread_local std::ostringstream buffer;
 	std::string name;
 	std::chrono::time_point<std::chrono::system_clock> start;
 };

@@ -368,10 +368,13 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 	if (CacheManager::remote_connection == nullptr)
 		throw NetworkException("No connection to remote-index.");
 
+	ExecTimer t("CacheManager.put");
+
 	size_t size = SizeUtil::get_byte_size(*item);
 
 	if ( strategy.do_cache(profiler,size) ) {
 		auto ref = put_local(semantic_id, item, size, strategy.get_costs(profiler,size));
+		ExecTimer t("CacheManager.put.remote");
 		BinaryStream &stream = *CacheManager::remote_connection;
 
 		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
@@ -385,6 +388,7 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 template<typename T>
 NodeCacheRef NodeCacheWrapper<T>::put_local(const std::string& semantic_id,
 	const std::unique_ptr<T>& item, size_t size, double costs, const AccessInfo info) {
+	ExecTimer t("CacheManager.put.local");
 	Log::debug("Adding item to local cache");
 	return cache.put(semantic_id, item, size, costs, info);
 }
@@ -408,6 +412,7 @@ NodeCacheRef NodeCacheWrapper<T>::get_entry_info(const NodeCacheKey& key) {
 
 template<typename T>
 std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const QueryRectangle& rect) {
+	ExecTimer t("CacheManager.query");
 	Log::debug("Querying item: %s on %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str() );
 
 	// Local lookup
@@ -417,12 +422,14 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 
 	// Full single local hit
 	if ( !qres.has_remainder() && qres.keys.size() == 1 ) {
+		ExecTimer t("CacheManager.query.full_single_hit");
 		Log::trace("Full single local HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 		NodeCacheKey key(op.getSemanticId(), qres.keys.at(0));
 		return cache.get_copy(key);
 	}
 	// Full local hit (puzzle)
 	else if ( !qres.has_remainder() ) {
+		ExecTimer t("CacheManager.query.full_local_hit");
 		Log::trace("Full local HIT for query: %s on %s. Puzzling result.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 		std::vector<CacheRef> refs;
 		for ( auto &id : qres.keys )
@@ -436,6 +443,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 	}
 	// Check index (if we aren't on depth = 0 )
 	else if ( op.getDepth() != 0 ) {
+		ExecTimer t("CacheManager.query.local_miss");
 		Log::debug("Local MISS for query: %s on %s. Querying index.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 		BaseRequest cr(CacheType::RASTER, op.getSemanticId(), rect);
 		BinaryStream &stream = *CacheManager::remote_connection;
@@ -480,25 +488,28 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 
 template<typename T>
 std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler) {
+	ExecTimer t("CacheManager.puzzle");
 	Log::trace("Processing puzzle-request: %s", request.to_string().c_str());
 
 	std::vector<std::shared_ptr<const T>> items;
 
+	{
+		ExecTimer t("CacheManager.puzzle.fetch_parts");
+		// Fetch puzzle parts
+		Log::trace("Fetching all puzzle-parts");
+		for (const CacheRef &cr : request.parts) {
+			if ( CacheManager::get_instance().is_self_ref(cr) ) {
+				Log::trace("Fetching puzzle-piece from local cache, key: %d", cr.entry_id);
+				items.push_back(get_ref( NodeCacheKey(request.semantic_id, cr.entry_id) ));
+			}
+			else {
+				Log::debug("Fetching puzzle-piece from %s:%d, key: %d", cr.host.c_str(), cr.port, cr.entry_id);
 
-	// Fetch puzzle parts
-	Log::trace("Fetching all puzzle-parts");
-	for (const CacheRef &cr : request.parts) {
-		if ( CacheManager::get_instance().is_self_ref(cr) ) {
-			Log::trace("Fetching puzzle-piece from local cache, key: %d", cr.entry_id);
-			items.push_back(get_ref( NodeCacheKey(request.semantic_id, cr.entry_id) ));
-		}
-		else {
-			Log::debug("Fetching puzzle-piece from %s:%d, key: %d", cr.host.c_str(), cr.port, cr.entry_id);
-
-			auto raster = fetch_item( request.semantic_id, cr );
-			// TODO: Estimate size
-			//profiler.addIOCost();
-			items.push_back( std::shared_ptr<const T>(raster.release()) );
+				auto raster = fetch_item( request.semantic_id, cr );
+				// TODO: Estimate size
+				//profiler.addIOCost();
+				items.push_back( std::shared_ptr<const T>(raster.release()) );
+			}
 		}
 	}
 
@@ -518,6 +529,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& requ
 template<typename T>
 SpatioTemporalReference NodeCacheWrapper<T>::enlarge_puzzle(const QueryRectangle& query,
 	const std::vector<std::shared_ptr<const T> >& items) {
+	ExecTimer t("CacheManager.puzzle.enlarge");
 
 	// Calculated maximum covered rectangle
 	double values[6] = { DoubleNegInfinity, DoubleInfinity,
@@ -600,6 +612,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_i
 template<typename T>
 std::vector<std::unique_ptr<T>> NodeCacheWrapper<T>::compute_remainders(const std::string& semantic_id,
 	const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler ) {
+	ExecTimer t("CacheManager.puzzle.remainer_calc");
 	(void) ref_result;
 	std::vector<std::unique_ptr<T>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
@@ -613,6 +626,7 @@ std::vector<std::unique_ptr<T>> NodeCacheWrapper<T>::compute_remainders(const st
 template<>
 std::vector<std::unique_ptr<GenericRaster>> NodeCacheWrapper<GenericRaster>::compute_remainders(
 	const std::string& semantic_id, const GenericRaster& ref_result, const PuzzleRequest &request, QueryProfiler &profiler) {
+	ExecTimer t("CacheManager.puzzle.remainer_calc");
 
 	std::vector<std::unique_ptr<GenericRaster>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
@@ -651,6 +665,7 @@ RasterCacheWrapper::RasterCacheWrapper(NodeCache<GenericRaster>& cache, const Ca
 
 std::unique_ptr<GenericRaster> RasterCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
 	const std::vector<std::shared_ptr<const GenericRaster> >& items) {
+	ExecTimer t("CacheManager.puzzle.do_puzzle");
 	Log::trace("Puzzling raster with %d pieces", items.size() );
 
 //	RasterWriter w = PuzzleTracer::get_writer();
@@ -727,6 +742,7 @@ FeatureCollectionCacheWrapper<T>::FeatureCollectionCacheWrapper(NodeCache<T>& ca
 template<typename T>
 std::unique_ptr<T> FeatureCollectionCacheWrapper<T>::do_puzzle(const SpatioTemporalReference &bbox,
 	const std::vector<std::shared_ptr<const T> >& items) {
+	ExecTimer t("CacheManager.puzzle.do_puzzle");
 	auto result = make_unique<T>(bbox);
 
 	T& target = *result;

@@ -41,10 +41,31 @@ void ex_handler() {
 	exit(1);
 }
 
+thread_local std::ostringstream ExecTimer::buffer;
+thread_local uint ExecTimer::depth = 0;
+
+ExecTimer::ExecTimer(std::string&& name)  : name(std::move(name)) {
+	if ( depth == 0 )
+		buffer << std::endl;
+	ExecTimer::depth++;
+	for ( uint i = 1; i < depth; i++ )
+		buffer << "  ";
+	buffer << "Enter " << this->name << std::endl;
+	start = std::chrono::system_clock::now();
+}
+
+
 ExecTimer::~ExecTimer() {
 	auto now = std::chrono::system_clock::now();
 	auto dur = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
-	Log::debug("%s duration: %ldms", name.c_str(), dur);
+	for ( uint i = 1; i < depth; i++ )
+		buffer << "  ";
+	buffer << "Exit " << name << ". Duration: " << dur << "ms" << std::endl;
+	depth--;
+	if ( depth == 0 ) {
+		Log::trace_time(buffer.str());
+		buffer.str("");
+	}
 }
 
 std::string CacheCommon::qr_to_string(const QueryRectangle &rect) {
@@ -152,8 +173,4 @@ bool CacheCommon::resolution_matches(double scalex1, double scaley1,
 
 	return std::abs( 1.0 - scalex1 / scalex2) < 0.01 &&
 		   std::abs( 1.0 - scaley1 / scaley2) < 0.01;
-}
-
-ExecTimer::ExecTimer(std::string&& name)  : name(std::move(name)) {
-	start = std::chrono::system_clock::now();
 }

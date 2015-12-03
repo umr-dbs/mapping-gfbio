@@ -59,7 +59,7 @@ void QueryManager::schedule_pending_jobs(
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
 			queries.emplace(con_id, QueryInfo(**it));
-			Log::info("Scheduled request: %s\non worker: %d", (*it)->to_string().c_str(), con_id);
+			Log::info("Scheduled request: %s\non worker: %d", (*it)->request->to_string().c_str(), con_id);
 			it = pending_jobs.erase(it);
 		}
 		else

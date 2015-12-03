@@ -60,6 +60,8 @@ protected:
 	JobDescription( std::unique_ptr<BaseRequest> request );
 	std::unique_ptr<BaseRequest> request;
 
+	friend class QueryManager;
+
 };
 
 //

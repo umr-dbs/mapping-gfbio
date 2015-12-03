@@ -25,12 +25,12 @@ void Log::setLevel(const std::string& level) {
 	std::string lower;
 	lower.resize( level.size() );
 	std::transform(level.begin(),level.end(),lower.begin(),::tolower);
-	if      ( level == "trace" ) setLevel(LogLevel::TRACE);
-	else if ( level == "debug" ) setLevel(LogLevel::DEBUG);
-	else if ( level == "info" ) setLevel(LogLevel::INFO);
-	else if ( level == "warn" ) setLevel(LogLevel::WARN);
-	else if ( level == "error" ) setLevel(LogLevel::ERROR);
-	else throw ArgumentException(concat("Illegal LogLevel",level));
+	if      ( lower == "trace" ) setLevel(LogLevel::TRACE);
+	else if ( lower == "debug" ) setLevel(LogLevel::DEBUG);
+	else if ( lower == "info" ) setLevel(LogLevel::INFO);
+	else if ( lower == "warn" ) setLevel(LogLevel::WARN);
+	else if ( lower == "error" ) setLevel(LogLevel::ERROR);
+	else throw ArgumentException(concat("Illegal LogLevel: ",lower));
 }
 
 #ifndef DISABLE_LOGGING

@@ -5,8 +5,8 @@
  *      Author: mika
  */
 
-#ifndef LOG_H_
-#define LOG_H_
+#ifndef UTIL_LOG_H_
+#define UTIL_LOG_H_
 //#define DISABLE_LOGGING
 
 #include <string>

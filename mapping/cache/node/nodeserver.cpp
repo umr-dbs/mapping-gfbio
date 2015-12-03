@@ -8,6 +8,7 @@
 // project-stuff
 #include "cache/node/nodeserver.h"
 #include "cache/node/delivery.h"
+#include "cache/node/util.h"
 #include "cache/index/indexserver.h"
 #include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
@@ -30,6 +31,7 @@ NodeServer::NodeServer(uint32_t my_port, std::string index_host, uint32_t index_
 	int num_threads) :
 	shutdown(false), workers_up(false), my_id(-1), my_port(my_port), index_host(index_host), index_port(
 		index_port), num_treads(num_threads), delivery_manager(my_port) {
+	NodeUtil::get_instance().set_self_port(my_port);
 }
 
 void NodeServer::worker_loop() {
@@ -41,7 +43,7 @@ void NodeServer::worker_loop() {
 			uint32_t magic = WorkerConnection::MAGIC_NUMBER;
 			stream.write(magic);
 			stream.write(my_id);
-			CacheManager::remote_connection = &sock;
+			NodeUtil::get_instance().set_index_connection(&sock);
 
 			Log::debug("Worker connected to index-server");
 
@@ -144,7 +146,7 @@ void NodeServer::process_create_request(BinaryStream& index_stream,
 
 void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 		const PuzzleRequest& request) {
-	ExecTimer t("RequestProcessing.create");
+	ExecTimer t("RequestProcessing.puzzle");
 	auto &cm = CacheManager::get_instance();
 	QueryProfiler profiler;
 
@@ -295,7 +297,7 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 		}
 		case ControlConnection::CMD_GET_STATS: {
 			Log::debug("Received stats-request.");
-			NodeStats stats = CacheManager::get_instance().get_stats();
+			NodeStats stats = NodeUtil::get_instance().get_stats();
 			stream.write(ControlConnection::RESP_STATS);
 			stats.toStream(stream);
 			break;
@@ -422,7 +424,7 @@ void NodeServer::setup_control_connection() {
 	// Establish connection
 	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
 	BinaryStream &stream = *this->control_connection;
-	NodeHandshake hs = CacheManager::get_instance().get_handshake(my_port);
+	NodeHandshake hs = NodeUtil::get_instance().create_handshake();
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
@@ -439,7 +441,7 @@ void NodeServer::setup_control_connection() {
 
 		stream.read(&my_id);
 		stream.read(&my_host);
-		CacheManager::get_instance().set_self_host(my_host);
+		NodeUtil::get_instance().set_self_host(my_host);
 		Log::info("Successfuly connected to index-server. My Id is: %d", my_id);
 	}
 	else {

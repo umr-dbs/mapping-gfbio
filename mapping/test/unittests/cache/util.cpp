@@ -122,7 +122,7 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 TestNodeServer::TestNodeServer(uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity)  :
 	NodeServer(my_port,index_host,index_port,1),
 	rcm( CachingStrategy::by_name(strategy), capacity,capacity,capacity,capacity,capacity ) {
-	rcm.set_self_port(my_port);
+	nu.set_self_port(my_port);
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -162,14 +162,6 @@ CacheManager& TestCacheMan::get_instance_mgr(int i) {
 	return instances.at(i)->rcm;
 }
 
-NodeHandshake TestCacheMan::get_handshake(uint32_t my_port) const {
-	return get_current_instance().get_handshake(my_port);
-}
-
-NodeStats TestCacheMan::get_stats() const {
-	return get_current_instance().get_stats();
-}
-
 CacheWrapper<GenericRaster>& TestCacheMan::get_raster_cache() {
 	return get_current_instance().get_raster_cache();
 }
@@ -192,22 +184,6 @@ CacheWrapper<GenericPlot>& TestCacheMan::get_plot_cache() {
 
 void TestCacheMan::add_instance(TestNodeServer *inst) {
 	instances.push_back(inst);
-}
-
-void TestCacheMan::set_self_port(uint32_t port) {
-	get_current_instance().set_self_port(port);
-}
-
-void TestCacheMan::set_self_host(const std::string& host) {
-	get_current_instance().set_self_host(host);
-}
-
-CacheRef TestCacheMan::create_self_ref(uint64_t id) {
-	return get_current_instance().create_self_ref(id);
-}
-
-bool TestCacheMan::is_self_ref(const CacheRef& ref) {
-	return get_current_instance().is_self_ref(ref);
 }
 
 CacheManager& TestCacheMan::get_current_instance() const {
@@ -247,4 +223,56 @@ void TestIdxServer::force_stat_update() {
 			all_idle &= kv.second->get_state() == ControlConnection::State::IDLE;
 		}
 	} while (!all_idle);
+}
+
+//
+// NodeUtil
+//
+
+void TestNodeUtil::add_instance(TestNodeServer* inst) {
+	instances.push_back(inst);
+}
+
+NodeUtil& TestNodeUtil::get_instance_util(int i) {
+	return instances.at(i)->nu;
+}
+
+void TestNodeUtil::set_self_port(uint32_t port) {
+	get_current_instance().set_self_port(port);
+}
+
+void TestNodeUtil::set_self_host(const std::string& host) {
+	get_current_instance().set_self_host(host);
+}
+
+void TestNodeUtil::set_index_connection(BinaryStream* con) {
+	get_current_instance().set_index_connection(con);
+}
+
+BinaryStream& TestNodeUtil::get_index_connection() {
+	return get_current_instance().get_index_connection();
+}
+
+CacheRef TestNodeUtil::create_self_ref(uint64_t id) const {
+	return get_current_instance().create_self_ref(id);
+}
+
+bool TestNodeUtil::is_self_ref(const CacheRef& ref) const {
+	return get_current_instance().is_self_ref(ref);
+}
+
+NodeHandshake TestNodeUtil::create_handshake() const {
+	return get_current_instance().create_handshake();
+}
+
+NodeStats TestNodeUtil::get_stats() const {
+	return get_current_instance().get_stats();
+}
+
+NodeUtil& TestNodeUtil::get_current_instance() const {
+	for (auto i : instances) {
+		if (i->owns_current_thread())
+			return i->nu;
+	}
+	throw ArgumentException("Unregistered instance called node-util");
 }

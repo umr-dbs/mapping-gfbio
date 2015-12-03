@@ -78,9 +78,6 @@ int main(void) {
 			CachingStrategy::by_name(cs), raster_size, point_size, line_size, polygon_size, plot_size);
 	CacheManager::init(std::move(cache_impl));
 
-	// Set self port
-	CacheManager::get_instance().set_self_port(portnr);
-
 	// Fire it up
 	instance = new NodeServer(portnr,ihoststr,iportnr,num_threads);
 	instance->run();

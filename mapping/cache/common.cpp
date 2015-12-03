@@ -10,6 +10,8 @@
 #include "cache/priv/connection.h"
 #include "util/log.h"
 #include "util/exceptions.h"
+#include "datatypes/spatiotemporal.h"
+#include "operators/operator.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -82,14 +84,6 @@ std::string CacheCommon::stref_to_string(const SpatioTemporalReference &ref) {
 		<< (uint16_t) ref.timetype << ", time: [" << ref.t1 << "," << ref.t2 << "]" << ", x: [" << ref.x1
 		<< "," << ref.x2 << "]" << ", y: [" << ref.y1 << "," << ref.y2 << "] ]";
 	return os.str();
-}
-
-
-std::string CacheCommon::raster_to_string(const GenericRaster& raster) {
-
-	return concat( "GenericRaster: ", stref_to_string(raster.stref),
-		", size: ", raster.width, "x", raster.height,
-		", res: ", raster.pixel_scale_x, "x", raster.pixel_scale_y, "]");
 }
 
 

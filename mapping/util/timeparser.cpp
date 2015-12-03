@@ -43,9 +43,9 @@ public:
 		try {
 			return stod(timeString);
 		} catch (const std::invalid_argument& e){
-			throw TimeParseException("Could not parse timeString: invalid argument");
+			throw TimeParseException(concat("Could not parse timeString ", timeString, " : invalid argument"));
 		} catch (const std::out_of_range& e){
-			throw TimeParseException("Could not parse timeString: out of range");
+			throw TimeParseException(concat("Could not parse timeString ", timeString, " : out of range"));
 		}
 	}
 };
@@ -61,7 +61,7 @@ public:
 		std::tm tm = {};
 		if (strptime(timeString.c_str(), "%d-%B-%Y  %H:%M", &tm))
 			return timegm(&tm);
-		throw TimeParseException("Could not parse time string");
+		throw TimeParseException(concat("Could not parse time string ", timeString, " for DMYHM format"));
 	}
 };
 
@@ -78,7 +78,7 @@ public:
 		std::tm tm = {};
 		if (strptime(timeString.c_str(), "%Y-%m-%dT%H:%M:%S", &tm))
 			return timegm(&tm);
-		throw TimeParseException("Could not parse time string");
+		throw TimeParseException(concat("Could not parse time string ", timeString, " for ISO format"));
 	}
 };
 

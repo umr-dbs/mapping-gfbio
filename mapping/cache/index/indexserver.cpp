@@ -303,8 +303,8 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					cc.release();
 					break;
 				case ControlConnection::State::STATS_RECEIVED: {
-					Log::debug("Node %d delivered fresh statistics.", cc.node->id);
 					auto &stats = cc.get_stats();
+					Log::debug("Node %d delivered fresh statistics: %s", cc.node->id, stats.to_string().c_str());
 					cc.node->capacity = stats;
 					time(&cc.node->last_stat_update);
 					caches.update_stats(cc.node->id, stats);

@@ -31,7 +31,7 @@ void BaseConnection::input() {
 	if (reading) {
 		reader->read(socket->getReadFD());
 		if (reader->is_finished()) {
-			Log::debug("Finished reading on connection: %d, read %d bytes", id, reader->get_total_read());
+			Log::trace("Finished reading on connection: %d, read %d bytes", id, reader->get_total_read());
 			reading = false;
 			read_finished(*reader);
 			reader.reset();

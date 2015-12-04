@@ -68,14 +68,17 @@ void QueryManager::schedule_pending_jobs(
 }
 
 size_t QueryManager::close_worker(uint64_t worker_id) {
-	finished_queries.emplace(worker_id, queries.at(worker_id));
-	queries.erase(worker_id);
-	return finished_queries.at(worker_id).get_clients().size();
+	auto it = queries.find(worker_id);
+	size_t res = it->second.get_clients().size();
+	finished_queries.insert(*it);
+	queries.erase(it);
+	return res;
 }
 
 std::vector<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
-	std::vector<uint64_t> clients = finished_queries.at(worker_id).get_clients();
-	finished_queries.erase(worker_id);
+	auto it = finished_queries.find(worker_id);
+	std::vector<uint64_t> clients = it->second.get_clients();
+	finished_queries.erase(it);
 	return clients;
 }
 

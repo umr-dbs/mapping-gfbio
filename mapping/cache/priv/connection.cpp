@@ -182,8 +182,8 @@ void ClientConnection::send_response(const DeliveryResponse& response) {
 	if (state == State::AWAIT_RESPONSE) {
 		state = State::WRITING_RESPONSE;
 		begin_write(
-			make_unique<NBMessageWriter>(RESP_OK,
-				make_unique<NBSimpleWriter<DeliveryResponse>>(response)));
+			make_unique<NBMessageWriter<DeliveryResponse>>(RESP_OK, response)
+		);
 	}
 	else
 		throw IllegalStateException("Can only send response in state: AWAIT_RESPONSE");
@@ -192,7 +192,7 @@ void ClientConnection::send_response(const DeliveryResponse& response) {
 void ClientConnection::send_error(const std::string& message) {
 	if (state == State::AWAIT_RESPONSE) {
 		state = State::WRITING_RESPONSE;
-		begin_write(make_unique<NBErrorWriter>(RESP_ERROR, message));
+		begin_write(make_unique<NBMessageWriter<std::string>>(RESP_ERROR, message));
 	}
 	else
 		throw IllegalStateException("Can only send error in state: AWAIT_RESPONSE");
@@ -319,7 +319,7 @@ void WorkerConnection::process_request(uint8_t command, const BaseRequest& reque
 	if (state == State::IDLE) {
 		state = State::SENDING_REQUEST;
 		begin_write(
-			make_unique<NBMessageWriter>(command, make_unique<NBSimpleWriter<BaseRequest>>(request, true)));
+			make_unique<NBMessageWriter<BaseRequest>>(command, request, true));
 	}
 	else
 		throw IllegalStateException("Can only process requests when idle");
@@ -338,7 +338,7 @@ void WorkerConnection::send_hit(const CacheRef& cr) {
 	if (state == State::QUERY_REQUESTED) {
 		state = State::SENDING_QUERY_RESPONSE;
 		begin_write(
-			make_unique<NBMessageWriter>(RESP_QUERY_HIT, make_unique<NBSimpleWriter<CacheRef>>(cr)));
+			make_unique<NBMessageWriter<CacheRef>>(RESP_QUERY_HIT, cr));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
@@ -348,8 +348,7 @@ void WorkerConnection::send_partial_hit(const PuzzleRequest& pr) {
 	if (state == State::QUERY_REQUESTED) {
 		state = State::SENDING_QUERY_RESPONSE;
 		begin_write(
-			make_unique<NBMessageWriter>(RESP_QUERY_PARTIAL,
-				make_unique<NBSimpleWriter<PuzzleRequest>>(pr)));
+			make_unique<NBMessageWriter<PuzzleRequest>>(RESP_QUERY_PARTIAL, pr));
 	}
 	else
 		throw IllegalStateException("Can only send raster query result in state RASTER_QUERY_REQUESTED");
@@ -368,7 +367,7 @@ void WorkerConnection::send_delivery_qty(uint32_t qty) {
 	if (state == State::DONE) {
 		state = State::SENDING_DELIVERY_QTY;
 		begin_write(
-			make_unique<NBMessageWriter>(RESP_DELIVERY_QTY, make_unique<NBSimpleWriter<uint32_t>>(qty)));
+			make_unique<NBMessageWriter<uint32_t>>(RESP_DELIVERY_QTY, qty));
 	}
 	else
 		throw IllegalStateException("Can only send delivery qty in state DONE");
@@ -534,7 +533,7 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 	if (state == State::IDLE) {
 		state = State::SENDING_REORG;
 		begin_write(
-			make_unique<NBMessageWriter>(CMD_REORG, make_unique<NBSimpleWriter<ReorgDescription>>(desc)));
+			make_unique<NBMessageWriter<ReorgDescription>>(CMD_REORG, desc));
 	}
 	else
 		throw IllegalStateException("Can only trigger reorg in state IDLE");
@@ -718,7 +717,12 @@ template<typename T>
 void DeliveryConnection::send(std::shared_ptr<const T> item) {
 	if (state == State::CACHE_REQUEST_READ || state == State::DELIVERY_REQUEST_READ) {
 		state = State::SENDING;
-		begin_write (make_unique<NBMessageWriter>(RESP_OK, get_data_writer(item)) );
+		begin_write (
+			make_unique<NBMultiWriter>(
+					make_unique<NBSimpleWriter<uint8_t>>(RESP_OK),
+					get_data_writer(item)
+			)
+		);
 	}
 	else
 		throw IllegalStateException(
@@ -731,12 +735,13 @@ void DeliveryConnection::send_move(const MoveInfo& info,
 
 	if (state == State::MOVE_REQUEST_READ) {
 		state = State::SENDING_MOVE;
-		begin_write( make_unique<NBMessageWriter>(RESP_OK,
+		begin_write(
 			make_unique<NBMultiWriter>(
+				make_unique<NBSimpleWriter<uint8_t>>(RESP_OK),
 				make_unique<NBSimpleWriter<MoveInfo>>(info),
 				get_data_writer(item)
 			)
-		));
+		);
 	}
 	else
 		throw IllegalStateException("Can only move item in state MOVE_REQUEST_READ");
@@ -749,7 +754,7 @@ void DeliveryConnection::send_error(const std::string& msg) {
 		|| state == State::SENDING_MOVE) {
 
 		state = State::SENDING_ERROR;
-		begin_write(make_unique<NBErrorWriter>(RESP_ERROR, msg));
+		begin_write(make_unique<NBMessageWriter<std::string>>(RESP_ERROR, msg));
 	}
 	else
 		throw IllegalStateException(

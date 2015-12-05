@@ -229,7 +229,7 @@ void IndexServer::process_handshake(std::vector<NewConnection> &new_fds, fd_set*
 	while (it != new_fds.end()) {
 		if (FD_ISSET(it->fd, readfds)) {
 			try {
-				std::unique_ptr<UnixSocket> us = make_unique<UnixSocket>(it->fd, it->fd);
+				std::unique_ptr<UnixSocket> us = make_unique<UnixSocket>(it->fd, it->fd,true);
 				BinaryStream &s = *us;
 
 				uint32_t magic;
@@ -285,7 +285,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 			switch (cc.get_state()) {
 				case ControlConnection::State::HANDSHAKE_READ: {
 					auto &hs = cc.get_handshake();
-					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, cc.hostname, hs.port);
+					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, cc.hostname, hs.port, hs);
 					node->control_connection = cc.id;
 					nodes.emplace(node->id, node);
 					Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, cc.hostname.c_str(), cc.id);

@@ -16,6 +16,7 @@
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/log.h"
+#include "util/nio.h"
 #include <sstream>
 
 #include <sys/select.h>
@@ -38,11 +39,9 @@ void NodeServer::worker_loop() {
 	while (workers_up && !shutdown) {
 		try {
 			// Setup index connection
-			UnixSocket sock(index_host.c_str(), index_port);
+			UnixSocket sock(index_host.c_str(), index_port,true);
 			BinaryStream &stream = sock;
-			uint32_t magic = WorkerConnection::MAGIC_NUMBER;
-			stream.write(magic);
-			stream.write(my_id);
+			buffered_write(sock,WorkerConnection::MAGIC_NUMBER,my_id);
 			NodeUtil::get_instance().set_index_connection(&sock);
 
 			Log::debug("Worker connected to index-server");
@@ -65,8 +64,8 @@ void NodeServer::worker_loop() {
 					throw;
 				} catch (const std::exception &e) {
 					Log::error("Unexpected error while processing request: %s", e.what());
-					stream.write(WorkerConnection::RESP_ERROR);
-					stream.write(concat("Unexpected error while processing request: ", e.what()));
+					auto msg = concat("Unexpected error while processing request: ", e.what());
+					buffered_write(stream,WorkerConnection::RESP_ERROR, msg);
 				}
 			}
 		} catch (const NetworkException &ne) {
@@ -218,16 +217,16 @@ void NodeServer::finish_request(BinaryStream& stream,
 	stream.write(WorkerConnection::RESP_RESULT_READY);
 	uint8_t cmd_qty;
 	uint32_t qty;
+
 	stream.read(&cmd_qty);
-	stream.read(&qty);
 	if (cmd_qty != WorkerConnection::RESP_DELIVERY_QTY)
 		throw ArgumentException(
 			concat("Expected command ", WorkerConnection::RESP_DELIVERY_QTY, " but received ", cmd_qty));
-
+	stream.read(&qty);
 	uint64_t delivery_id = delivery_manager.add_delivery(item, qty);
+
 	Log::debug("Sending delivery_id.");
-	stream.write(WorkerConnection::RESP_DELIVERY_READY);
-	stream.write(delivery_id);
+	buffered_write(stream,WorkerConnection::RESP_DELIVERY_READY,delivery_id);
 }
 
 void NodeServer::run() {
@@ -298,8 +297,7 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 		case ControlConnection::CMD_GET_STATS: {
 			Log::debug("Received stats-request.");
 			NodeStats stats = NodeUtil::get_instance().get_stats();
-			stream.write(ControlConnection::RESP_STATS);
-			stats.toStream(stream);
+			buffered_write(stream,ControlConnection::RESP_STATS,stats);
 			break;
 		}
 		default: {
@@ -343,12 +341,10 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 	try {
 		uint8_t del_resp;
 
-		UnixSocket us(item.from_host.c_str(), item.from_port);
+		UnixSocket us(item.from_host.c_str(), item.from_port, true);
 		BinaryStream &del_stream = us;
 
-		del_stream.write(DeliveryConnection::MAGIC_NUMBER);
-		del_stream.write(DeliveryConnection::CMD_MOVE_ITEM);
-		item.TypedNodeCacheKey::toStream(del_stream);
+		buffered_write(us,DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
 		del_stream.read(&del_resp);
 		switch (del_resp) {
 			case DeliveryConnection::RESP_OK: {
@@ -397,10 +393,9 @@ void NodeServer::confirm_move(const ReorgMoveItem& item, uint64_t new_id, Binary
 	// Notify index
 	uint8_t iresp;
 	ReorgMoveResult rr(item.type, item.semantic_id, item.entry_id, item.from_node_id, my_id, new_id);
-	index_stream.write(ControlConnection::RESP_REORG_ITEM_MOVED);
-	rr.toStream(index_stream);
-	index_stream.read(&iresp);
+	buffered_write(index_stream,ControlConnection::RESP_REORG_ITEM_MOVED,rr);
 
+	index_stream.read(&iresp);
 	try {
 		switch (iresp) {
 			case ControlConnection::CMD_REORG_ITEM_OK: {
@@ -422,15 +417,13 @@ void NodeServer::setup_control_connection() {
 	Log::info("Connecting to index-server: %s:%d", index_host.c_str(), index_port);
 
 	// Establish connection
-	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port));
+	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port,true));
 	BinaryStream &stream = *this->control_connection;
 	NodeHandshake hs = NodeUtil::get_instance().create_handshake();
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
-	uint32_t magic = ControlConnection::MAGIC_NUMBER;
-	stream.write(magic);
-	hs.toStream(stream);
+	buffered_write(stream,ControlConnection::MAGIC_NUMBER,hs);
 
 	Log::debug("Waiting for response from index-server");
 	// Read node-id

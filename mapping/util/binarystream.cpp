@@ -11,6 +11,7 @@
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <netinet/tcp.h>
 
 
 BinaryStream::BinaryStream() {
@@ -64,7 +65,7 @@ UnixSocket::UnixSocket(const char *server_path) : is_eof(false), read_fd(-1), wr
 }
 
 
-UnixSocket::UnixSocket(const char *hostname, int port) : is_eof(false), read_fd(-1), write_fd(-1) {
+UnixSocket::UnixSocket(const char *hostname, int port, bool no_delay) : is_eof(false), read_fd(-1), write_fd(-1) {
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	struct addrinfo *servinfo;
@@ -90,15 +91,25 @@ UnixSocket::UnixSocket(const char *hostname, int port) : is_eof(false), read_fd(
 		throw NetworkException(concat("UnixSocket: unable to connect(", hostname, ":", port, "/", portstr, "): ", strerror(errno)));
 	}
 
+	if ( no_delay ) {
+		int one = 1;
+		setsockopt(new_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+	}
+
 	read_fd = new_fd;
 	write_fd = new_fd;
 	freeaddrinfo(servinfo);
 }
 
 
-UnixSocket::UnixSocket(int read_fd, int write_fd) : is_eof(false), read_fd(read_fd), write_fd(write_fd) {
+UnixSocket::UnixSocket(int read_fd, int write_fd, bool no_delay) : is_eof(false), read_fd(read_fd), write_fd(write_fd) {
 	if (write_fd == -2)
-		write_fd = read_fd;
+		this->write_fd = read_fd;
+
+	if ( no_delay ) {
+		int one = 1;
+		setsockopt(this->write_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+	}
 }
 
 UnixSocket::~UnixSocket() {

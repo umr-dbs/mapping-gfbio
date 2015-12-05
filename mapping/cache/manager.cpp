@@ -12,6 +12,7 @@
 #include "cache/node/util.h"
 #include "util/log.h"
 #include "util/sizeutil.h"
+#include "util/nio.h"
 
 class AttributeArraysHelper {
 public:
@@ -200,45 +201,39 @@ void ClientCacheWrapper<T,CType>::put(const std::string& semantic_id,
 	(void) semantic_id;
 	(void) item;
 	(void) profiler;
-	throw CacheException("ClientWrapper only support the query-method");
 }
 
 template<typename T, CacheType CType>
 std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
 		const GenericOperator& op, const QueryRectangle& rect) {
 
-	UnixSocket idx_con(idx_host.c_str(), idx_port);
-	BinaryStream &stream = idx_con;
-	uint32_t magic = ClientConnection::MAGIC_NUMBER;
-	stream.write(magic);
+	UnixSocket idx_con(idx_host.c_str(), idx_port, true);
+	BinaryStream &idx_stream = idx_con;
 
-	BaseRequest rr(type,op.getSemanticId(),rect);
-	stream.write(ClientConnection::CMD_GET);
-	rr.toStream( stream );
+	BaseRequest req(type,op.getSemanticId(),rect);
+	buffered_write(idx_con, ClientConnection::MAGIC_NUMBER, ClientConnection::CMD_GET, req );
 
 	uint8_t idx_resp;
-	stream.read(&idx_resp);
+	idx_stream.read(&idx_resp);
 	switch (idx_resp) {
 		case ClientConnection::RESP_OK: {
 			DeliveryResponse dr(idx_con);
 			Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
-			UnixSocket dsock(dr.host.c_str(),dr.port);
-			BinaryStream &dstream = dsock;
+			UnixSocket del_sock(dr.host.c_str(),dr.port,true);
+			BinaryStream &del_stream = del_sock;
 
-			dstream.write(DeliveryConnection::MAGIC_NUMBER);
-			dstream.write(DeliveryConnection::CMD_GET);
-			dstream.write(dr.delivery_id);
+			buffered_write( del_sock, DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET, dr.delivery_id);
 
 			uint8_t resp;
-			dstream.read(&resp);
+			del_stream.read(&resp);
 			switch (resp) {
 				case DeliveryConnection::RESP_OK: {
 					Log::debug("Delivery responded OK.");
-					return read_result(dstream);
+					return read_result(del_sock);
 				}
 				case DeliveryConnection::RESP_ERROR: {
 					std::string err_msg;
-					dstream.read(&err_msg);
+					del_stream.read(&err_msg);
 					Log::error("Delivery returned error: %s", err_msg.c_str());
 					throw DeliveryException(err_msg);
 				}
@@ -251,7 +246,7 @@ std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
 		}
 		case ClientConnection::RESP_ERROR: {
 			std::string err_msg;
-			stream.read(&err_msg);
+			idx_stream.read(&err_msg);
 			Log::error("Cache returned error: %s", err_msg.c_str());
 			throw OperatorException(err_msg);
 		}
@@ -400,8 +395,7 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 		ExecTimer t("CacheManager.put.remote");
 
 		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
-		stream.write(WorkerConnection::RESP_NEW_CACHE_ENTRY);
-		ref.toStream(stream);
+		buffered_write(stream,WorkerConnection::RESP_NEW_CACHE_ENTRY,ref);
 	}
 	else
 		Log::debug("Item will not be cached according to strategy");
@@ -470,9 +464,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 		BaseRequest cr(CacheType::RASTER, op.getSemanticId(), rect);
 		BinaryStream &stream = NodeUtil::get_instance().get_index_connection();
 
-		stream.write(WorkerConnection::CMD_QUERY_CACHE);
-		cr.toStream(stream);
-
+		buffered_write(stream,WorkerConnection::CMD_QUERY_CACHE,cr);
 		uint8_t resp;
 		stream.read(&resp);
 		switch (resp) {
@@ -605,13 +597,10 @@ template<typename T>
 std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_id, const CacheRef& ref) {
 	TypedNodeCacheKey key(cache.type,semantic_id,ref.entry_id);
 	Log::debug("Fetching cache-entry from: %s:%d, key: %d", ref.host.c_str(), ref.port, ref.entry_id );
-	UnixSocket sock(ref.host.c_str(), ref.port);
-
+	UnixSocket sock(ref.host.c_str(), ref.port,true);
 	BinaryStream &stream = sock;
-	stream.write(DeliveryConnection::MAGIC_NUMBER);
-	stream.write(DeliveryConnection::CMD_GET_CACHED_ITEM);
-	key.toStream(stream);
 
+	buffered_write(sock,DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET_CACHED_ITEM,key);
 	uint8_t resp;
 	stream.read(&resp);
 	switch (resp) {

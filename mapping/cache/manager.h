@@ -12,7 +12,7 @@
 #include "cache/priv/caching_strategy.h"
 #include "cache/priv/cache_stats.h"
 #include "cache/priv/transfer.h"
-#include "datatypes/raster.h"
+
 
 #include <unordered_map>
 #include <unordered_set>
@@ -49,6 +49,16 @@ public:
 	virtual NodeCacheRef get_entry_info( const NodeCacheKey &key) = 0;
 
 	virtual std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler ) = 0;
+
+	virtual size_t get_max_size() = 0;
+
+	virtual size_t get_current_size() = 0;
+
+	virtual std::vector<NodeCacheRef> get_all() = 0;
+
+	virtual CacheStats get_stats() = 0;
+private:
+	friend class NodeUtil;
 };
 
 //
@@ -57,46 +67,22 @@ public:
 class CacheManager {
 public:
 	static CacheManager& get_instance();
-
 	// Inititalizes the manager with the given implementation
 	static void init( std::unique_ptr<CacheManager> instance);
-
-	// Index-connection -- set per worker DO NOT TOUCH
-	static thread_local UnixSocket *remote_connection;
 private:
 	static std::unique_ptr<CacheManager> instance;
-
 public:
 	//
 	// INSTANCE METHODS
 	//
-
-	CacheManager() : my_host(""), my_port(0) {}
-
-	virtual void set_self_port(uint32_t port);
-
-	virtual void set_self_host( const std::string &host );
-
-	virtual CacheRef create_self_ref(uint64_t id);
-
-	virtual bool is_self_ref(const CacheRef& ref);
-
 	virtual ~CacheManager() = default;
-
-	// Creates a handshake message for the index-server
-	virtual NodeHandshake get_handshake(uint32_t my_port) const = 0;
-
-	// Retrieves statistics for this cache
-	virtual NodeStats get_stats() const = 0;
-
 	virtual CacheWrapper<GenericRaster>& get_raster_cache() = 0;
 	virtual CacheWrapper<PointCollection>& get_point_cache() = 0;
 	virtual CacheWrapper<LineCollection>& get_line_cache() = 0;
 	virtual CacheWrapper<PolygonCollection>& get_polygon_cache() = 0;
 	virtual CacheWrapper<GenericPlot>& get_plot_cache() = 0;
 private:
-	std::string my_host;
-	uint32_t my_port;
+
 };
 
 
@@ -107,7 +93,7 @@ private:
 // On CGI to disable access to the index-server and compute results by itself (old behaviour)
 //
 
-template<typename T>
+template<typename T, CacheType CType>
 class NopCacheWrapper : public CacheWrapper<T> {
 public:
 	NopCacheWrapper();
@@ -118,29 +104,26 @@ public:
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
 	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler );
+	size_t get_max_size();
+	size_t get_current_size();
+	std::vector<NodeCacheRef> get_all();
+	CacheStats get_stats();
 };
 
 class NopCacheManager : public CacheManager {
 public:
 	NopCacheManager();
-
-	// Creates a handshake message for the index-server
-	NodeHandshake get_handshake(uint32_t my_port) const;
-
-	// Retrieves statistics for this cache
-	NodeStats get_stats() const;
-
 	CacheWrapper<GenericRaster>& get_raster_cache();
 	CacheWrapper<PointCollection>& get_point_cache();
 	CacheWrapper<LineCollection>& get_line_cache();
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
 private:
-	NopCacheWrapper<GenericRaster> raster_cache;
-	NopCacheWrapper<PointCollection> point_cache;
-	NopCacheWrapper<LineCollection> line_cache;
-	NopCacheWrapper<PolygonCollection> poly_cache;
-	NopCacheWrapper<GenericPlot> plot_cache;
+	NopCacheWrapper<GenericRaster,CacheType::RASTER> raster_cache;
+	NopCacheWrapper<PointCollection,CacheType::POINT> point_cache;
+	NopCacheWrapper<LineCollection,CacheType::LINE> line_cache;
+	NopCacheWrapper<PolygonCollection,CacheType::POLYGON> poly_cache;
+	NopCacheWrapper<GenericPlot,CacheType::PLOT> plot_cache;
 };
 
 
@@ -153,7 +136,7 @@ private:
 // and result in a hit.
 //
 
-template<typename T>
+template<typename T, CacheType CType>
 class ClientCacheWrapper : public CacheWrapper<T> {
 public:
 	ClientCacheWrapper( CacheType type, const std::string &idx_host, int idx_port );
@@ -164,6 +147,10 @@ public:
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
 	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler );
+	size_t get_max_size();
+	size_t get_current_size();
+	std::vector<NodeCacheRef> get_all();
+	CacheStats get_stats();
 protected:
 	std::unique_ptr<T> read_result( BinaryStream &stream );
 private:
@@ -175,13 +162,6 @@ private:
 class ClientCacheManager : public CacheManager {
 public:
 	ClientCacheManager(const std::string &idx_host, int idx_port);
-
-	// Creates a handshake message for the index-server
-	NodeHandshake get_handshake(uint32_t my_port) const;
-
-	// Retrieves statistics for this cache
-	NodeStats get_stats() const;
-
 	CacheWrapper<GenericRaster>& get_raster_cache();
 	CacheWrapper<PointCollection>& get_point_cache();
 	CacheWrapper<LineCollection>& get_line_cache();
@@ -191,11 +171,11 @@ private:
 	std::string idx_host;
 	int idx_port;
 
-	ClientCacheWrapper<GenericRaster> raster_cache;
-	ClientCacheWrapper<PointCollection> point_cache;
-	ClientCacheWrapper<LineCollection> line_cache;
-	ClientCacheWrapper<PolygonCollection> poly_cache;
-	ClientCacheWrapper<GenericPlot> plot_cache;
+	ClientCacheWrapper<GenericRaster,CacheType::RASTER> raster_cache;
+	ClientCacheWrapper<PointCollection,CacheType::POINT> point_cache;
+	ClientCacheWrapper<LineCollection,CacheType::LINE> line_cache;
+	ClientCacheWrapper<PolygonCollection,CacheType::POLYGON> poly_cache;
+	ClientCacheWrapper<GenericPlot,CacheType::PLOT> plot_cache;
 };
 
 //
@@ -217,6 +197,10 @@ public:
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
 	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler );
+	size_t get_max_size();
+	size_t get_current_size();
+	std::vector<NodeCacheRef> get_all();
+	CacheStats get_stats();
 protected:
 	virtual std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items) = 0;
 	virtual std::unique_ptr<T> read_item( BinaryStream &stream ) = 0;
@@ -288,12 +272,6 @@ public:
 	NodeCacheManager( std::unique_ptr<CachingStrategy> strategy,
 			size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
 			size_t polygon_cache_size, size_t plot_cache_size );
-
-	// Creates a handshake message for the index-server
-	NodeHandshake get_handshake(uint32_t my_port) const;
-
-	// Retrieves statistics for this cache
-	NodeStats get_stats() const;
 
 	CacheWrapper<GenericRaster>& get_raster_cache();
 	CacheWrapper<PointCollection>& get_point_cache();

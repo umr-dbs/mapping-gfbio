@@ -479,7 +479,7 @@ std::vector<Cube<3> > CacheStructure<KType, EType>::union_remainders(
 		while ( i != work.end() ) {
 			auto tmp = current.combine(*i);
 			if ( tmp.volume() < (current.volume() + i->volume()) * 1.01 ) {
-				current = tmp;
+				current = std::move(tmp);
 				work.erase(i);
 				i = work.begin();
 			}
@@ -499,8 +499,15 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 	// Extract ids for the result;
 	std::vector<KType> ids;
 
-	// Tells which dimensions may be extended
-	bool do_check[6] = {true,true,true,true,true,true};
+
+	// Calculated maximum covered cube
+	double values[6] = { DoubleNegInfinity,
+						 DoubleInfinity,
+						 DoubleNegInfinity,
+						 DoubleInfinity,
+						 DoubleNegInfinity,
+						 DoubleInfinity };
+
 
 	const QueryCube qc(orig);
 	double rem_volume = 0;
@@ -516,9 +523,11 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 		for ( int i = 0; i < check_dims; i++ ) {
 			auto &rdim = rem.get_dimension(i);
 			auto &qdim = qc.get_dimension(i);
-			// Extend if it not touches to borders of the query
-			do_check[2*i] &= rdim.a > qdim.a;
-			do_check[2*i+1] &= rdim.b < qdim.b;
+			// Limit to original query if a remainder touches query-bounds
+			if ( rdim.a <= qdim.a )
+				values[2*i] = qdim.a;
+			if ( rdim.b >= qdim.b )
+				values[2*i+1] = qdim.b;
 		}
 	}
 
@@ -526,17 +535,7 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 	if ( rem_volume/qc.volume() > 0.9 )
 		return CacheQueryResult<KType>( orig );
 
-
-	// Calculated maximum covered cube
-	double values[6] = { do_check[0] ? DoubleNegInfinity : orig.x1,
-				   	     do_check[1] ? DoubleInfinity : orig.x2,
-				   	     do_check[2] ? DoubleNegInfinity : orig.y1,
-				   	     do_check[3] ? DoubleInfinity : orig.y2,
-				   	     do_check[4] ? DoubleNegInfinity : orig.t1,
-				   	     do_check[5] ? DoubleInfinity : orig.t2 };
-
-
-
+	// Do extend
 	for ( auto &cqi : hits ) {
 		ids.push_back( cqi.key );
 		for ( int i = 0; i < 3; i++ ) {
@@ -546,10 +545,10 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 			int idx_r = idx_l + 1;
 
 			// If this item touches the bounds of the query.... extend
-			if ( do_check[idx_l] && cdim.a <= qdim.a )
+			if ( cdim.a <= qdim.a )
 				values[idx_l] = std::max(values[idx_l],cdim.a);
 
-			if ( do_check[idx_r] && cdim.b >= qdim.b )
+			if ( cdim.b >= qdim.b )
 				values[idx_r] = std::min(values[idx_r],cdim.b);
 		}
 	}

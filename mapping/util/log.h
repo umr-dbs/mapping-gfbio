@@ -5,8 +5,8 @@
  *      Author: mika
  */
 
-#ifndef LOG_H_
-#define LOG_H_
+#ifndef UTIL_LOG_H_
+#define UTIL_LOG_H_
 //#define DISABLE_LOGGING
 
 #include <string>
@@ -28,9 +28,11 @@ public:
 	static void debug(const char *msg, ...);
 	static void trace(const char *msg, ...);
 private:
-	static void log(LogLevel level, const char *msg, va_list vargs);
+	static void trace_time( const std::string &msg );
+	static void log(const std::string &level, const char *msg, va_list vargs);
 	static LogLevel level;
 	static FILE *fd;
+	friend class ExecTimer;
 };
 
 #endif /* LOG_H_ */

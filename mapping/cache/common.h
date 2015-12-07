@@ -5,14 +5,12 @@
  *      Author: mika
  */
 
-#ifndef COMMON_H_
-#define COMMON_H_
+#ifndef CACHE_COMMON_H_
+#define CACHE_COMMON_H_ 1
 
 #include "util/binarystream.h"
 #include "util/exceptions.h"
 #include "util/log.h"
-#include "operators/operator.h"
-#include "datatypes/raster.h"
 #include <memory>
 
 #include <sstream>
@@ -29,6 +27,9 @@
 enum class CacheType : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT, UNKNOWN };
 
 class CacheCube;
+class QueryRectangle;
+class SpatioTemporalReference;
+class GridSpatioTemporalResult;
 
 
 class ExecTimer {
@@ -41,6 +42,8 @@ public:
 	ExecTimer& operator=( ExecTimer&& ) = delete;
 	~ExecTimer();
 private:
+	static thread_local uint depth;
+	static thread_local std::ostringstream buffer;
 	std::string name;
 	std::chrono::time_point<std::chrono::system_clock> start;
 };
@@ -63,11 +66,6 @@ public:
 	// Returns a string-representation for the given spatio-temporal reference
 	//
 	static std::string stref_to_string( const SpatioTemporalReference &ref );
-
-	//
-	// Returns a string-representation of the given raster
-	//
-	static std::string raster_to_string( const GenericRaster &raster );
 
 	static void set_uncaught_exception_handler();
 

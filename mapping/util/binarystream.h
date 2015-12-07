@@ -79,8 +79,8 @@ template<typename T> void BinaryStream::write(T& t) {
 class UnixSocket : public BinaryStream {
 	public:
 		UnixSocket(const char *server_path);
-		UnixSocket(const char *hostname, int port);
-		UnixSocket(int read_fd, int write_fd = -2);
+		UnixSocket(const char *hostname, int port, bool no_delay = false);
+		UnixSocket(int read_fd, int write_fd = -2, bool no_delay = false);
 		virtual ~UnixSocket();
 
 		void close();

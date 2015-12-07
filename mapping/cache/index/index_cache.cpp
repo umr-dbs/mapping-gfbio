@@ -140,7 +140,9 @@ std::vector<std::shared_ptr<IndexCacheEntry>>& IndexCache::get_node_entries(uint
 }
 
 double IndexCache::get_capacity_usage(const Capacity& capacity) const {
-	return (double) get_used_capacity(capacity) / (double) get_total_capacity(capacity);
+	if ( get_total_capacity(capacity) > 0 )
+		return (double) get_used_capacity(capacity) / (double) get_total_capacity(capacity);
+	return 1;
 }
 
 void IndexCache::remove_from_node(const IndexCacheKey& key) {

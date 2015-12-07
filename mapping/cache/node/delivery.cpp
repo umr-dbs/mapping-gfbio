@@ -123,7 +123,7 @@ void DeliveryManager::run() {
 		auto fd_it = new_fds.begin();
 		while (fd_it != new_fds.end()) {
 			if (FD_ISSET(*fd_it, &readfds)) {
-				std::unique_ptr<UnixSocket> socket = make_unique<UnixSocket>(*fd_it, *fd_it);
+				std::unique_ptr<UnixSocket> socket = make_unique<UnixSocket>(*fd_it, *fd_it,true);
 				BinaryStream &stream = *socket;
 				uint32_t magic;
 				stream.read(&magic);

@@ -41,6 +41,32 @@ private:
 };
 
 //
+// Helper to combine several writes into a buffer first
+// and then write them in one go --> Required since
+// we turned of nagle's algorithm for all cache-related
+// communication. The little space overhead is worth it.
+//
+
+template<typename Head>
+void _internal_write(BinaryStream &ss, const Head &head) {
+	ss.write(head);
+}
+
+template<typename Head, typename... Tail>
+void _internal_write(BinaryStream &ss, const Head &head, const Tail &... tail) {
+	ss.write(head);
+	_internal_write(ss, tail...);
+}
+
+template<typename... Params>
+void buffered_write(BinaryStream &stream, const Params &... params) {
+	StreamBuffer sb;
+	_internal_write(sb, params...);
+	auto res = sb.get_content();
+	stream.write(res.c_str(),res.length());
+}
+
+//
 // Classes for non-blocking writes
 //
 
@@ -79,6 +105,7 @@ public:
 	size_t get_total_written() const;
 	std::string to_string() const;
 	void set_data( const T &value);
+protected:
 
 private:
 	template <typename U = T>
@@ -170,6 +197,7 @@ private:
 class NBMultiWriter : public NBWriter {
 public:
 	NBMultiWriter( std::unique_ptr<NBWriter> w1, std::unique_ptr<NBWriter> w2 );
+	NBMultiWriter( std::unique_ptr<NBWriter> w1, std::unique_ptr<NBWriter> w2, std::unique_ptr<NBWriter> w3 );
 	NBMultiWriter( std::vector<std::unique_ptr<NBWriter>> writers );
 	virtual void write(int fd);
 	virtual bool has_error() const;
@@ -185,22 +213,23 @@ private:
  	std::vector<std::unique_ptr<NBWriter>> writers;
 };
 
-//
-// Writer sending a message-code and a payload
-//
 
-class NBMessageWriter : public NBMultiWriter {
+template <typename T>
+class ConMsg {
 public:
-	NBMessageWriter( uint8_t code, std::unique_ptr<NBWriter> payload );
+	ConMsg( uint8_t code, const T &payload, bool use_dynamic_type = false );
+	void toStream(BinaryStream &stream) const;
+private:
+	uint8_t code;
+	const T &payload;
+	bool dyn_type;
 };
 
-//
-// Writer sending an error-message
-//
 
-class NBErrorWriter : public NBMessageWriter {
+template <typename T>
+class NBMessageWriter : public NBSimpleWriter<ConMsg<T>> {
 public:
-	NBErrorWriter( uint8_t code, const std::string &msg );
+	NBMessageWriter( uint8_t code, const T &payload, bool use_dynamic_type = false );
 };
 
 class NBHelloWriter : public NBMultiWriter {

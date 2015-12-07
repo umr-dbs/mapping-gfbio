@@ -253,6 +253,13 @@ NBMultiWriter::NBMultiWriter( std::unique_ptr<NBWriter> w1, std::unique_ptr<NBWr
 	add_writer( std::move(w2) );
 }
 
+NBMultiWriter::NBMultiWriter(std::unique_ptr<NBWriter> w1,
+		std::unique_ptr<NBWriter> w2, std::unique_ptr<NBWriter> w3) : current_index(0) {
+	add_writer( std::move(w1) );
+	add_writer( std::move(w2) );
+	add_writer( std::move(w3) );
+}
+
 NBMultiWriter::NBMultiWriter(std::vector<std::unique_ptr<NBWriter> > writers) :
 	current_index(0), writers(std::move(writers)) {
 	for ( auto &w : this->writers ) {
@@ -402,14 +409,37 @@ NBPlotWriter::NBPlotWriter(std::shared_ptr<const GenericPlot> plot) :
 //
 // Message writer
 //
-
-NBMessageWriter::NBMessageWriter(uint8_t code, std::unique_ptr<NBWriter> payload) {
-	add_writer(make_unique<NBSimpleWriter<uint8_t>>(code));
-	add_writer(std::move(payload));
+template<typename T>
+ConMsg<T>::ConMsg(uint8_t code, const T& payload,
+		bool use_dynamic_type) : code(code), payload(payload), dyn_type(use_dynamic_type) {
 }
 
-NBErrorWriter::NBErrorWriter(uint8_t code, const std::string& msg) :
-	NBMessageWriter(code, make_unique<NBSimpleWriter<std::string>>(msg)) {
+template<typename T>
+void ConMsg<T>::toStream(BinaryStream &stream) const {
+	stream.write(code);
+	if ( dyn_type )
+		payload.toStream(stream);
+	else
+		payload.T::toStream(stream);
+}
+
+template<>
+void ConMsg<std::string>::toStream(BinaryStream &stream) const {
+	stream.write(code);
+	stream.write(payload);
+}
+
+template<>
+void ConMsg<uint32_t>::toStream(BinaryStream &stream) const {
+	stream.write(code);
+	stream.write(payload);
+}
+
+
+template <typename T>
+NBMessageWriter<T>::NBMessageWriter(uint8_t code, const T &payload, bool dyn_type) :
+	NBSimpleWriter<ConMsg<T>>( ConMsg<T>(code,payload,dyn_type)) {
+
 }
 
 NBHelloWriter::NBHelloWriter(uint32_t hostid, const std::string& hostname) {
@@ -420,13 +450,15 @@ NBHelloWriter::NBHelloWriter(uint32_t hostid, const std::string& hostname) {
 
 
 template class NBSimpleWriter<uint8_t> ;
-template class NBSimpleWriter<uint32_t> ;
-template class NBSimpleWriter<DeliveryResponse> ;
 template class NBSimpleWriter<MoveInfo> ;
-template class NBSimpleWriter<ReorgDescription> ;
-template class NBSimpleWriter<CacheRef> ;
-template class NBSimpleWriter<BaseRequest> ;
-template class NBSimpleWriter<PuzzleRequest> ;
+
+template class NBMessageWriter<uint32_t> ;
+template class NBMessageWriter<std::string> ;
+template class NBMessageWriter<DeliveryResponse> ;
+template class NBMessageWriter<ReorgDescription> ;
+template class NBMessageWriter<CacheRef> ;
+template class NBMessageWriter<BaseRequest> ;
+template class NBMessageWriter<PuzzleRequest> ;
 
 ///////////////////////////////////////////////////////////////////
 //

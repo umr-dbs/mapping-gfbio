@@ -20,13 +20,17 @@
 TEST(DistributionTest,TestRedistibution) {
 
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
+	std::unique_ptr<TestNodeUtil> nu = make_unique<TestNodeUtil>();
 	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1(12347, "localhost", 12346, "always");
 	TestNodeServer ns2(12348, "localhost", 12346, "always");
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
+	nu->add_instance(&ns1);
+	nu->add_instance(&ns2);
 
+	TestNodeUtil::set_inst(std::move(nu));
 	CacheManager::init(std::move(cm));
 
 	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::get_instance());
@@ -48,7 +52,7 @@ TEST(DistributionTest,TestRedistibution) {
 	time_t timestamp = parseIso8601DateTime(timestr);
 	double bbox[4];
 
-	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER, "localhost", 12346);
+	ClientCacheWrapper<GenericRaster,CacheType::RASTER> cc(CacheType::RASTER, "localhost", 12346);
 
 	parseBBOX(bbox, bbox_str, epsg, false);
 	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
@@ -102,14 +106,20 @@ TEST(DistributionTest,TestRedistibution) {
 }
 
 TEST(DistributionTest,TestRemoteNodeFetch) {
+	// Reset testnodeutil
+	TestNodeUtil::set_inst(make_unique<NodeUtil>());
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
+	std::unique_ptr<TestNodeUtil> nu = make_unique<TestNodeUtil>();
 	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1(12347, "localhost", 12346, "always");
 	TestNodeServer ns2(12348, "localhost", 12346, "always");
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
+	nu->add_instance(&ns1);
+	nu->add_instance(&ns2);
 
+	TestNodeUtil::set_inst(std::move(nu));
 	CacheManager::init(std::move(cm));
 
 	std::vector<TP> ts;
@@ -129,7 +139,7 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 	time_t timestamp = parseIso8601DateTime(timestr);
 	double bbox[4];
 
-	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER, "localhost", 12346);
+	ClientCacheWrapper<GenericRaster,CacheType::RASTER> cc(CacheType::RASTER, "localhost", 12346);
 
 	parseBBOX(bbox, bbox_str, epsg, false);
 	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
@@ -259,15 +269,20 @@ TEST(DistributionTest,TestGeographicReorg) {
 
 
 TEST(DistributionTest,TestStatsAndReorg) {
-
+	// Reset testnodeutil
+	TestNodeUtil::set_inst(make_unique<NodeUtil>());
 	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
+	std::unique_ptr<TestNodeUtil> nu = make_unique<TestNodeUtil>();
 	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1(12347, "localhost", 12346, "always", 204800 );
 	TestNodeServer ns2(12348, "localhost", 12346, "always", 204800 );
 
 	cm->add_instance(&ns1);
 	cm->add_instance(&ns2);
+	nu->add_instance(&ns1);
+	nu->add_instance(&ns2);
 
+	TestNodeUtil::set_inst(std::move(nu));
 	CacheManager::init(std::move(cm));
 
 	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::get_instance());
@@ -288,7 +303,7 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	auto op = GenericOperator::fromJSON(json);
 
-	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER, "localhost", 12346);
+	ClientCacheWrapper<GenericRaster,CacheType::RASTER> cc(CacheType::RASTER, "localhost", 12346);
 
 	TemporalReference tr(TIMETYPE_UNIX, timestamp, timestamp);
 	QueryResolution   qres = QueryResolution::pixels(256, 256);

@@ -6,6 +6,8 @@
  */
 
 #include "wfs_request.h"
+#include "util/timeparser.h"
+#include <string>
 
 WFSRequest::WFSRequest(std::map<std::string, std::string> parameters) :
 		parameters(parameters) {
@@ -57,12 +59,28 @@ auto WFSRequest::getFeature() -> std::string {
 		return "output_width or output_height not valid";
 	}
 
-	time_t timestamp = 42; // TODO: default value
-	//if(featureId["timestamp"].isInt()) {
-	//	timestamp = static_cast<long>(featureId["timestamp"].asInt64());
-	//}
+	TemporalReference tref(TIMETYPE_UNIX);
 	if(parameters.count("time") > 0){
-		timestamp = this->parseIso8601DateTime(parameters["time"]);
+		// from: http://www.ogcnetwork.net/node/178
+		// "Constrain the results to return values within these _slash-separated_
+		// timestamps. Specified using this format: 2006-10-23T04:05:06 -0500/2006-10-25T04:05:06 -0500
+		// Either the start value or the end value can be omitted to indicate no restriction on time in that direction."
+		std::string &timeString = parameters["time"];
+		auto timeParser = TimeParser::create(TimeParser::Format::ISO);
+		size_t sep = timeString.find("/");
+
+		if(sep == std::string::npos){
+			tref.t1 = timeParser->parse(timeString);
+		} else if (sep == 0){
+			tref.t2 = timeParser->parse(timeString.substr(1));
+		}
+		else {
+			tref.t1 = timeParser->parse(timeString.substr(0, sep));
+			if(sep < timeString.length() - 1)
+				tref.t2 = timeParser->parse(timeString.substr(sep + 1));
+		}
+
+		tref.validate();
 	}
 
 	// srsName=CRS
@@ -78,9 +96,10 @@ auto WFSRequest::getFeature() -> std::string {
 
 	QueryProfiler profiler;
 	bool flipx, flipy;
+
 	QueryRectangle rect(
 		SpatialReference(queryEpsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy),
-		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+		tref,
 		QueryResolution::none()
 	);
 	auto points = graph->getCachedPointCollection(rect, profiler);
@@ -277,23 +296,4 @@ auto WFSRequest::epsg_from_param(const std::map<std::string, std::string> &param
 	if (params.count(key) < 1)
 		return def;
 	return epsg_from_param(params.at(key), def);
-}
-
-/**
- * This function converts a "datetime"-string in ISO8601 format into a time_t using UTC
- * @param dateTimeString a string with ISO8601 "datetime"
- * @returns The time_t representing the "datetime"
- */
-auto WFSRequest::parseIso8601DateTime(const std::string &dateTimeString) const -> time_t {
-	const std::string dateTimeFormat{"%Y-%m-%dT%H:%M:%S"}; //TODO: we should allow millisec -> "%Y-%m-%dT%H:%M:%S.SSSZ" std::get_time and the tm struct dont have them.
-
-	//std::stringstream dateTimeStream{dateTimeString}; //TODO: use this with gcc >5.0
-	tm queryDateTime{0};
-	//std::get_time(&queryDateTime, dateTimeFormat); //TODO: use this with gcc >5.0
-	strptime(dateTimeString.c_str(), dateTimeFormat.c_str(), &queryDateTime); //TODO: remove this with gcc >5.0
-	time_t queryTimestamp = timegm(&queryDateTime); //TODO: is there a c++ version for timegm?
-
-	//TODO: parse millisec
-
-	return (queryTimestamp);
 }

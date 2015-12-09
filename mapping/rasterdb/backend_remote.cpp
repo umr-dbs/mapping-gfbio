@@ -29,6 +29,8 @@ RemoteRasterDBBackend::~RemoteRasterDBBackend() {
 std::vector<std::string> RemoteRasterDBBackend::enumerateSources() {
 	auto c = COMMAND_ENUMERATESOURCES;
 	stream->write(c);
+	stream->flush();
+
 	std::vector<std::string> sourcenames;
 	size_t count;
 	stream->read(&count);
@@ -43,6 +45,8 @@ std::string RemoteRasterDBBackend::readJSON(const std::string &sourcename) {
 	auto c = COMMAND_READANYJSON;
 	stream->write(c);
 	stream->write(sourcename);
+	stream->flush();
+
 	std::string json;
 	stream->read(&json);
 	return json;
@@ -61,6 +65,8 @@ void RemoteRasterDBBackend::open(const std::string &_sourcename, bool writeable)
 	auto c = COMMAND_OPEN;
 	stream->write(c);
 	stream->write(this->sourcename);
+	stream->flush();
+
 	uint8_t response;
 	stream->read(&response);
 	if (response != 48)
@@ -77,6 +83,8 @@ std::string RemoteRasterDBBackend::readJSON() {
 	if (json.size() == 0) {
 		auto cmd = this->COMMAND_READJSON;
 		stream->write( cmd );
+		stream->flush();
+
 		stream->read(&json);
 	}
 	return json;
@@ -92,6 +100,8 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 	stream->write(channelid);
 	stream->write(t1);
 	stream->write(t2);
+	stream->flush();
+
 	RasterDescription res(*stream);
 	if (res.rasterid < 0) {
 		std::string error;
@@ -108,6 +118,8 @@ void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &a
 	auto c = COMMAND_READATTRIBUTES;
 	stream->write(c);
 	stream->write(rasterid);
+	stream->flush();
+
 	// read strings
 	while (true) {
 		std::string key;
@@ -138,6 +150,8 @@ int RemoteRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 	stream->write(c);
 	stream->write(rasterid);
 	stream->write(desiredzoom);
+	stream->flush();
+
 	int bestzoom;
 	stream->read(&bestzoom);
 	return bestzoom;
@@ -156,6 +170,8 @@ const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enume
 	stream->write(x2);
 	stream->write(y2);
 	stream->write(zoom);
+	stream->flush();
+
 	std::vector<TileDescription> result;
 	size_t count;
 	stream->read(&count);
@@ -198,6 +214,8 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 	auto c = COMMAND_READTILE;
 	stream->write(c);
 	stream->write(tiledesc);
+	stream->flush();
+
 	size_t size;
 	stream->read(&size);
 

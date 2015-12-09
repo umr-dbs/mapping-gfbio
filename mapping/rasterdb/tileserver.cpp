@@ -223,6 +223,7 @@ int Connection::input() {
 		default:
 			return -1;
 	}
+	stream->flush();
 	return 0;
 }
 

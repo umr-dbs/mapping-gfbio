@@ -75,6 +75,7 @@ void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char
 	stream.write((int) getRasterSourceCount());
 	stream.write((int) getPointCollectionSourceCount());
 	stream.write(rect);
+	stream.flush();
 
 	char type;
 	while (stream.read(&type) != 0) {
@@ -94,6 +95,7 @@ void ROperator::runScript(BinaryStream &stream, const QueryRectangle &rect, char
 			else {
 				throw OperatorException("R: invalid data type requested by server");
 			}
+			stream.flush();
 		}
 		else {
 			if (type == -RSERVER_TYPE_ERROR) {

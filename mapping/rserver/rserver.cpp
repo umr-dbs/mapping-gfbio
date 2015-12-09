@@ -84,6 +84,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 	stream.write((char) RSERVER_TYPE_RASTER);
 	stream.write(childidx);
 	stream.write(rect);
+	stream.flush();
 	is_sending = false;
 
 	auto raster = GenericRaster::fromStream(stream);
@@ -98,6 +99,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 	stream.write((char) RSERVER_TYPE_RASTER);
 	stream.write(childidx);
 	stream.write(rect);
+	stream.flush();
 	is_sending = false;
 
 	auto raster = GenericRaster::fromStream(stream);
@@ -125,6 +127,7 @@ std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int c
 	stream.write((char) RSERVER_TYPE_POINTS);
 	stream.write(childidx);
 	stream.write(rect);
+	stream.flush();
 	is_sending = false;
 
 	auto points = make_unique<PointCollection>(stream);
@@ -233,6 +236,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 		}
 		else
 			throw PlatformException("Unknown result type requested");
+		stream.flush();
 	}
 	catch (const NetworkException &e) {
 		// don't do anything

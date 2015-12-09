@@ -37,6 +37,8 @@ class BinaryStream {
 		template<typename T> void write(const T& t);
 		template<typename T> void write(T& t);
 
+		void flush();
+
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) = 0;
 		size_t read(std::string *string, bool allow_eof = false);
 		/*
@@ -46,6 +48,10 @@ class BinaryStream {
 		 */
 		template<typename T> typename std::enable_if< !std::is_class<T>::value, size_t>::type
 			read(T *t, bool allow_eof = false) { return read((char *) t, sizeof(T), allow_eof); }
+		template<typename T>
+			T read() {
+				T t; read(&t); return t;
+		}
 };
 
 
@@ -98,21 +104,6 @@ class UnixSocket : public BinaryStream {
 		int write_fd;
 };
 
-
-class CountingStream : public BinaryStream {
-	public:
-		CountingStream();
-		virtual ~CountingStream();
-
-		virtual void write(const char *buffer, size_t len);
-		virtual size_t read(char *buffer, size_t len, bool allow_eof = false);
-
-		size_t getBytesRead() { return bytes_read; }
-		size_t getBytesWritten() { return bytes_written; }
-	private:
-		size_t bytes_read;
-		size_t bytes_written;
-};
 
 
 #endif

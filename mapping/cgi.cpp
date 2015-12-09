@@ -385,7 +385,7 @@ int processWCS(std::map<std::string, std::string> &params) {
 		unsigned int sizeX = getWfsParameterInteger(params["size_x"]);
 		unsigned int sizeY = getWfsParameterInteger(params["size_y"]);
 
-		time_t timestamp = 1295266500; // 2011-1-17 12:15
+		double timestamp = 1295266500; // 2011-1-17 12:15
 		if(params.count("time") > 0)
 			timestamp = TimeParser::create(TimeParser::Format::ISO)->parse(params["time"]);
 
@@ -466,9 +466,9 @@ int main() {
 
 		epsg_t query_epsg = epsg_from_param(params, "crs", EPSG_WEBMERCATOR);
 
-		time_t timestamp = 1295266500; // 2011-1-17 12:15
+		double timestamp = 1295266500; // 2011-1-17 12:15
 		if (params.count("timestamp") > 0) {
-			timestamp = std::stol(params["timestamp"]);
+			timestamp = TimeParser::create(TimeParser::Format::SECONDS)->parse(params["timestamp"]);
 		}
 		if (params.count("time") > 0) { //TODO: prefer time over timestamp?
 			timestamp = TimeParser::create(TimeParser::Format::ISO)->parse(params["time"]);

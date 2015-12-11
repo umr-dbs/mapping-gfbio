@@ -57,9 +57,36 @@ public:
 	// Timestamps
 	std::vector<double> time_start;
 	std::vector<double> time_end;
+
+	/**
+	 * check if the features in the collection have associated timestamps
+	 * @return true if all features in the collection have associated timestamps
+	 */
 	bool hasTime() const;
+
+	/**
+	 * add default timestamps [minDouble, maxDouble) for all features in the collection
+	 */
 	void addDefaultTimestamps();
+
+	/**
+	 * add given timestamps for all features in the collection
+	 * @param min the time_start for all features
+	 * @param max the time_end for all features
+	 */
 	void addDefaultTimestamps(double min, double max);
+
+	/**
+	 * set the time_start vector for the features
+	 * @param new time_start vector, length must be equal to featureCount
+	 */
+	void setTimeStart(std::vector<double> &&timeStart);
+
+	/**
+	 * set the time_end vector for the features
+	 * @param new time_start vector, length must be equal to featureCount
+	 */
+	void setTimeEnd(std::vector<double> &&timeEnd);
 
 	// feature attributes (one value per feature)
 	AttributeArrays feature_attributes;

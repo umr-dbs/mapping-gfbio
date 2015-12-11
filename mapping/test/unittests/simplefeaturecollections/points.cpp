@@ -455,9 +455,27 @@ TEST(PointCollection, WKTAddMultiFeature){
 	EXPECT_EQ(6, points.coordinates[2].y);
 }
 
-TEST(PointCollection, DISABLED_filterBySTRefIntersection){
-	//TODO
-	FAIL();
+
+
+TEST(PointCollection, filterBySTRefIntersection){
+	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));
+
+	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), POINT(1 2), POINT(55 70), MULTIPOINT(1 2, 17 88), POINT(55 66))";
+	auto points = WKBUtil::readPointCollection(wkt, stref);
+	points->setTimeStart({1, 22, 3, 4 , 11});
+	points->setTimeEnd(  {9, 30, 4, 88, 12});
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	auto filtered = points->filterBySpatioTemporalReferenceIntersection(filter);
+
+	std::vector<bool> keep({true, false, false, true, false});
+	auto expected = points->filter(keep);
+	expected->replaceSTRef(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
 }
 
 TEST(PointCollection, DISABLED_filterBySTRefIntersectionInPlace){

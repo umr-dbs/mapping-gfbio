@@ -28,6 +28,10 @@ void BinaryStream::write(const std::string &string) {
 	write(string.data(), len);
 }
 
+void BinaryStream::flush() {
+
+}
+
 size_t BinaryStream::read(std::string *string, bool allow_eof) {
 	size_t len;
 	if (read(&len, allow_eof) == 0)
@@ -150,7 +154,6 @@ void UnixSocket::write(const char *buffer, size_t len) {
 	//fprintf(stderr, "UnixSocket: written %lu bytes\n", len);
 }
 
-
 size_t UnixSocket::read(char *buffer, size_t len, bool allow_eof) {
 	if (read_fd < 0)
 		throw NetworkException(concat("UnixSocket: cannot read from closed socket ", read_fd, " in pid ", getpid()));
@@ -185,16 +188,3 @@ size_t UnixSocket::read(char *buffer, size_t len, bool allow_eof) {
 
 
 
-
-CountingStream::CountingStream() : bytes_read(0), bytes_written(0) {
-}
-CountingStream::~CountingStream() {
-}
-
-void CountingStream::write(const char *buffer, size_t len) {
-	bytes_written += len;
-}
-size_t CountingStream::read(char *buffer, size_t len, bool allow_eof) {
-	bytes_read += len;
-	return len;
-}

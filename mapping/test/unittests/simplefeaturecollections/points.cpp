@@ -14,38 +14,8 @@
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
 #include "raster/opencl.h"
+#include "test/unittests/simplefeaturecollections/util.h"
 
-void checkEquality(const PointCollection& a, const PointCollection& b){
-	//TODO: check global attributes equality
-
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
-	EXPECT_EQ(a.stref.t1, b.stref.t1);
-	EXPECT_EQ(a.stref.t2, b.stref.t2);
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.x1, b.stref.x1);
-	EXPECT_EQ(a.stref.y1, b.stref.y1);
-	EXPECT_EQ(a.stref.x2, b.stref.x2);
-	EXPECT_EQ(a.stref.y2, b.stref.y2);
-
-	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
-	EXPECT_EQ(a.hasTime(), b.hasTime());
-
-	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
-		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
-		if(a.hasTime()){
-			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
-			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
-		}
-
-		//TODO: check feature attributes equality
-
-		for(size_t point = a.start_feature[feature]; point < a.start_feature[feature + 1]; ++point){
-			EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
-			EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
-		}
-	}
-}
 
 TEST(PointCollection, AddSinglePointFeature) {
 	PointCollection points(SpatioTemporalReference::unreferenced());
@@ -484,38 +454,50 @@ TEST(PointCollection, WKTAddMultiFeature){
 	EXPECT_EQ(5, points.coordinates[2].x);
 	EXPECT_EQ(6, points.coordinates[2].y);
 }
-/*
-TEST(PointCollection, FilterByRectangleIntersection){
-	PointCollection points(SpatioTemporalReference::unreferenced());
-	points.addSinglePointFeature(Coordinate(1,1));
-	points.addCoordinate(11, 11);
-	points.addCoordinate(12, 11);
-	points.finishFeature();
 
-	points.addCoordinate(9, 9);
-	points.addCoordinate(15, 14);
-	points.finishFeature();
 
-	points.addSinglePointFeature(Coordinate(2,3));
 
-	points.addSinglePointFeature(Coordinate(20,20));
+TEST(PointCollection, filterBySTRefIntersection){
+	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));
 
-	auto filteredPoints = points.filterByRectangleIntersection(0, 0, 10, 10);
+	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), POINT(1 2), POINT(55 70), MULTIPOINT(1 2, 17 88), POINT(55 66))";
+	auto points = WKBUtil::readPointCollection(wkt, stref);
+	points->setTimeStart({1, 22, 3, 4 , 11});
+	points->setTimeEnd(  {9, 30, 4, 88, 12});
 
-	EXPECT_EQ(3, filteredPoints->getFeatureCount());
-	EXPECT_EQ(1, filteredPoints->getFeatureReference(0).size());
-	EXPECT_EQ(1, filteredPoints->coordinates[0].x);
-	EXPECT_EQ(1, filteredPoints->coordinates[0].y);
-	EXPECT_EQ(2, filteredPoints->getFeatureReference(1).size());
-	EXPECT_EQ(9, filteredPoints->coordinates[1].x);
-	EXPECT_EQ(9, filteredPoints->coordinates[1].y);
-	EXPECT_EQ(15, filteredPoints->coordinates[2].x);
-	EXPECT_EQ(14, filteredPoints->coordinates[2].y);
-	EXPECT_EQ(1, filteredPoints->getFeatureReference(2).size());
-	EXPECT_EQ(2, filteredPoints->coordinates[3].x);
-	EXPECT_EQ(3, filteredPoints->coordinates[3].y);
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	auto filtered = points->filterBySpatioTemporalReferenceIntersection(filter);
+
+	std::vector<bool> keep({true, false, false, true, false});
+	auto expected = points->filter(keep);
+	expected->replaceSTRef(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
 }
-*/
+
+TEST(PointCollection, DISABLED_filterBySTRefIntersectionInPlace){
+	//TODO
+	FAIL();
+}
+
+TEST(PointCollection, DISABLED_filterInPlace){
+	//TODO
+	FAIL();
+}
+
+TEST(PointCollection, DISABLED_filterByPredicate){
+	//TODO
+	FAIL();
+}
+
+TEST(PointCollection, DISABLED_filterByPredicateInPlace){
+	//TODO
+	FAIL();
+}
+
 TEST(PointCollection, StreamSerialization){
 	PointCollection points(SpatioTemporalReference::unreferenced());
 
@@ -545,5 +527,5 @@ TEST(PointCollection, StreamSerialization){
 
 	PointCollection points2(stream);
 
-	checkEquality(points, points2);
+	CollectionTestUtil::checkEquality(points, points2);
 }

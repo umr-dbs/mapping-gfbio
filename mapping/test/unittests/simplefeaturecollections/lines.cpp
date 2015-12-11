@@ -15,43 +15,7 @@
 #include "raster/opencl.h"
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
-
-void checkEquality(const LineCollection& a, const LineCollection& b){
-	//TODO: check global attributes equality
-
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
-	EXPECT_EQ(a.stref.t1, b.stref.t1);
-	EXPECT_EQ(a.stref.t2, b.stref.t2);
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.x1, b.stref.x1);
-	EXPECT_EQ(a.stref.y1, b.stref.y1);
-	EXPECT_EQ(a.stref.x2, b.stref.x2);
-	EXPECT_EQ(a.stref.y2, b.stref.y2);
-
-	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
-	EXPECT_EQ(a.hasTime(), b.hasTime());
-
-	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
-		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
-		if(a.hasTime()){
-			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
-			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
-		}
-
-		//TODO: check feature attributes equality
-
-		for(size_t line = 0; line < a.getFeatureReference(feature).size(); ++line){
-			EXPECT_EQ(a.getFeatureReference(feature).getLineReference(line).size(), b.getFeatureReference(feature).getLineReference(line).size());
-
-			for(size_t point = a.start_line[a.getFeatureReference(feature).getLineReference(line).getLineIndex()];
-					point < a.start_line[a.getFeatureReference(feature).getLineReference(line).getLineIndex() + 1]; ++point){
-				EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
-				EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
-			}
-		}
-	}
-}
+#include "test/unittests/simplefeaturecollections/util.h"
 
 TEST(LineCollection, GeosGeomConversion) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
@@ -483,79 +447,29 @@ TEST(LineCollection, WKTAddMultiFeature){
 	EXPECT_EQ(1, lines.coordinates[8].y);
 }
 
-TEST(LineCollection, filterByRectangleIntersection){
-	LineCollection lines(SpatioTemporalReference::unreferenced());
-	lines.addCoordinate(1, 1);
-	lines.addCoordinate(5, 1);
-	lines.addCoordinate(8, 8);
-	lines.finishLine(); //inside
-	lines.finishFeature();
+TEST(LineCollection, DISABLED_filterBySTRefIntersection){
+	//TODO
+	FAIL();
+}
 
-	lines.addCoordinate(11, 11);
-	lines.addCoordinate(0, 11);
-	lines.addCoordinate(15, 15);
-	lines.finishLine(); //outside
-	lines.finishFeature();
+TEST(LineCollection, DISABLED_filterBySTRefIntersectionInPlace){
+	//TODO
+	FAIL();
+}
 
-	lines.addCoordinate(5, 5);
-	lines.addCoordinate(11, 11);
-	lines.addCoordinate(18, 15);
-	lines.finishLine(); //crosses
-	lines.finishFeature();
+TEST(LineCollection, DISABLED_filterInPlace){
+	//TODO
+	FAIL();
+}
 
-	lines.addCoordinate(10, 10);
-	lines.addCoordinate(11, 11);
-	lines.addCoordinate(18, 15);
-	lines.finishLine(); //touches in single point
-	lines.finishFeature();
+TEST(LineCollection, DISABLED_filterByPredicate){
+	//TODO
+	FAIL();
+}
 
-	lines.addCoordinate(0, 10);
-	lines.addCoordinate(10, 10);
-	lines.addCoordinate(15, 15);
-	lines.finishLine(); //shares line
-	lines.finishFeature();
-
-	lines.addCoordinate(0, 0);
-	lines.addCoordinate(20, 20);
-	lines.addCoordinate(25, 20);
-	lines.finishLine(); //diagonal
-	lines.finishFeature();
-
-	lines.addCoordinate(11, 11);
-	lines.addCoordinate(0, 11);
-	lines.addCoordinate(15, 15);
-	lines.finishLine();
-	lines.addCoordinate(12, 12);
-	lines.addCoordinate(12, 0);
-	lines.addCoordinate(14, 18);
-	lines.finishLine();
-	lines.finishFeature(); //outside
-
-	lines.addCoordinate(1, 1);
-	lines.addCoordinate(5, 1);
-	lines.addCoordinate(8, 8);
-	lines.finishLine();
-	lines.addCoordinate(12, 12);
-	lines.addCoordinate(12, 0);
-	lines.addCoordinate(14, 18);
-	lines.finishLine();
-	lines.finishFeature(); //one line in- & one line outside
-
-	lines.feature_attributes.addNumericAttribute("numeric", Unit::unknown(), { 1, 2, 3, 4, 5, 6, 7, 8 });
-	lines.feature_attributes.addTextualAttribute("textual", Unit::unknown(), { "1", "2", "3", "4", "5", "6", "7", "8" });
-
-	EXPECT_NO_THROW(lines.validate());
-
-	auto filteredLines = lines.filterByRectangleIntersection(0, 0, 10, 10);
-	EXPECT_NO_THROW(filteredLines->validate());
-
-	auto expected = WKBUtil::readLineCollection("GEOMETRYCOLLECTION(LINESTRING(1 1, 5 1, 8 8), LINESTRING(5 5, 11 11, 18 15), LINESTRING(10 10, 11 11, 18 15), LINESTRING(0 10, 10 10, 15 15), LINESTRING(0 0, 20 20, 25 20), MULTILINESTRING((1 1, 5 1, 8 8), (12 12, 12 0, 14 18)))",SpatioTemporalReference::unreferenced());
-	expected->feature_attributes.addNumericAttribute("numeric", Unit::unknown(), { 1, 3, 4, 5, 6, 8 });
-	expected->feature_attributes.addTextualAttribute("textual", Unit::unknown(), { "1", "3", "4", "5", "6", "8" });
-
-	EXPECT_NO_THROW(expected->validate());
-
-	checkEquality(*expected, *filteredLines);
+TEST(LineCollection, DISABLED_filterByPredicateInPlace){
+	//TODO
+	FAIL();
 }
 
 TEST(LineCollection, StreamSerialization){
@@ -587,5 +501,5 @@ TEST(LineCollection, StreamSerialization){
 
 	LineCollection lines2(stream);
 
-	checkEquality(lines, lines2);
+	CollectionTestUtil::checkEquality(lines, lines2);
 }

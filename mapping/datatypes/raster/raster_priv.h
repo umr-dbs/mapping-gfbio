@@ -34,8 +34,7 @@ class RasterOperator;
 
 template<typename T> class Raster2D : public Raster<T, 2> {
 	public:
-		Raster2D(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth = 0)
-			:Raster<T, 2>(datadescription, stref, width, height, depth) {};
+		Raster2D(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth = 0);
 		virtual ~Raster2D();
 
 		virtual void toPGM(const char *filename, bool avg);

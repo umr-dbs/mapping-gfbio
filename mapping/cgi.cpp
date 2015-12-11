@@ -9,6 +9,7 @@
 #include "services/wfs_request.h"
 #include "util/binarystream.h"
 #include "cache/manager.h"
+#include "util/timeparser.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -141,26 +142,6 @@ static std::map<std::string, std::string> parseQueryString(const char *query_str
 
 	return query_params;
 }
-
-/**
- * This function converts a "datetime"-string in ISO8601 format into a time_t using UTC
- * @param dateTimeString a string with ISO8601 "datetime"
- * @returns The time_t representing the "datetime"
- */
-static time_t parseIso8601DateTime(std::string dateTimeString){
-	const std::string dateTimeFormat{"%Y-%m-%dT%H:%M:%S"}; //TODO: we should allow millisec -> "%Y-%m-%dT%H:%M:%S.SSSZ" std::get_time and the tm struct dont have them.
-
-	//std::stringstream dateTimeStream{dateTimeString}; //TODO: use this with gcc >5.0
-	tm queryDateTime{0};
-	//std::get_time(&queryDateTime, dateTimeFormat); //TODO: use this with gcc >5.0
-	strptime(dateTimeString.c_str(), dateTimeFormat.c_str(), &queryDateTime); //TODO: remove this with gcc >5.0
-	time_t queryTimestamp = timegm(&queryDateTime); //TODO: is there a c++ version for timegm?
-
-	//TODO: parse millisec
-
-	return (queryTimestamp);
-}
-
 
 void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr) {
 	// For now, always guess the colorizer, ignore any user-specified colors
@@ -404,9 +385,9 @@ int processWCS(std::map<std::string, std::string> &params) {
 		unsigned int sizeX = getWfsParameterInteger(params["size_x"]);
 		unsigned int sizeY = getWfsParameterInteger(params["size_y"]);
 
-		time_t timestamp = 1295266500; // 2011-1-17 12:15
+		double timestamp = 1295266500; // 2011-1-17 12:15
 		if(params.count("time") > 0)
-			timestamp = parseIso8601DateTime(params["time"]);
+			timestamp = TimeParser::create(TimeParser::Format::ISO)->parse(params["time"]);
 
 		//build the queryRectangle and get the data
 		bool flipx, flipy;
@@ -485,12 +466,12 @@ int main() {
 
 		epsg_t query_epsg = epsg_from_param(params, "crs", EPSG_WEBMERCATOR);
 
-		time_t timestamp = 1295266500; // 2011-1-17 12:15
+		double timestamp = 1295266500; // 2011-1-17 12:15
 		if (params.count("timestamp") > 0) {
-			timestamp = std::stol(params["timestamp"]);
+			timestamp = TimeParser::create(TimeParser::Format::SECONDS)->parse(params["timestamp"]);
 		}
 		if (params.count("time") > 0) { //TODO: prefer time over timestamp?
-			timestamp = parseIso8601DateTime(params["time"]);
+			timestamp = TimeParser::create(TimeParser::Format::ISO)->parse(params["time"]);
 		}
 
 		bool debug = Configuration::getBool("global.debug", false);

@@ -306,6 +306,12 @@ Raster<T, dimensions>::~Raster() {
 
 
 template<typename T>
+Raster2D<T>::Raster2D(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth )
+	:Raster<T, 2>(datadescription, stref, width, height, depth) {
+}
+
+
+template<typename T>
 Raster2D<T>::~Raster2D() {
 }
 

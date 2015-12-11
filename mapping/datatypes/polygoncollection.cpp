@@ -124,28 +124,22 @@ void PolygonCollection::toStream(BinaryStream &stream) const {
 
 
 template<typename T>
-std::unique_ptr<PolygonCollection> filter( const PolygonCollection *in, const std::vector<T> &keep) {
-	size_t count = in->getFeatureCount();
+std::unique_ptr<PolygonCollection> filter(const PolygonCollection &in, const std::vector<T> &keep, size_t kept_count) {
+	size_t count = in.getFeatureCount();
 	if (keep.size() != count) {
 		std::ostringstream msg;
 		msg << "PolygonCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
 		throw ArgumentException(msg.str());
 	}
 
-	size_t kept_count = 0;
-	for (size_t idx=0;idx<count;idx++) {
-		if (keep[idx])
-			kept_count++;
-	}
-
-	auto out = make_unique<PolygonCollection>(in->stref);
+	auto out = make_unique<PolygonCollection>(in.stref);
 	out->start_feature.reserve(kept_count);
 
 	// copy global attributes
-	out->global_attributes = in->global_attributes;
+	out->global_attributes = in.global_attributes;
 
 	// copy features
-	for (auto feature : *in) {
+	for (auto feature : in) {
 		if (keep[feature]) {
 			//copy polygons
 			for(auto polygon : feature){
@@ -163,17 +157,17 @@ std::unique_ptr<PolygonCollection> filter( const PolygonCollection *in, const st
 	}
 
 	// copy feature attributes
-	out->feature_attributes = in->feature_attributes.filter(keep, kept_count);
+	out->feature_attributes = in.feature_attributes.filter(keep, kept_count);
 
 	// copy time arrays
-	if (in->hasTime()) {
+	if (in.hasTime()) {
 		out->time_start.reserve(kept_count);
 		out->time_end.reserve(kept_count);
 		for (auto i=0;i<count;i++) {
 			for (size_t idx=0;idx<count;idx++) {
 				if (keep[idx]) {
-					out->time_start.push_back(in->time_start[idx]);
-					out->time_end.push_back(in->time_end[idx]);
+					out->time_start.push_back(in.time_start[idx]);
+					out->time_end.push_back(in.time_end[idx]);
 				}
 			}
 		}
@@ -183,11 +177,42 @@ std::unique_ptr<PolygonCollection> filter( const PolygonCollection *in, const st
 }
 
 std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<bool> &keep) const {
-	return ::filter<bool>(this, keep);
+	size_t kept_count = calculate_kept_count(keep);
+	return ::filter<bool>(*this, keep, kept_count);
 }
 
 std::unique_ptr<PolygonCollection> PolygonCollection::filter(const std::vector<char> &keep) const {
-	return ::filter<char>(this, keep);
+	size_t kept_count = calculate_kept_count(keep);
+	return ::filter<char>(*this, keep, kept_count);
+}
+
+void PolygonCollection::filterInPlace(const std::vector<bool> &keep) {
+	auto kept_count = calculate_kept_count(keep);
+	if (kept_count == getFeatureCount())
+		return;
+	auto other = ::filter<bool>(*this, keep, kept_count);
+	*this = std::move(*other);
+}
+
+void PolygonCollection::filterInPlace(const std::vector<char> &keep) {
+	auto kept_count = calculate_kept_count(keep);
+	if (kept_count == getFeatureCount())
+		return;
+	auto other = ::filter<char>(*this, keep, kept_count);
+	*this = std::move(*other);
+}
+
+std::unique_ptr<PolygonCollection> PolygonCollection::filterBySpatioTemporalReferenceIntersection(const SpatioTemporalReference& stref) const{
+	auto keep = getKeepVectorForFilterBySpatioTemporalReferenceIntersection(stref);
+	auto filtered = filter(keep);
+	filtered->replaceSTRef(stref);
+	return filtered;
+}
+
+void PolygonCollection::filterBySpatioTemporalReferenceIntersectionInPlace(const SpatioTemporalReference& stref) {
+	auto keep = getKeepVectorForFilterBySpatioTemporalReferenceIntersection(stref);
+	replaceSTRef(stref);
+	filterInPlace(keep);
 }
 
 bool PolygonCollection::featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const{
@@ -219,22 +244,6 @@ bool PolygonCollection::featureIntersectsRectangle(size_t featureIndex, double x
 	}
 
 	return false;
-}
-
-std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(double x1, double y1, double x2, double y2) const{
-	std::vector<bool> keep(getFeatureCount());
-
-	for(auto feature : *this){
-		if(featureIntersectsRectangle(feature, x1, y1, x2, y2)){
-			keep[feature] = true;
-		}
-	}
-
-	return filter(keep);
-}
-
-std::unique_ptr<PolygonCollection> PolygonCollection::filterByRectangleIntersection(const SpatialReference& sref) const{
-	return filterByRectangleIntersection(sref.x1, sref.y1, sref.x2, sref.y2);
 }
 
 void PolygonCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostringstream& json) const {

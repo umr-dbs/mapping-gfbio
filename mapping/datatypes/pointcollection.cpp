@@ -23,37 +23,21 @@ std::unique_ptr<PointCollection> PointCollection::clone() const {
 }
 
 
-
 template<typename T>
-size_t calculate_kept_count(const std::vector<T> &keep, size_t feature_count) {
-	if (keep.size() != feature_count)
-		throw ArgumentException(concat("PointCollection::filter(): size of filter does not match (", keep.size(), " != ", feature_count, ")"));
-
-	size_t kept_count = 0;
-	for (size_t idx=0;idx<feature_count;idx++) {
-		if (keep[idx])
-			kept_count++;
-	}
-	return kept_count;
-}
-
-template<typename T>
-std::unique_ptr<PointCollection> filter(const PointCollection *in, const std::vector<T> &keep, size_t kept_count) {
-	size_t count = in->getFeatureCount();
+std::unique_ptr<PointCollection> filter(const PointCollection &in, const std::vector<T> &keep, size_t kept_count) {
+	size_t count = in.getFeatureCount();
 	if (keep.size() != count) {
-		std::ostringstream msg;
-		msg << "PointCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
-		throw ArgumentException(msg.str());
+		throw ArgumentException(concat("PointCollection::filter(): size of filter does not match (", keep.size(), " != ",count, ")"));
 	}
 
-	auto out = make_unique<PointCollection>(in->stref);
+	auto out = make_unique<PointCollection>(in.stref);
 	out->start_feature.reserve(kept_count);
 
 	// copy global attributes
-	out->global_attributes = in->global_attributes;
+	out->global_attributes = in.global_attributes;
 
 	// copy features
-	for (auto feature : *in) {
+	for (auto feature : in) {
 		if (keep[feature]) {
 			//copy coordinates
 			for (auto & c : feature) {
@@ -64,18 +48,16 @@ std::unique_ptr<PointCollection> filter(const PointCollection *in, const std::ve
 	}
 
 	// copy feature attributes
-	out->feature_attributes = in->feature_attributes.filter(keep, kept_count);
+	out->feature_attributes = in.feature_attributes.filter(keep, kept_count);
 
 	// copy time arrays
-	if (in->hasTime()) {
+	if (in.hasTime()) {
 		out->time_start.reserve(kept_count);
 		out->time_end.reserve(kept_count);
-		for (auto i=0;i<count;i++) {
-			for (size_t idx=0;idx<count;idx++) {
-				if (keep[idx]) {
-					out->time_start.push_back(in->time_start[idx]);
-					out->time_end.push_back(in->time_end[idx]);
-				}
+		for (size_t idx = 0; idx < count; idx++) {
+			if (keep[idx]) {
+				out->time_start.push_back(in.time_start[idx]);
+				out->time_end.push_back(in.time_end[idx]);
 			}
 		}
 	}
@@ -84,38 +66,41 @@ std::unique_ptr<PointCollection> filter(const PointCollection *in, const std::ve
 }
 
 std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<bool> &keep) const {
-	auto kept_count = calculate_kept_count(keep, this->getFeatureCount());
-	return ::filter<bool>(this, keep, kept_count);
+	auto kept_count = calculate_kept_count(keep);
+	return ::filter<bool>(*this, keep, kept_count);
 }
 
 std::unique_ptr<PointCollection> PointCollection::filter(const std::vector<char> &keep) const {
-	auto kept_count = calculate_kept_count(keep, this->getFeatureCount());
-	return ::filter<char>(this, keep, kept_count);
+	auto kept_count = calculate_kept_count(keep);
+	return ::filter<char>(*this, keep, kept_count);
 }
 
 void PointCollection::filterInPlace(const std::vector<bool> &keep) {
-	auto kept_count = calculate_kept_count(keep, this->getFeatureCount());
+	auto kept_count = calculate_kept_count(keep);
 	if (kept_count == getFeatureCount())
 		return;
-	auto other = ::filter<bool>(this, keep, kept_count);
+	auto other = ::filter<bool>(*this, keep, kept_count);
 	*this = std::move(*other);
 }
 
 void PointCollection::filterInPlace(const std::vector<char> &keep) {
-	auto kept_count = calculate_kept_count(keep, this->getFeatureCount());
+	auto kept_count = calculate_kept_count(keep);
 	if (kept_count == getFeatureCount())
 		return;
-	auto other = ::filter<char>(this, keep, kept_count);
+	auto other = ::filter<char>(*this, keep, kept_count);
 	*this = std::move(*other);
 }
 
 std::unique_ptr<PointCollection> PointCollection::filterBySpatioTemporalReferenceIntersection(const SpatioTemporalReference& stref) const{
 	auto keep = getKeepVectorForFilterBySpatioTemporalReferenceIntersection(stref);
-	return filter(keep);
+	auto filtered = filter(keep);
+	filtered->replaceSTRef(stref);
+	return filtered;
 }
 
 void PointCollection::filterBySpatioTemporalReferenceIntersectionInPlace(const SpatioTemporalReference& stref) {
 	auto keep = getKeepVectorForFilterBySpatioTemporalReferenceIntersection(stref);
+	replaceSTRef(stref);
 	filterInPlace(keep);
 }
 

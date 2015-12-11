@@ -16,7 +16,7 @@ TEST(STCacheTest,SimpleTest) {
 	epsg_t epsg = EPSG_LATLON;
 	uint32_t width = 256, height = 256;
 	time_t timestamp = parseIso8601DateTime(timestr);
-	GenericOperator *op = GenericOperator::fromJSON( json ).release();
+	auto op = GenericOperator::fromJSON( json );
 
 
 	std::string bboxes[] = {

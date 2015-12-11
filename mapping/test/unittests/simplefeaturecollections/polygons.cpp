@@ -13,46 +13,7 @@
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
 #include "raster/opencl.h"
-
-void checkEquality(const PolygonCollection& a, const PolygonCollection& b){
-	//TODO: check global attributes equality
-
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
-	EXPECT_EQ(a.stref.t1, b.stref.t1);
-	EXPECT_EQ(a.stref.t2, b.stref.t2);
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.x1, b.stref.x1);
-	EXPECT_EQ(a.stref.y1, b.stref.y1);
-	EXPECT_EQ(a.stref.x2, b.stref.x2);
-	EXPECT_EQ(a.stref.y2, b.stref.y2);
-
-	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
-	EXPECT_EQ(a.hasTime(), b.hasTime());
-
-	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
-		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
-		if(a.hasTime()){
-			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
-			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
-		}
-
-		//TODO: check feature attributes equality
-
-		for(size_t polygon = 0; polygon < a.getFeatureReference(feature).size(); ++polygon){
-			EXPECT_EQ(a.getFeatureReference(feature).getPolygonReference(polygon).size(), b.getFeatureReference(feature).getPolygonReference(polygon).size());
-			for(size_t ring = 0; ring < a.getFeatureReference(feature).getPolygonReference(polygon).size(); ++ring){
-				EXPECT_EQ(a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).size(), b.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).size());
-
-				for(size_t point = a.start_ring[a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).getRingIndex()];
-						point < a.start_ring[a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).getRingIndex() + 1]; ++point){
-					EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
-					EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
-				}
-			}
-		}
-	}
-}
+#include "test/unittests/simplefeaturecollections/util.h"
 
 TEST(PolygonCollection, AddSinglePolygonFeature) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
@@ -748,75 +709,29 @@ TEST(PolygonCollection, WKTAddMultiFeature){
 	EXPECT_EQ(2, polygons.getFeatureReference(1).size());
 }
 
-TEST(PolygonCollection, filterByRectangleIntersection){
-	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+TEST(PolygonCollection, DISABLED_filterBySTRefIntersection){
+	//TODO
+	FAIL();
+}
 
-	polygons.addCoordinate(1,1);
-	polygons.addCoordinate(2,8);
-	polygons.addCoordinate(8,2);
-	polygons.addCoordinate(1,1);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //inside
+TEST(PolygonCollection, DISABLED_filterBySTRefIntersectionInPlace){
+	//TODO
+	FAIL();
+}
 
-	polygons.addCoordinate(11,11);
-	polygons.addCoordinate(12,18);
-	polygons.addCoordinate(18,12);
-	polygons.addCoordinate(11,11);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //outside
+TEST(PolygonCollection, DISABLED_filterInPlace){
+	//TODO
+	FAIL();
+}
 
-	polygons.addCoordinate(1,1);
-	polygons.addCoordinate(12,18);
-	polygons.addCoordinate(18,12);
-	polygons.addCoordinate(1,1);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //crosses
+TEST(PolygonCollection, DISABLED_filterByPredicate){
+	//TODO
+	FAIL();
+}
 
-	polygons.addCoordinate(10,10);
-	polygons.addCoordinate(12,18);
-	polygons.addCoordinate(18,12);
-	polygons.addCoordinate(10,10);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //touches
-
-	polygons.addCoordinate(-10,-10);
-	polygons.addCoordinate(-10,20);
-	polygons.addCoordinate(20,20);
-	polygons.addCoordinate(20,-10);
-	polygons.addCoordinate(-10,-10);
-	polygons.finishRing();
-	polygons.addCoordinate(-5,-5);
-	polygons.addCoordinate(-5,15);
-	polygons.addCoordinate(15,15);
-	polygons.addCoordinate(15,-5);
-	polygons.addCoordinate(-5,-5);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //rectangle in hole
-
-	polygons.addCoordinate(1,1);
-	polygons.addCoordinate(2,8);
-	polygons.addCoordinate(8,2);
-	polygons.addCoordinate(1,1);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.addCoordinate(11,11);
-	polygons.addCoordinate(12,18);
-	polygons.addCoordinate(18,12);
-	polygons.addCoordinate(11,11);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //one polygon inside, one outside
-
-	auto filteredPolygons = polygons.filterByRectangleIntersection(0, 0, 10, 10);
-
-	auto expected = WKBUtil::readPolygonCollection("GEOMETRYCOLLECTION(POLYGON((1 1, 2 8, 8 2, 1 1)), POLYGON((1 1, 12 18, 18 12, 1 1)), POLYGON((10 10, 12 18, 18 12, 10 10)), MULTIPOLYGON(((1 1, 2 8, 8 2, 1 1)),((11 11, 12 18, 18 12, 11 11))))", SpatioTemporalReference::unreferenced());
-
-	checkEquality(*expected, *filteredPolygons);
+TEST(PolygonCollection, DISABLED_filterByPredicateInPlace){
+	//TODO
+	FAIL();
 }
 
 TEST(PolygonCollection, StreamSerialization){
@@ -870,5 +785,5 @@ TEST(PolygonCollection, StreamSerialization){
 
 	PolygonCollection polygons2(stream);
 
-	checkEquality(polygons, polygons2);
+	CollectionTestUtil::checkEquality(polygons, polygons2);
 }

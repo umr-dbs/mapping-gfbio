@@ -11,14 +11,14 @@ public:
 	static void checkAttributeMapsEquality(const AttributeMaps& expected, const AttributeMaps& actual){
 		{//numeric
 			auto expectedRef = expected.numeric();
-			auto actualRef = expected.numeric();
+			auto actualRef = actual.numeric();
 
 			auto expectedIt = expectedRef.begin();
 			auto actualIt = actualRef.begin();
 
 			for(;expectedIt != expectedRef.end() && actualIt !=actualRef.end(); ++expectedIt, ++actualIt){
 				EXPECT_EQ(expectedIt->first, actualIt->first);
-				EXPECT_EQ(expectedIt->second, expectedIt->second);
+				EXPECT_EQ(expectedIt->second, actualIt->second);
 			}
 			EXPECT_EQ(expectedRef.end(), expectedIt);
 			EXPECT_EQ(actualRef.end(), actualIt);
@@ -26,14 +26,14 @@ public:
 
 		{//textual
 			auto expectedRef = expected.textual();
-			auto actualRef = expected.textual();
+			auto actualRef = actual.textual();
 
 			auto expectedIt = expectedRef.begin();
 			auto actualIt = actualRef.begin();
 
 			for(;expectedIt != expectedRef.end() && actualIt !=actualRef.end(); ++expectedIt, ++actualIt){
 				EXPECT_EQ(expectedIt->first, actualIt->first);
-				EXPECT_EQ(expectedIt->second, expectedIt->second);
+				EXPECT_EQ(expectedIt->second, actualIt->second);
 			}
 			EXPECT_EQ(expectedRef.end(), expectedIt);
 			EXPECT_EQ(actualRef.end(), actualIt);
@@ -47,8 +47,11 @@ public:
 
 			EXPECT_EQ(expectedKeys.size(), actualKeys.size());
 			for(size_t keyIndex = 0; keyIndex < expectedKeys.size(); ++keyIndex){
+				std::string& expectedKey = expectedKeys[keyIndex];
+				std::string& actualKey = actualKeys[keyIndex];
+				EXPECT_EQ(expectedKey, actualKey);
 				for(size_t i = 0; i < featureCount; ++i){
-					EXPECT_EQ(expected.numeric(expectedKeys[keyIndex]).get(i), actual.numeric(actualKeys[keyIndex]).get(i));
+					EXPECT_EQ(expected.numeric(expectedKey).get(i), actual.numeric(actualKey).get(i));
 				}
 			}
 		}
@@ -59,11 +62,13 @@ public:
 
 			EXPECT_EQ(expectedKeys.size(), actualKeys.size());
 			for(size_t keyIndex = 0; keyIndex < expectedKeys.size(); ++keyIndex){
+				std::string& expectedKey = expectedKeys[keyIndex];
+				std::string& actualKey = actualKeys[keyIndex];
+				EXPECT_EQ(expectedKey, actualKey);
 				for(size_t i = 0; i < featureCount; ++i){
-					EXPECT_EQ(expected.numeric(expectedKeys[keyIndex]).get(i), actual.numeric(actualKeys[keyIndex]).get(i));
+					EXPECT_EQ(expected.textual(expectedKey).get(i), actual.textual(actualKey).get(i));
 				}
 			}
-
 		}
 	}
 

@@ -44,13 +44,13 @@ void ex_handler() {
 }
 
 thread_local std::ostringstream ExecTimer::buffer;
-thread_local uint ExecTimer::depth = 0;
+thread_local uint8_t ExecTimer::depth = 0;
 
 ExecTimer::ExecTimer(std::string&& name)  : name(std::move(name)) {
 	if ( depth == 0 )
 		buffer << std::endl;
 	ExecTimer::depth++;
-	for ( uint i = 1; i < depth; i++ )
+	for ( uint8_t i = 1; i < depth; i++ )
 		buffer << "  ";
 	buffer << "Enter " << this->name << std::endl;
 	start = std::chrono::system_clock::now();

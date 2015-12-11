@@ -748,75 +748,24 @@ TEST(PolygonCollection, WKTAddMultiFeature){
 	EXPECT_EQ(2, polygons.getFeatureReference(1).size());
 }
 
-TEST(PolygonCollection, filterByRectangleIntersection){
-	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+TEST(PolygonCollection, filterBySTRefIntersection){
+	//TODO
+	FAIL();
+}
 
-	polygons.addCoordinate(1,1);
-	polygons.addCoordinate(2,8);
-	polygons.addCoordinate(8,2);
-	polygons.addCoordinate(1,1);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //inside
+TEST(PolygonCollection, filterBySTRefIntersectionInPlace){
+	//TODO
+	FAIL();
+}
 
-	polygons.addCoordinate(11,11);
-	polygons.addCoordinate(12,18);
-	polygons.addCoordinate(18,12);
-	polygons.addCoordinate(11,11);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //outside
+TEST(PolygonCollection, filterByPredicate){
+	//TODO
+	FAIL();
+}
 
-	polygons.addCoordinate(1,1);
-	polygons.addCoordinate(12,18);
-	polygons.addCoordinate(18,12);
-	polygons.addCoordinate(1,1);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //crosses
-
-	polygons.addCoordinate(10,10);
-	polygons.addCoordinate(12,18);
-	polygons.addCoordinate(18,12);
-	polygons.addCoordinate(10,10);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //touches
-
-	polygons.addCoordinate(-10,-10);
-	polygons.addCoordinate(-10,20);
-	polygons.addCoordinate(20,20);
-	polygons.addCoordinate(20,-10);
-	polygons.addCoordinate(-10,-10);
-	polygons.finishRing();
-	polygons.addCoordinate(-5,-5);
-	polygons.addCoordinate(-5,15);
-	polygons.addCoordinate(15,15);
-	polygons.addCoordinate(15,-5);
-	polygons.addCoordinate(-5,-5);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //rectangle in hole
-
-	polygons.addCoordinate(1,1);
-	polygons.addCoordinate(2,8);
-	polygons.addCoordinate(8,2);
-	polygons.addCoordinate(1,1);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.addCoordinate(11,11);
-	polygons.addCoordinate(12,18);
-	polygons.addCoordinate(18,12);
-	polygons.addCoordinate(11,11);
-	polygons.finishRing();
-	polygons.finishPolygon();
-	polygons.finishFeature(); //one polygon inside, one outside
-
-	auto filteredPolygons = polygons.filterByRectangleIntersection(0, 0, 10, 10);
-
-	auto expected = WKBUtil::readPolygonCollection("GEOMETRYCOLLECTION(POLYGON((1 1, 2 8, 8 2, 1 1)), POLYGON((1 1, 12 18, 18 12, 1 1)), POLYGON((10 10, 12 18, 18 12, 10 10)), MULTIPOLYGON(((1 1, 2 8, 8 2, 1 1)),((11 11, 12 18, 18 12, 11 11))))", SpatioTemporalReference::unreferenced());
-
-	checkEquality(*expected, *filteredPolygons);
+TEST(PolygonCollection, filterByPredicateInPlace){
+	//TODO
+	FAIL();
 }
 
 TEST(PolygonCollection, StreamSerialization){

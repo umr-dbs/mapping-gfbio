@@ -116,6 +116,9 @@ protected:
 	//calculate the MBR of the coordinates in range from start to stop (exclusive)
 	SpatialReference calculateMBR(size_t coordinateIndexStart, size_t coordinateIndexStop) const;
 
+	size_t calculate_kept_count(const std::vector<bool> &keep) const;
+	size_t calculate_kept_count(const std::vector<char> &keep) const;
+
 	// helper for filterBySpatioTemporalReferenceIntersection() implemented in the child classes
 	std::vector<bool> getKeepVectorForFilterBySpatioTemporalReferenceIntersection(const SpatioTemporalReference& stref) const;
 

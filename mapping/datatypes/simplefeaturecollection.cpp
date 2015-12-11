@@ -319,3 +319,31 @@ std::vector<bool> SimpleFeatureCollection::getKeepVectorForFilterBySpatioTempora
 	}
 	return keep;
 }
+
+size_t SimpleFeatureCollection::calculate_kept_count(const std::vector<bool> &keep) const {
+	size_t count = getFeatureCount();
+	if (keep.size() != count) {
+		throw ArgumentException(concat("SimpleFeatureCollection::filter(): size of filter does not match (", keep.size(), " != ",count, ")"));
+	}
+
+	size_t kept_count = 0;
+	for (size_t idx=0;idx<keep.size();idx++) {
+		if (keep[idx])
+			kept_count++;
+	}
+	return kept_count;
+}
+
+size_t SimpleFeatureCollection::calculate_kept_count(const std::vector<char> &keep) const {
+	size_t count = getFeatureCount();
+	if (keep.size() != count) {
+		throw ArgumentException(concat("SimpleFeatureCollection::filter(): size of filter does not match (", keep.size(), " != ",count, ")"));
+	}
+
+	size_t kept_count = 0;
+	for (size_t idx=0;idx<keep.size();idx++) {
+		if (keep[idx])
+			kept_count++;
+	}
+	return kept_count;
+}

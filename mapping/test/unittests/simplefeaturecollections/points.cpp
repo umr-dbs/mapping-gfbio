@@ -484,38 +484,32 @@ TEST(PointCollection, WKTAddMultiFeature){
 	EXPECT_EQ(5, points.coordinates[2].x);
 	EXPECT_EQ(6, points.coordinates[2].y);
 }
-/*
-TEST(PointCollection, FilterByRectangleIntersection){
-	PointCollection points(SpatioTemporalReference::unreferenced());
-	points.addSinglePointFeature(Coordinate(1,1));
-	points.addCoordinate(11, 11);
-	points.addCoordinate(12, 11);
-	points.finishFeature();
 
-	points.addCoordinate(9, 9);
-	points.addCoordinate(15, 14);
-	points.finishFeature();
-
-	points.addSinglePointFeature(Coordinate(2,3));
-
-	points.addSinglePointFeature(Coordinate(20,20));
-
-	auto filteredPoints = points.filterByRectangleIntersection(0, 0, 10, 10);
-
-	EXPECT_EQ(3, filteredPoints->getFeatureCount());
-	EXPECT_EQ(1, filteredPoints->getFeatureReference(0).size());
-	EXPECT_EQ(1, filteredPoints->coordinates[0].x);
-	EXPECT_EQ(1, filteredPoints->coordinates[0].y);
-	EXPECT_EQ(2, filteredPoints->getFeatureReference(1).size());
-	EXPECT_EQ(9, filteredPoints->coordinates[1].x);
-	EXPECT_EQ(9, filteredPoints->coordinates[1].y);
-	EXPECT_EQ(15, filteredPoints->coordinates[2].x);
-	EXPECT_EQ(14, filteredPoints->coordinates[2].y);
-	EXPECT_EQ(1, filteredPoints->getFeatureReference(2).size());
-	EXPECT_EQ(2, filteredPoints->coordinates[3].x);
-	EXPECT_EQ(3, filteredPoints->coordinates[3].y);
+TEST(PointCollection, filterBySTRefIntersection){
+	//TODO
+	FAIL();
 }
-*/
+
+TEST(PointCollection, filterBySTRefIntersectionInPlace){
+	//TODO
+	FAIL();
+}
+
+TEST(PointCollection, filterInPlace){
+	//TODO
+	FAIL();
+}
+
+TEST(PointCollection, filterByPredicate){
+	//TODO
+	FAIL();
+}
+
+TEST(PointCollection, filterByPredicateInPlace){
+	//TODO
+	FAIL();
+}
+
 TEST(PointCollection, StreamSerialization){
 	PointCollection points(SpatioTemporalReference::unreferenced());
 

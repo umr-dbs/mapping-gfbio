@@ -14,38 +14,8 @@
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
 #include "raster/opencl.h"
+#include "test/unittests/simplefeaturecollections/util.h"
 
-void checkEquality(const PointCollection& a, const PointCollection& b){
-	//TODO: check global attributes equality
-
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
-	EXPECT_EQ(a.stref.t1, b.stref.t1);
-	EXPECT_EQ(a.stref.t2, b.stref.t2);
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.x1, b.stref.x1);
-	EXPECT_EQ(a.stref.y1, b.stref.y1);
-	EXPECT_EQ(a.stref.x2, b.stref.x2);
-	EXPECT_EQ(a.stref.y2, b.stref.y2);
-
-	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
-	EXPECT_EQ(a.hasTime(), b.hasTime());
-
-	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
-		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
-		if(a.hasTime()){
-			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
-			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
-		}
-
-		//TODO: check feature attributes equality
-
-		for(size_t point = a.start_feature[feature]; point < a.start_feature[feature + 1]; ++point){
-			EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
-			EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
-		}
-	}
-}
 
 TEST(PointCollection, AddSinglePointFeature) {
 	PointCollection points(SpatioTemporalReference::unreferenced());
@@ -539,5 +509,5 @@ TEST(PointCollection, StreamSerialization){
 
 	PointCollection points2(stream);
 
-	checkEquality(points, points2);
+	CollectionTestUtil::checkEquality(points, points2);
 }

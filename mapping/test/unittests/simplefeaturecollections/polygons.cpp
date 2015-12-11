@@ -13,46 +13,7 @@
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
 #include "raster/opencl.h"
-
-void checkEquality(const PolygonCollection& a, const PolygonCollection& b){
-	//TODO: check global attributes equality
-
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
-	EXPECT_EQ(a.stref.t1, b.stref.t1);
-	EXPECT_EQ(a.stref.t2, b.stref.t2);
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.x1, b.stref.x1);
-	EXPECT_EQ(a.stref.y1, b.stref.y1);
-	EXPECT_EQ(a.stref.x2, b.stref.x2);
-	EXPECT_EQ(a.stref.y2, b.stref.y2);
-
-	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
-	EXPECT_EQ(a.hasTime(), b.hasTime());
-
-	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
-		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
-		if(a.hasTime()){
-			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
-			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
-		}
-
-		//TODO: check feature attributes equality
-
-		for(size_t polygon = 0; polygon < a.getFeatureReference(feature).size(); ++polygon){
-			EXPECT_EQ(a.getFeatureReference(feature).getPolygonReference(polygon).size(), b.getFeatureReference(feature).getPolygonReference(polygon).size());
-			for(size_t ring = 0; ring < a.getFeatureReference(feature).getPolygonReference(polygon).size(); ++ring){
-				EXPECT_EQ(a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).size(), b.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).size());
-
-				for(size_t point = a.start_ring[a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).getRingIndex()];
-						point < a.start_ring[a.getFeatureReference(feature).getPolygonReference(polygon).getRingReference(ring).getRingIndex() + 1]; ++point){
-					EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
-					EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
-				}
-			}
-		}
-	}
-}
+#include "test/unittests/simplefeaturecollections/util.h"
 
 TEST(PolygonCollection, AddSinglePolygonFeature) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
@@ -758,6 +719,11 @@ TEST(PolygonCollection, filterBySTRefIntersectionInPlace){
 	FAIL();
 }
 
+TEST(PolygonCollection, filterInPlace){
+	//TODO
+	FAIL();
+}
+
 TEST(PolygonCollection, filterByPredicate){
 	//TODO
 	FAIL();
@@ -819,5 +785,5 @@ TEST(PolygonCollection, StreamSerialization){
 
 	PolygonCollection polygons2(stream);
 
-	checkEquality(polygons, polygons2);
+	CollectionTestUtil::checkEquality(polygons, polygons2);
 }

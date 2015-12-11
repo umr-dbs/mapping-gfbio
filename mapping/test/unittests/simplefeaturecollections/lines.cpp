@@ -15,43 +15,7 @@
 #include "raster/opencl.h"
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
-
-void checkEquality(const LineCollection& a, const LineCollection& b){
-	//TODO: check global attributes equality
-
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.timetype, b.stref.timetype);
-	EXPECT_EQ(a.stref.t1, b.stref.t1);
-	EXPECT_EQ(a.stref.t2, b.stref.t2);
-	EXPECT_EQ(a.stref.epsg, b.stref.epsg);
-	EXPECT_EQ(a.stref.x1, b.stref.x1);
-	EXPECT_EQ(a.stref.y1, b.stref.y1);
-	EXPECT_EQ(a.stref.x2, b.stref.x2);
-	EXPECT_EQ(a.stref.y2, b.stref.y2);
-
-	EXPECT_EQ(a.getFeatureCount(), b.getFeatureCount());
-	EXPECT_EQ(a.hasTime(), b.hasTime());
-
-	for(size_t feature = 0; feature < a.getFeatureCount(); ++feature){
-		EXPECT_EQ(a.getFeatureReference(feature).size(), b.getFeatureReference(feature).size());
-		if(a.hasTime()){
-			EXPECT_EQ(a.time_start[feature], b.time_start[feature]);
-			EXPECT_EQ(a.time_end[feature], b.time_end[feature]);
-		}
-
-		//TODO: check feature attributes equality
-
-		for(size_t line = 0; line < a.getFeatureReference(feature).size(); ++line){
-			EXPECT_EQ(a.getFeatureReference(feature).getLineReference(line).size(), b.getFeatureReference(feature).getLineReference(line).size());
-
-			for(size_t point = a.start_line[a.getFeatureReference(feature).getLineReference(line).getLineIndex()];
-					point < a.start_line[a.getFeatureReference(feature).getLineReference(line).getLineIndex() + 1]; ++point){
-				EXPECT_EQ(a.coordinates[point].x, b.coordinates[point].x);
-				EXPECT_EQ(a.coordinates[point].y, b.coordinates[point].y);
-			}
-		}
-	}
-}
+#include "test/unittests/simplefeaturecollections/util.h"
 
 TEST(LineCollection, GeosGeomConversion) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
@@ -537,5 +501,5 @@ TEST(LineCollection, StreamSerialization){
 
 	LineCollection lines2(stream);
 
-	checkEquality(lines, lines2);
+	CollectionTestUtil::checkEquality(lines, lines2);
 }

@@ -709,27 +709,27 @@ TEST(PolygonCollection, WKTAddMultiFeature){
 	EXPECT_EQ(2, polygons.getFeatureReference(1).size());
 }
 
-TEST(PolygonCollection, filterBySTRefIntersection){
+TEST(PolygonCollection, DISABLED_filterBySTRefIntersection){
 	//TODO
 	FAIL();
 }
 
-TEST(PolygonCollection, filterBySTRefIntersectionInPlace){
+TEST(PolygonCollection, DISABLED_filterBySTRefIntersectionInPlace){
 	//TODO
 	FAIL();
 }
 
-TEST(PolygonCollection, filterInPlace){
+TEST(PolygonCollection, DISABLED_filterInPlace){
 	//TODO
 	FAIL();
 }
 
-TEST(PolygonCollection, filterByPredicate){
+TEST(PolygonCollection, DISABLED_filterByPredicate){
 	//TODO
 	FAIL();
 }
 
-TEST(PolygonCollection, filterByPredicateInPlace){
+TEST(PolygonCollection, DISABLED_filterByPredicateInPlace){
 	//TODO
 	FAIL();
 }

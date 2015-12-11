@@ -455,27 +455,27 @@ TEST(PointCollection, WKTAddMultiFeature){
 	EXPECT_EQ(6, points.coordinates[2].y);
 }
 
-TEST(PointCollection, filterBySTRefIntersection){
+TEST(PointCollection, DISABLED_filterBySTRefIntersection){
 	//TODO
 	FAIL();
 }
 
-TEST(PointCollection, filterBySTRefIntersectionInPlace){
+TEST(PointCollection, DISABLED_filterBySTRefIntersectionInPlace){
 	//TODO
 	FAIL();
 }
 
-TEST(PointCollection, filterInPlace){
+TEST(PointCollection, DISABLED_filterInPlace){
 	//TODO
 	FAIL();
 }
 
-TEST(PointCollection, filterByPredicate){
+TEST(PointCollection, DISABLED_filterByPredicate){
 	//TODO
 	FAIL();
 }
 
-TEST(PointCollection, filterByPredicateInPlace){
+TEST(PointCollection, DISABLED_filterByPredicateInPlace){
 	//TODO
 	FAIL();
 }

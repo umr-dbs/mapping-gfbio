@@ -447,27 +447,27 @@ TEST(LineCollection, WKTAddMultiFeature){
 	EXPECT_EQ(1, lines.coordinates[8].y);
 }
 
-TEST(LineCollection, filterBySTRefIntersection){
+TEST(LineCollection, DISABLED_filterBySTRefIntersection){
 	//TODO
 	FAIL();
 }
 
-TEST(LineCollection, filterBySTRefIntersectionInPlace){
+TEST(LineCollection, DISABLED_filterBySTRefIntersectionInPlace){
 	//TODO
 	FAIL();
 }
 
-TEST(LineCollection, filterInPlace){
+TEST(LineCollection, DISABLED_filterInPlace){
 	//TODO
 	FAIL();
 }
 
-TEST(LineCollection, filterByPredicate){
+TEST(LineCollection, DISABLED_filterByPredicate){
 	//TODO
 	FAIL();
 }
 
-TEST(LineCollection, filterByPredicateInPlace){
+TEST(LineCollection, DISABLED_filterByPredicateInPlace){
 	//TODO
 	FAIL();
 }

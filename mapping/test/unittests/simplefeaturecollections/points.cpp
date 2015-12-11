@@ -16,6 +16,20 @@
 #include "raster/opencl.h"
 #include "test/unittests/simplefeaturecollections/util.h"
 
+std::unique_ptr<PointCollection> createPointsWithAttributesAndTime(){
+	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 1), POINT(2 5), MULTIPOINT(8 6, 8 9, 88 99, 23 21), POINT(68 59), MULTIPOINT(42 6, 43 7))";
+	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
+	points->setTimeStart({2, 4,  8, 16, 32});
+	points->setTimeEnd(  {4, 8, 16, 32, 64});
+
+	points->global_attributes.setTextual("info", "1234");
+	points->global_attributes.setNumeric("index", 42);
+
+	points->feature_attributes.addNumericAttribute("value", Unit::unknown(), {0.0, 1.1, 2.2, 3.3, 4.4});
+	points->feature_attributes.addTextualAttribute("label", Unit::unknown(), {"l0", "l1", "l2", "l3", "l4"});
+
+	return points;
+}
 
 TEST(PointCollection, AddSinglePointFeature) {
 	PointCollection points(SpatioTemporalReference::unreferenced());
@@ -455,16 +469,20 @@ TEST(PointCollection, WKTAddMultiFeature){
 	EXPECT_EQ(6, points.coordinates[2].y);
 }
 
-
-
-TEST(PointCollection, filterBySTRefIntersection){
+std::unique_ptr<PointCollection> createPointsForSTRefFilter(){
 	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));
 
-	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), POINT(1 2), POINT(55 70), MULTIPOINT(1 2, 17 88), POINT(55 66))";
+	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), POINT(1 2), POINT(55 70), MULTIPOINT((1 2), (17 88)), POINT(55 66))";
 	auto points = WKBUtil::readPointCollection(wkt, stref);
 	points->setTimeStart({1, 22, 3, 4 , 11});
 	points->setTimeEnd(  {9, 30, 4, 88, 12});
+
+	return points;
+}
+
+TEST(PointCollection, filterBySTRefIntersection){
+	auto points = createPointsForSTRefFilter();
 
 	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
@@ -478,24 +496,56 @@ TEST(PointCollection, filterBySTRefIntersection){
 	CollectionTestUtil::checkEquality(*expected, *filtered);
 }
 
-TEST(PointCollection, DISABLED_filterBySTRefIntersectionInPlace){
-	//TODO
-	FAIL();
+TEST(PointCollection, filterBySTRefIntersectionInPlace){
+	auto points = createPointsForSTRefFilter();
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	std::vector<bool> keep({true, false, false, true, false});
+	auto expected = points->filter(keep);
+	expected->replaceSTRef(filter);
+
+	points->filterBySpatioTemporalReferenceIntersectionInPlace(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *points);
 }
 
-TEST(PointCollection, DISABLED_filterInPlace){
-	//TODO
-	FAIL();
+TEST(PointCollection, filterInPlace){
+	auto points = createPointsWithAttributesAndTime();
+
+	std::vector<bool> keep({true, false, false, true, false});
+	auto filtered = points->filter(keep);
+
+	points->filterInPlace(keep);
+
+	CollectionTestUtil::checkEquality(*points, *points);
 }
 
-TEST(PointCollection, DISABLED_filterByPredicate){
-	//TODO
-	FAIL();
+TEST(PointCollection, filterByPredicate){
+	auto points = createPointsWithAttributesAndTime();
+
+	auto filtered = points->filter([](const PointCollection &c, size_t feature) {
+		return c.time_start[feature] >= 16;
+	});
+
+	std::vector<bool> keep({false, false, false, true, true});
+	auto expected = points->filter(keep);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
 }
 
-TEST(PointCollection, DISABLED_filterByPredicateInPlace){
-	//TODO
-	FAIL();
+TEST(PointCollection, filterByPredicateInPlace){
+	auto points = createPointsWithAttributesAndTime();
+
+	std::vector<bool> keep({false, false, false, true, true});
+	auto expected = points->filter(keep);
+
+	points->filterInPlace([](PointCollection &c, size_t feature) {
+		return c.time_start[feature] >= 16;
+	});
+
+	CollectionTestUtil::checkEquality(*expected, *points);
 }
 
 TEST(PointCollection, StreamSerialization){

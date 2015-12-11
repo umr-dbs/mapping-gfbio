@@ -293,6 +293,16 @@ uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 			return con.id;
 		}
 	}
+	// Fallback
+	for (auto &e : connections) {
+		auto &con = *e.second;
+		if (!con.is_faulty() && con.get_state() == WorkerConnection::State::IDLE) {
+			con.process_request(WorkerConnection::CMD_CREATE, *request);
+			return con.id;
+		}
+	}
+
+
 	return 0;
 }
 

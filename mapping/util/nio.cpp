@@ -451,6 +451,7 @@ NBHelloWriter::NBHelloWriter(uint32_t hostid, const std::string& hostname) {
 
 template class NBSimpleWriter<uint8_t> ;
 template class NBSimpleWriter<MoveInfo> ;
+template class NBSimpleWriter<CacheEntry> ;
 
 template class NBMessageWriter<uint32_t> ;
 template class NBMessageWriter<std::string> ;

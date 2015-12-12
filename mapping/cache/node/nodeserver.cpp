@@ -348,24 +348,24 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 		del_stream.read(&del_resp);
 		switch (del_resp) {
 			case DeliveryConnection::RESP_OK: {
-				MoveInfo mi(del_stream);
+				CacheEntry ce(del_stream);
 				switch (item.type) {
 					case CacheType::RASTER:
 						new_cache_id = CacheManager::get_instance().get_raster_cache().put_local(
-							item.semantic_id, GenericRaster::fromStream(del_stream), mi.size, mi.costs, mi).entry_id;
+							item.semantic_id, GenericRaster::fromStream(del_stream), std::move(ce)).entry_id;
 						break;
 					case CacheType::POINT:
 						new_cache_id = CacheManager::get_instance().get_point_cache().put_local(
-							item.semantic_id, make_unique<PointCollection>(del_stream), mi.size, mi.costs, mi).entry_id;
+							item.semantic_id, make_unique<PointCollection>(del_stream), std::move(ce)).entry_id;
 					case CacheType::LINE:
 						new_cache_id = CacheManager::get_instance().get_line_cache().put_local(
-							item.semantic_id, make_unique<LineCollection>(del_stream), mi.size, mi.costs, mi).entry_id;
+							item.semantic_id, make_unique<LineCollection>(del_stream), std::move(ce)).entry_id;
 					case CacheType::POLYGON:
 						new_cache_id = CacheManager::get_instance().get_polygon_cache().put_local(
-							item.semantic_id, make_unique<PolygonCollection>(del_stream), mi.size, mi.costs, mi).entry_id;
+							item.semantic_id, make_unique<PolygonCollection>(del_stream), std::move(ce)).entry_id;
 					case CacheType::PLOT:
 						new_cache_id = CacheManager::get_instance().get_plot_cache().put_local(
-							item.semantic_id, GenericPlot::fromStream(del_stream), mi.size, mi.costs, mi).entry_id;
+							item.semantic_id, GenericPlot::fromStream(del_stream), std::move(ce)).entry_id;
 					default:
 						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
 				}

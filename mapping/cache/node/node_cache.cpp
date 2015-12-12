@@ -19,8 +19,8 @@
 //////////////////////////////////////////////////////////////
 
 template<typename EType>
-NodeCacheEntry<EType>::NodeCacheEntry(uint64_t entry_id, std::shared_ptr<EType> result,
-	uint64_t size, double costs) : CacheEntry( CacheCube(*result), size, costs ), entry_id(entry_id), data(result) {
+NodeCacheEntry<EType>::NodeCacheEntry(uint64_t entry_id, const CacheEntry &meta, std::shared_ptr<EType> result)
+: CacheEntry( meta ), entry_id(entry_id), data(result) {
 }
 
 template<typename EType>
@@ -44,12 +44,6 @@ NodeCache<EType>::~NodeCache() {
 	for (auto &entry : caches) {
 		delete entry.second;
 	}
-}
-
-template<typename EType>
-std::shared_ptr<NodeCacheEntry<EType> > NodeCache<EType>::create_entry(uint64_t id, const EType& data, size_t size, double costs) {
-	auto cpy = const_cast<EType*>( &data )->clone();
-	return std::shared_ptr<NodeCacheEntry<EType>>( new NodeCacheEntry<EType>(id, std::shared_ptr<EType>(cpy.release()), size, costs) );
 }
 
 template<typename EType>
@@ -95,12 +89,11 @@ void NodeCache<EType>::remove(const NodeCacheKey& key) {
 }
 
 template<typename EType>
-const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const std::unique_ptr<EType> &item, size_t size, double costs, const AccessInfo info) {
+const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id, const std::unique_ptr<EType> &item, const CacheEntry &meta) {
 	uint64_t id = next_id++;
 	auto cache = get_structure(semantic_id, true);
-	auto entry = create_entry( id, *item, size, costs  );
-	entry->last_access = info.last_access;
-	entry->access_count = info.access_count;
+	auto cpy = const_cast<EType*>( item.get() )->clone();
+	auto entry = std::shared_ptr<NodeCacheEntry<EType>>( new NodeCacheEntry<EType>( id, meta, std::shared_ptr<EType>( cpy.release() ) ) );
 	cache->put( id, entry );
 	current_size += entry->size;
 	return NodeCacheRef( type, semantic_id, entry->entry_id, *entry );

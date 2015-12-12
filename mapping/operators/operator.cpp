@@ -180,7 +180,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 			ExecTimer t("Operator.getRaster");
 			result = getRaster(rect,profiler);
 		}
-		CacheManager::get_instance().get_raster_cache().put(semantic_id,result,profiler);
+		CacheManager::get_instance().get_raster_cache().put(semantic_id,result,rect,profiler);
 	}
 	//d_profile(depth, type, "raster", profiler, result->getDataSize());
 
@@ -206,7 +206,7 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 			ExecTimer t("Operator.getPointCollection");
 			result = getPointCollection(rect,profiler);
 		}
-		CacheManager::get_instance().get_point_cache().put(semantic_id,result,profiler);
+		CacheManager::get_instance().get_point_cache().put(semantic_id,result,rect,profiler);
 	}
 	//d_profile(depth, type, "points", profiler);
 
@@ -235,7 +235,7 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 			ExecTimer t("Operator.getLineCollection");
 			result = getLineCollection(rect,profiler);
 		}
-		CacheManager::get_instance().get_line_cache().put(semantic_id,result,profiler);
+		CacheManager::get_instance().get_line_cache().put(semantic_id,result,rect,profiler);
 	}
 	//d_profile(depth, type, "lines", profiler);
 
@@ -264,7 +264,7 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 			ExecTimer t("Operator.getPolygonCollection");
 			result = getPolygonCollection(rect,profiler);
 		}
-		CacheManager::get_instance().get_polygon_cache().put(semantic_id,result,profiler);
+		CacheManager::get_instance().get_polygon_cache().put(semantic_id,result,rect,profiler);
 	}
 	//d_profile(depth, type, "polygons", profiler);
 

@@ -44,7 +44,8 @@ TEST(STCacheTest,SimpleTest) {
 		printf("%s", qres.to_string().c_str());
 		ASSERT_TRUE( qres.has_remainder() );
 		auto res = op->getCachedRaster(qr,qp);
-		cache.put(op->getSemanticId(), res, 10, 1.0);
+		CacheEntry meta( CacheCube(*res), 10, 1.0 );
+		cache.put(op->getSemanticId(), res, meta);
 		qres = cache.query(op->getSemanticId(),qr);
 		ASSERT_TRUE( qres.has_hit() );
 		ASSERT_FALSE( qres.has_remainder() );
@@ -73,9 +74,9 @@ TEST(STCacheTest,TestQuery) {
 	auto r2 = createRaster(0,1,1,2);
 	auto r3 = createRaster(1,2,0,1);
 
-	cache.put( sem_id, r1, 10, 1.0 );
-	cache.put( sem_id, r2, 10, 1.0 );
-	cache.put( sem_id, r3, 10, 1.0 );
+	cache.put( sem_id, r1, CacheEntry( CacheCube(*r1), 10, 1.0) );
+	cache.put( sem_id, r2, CacheEntry( CacheCube(*r2), 10, 1.0) );
+	cache.put( sem_id, r3, CacheEntry( CacheCube(*r3), 10, 1.0) );
 
 	QueryRectangle qrect(
 		SpatialReference(EPSG_LATLON, 0, 0, 2, 2),
@@ -93,7 +94,7 @@ TEST(STCacheTest,TestQuery) {
 	ASSERT_EQ( rem, Cube3( 1,2,1,2,0,100) );
 
 	auto r4 = createRaster(1,2,1,2);
-	cache.put(sem_id,r4, 10, 1.0);
+	cache.put(sem_id,r4, CacheEntry( CacheCube(*r4), 10, 1.0) );
 
 	qr = cache.query( sem_id, qrect );
 	ASSERT_FALSE(qr.has_remainder());

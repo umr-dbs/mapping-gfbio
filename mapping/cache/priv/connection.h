@@ -335,7 +335,7 @@ public:
 		READING_CACHE_REQUEST, CACHE_REQUEST_READ,
 		READING_MOVE_REQUEST, MOVE_REQUEST_READ,
 		AWAITING_MOVE_CONFIRM, MOVE_DONE,
-		SENDING, SENDING_MOVE, SENDING_ERROR
+		SENDING, SENDING_MOVE, SENDING_CACHE_ENTRY, SENDING_ERROR
 	};
 
 	static const uint32_t MAGIC_NUMBER = 0x52345678;
@@ -393,7 +393,10 @@ public:
 	void send( std::shared_ptr<const T> item );
 
 	template <typename T>
-	void send_move( const MoveInfo &info, std::shared_ptr<const T> item );
+	void send_cache_entry( const MoveInfo &info, std::shared_ptr<const T> item );
+
+	template <typename T>
+	void send_move( const CacheEntry &info, std::shared_ptr<const T> item );
 
 	void send_error( const std::string &msg );
 

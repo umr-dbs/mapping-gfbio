@@ -32,6 +32,8 @@ public:
 	void add_client( uint64_t client );
 	void add_clients( const std::vector<uint64_t> &clients );
 	const std::vector<uint64_t>& get_clients() const;
+	bool remove_client(uint64_t client_id);
+	bool has_clients() const;
 private:
 	std::vector<uint64_t> clients;
 };
@@ -136,6 +138,8 @@ public:
 	// releases this worker -- returns the clients waiting for its response
 	// worker MUST be closed before
 	std::vector<uint64_t> release_worker( uint64_t worker_id );
+
+	void handle_client_abort( uint64_t client_id );
 
 private:
 	std::unique_ptr<JobDescription> create_job( const BaseRequest &req );

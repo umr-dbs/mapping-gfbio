@@ -19,14 +19,16 @@
 std::unique_ptr<PointCollection> createPointsWithAttributesAndTime(){
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 1), POINT(2 5), MULTIPOINT(8 6, 8 9, 88 99, 23 21), POINT(68 59), MULTIPOINT(42 6, 43 7))";
 	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
-	points->setTimeStart({2, 4,  8, 16, 32});
-	points->setTimeEnd(  {4, 8, 16, 32, 64});
+	points->time_start = {2, 4,  8, 16, 32};
+	points->time_end = {4, 8, 16, 32, 64};
 
 	points->global_attributes.setTextual("info", "1234");
 	points->global_attributes.setNumeric("index", 42);
 
 	points->feature_attributes.addNumericAttribute("value", Unit::unknown(), {0.0, 1.1, 2.2, 3.3, 4.4});
 	points->feature_attributes.addTextualAttribute("label", Unit::unknown(), {"l0", "l1", "l2", "l3", "l4"});
+
+	EXPECT_NO_THROW(points->validate());
 
 	return points;
 }
@@ -475,8 +477,10 @@ std::unique_ptr<PointCollection> createPointsForSTRefFilter(){
 
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), POINT(1 2), POINT(55 70), MULTIPOINT((1 2), (17 88)), POINT(55 66))";
 	auto points = WKBUtil::readPointCollection(wkt, stref);
-	points->setTimeStart({1, 22, 3, 4 , 11});
-	points->setTimeEnd(  {9, 30, 4, 88, 12});
+	points->time_start = {1, 22, 3, 4 , 11};
+	points->time_end = {9, 30, 4, 88, 12};
+
+	EXPECT_NO_THROW(points->validate());
 
 	return points;
 }

@@ -8,6 +8,18 @@
 
 class CollectionTestUtil {
 public:
+
+	static void checkUnitEquality(const Unit &expected, const Unit &actual){
+		EXPECT_EQ(expected.getMeasurement(), actual.getMeasurement());
+		EXPECT_EQ(expected.getUnit(), actual.getUnit());
+		EXPECT_EQ(expected.isClassification(), actual.isClassification());
+		EXPECT_EQ(expected.isContinuous(), actual.isContinuous());
+		EXPECT_EQ(expected.isDiscrete(), actual.isDiscrete());
+		EXPECT_EQ(expected.hasMinMax(), actual.hasMinMax());
+		EXPECT_EQ(expected.getMin(), actual.getMin());
+		EXPECT_EQ(expected.getMax(), actual.getMax());
+	}
+
 	static void checkAttributeMapsEquality(const AttributeMaps& expected, const AttributeMaps& actual){
 		{//numeric
 			auto expectedRef = expected.numeric();
@@ -50,8 +62,14 @@ public:
 				std::string& expectedKey = expectedKeys[keyIndex];
 				std::string& actualKey = actualKeys[keyIndex];
 				EXPECT_EQ(expectedKey, actualKey);
+
+				auto& expectedArray = expected.numeric(expectedKey);
+				auto& actualArray = actual.numeric(actualKey);
+
+				checkUnitEquality(expectedArray.unit, actualArray.unit);
+
 				for(size_t i = 0; i < featureCount; ++i){
-					EXPECT_EQ(expected.numeric(expectedKey).get(i), actual.numeric(actualKey).get(i));
+					EXPECT_EQ(expectedArray.get(i), actualArray.get(i));
 				}
 			}
 		}
@@ -65,8 +83,14 @@ public:
 				std::string& expectedKey = expectedKeys[keyIndex];
 				std::string& actualKey = actualKeys[keyIndex];
 				EXPECT_EQ(expectedKey, actualKey);
+
+				auto& expectedArray = expected.textual(expectedKey);
+				auto& actualArray = actual.textual(actualKey);
+
+				checkUnitEquality(expectedArray.unit, actualArray.unit);
+
 				for(size_t i = 0; i < featureCount; ++i){
-					EXPECT_EQ(expected.textual(expectedKey).get(i), actual.textual(actualKey).get(i));
+					EXPECT_EQ(expectedArray.get(i), actualArray.get(i));
 				}
 			}
 		}

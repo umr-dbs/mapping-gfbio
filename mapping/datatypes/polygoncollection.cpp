@@ -126,11 +126,8 @@ void PolygonCollection::toStream(BinaryStream &stream) const {
 template<typename T>
 std::unique_ptr<PolygonCollection> filter(const PolygonCollection &in, const std::vector<T> &keep, size_t kept_count) {
 	size_t count = in.getFeatureCount();
-	if (keep.size() != count) {
-		std::ostringstream msg;
-		msg << "PolygonCollection::filter(): size of filter does not match (" << keep.size() << " != " << count << ")";
-		throw ArgumentException(msg.str());
-	}
+	if (keep.size() != count)
+		throw ArgumentException(concat("PolygonCollection::filter(): size of filter does not match (", keep.size(), " != ", count, ")"));
 
 	auto out = make_unique<PolygonCollection>(in.stref);
 	out->start_feature.reserve(kept_count);
@@ -163,12 +160,10 @@ std::unique_ptr<PolygonCollection> filter(const PolygonCollection &in, const std
 	if (in.hasTime()) {
 		out->time_start.reserve(kept_count);
 		out->time_end.reserve(kept_count);
-		for (auto i=0;i<count;i++) {
-			for (size_t idx=0;idx<count;idx++) {
-				if (keep[idx]) {
-					out->time_start.push_back(in.time_start[idx]);
-					out->time_end.push_back(in.time_end[idx]);
-				}
+		for (size_t idx = 0; idx < count; idx++) {
+			if (keep[idx]) {
+				out->time_start.push_back(in.time_start[idx]);
+				out->time_end.push_back(in.time_end[idx]);
 			}
 		}
 	}

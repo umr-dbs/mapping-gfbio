@@ -10,14 +10,7 @@ class CollectionTestUtil {
 public:
 
 	static void checkUnitEquality(const Unit &expected, const Unit &actual){
-		EXPECT_EQ(expected.getMeasurement(), actual.getMeasurement());
-		EXPECT_EQ(expected.getUnit(), actual.getUnit());
-		EXPECT_EQ(expected.isClassification(), actual.isClassification());
-		EXPECT_EQ(expected.isContinuous(), actual.isContinuous());
-		EXPECT_EQ(expected.isDiscrete(), actual.isDiscrete());
-		EXPECT_EQ(expected.hasMinMax(), actual.hasMinMax());
-		EXPECT_EQ(expected.getMin(), actual.getMin());
-		EXPECT_EQ(expected.getMax(), actual.getMax());
+		EXPECT_EQ(expected.toJson(), actual.toJson());
 	}
 
 	static void checkAttributeMapsEquality(const AttributeMaps& expected, const AttributeMaps& actual){
@@ -112,7 +105,7 @@ public:
 		checkStrefEquality(expected.stref, actual.stref);
 
 		//check global attributes
-		checkAttributeMapsEquality(actual.global_attributes, expected.global_attributes);
+		checkAttributeMapsEquality(expected.global_attributes, actual.global_attributes);
 
 		//check time
 		EXPECT_EQ(expected.getFeatureCount(), actual.getFeatureCount());
@@ -120,7 +113,7 @@ public:
 	}
 
 	static void checkEquality(const PointCollection& expected, const PointCollection& actual){
-		checkSimpleFeatureCollectionEquality(actual, expected);
+		checkSimpleFeatureCollectionEquality(expected, actual);
 
 		//check features
 		for(size_t feature = 0; feature < expected.getFeatureCount(); ++feature){
@@ -141,7 +134,7 @@ public:
 	}
 
 	static void checkEquality(const LineCollection& expected, const LineCollection& actual){
-		checkSimpleFeatureCollectionEquality(actual, expected);
+		checkSimpleFeatureCollectionEquality(expected, actual);
 
 		for(size_t feature = 0; feature < expected.getFeatureCount(); ++feature){
 			EXPECT_EQ(expected.getFeatureReference(feature).size(), actual.getFeatureReference(feature).size());

@@ -17,6 +17,23 @@
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include "test/unittests/simplefeaturecollections/util.h"
 
+std::unique_ptr<LineCollection> createLinesWithAttributesAndTime(){
+	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 1, 2 3, 14 8), LINESTRING(14 10, 45 7, 26 3), MULTILINESTRING((8 6, 8 9, 88 99), (47 11, 47 8, 99 3)), LINESTRING(68 59, 11 15, 77 44, 84 13), LINESTRING(78 65, 32 14, 36 63))";
+	auto lines = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
+	lines->time_start = {2, 4,  8, 16, 32};
+	lines->time_end = {4, 8, 16, 32, 64};
+
+	lines->global_attributes.setTextual("info", "1234");
+	lines->global_attributes.setNumeric("index", 42);
+
+	lines->feature_attributes.addNumericAttribute("value", Unit::unknown(), {0.0, 1.1, 2.2, 3.3, 4.4});
+	lines->feature_attributes.addTextualAttribute("label", Unit::unknown(), {"l0", "l1", "l2", "l3", "l4"});
+
+	EXPECT_NO_THROW(lines->validate());
+
+	return lines;
+}
+
 TEST(LineCollection, GeosGeomConversion) {
 	LineCollection lines(SpatioTemporalReference::unreferenced());
 	std::string wkt = "GEOMETRYCOLLECTION(MULTILINESTRING ((10 10, 20 20, 10 40),(40 40, 30 30, 40 20, 30 10)),LINESTRING (30 10, 10 30, 40 40))";
@@ -447,29 +464,102 @@ TEST(LineCollection, WKTAddMultiFeature){
 	EXPECT_EQ(1, lines.coordinates[8].y);
 }
 
-TEST(LineCollection, DISABLED_filterBySTRefIntersection){
-	//TODO
-	FAIL();
+std::unique_ptr<LineCollection> createLinesForSTRefFilter(){
+	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));
+
+	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 2, 5 5, 8 9), LINESTRING(9 8, 4 4, 1 9), LINESTRING(6 6, 11 12, 20 30), LINESTRING(0 10, 10 10, 10 0), LINESTRING(33 40, 49 17, 88 65), MULTILINESTRING((9 8, 8 7, 7 6), (0 1, 1 2, 2 3)))";
+	auto lines = WKBUtil::readLineCollection(wkt, stref);
+
+	EXPECT_NO_THROW(lines->validate());
+
+	return lines;
 }
 
-TEST(LineCollection, DISABLED_filterBySTRefIntersectionInPlace){
-	//TODO
-	FAIL();
+TEST(LineCollection, filterBySTRefIntersection){
+	auto lines = createLinesForSTRefFilter();
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	auto filtered = lines->filterBySpatioTemporalReferenceIntersection(filter);
+
+	std::vector<bool> keep = {true, true, true, true, false, true};
+	auto expected = lines->filter(keep);
+	expected->replaceSTRef(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
 }
 
-TEST(LineCollection, DISABLED_filterInPlace){
-	//TODO
-	FAIL();
+TEST(LineCollection, filterBySTRefIntersectionWithTime){
+	auto lines = createLinesForSTRefFilter();
+	lines->time_start = {1,  20,  5  ,3,  4, 11};
+	lines->time_end =   {9,  22,  30,  4, 88, 12};
+
+	EXPECT_NO_THROW(lines->validate());
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	auto filtered = lines->filterBySpatioTemporalReferenceIntersection(filter);
+
+	std::vector<bool> keep = {true, false, true, true, false, false};
+	auto expected = lines->filter(keep);
+	expected->replaceSTRef(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
 }
 
-TEST(LineCollection, DISABLED_filterByPredicate){
-	//TODO
-	FAIL();
+TEST(LineCollection, filterBySTRefIntersectionInPlace){
+	auto lines = createLinesForSTRefFilter();
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	std::vector<bool> keep = {true, true, true, true, false, true};
+	auto expected = lines->filter(keep);
+	expected->replaceSTRef(filter);
+
+	lines->filterBySpatioTemporalReferenceIntersectionInPlace(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *lines);
 }
 
-TEST(LineCollection, DISABLED_filterByPredicateInPlace){
-	//TODO
-	FAIL();
+TEST(LineCollection, filterInPlace){
+	auto lines = createLinesWithAttributesAndTime();
+	std::vector<bool> keep = {true, false, true, false, true};
+
+	auto expected = lines->filter(keep);
+
+	lines->filterInPlace(keep);
+
+	CollectionTestUtil::checkEquality(*expected, *lines);
+}
+
+TEST(LineCollection, filterByPredicate){
+	auto lines = createLinesWithAttributesAndTime();
+
+	auto filtered = lines->filter([](const LineCollection &c, size_t feature) {
+		return c.time_start[feature] >= 16;
+	});
+
+	std::vector<bool> keep({false, false, false, true, true});
+	auto expected = lines->filter(keep);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
+}
+
+TEST(LineCollection, filterByPredicateInPlace){
+	auto lines = createLinesWithAttributesAndTime();
+
+	std::vector<bool> keep({false, false, false, true, true});
+	auto expected = lines->filter(keep);
+
+	lines->filterInPlace([](LineCollection &c, size_t feature) {
+		return c.time_start[feature] >= 16;
+	});
+
+	CollectionTestUtil::checkEquality(*expected, *lines);
 }
 
 TEST(LineCollection, StreamSerialization){

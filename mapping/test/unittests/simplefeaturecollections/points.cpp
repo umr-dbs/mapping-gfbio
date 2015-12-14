@@ -475,10 +475,8 @@ std::unique_ptr<PointCollection> createPointsForSTRefFilter(){
 	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));
 
-	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), POINT(1 2), POINT(55 70), MULTIPOINT((1 2), (17 88)), POINT(55 66))";
+	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 2), POINT(2 3), POINT(55 70), MULTIPOINT((1 2), (17 88)), POINT(55 66))";
 	auto points = WKBUtil::readPointCollection(wkt, stref);
-	points->time_start = {1, 22, 3, 4 , 11};
-	points->time_end = {9, 30, 4, 88, 12};
 
 	EXPECT_NO_THROW(points->validate());
 
@@ -487,6 +485,25 @@ std::unique_ptr<PointCollection> createPointsForSTRefFilter(){
 
 TEST(PointCollection, filterBySTRefIntersection){
 	auto points = createPointsForSTRefFilter();
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	auto filtered = points->filterBySpatioTemporalReferenceIntersection(filter);
+
+	std::vector<bool> keep({true, true, false, true, false});
+	auto expected = points->filter(keep);
+	expected->replaceSTRef(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
+}
+
+TEST(PointCollection, filterBySTRefIntersectionWithTime){
+	auto points = createPointsForSTRefFilter();
+	points->time_start = {1, 22, 3, 4 , 11};
+	points->time_end = {9, 30, 4, 88, 12};
+
+	EXPECT_NO_THROW(points->validate());
 
 	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
@@ -506,7 +523,7 @@ TEST(PointCollection, filterBySTRefIntersectionInPlace){
 	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
 
-	std::vector<bool> keep({true, false, false, true, false});
+	std::vector<bool> keep({true, true, false, true, false});
 	auto expected = points->filter(keep);
 	expected->replaceSTRef(filter);
 

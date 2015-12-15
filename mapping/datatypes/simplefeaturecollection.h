@@ -76,18 +76,6 @@ public:
 	 */
 	void addDefaultTimestamps(double min, double max);
 
-	/**
-	 * set the time_start vector for the features
-	 * @param new time_start vector, length must be equal to featureCount
-	 */
-	void setTimeStart(std::vector<double> &&timeStart);
-
-	/**
-	 * set the time_end vector for the features
-	 * @param new time_start vector, length must be equal to featureCount
-	 */
-	void setTimeEnd(std::vector<double> &&timeEnd);
-
 	// feature attributes (one value per feature)
 	AttributeArrays feature_attributes;
 

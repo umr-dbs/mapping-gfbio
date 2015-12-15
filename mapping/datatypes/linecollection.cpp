@@ -138,12 +138,10 @@ std::unique_ptr<LineCollection> filter(const LineCollection &in, const std::vect
 	if (in.hasTime()) {
 		out->time_start.reserve(kept_count);
 		out->time_end.reserve(kept_count);
-		for (auto i=0;i<count;i++) {
-			for (size_t idx=0;idx<count;idx++) {
-				if (keep[idx]) {
-					out->time_start.push_back(in.time_start[idx]);
-					out->time_end.push_back(in.time_end[idx]);
-				}
+		for (size_t idx = 0; idx < count; idx++) {
+			if (keep[idx]) {
+				out->time_start.push_back(in.time_start[idx]);
+				out->time_end.push_back(in.time_end[idx]);
 			}
 		}
 	}

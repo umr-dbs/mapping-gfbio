@@ -43,21 +43,6 @@ void SimpleFeatureCollection::addDefaultTimestamps(double min, double max) {
 	time_end.resize(fcount, max);
 }
 
-void SimpleFeatureCollection::setTimeStart(std::vector<double> &&timeStart) {
-	if(timeStart.size() != getFeatureCount())
-		throw ArgumentException("Time array size != getFeatureCount");
-
-	time_start = timeStart;
-}
-
-void SimpleFeatureCollection::setTimeEnd(std::vector<double> &&timeEnd) {
-	if(timeEnd.size() != getFeatureCount())
-		throw ArgumentException("Time array size != getFeatureCount");
-
-	time_end = timeEnd;
-}
-
-
 /*
  * Validation
  */

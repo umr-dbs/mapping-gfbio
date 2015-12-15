@@ -15,6 +15,23 @@
 #include "raster/opencl.h"
 #include "test/unittests/simplefeaturecollections/util.h"
 
+std::unique_ptr<PolygonCollection> createPolygonsWithAttributesAndTime(){
+	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((10 10, 10 30, 25 20, 10 10)), POLYGON((15 70, 25 90, 45 90, 40 80, 50 70, 15 70), (30 75, 25 80, 30 85, 35 80, 30 75)), POLYGON((50 30, 65 60, 100 25, 50 30), (55 35, 65 45, 65 35, 55 35), (75 30, 75 35, 85 35, 85 30, 75 30)), MULTIPOLYGON(((15 50, 15 60, 30 65, 35 60 25 50, 15 50)), ((30 35, 35 45, 40 34, 30 35))))";
+	auto polygons = WKBUtil::readPolygonCollection(wkt, SpatioTemporalReference::unreferenced());
+	polygons->time_start = {2, 4,  8, 16};
+	polygons->time_end =   {4, 8, 16, 32};
+
+	polygons->global_attributes.setTextual("info", "1234");
+	polygons->global_attributes.setNumeric("index", 42);
+
+	polygons->feature_attributes.addNumericAttribute("value", Unit::unknown(), {0.0, 1.1, 2.2, 3.3});
+	polygons->feature_attributes.addTextualAttribute("label", Unit::unknown(), {"l0", "l1", "l2", "l3"});
+
+	EXPECT_NO_THROW(polygons->validate());
+
+	return polygons;
+}
+
 TEST(PolygonCollection, AddSinglePolygonFeature) {
 	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
 
@@ -709,29 +726,102 @@ TEST(PolygonCollection, WKTAddMultiFeature){
 	EXPECT_EQ(2, polygons.getFeatureReference(1).size());
 }
 
-TEST(PolygonCollection, DISABLED_filterBySTRefIntersection){
-	//TODO
-	FAIL();
+std::unique_ptr<PolygonCollection> createPolygonsForSTRefFilter(){
+	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));
+
+	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((1 2, 5 5, 8 9, 1 2)), POLYGON((5 5, 10 12, 13 4, 5 5)), POLYGON((10 0, 10 10, 12 14, 10 0)), POLYGON((10 0, 10 10, 12 14, 10 0)), POLYGON((30 30, 33 12, 44 18, 30 30)), POLYGON((-5 -5, 15 -5, 15 15, -5 15, -5 -5), (-1 -1, 11 -1, 11 11, -1 11, -1 -1)), MULTIPOLYGON(((1 1, 1 9, 9 9, 9 9, 1 1)), ((11 11, 11 99, 99 99, 99 11, 11 11))))";
+	auto lines = WKBUtil::readPolygonCollection(wkt, stref);
+
+	EXPECT_NO_THROW(lines->validate());
+
+	return lines;
 }
 
-TEST(PolygonCollection, DISABLED_filterBySTRefIntersectionInPlace){
-	//TODO
-	FAIL();
+TEST(PolygonCollection, filterBySTRefIntersection){
+	const auto polygons = createPolygonsForSTRefFilter();
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	auto filtered = polygons->filterBySpatioTemporalReferenceIntersection(filter);
+
+	std::vector<bool> keep = {true, true, true, true, false, false, true};
+	auto expected = polygons->filter(keep);
+	expected->replaceSTRef(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
 }
 
-TEST(PolygonCollection, DISABLED_filterInPlace){
-	//TODO
-	FAIL();
+TEST(PolygonCollection, filterBySTRefIntersectionWithTime){
+	const auto polygons = createPolygonsForSTRefFilter();
+	polygons->time_start = {1,  5,  9, 15, 30, 1,  1};
+	polygons->time_end =   {9, 12, 11, 80, 44, 6, 99};
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+
+	auto filtered = polygons->filterBySpatioTemporalReferenceIntersection(filter);
+
+	std::vector<bool> keep = {true, true, true, false, false, false, true};
+	auto expected = polygons->filter(keep);
+	expected->replaceSTRef(filter);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
 }
 
-TEST(PolygonCollection, DISABLED_filterByPredicate){
-	//TODO
-	FAIL();
+TEST(PolygonCollection, filterBySTRefIntersectionInPlace){
+	const auto polygons = createPolygonsForSTRefFilter();
+
+
+	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
+					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
+	std::vector<bool> keep = {true, true, true, true, false, false, true};
+	auto expected = polygons->filter(keep);
+	expected->replaceSTRef(filter);
+
+	polygons->filterBySpatioTemporalReferenceIntersectionInPlace(filter);
+
+
+
+	CollectionTestUtil::checkEquality(*expected, *polygons);
 }
 
-TEST(PolygonCollection, DISABLED_filterByPredicateInPlace){
-	//TODO
-	FAIL();
+TEST(PolygonCollection, filterInPlace){
+	auto polygons = createPolygonsWithAttributesAndTime();
+
+	std::vector<bool> keep = {true, false, true, false};
+	auto expected = polygons->filter(keep);
+
+	polygons->filterInPlace(keep);
+
+	CollectionTestUtil::checkEquality(*expected, *polygons);
+}
+
+TEST(PolygonCollection, filterByPredicate){
+	auto polygons = createPolygonsWithAttributesAndTime();
+
+	auto filtered = polygons->filter([](const PolygonCollection &c, size_t feature) {
+		return c.time_start[feature] >= 8;
+	});
+
+	std::vector<bool> keep({false, false, true, true});
+	auto expected = polygons->filter(keep);
+
+	CollectionTestUtil::checkEquality(*expected, *filtered);
+}
+
+TEST(PolygonCollection, filterByPredicateInPlace){
+	auto polygons = createPolygonsWithAttributesAndTime();
+
+	std::vector<bool> keep({false, false, true, true});
+	auto expected = polygons->filter(keep);
+
+	polygons->filterInPlace([](PolygonCollection &c, size_t feature) {
+		return c.time_start[feature] >= 8;
+	});
+
+	CollectionTestUtil::checkEquality(*expected, *polygons);
 }
 
 TEST(PolygonCollection, StreamSerialization){

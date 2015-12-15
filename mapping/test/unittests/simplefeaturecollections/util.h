@@ -8,6 +8,11 @@
 
 class CollectionTestUtil {
 public:
+
+	static void checkUnitEquality(const Unit &expected, const Unit &actual){
+		EXPECT_EQ(expected.toJson(), actual.toJson());
+	}
+
 	static void checkAttributeMapsEquality(const AttributeMaps& expected, const AttributeMaps& actual){
 		{//numeric
 			auto expectedRef = expected.numeric();
@@ -50,8 +55,14 @@ public:
 				std::string& expectedKey = expectedKeys[keyIndex];
 				std::string& actualKey = actualKeys[keyIndex];
 				EXPECT_EQ(expectedKey, actualKey);
+
+				auto& expectedArray = expected.numeric(expectedKey);
+				auto& actualArray = actual.numeric(actualKey);
+
+				checkUnitEquality(expectedArray.unit, actualArray.unit);
+
 				for(size_t i = 0; i < featureCount; ++i){
-					EXPECT_EQ(expected.numeric(expectedKey).get(i), actual.numeric(actualKey).get(i));
+					EXPECT_EQ(expectedArray.get(i), actualArray.get(i));
 				}
 			}
 		}
@@ -65,8 +76,14 @@ public:
 				std::string& expectedKey = expectedKeys[keyIndex];
 				std::string& actualKey = actualKeys[keyIndex];
 				EXPECT_EQ(expectedKey, actualKey);
+
+				auto& expectedArray = expected.textual(expectedKey);
+				auto& actualArray = actual.textual(actualKey);
+
+				checkUnitEquality(expectedArray.unit, actualArray.unit);
+
 				for(size_t i = 0; i < featureCount; ++i){
-					EXPECT_EQ(expected.textual(expectedKey).get(i), actual.textual(actualKey).get(i));
+					EXPECT_EQ(expectedArray.get(i), actualArray.get(i));
 				}
 			}
 		}
@@ -88,7 +105,7 @@ public:
 		checkStrefEquality(expected.stref, actual.stref);
 
 		//check global attributes
-		checkAttributeMapsEquality(actual.global_attributes, expected.global_attributes);
+		checkAttributeMapsEquality(expected.global_attributes, actual.global_attributes);
 
 		//check time
 		EXPECT_EQ(expected.getFeatureCount(), actual.getFeatureCount());
@@ -96,7 +113,7 @@ public:
 	}
 
 	static void checkEquality(const PointCollection& expected, const PointCollection& actual){
-		checkSimpleFeatureCollectionEquality(actual, expected);
+		checkSimpleFeatureCollectionEquality(expected, actual);
 
 		//check features
 		for(size_t feature = 0; feature < expected.getFeatureCount(); ++feature){
@@ -117,7 +134,7 @@ public:
 	}
 
 	static void checkEquality(const LineCollection& expected, const LineCollection& actual){
-		checkSimpleFeatureCollectionEquality(actual, expected);
+		checkSimpleFeatureCollectionEquality(expected, actual);
 
 		for(size_t feature = 0; feature < expected.getFeatureCount(); ++feature){
 			EXPECT_EQ(expected.getFeatureReference(feature).size(), actual.getFeatureReference(feature).size());

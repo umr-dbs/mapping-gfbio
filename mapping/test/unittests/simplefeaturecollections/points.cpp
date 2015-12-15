@@ -562,7 +562,7 @@ TEST(PointCollection, filterByPredicateInPlace){
 	std::vector<bool> keep({false, false, false, true, true});
 	auto expected = points->filter(keep);
 
-	points->filterInPlace([](PointCollection &c, size_t feature) {
+	points->filterInPlace([](const PointCollection &c, size_t feature) {
 		return c.time_start[feature] >= 16;
 	});
 

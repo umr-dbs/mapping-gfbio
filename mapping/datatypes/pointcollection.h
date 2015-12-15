@@ -150,7 +150,7 @@ public:
 	void filterInPlace(const Predicate &predicate, Args... args) {
 		std::vector<bool> keep(this->getFeatureCount());
 		for (auto feature : *this)
-			keep[feature] = predicate(*this, (size_t) feature, std::forward<Args>(args)...);
+			keep[feature] = predicate((const PointCollection &) *this, (size_t) feature, std::forward<Args>(args)...);
 		filterInPlace(keep);
 	}
 

@@ -365,6 +365,7 @@ std::unique_ptr<PointCollection> CSVPointSource::getPointCollection(const QueryR
 	else
 		throw OperatorException("Unimplemented geometry_specification for Points");
 
+	collection->filterBySpatioTemporalReferenceIntersectionInPlace(rect);
 	return collection;
 }
 
@@ -379,6 +380,8 @@ std::unique_ptr<LineCollection> CSVPointSource::getLineCollection(const QueryRec
 	}
 	else
 		throw OperatorException("Unimplemented geometry_specification for Lines");
+
+	collection->filterBySpatioTemporalReferenceIntersectionInPlace(rect);
 	return collection;
 }
 
@@ -393,6 +396,8 @@ std::unique_ptr<PolygonCollection> CSVPointSource::getPolygonCollection(const Qu
 	}
 	else
 		throw OperatorException("Unimplemented geometry_specification for Polygons");
+
+	collection->filterBySpatioTemporalReferenceIntersectionInPlace(rect);
 	return collection;
 }
 

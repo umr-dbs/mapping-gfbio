@@ -122,7 +122,7 @@ public:
 	std::unique_ptr<LineCollection> filter(const Predicate &predicate, Args... args) const {
 		std::vector<bool> keep(this->getFeatureCount());
 		for (auto feature : *this)
-			keep[feature] = predicate(*this, (size_t) feature, std::forward<Args>(args)...);
+			keep[feature] = predicate((const LineCollection &) *this, (size_t) feature, std::forward<Args>(args)...);
 		return filter(keep);
 	}
 

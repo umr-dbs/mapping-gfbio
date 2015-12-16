@@ -1,16 +1,21 @@
 {
+	/*select osm_id, st_astext(geom), time_start, name from osm_large_cities
+	where ST_INTERSECTS(geom, 'POLYGON((0 0, 0 90, 180 90, 180 0, 0 0))'::geometry)
+	and time_start > timestamp '2015-01-01 00:00'
+	order by osm_id asc*/
+	
 	"name" : "Load points",	
 	"query_result": "points",
     "temporal_reference": {
         "type": "UNIX",
-        "start": 0,
+        "start": 1420070400,
         "end": 2147483647
     },
     "spatial_reference": {
         "projection": "EPSG:4326",
-        "x1": -180,
+        "x1": 0,
         "x2": 180,
-        "y1": -90,
+        "y1": 0,
         "y2": 90
     },
 	"query" : 
@@ -35,5 +40,5 @@
 		"sources" : null,
 		"type" : "csvpointsource"
 	},
-	"query_expected_hash" : "29175693d26524c816c97dcbcd6ecce9"
+	"query_expected_hash" : "df91c6f5559c37258cde6ec0e6886e31"
 }

@@ -2,6 +2,7 @@
 #include <sstream>
 #include "util/make_unique.h"
 #include "util/binarystream.h"
+#include "util/hash.h"
 
 
 std::unique_ptr<LineCollection> LineCollection::clone() const {
@@ -289,6 +290,14 @@ void LineCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) 
 		wkt << ")";
 	}
 }
+
+std::string LineCollection::hash() const {
+	// certainly not the most stable solution, but it has few lines of code..
+	std::string serialized = toGeoJSON(true);
+
+	return calculateHash((const unsigned char *) serialized.c_str(), (int) serialized.length()).asHex();
+}
+
 
 bool LineCollection::isSimple() const {
 	return getFeatureCount() == (start_line.size() - 1);

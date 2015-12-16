@@ -338,6 +338,34 @@ static void runquery(int argc, char *argv[]) {
 		else
 			printf("No output filename given, discarding result\n");
 	}
+	else if (result == "lines") {
+		QueryProfiler profiler;
+		auto lines = graph->getCachedLineCollection(qrect, profiler);
+		auto csv = lines->toCSV();
+		if (out_filename) {
+			FILE *f = fopen(out_filename, "w");
+			if (f) {
+				fwrite(csv.c_str(), csv.length(), 1, f);
+				fclose(f);
+			}
+		}
+		else
+			printf("No output filename given, discarding result\n");
+	}
+	else if (result == "polygons") {
+		QueryProfiler profiler;
+		auto polygons = graph->getCachedPolygonCollection(qrect, profiler);
+		auto csv = polygons->toCSV();
+		if (out_filename) {
+			FILE *f = fopen(out_filename, "w");
+			if (f) {
+				fwrite(csv.c_str(), csv.length(), 1, f);
+				fclose(f);
+			}
+		}
+		else
+			printf("No output filename given, discarding result\n");
+	}
 	else {
 		printf("Unknown result type: %s\n", result.c_str());
 		exit(5);
@@ -411,6 +439,12 @@ static int testquery(int argc, char *argv[]) {
 			auto points = graph->getCachedPointCollection(qrect, profiler);
 			real_hash = points->hash();
 			real_hash2 = points->clone()->hash();
+		}
+		else if (result == "lines") {
+			QueryProfiler profiler;
+			auto lines = graph->getCachedLineCollection(qrect, profiler);
+			real_hash = lines->hash();
+			real_hash2 = lines->clone()->hash();
 		}
 		else if (result == "polygons") {
 			QueryProfiler profiler;

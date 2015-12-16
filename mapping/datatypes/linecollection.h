@@ -166,6 +166,12 @@ public:
 
 	virtual std::string toCSV() const;
 
+	/**
+	 * compute the hash of the collection
+	 * @return the hash of the collection
+	 */
+	std::string hash() const;
+
 	virtual bool isSimple() const;
 
 	virtual size_t getFeatureCount() const {

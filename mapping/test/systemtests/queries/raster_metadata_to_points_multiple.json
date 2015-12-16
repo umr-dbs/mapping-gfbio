@@ -11,7 +11,7 @@
 		order by osm_id asc
 	*/
 	
-	"name" : "Raster metadata to points",	
+	"name" : "Raster metadata to points (multiple)",	
 	"query_result": "points",
     "temporal_reference": {
         "type": "UNIX",
@@ -30,13 +30,21 @@
         "type": "raster_metadata_to_points",
         "params": {
             "names": [
-                "raster_value"
+                "raster_value",
+                "raster_value2"
             ],
             "xResolution" : 10800,
             "yResolution": 5400
         },
         "sources": {
             "raster": [
+                {
+                    "type": "source",
+                    "params": {
+                        "sourcename": "world1",
+                        "channel": 0
+                    }
+                },
                 {
                     "type": "source",
                     "params": {
@@ -70,5 +78,5 @@
             ]
         }
     },
-	"query_expected_hash" : "8d51cc135460c067393e44ce1a553e2f"
+	"query_expected_hash" : "f3f08235161d1f28db2975336ad5a571"
 }

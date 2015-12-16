@@ -678,11 +678,11 @@ void DeliveryConnection::read_finished(NBReader& reader) {
 
 void DeliveryConnection::write_finished() {
 	switch (state) {
-		case State::SENDING: {
+		case State::SENDING:
+		case State::SENDING_CACHE_ENTRY: {
 			state = State::IDLE;
 			break;
 		}
-
 		case State::SENDING_MOVE: {
 			state = State::AWAITING_MOVE_CONFIRM;
 			break;
@@ -730,7 +730,25 @@ void DeliveryConnection::send(std::shared_ptr<const T> item) {
 }
 
 template<typename T>
-void DeliveryConnection::send_move(const MoveInfo& info,
+void DeliveryConnection::send_cache_entry(const MoveInfo& info,
+		std::shared_ptr<const T> item) {
+
+	if (state == State::CACHE_REQUEST_READ) {
+		state = State::SENDING_CACHE_ENTRY;
+		begin_write(
+			make_unique<NBMultiWriter>(
+				make_unique<NBSimpleWriter<uint8_t>>(RESP_OK),
+				make_unique<NBSimpleWriter<MoveInfo>>(info),
+				get_data_writer(item)
+			)
+		);
+	}
+	else
+		throw IllegalStateException("Can only move item in state CACHE_REQUEST_READ");
+}
+
+template<typename T>
+void DeliveryConnection::send_move(const CacheEntry& info,
 		std::shared_ptr<const T> item) {
 
 	if (state == State::MOVE_REQUEST_READ) {
@@ -738,7 +756,7 @@ void DeliveryConnection::send_move(const MoveInfo& info,
 		begin_write(
 			make_unique<NBMultiWriter>(
 				make_unique<NBSimpleWriter<uint8_t>>(RESP_OK),
-				make_unique<NBSimpleWriter<MoveInfo>>(info),
+				make_unique<NBSimpleWriter<CacheEntry>>(info),
 				get_data_writer(item)
 			)
 		);
@@ -818,9 +836,15 @@ template void DeliveryConnection::send(std::shared_ptr<const LineCollection>);
 template void DeliveryConnection::send(std::shared_ptr<const PolygonCollection>);
 template void DeliveryConnection::send(std::shared_ptr<const GenericPlot>);
 
-template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const GenericRaster> );
-template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const PointCollection> );
-template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const LineCollection> );
-template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const PolygonCollection> );
-template void DeliveryConnection::send_move( const MoveInfo&, std::shared_ptr<const GenericPlot> );
+template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const GenericRaster> );
+template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const PointCollection> );
+template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const LineCollection> );
+template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const PolygonCollection> );
+template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const GenericPlot> );
+
+template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const GenericRaster> );
+template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const PointCollection> );
+template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const LineCollection> );
+template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const PolygonCollection> );
+template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const GenericPlot> );
 

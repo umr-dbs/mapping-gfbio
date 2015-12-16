@@ -35,7 +35,7 @@
 template<typename EType>
 class NodeCacheEntry : public CacheEntry {
 public:
-	NodeCacheEntry( uint64_t entry_id, std::shared_ptr<EType> result, uint64_t size, double costs );
+	NodeCacheEntry( uint64_t entry_id, const CacheEntry &meta, std::shared_ptr<EType> result );
 	const uint64_t entry_id;
 	const std::shared_ptr<EType> data;
 
@@ -55,7 +55,7 @@ public:
 	~NodeCache();
 
 	// Adds an entry for the given semantic_id to the cache.
-	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item, size_t size, double costs, const AccessInfo info = AccessInfo());
+	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item, const CacheEntry &meta);
 
 	// Removes the entry with the given key from the cache
 	void remove( const NodeCacheKey &key );
@@ -87,9 +87,6 @@ public:
 	const CacheType type;
 private:
 	typedef CacheStructure<uint64_t,NodeCacheEntry<EType>> Struct;
-
-	// Creates an entry for the given data
-	std::shared_ptr<NodeCacheEntry<EType>> create_entry( uint64_t id, const EType &data, size_t size, double costs );
 
 	// Retrieves the cache-structure for the given semantic_id.
 	Struct* get_structure( const std::string &semantic_id, bool create = false) const;

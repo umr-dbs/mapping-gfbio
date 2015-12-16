@@ -208,6 +208,10 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	while (clit != client_connections.end()) {
 		ClientConnection &cc = *clit->second;
 		if (cc.is_faulty()) {
+			if ( cc.get_state() != ClientConnection::State::IDLE ) {
+				Log::info("Client connection cancelled: %ld", cc.id);
+				query_manager.handle_client_abort(cc.id);
+			}
 			client_connections.erase(clit++);
 		}
 		else if (cc.is_writing()) {

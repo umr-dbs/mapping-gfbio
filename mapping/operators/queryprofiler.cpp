@@ -16,7 +16,7 @@ QueryProfiler::QueryProfiler() : self_cpu(0), all_cpu(0), self_gpu(0), all_gpu(0
 double QueryProfiler::getTimestamp() {
 #if defined(_POSIX_TIMERS) && defined(_POSIX_CPUTIME)
 	struct timespec t;
-	if (clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &t) != 0)
+	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t) != 0)
 		throw OperatorException("QueryProfiler: clock_gettime() failed");
 	return (double) t.tv_sec + t.tv_nsec/1000000000.0;
 #else

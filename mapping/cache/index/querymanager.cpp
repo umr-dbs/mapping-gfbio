@@ -163,6 +163,19 @@ void QueryManager::node_failed(uint32_t node_id) {
 	}
 }
 
+void QueryManager::handle_client_abort(uint64_t client_id) {
+	auto iter = pending_jobs.begin();
+	while ( iter != pending_jobs.end() ) {
+		auto &jd = **iter;
+		if ( jd.remove_client(client_id) && !jd.has_clients() ) {
+			Log::info("Cancelled request for client: %ld", client_id);
+			pending_jobs.erase(iter);
+			return;
+		}
+		iter++;
+	}
+}
+
 std::unique_ptr<JobDescription> QueryManager::recreate_job(const QueryInfo& query) {
 	std::unique_ptr<JobDescription> res = create_job(query);
 	res->add_clients( query.get_clients() );
@@ -218,6 +231,20 @@ void QueryInfo::add_clients(const std::vector<uint64_t>& clients) {
 const std::vector<uint64_t>& QueryInfo::get_clients() const {
 	return clients;
 }
+
+bool QueryInfo::remove_client(uint64_t client_id) {
+	auto res = std::find(clients.begin(),clients.end(), client_id);
+	if ( res != clients.end() ) {
+		clients.erase(res);
+		return true;
+	}
+	return false;
+}
+
+bool QueryInfo::has_clients() const {
+	return !clients.empty();
+}
+
 
 bool JobDescription::extend(const BaseRequest& req) {
 	(void) type;
@@ -293,6 +320,16 @@ uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 			return con.id;
 		}
 	}
+	// Fallback
+	for (auto &e : connections) {
+		auto &con = *e.second;
+		if (!con.is_faulty() && con.get_state() == WorkerConnection::State::IDLE) {
+			con.process_request(WorkerConnection::CMD_CREATE, *request);
+			return con.id;
+		}
+	}
+
+
 	return 0;
 }
 

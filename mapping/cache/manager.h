@@ -28,7 +28,7 @@ public:
 	virtual ~CacheWrapper() = default;
 
 	// Inserts an item into the cache
-	virtual void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler) = 0;
+	virtual void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) = 0;
 
 	// Queries for an item satisfying the given request
 	// The result is a copy of the cached version and may be modified
@@ -36,7 +36,7 @@ public:
 
 	// Inserts an element into the local cache -- omitting any communication
 	// to the remote server
-	virtual NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &raster, size_t size, double costs, const AccessInfo info = AccessInfo() ) = 0;
+	virtual NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &data, CacheEntry &&info ) = 0;
 
 	// Removes the element with the given key from the cache,
 	// not notifying the index (if applicable)
@@ -97,9 +97,9 @@ template<typename T, CacheType CType>
 class NopCacheWrapper : public CacheWrapper<T> {
 public:
 	NopCacheWrapper();
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, size_t size, double costs, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, CacheEntry &&info );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
@@ -140,9 +140,9 @@ template<typename T, CacheType CType>
 class ClientCacheWrapper : public CacheWrapper<T> {
 public:
 	ClientCacheWrapper( CacheType type, const std::string &idx_host, int idx_port );
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, size_t size, double costs, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, CacheEntry &&info );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
@@ -190,9 +190,9 @@ public:
 	NodeCacheWrapper( NodeCache<T> &cache, const CachingStrategy &strategy );
 	virtual ~NodeCacheWrapper() = default;
 
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryProfiler &profiler);
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
-	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, size_t size, double costs, const AccessInfo info = AccessInfo() );
+	NodeCacheRef put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, CacheEntry &&info );
 	void remove_local(const NodeCacheKey &key);
 	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
@@ -206,7 +206,7 @@ protected:
 	virtual std::unique_ptr<T> read_item( BinaryStream &stream ) = 0;
 	virtual std::unique_ptr<T> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) = 0;
 private:
-	std::unique_ptr<T> fetch_item( const std::string &semantic_id, const CacheRef &ref );
+	std::unique_ptr<T> fetch_item( const std::string &semantic_id, const CacheRef &ref, QueryProfiler &qp );
 	SpatioTemporalReference enlarge_puzzle( const QueryRectangle &query, const std::vector<std::shared_ptr<const T>>& items);
 	std::vector<std::unique_ptr<T>> compute_remainders( const std::string &semantic_id, const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler );
 	NodeCache<T> &cache;

@@ -89,9 +89,10 @@ CacheStats NopCacheWrapper<T,CType>::get_stats() {
 
 template<typename T, CacheType CType>
 void NopCacheWrapper<T,CType>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
+		const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
+	(void) query;
 	(void) profiler;
 }
 
@@ -105,10 +106,9 @@ std::unique_ptr<T> NopCacheWrapper<T,CType>::query(const GenericOperator& op,
 
 template<typename T, CacheType CType>
 NodeCacheRef NopCacheWrapper<T,CType>::put_local(
-		const std::string& semantic_id, const std::unique_ptr<T>& item,
-		size_t size, double costs, const AccessInfo info) {
-	CacheEntry ce( CacheCube(*item), size, costs, info.last_access, info.access_count );
-	return NodeCacheRef( CacheType::UNKNOWN, semantic_id, 0, ce );
+		const std::string& semantic_id, const std::unique_ptr<T>& item, CacheEntry &&info) {
+	(void) item;
+	return NodeCacheRef( CacheType::UNKNOWN, semantic_id, 0, info );
 }
 
 template<typename T, CacheType CType>
@@ -197,9 +197,10 @@ CacheStats ClientCacheWrapper<T,CType>::get_stats() {
 
 template<typename T, CacheType CType>
 void ClientCacheWrapper<T,CType>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
+		const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
+	(void) query;
 	(void) profiler;
 }
 
@@ -278,12 +279,9 @@ std::unique_ptr<GenericPlot> ClientCacheWrapper<GenericPlot,CacheType::PLOT>::re
 
 template<typename T, CacheType CType>
 NodeCacheRef ClientCacheWrapper<T,CType>::put_local(
-		const std::string& semantic_id, const std::unique_ptr<T>& item,
-		size_t size, double costs, const AccessInfo info) {
+		const std::string& semantic_id, const std::unique_ptr<T>& item, CacheEntry &&info) {
 	(void) semantic_id;
 	(void) item;
-	(void) size;
-	(void) costs;
 	(void) info;
 	throw CacheException("ClientWrapper only support the query-method");
 }
@@ -382,7 +380,7 @@ CacheStats NodeCacheWrapper<T>::get_stats() {
 }
 
 template<typename T>
-void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item, const QueryProfiler &profiler) {
+void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
 
 	ExecTimer t("CacheManager.put");
 
@@ -391,7 +389,29 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 	size_t size = SizeUtil::get_byte_size(*item);
 
 	if ( strategy.do_cache(profiler,size) ) {
-		auto ref = put_local(semantic_id, item, size, strategy.get_costs(profiler,size));
+		CacheCube cube(*item);
+		// Min/Max resolution hack
+		if ( query.restype == QueryResolution::Type::PIXELS ) {
+			double scale_x = (query.x2-query.x1) / query.xres;
+			double scale_y = (query.y2-query.y1) / query.yres;
+
+			// Result was max
+			if ( scale_x < cube.resolution_info.pixel_scale_x.a )
+				cube.resolution_info.pixel_scale_x.a = 0;
+			// Result was minimal
+			else if ( scale_x > cube.resolution_info.pixel_scale_x.b )
+				cube.resolution_info.pixel_scale_x.b = std::numeric_limits<double>::infinity();
+
+
+			// Result was max
+			if ( scale_y < cube.resolution_info.pixel_scale_y.a )
+				cube.resolution_info.pixel_scale_y.a = 0;
+			// Result was minimal
+			else if ( scale_y > cube.resolution_info.pixel_scale_y.b )
+				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
+		}
+
+		auto ref = put_local(semantic_id, item, CacheEntry( cube, size, strategy.get_costs(profiler,size)) );
 		ExecTimer t("CacheManager.put.remote");
 
 		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
@@ -403,10 +423,10 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 
 template<typename T>
 NodeCacheRef NodeCacheWrapper<T>::put_local(const std::string& semantic_id,
-	const std::unique_ptr<T>& item, size_t size, double costs, const AccessInfo info) {
+	const std::unique_ptr<T>& item, CacheEntry &&info) {
 	ExecTimer t("CacheManager.put.local");
 	Log::debug("Adding item to local cache");
-	return cache.put(semantic_id, item, size, costs, info);
+	return cache.put(semantic_id, item, info);
 }
 
 template<typename T>
@@ -428,6 +448,11 @@ NodeCacheRef NodeCacheWrapper<T>::get_entry_info(const NodeCacheKey& key) {
 
 template<typename T>
 std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const QueryRectangle& rect) {
+	if ( op.getDepth() == 0 ) {
+		Log::debug("Graph-Depth = 0, omitting index query, returning MISS.");
+		throw NoSuchElementException("Cache-Miss");
+	}
+
 	ExecTimer t("CacheManager.query");
 	Log::debug("Querying item: %s on %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str() );
 
@@ -454,11 +479,9 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 		PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
 		QueryProfiler qp;
 		std::unique_ptr<T> result = process_puzzle(pr,qp);
-		put( op.getSemanticId(), result, qp );
 		return result;
 	}
-	// Check index (if we aren't on depth = 0 )
-	else if ( op.getDepth() != 0 ) {
+	else {
 		ExecTimer t("CacheManager.query.local_miss");
 		Log::debug("Local MISS for query: %s on %s. Querying index.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 		BaseRequest cr(CacheType::RASTER, op.getSemanticId(), rect);
@@ -471,7 +494,8 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 			// Full hit on different client
 			case WorkerConnection::RESP_QUERY_HIT: {
 				Log::trace("Full single remote HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
-				return fetch_item( op.getSemanticId(), CacheRef(stream) );
+				QueryProfiler qp;
+				return fetch_item( op.getSemanticId(), CacheRef(stream), qp );
 			}
 			// Full miss on whole cache
 			case WorkerConnection::RESP_QUERY_MISS: {
@@ -485,7 +509,6 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 				Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
 				QueryProfiler qp;
 				auto res = process_puzzle(pr,qp);
-				put(op.getSemanticId(),res,qp);
 				return res;
 				break;
 			}
@@ -493,10 +516,6 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 				throw NetworkException("Received unknown response from index.");
 			}
 		}
-	}
-	else {
-		Log::debug("Graph-Depth = 0, omitting index query, returning MISS.");
-		throw NoSuchElementException("Cache-Miss");
 	}
 }
 
@@ -519,9 +538,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& requ
 			else {
 				Log::debug("Fetching puzzle-piece from %s:%d, key: %d", cr.host.c_str(), cr.port, cr.entry_id);
 
-				auto raster = fetch_item( request.semantic_id, cr );
-				// TODO: Estimate size
-				//profiler.addIOCost();
+				auto raster = fetch_item( request.semantic_id, cr, profiler );
 				items.push_back( std::shared_ptr<const T>(raster.release()) );
 			}
 		}
@@ -536,6 +553,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& requ
 		items.push_back( std::shared_ptr<T>(r.release()));
 
 	auto result = do_puzzle( enlarge_puzzle(request.query,items), items);
+	put( request.semantic_id, result, request.query, profiler );
 	Log::trace("Finished processing puzzle-request: %s", request.to_string().c_str());
 	return result;
 }
@@ -594,7 +612,7 @@ SpatioTemporalReference NodeCacheWrapper<GenericPlot>::enlarge_puzzle(const Quer
 
 
 template<typename T>
-std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_id, const CacheRef& ref) {
+std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_id, const CacheRef& ref, QueryProfiler &qp) {
 	TypedNodeCacheKey key(cache.type,semantic_id,ref.entry_id);
 	Log::debug("Fetching cache-entry from: %s:%d, key: %d", ref.host.c_str(), ref.port, ref.entry_id );
 	UnixSocket sock(ref.host.c_str(), ref.port,true);
@@ -603,8 +621,11 @@ std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_i
 	buffered_write(sock,DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET_CACHED_ITEM,key);
 	uint8_t resp;
 	stream.read(&resp);
+
 	switch (resp) {
 		case DeliveryConnection::RESP_OK: {
+			MoveInfo mi(stream);
+			qp.addIOCost( mi.size );
 			return read_item(stream);
 		}
 		case DeliveryConnection::RESP_ERROR: {

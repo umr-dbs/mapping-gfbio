@@ -228,11 +228,11 @@ void DeliveryManager::handle_cache_request(DeliveryConnection& dc) {
 	try {
 		Log::debug("Sending cache-entry: %s", key.to_string().c_str());
 		switch ( key.type ) {
-			case CacheType::RASTER: dc.send( cm.get_raster_cache().get_ref(key) ); break;
-			case CacheType::POINT: dc.send( cm.get_point_cache().get_ref(key) ); break;
-			case CacheType::LINE: dc.send( cm.get_line_cache().get_ref(key) ); break;
-			case CacheType::POLYGON: dc.send( cm.get_polygon_cache().get_ref(key) ); break;
-			case CacheType::PLOT: dc.send( cm.get_plot_cache().get_ref(key) ); break;
+			case CacheType::RASTER: dc.send_cache_entry( cm.get_raster_cache().get_entry_info(key), cm.get_raster_cache().get_ref(key) ); break;
+			case CacheType::POINT: dc.send_cache_entry( cm.get_point_cache().get_entry_info(key), cm.get_point_cache().get_ref(key) ); break;
+			case CacheType::LINE: dc.send_cache_entry( cm.get_line_cache().get_entry_info(key), cm.get_line_cache().get_ref(key) ); break;
+			case CacheType::POLYGON: dc.send_cache_entry( cm.get_polygon_cache().get_entry_info(key), cm.get_polygon_cache().get_ref(key) ); break;
+			case CacheType::PLOT: dc.send_cache_entry( cm.get_plot_cache().get_entry_info(key), cm.get_plot_cache().get_ref(key) ); break;
 			default: throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
 		}
 	} catch (const NoSuchElementException &nse) {

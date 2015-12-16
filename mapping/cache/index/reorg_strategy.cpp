@@ -119,17 +119,7 @@ bool CapacityReorgStrategy::requires_reorg(const std::map<uint32_t, std::shared_
 
 void CapacityReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) const {
 
-	std::unordered_map<uint32_t,std::vector<std::shared_ptr<IndexCacheEntry>>&> per_node;
 	double target_mean = get_target_usage( result );
-
-	// Calculate mean usage
-	for (auto &e : result) {
-		auto &node_entries = cache.get_node_entries(e.second.node->id);
-
-		// Sort according to score (ascending) -- for easy removal of least relevant entries
-		std::sort(node_entries.begin(), node_entries.end(), entry_less);
-		per_node.emplace( e.second.node->id, node_entries );
-	}
 
 	// Find overflowing nodes
 	std::vector<std::shared_ptr<IndexCacheEntry>> overflow;
@@ -147,7 +137,9 @@ void CapacityReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &
 			underflow_nodes.push_back(e.second.node->id);
 		}
 		else  {
-			auto &node_entries = per_node.at(e.first);
+			auto &node_entries = cache.get_node_entries(e.second.node->id);
+			// Sort according to score (ascending) -- for easy removal of least relevant entries
+			std::sort(node_entries.begin(), node_entries.end(), entry_less);
 			auto iter = node_entries.begin();
 			while ( iter != node_entries.end() &&
 				bytes_used > target_bytes ) {
@@ -286,7 +278,6 @@ bool GeographicReorgStrategy::requires_reorg(const std::map<uint32_t, std::share
 }
 
 void GeographicReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) const {
-
 	double target_mean = get_target_usage( result );
 
 	n_pos = calculate_node_pos( result );
@@ -303,8 +294,6 @@ void GeographicReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription>
 			n_pos.at(node_id).entries.push_back(e);
 		}
 	}
-
-	std::vector<std::shared_ptr<IndexCacheEntry>> overflow;
 
 	// Find overflowing nodes and create result
 	for ( auto &kv : n_pos ) {
@@ -328,14 +317,10 @@ void GeographicReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription>
 										  remote_node->port ) );
 			}
 			else
-				overflow.push_back( e );
+				result.at(e->node_id).add_removal(
+						TypedNodeCacheKey( cache.get_reorg_type(), e->semantic_id, e->entry_id )
+				);
 		}
-	}
-
-	for ( auto &e : overflow ) {
-		result.at(e->node_id).add_removal(
-			TypedNodeCacheKey( cache.get_reorg_type(), e->semantic_id, e->entry_id )
-		);
 	}
 }
 
@@ -368,14 +353,15 @@ std::map<uint32_t,NodePos> GeographicReorgStrategy::calculate_node_pos(
 			double y1 = b.get_dimension(1).a;
 			double y2 = b.get_dimension(1).b;
 
+			double e_x = x1 + (x2-x1)/2;
+			double e_y = y1 + (y2-y1)/2;
+
 			// Transform dimension if required
 			if ( b.epsg == EPSG_GEOSMSG ) {
-				geosmsg_trans.transform(x1,y1);
-				geosmsg_trans.transform(x2,y2);
+				geosmsg_trans.transform(e_x,e_y);
 			}
 			else if ( b.epsg == EPSG_WEBMERCATOR ) {
-				webmercator_trans.transform(x1,y1);
-				webmercator_trans.transform(x2,y2);
+				webmercator_trans.transform(e_x,e_y);
 			}
 			else if ( b.epsg != EPSG_LATLON ) {
 				Log::error("Unknown CRS: %d, ignoring in calculation.", b.epsg );
@@ -383,9 +369,6 @@ std::map<uint32_t,NodePos> GeographicReorgStrategy::calculate_node_pos(
 			}
 
 			double e_mass = e->size;
-			double e_x = x1 + (x2-x1)/2;
-			double e_y = y1 + (y2-y1)/2;
-
 			weighted_x += (e_x*e_mass);
 			weighted_y += (e_y*e_mass);
 			mass += e_mass;

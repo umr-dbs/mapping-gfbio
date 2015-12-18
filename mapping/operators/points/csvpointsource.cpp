@@ -301,7 +301,6 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 		}
 		if (!added)
 			continue;
-		// TODO: check if geometry is outside the query rectangle?
 
 		// Step 2: extract the time information
 		if (time_specification != TimeSpecification::NONE) {
@@ -320,7 +319,6 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 			}
 			collection->time_start.push_back(t1);
 			collection->time_end.push_back(t2);
-			// TODO: what if they're outside of the query rectangle? We cannot just 'continue', since the Feature was already added
 		}
 
 

@@ -1,0 +1,74 @@
+{
+	/* select *, (
+			select 
+			     ST_Value(rast, geom) 
+			from 
+			     world1 
+			where
+			     ST_Intersects(rast,geom)
+			)
+		from osm_large_cities
+		order by osm_id asc
+	*/
+	
+	"name" : "Raster metadata to points",	
+	"query_result": "points",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+	"query" : 
+	{
+        "type": "raster_metadata_to_points",
+        "params": {
+            "names": [
+                "raster_value"
+            ],
+            "xResolution" : 10800,
+            "yResolution": 5400
+        },
+        "sources": {
+            "raster": [
+                {
+                    "type": "source",
+                    "params": {
+                        "sourcename": "world1",
+                        "channel": 0
+                    }
+                }
+            ],
+            "points": [
+                {
+                    "params" : 
+					{
+						"filename" : "test/systemtests/data/osm_large_cities/osm_large_cities.csv",
+						"separator" : ";",
+						"geometry": "wkt",
+						"time": "start",
+						"time1_format": {
+							"format" : "custom",
+							"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
+						},
+						"columns": {
+							"x": "wkt",
+							"numeric": ["osm_id"],
+							"textual": ["name", "is_in"],
+							"time1": "time_start"
+						}
+					},
+					"sources" : null,
+					"type" : "csvpointsource"
+                }
+            ]
+        }
+    },
+	"query_expected_hash" : "8d51cc135460c067393e44ce1a553e2f"
+}

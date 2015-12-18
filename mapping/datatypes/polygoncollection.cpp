@@ -314,7 +314,7 @@ void PolygonCollection::featureToWKT(size_t featureIndex, std::ostringstream& wk
 	}
 }
 
-std::string PolygonCollection::hash() {
+std::string PolygonCollection::hash() const {
 	// certainly not the most stable solution, but it has few lines of code..
 	std::string serialized = toGeoJSON(true);
 

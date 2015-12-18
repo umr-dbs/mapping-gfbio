@@ -407,7 +407,7 @@ std::string PointCollection::toARFF(std::string layerName) const {
 	return arff.str();
 }
 
-std::string PointCollection::hash() {
+std::string PointCollection::hash()const {
 	// certainly not the most stable solution, but it has few lines of code..
 	std::string csv = toCSV();
 

@@ -198,7 +198,7 @@ public:
 	 * compute the hash of the collection
 	 * @return the hash of the collection
 	 */
-	std::string hash();
+	std::string hash() const;
 
 	virtual std::string toCSV() const;
 

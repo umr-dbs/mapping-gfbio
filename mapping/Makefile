@@ -51,7 +51,7 @@ endif
 #
 # All object files, grouped by subsystem
 #
-OBJ_SERVICES=o/services/httpservice.o o/services/ogcservice.o o/services/wms.o o/services/wcs.o o/services/fakewfs.o o/services/wfs.o
+OBJ_SERVICES=o/services/httpservice.o o/services/httpparsing.o o/services/ogcservice.o o/services/wms.o o/services/wcs.o o/services/fakewfs.o o/services/wfs.o
 OBJ_RASTER=o/raster/opencl.o o/raster/profiler.o
 OBJ_RASTERDB=o/rasterdb/rasterdb.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/rasterdb/backend_remote.o
 OBJ_DATATYPES_COMMON=o/datatypes/attributes.o o/datatypes/spatiotemporal.o o/datatypes/raster/import_gdal.o o/datatypes/raster/export_pgm.o o/datatypes/raster/export_yuv.o o/datatypes/raster/export_png.o o/datatypes/raster/export_jpeg.o o/datatypes/simplefeaturecollection.o o/datatypes/pointcollection.o o/datatypes/linecollection.o o/datatypes/polygoncollection.o o/datatypes/simplefeaturecollections/geosgeomutil.o o/datatypes/simplefeaturecollections/wkbutil.o o/datatypes/unit.o o/datatypes/colorizer.o

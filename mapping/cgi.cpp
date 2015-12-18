@@ -54,7 +54,7 @@ int main() {
 
 	if (getenv("FCGI_WEB_SERVER_ADDRS") == nullptr) {
 		// CGI mode
-		HTTPService::run(getenv("QUERY_STRING"), std::cout.rdbuf(), std::cerr.rdbuf());
+		HTTPService::run(std::cin.rdbuf(), std::cout.rdbuf(), std::cerr.rdbuf());
 	}
 	else {
 		// FCGI mode
@@ -68,11 +68,11 @@ int main() {
 			throw std::runtime_error("FCGX_InitRequest failed");
 
 		while (FCGX_Accept_r(&request) == 0) {
-			//fcgi_streambuf streambuf_in(request.in);
+			fcgi_streambuf streambuf_in(request.in);
 			fcgi_streambuf streambuf_out(request.out);
 			fcgi_streambuf streambuf_err(request.err);
 
-			HTTPService::run(getenv("QUERY_STRING"), &streambuf_out, &streambuf_err);
+			HTTPService::run(&streambuf_in, &streambuf_out, &streambuf_err);
 		}
 	}
 }

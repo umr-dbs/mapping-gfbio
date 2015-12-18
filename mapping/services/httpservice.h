@@ -6,13 +6,16 @@
 #include <memory>
 #include <string>
 #include <map>
-#include <ostream>
+#include <iostream>
 
 
 class HTTPService {
-	protected:
+	public:
 		// class Params
 		class Params : public std::map<std::string, std::string> {
+			private:
+				Params() {};
+				friend class HTTPService;
 			public:
 				bool hasParam(const std::string& key) const {
 					return find(key) != end();
@@ -26,6 +29,7 @@ class HTTPService {
 				bool getBool(const std::string &name, bool defaultValue) const;
 		};
 
+	protected:
 		// class ResponseStream
 		class HTTPResponseStream : public std::ostream {
 			public:
@@ -50,12 +54,10 @@ class HTTPService {
 		virtual void run(const Params& params, HTTPResponseStream& result, std::ostream &error) = 0;
 		static std::unique_ptr<HTTPService> getRegisteredService(const std::string &name);
 
-		static Params parseQueryString(const char *query_string);
-
 	public:
 		virtual ~HTTPService() = default;
 
-		static void run(const char *query_string, std::streambuf *out, std::streambuf *err);
+		static void run(std::streambuf *in, std::streambuf *out, std::streambuf *err);
 };
 
 

@@ -49,7 +49,8 @@ static void convert(int argc, char *argv[]) {
 	try {
 		auto raster = GenericRaster::fromGDAL(argv[2], 1);
 		auto c = Colorizer::create("grey");
-		raster->toPNG(argv[3], *c);
+		std::ofstream output(argv[3]);
+		raster->toPNG(output, *c);
 	}
 	catch (ImporterException &e) {
 		printf("%s\n", e.what());
@@ -318,7 +319,8 @@ static void runquery(int argc, char *argv[]) {
 			{
 				Profiler::Profiler p("TO_PNG");
 				auto colors = Colorizer::create("grey");
-				raster->toPNG((std::string(out_filename) + ".png").c_str(), *colors);
+				std::ofstream output(std::string(out_filename) + ".png");
+				raster->toPNG(output, *colors);
 			}
 		}
 		else

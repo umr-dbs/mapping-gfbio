@@ -8,7 +8,14 @@
 #include <sstream>
 #include <cmath>
 
-template<typename T> void Raster2D<T>::toPNG(const char *filename, const Colorizer &colorizer, bool flipx, bool flipy, Raster2D<uint8_t> *overlay) {
+
+static void png_write_wrapper(png_structp png_ptr, png_bytep data, png_size_t length) {
+	std::ostream *stream = (std::ostream *) png_get_io_ptr(png_ptr);
+	stream->write((const char *) data, length);
+}
+
+
+template<typename T> void Raster2D<T>::toPNG(std::ostream &output, const Colorizer &colorizer, bool flipx, bool flipy, Raster2D<uint8_t> *overlay) {
 	this->setRepresentation(GenericRaster::Representation::CPU);
 
 	if (overlay) {
@@ -71,14 +78,7 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 	}
 
 
-	// start PNG output
-	FILE *file = nullptr;
-	if (filename != nullptr) {
-		file = fopen(filename, "w");
-		if (!file)
-			throw ExporterException("Could not write to file");
-	}
-
+	// prepare PNG output
 	png_structp png_ptr = png_create_write_struct(
 			PNG_LIBPNG_VER_STRING,
 			NULL, NULL, NULL
@@ -97,13 +97,10 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 		throw ExporterException("Could not initialize libpng");
 	}
 
-	if (filename != nullptr) {
-		png_init_io(png_ptr, file);
-	}
-	else {
-		png_init_io(png_ptr, stdout);
-	}
+	// write into the provided ostream
+	png_set_write_fn(png_ptr, &output, png_write_wrapper, nullptr);
 
+	// start PNG output, headers first
 	png_set_IHDR(png_ptr, info_ptr,
 		width, height,
 		8, PNG_COLOR_TYPE_PALETTE,
@@ -189,9 +186,6 @@ template<typename T> void Raster2D<T>::toPNG(const char *filename, const Coloriz
 	png_write_end(png_ptr, info_ptr);
 
 	png_destroy_write_struct(&png_ptr, &info_ptr);
-	if (filename != nullptr) {
-		fclose(file);
-	}
 }
 
 

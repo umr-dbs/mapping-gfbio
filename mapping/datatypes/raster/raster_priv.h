@@ -39,7 +39,7 @@ template<typename T> class Raster2D : public Raster<T, 2> {
 
 		virtual void toPGM(const char *filename, bool avg);
 		virtual void toYUV(const char *filename);
-		virtual void toPNG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false, Raster2D<uint8_t> *overlay = nullptr);
+		virtual void toPNG(std::ostream &output, const Colorizer &colorizer, bool flipx = false, bool flipy = false, Raster2D<uint8_t> *overlay = nullptr);
 		virtual void toJPEG(const char *filename, const Colorizer &colorizer, bool flipx = false, bool flipy = false);
 		virtual void toGDAL(const char *filename, const char *driver, bool flipx = false, bool flipy = false);
 

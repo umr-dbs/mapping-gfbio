@@ -21,13 +21,3 @@ std::vector<std::string> get_debug_messages() {
 	return debugmessages;
 #endif
 }
-
-
-void print_debug_header() {
-	auto msgs = get_debug_messages();
-	printf("Profiling-header: ");
-	for (auto &str : msgs) {
-		printf("%s, ", str.c_str());
-	}
-	printf("\r\n");
-}

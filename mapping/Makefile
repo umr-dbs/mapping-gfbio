@@ -30,7 +30,7 @@ CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
-LDFLAGS_CGI=-luriparser
+LDFLAGS_CGI=-lfcgi++ -lfcgi -luriparser
 LDFLAGS_GTEST=-lpthread
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
@@ -51,7 +51,7 @@ endif
 #
 # All object files, grouped by subsystem
 #
-OBJ_SERVICES=o/services/wfs_request.o
+OBJ_SERVICES=o/services/httpservice.o o/services/ogcservice.o o/services/wms.o
 OBJ_RASTER=o/raster/opencl.o o/raster/profiler.o
 OBJ_RASTERDB=o/rasterdb/rasterdb.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/rasterdb/backend_remote.o
 OBJ_DATATYPES_COMMON=o/datatypes/attributes.o o/datatypes/spatiotemporal.o o/datatypes/raster/import_gdal.o o/datatypes/raster/export_pgm.o o/datatypes/raster/export_yuv.o o/datatypes/raster/export_png.o o/datatypes/raster/export_jpeg.o o/datatypes/simplefeaturecollection.o o/datatypes/pointcollection.o o/datatypes/linecollection.o o/datatypes/polygoncollection.o o/datatypes/simplefeaturecollections/geosgeomutil.o o/datatypes/simplefeaturecollections/wkbutil.o o/datatypes/unit.o o/datatypes/colorizer.o
@@ -78,7 +78,7 @@ OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALL}
 OBJ_OPERATORS_STUBS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALLSTUBS}
 
 OBJ_CACHE_COMMON=o/cache/common.o o/cache/priv/transfer.o o/cache/priv/connection.o o/cache/priv/redistribution.o o/cache/priv/cache_stats.o o/cache/priv/cache_structure.o o/cache/node/node_cache.o o/cache/manager.o o/cache/priv/caching_strategy.o o/cache/priv/cube.o o/cache/node/util.o o/util/nio.o
-OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL} ${OBJ_SERVICES}
+OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL}
 
 SRC_UNITTEST:=$(wildcard test/unittests/*.cpp) $(wildcard test/unittests/*/*.cpp)
 OBJ_UNITTEST:=$(patsubst test/%,o/test/%,$(SRC_UNITTEST:.cpp=.o))
@@ -116,7 +116,7 @@ all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXEC
 ${EXE}:	o/mapping_manager.o ${OBJ_COMMON}
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
-${EXECGI}:	o/cgi.o ${OBJ_COMMON}
+${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES}
 	${CPP} $+ -o $@  ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_CGI}
 
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o o/cache/common.o

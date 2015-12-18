@@ -47,6 +47,7 @@ apt-get install libboost-date-time-dev
 apt-get install libsqlite3-dev
 apt-get install liburiparser-dev
 apt-get install libgtest-dev
+apt-get install libfcgi-dev
 
 apt-get install libproj-dev
 apt-get install git

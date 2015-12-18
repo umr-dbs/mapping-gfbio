@@ -6,6 +6,5 @@
 
 void d(const std::string &str);
 std::vector<std::string> get_debug_messages();
-void print_debug_header();
 
 #endif

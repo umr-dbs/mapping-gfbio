@@ -82,7 +82,7 @@ private:
 	void handle_reorg_move_item( const ReorgMoveItem &item, BinaryStream &index_stream );
 
 	// Removes the given item from the local cache of this node
-	void handle_reorg_remove_item( const TypedNodeCacheKey &item );
+	void handle_reorg_remove_item( const TypedNodeCacheKey &item, BinaryStream &index_stream );
 
 
 	template <typename T>

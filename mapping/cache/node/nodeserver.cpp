@@ -286,7 +286,7 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 			Log::debug("Received reorg command.");
 			ReorgDescription d(stream);
 			for (auto &rem_item : d.get_removals()) {
-				handle_reorg_remove_item(rem_item);
+				handle_reorg_remove_item(rem_item, stream);
 			}
 			for (auto &move_item : d.get_moves()) {
 				handle_reorg_move_item(move_item, stream);
@@ -307,26 +307,37 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 	}
 }
 
-void NodeServer::handle_reorg_remove_item(const TypedNodeCacheKey &item) {
+void NodeServer::handle_reorg_remove_item(const TypedNodeCacheKey &item, BinaryStream &index_stream) {
 	Log::debug("Removing item from cache. Key: %s", item.to_string().c_str() );
-	switch (item.type) {
-		case CacheType::RASTER:
-			CacheManager::get_instance().get_raster_cache().remove_local(item);
-			break;
-		case CacheType::POINT:
-			CacheManager::get_instance().get_point_cache().remove_local(item);
-			break;
-		case CacheType::LINE:
-			CacheManager::get_instance().get_line_cache().remove_local(item);
-			break;
-		case CacheType::POLYGON:
-			CacheManager::get_instance().get_polygon_cache().remove_local(item);
-			break;
-		case CacheType::PLOT:
-			CacheManager::get_instance().get_plot_cache().remove_local(item);
-			break;
-		default:
-			throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+
+	uint8_t iresp;
+	buffered_write( index_stream, ControlConnection::RESP_REORG_REMOVE_REQUEST, item );
+
+	index_stream.read(&iresp);
+
+	if ( iresp == ControlConnection::CMD_REMOVE_OK ) {
+		switch (item.type) {
+			case CacheType::RASTER:
+				CacheManager::get_instance().get_raster_cache().remove_local(item);
+				break;
+			case CacheType::POINT:
+				CacheManager::get_instance().get_point_cache().remove_local(item);
+				break;
+			case CacheType::LINE:
+				CacheManager::get_instance().get_line_cache().remove_local(item);
+				break;
+			case CacheType::POLYGON:
+				CacheManager::get_instance().get_polygon_cache().remove_local(item);
+				break;
+			case CacheType::PLOT:
+				CacheManager::get_instance().get_plot_cache().remove_local(item);
+				break;
+			default:
+				throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+		}
+	}
+	else {
+		Log::error("Index did not confirm removal. Skipping. Response was: %d", iresp);
 	}
 }
 
@@ -398,7 +409,7 @@ void NodeServer::confirm_move(const ReorgMoveItem& item, uint64_t new_id, Binary
 	index_stream.read(&iresp);
 	try {
 		switch (iresp) {
-			case ControlConnection::CMD_REORG_ITEM_OK: {
+			case ControlConnection::CMD_MOVE_OK: {
 				Log::debug("Reorg of item finished. Notifying delivery instance.");
 				del_stream.write(DeliveryConnection::CMD_MOVE_DONE);
 				break;

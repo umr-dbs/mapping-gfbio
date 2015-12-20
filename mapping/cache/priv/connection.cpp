@@ -455,9 +455,13 @@ void ControlConnection::process_command(uint8_t cmd) {
 
 	switch (cmd) {
 		case RESP_REORG_ITEM_MOVED: {
-			state = State::READING_REORG_RESULT;
-			Log::debug("Reading ReorgResult.");
+			state = State::READING_MOVE_RESULT;
 			begin_read(make_unique<NBReorgMoveResultReader>());
+			break;
+		}
+		case RESP_REORG_REMOVE_REQUEST: {
+			state = State::READING_REMOVE_REQUEST;
+			begin_read(make_unique<NBTypedNodeCacheKeyReader>());
 			break;
 		}
 		case RESP_REORG_DONE: {
@@ -479,9 +483,13 @@ void ControlConnection::process_command(uint8_t cmd) {
 
 void ControlConnection::read_finished(NBReader& reader) {
 	switch (state) {
-		case State::READING_REORG_RESULT:
-			reorg_result.reset(new ReorgMoveResult(*reader.get_stream()));
-			state = State::REORG_RESULT_READ;
+		case State::READING_MOVE_RESULT:
+			move_result.reset(new ReorgMoveResult(*reader.get_stream()));
+			state = State::MOVE_RESULT_READ;
+			break;
+		case State::READING_REMOVE_REQUEST:
+			remove_request.reset(new TypedNodeCacheKey(*reader.get_stream()));
+			state = State::REMOVE_REQUEST_READ;
 			break;
 		case State::READING_STATS:
 			stats.reset(new NodeStats(*reader.get_stream()));
@@ -501,7 +509,8 @@ void ControlConnection::write_finished() {
 		case State::SENDING_REORG:
 			state = State::REORGANIZING;
 			break;
-		case State::SENDING_REORG_CONFIRM:
+		case State::SENDING_MOVE_CONFIRM:
+		case State::SENDING_REMOVE_CONFIRM:
 			state = State::REORGANIZING;
 			break;
 		case State::SENDING_STATS_REQUEST:
@@ -539,13 +548,23 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 		throw IllegalStateException("Can only trigger reorg in state IDLE");
 }
 
-void ControlConnection::confirm_reorg() {
-	if (state == State::REORG_RESULT_READ) {
-		state = State::SENDING_REORG_CONFIRM;
-		begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_REORG_ITEM_OK));
+void ControlConnection::confirm_move() {
+	if (state == State::MOVE_RESULT_READ) {
+		state = State::SENDING_MOVE_CONFIRM;
+		begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_MOVE_OK));
 	}
 	else
-		throw IllegalStateException("Can only send raster query result in state REORG_RESULT_READ");
+		throw IllegalStateException("Can only confirm move in state REORG_RESULT_READ");
+
+}
+
+void ControlConnection::confirm_remove() {
+	if (state == State::REMOVE_REQUEST_READ) {
+		state = State::SENDING_REMOVE_CONFIRM;
+		begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_REMOVE_OK));
+	}
+	else
+		throw IllegalStateException("Can only confirm removals in state REMOVE_REQUEST_READ");
 
 }
 
@@ -570,21 +589,28 @@ void ControlConnection::release() {
 // GETTER
 //
 
-const NodeHandshake& ControlConnection::get_handshake() {
+const NodeHandshake& ControlConnection::get_handshake() const {
 	if ( state == State::HANDSHAKE_READ )
 		return *handshake;
 	else
 		throw IllegalStateException("Can only return Handshake in state HANDSHAKE_READ");
 }
 
-const ReorgMoveResult& ControlConnection::get_result() {
-	if (state == State::REORG_RESULT_READ)
-		return *reorg_result;
+const ReorgMoveResult& ControlConnection::get_move_result() const {
+	if (state == State::MOVE_RESULT_READ)
+		return *move_result;
 	else
 		throw IllegalStateException("Can only return ReorgResult in state REORG_RESULT_READ");
 }
 
-const NodeStats& ControlConnection::get_stats() {
+const TypedNodeCacheKey& ControlConnection::get_remove_request() const {
+	if (state == State::REMOVE_REQUEST_READ)
+		return *remove_request;
+	else
+		throw IllegalStateException("Can only return ReorgResult in state REORG_RESULT_READ");
+}
+
+const NodeStats& ControlConnection::get_stats() const {
 	if (state == State::STATS_RECEIVED)
 		return *stats;
 	else
@@ -594,7 +620,7 @@ const NodeStats& ControlConnection::get_stats() {
 // Private stuff
 
 void ControlConnection::reset() {
-	reorg_result.reset();
+	move_result.reset();
 	stats.reset();
 	state = State::IDLE;
 }
@@ -602,9 +628,11 @@ void ControlConnection::reset() {
 const uint32_t ControlConnection::MAGIC_NUMBER;
 const uint8_t ControlConnection::CMD_REORG;
 const uint8_t ControlConnection::CMD_GET_STATS;
-const uint8_t ControlConnection::CMD_REORG_ITEM_OK;
+const uint8_t ControlConnection::CMD_MOVE_OK;
+const uint8_t ControlConnection::CMD_REMOVE_OK;
 const uint8_t ControlConnection::CMD_HELLO;
 const uint8_t ControlConnection::RESP_REORG_ITEM_MOVED;
+const uint8_t ControlConnection::RESP_REORG_REMOVE_REQUEST;
 const uint8_t ControlConnection::RESP_REORG_DONE;
 const uint8_t ControlConnection::RESP_STATS;
 

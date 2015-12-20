@@ -12,9 +12,70 @@
 
 #include <algorithm>
 
+CacheLocks::Lock::Lock(CacheType type, const IndexCacheKey& key) :
+	IndexCacheKey(key), type(type) {
+}
+
+bool CacheLocks::Lock::operator <(const Lock& l) const {
+	return (type <  l.type) ||
+		   (type == l.type && entry_id <  l.entry_id) ||
+		   (type == l.type && entry_id == l.entry_id && node_id <  l.node_id) ||
+		   (type == l.type && entry_id == l.entry_id && node_id == l.node_id && semantic_id < l.semantic_id);
+}
+
+bool CacheLocks::Lock::operator ==(const Lock& l) const {
+	return type == l.type &&
+		   entry_id == l.entry_id &&
+		   node_id == l.node_id &&
+		   semantic_id == l.semantic_id;
+}
+
+
+bool CacheLocks::is_locked(CacheType type, const IndexCacheKey& key) const {
+	return is_locked( Lock(type,key) );
+}
+
+bool CacheLocks::is_locked(const Lock& lock) const {
+	return locks.find(lock) != locks.end();
+}
+
+void CacheLocks::add_lock(const Lock& lock) {
+	auto it = locks.find(lock);
+	if ( it != locks.end() )
+		it->second++;
+	else if ( !locks.emplace( lock, 1 ).second )
+		throw IllegalStateException("Locking failed!");
+}
+
+void CacheLocks::add_locks(const std::vector<Lock>& locks) {
+	for ( auto &l : locks )
+		add_lock(l);
+}
+
+void CacheLocks::remove_lock(const Lock& lock) {
+	auto it = locks.find(lock);
+		if ( it != locks.end() ) {
+			if ( it->second == 1 )
+				locks.erase(it);
+			else if ( it->second > 1 )
+				it->second--;
+			else
+				throw IllegalStateException("Illegal state on locks!");
+		}
+		else
+			throw ArgumentException(concat("No lock held for key: ", lock.to_string()) );
+}
+
+void CacheLocks::remove_locks(const std::vector<Lock>& locks) {
+	for ( auto &l : locks )
+			remove_lock(l);
+}
+
 //
 //
 //
+
+CacheLocks QueryManager::locks;
 
 QueryManager::QueryManager(IndexCaches &caches, const std::map<uint32_t, std::shared_ptr<Node>> &nodes) :
 	caches(caches), nodes(nodes) {
@@ -24,8 +85,8 @@ void QueryManager::add_request(uint64_t client_id, const BaseRequest &req ) {
 	ExecTimer t("QueryManager.add_request");
 	// Check if running jobs satisfy the given query
 	for (auto &qi : queries) {
-		if (qi.second.satisfies(req)) {
-			qi.second.add_client(client_id);
+		if (qi.second->satisfies(req)) {
+			qi.second->add_client(client_id);
 			return;
 		}
 	}
@@ -58,8 +119,8 @@ void QueryManager::schedule_pending_jobs(
 	while (it != pending_jobs.end()) {
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
-			queries.emplace(con_id, QueryInfo(**it));
-			Log::info("Scheduled request: %s\non worker: %d", (*it)->request->to_string().c_str(), con_id);
+			//Log::info("Scheduled request: %s\non worker: %d", (*it)->to_string().c_str(), con_id);
+			queries.emplace(con_id, std::move(*it));
 			it = pending_jobs.erase(it);
 		}
 		else
@@ -69,42 +130,84 @@ void QueryManager::schedule_pending_jobs(
 
 size_t QueryManager::close_worker(uint64_t worker_id) {
 	auto it = queries.find(worker_id);
-	size_t res = it->second.get_clients().size();
-	finished_queries.insert(*it);
+	size_t res = it->second->get_clients().size();
+	finished_queries.insert(std::move(*it));
 	queries.erase(it);
 	return res;
 }
 
-std::vector<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
+std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
 	auto it = finished_queries.find(worker_id);
-	std::vector<uint64_t> clients = it->second.get_clients();
+	std::set<uint64_t> clients = it->second->get_clients();
 	finished_queries.erase(it);
 	return clients;
 }
 
 void QueryManager::worker_failed(uint64_t worker_id) {
-	try {
-		auto job = recreate_job(finished_queries.at(worker_id));
-		finished_queries.erase(worker_id);
+	auto fi = finished_queries.find(worker_id);
+	if ( fi != finished_queries.end() ) {
+		auto job = recreate_job(*fi->second);
+		finished_queries.erase(fi);
 		pending_jobs.push_back(std::move(job));
-	} catch (const std::out_of_range &oor) {
-		// Nothing to do
+		return;
 	}
 
-	try {
-		auto job = recreate_job(queries.at(worker_id));
-		queries.erase(worker_id);
+	fi = queries.find(worker_id);
+	if ( fi != queries.end() ) {
+		auto job = recreate_job(*fi->second);
+		queries.erase(fi);
 		pending_jobs.push_back(std::move(job));
-	} catch (const std::out_of_range &oor) {
-		// Nothing to do
 	}
 }
+
+void QueryManager::process_worker_query(WorkerConnection& con) {
+	auto &req = con.get_query();
+	auto &query = *queries.at(con.id);
+	auto &cache = caches.get_cache(req.type);
+	auto res = cache.query(req.semantic_id, req.query);
+	Log::debug("QueryResult: %s", res.to_string().c_str());
+
+	// Full single hit
+	if (res.keys.size() == 1 && !res.has_remainder()) {
+		Log::debug("Full HIT. Sending reference.");
+		IndexCacheKey key(req.semantic_id, res.keys.at(0));
+		auto ref = cache.get(key);
+		auto node = nodes.at(ref->node_id);
+		CacheRef cr(node->host, node->port, ref->entry_id);
+		// Apply lock
+		query.add_lock( CacheLocks::Lock(req.type,key) );
+		con.send_hit(cr);
+	}
+	// Puzzle
+	else if (res.has_hit() ) {
+		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f");
+		std::vector<CacheRef> entries;
+		for (auto id : res.keys) {
+			IndexCacheKey key(req.semantic_id, id);
+			auto ref = cache.get(key);
+			auto &node = nodes.at(ref->node_id);
+			query.add_lock(CacheLocks::Lock(req.type,key));
+			entries.push_back(CacheRef(node->host, node->port, ref->entry_id));
+		}
+		PuzzleRequest pr( req.type, req.semantic_id, req.query, res.remainder, entries);
+		con.send_partial_hit(pr);
+	}
+	// Full miss
+	else {
+		Log::debug("Full MISS.");
+		con.send_miss();
+	}
+
+
+}
+
+
 
 //
 // PRIVATE
 //
 
-std::unique_ptr<JobDescription> QueryManager::create_job(const BaseRequest& req) {
+std::unique_ptr<PendingQuery> QueryManager::create_job(const BaseRequest& req) {
 	ExecTimer t("QueryManager.create_job");
 	auto &cache = caches.get_cache(req.type);
 	auto res = cache.query(req.semantic_id, req.query);
@@ -116,37 +219,38 @@ std::unique_ptr<JobDescription> QueryManager::create_job(const BaseRequest& req)
 
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
 		auto ref = cache.get(key);
-		std::unique_ptr<DeliveryRequest> jreq = make_unique<DeliveryRequest>(
+		DeliveryRequest dr(
 				req.type,
 				req.semantic_id,
 				res.covered,
 				ref->entry_id);
-		return make_unique<DeliverJob>(jreq, ref->node_id);
+		return make_unique<DeliverJob>(std::move(dr), key);
 	}
 	// Puzzle
 	else if (res.has_hit()) {
 		Log::debug("Partial HIT. Sending puzzle-request.");
 		std::vector<uint32_t> node_ids;
+		std::vector<IndexCacheKey> keys;
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
 			IndexCacheKey key(req.semantic_id, id);
 			auto ref = cache.get(key);
 			auto &node = nodes.at(ref->node_id);
+			keys.push_back(key);
 			node_ids.push_back(ref->node_id);
 			entries.push_back(CacheRef(node->host, node->port, ref->entry_id));
 		}
-		std::unique_ptr<PuzzleRequest> jreq = make_unique<PuzzleRequest>(
+		PuzzleRequest pr(
 				req.type,
 				req.semantic_id,
 				res.covered,
 				res.remainder, entries);
-		return make_unique<PuzzleJob>(jreq, node_ids);
+		return make_unique<PuzzleJob>(std::move(pr), std::move(keys));
 	}
 	// Full miss
 	else {
 		Log::debug("Full MISS.");
-		std::unique_ptr<BaseRequest> jreq = make_unique<BaseRequest>(req);
-		return make_unique<CreateJob>(jreq, nodes, cache);
+		return make_unique<CreateJob>(BaseRequest(req), nodes, cache);
 	}
 }
 
@@ -176,37 +280,55 @@ void QueryManager::handle_client_abort(uint64_t client_id) {
 	}
 }
 
-std::unique_ptr<JobDescription> QueryManager::recreate_job(const QueryInfo& query) {
-	std::unique_ptr<JobDescription> res = create_job(query);
+std::unique_ptr<PendingQuery> QueryManager::recreate_job(const RunningQuery& query) {
+	std::unique_ptr<PendingQuery> res = create_job( query.get_request() );
 	res->add_clients( query.get_clients() );
 	return res;
 }
 
+bool QueryManager::is_locked( CacheType type, const IndexCacheKey& key) {
+	return locks.is_locked(type,key);
+}
 
 //
 // Jobs
 //
 
-QueryInfo::QueryInfo(const BaseRequest& request) : BaseRequest(request) {
+RunningQuery::RunningQuery( std::vector<CacheLocks::Lock> &&locks ) :
+	locks(std::move(locks)) {
+	QueryManager::locks.add_locks(this->locks);
 }
 
-QueryInfo::QueryInfo(CacheType type, const QueryRectangle& query, const std::string& semantic_id) :
-	BaseRequest(type, semantic_id, query ) {
+RunningQuery::~RunningQuery() {
+	QueryManager::locks.remove_locks(this->locks);
 }
 
-bool QueryInfo::satisfies( const BaseRequest& req) const {
-	if ( req.type == type && req.semantic_id == semantic_id
-	    && query.restype == req.query.restype
-		&& query.timetype == req.query.timetype
-		&& query.SpatialReference::contains(req.query)
-		&& query.TemporalReference::contains(req.query) ) {
+void RunningQuery::add_lock(const CacheLocks::Lock& lock) {
+	QueryManager::locks.add_lock(lock);
+	locks.push_back(lock);
+}
 
-		if (query.restype == QueryResolution::Type::NONE)
+void RunningQuery::add_locks(const std::vector<CacheLocks::Lock>& locks) {
+	QueryManager::locks.add_locks(locks);
+	this->locks.insert(this->locks.end(),locks.begin(),locks.end());
+}
+
+
+bool RunningQuery::satisfies( const BaseRequest& req) const {
+	const BaseRequest &my_req = get_request();
+	if ( req.type == my_req.type &&
+		 req.semantic_id == my_req.semantic_id &&
+		 req.query.restype == my_req.query.restype &&
+		 req.query.timetype == my_req.query.timetype &&
+		 my_req.query.SpatialReference::contains(req.query) &&
+		 my_req.query.TemporalReference::contains(req.query) ) {
+
+		if ( my_req.query.restype == QueryResolution::Type::NONE)
 			return true;
-		else if (query.restype == QueryResolution::Type::PIXELS) {
+		else if (my_req.query.restype == QueryResolution::Type::PIXELS) {
 			// Check resolution
-			double my_xres = (query.x2 - query.x1) / query.xres;
-			double my_yres = (query.y2 - query.y1) / query.yres;
+			double my_xres = (my_req.query.x2 - my_req.query.x1) / my_req.query.xres;
+			double my_yres = (my_req.query.y2 - my_req.query.y1) / my_req.query.yres;
 
 			double q_xres = (req.query.x2 - req.query.x1) / req.query.xres;
 			double q_yres = (req.query.y2 - req.query.y1) / req.query.yres;
@@ -219,70 +341,59 @@ bool QueryInfo::satisfies( const BaseRequest& req) const {
 	return false;
 }
 
-void QueryInfo::add_client(uint64_t client) {
-	clients.push_back(client);
+void RunningQuery::add_client(uint64_t client) {
+	clients.insert(client);
 }
 
-void QueryInfo::add_clients(const std::vector<uint64_t>& clients) {
-	for ( auto &c : clients )
-		this->clients.push_back(c);
+void RunningQuery::add_clients(const std::set<uint64_t>& clients) {
+	this->clients.insert(clients.begin(),clients.end());
 }
 
-const std::vector<uint64_t>& QueryInfo::get_clients() const {
+const std::set<uint64_t>& RunningQuery::get_clients() const {
 	return clients;
 }
 
-bool QueryInfo::remove_client(uint64_t client_id) {
-	auto res = std::find(clients.begin(),clients.end(), client_id);
-	if ( res != clients.end() ) {
-		clients.erase(res);
-		return true;
-	}
-	return false;
+bool RunningQuery::remove_client(uint64_t client_id) {
+	return clients.erase(client_id) > 0;
 }
 
-bool QueryInfo::has_clients() const {
+bool RunningQuery::has_clients() const {
 	return !clients.empty();
 }
 
-
-bool JobDescription::extend(const BaseRequest& req) {
-	(void) type;
-	(void) req;
-	return false;
+PendingQuery::PendingQuery( std::vector<CacheLocks::Lock> &&locks ) :
+	RunningQuery(std::move(locks)) {
 }
 
-JobDescription::JobDescription( std::unique_ptr<BaseRequest> request) :
-	QueryInfo(*request), request(std::move(request)) {
-}
-
-CreateJob::CreateJob(std::unique_ptr<BaseRequest>& request,
+CreateJob::CreateJob( BaseRequest&& request,
 					 const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const IndexCache &cache) :
-	JobDescription(std::unique_ptr<BaseRequest>(request.release())), orig_query(query), orig_area(
-		(query.x2 - query.x1) * (query.y2 - query.y1)), nodes(nodes), cache(cache) {
+	PendingQuery(), request(request),
+	orig_query(this->request.query),
+	orig_area( (this->request.query.x2 - this->request.query.x1) * (this->request.query.y2 - this->request.query.y1)),
+	nodes(nodes), cache(cache) {
 }
 
 bool CreateJob::extend(const BaseRequest& req) {
-	if ( type == this->type &&
-		 req.semantic_id == semantic_id &&
+	if ( req.type == request.type &&
+		 req.semantic_id == request.semantic_id &&
 		 orig_query.TemporalReference::contains(req.query) &&
 		 orig_query.restype == req.query.restype) {
 
 		double nx1, nx2, ny1, ny2, narea;
 
-		nx1 = std::min(query.x1, req.query.x1);
-		ny1 = std::min(query.y1, req.query.y1);
-		nx2 = std::max(query.x2, req.query.x2);
-		ny2 = std::max(query.y2, req.query.y2);
+		nx1 = std::min(request.query.x1, req.query.x1);
+		ny1 = std::min(request.query.y1, req.query.y1);
+		nx2 = std::max(request.query.x2, req.query.x2);
+		ny2 = std::max(request.query.y2, req.query.y2);
 
 		narea = (nx2 - nx1) * (ny2 - ny1);
 
-		if (orig_query.restype == QueryResolution::Type::NONE && narea / orig_area <= 4) {
+		if (orig_query.restype == QueryResolution::Type::NONE && narea / orig_area <= 4.01) {
 			SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
-			query = QueryRectangle(sref, orig_query, orig_query);
+			request.query = QueryRectangle(sref, orig_query, orig_query);
 			return true;
 		}
-		else if (orig_query.restype == QueryResolution::Type::PIXELS && narea / orig_area <= 4) {
+		else if (orig_query.restype == QueryResolution::Type::PIXELS && narea / orig_area <= 4.01) {
 			// Check resolution
 			double my_xres = (orig_query.x2 - orig_query.x1) / orig_query.xres;
 			double my_yres = (orig_query.y2 - orig_query.y1) / orig_query.yres;
@@ -292,14 +403,13 @@ bool CreateJob::extend(const BaseRequest& req) {
 
 			if (std::abs(1.0 - my_xres / q_xres) < 0.01 && std::abs(1.0 - my_yres / q_yres) < 0.01) {
 
-				uint32_t nxres = std::round(
+				uint32_t nxres = std::ceil(
 					orig_query.xres * ((nx2 - nx1) / (orig_query.x2 - orig_query.x1)));
-				uint32_t nyres = std::round(
+				uint32_t nyres = std::ceil(
 					orig_query.yres * ((ny2 - ny1) / (orig_query.y2 - orig_query.y1)));
 
 				SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
-				query = QueryRectangle(sref, orig_query, QueryResolution::pixels(nxres, nyres));
-				request.reset(new BaseRequest(type, semantic_id, query));
+				request.query = QueryRectangle(sref, orig_query, QueryResolution::pixels(nxres, nyres));
 				return true;
 			}
 		}
@@ -312,11 +422,11 @@ uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 	if ( nodes.empty() )
 		return 0;
 
-	uint32_t node_id = cache.get_node_for_job(query,nodes);
+	uint32_t node_id = cache.get_node_for_job(request.query,nodes);
 	for (auto &e : connections) {
 		auto &con = *e.second;
 		if (!con.is_faulty() && con.node->id == node_id && con.get_state() == WorkerConnection::State::IDLE) {
-			con.process_request(WorkerConnection::CMD_CREATE, *request);
+			con.process_request(WorkerConnection::CMD_CREATE, request);
 			return con.id;
 		}
 	}
@@ -324,7 +434,7 @@ uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 	for (auto &e : connections) {
 		auto &con = *e.second;
 		if (!con.is_faulty() && con.get_state() == WorkerConnection::State::IDLE) {
-			con.process_request(WorkerConnection::CMD_CREATE, *request);
+			con.process_request(WorkerConnection::CMD_CREATE, request);
 			return con.id;
 		}
 	}
@@ -338,19 +448,25 @@ bool CreateJob::is_affected_by_node(uint32_t node_id) {
 	return false;
 }
 
+const BaseRequest& CreateJob::get_request() const {
+	return request;
+}
+
 //
 // DELIVCER JOB
 //
 
-DeliverJob::DeliverJob(std::unique_ptr<DeliveryRequest>& request, uint32_t node) :
-	JobDescription(std::unique_ptr<BaseRequest>(request.release())), node(node) {
+DeliverJob::DeliverJob(DeliveryRequest&& request, const IndexCacheKey &key) :
+	PendingQuery(std::vector<CacheLocks::Lock>{CacheLocks::Lock(request.type,key)}),
+	request(request),
+	node(key.node_id) {
 }
 
 uint64_t DeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
 	for (auto &e : connections) {
 		auto &con = *e.second;
 		if (!con.is_faulty() && con.node->id == node && con.get_state() == WorkerConnection::State::IDLE) {
-			con.process_request(WorkerConnection::CMD_DELIVER, *request);
+			con.process_request(WorkerConnection::CMD_DELIVER, request);
 			return con.id;
 		}
 	}
@@ -361,12 +477,25 @@ bool DeliverJob::is_affected_by_node(uint32_t node_id) {
 	return node_id == node;
 }
 
+bool DeliverJob::extend(const BaseRequest&) {
+	return false;
+}
+
+const BaseRequest& DeliverJob::get_request() const {
+	return request;
+}
+
 //
 // PUZZLE JOB
 //
 
-PuzzleJob::PuzzleJob(std::unique_ptr<PuzzleRequest>& request, std::vector<uint32_t>& nodes) :
-	JobDescription(std::unique_ptr<BaseRequest>(request.release())), nodes(std::move(nodes)) {
+PuzzleJob::PuzzleJob(PuzzleRequest&& request, const std::vector<IndexCacheKey> &keys) :
+	PendingQuery(),
+	request(std::move(request)) {
+	for ( auto &k : keys ) {
+		nodes.insert(k.node_id);
+		add_lock( CacheLocks::Lock(request.type,k) );
+	}
 }
 
 uint64_t PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
@@ -375,7 +504,7 @@ uint64_t PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 			auto &con = *e.second;
 			if (!con.is_faulty() && con.node->id == node
 				&& con.get_state() == WorkerConnection::State::IDLE) {
-				con.process_request(WorkerConnection::CMD_PUZZLE, *request);
+				con.process_request(WorkerConnection::CMD_PUZZLE, request);
 				return con.id;
 			}
 		}
@@ -384,5 +513,15 @@ uint64_t PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 }
 
 bool PuzzleJob::is_affected_by_node(uint32_t node_id) {
-	return std::find(nodes.begin(),nodes.end(),node_id) != nodes.end();
+	return nodes.find(node_id) != nodes.end();
 }
+
+
+bool PuzzleJob::extend(const BaseRequest&) {
+	return false;
+}
+
+const BaseRequest& PuzzleJob::get_request() const {
+	return request;
+}
+

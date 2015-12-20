@@ -103,9 +103,6 @@ private:
 	// Processes actions on client-connections
 	void process_client_connections(fd_set *readfds, fd_set* writefds);
 
-	// Handles a raster-request issued by a worker
-	void process_worker_query( WorkerConnection &con );
-
 	// Adjusts the cache according to the given reorg
 	void handle_reorg_result( const ReorgMoveResult &res );
 

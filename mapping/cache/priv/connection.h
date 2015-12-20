@@ -242,7 +242,10 @@ public:
 	enum class State {
 		READING_HANDSHAKE, HANDSHAKE_READ, SENDING_HELLO,
 		IDLE,
-		SENDING_REORG, REORGANIZING, READING_REORG_RESULT, REORG_RESULT_READ, SENDING_REORG_CONFIRM, REORG_FINISHED,
+		SENDING_REORG, REORGANIZING,
+		READING_MOVE_RESULT, MOVE_RESULT_READ, SENDING_MOVE_CONFIRM,
+		READING_REMOVE_REQUEST, REMOVE_REQUEST_READ, SENDING_REMOVE_CONFIRM,
+		REORG_FINISHED,
 		SENDING_STATS_REQUEST, STATS_REQUESTED, READING_STATS, STATS_RECEIVED
 	};
 	static const uint32_t MAGIC_NUMBER = 0x42345678;
@@ -261,16 +264,22 @@ public:
 	static const uint8_t CMD_GET_STATS = 41;
 
 	//
-	// Tells the node that the reorg on index was OK
+	// Tells the node that the move on index was OK
 	// There is no data on stream
 	//
-	static const uint8_t CMD_REORG_ITEM_OK = 42;
+	static const uint8_t CMD_MOVE_OK = 42;
+
+	//
+	// Tells the node that the given item can
+	// safely be removed from the cache
+	//
+	static const uint8_t CMD_REMOVE_OK = 43;
 
 	//
 	// Response from index-server after successful
 	// registration of a new node. Data on stream is:
 	// id:uint32_t -- the id assigned to the node
-	static const uint8_t CMD_HELLO = 43;
+	static const uint8_t CMD_HELLO = 44;
 
 	//
 	// Tells the index that the node finished
@@ -291,18 +300,22 @@ public:
 	//
 	static const uint8_t RESP_STATS = 53;
 
+	static const uint8_t RESP_REORG_REMOVE_REQUEST = 54;
+
 	State get_state() const;
 
 	void confirm_handshake( std::shared_ptr<Node> node );
 	void send_reorg( const ReorgDescription &desc );
-	void confirm_reorg();
+	void confirm_move();
+	void confirm_remove();
 	void send_get_stats();
 
 	void release();
 
-	const NodeHandshake& get_handshake();
-	const ReorgMoveResult& get_result();
-	const NodeStats& get_stats();
+	const NodeHandshake& get_handshake() const;
+	const ReorgMoveResult& get_move_result() const;
+	const TypedNodeCacheKey& get_remove_request() const;
+	const NodeStats& get_stats() const;
 
 
 	ControlConnection(std::unique_ptr<UnixSocket> socket, const std::string &hostname);
@@ -317,7 +330,8 @@ private:
 	void reset();
 	State state;
 	std::unique_ptr<NodeHandshake> handshake;
-	std::unique_ptr<ReorgMoveResult> reorg_result;
+	std::unique_ptr<ReorgMoveResult> move_result;
+	std::unique_ptr<TypedNodeCacheKey> remove_request;
 	std::unique_ptr<NodeStats> stats;
 };
 

@@ -276,7 +276,21 @@ void IndexServer::process_handshake(std::vector<NewConnection> &new_fds, fd_set*
 void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds) {
 	for (auto &e : control_connections) {
 		ControlConnection &cc = *e.second;
-		if (cc.is_writing() && FD_ISSET(cc.get_write_fd(), writefds)) {
+		// Check if node is waiting for a confirmation
+		if ( cc.get_state() == ControlConnection::State::MOVE_RESULT_READ ) {
+			auto res = cc.get_move_result();
+			IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
+			if ( !query_manager.is_locked(res.type, old) )
+				cc.confirm_move();
+		}
+		else if ( cc.get_state() == ControlConnection::State::REMOVE_REQUEST_READ ) {
+			auto &node_key = cc.get_remove_request();
+			IndexCacheKey key(cc.node->id, node_key.semantic_id, node_key.entry_id );
+			if ( !query_manager.is_locked( node_key.type, key ) )
+				cc.confirm_remove();
+		}
+		// Normal handling
+		else if (cc.is_writing() && FD_ISSET(cc.get_write_fd(), writefds)) {
 			cc.output();
 		}
 		else if (!cc.is_writing() && FD_ISSET(cc.get_read_fd(), readfds)) {
@@ -297,11 +311,23 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					cc.confirm_handshake(node);
 					break;
 				}
-				case ControlConnection::State::REORG_RESULT_READ:
+				case ControlConnection::State::MOVE_RESULT_READ: {
 					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
-					handle_reorg_result(cc.get_result());
-					cc.confirm_reorg();
+					auto res = cc.get_move_result();
+					handle_reorg_result(res);
+					IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
+					if ( !query_manager.is_locked(res.type, old) )
+						cc.confirm_move();
 					break;
+				}
+				case ControlConnection::State::REMOVE_REQUEST_READ: {
+					Log::trace("Node %d requested removal of entry: %s", cc.node->id, cc.get_remove_request().to_string().c_str() );
+					auto &node_key = cc.get_remove_request();
+					IndexCacheKey key(cc.node->id, node_key.semantic_id, node_key.entry_id );
+					if ( !query_manager.is_locked( node_key.type, key ) )
+						cc.confirm_remove();
+					break;
+				}
 				case ControlConnection::State::REORG_FINISHED:
 					Log::debug("Node %d finished reorganization.", cc.node->id);
 					cc.release();
@@ -415,7 +441,7 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				}
 				case WorkerConnection::State::QUERY_REQUESTED: {
 					Log::debug("Worker issued cache-query: %s", wc.get_query().to_string().c_str());
-					process_worker_query(wc);
+					query_manager.process_worker_query(wc);
 					break;
 				}
 				default: {
@@ -424,40 +450,5 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				}
 			}
 		}
-	}
-}
-
-void IndexServer::process_worker_query(WorkerConnection& con) {
-	auto &req = con.get_query();
-	auto &cache = caches.get_cache(req.type);
-	auto res = cache.query(req.semantic_id, req.query);
-	Log::debug("QueryResult: %s", res.to_string().c_str());
-
-	// Full single hit
-	if (res.keys.size() == 1 && !res.has_remainder()) {
-		Log::debug("Full HIT. Sending reference.");
-		IndexCacheKey key(req.semantic_id, res.keys.at(0));
-		auto ref = cache.get(key);
-		auto node = nodes.at(ref->node_id);
-		CacheRef cr(node->host, node->port, ref->entry_id);
-		con.send_hit(cr);
-	}
-	// Puzzle
-	else if (res.has_hit() ) {
-		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f");
-		std::vector<CacheRef> entries;
-		for (auto id : res.keys) {
-			IndexCacheKey key(req.semantic_id, id);
-			auto ref = cache.get(key);
-			auto &node = nodes.at(ref->node_id);
-			entries.push_back(CacheRef(node->host, node->port, ref->entry_id));
-		}
-		PuzzleRequest pr( req.type, req.semantic_id, req.query, res.remainder, entries);
-		con.send_partial_hit(pr);
-	}
-	// Full miss
-	else {
-		Log::debug("Full MISS.");
-		con.send_miss();
 	}
 }

@@ -19,6 +19,7 @@
 #include <errno.h>
 #include <chrono>
 #include <iostream>
+#include <mutex>
 
 //
 // Provides helper functions for common tasks.
@@ -46,6 +47,62 @@ private:
 	static thread_local std::ostringstream buffer;
 	std::string name;
 	std::chrono::time_point<std::chrono::system_clock> start;
+};
+
+class RWLock {
+public:
+	class Lock {
+	public:
+		~Lock() {
+			if ( !released )
+				lock.release_lock(*this);
+		};
+		Lock() = delete;
+		Lock(const Lock&) = delete;
+		Lock(Lock&& o) : lock(o.lock), exclusive(o.exclusive), released(o.released) {
+			o.released = true;
+		}
+		Lock& operator=(const Lock&) = delete;
+		Lock& operator=(Lock&&) = delete;
+	private:
+		Lock( RWLock &lock, bool exclusive) : lock(lock), exclusive(exclusive), released(false) {};
+		RWLock &lock;
+		bool exclusive;
+		bool released;
+		friend class RWLock;
+	};
+
+public:
+	RWLock() : read_count(0) {};
+
+	Lock get_read_lock() {
+		std::lock_guard<std::mutex> g(mtx);
+		read_count++;
+		if ( read_count == 1 )
+			w_lock.lock();
+		return Lock(*this,false);
+	};
+
+	Lock get_write_lock() {
+		w_lock.lock();
+		return Lock(*this,true);
+	};
+
+	void release_lock( Lock &lock ) {
+		if ( lock.exclusive )
+			w_lock.unlock();
+		else {
+			std::lock_guard<std::mutex> g(mtx);
+			read_count--;
+			if ( read_count == 0 )
+				w_lock.unlock();
+		}
+		lock.released = true;
+	};
+private:
+	int read_count;
+	std::mutex mtx;
+	std::mutex w_lock;
 };
 
 

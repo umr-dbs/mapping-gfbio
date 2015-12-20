@@ -220,7 +220,7 @@ private:
 	CacheQueryResult<KType> enlarge_expected_result( const QueryRectangle &orig, const std::vector<CacheQueryInfo<KType>> &hits, std::vector<Cube<3>> &remainders ) const;
 
 	std::map<KType, std::shared_ptr<EType>> entries;
-	mutable std::mutex mtx;
+	mutable RWLock lock;
 };
 
 #endif /* CACHE_STRUCTURE_H_ */

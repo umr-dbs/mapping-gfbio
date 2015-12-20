@@ -432,6 +432,7 @@ NodeCacheRef NodeCacheWrapper<T>::put_local(const std::string& semantic_id,
 template<typename T>
 void NodeCacheWrapper<T>::remove_local(const NodeCacheKey& key) {
 	Log::debug("Removing item from local cache. Key: %s", key.to_string().c_str());
+	auto w = local_lock.get_write_lock();
 	cache.remove(key);
 }
 
@@ -456,65 +457,68 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 	ExecTimer t("CacheManager.query");
 	Log::debug("Querying item: %s on %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str() );
 
-	// Local lookup
-	CacheQueryResult<uint64_t> qres = cache.query(op.getSemanticId(), rect);
+	{
+		auto r = local_lock.get_read_lock();
+		// Local lookup
+		CacheQueryResult<uint64_t> qres = cache.query(op.getSemanticId(), rect);
 
-	Log::debug("QueryResult: %s", qres.to_string().c_str() );
+		Log::debug("QueryResult: %s", qres.to_string().c_str() );
 
-	// Full single local hit
-	if ( !qres.has_remainder() && qres.keys.size() == 1 ) {
-		ExecTimer t("CacheManager.query.full_single_hit");
-		Log::trace("Full single local HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
-		NodeCacheKey key(op.getSemanticId(), qres.keys.at(0));
-		return cache.get_copy(key);
+		// Full single local hit
+		if ( !qres.has_remainder() && qres.keys.size() == 1 ) {
+			ExecTimer t("CacheManager.query.full_single_hit");
+			Log::trace("Full single local HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
+			NodeCacheKey key(op.getSemanticId(), qres.keys.at(0));
+			return cache.get_copy(key);
+		}
+		// Full local hit (puzzle)
+		else if ( !qres.has_remainder() ) {
+			ExecTimer t("CacheManager.query.full_local_hit");
+			Log::trace("Full local HIT for query: %s on %s. Puzzling result.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
+			std::vector<CacheRef> refs;
+			for ( auto &id : qres.keys )
+				refs.push_back( NodeUtil::get_instance().create_self_ref(id) );
+
+			PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
+			QueryProfiler qp;
+			std::unique_ptr<T> result = process_puzzle(pr,qp);
+			return result;
+		}
 	}
-	// Full local hit (puzzle)
-	else if ( !qres.has_remainder() ) {
-		ExecTimer t("CacheManager.query.full_local_hit");
-		Log::trace("Full local HIT for query: %s on %s. Puzzling result.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
-		std::vector<CacheRef> refs;
-		for ( auto &id : qres.keys )
-			refs.push_back( NodeUtil::get_instance().create_self_ref(id) );
 
-		PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
-		QueryProfiler qp;
-		std::unique_ptr<T> result = process_puzzle(pr,qp);
-		return result;
-	}
-	else {
-		ExecTimer t("CacheManager.query.local_miss");
-		Log::debug("Local MISS for query: %s on %s. Querying index.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
-		BaseRequest cr(CacheType::RASTER, op.getSemanticId(), rect);
-		BinaryStream &stream = NodeUtil::get_instance().get_index_connection();
+	// Local miss... asking index
+	ExecTimer t2("CacheManager.query.remote");
+	Log::debug("Local MISS for query: %s on %s. Querying index.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
+	BaseRequest cr(CacheType::RASTER, op.getSemanticId(), rect);
+	BinaryStream &stream = NodeUtil::get_instance().get_index_connection();
 
-		buffered_write(stream,WorkerConnection::CMD_QUERY_CACHE,cr);
-		uint8_t resp;
-		stream.read(&resp);
-		switch (resp) {
-			// Full hit on different client
-			case WorkerConnection::RESP_QUERY_HIT: {
-				Log::trace("Full single remote HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
-				QueryProfiler qp;
-				return fetch_item( op.getSemanticId(), CacheRef(stream), qp );
-			}
-			// Full miss on whole cache
-			case WorkerConnection::RESP_QUERY_MISS: {
-				Log::trace("Full remote MISS for query: %s on %s.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
-				throw NoSuchElementException("Cache-Miss.");
-				break;
-			}
-			// Puzzle time
-			case WorkerConnection::RESP_QUERY_PARTIAL: {
-				PuzzleRequest pr(stream);
-				Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
-				QueryProfiler qp;
-				auto res = process_puzzle(pr,qp);
-				return res;
-				break;
-			}
-			default: {
-				throw NetworkException("Received unknown response from index.");
-			}
+	buffered_write(stream,WorkerConnection::CMD_QUERY_CACHE,cr);
+	uint8_t resp;
+	stream.read(&resp);
+	switch (resp) {
+		// Full hit on different client
+		case WorkerConnection::RESP_QUERY_HIT: {
+			Log::trace("Full single remote HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
+			QueryProfiler qp;
+			return fetch_item( op.getSemanticId(), CacheRef(stream), qp );
+		}
+		// Full miss on whole cache
+		case WorkerConnection::RESP_QUERY_MISS: {
+			Log::trace("Full remote MISS for query: %s on %s.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
+			throw NoSuchElementException("Cache-Miss.");
+			break;
+		}
+		// Puzzle time
+		case WorkerConnection::RESP_QUERY_PARTIAL: {
+			PuzzleRequest pr(stream);
+			Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
+			QueryProfiler qp;
+			auto res = process_puzzle(pr,qp);
+			return res;
+			break;
+		}
+		default: {
+			throw NetworkException("Received unknown response from index.");
 		}
 	}
 }

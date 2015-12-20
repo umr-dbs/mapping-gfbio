@@ -12,6 +12,7 @@
 #include "cache/priv/caching_strategy.h"
 #include "cache/priv/cache_stats.h"
 #include "cache/priv/transfer.h"
+#include "cache/common.h"
 
 
 #include <unordered_map>
@@ -211,6 +212,7 @@ private:
 	std::vector<std::unique_ptr<T>> compute_remainders( const std::string &semantic_id, const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler );
 	NodeCache<T> &cache;
 	const CachingStrategy &strategy;
+	RWLock local_lock;
 };
 
 class RasterCacheWrapper : public NodeCacheWrapper<GenericRaster> {

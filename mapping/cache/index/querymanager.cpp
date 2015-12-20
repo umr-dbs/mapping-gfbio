@@ -119,7 +119,7 @@ void QueryManager::schedule_pending_jobs(
 	while (it != pending_jobs.end()) {
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
-			//Log::info("Scheduled request: %s\non worker: %d", (*it)->to_string().c_str(), con_id);
+			Log::info("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
 			queries.emplace(con_id, std::move(*it));
 			it = pending_jobs.erase(it);
 		}

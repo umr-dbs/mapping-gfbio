@@ -11,13 +11,11 @@
 TEST(STCacheTest,SimpleTest) {
 	Configuration::loadFromDefaultPaths();
 
-	std::string json = "{\"type\":\"source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}";
 	std::string timestr("2010-06-06T18:00:00.000Z");
 	epsg_t epsg = EPSG_LATLON;
 	uint32_t width = 256, height = 256;
 	time_t timestamp = parseIso8601DateTime(timestr);
-	auto op = GenericOperator::fromJSON( json );
-
+	std::string sem_id = "TEST";
 
 	std::string bboxes[] = {
 		std::string("45,-180,67.5,-157.5"),
@@ -27,9 +25,9 @@ TEST(STCacheTest,SimpleTest) {
 	};
 	double bbox[4];
 
-	CacheManager::init( make_unique<NopCacheManager>() );
-
 	NodeCache<GenericRaster> cache(CacheType::RASTER, 114508*2 + 17);
+
+	DataDescription dd( GDALDataType::GDT_Byte, Unit::unknown() );
 
 
 	for ( int i = 0; i < 4; i++ ) {
@@ -40,13 +38,13 @@ TEST(STCacheTest,SimpleTest) {
 			QueryResolution::pixels(width, height)
 		);
 		QueryProfiler qp;
-		CacheQueryResult<uint64_t> qres = cache.query(op->getSemanticId(),qr);
+		CacheQueryResult<uint64_t> qres = cache.query(sem_id,qr);
 		printf("%s", qres.to_string().c_str());
 		ASSERT_TRUE( qres.has_remainder() );
-		auto res = op->getCachedRaster(qr,qp);
+		auto res = GenericRaster::create(dd,qr,width,height);
 		CacheEntry meta( CacheCube(*res), 10, 1.0 );
-		cache.put(op->getSemanticId(), res, meta);
-		qres = cache.query(op->getSemanticId(),qr);
+		cache.put(sem_id, res, meta);
+		qres = cache.query(sem_id,qr);
 		ASSERT_TRUE( qres.has_hit() );
 		ASSERT_FALSE( qres.has_remainder() );
 	}

@@ -330,14 +330,14 @@ std::string NodeCacheRef::to_string() const {
 
 template<typename KType, typename EType>
 void CacheStructure<KType, EType>::put(const KType& key, const std::shared_ptr<EType>& result) {
-	auto w = lock.get_write_lock();
+	ExclusiveLockGuard g(lock);
 //	Log::trace("Inserting new entry. Id: %d", key );
 	entries.emplace(key, result);
 }
 
 template<typename KType, typename EType>
 std::shared_ptr<EType> CacheStructure<KType, EType>::get(const KType& key) const {
-	auto r = lock.get_read_lock();
+	SharedLockGuard g(lock);
 	try {
 		return entries.at(key);
 	} catch (const std::out_of_range &oor) {
@@ -347,7 +347,7 @@ std::shared_ptr<EType> CacheStructure<KType, EType>::get(const KType& key) const
 
 template<typename KType, typename EType>
 std::shared_ptr<EType> CacheStructure<KType, EType>::remove(const KType& key) {
-	auto w = lock.get_write_lock();
+	ExclusiveLockGuard g(lock);
 	auto iter = entries.find(key);
 	if ( iter != entries.end() ) {
 		auto result = iter->second;
@@ -399,7 +399,7 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 
 template<typename KType, typename EType>
 const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRectangle& spec) const {
-	auto r = lock.get_read_lock();
+	SharedLockGuard g(lock);
 
 	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
 

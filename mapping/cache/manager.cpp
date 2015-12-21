@@ -432,7 +432,7 @@ NodeCacheRef NodeCacheWrapper<T>::put_local(const std::string& semantic_id,
 template<typename T>
 void NodeCacheWrapper<T>::remove_local(const NodeCacheKey& key) {
 	Log::debug("Removing item from local cache. Key: %s", key.to_string().c_str());
-	auto w = local_lock.get_write_lock();
+	ExclusiveLockGuard g(local_lock);
 	cache.remove(key);
 }
 
@@ -458,7 +458,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 	Log::debug("Querying item: %s on %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str() );
 
 	{
-		auto r = local_lock.get_read_lock();
+		SharedLockGuard g(local_lock);
 		// Local lookup
 		CacheQueryResult<uint64_t> qres = cache.query(op.getSemanticId(), rect);
 

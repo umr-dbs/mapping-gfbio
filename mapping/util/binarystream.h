@@ -76,18 +76,16 @@ template<typename T> void BinaryStream::write(T& t) {
 
 
 /**
- * An implementation using Unix Sockets
+ * An implementation using posix file descriptors
  *
- * Unix sockets are a lot faster than TCP sockets, since they don't need to wrap the data in TCP packets with headers.
- *
- *
+ * Currently used for AF_UNIX and TCP socket connections.
  */
-class UnixSocket : public BinaryStream {
+class BinaryFDStream : public BinaryStream {
 	public:
-		UnixSocket(const char *server_path);
-		UnixSocket(const char *hostname, int port, bool no_delay = false);
-		UnixSocket(int read_fd, int write_fd = -2, bool no_delay = false);
-		virtual ~UnixSocket();
+		BinaryFDStream(const char *server_path);
+		BinaryFDStream(const char *hostname, int port, bool no_delay = false);
+		BinaryFDStream(int read_fd, int write_fd = -2, bool no_delay = false);
+		virtual ~BinaryFDStream();
 
 		void close();
 

@@ -19,7 +19,7 @@ RemoteRasterDBBackend::RemoteRasterDBBackend() {
 
 	//printf("Connecting to %s port %d\n", servername.c_str(), portnr);
 
-	stream.reset( new UnixSocket(servername.c_str(), portnr) );
+	stream.reset( new BinaryFDStream(servername.c_str(), portnr) );
 }
 
 RemoteRasterDBBackend::~RemoteRasterDBBackend() {

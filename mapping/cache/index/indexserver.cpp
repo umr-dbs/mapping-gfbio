@@ -233,7 +233,7 @@ void IndexServer::process_handshake(std::vector<NewConnection> &new_fds, fd_set*
 	while (it != new_fds.end()) {
 		if (FD_ISSET(it->fd, readfds)) {
 			try {
-				std::unique_ptr<UnixSocket> us = make_unique<UnixSocket>(it->fd, it->fd,true);
+				std::unique_ptr<BinaryFDStream> us = make_unique<BinaryFDStream>(it->fd, it->fd,true);
 				BinaryStream &s = *us;
 
 				uint32_t magic;

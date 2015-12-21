@@ -49,7 +49,7 @@ size_t BinaryStream::read(std::string *string, bool allow_eof) {
 
 
 
-UnixSocket::UnixSocket(const char *server_path) : is_eof(false), read_fd(-1), write_fd(-1) {
+BinaryFDStream::BinaryFDStream(const char *server_path) : is_eof(false), read_fd(-1), write_fd(-1) {
 	int new_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (new_fd < 0)
 		throw NetworkException("UnixSocket: unable to create socket()");
@@ -69,7 +69,7 @@ UnixSocket::UnixSocket(const char *server_path) : is_eof(false), read_fd(-1), wr
 }
 
 
-UnixSocket::UnixSocket(const char *hostname, int port, bool no_delay) : is_eof(false), read_fd(-1), write_fd(-1) {
+BinaryFDStream::BinaryFDStream(const char *hostname, int port, bool no_delay) : is_eof(false), read_fd(-1), write_fd(-1) {
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	struct addrinfo *servinfo;
@@ -106,7 +106,7 @@ UnixSocket::UnixSocket(const char *hostname, int port, bool no_delay) : is_eof(f
 }
 
 
-UnixSocket::UnixSocket(int read_fd, int write_fd, bool no_delay) : is_eof(false), read_fd(read_fd), write_fd(write_fd) {
+BinaryFDStream::BinaryFDStream(int read_fd, int write_fd, bool no_delay) : is_eof(false), read_fd(read_fd), write_fd(write_fd) {
 	if (write_fd == -2)
 		this->write_fd = read_fd;
 
@@ -116,11 +116,11 @@ UnixSocket::UnixSocket(int read_fd, int write_fd, bool no_delay) : is_eof(false)
 	}
 }
 
-UnixSocket::~UnixSocket() {
+BinaryFDStream::~BinaryFDStream() {
 	close();
 }
 
-void UnixSocket::close() {
+void BinaryFDStream::close() {
 	if (read_fd >= 0) {
 		::close(read_fd);
 		if (read_fd == write_fd)
@@ -133,7 +133,7 @@ void UnixSocket::close() {
 	}
 }
 
-void UnixSocket::write(const char *buffer, size_t len) {
+void BinaryFDStream::write(const char *buffer, size_t len) {
 	if (write_fd < 0) {
 		throw NetworkException(concat("UnixSocket: cannot write to closed socket ", write_fd, " in pid ", getpid()));
 	}
@@ -154,7 +154,7 @@ void UnixSocket::write(const char *buffer, size_t len) {
 	//fprintf(stderr, "UnixSocket: written %lu bytes\n", len);
 }
 
-size_t UnixSocket::read(char *buffer, size_t len, bool allow_eof) {
+size_t BinaryFDStream::read(char *buffer, size_t len, bool allow_eof) {
 	if (read_fd < 0)
 		throw NetworkException(concat("UnixSocket: cannot read from closed socket ", read_fd, " in pid ", getpid()));
 	if (is_eof)

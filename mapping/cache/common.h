@@ -86,7 +86,7 @@ public:
 	// On a harmful error, a NetworkException is thrown.
 	//
 	template<typename T>
-	static size_t read(T *t, UnixSocket &sock, int timeout, bool allow_eof = false) {
+	static size_t read(T *t, BinaryFDStream &sock, int timeout, bool allow_eof = false) {
 		struct timeval tv { timeout, 0 };
 		fd_set readfds;
 		FD_ZERO(&readfds);

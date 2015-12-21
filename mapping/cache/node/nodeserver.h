@@ -109,7 +109,7 @@ private:
 	// The number of worker-threads to use
 	int num_treads;
 	// The control-connection
-	std::unique_ptr<UnixSocket> control_connection;
+	std::unique_ptr<BinaryFDStream> control_connection;
 	// The delivery-manager
 	DeliveryManager delivery_manager;
 };

@@ -89,7 +89,7 @@ class Connection {
 static int connection_id = 1;
 Connection::Connection(int fd) : fd(fd) {
 	id = connection_id++;
-	stream.reset( new UnixSocket(fd,fd) );
+	stream.reset( new BinaryFDStream(fd,fd) );
 	printf("%d: connected\n", id);
 	backend = make_unique<LocalRasterDBBackend>();
 }

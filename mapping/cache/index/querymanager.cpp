@@ -99,15 +99,22 @@ void QueryManager::add_request(uint64_t client_id, const BaseRequest &req ) {
 		}
 	}
 
-	// Check if a pending query may be extended by the given query
-	for (auto &j : pending_jobs) {
-		if (j->extend(req)) {
-			j->add_client(client_id);
-			return;
+	// Perform a cache-query
+	auto &cache = caches.get_cache(req.type);
+	auto res = cache.query(req.semantic_id, req.query);
+	Log::debug("QueryResult: %s", res.to_string().c_str());
+
+	//  No result --> Check if a pending query may be extended by the given query
+	if ( res.keys.empty() ) {
+		for (auto &j : pending_jobs) {
+			if (j->extend(req)) {
+				j->add_client(client_id);
+				return;
+			}
 		}
 	}
-
-	auto job = create_job(req);
+	// Create a new job
+	auto job = create_job(req,cache,res);
 	job->add_client(client_id);
 	pending_jobs.push_back(std::move(job));
 }
@@ -197,8 +204,6 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 		Log::debug("Full MISS.");
 		con.send_miss();
 	}
-
-
 }
 
 
@@ -207,16 +212,12 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 // PRIVATE
 //
 
-std::unique_ptr<PendingQuery> QueryManager::create_job(const BaseRequest& req) {
+std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, const IndexCache &cache, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res) {
 	ExecTimer t("QueryManager.create_job");
-	auto &cache = caches.get_cache(req.type);
-	auto res = cache.query(req.semantic_id, req.query);
-	Log::debug("QueryResult: %s", res.to_string().c_str());
 
 	// Full single hit
 	if (res.keys.size() == 1 && !res.has_remainder()) {
 		Log::debug("Full HIT. Sending reference.");
-
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
 		auto ref = cache.get(key);
 		DeliveryRequest dr(
@@ -281,9 +282,12 @@ void QueryManager::handle_client_abort(uint64_t client_id) {
 }
 
 std::unique_ptr<PendingQuery> QueryManager::recreate_job(const RunningQuery& query) {
-	std::unique_ptr<PendingQuery> res = create_job( query.get_request() );
-	res->add_clients( query.get_clients() );
-	return res;
+	auto &req = query.get_request();
+	auto &cache = caches.get_cache(req.type);
+	auto res = cache.query(req.semantic_id, req.query);
+	auto job = create_job( req, cache, res );
+	job->add_clients( query.get_clients() );
+	return job;
 }
 
 bool QueryManager::is_locked( CacheType type, const IndexCacheKey& key) {

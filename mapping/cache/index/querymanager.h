@@ -190,7 +190,7 @@ public:
 	bool is_locked( CacheType type, const IndexCacheKey &key );
 
 private:
-	std::unique_ptr<PendingQuery> create_job( const BaseRequest &req );
+	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req, const IndexCache &cache, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res);
 
 	std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query );
 

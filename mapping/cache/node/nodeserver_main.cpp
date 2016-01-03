@@ -74,12 +74,13 @@ int main(void) {
 	size_t plot_size = atoi(Configuration::get("nodeserver.cache.plots.size").c_str());
 
 	// Inititalize cache
-	std::unique_ptr<CacheManager> cache_impl = make_unique<NodeCacheManager>(
+	std::unique_ptr<NodeCacheManager> cache_impl = make_unique<NodeCacheManager>(
 			CachingStrategy::by_name(cs), raster_size, point_size, line_size, polygon_size, plot_size);
-	CacheManager::init(std::move(cache_impl));
+
+	CacheManager::init( cache_impl.get() );
 
 	// Fire it up
-	instance = new NodeServer(portnr,ihoststr,iportnr,num_threads);
+	instance = new NodeServer( std::move(cache_impl), portnr,ihoststr,iportnr,num_threads);
 	instance->run();
 	return 0;
 }

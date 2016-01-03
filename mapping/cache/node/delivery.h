@@ -8,6 +8,7 @@
 #ifndef DELIVERY_H_
 #define DELIVERY_H_
 
+#include "cache/node/node_manager.h"
 #include "cache/priv/connection.h"
 #include "operators/operator.h"
 
@@ -61,7 +62,7 @@ class DeliveryManager {
 	friend class DeliveryConnection;
 
 public:
-	DeliveryManager(uint32_t listen_port);
+	DeliveryManager(uint32_t listen_port, NodeCacheManager &manager);
 	~DeliveryManager();
 	//
 	// Adds the given result to the delivery queue.
@@ -116,6 +117,8 @@ private:
 	std::map<uint64_t, Delivery> deliveries;
 	// the currently open connections
 	std::vector<std::unique_ptr<DeliveryConnection>> connections;
+
+	NodeCacheManager &manager;
 };
 
 #endif /* DELIVERY_H_ */

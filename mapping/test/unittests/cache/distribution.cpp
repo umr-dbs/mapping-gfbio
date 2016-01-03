@@ -19,21 +19,15 @@
 
 TEST(DistributionTest,TestRedistibution) {
 
-	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
-	std::unique_ptr<TestNodeUtil> nu = make_unique<TestNodeUtil>();
+	TestCacheMan cm;
 	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1(12347, "localhost", 12346, "always");
 	TestNodeServer ns2(12348, "localhost", 12346, "always");
 
-	cm->add_instance(&ns1);
-	cm->add_instance(&ns2);
-	nu->add_instance(&ns1);
-	nu->add_instance(&ns2);
+	cm.add_instance(&ns1);
+	cm.add_instance(&ns2);
 
-	TestNodeUtil::set_inst(std::move(nu));
-	CacheManager::init(std::move(cm));
-
-	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::get_instance());
+	CacheManager::init(&cm);
 
 	std::vector<TP> ts;
 	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
@@ -68,7 +62,7 @@ TEST(DistributionTest,TestRedistibution) {
 	NodeCacheKey key1(sem_id, 2);
 
 	try {
-		tcm.get_instance_mgr(0).get_raster_cache().get_ref(key1);
+		cm.get_instance_mgr(0).get_raster_cache().get_ref(key1);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
@@ -83,14 +77,14 @@ TEST(DistributionTest,TestRedistibution) {
 
 	// Assert moved
 	try {
-		tcm.get_instance_mgr(0).get_raster_cache().get_ref(key1);
+		cm.get_instance_mgr(0).get_raster_cache().get_ref(key1);
 		FAIL();
 	} catch (NoSuchElementException &nse) {
 	}
 
 	NodeCacheKey key_new(sem_id, 1);
 	try {
-		tcm.get_instance_mgr(1).get_raster_cache().get_ref(key_new);
+		cm.get_instance_mgr(1).get_raster_cache().get_ref(key_new);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
@@ -107,20 +101,15 @@ TEST(DistributionTest,TestRedistibution) {
 
 TEST(DistributionTest,TestRemoteNodeFetch) {
 	// Reset testnodeutil
-	TestNodeUtil::set_inst(make_unique<NodeUtil>());
-	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
-	std::unique_ptr<TestNodeUtil> nu = make_unique<TestNodeUtil>();
+	TestCacheMan cm;
 	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1(12347, "localhost", 12346, "always");
 	TestNodeServer ns2(12348, "localhost", 12346, "always");
 
-	cm->add_instance(&ns1);
-	cm->add_instance(&ns2);
-	nu->add_instance(&ns1);
-	nu->add_instance(&ns2);
+	cm.add_instance(&ns1);
+	cm.add_instance(&ns2);
 
-	TestNodeUtil::set_inst(std::move(nu));
-	CacheManager::init(std::move(cm));
+	CacheManager::init(&cm);
 
 	std::vector<TP> ts;
 	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
@@ -270,22 +259,15 @@ TEST(DistributionTest,TestGeographicReorg) {
 
 TEST(DistributionTest,TestStatsAndReorg) {
 	// Reset testnodeutil
-	TestNodeUtil::set_inst(make_unique<NodeUtil>());
-	std::unique_ptr<TestCacheMan> cm = make_unique<TestCacheMan>();
-	std::unique_ptr<TestNodeUtil> nu = make_unique<TestNodeUtil>();
+	TestCacheMan cm;
 	TestIdxServer is(12346, "capacity");
 	TestNodeServer ns1(12347, "localhost", 12346, "always", 204800 );
 	TestNodeServer ns2(12348, "localhost", 12346, "always", 204800 );
 
-	cm->add_instance(&ns1);
-	cm->add_instance(&ns2);
-	nu->add_instance(&ns1);
-	nu->add_instance(&ns2);
+	cm.add_instance(&ns1);
+	cm.add_instance(&ns2);
 
-	TestNodeUtil::set_inst(std::move(nu));
-	CacheManager::init(std::move(cm));
-
-	TestCacheMan &tcm = dynamic_cast<TestCacheMan&>(CacheManager::get_instance());
+	CacheManager::init(&cm);
 
 	std::vector<TP> ts;
 	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
@@ -325,7 +307,7 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	// Assert moved
 	try {
 		NodeCacheKey k(op->getSemanticId(),2);
-		tcm.get_instance_mgr(0).get_raster_cache().get_ref(k);
+		cm.get_instance_mgr(0).get_raster_cache().get_ref(k);
 		Log::debug("FAILED on get 2");
 		FAIL();
 	} catch (NoSuchElementException &nse) {
@@ -333,14 +315,14 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	try {
 		NodeCacheKey k(op->getSemanticId(),1);
-		tcm.get_instance_mgr(0).get_raster_cache().get_ref(k);
+		cm.get_instance_mgr(0).get_raster_cache().get_ref(k);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}
 
 	try {
 		NodeCacheKey k(op->getSemanticId(),1);
-		tcm.get_instance_mgr(1).get_raster_cache().get_ref(k);
+		cm.get_instance_mgr(1).get_raster_cache().get_ref(k);
 	} catch (NoSuchElementException &nse) {
 		FAIL();
 	}

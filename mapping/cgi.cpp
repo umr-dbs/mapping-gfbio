@@ -42,15 +42,19 @@ int main() {
 	Configuration::loadFromDefaultPaths();
 	bool cache_enabled = Configuration::getBool("cache.enabled",false);
 
+	std::unique_ptr<CacheManager> cm;
+
 	// Plug in Cache-Dummy if cache is disabled
 	if ( !cache_enabled ) {
-		CacheManager::init( make_unique<NopCacheManager>() );
+		cm = make_unique<NopCacheManager>();
 	}
 	else {
 		std::string host = Configuration::get("indexserver.host");
 		int port = atoi( Configuration::get("indexserver.port").c_str() );
-		CacheManager::init( make_unique<ClientCacheManager>(host,port) );
+		cm = make_unique<ClientCacheManager>(host,port);
 	}
+	CacheManager::init( cm.get() );
+
 
 	if (getenv("FCGI_WEB_SERVER_ADDRS") == nullptr) {
 		// CGI mode

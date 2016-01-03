@@ -55,8 +55,8 @@ void Delivery::send(DeliveryConnection& connection) {
 //
 ////////////////////////////////////////////////////////////
 
-DeliveryManager::DeliveryManager(uint32_t listen_port) :
-	shutdown(false), listen_port(listen_port), delivery_id(1) {
+DeliveryManager::DeliveryManager(uint32_t listen_port, NodeCacheManager &manager) :
+	shutdown(false), listen_port(listen_port), delivery_id(1), manager(manager) {
 }
 
 template <typename T>
@@ -224,15 +224,14 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 
 void DeliveryManager::handle_cache_request(DeliveryConnection& dc) {
 	auto &key = dc.get_key();
-	auto &cm = CacheManager::get_instance();
 	try {
 		Log::debug("Sending cache-entry: %s", key.to_string().c_str());
 		switch ( key.type ) {
-			case CacheType::RASTER: dc.send_cache_entry( cm.get_raster_cache().get_entry_info(key), cm.get_raster_cache().get_ref(key) ); break;
-			case CacheType::POINT: dc.send_cache_entry( cm.get_point_cache().get_entry_info(key), cm.get_point_cache().get_ref(key) ); break;
-			case CacheType::LINE: dc.send_cache_entry( cm.get_line_cache().get_entry_info(key), cm.get_line_cache().get_ref(key) ); break;
-			case CacheType::POLYGON: dc.send_cache_entry( cm.get_polygon_cache().get_entry_info(key), cm.get_polygon_cache().get_ref(key) ); break;
-			case CacheType::PLOT: dc.send_cache_entry( cm.get_plot_cache().get_entry_info(key), cm.get_plot_cache().get_ref(key) ); break;
+			case CacheType::RASTER: dc.send_cache_entry( manager.get_raster_cache().get_entry_info(key), manager.get_raster_cache().get_ref(key) ); break;
+			case CacheType::POINT: dc.send_cache_entry( manager.get_point_cache().get_entry_info(key), manager.get_point_cache().get_ref(key) ); break;
+			case CacheType::LINE: dc.send_cache_entry( manager.get_line_cache().get_entry_info(key), manager.get_line_cache().get_ref(key) ); break;
+			case CacheType::POLYGON: dc.send_cache_entry( manager.get_polygon_cache().get_entry_info(key), manager.get_polygon_cache().get_ref(key) ); break;
+			case CacheType::PLOT: dc.send_cache_entry( manager.get_plot_cache().get_entry_info(key), manager.get_plot_cache().get_ref(key) ); break;
 			default: throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
 		}
 	} catch (const NoSuchElementException &nse) {
@@ -242,24 +241,23 @@ void DeliveryManager::handle_cache_request(DeliveryConnection& dc) {
 
 void DeliveryManager::handle_move_request(DeliveryConnection& dc) {
 	auto &key = dc.get_key();
-	auto &cm = CacheManager::get_instance();
 	try {
 		Log::debug("Moving cache-entry: %s", key.to_string().c_str());
 		switch ( key.type ) {
 			case CacheType::RASTER:
-				dc.send_move( cm.get_raster_cache().get_entry_info(key), cm.get_raster_cache().get_ref(key) );
+				dc.send_move( manager.get_raster_cache().get_entry_info(key), manager.get_raster_cache().get_ref(key) );
 				break;
 			case CacheType::POINT:
-				dc.send_move( cm.get_point_cache().get_entry_info(key), cm.get_point_cache().get_ref(key) );
+				dc.send_move( manager.get_point_cache().get_entry_info(key), manager.get_point_cache().get_ref(key) );
 				break;
 			case CacheType::LINE:
-				dc.send_move( cm.get_line_cache().get_entry_info(key), cm.get_line_cache().get_ref(key) );
+				dc.send_move( manager.get_line_cache().get_entry_info(key), manager.get_line_cache().get_ref(key) );
 				break;
 			case CacheType::POLYGON:
-				dc.send_move( cm.get_polygon_cache().get_entry_info(key), cm.get_polygon_cache().get_ref(key) );
+				dc.send_move( manager.get_polygon_cache().get_entry_info(key), manager.get_polygon_cache().get_ref(key) );
 				break;
 			case CacheType::PLOT:
-				dc.send_move( cm.get_plot_cache().get_entry_info(key), cm.get_plot_cache().get_ref(key) );
+				dc.send_move( manager.get_plot_cache().get_entry_info(key), manager.get_plot_cache().get_ref(key) );
 				break;
 			default:
 				throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
@@ -271,14 +269,13 @@ void DeliveryManager::handle_move_request(DeliveryConnection& dc) {
 
 void DeliveryManager::handle_move_done(DeliveryConnection& dc) {
 	auto &key = dc.get_key();
-	auto &cm = CacheManager::get_instance();
 	Log::debug("Move of entry: %s confirmed. Dropping.", key.to_string().c_str());
 	switch ( key.type ) {
-		case CacheType::RASTER: cm.get_raster_cache().remove_local(key); break;
-		case CacheType::POINT: cm.get_point_cache().remove_local(key); break;
-		case CacheType::LINE: cm.get_line_cache().remove_local(key); break;
-		case CacheType::POLYGON: cm.get_polygon_cache().remove_local(key); break;
-		case CacheType::PLOT: cm.get_plot_cache().remove_local(key); break;
+		case CacheType::RASTER: manager.get_raster_cache().remove_local(key); break;
+		case CacheType::POINT: manager.get_point_cache().remove_local(key); break;
+		case CacheType::LINE: manager.get_line_cache().remove_local(key); break;
+		case CacheType::POLYGON: manager.get_polygon_cache().remove_local(key); break;
+		case CacheType::PLOT: manager.get_plot_cache().remove_local(key); break;
 		default: throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
 	}
 	dc.release();

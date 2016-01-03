@@ -6,9 +6,9 @@
  */
 
 // project-stuff
+#include "cache/node/node_manager.h"
 #include "cache/node/nodeserver.h"
 #include "cache/node/delivery.h"
-#include "cache/node/util.h"
 #include "cache/index/indexserver.h"
 #include "cache/priv/connection.h"
 #include "cache/priv/transfer.h"
@@ -28,11 +28,11 @@
 //
 ////////////////////////////////////////////////////////////
 
-NodeServer::NodeServer(uint32_t my_port, std::string index_host, uint32_t index_port,
+NodeServer::NodeServer(std::unique_ptr<NodeCacheManager> manager, uint32_t my_port, std::string index_host, uint32_t index_port,
 	int num_threads) :
 	shutdown(false), workers_up(false), my_id(-1), my_port(my_port), index_host(index_host), index_port(
-		index_port), num_treads(num_threads), delivery_manager(my_port) {
-	NodeUtil::get_instance().set_self_port(my_port);
+		index_port), num_treads(num_threads), delivery_manager(my_port,*manager), manager(std::move(manager) ) {
+	this->manager->set_self_port(my_port);
 }
 
 void NodeServer::worker_loop() {
@@ -42,7 +42,7 @@ void NodeServer::worker_loop() {
 			UnixSocket sock(index_host.c_str(), index_port,true);
 			BinaryStream &stream = sock;
 			buffered_write(sock,WorkerConnection::MAGIC_NUMBER,my_id);
-			NodeUtil::get_instance().set_index_connection(&sock);
+			manager->set_index_connection(&sock);
 
 			Log::debug("Worker connected to index-server");
 
@@ -146,32 +146,31 @@ void NodeServer::process_create_request(BinaryStream& index_stream,
 void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 		const PuzzleRequest& request) {
 	ExecTimer t("RequestProcessing.puzzle");
-	auto &cm = CacheManager::get_instance();
 	QueryProfiler profiler;
 
 	switch ( request.type ) {
 		case CacheType::RASTER: {
-			auto res = cm.get_raster_cache().process_puzzle(request,profiler);
+			auto res = manager->get_raster_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const GenericRaster>(res.release()) );
 			break;
 		}
 		case CacheType::POINT: {
-			auto res = cm.get_point_cache().process_puzzle(request,profiler);
+			auto res = manager->get_point_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const PointCollection>(res.release()) );
 			break;
 		}
 		case CacheType::LINE: {
-			auto res = cm.get_line_cache().process_puzzle(request,profiler);
+			auto res = manager->get_line_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const LineCollection>(res.release()) );
 			break;
 		}
 		case CacheType::POLYGON: {
-			auto res = cm.get_polygon_cache().process_puzzle(request,profiler);
+			auto res = manager->get_polygon_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const PolygonCollection>(res.release()) );
 			break;
 		}
 		case CacheType::PLOT: {
-			auto res = cm.get_plot_cache().process_puzzle(request,profiler);
+			auto res = manager->get_plot_cache().process_puzzle(request,profiler);
 			finish_request( index_stream, std::shared_ptr<const GenericPlot>(res.release()) );
 			break;
 		}
@@ -183,24 +182,23 @@ void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 void NodeServer::process_delivery_request(BinaryStream& index_stream,
 		const DeliveryRequest& request) {
 	ExecTimer t("RequestProcessing.delivery");
-	auto &cm = CacheManager::get_instance();
 	NodeCacheKey key(request.semantic_id,request.entry_id);
 
 	switch ( request.type ) {
 		case CacheType::RASTER:
-			finish_request( index_stream, cm.get_raster_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_raster_cache().get_ref(key) );
 			break;
 		case CacheType::POINT:
-			finish_request( index_stream, cm.get_point_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_point_cache().get_ref(key) );
 			break;
 		case CacheType::LINE:
-			finish_request( index_stream, cm.get_line_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_line_cache().get_ref(key) );
 			break;
 		case CacheType::POLYGON:
-			finish_request( index_stream, cm.get_polygon_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_polygon_cache().get_ref(key) );
 			break;
 		case CacheType::PLOT:
-			finish_request( index_stream, cm.get_plot_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_plot_cache().get_ref(key) );
 			break;
 		default:
 			throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));
@@ -296,7 +294,7 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 		}
 		case ControlConnection::CMD_GET_STATS: {
 			Log::debug("Received stats-request.");
-			NodeStats stats = NodeUtil::get_instance().get_stats();
+			NodeStats stats = manager->get_stats();
 			buffered_write(stream,ControlConnection::RESP_STATS,stats);
 			break;
 		}
@@ -318,19 +316,19 @@ void NodeServer::handle_reorg_remove_item(const TypedNodeCacheKey &item, BinaryS
 	if ( iresp == ControlConnection::CMD_REMOVE_OK ) {
 		switch (item.type) {
 			case CacheType::RASTER:
-				CacheManager::get_instance().get_raster_cache().remove_local(item);
+				manager->get_raster_cache().remove_local(item);
 				break;
 			case CacheType::POINT:
-				CacheManager::get_instance().get_point_cache().remove_local(item);
+				manager->get_point_cache().remove_local(item);
 				break;
 			case CacheType::LINE:
-				CacheManager::get_instance().get_line_cache().remove_local(item);
+				manager->get_line_cache().remove_local(item);
 				break;
 			case CacheType::POLYGON:
-				CacheManager::get_instance().get_polygon_cache().remove_local(item);
+				manager->get_polygon_cache().remove_local(item);
 				break;
 			case CacheType::PLOT:
-				CacheManager::get_instance().get_plot_cache().remove_local(item);
+				manager->get_plot_cache().remove_local(item);
 				break;
 			default:
 				throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
@@ -362,20 +360,20 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 				CacheEntry ce(del_stream);
 				switch (item.type) {
 					case CacheType::RASTER:
-						new_cache_id = CacheManager::get_instance().get_raster_cache().put_local(
+						new_cache_id = manager->get_raster_cache().put_local(
 							item.semantic_id, GenericRaster::fromStream(del_stream), std::move(ce)).entry_id;
 						break;
 					case CacheType::POINT:
-						new_cache_id = CacheManager::get_instance().get_point_cache().put_local(
+						new_cache_id = manager->get_point_cache().put_local(
 							item.semantic_id, make_unique<PointCollection>(del_stream), std::move(ce)).entry_id;
 					case CacheType::LINE:
-						new_cache_id = CacheManager::get_instance().get_line_cache().put_local(
+						new_cache_id = manager->get_line_cache().put_local(
 							item.semantic_id, make_unique<LineCollection>(del_stream), std::move(ce)).entry_id;
 					case CacheType::POLYGON:
-						new_cache_id = CacheManager::get_instance().get_polygon_cache().put_local(
+						new_cache_id = manager->get_polygon_cache().put_local(
 							item.semantic_id, make_unique<PolygonCollection>(del_stream), std::move(ce)).entry_id;
 					case CacheType::PLOT:
-						new_cache_id = CacheManager::get_instance().get_plot_cache().put_local(
+						new_cache_id = manager->get_plot_cache().put_local(
 							item.semantic_id, GenericPlot::fromStream(del_stream), std::move(ce)).entry_id;
 					default:
 						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
@@ -430,7 +428,7 @@ void NodeServer::setup_control_connection() {
 	// Establish connection
 	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port,true));
 	BinaryStream &stream = *this->control_connection;
-	NodeHandshake hs = NodeUtil::get_instance().create_handshake();
+	NodeHandshake hs = manager->create_handshake();
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
@@ -445,7 +443,7 @@ void NodeServer::setup_control_connection() {
 
 		stream.read(&my_id);
 		stream.read(&my_host);
-		NodeUtil::get_instance().set_self_host(my_host);
+		manager->set_self_host(my_host);
 		Log::info("Successfuly connected to index-server. My Id is: %d", my_id);
 	}
 	else {

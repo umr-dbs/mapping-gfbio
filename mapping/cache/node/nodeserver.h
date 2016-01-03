@@ -8,6 +8,7 @@
 #ifndef SERVER_H_
 #define SERVER_H_
 
+#include "cache/node/node_manager.h"
 #include "cache/common.h"
 #include "cache/node/delivery.h"
 #include "cache/priv/connection.h"
@@ -31,8 +32,10 @@
 //
 class NodeServer {
 	friend class std::thread;
+	friend class TestNodeServer;
+	friend class TestCacheMan;
 public:
-	NodeServer(uint32_t my_port, std::string index_host,
+	NodeServer( std::unique_ptr<NodeCacheManager> manager, uint32_t my_port, std::string index_host,
 			uint32_t index_port, int num_threads);
 	virtual ~NodeServer();
 
@@ -112,6 +115,8 @@ private:
 	std::unique_ptr<UnixSocket> control_connection;
 	// The delivery-manager
 	DeliveryManager delivery_manager;
+
+	std::unique_ptr<NodeCacheManager> manager;
 };
 
 #endif /* SERVER_H_ */

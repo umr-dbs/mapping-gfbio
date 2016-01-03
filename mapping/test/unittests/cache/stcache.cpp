@@ -61,7 +61,8 @@ std::unique_ptr<GenericRaster> createRaster( double x1, double x2, double y1, do
 
 
 TEST(STCacheTest,TestQuery) {
-	CacheManager::init( make_unique<NopCacheManager>() );
+	NopCacheManager ncm;
+	CacheManager::init( &ncm );
 	NodeCache<GenericRaster> cache(CacheType::RASTER, 5 * 1024 * 1024);
 	std::string sem_id = "a";
 

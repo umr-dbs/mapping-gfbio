@@ -327,11 +327,16 @@ std::string NodeCacheRef::to_string() const {
 //
 //////////////////////////////////////////////////////////////
 
+template<typename KType, typename EType>
+CacheStructure<KType, EType>::CacheStructure() : _size(0) {
+}
+
 
 template<typename KType, typename EType>
 void CacheStructure<KType, EType>::put(const KType& key, const std::shared_ptr<EType>& result) {
 	ExclusiveLockGuard g(lock);
 //	Log::trace("Inserting new entry. Id: %d", key );
+	_size += result->size;
 	entries.emplace(key, result);
 }
 
@@ -352,6 +357,7 @@ std::shared_ptr<EType> CacheStructure<KType, EType>::remove(const KType& key) {
 	if ( iter != entries.end() ) {
 		auto result = iter->second;
 		entries.erase(iter);
+		_size -= result->size;
 		return result;
 	}
 	throw NoSuchElementException("No cache-entry found");
@@ -590,8 +596,6 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 // END QUERY STUFF
 //
 
-
-
 template<typename KType, typename EType>
 std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() const {
 	std::vector<std::shared_ptr<EType> > result;
@@ -600,6 +604,16 @@ std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() con
 		result.push_back(e.second);
 	}
 	return result;
+}
+
+template<typename KType, typename EType>
+uint64_t CacheStructure<KType, EType>::size() const {
+	return _size;
+}
+
+template<typename KType, typename EType>
+uint64_t CacheStructure<KType, EType>::num_elements() const {
+	return entries.size();
 }
 
 template<typename KType, typename EType>

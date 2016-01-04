@@ -160,8 +160,8 @@ void IndexCache::remove_from_node(const IndexCacheKey& key) {
 }
 
 
-uint32_t IndexCache::get_node_for_job(const QueryRectangle& query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes) const {
-	return reorg_strategy->get_node_for_job(query, nodes);
+uint32_t IndexCache::get_node_for_job(const BaseRequest& request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes) const {
+	return reorg_strategy->get_node_for_job(request, nodes);
 }
 
 bool IndexCache::requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> > &nodes ) const {

@@ -11,6 +11,7 @@
 #include "util/concat.h"
 #include <ctime>
 #include <algorithm>
+#include <deque>
 
 NodeReorgDescription::NodeReorgDescription( std::shared_ptr<Node> node ) :
 	node(node) {
@@ -34,7 +35,7 @@ std::unique_ptr<ReorgStrategy> ReorgStrategy::by_name(const IndexCache &cache, c
 
 }
 
-ReorgStrategy::ReorgStrategy(const IndexCache &cache, double target_usage) : cache(cache), target_usage(target_usage) {
+ReorgStrategy::ReorgStrategy(const IndexCache &cache, double target_usage) : cache(cache), max_target_usage(target_usage) {
 }
 
 ReorgStrategy::~ReorgStrategy() {
@@ -72,9 +73,6 @@ double ReorgStrategy::get_score(const IndexCacheEntry& entry) {
 NeverReorgStrategy::NeverReorgStrategy(const IndexCache &cache) : ReorgStrategy(cache,0) {
 }
 
-NeverReorgStrategy::~NeverReorgStrategy() {
-}
-
 bool NeverReorgStrategy::requires_reorg(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
 	(void) nodes;
 	return false;
@@ -84,9 +82,9 @@ void NeverReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &res
 	(void) result;
 }
 
-uint32_t NeverReorgStrategy::get_node_for_job(const QueryRectangle& query,
+uint32_t NeverReorgStrategy::get_node_for_job(const BaseRequest &request,
 	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
-	(void) query;
+	(void) request;
 
 	int idx = std::rand() % nodes.size();
 	auto iter = nodes.begin();
@@ -101,9 +99,6 @@ uint32_t NeverReorgStrategy::get_node_for_job(const QueryRectangle& query,
 //
 
 CapacityReorgStrategy::CapacityReorgStrategy(const IndexCache &cache, double target_usage) : ReorgStrategy(cache,target_usage)  {
-}
-
-CapacityReorgStrategy::~CapacityReorgStrategy() {
 }
 
 bool CapacityReorgStrategy::requires_reorg(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
@@ -188,9 +183,9 @@ void CapacityReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &
 	}
 }
 
-uint32_t CapacityReorgStrategy::get_node_for_job(const QueryRectangle& query,
+uint32_t CapacityReorgStrategy::get_node_for_job(const BaseRequest &request,
 	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
-	(void) query;
+	(void) request;
 
 	uint32_t min_id = 0;
 	double min_usage = DoubleInfinity;
@@ -246,10 +241,6 @@ GDAL::CRSTransformer GeographicReorgStrategy::webmercator_trans(EPSG_WEBMERCATOR
 GeographicReorgStrategy::GeographicReorgStrategy(const IndexCache &cache, double target_usage) : ReorgStrategy(cache,target_usage) {
 }
 
-GeographicReorgStrategy::~GeographicReorgStrategy() {
-}
-
-
 //
 // Reorganize if:
 // - there is a new node
@@ -290,7 +281,7 @@ void GeographicReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription>
 	// Redistribute entries;
 	for ( auto &kv : result ) {
 		for ( auto &e : cache.get_node_entries(kv.first) ) {
-			uint32_t node_id = get_closest_node( e->bounds.epsg, e->bounds );
+			uint32_t node_id = get_closest_node( e->bounds );
 			n_pos.at(node_id).entries.push_back(e);
 		}
 	}
@@ -324,12 +315,12 @@ void GeographicReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription>
 	}
 }
 
-uint32_t GeographicReorgStrategy::get_node_for_job(const QueryRectangle& query,
+uint32_t GeographicReorgStrategy::get_node_for_job(const BaseRequest &request,
 	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
 
 	// Get closest node according to last reorg
 	if ( !n_pos.empty() )
-		return get_closest_node(query.epsg, QueryCube(query));
+		return get_closest_node(QueryCube(request.query));
 	// If no positions have been calculated yet
 	else
 		return nodes.begin()->first;
@@ -396,11 +387,11 @@ std::map<uint32_t,NodePos> GeographicReorgStrategy::calculate_node_pos(
 	return n_pos;
 }
 
-uint32_t GeographicReorgStrategy::get_closest_node(  epsg_t epsg, const Cube<3> &cube ) const {
+uint32_t GeographicReorgStrategy::get_closest_node(  const QueryCube &cube ) const {
 	double min_dist = DoubleInfinity;
 	uint32_t min_id = 0;
 	for ( auto &np : n_pos ) {
-		double d = np.second.dist_to(epsg, cube);
+		double d = np.second.dist_to(cube.epsg, cube);
 		if ( d < min_dist ) {
 			min_dist = d;
 			min_id = np.first;
@@ -409,31 +400,295 @@ uint32_t GeographicReorgStrategy::get_closest_node(  epsg_t epsg, const Cube<3> 
 	return min_id;
 }
 
+/////////////////////////////////////////////////////////////////////
 //
+// OPERATOR-GRAPH BASED
 //
-//
+/////////////////////////////////////////////////////////////////////
 
-GraphReorgStrategy::GraphReorgStrategy(const IndexCache &cache, double target_usage) : ReorgStrategy(cache,target_usage)  {
+
+
+GraphReorgStrategy::GNode::GNode(const std::string& semantic_id,
+		const Struct* structure) : semantic_id(semantic_id), structure(structure), _mark(false) {
 }
 
-GraphReorgStrategy::~GraphReorgStrategy() {
+void GraphReorgStrategy::GNode::append(std::shared_ptr<GNode> n) {
+	GraphReorgStrategy::append( n, children );
 }
 
-void GraphReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) const {
-	(void) result;
-	// TODO: Implement
+void GraphReorgStrategy::GNode::mark() {
+	_mark = true;
+}
+
+bool GraphReorgStrategy::GNode::is_marked() {
+	return _mark;
+}
+
+// HELPER
+
+
+GraphReorgStrategy::TempNode::TempNode(uint32_t id, uint64_t max_size) : id(id), max_size(max_size), size(0) {
+}
+
+bool GraphReorgStrategy::TempNode::fits( const std::shared_ptr<GraphReorgStrategy::GNode> &gn,
+		double target_usage) const {
+
+	double tmp = size + gn->structure->size();
+	return max_size / tmp <= target_usage;
+}
+
+void GraphReorgStrategy::TempNode::add(const std::shared_ptr<GraphReorgStrategy::GNode>& gn) {
+	size += gn->structure->size();
+	entries.push_back(gn);
+}
+
+double GraphReorgStrategy::TempNode::get_usage() const {
+	double s = size;
+	return s / max_size;
+}
+
+double GraphReorgStrategy::TempNode::get_usage_with(
+		const std::shared_ptr<GraphReorgStrategy::GNode>& gn) const {
+	double s = size + gn->structure->size();
+	return s / max_size;
+}
+
+double GraphReorgStrategy::TempNode::get_usage_without(
+		const std::shared_ptr<GraphReorgStrategy::GNode>& gn) const {
+	double s = size - gn->structure->size();
+	return s / max_size;
+}
+
+std::shared_ptr<GraphReorgStrategy::GNode> GraphReorgStrategy::TempNode::remove_first() {
+	auto res = entries.front();
+	size -= res->structure->size();
+	entries.pop_front();
+	return res;
+}
+
+bool GraphReorgStrategy::TempNode::operator <(const TempNode& other) const {
+	return get_usage() < other.get_usage();
+}
+
+//
+// STRATEGY
+//
+
+void GraphReorgStrategy::append(std::shared_ptr<GNode> node,
+		std::vector<std::shared_ptr<GNode>>& roots) {
+	bool added = false;
+	for ( size_t i = 0; i < roots.size(); i++ ) {
+		if ( roots[i]->semantic_id.find(node->semantic_id) != std::string::npos ) {
+			roots[i]->append(node);
+			added = true;
+		}
+		else if ( node->semantic_id.find(roots[i]->semantic_id) != std::string::npos ) {
+			node->append(roots[i]);
+			roots[i] = node;
+			added = true;
+		}
+	}
+	if ( !added )
+		roots.push_back(node);
+}
+
+
+GraphReorgStrategy::GraphReorgStrategy(const IndexCache &cache, double target_usage) :
+	ReorgStrategy(cache,target_usage)  {
 }
 
 bool GraphReorgStrategy::requires_reorg(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
-	(void) nodes;
-	// TODO: Implement
-	return false;
+	double maxru(0);
+	double minru(1);
+
+	for (auto &e : nodes) {
+		maxru = std::max(maxru, cache.get_capacity_usage(e.second->capacity));
+		minru = std::min(minru, cache.get_capacity_usage(e.second->capacity));
+	}
+	return  maxru - minru > 0.15 || maxru >= 1.0;
 }
 
-uint32_t GraphReorgStrategy::get_node_for_job(const QueryRectangle& query,
+
+void GraphReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) const {
+	double target_usage = get_target_usage(result);
+	assignments.clear();
+	auto roots   = build_graph();
+	auto ordered = build_order(roots);
+
+	std::vector<TempNode> nodes;
+	for ( auto &pair: result ) {
+		nodes.push_back( TempNode(pair.first, cache.get_total_capacity(pair.second.node->capacity)));
+	}
+
+	// Distribute all fitting elements
+	auto niter = nodes.begin();
+	auto oiter = ordered.begin();
+	bool new_node = true;
+
+	while ( oiter != ordered.end() && niter != nodes.end() ) {
+		if ( new_node || niter->fits(*oiter,target_usage) ) {
+			assignments[(*oiter)->semantic_id] = niter->id;
+			niter->add(*oiter);
+			oiter = ordered.erase(oiter);
+			new_node = false;
+		}
+		else {
+			new_node = true;
+			niter++;
+		}
+	}
+	// shift in the remaining nodes;
+	for ( auto &op : ordered )
+		shift_in(op,nodes);
+
+	// Calculate removals and moves
+	for ( auto &node : nodes ) {
+		auto &res = result.at(node.id);
+
+		// Collect all entries
+		size_t size = 0;
+		for ( auto &s : node.entries )
+			size += s->structure->num_elements();
+
+		std::vector<std::shared_ptr<IndexCacheEntry>> all;
+		all.reserve(size);
+
+		for ( auto &s : node.entries ) {
+			auto s_all = s->structure->get_all();
+			all.insert(all.end(),s_all.begin(),s_all.end());
+		}
+
+
+		// Remove overflow
+		if ( node.get_usage() > max_target_usage ) {
+			std::sort(all.begin(), all.end(), ReorgStrategy::entry_greater );
+			while ( node.get_usage() > max_target_usage ) {
+				auto &e = all.back();
+				node.size -= e->size;
+				result.at(e->node_id).add_removal( TypedNodeCacheKey(cache.get_reorg_type(), e->semantic_id, e->entry_id) );
+				all.pop_back();
+			}
+		}
+
+		// Check which entries to be moved
+		for ( auto &e : all ) {
+			if ( e->node_id != node.id ) {
+				auto &remote_node = result.at(e->node_id).node;
+				res.add_move( ReorgMoveItem(
+					cache.get_reorg_type(),
+					e->semantic_id,
+					e->entry_id,
+					remote_node->id,
+					remote_node->host,
+					remote_node->port
+				));
+			}
+		}
+	}
+}
+
+
+void GraphReorgStrategy::shift_in(const std::shared_ptr<GraphReorgStrategy::GNode> &node,
+		std::vector<GraphReorgStrategy::TempNode>& nodes) const {
+	auto tmp = node;
+	for ( int i = nodes.size() - 1; i > 0; i-- ) {
+		assignments[tmp->semantic_id] = nodes[i].id;
+		auto &curr = nodes[i];
+		auto &prev = nodes[i-1];
+		curr.add(tmp);
+
+		double c1 = curr.get_usage_without(curr.entries.front());
+		double p1 = prev.get_usage_with(curr.entries.front());
+
+		double d1 = std::abs( curr.get_usage() - prev.get_usage() );
+		double d2 = std::abs( c1 - p1 );
+
+		// If shifts promises a better distribution... do it
+		if ( d2 < d1 )
+			tmp = nodes[i].remove_first();
+		else
+			return;
+	}
+	assignments[tmp->semantic_id] = nodes[0].id;
+	nodes[0].add(tmp);
+}
+
+std::vector<std::shared_ptr<GraphReorgStrategy::GNode>> GraphReorgStrategy::build_graph() const {
+	std::vector<std::shared_ptr<GNode>> roots;
+	for ( auto &pair : cache.caches )
+		GraphReorgStrategy::append(std::shared_ptr<GNode>( new GNode(pair.first,pair.second) ),roots);
+	return roots;
+}
+
+std::vector<std::shared_ptr<GraphReorgStrategy::GNode> > GraphReorgStrategy::build_order(
+		const std::vector<std::shared_ptr<GNode> >& roots) const {
+
+	std::vector<std::shared_ptr<GNode>> result;
+
+	// Root-wise breadth-first search
+	for ( auto &root : roots ) {
+		std::vector<std::shared_ptr<GNode>> v;
+		v.push_back( root );
+		for ( size_t i = 0; i < v.size(); i++ ) {
+			for ( auto &c : v[i]->children ) {
+				// Omit already added nodes
+				if ( !c->is_marked() ) {
+					c->mark();
+					v.push_back(c);
+				}
+			}
+		}
+		result.insert( result.end(), v.begin(), v.end() );
+	}
+	return result;
+}
+
+
+uint32_t GraphReorgStrategy::get_node_for_job(const BaseRequest& request,
 	const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
-	(void) query;
-	// TODO: Implement
-	return nodes.begin()->first;
+
+	auto op = GenericOperator::fromJSON( request.semantic_id );
+	uint32_t node = find_node_for_graph( *op );
+
+	// Nothing found --> Pick node with max. free capacity
+	if ( node == 0 ) {
+		double usage = std::numeric_limits<double>::infinity();
+		double tmp = 0;
+		for ( auto &pair : nodes ) {
+			tmp = cache.get_capacity_usage( pair.second->capacity );
+			if ( tmp < usage ) {
+				usage = tmp;
+				node = pair.first;
+			}
+		}
+	}
+	return node;
 }
 
+uint32_t GraphReorgStrategy::find_node_for_graph(const GenericOperator& op) const {
+	std::deque<const GenericOperator*> queue;
+	queue.push_back(&op);
+
+	// Breadth first search
+	while ( !queue.empty() ) {
+		auto current = queue.front();
+		auto it = assignments.find( current->getSemanticId() );
+		// HIT
+		if ( it != assignments.end() ) {
+			return it->second;
+		}
+		// Add child-operators
+		else {
+			int src_cnt = 0;
+			for ( int i = 0; i < GenericOperator::MAX_INPUT_TYPES; i++ )
+				src_cnt += op.sourcecounts[i];
+
+			for ( int i = 0; i < src_cnt; i++ ) {
+				queue.push_back( op.sources[i] );
+			}
+		}
+		queue.pop_front();
+	}
+	// No Node found...
+	return 0;
+}

@@ -197,8 +197,13 @@ public:
 template<typename KType, typename EType>
 class CacheStructure {
 public:
+	CacheStructure();
+
 	// Inserts the given result into the cache. The cache copies the content of the result.
 	void put( const KType &key, const std::shared_ptr<EType> &result );
+
+	// Removes the entry with the given id
+	std::shared_ptr<EType> remove( const KType &key );
 
 	// Fetches the entry by the given id. Careful when manipulating entries...
 	std::shared_ptr<EType> get( const KType &key ) const;
@@ -206,10 +211,14 @@ public:
 	// Queries the cache with the given query-rectangle
 	const CacheQueryResult<KType> query( const QueryRectangle &spec ) const;
 
-	// Removes the entry with the given id
-	std::shared_ptr<EType> remove( const KType &key );
-
+	// Retrieves a reference to all stored entries
 	std::vector<std::shared_ptr<EType>> get_all() const;
+
+	// returns the size in bytes all entries currently stored
+	uint64_t size() const;
+
+	// returns the number of stored elements;
+	uint64_t num_elements() const;
 
 private:
 	std::string key_to_string( uint64_t key ) const;
@@ -221,6 +230,7 @@ private:
 
 	std::map<KType, std::shared_ptr<EType>> entries;
 	mutable RWLock lock;
+	uint64_t _size;
 };
 
 #endif /* CACHE_STRUCTURE_H_ */

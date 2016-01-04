@@ -14,6 +14,7 @@
 #include <map>
 #include <unordered_map>
 #include <memory>
+#include <set>
 
 // Reorg-strategies manage the reconfiguration of the cache
 // on imbalance
@@ -41,7 +42,7 @@ public:
 	virtual ~ReorgStrategy();
 	virtual bool requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
 	virtual void reorganize(std::map<uint32_t,NodeReorgDescription> &result ) const = 0 ;
-	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
+	virtual uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
 
 	static bool entry_less(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
 	static bool entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
@@ -50,8 +51,7 @@ protected:
 	ReorgStrategy(const IndexCache &cache, double target_usage);
 	double get_target_usage( const std::map<uint32_t,NodeReorgDescription> &result ) const;
 	const IndexCache &cache;
-private:
-	const double target_usage;
+	const double max_target_usage;
 };
 
 //
@@ -60,10 +60,9 @@ private:
 class NeverReorgStrategy : public ReorgStrategy {
 public:
 	NeverReorgStrategy(const IndexCache &cache);
-	virtual ~NeverReorgStrategy();
-	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
-	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 };
 
 //
@@ -74,10 +73,9 @@ public:
 class CapacityReorgStrategy : public ReorgStrategy {
 public:
 	CapacityReorgStrategy(const IndexCache &cache, double target_usage);
-	virtual ~CapacityReorgStrategy();
-	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
-	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 };
 
 
@@ -89,14 +87,13 @@ class GeographicReorgStrategy : public ReorgStrategy {
 	friend class NodePos;
 public:
 	GeographicReorgStrategy(const IndexCache &cache, double target_usage);
-	virtual ~GeographicReorgStrategy();
-	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
 	// It must be ensured that at least on node is present in the given map
-	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 private:
 	std::map<uint32_t,NodePos> calculate_node_pos(const std::map<uint32_t,NodeReorgDescription> &result) const;
-	uint32_t get_closest_node( epsg_t epsg, const Cube<3> &cube ) const;
+	uint32_t get_closest_node( const QueryCube &cube ) const;
 
 	mutable std::map<uint32_t,NodePos> n_pos;
 	static GDAL::CRSTransformer geosmsg_trans;
@@ -105,17 +102,62 @@ private:
 
 
 //
-// This strategy calculates clusters cache-entries
+// This strategy clusters cache-entries
 // by similarity of their operator-graphs
 //
 class GraphReorgStrategy : public ReorgStrategy {
-	friend class NodePos;
+private:
+	class GNode {
+	public:
+		typedef CacheStructure<std::pair<uint32_t,uint64_t>,IndexCacheEntry> Struct;
+
+		GNode( const std::string &semantic_id, const Struct *structure );
+
+		void append( std::shared_ptr<GNode> n );
+
+		void mark();
+
+		bool is_marked();
+
+		const std::string semantic_id;
+		const Struct *structure;
+		std::vector<std::shared_ptr<GNode>> children;
+	private:
+		bool _mark;
+	};
+
+	class TempNode {
+	public:
+		TempNode( uint32_t id, uint64_t max_size );
+
+		bool fits( const std::shared_ptr<GraphReorgStrategy::GNode> &gn, double target_usage ) const;
+		void add( const std::shared_ptr<GraphReorgStrategy::GNode> &gn );
+		std::shared_ptr<GraphReorgStrategy::GNode> remove_first();
+		double get_usage() const;
+		double get_usage_with(const std::shared_ptr<GraphReorgStrategy::GNode>& gn) const;
+		double get_usage_without(const std::shared_ptr<GraphReorgStrategy::GNode>& gn) const;
+
+		bool operator<( const TempNode &other ) const;
+
+		uint32_t id;
+		uint64_t max_size;
+		uint64_t size;
+		std::deque<std::shared_ptr<GraphReorgStrategy::GNode>> entries;
+
+	};
 public:
+	static void append( std::shared_ptr<GNode> node, std::vector<std::shared_ptr<GNode>> &roots );
+
 	GraphReorgStrategy(const IndexCache &cache, double target_usage);
-	virtual ~GraphReorgStrategy();
-	virtual bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	virtual void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
-	virtual uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+private:
+	std::vector<std::shared_ptr<GNode>> build_graph() const;
+	std::vector<std::shared_ptr<GNode>> build_order( const std::vector<std::shared_ptr<GNode>> &roots ) const;
+	void shift_in( const std::shared_ptr<GNode> &node, std::vector<TempNode> &nodes ) const;
+	uint32_t find_node_for_graph( const GenericOperator &op ) const;
+	mutable std::map<std::string,uint32_t> assignments;
 };
 
 

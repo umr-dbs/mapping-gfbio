@@ -426,7 +426,7 @@ uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 	if ( nodes.empty() )
 		return 0;
 
-	uint32_t node_id = cache.get_node_for_job(request.query,nodes);
+	uint32_t node_id = cache.get_node_for_job(request,nodes);
 	for (auto &e : connections) {
 		auto &con = *e.second;
 		if (!con.is_faulty() && con.node->id == node_id && con.get_state() == WorkerConnection::State::IDLE) {

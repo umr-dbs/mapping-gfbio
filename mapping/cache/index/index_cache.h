@@ -10,6 +10,7 @@
 
 #include "cache/priv/cache_structure.h"
 #include "cache/priv/cache_stats.h"
+#include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
 #include "cache/common.h"
 #include <utility>
@@ -51,6 +52,7 @@ public:
 // One instance used per data-type.
 //
 class IndexCache {
+	friend class GraphReorgStrategy;
 public:
 	// Constructs a new instance with the given reorg-strategy
 	IndexCache( const std::string &reorg_strategy );
@@ -91,7 +93,7 @@ public:
 	void reorganize(std::map<uint32_t, NodeReorgDescription>& result );
 
 	// Tells us which node to use for the given query
-	uint32_t get_node_for_job( const QueryRectangle &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	uint32_t get_node_for_job( const BaseRequest &query, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 
 	// Tells the total capacity of the implementing cache
 	virtual size_t get_total_capacity( const Capacity& capacity ) const = 0;

@@ -429,7 +429,7 @@ uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 	uint32_t node_id = cache.get_node_for_job(request,nodes);
 	for (auto &e : connections) {
 		auto &con = *e.second;
-		if (!con.is_faulty() && con.node->id == node_id && con.get_state() == WorkerConnection::State::IDLE) {
+		if (!con.is_faulty() && con.node->id == node_id && con.get_state() == WorkerState::IDLE) {
 			con.process_request(WorkerConnection::CMD_CREATE, request);
 			return con.id;
 		}
@@ -437,7 +437,7 @@ uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 	// Fallback
 	for (auto &e : connections) {
 		auto &con = *e.second;
-		if (!con.is_faulty() && con.get_state() == WorkerConnection::State::IDLE) {
+		if (!con.is_faulty() && con.get_state() == WorkerState::IDLE) {
 			con.process_request(WorkerConnection::CMD_CREATE, request);
 			return con.id;
 		}
@@ -469,7 +469,7 @@ DeliverJob::DeliverJob(DeliveryRequest&& request, const IndexCacheKey &key) :
 uint64_t DeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
 	for (auto &e : connections) {
 		auto &con = *e.second;
-		if (!con.is_faulty() && con.node->id == node && con.get_state() == WorkerConnection::State::IDLE) {
+		if (!con.is_faulty() && con.node->id == node && con.get_state() == WorkerState::IDLE) {
 			con.process_request(WorkerConnection::CMD_DELIVER, request);
 			return con.id;
 		}
@@ -507,7 +507,7 @@ uint64_t PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 		for (auto &e : connections) {
 			auto &con = *e.second;
 			if (!con.is_faulty() && con.node->id == node
-				&& con.get_state() == WorkerConnection::State::IDLE) {
+				&& con.get_state() == WorkerState::IDLE) {
 				con.process_request(WorkerConnection::CMD_PUZZLE, request);
 				return con.id;
 			}

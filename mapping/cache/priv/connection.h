@@ -21,9 +21,10 @@
 
 class Node;
 
+template<typename StateType>
 class BaseConnection {
 public:
-	BaseConnection(std::unique_ptr<UnixSocket> socket);
+	BaseConnection(StateType state, std::unique_ptr<UnixSocket> socket);
 	virtual ~BaseConnection();
 	// Called if data is available on the unerlying socket and this connection is not in writing mode
 	void input();
@@ -31,15 +32,17 @@ public:
 	void output();
 
 	// Returns the fd used for writes by this connection
-	int get_write_fd();
+	int get_write_fd() const;
 	// Returns the fd used for reads by this connection
-	int get_read_fd();
+	int get_read_fd() const;
 	// Tells whether an error occured on this connection
-	bool is_faulty();
+	bool is_faulty() const;
 	// Tells whether this connection is currently reading data
-	bool is_reading();
+	bool is_reading() const;
 	// Tells whether this connection is currently writing data
-	bool is_writing();
+	bool is_writing() const;
+
+	StateType get_state() const;
 
 	// This connection's id
 	const uint64_t id;
@@ -54,7 +57,16 @@ protected:
 	void begin_write( std::unique_ptr<NBWriter> writer );
 	// Called by implementing classes to trigger a non-blocking read
 	void begin_read( std::unique_ptr<NBReader> reader );
+
+	void set_state( StateType state );
+
+	template<typename... States>
+	void ensure_state( const States... states ) const;
 private:
+	template<typename... States>
+	bool _ensure_state( StateType state, States... states) const;
+	bool _ensure_state( StateType state ) const;
+	StateType state;
 	bool writing;
 	bool reading;
 	bool faulty;
@@ -65,11 +77,13 @@ private:
 	static uint64_t next_id;
 };
 
-class ClientConnection: public BaseConnection {
+enum class ClientState {
+	IDLE, READING_REQUEST, AWAIT_RESPONSE, WRITING_RESPONSE
+};
+
+class ClientConnection: public BaseConnection<ClientState> {
 public:
-	enum class State {
-		IDLE, READING_REQUEST, AWAIT_RESPONSE, WRITING_RESPONSE
-	};
+
 
 	static const uint32_t MAGIC_NUMBER = 0x22345678;
 
@@ -94,8 +108,6 @@ public:
 	ClientConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~ClientConnection();
 
-	State get_state() const;
-
 	// Sends the given response and resets the state to IDLE
 	void send_response(const DeliveryResponse &response);
 	// Sends the given error and resets the state to IDLE
@@ -109,20 +121,24 @@ protected:
 	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
-	State state;
 	std::unique_ptr<BaseRequest> request;
 };
 
-class WorkerConnection: public BaseConnection {
+
+
+enum class WorkerState {
+	IDLE,
+	SENDING_REQUEST, PROCESSING, READING_ENTRY, NEW_ENTRY,
+	READING_QUERY, QUERY_REQUESTED, SENDING_QUERY_RESPONSE,
+	DONE,
+	SENDING_DELIVERY_QTY, WAITING_DELIVERY, READING_DELIVERY_ID, DELIVERY_READY,
+	READING_ERROR, ERROR
+};
+
+
+class WorkerConnection: public BaseConnection<WorkerState> {
 public:
-	enum class State {
-		IDLE,
-		SENDING_REQUEST, PROCESSING, READING_ENTRY, NEW_ENTRY,
-		READING_QUERY, QUERY_REQUESTED, SENDING_QUERY_RESPONSE,
-		DONE,
-		SENDING_DELIVERY_QTY, WAITING_DELIVERY, READING_DELIVERY_ID, DELIVERY_READY,
-		READING_ERROR, ERROR
-	};
+
 	static const uint32_t MAGIC_NUMBER = 0x32345678;
 
 	//
@@ -205,8 +221,6 @@ public:
 	WorkerConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
 	virtual ~WorkerConnection();
 
-	State get_state() const;
-
 	void process_request(uint8_t command, const BaseRequest &request);
 	void entry_cached();
 	void send_hit( const CacheRef &cr );
@@ -229,25 +243,28 @@ protected:
 	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
-
-	State state;
 	std::unique_ptr<DeliveryResponse> result;
 	std::unique_ptr<NodeCacheRef> new_entry;
 	std::unique_ptr<BaseRequest> query;
 	std::string error_msg;
 };
 
-class ControlConnection: public BaseConnection {
+
+
+
+enum class ControlState {
+	READING_HANDSHAKE, HANDSHAKE_READ, SENDING_HELLO,
+	IDLE,
+	SENDING_REORG, REORGANIZING,
+	READING_MOVE_RESULT, MOVE_RESULT_READ, SENDING_MOVE_CONFIRM,
+	READING_REMOVE_REQUEST, REMOVE_REQUEST_READ, SENDING_REMOVE_CONFIRM,
+	REORG_FINISHED,
+	SENDING_STATS_REQUEST, STATS_REQUESTED, READING_STATS, STATS_RECEIVED
+};
+
+
+class ControlConnection: public BaseConnection<ControlState> {
 public:
-	enum class State {
-		READING_HANDSHAKE, HANDSHAKE_READ, SENDING_HELLO,
-		IDLE,
-		SENDING_REORG, REORGANIZING,
-		READING_MOVE_RESULT, MOVE_RESULT_READ, SENDING_MOVE_CONFIRM,
-		READING_REMOVE_REQUEST, REMOVE_REQUEST_READ, SENDING_REMOVE_CONFIRM,
-		REORG_FINISHED,
-		SENDING_STATS_REQUEST, STATS_REQUESTED, READING_STATS, STATS_RECEIVED
-	};
 	static const uint32_t MAGIC_NUMBER = 0x42345678;
 
 	//
@@ -302,8 +319,6 @@ public:
 
 	static const uint8_t RESP_REORG_REMOVE_REQUEST = 54;
 
-	State get_state() const;
-
 	void confirm_handshake( std::shared_ptr<Node> node );
 	void send_reorg( const ReorgDescription &desc );
 	void confirm_move();
@@ -328,7 +343,6 @@ protected:
 	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
-	State state;
 	std::unique_ptr<NodeHandshake> handshake;
 	std::unique_ptr<ReorgMoveResult> move_result;
 	std::unique_ptr<TypedNodeCacheKey> remove_request;
@@ -341,17 +355,17 @@ private:
 //
 ////////////////////////////////////////////////////
 
-class DeliveryConnection: public BaseConnection {
-public:
-	enum class State {
-		IDLE,
-		READING_DELIVERY_REQUEST, DELIVERY_REQUEST_READ,
-		READING_CACHE_REQUEST, CACHE_REQUEST_READ,
-		READING_MOVE_REQUEST, MOVE_REQUEST_READ,
-		AWAITING_MOVE_CONFIRM, MOVE_DONE,
-		SENDING, SENDING_MOVE, SENDING_CACHE_ENTRY, SENDING_ERROR
-	};
+enum class DeliveryState {
+	IDLE,
+	READING_DELIVERY_REQUEST, DELIVERY_REQUEST_READ,
+	READING_CACHE_REQUEST, CACHE_REQUEST_READ,
+	READING_MOVE_REQUEST, MOVE_REQUEST_READ,
+	AWAITING_MOVE_CONFIRM, MOVE_DONE,
+	SENDING, SENDING_MOVE, SENDING_CACHE_ENTRY, SENDING_ERROR
+};
 
+class DeliveryConnection: public BaseConnection<DeliveryState> {
+public:
 	static const uint32_t MAGIC_NUMBER = 0x52345678;
 
 	//
@@ -397,8 +411,6 @@ public:
 	DeliveryConnection(std::unique_ptr<UnixSocket> socket);
 	virtual ~DeliveryConnection();
 
-	State get_state() const;
-
 	const TypedNodeCacheKey& get_key() const;
 
 	uint64_t get_delivery_id() const;
@@ -423,8 +435,6 @@ protected:
 private:
 template<typename T>
 std::unique_ptr<NBWriter> get_data_writer( std::shared_ptr<const T> item );
-
-	State state;
 	uint64_t delivery_id;
 	TypedNodeCacheKey cache_key;
 };

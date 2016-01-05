@@ -203,7 +203,7 @@ void TestIdxServer::force_stat_update() {
 			std::this_thread::sleep_for( std::chrono::milliseconds(500) );
 
 		for ( auto &kv : control_connections ) {
-			all_idle &= kv.second->get_state() == ControlConnection::State::IDLE;
+			all_idle &= kv.second->get_state() == ControlState::IDLE;
 		}
 	} while (!all_idle);
 
@@ -218,7 +218,7 @@ void TestIdxServer::force_stat_update() {
 			std::this_thread::sleep_for( std::chrono::milliseconds(500) );
 
 		for ( auto &kv : control_connections ) {
-			all_idle &= kv.second->get_state() == ControlConnection::State::IDLE;
+			all_idle &= kv.second->get_state() == ControlState::IDLE;
 		}
 	} while (!all_idle);
 }

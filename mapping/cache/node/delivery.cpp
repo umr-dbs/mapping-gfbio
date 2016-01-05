@@ -194,7 +194,7 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 			if ( dc->is_faulty() || dc->is_reading() )
 				continue;
 			switch ( dc->get_state() ) {
-				case DeliveryConnection::State::DELIVERY_REQUEST_READ: {
+				case DeliveryState::DELIVERY_REQUEST_READ: {
 					uint64_t id = dc->get_delivery_id();
 					try {
 						auto &res = get_delivery(id);
@@ -206,13 +206,13 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 					}
 					break;
 				}
-				case DeliveryConnection::State::CACHE_REQUEST_READ:
+				case DeliveryState::CACHE_REQUEST_READ:
 					handle_cache_request(*dc);
 					break;
-				case DeliveryConnection::State::MOVE_REQUEST_READ:
+				case DeliveryState::MOVE_REQUEST_READ:
 					handle_move_request(*dc);
 					break;
-				case DeliveryConnection::State::MOVE_DONE:
+				case DeliveryState::MOVE_DONE:
 					handle_move_done(*dc);
 					break;
 				default:

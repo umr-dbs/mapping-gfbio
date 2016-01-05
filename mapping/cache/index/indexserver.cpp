@@ -125,11 +125,11 @@ void IndexServer::run() {
 			oldest_stats = std::min(oldest_stats, node.last_stat_update);
 			ControlConnection &cc = *control_connections.at(node.control_connection);
 			// Fetch stats
-			if (cc.get_state() == ControlConnection::State::IDLE && (now - node.last_stat_update) > 10) {
+			if (cc.get_state() == ControlState::IDLE && (now - node.last_stat_update) > 10) {
 				cc.send_get_stats();
 			}
 			// Remeber if all connections are idle -> Allows reorg
-			all_idle &= (cc.get_state() == ControlConnection::State::IDLE);
+			all_idle &= (cc.get_state() == ControlState::IDLE);
 		}
 
 		// Reorganize
@@ -208,7 +208,7 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	while (clit != client_connections.end()) {
 		ClientConnection &cc = *clit->second;
 		if (cc.is_faulty()) {
-			if ( cc.get_state() != ClientConnection::State::IDLE ) {
+			if ( cc.get_state() != ClientState::IDLE ) {
 				Log::info("Client connection cancelled: %ld", cc.id);
 				query_manager.handle_client_abort(cc.id);
 			}
@@ -277,13 +277,13 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 	for (auto &e : control_connections) {
 		ControlConnection &cc = *e.second;
 		// Check if node is waiting for a confirmation
-		if ( cc.get_state() == ControlConnection::State::MOVE_RESULT_READ ) {
+		if ( cc.get_state() == ControlState::MOVE_RESULT_READ ) {
 			auto res = cc.get_move_result();
 			IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
 			if ( !query_manager.is_locked(res.type, old) )
 				cc.confirm_move();
 		}
-		else if ( cc.get_state() == ControlConnection::State::REMOVE_REQUEST_READ ) {
+		else if ( cc.get_state() == ControlState::REMOVE_REQUEST_READ ) {
 			auto &node_key = cc.get_remove_request();
 			IndexCacheKey key(cc.node->id, node_key.semantic_id, node_key.entry_id );
 			if ( !query_manager.is_locked( node_key.type, key ) )
@@ -301,7 +301,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 				continue;
 
 			switch (cc.get_state()) {
-				case ControlConnection::State::HANDSHAKE_READ: {
+				case ControlState::HANDSHAKE_READ: {
 					auto &hs = cc.get_handshake();
 					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, cc.hostname, hs.port, hs);
 					node->control_connection = cc.id;
@@ -311,7 +311,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					cc.confirm_handshake(node);
 					break;
 				}
-				case ControlConnection::State::MOVE_RESULT_READ: {
+				case ControlState::MOVE_RESULT_READ: {
 					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
 					auto res = cc.get_move_result();
 					handle_reorg_result(res);
@@ -320,7 +320,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 						cc.confirm_move();
 					break;
 				}
-				case ControlConnection::State::REMOVE_REQUEST_READ: {
+				case ControlState::REMOVE_REQUEST_READ: {
 					Log::trace("Node %d requested removal of entry: %s", cc.node->id, cc.get_remove_request().to_string().c_str() );
 					auto &node_key = cc.get_remove_request();
 					IndexCacheKey key(cc.node->id, node_key.semantic_id, node_key.entry_id );
@@ -328,11 +328,11 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 						cc.confirm_remove();
 					break;
 				}
-				case ControlConnection::State::REORG_FINISHED:
+				case ControlState::REORG_FINISHED:
 					Log::debug("Node %d finished reorganization.", cc.node->id);
 					cc.release();
 					break;
-				case ControlConnection::State::STATS_RECEIVED: {
+				case ControlState::STATS_RECEIVED: {
 					auto &stats = cc.get_stats();
 					Log::debug("Node %d delivered fresh statistics: %s", cc.node->id, stats.to_string().c_str());
 					cc.node->capacity = stats;
@@ -370,7 +370,7 @@ void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) 
 				continue;
 			// Handle state-changes
 			switch (cc.get_state()) {
-				case ClientConnection::State::AWAIT_RESPONSE:
+				case ClientState::AWAIT_RESPONSE:
 					Log::info("Client-request read: %s", cc.get_request().to_string().c_str() );
 
 					query_manager.add_request(cc.id, cc.get_request());
@@ -398,7 +398,7 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				continue;
 			// Handle state-changes
 			switch (wc.get_state()) {
-				case WorkerConnection::State::ERROR: {
+				case WorkerState::ERROR: {
 					Log::warn("Worker returned error: %s. Forwarding to client.",
 						wc.get_error_message().c_str());
 					query_manager.close_worker(wc.id);
@@ -413,13 +413,13 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 					wc.release();
 					break;
 				}
-				case WorkerConnection::State::DONE: {
+				case WorkerState::DONE: {
 					Log::debug("Worker returned result. Determinig delivery qty.");
 					size_t qty = query_manager.close_worker(wc.id);
 					wc.send_delivery_qty(qty);
 					break;
 				}
-				case WorkerConnection::State::DELIVERY_READY: {
+				case WorkerState::DELIVERY_READY: {
 					Log::debug("Worker returned delivery: %s", wc.get_result().to_string().c_str());
 					auto clients = query_manager.release_worker(wc.id);
 					for (auto &cid : clients) {
@@ -432,14 +432,14 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 					wc.release();
 					break;
 				}
-				case WorkerConnection::State::NEW_ENTRY: {
+				case WorkerState::NEW_ENTRY: {
 					Log::debug("Worker added new raster-entry");
 					caches.get_cache( wc.get_new_entry().type )
 						.put(IndexCacheEntry(wc.node->id, wc.get_new_entry()));
 					wc.entry_cached();
 					break;
 				}
-				case WorkerConnection::State::QUERY_REQUESTED: {
+				case WorkerState::QUERY_REQUESTED: {
 					Log::debug("Worker issued cache-query: %s", wc.get_query().to_string().c_str());
 					query_manager.process_worker_query(wc);
 					break;

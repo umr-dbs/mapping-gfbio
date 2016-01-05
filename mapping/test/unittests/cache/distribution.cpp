@@ -61,11 +61,7 @@ TEST(DistributionTest,TestRedistibution) {
 
 	NodeCacheKey key1(sem_id, 2);
 
-	try {
-		cm.get_instance_mgr(0).get_raster_cache().get_ref(key1);
-	} catch (NoSuchElementException &nse) {
-		FAIL();
-	}
+	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(key1));
 
 	ReorgDescription rod;
 	ReorgMoveItem ri(CacheType::RASTER, sem_id, 2, 1, "localhost", 12347);
@@ -76,18 +72,10 @@ TEST(DistributionTest,TestRedistibution) {
 	std::this_thread::sleep_for(std::chrono::milliseconds(2500));
 
 	// Assert moved
-	try {
-		cm.get_instance_mgr(0).get_raster_cache().get_ref(key1);
-		FAIL();
-	} catch (NoSuchElementException &nse) {
-	}
+	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(key1), NoSuchElementException);
 
 	NodeCacheKey key_new(sem_id, 1);
-	try {
-		cm.get_instance_mgr(1).get_raster_cache().get_ref(key_new);
-	} catch (NoSuchElementException &nse) {
-		FAIL();
-	}
+	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get_ref(key_new));
 
 	ns2.stop();
 	ns1.stop();
@@ -200,27 +188,11 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	// Reorg should be finished at this point
 
 	// Assert moved
-	try {
-		NodeCacheKey k(op->getSemanticId(),2);
-		cm.get_instance_mgr(0).get_raster_cache().get_ref(k);
-		Log::debug("FAILED on get 2");
-		FAIL();
-	} catch (NoSuchElementException &nse) {
-	}
+	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),1)),
+			NoSuchElementException );
 
-	try {
-		NodeCacheKey k(op->getSemanticId(),1);
-		cm.get_instance_mgr(0).get_raster_cache().get_ref(k);
-	} catch (NoSuchElementException &nse) {
-		FAIL();
-	}
-
-	try {
-		NodeCacheKey k(op->getSemanticId(),1);
-		cm.get_instance_mgr(1).get_raster_cache().get_ref(k);
-	} catch (NoSuchElementException &nse) {
-		FAIL();
-	}
+	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),2)));
+	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),1)));
 
 	ns2.stop();
 	ns1.stop();

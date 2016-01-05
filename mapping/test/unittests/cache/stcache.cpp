@@ -40,13 +40,13 @@ TEST(STCacheTest,SimpleTest) {
 		QueryProfiler qp;
 		CacheQueryResult<uint64_t> qres = cache.query(sem_id,qr);
 		printf("%s", qres.to_string().c_str());
-		ASSERT_TRUE( qres.has_remainder() );
+		EXPECT_TRUE( qres.has_remainder() );
 		auto res = GenericRaster::create(dd,qr,width,height);
 		CacheEntry meta( CacheCube(*res), 10, 1.0 );
 		cache.put(sem_id, res, meta);
 		qres = cache.query(sem_id,qr);
-		ASSERT_TRUE( qres.has_hit() );
-		ASSERT_FALSE( qres.has_remainder() );
+		EXPECT_TRUE( qres.has_hit() );
+		EXPECT_FALSE( qres.has_remainder() );
 	}
 }
 
@@ -84,20 +84,20 @@ TEST(STCacheTest,TestQuery) {
 	);
 	CacheQueryResult<uint64_t> qr = cache.query(sem_id, qrect);
 
-	ASSERT_TRUE( qr.has_remainder() );
+	EXPECT_TRUE( qr.has_remainder() );
 
 
 	auto &rem = qr.remainder.at(0);
 	printf("Remainder:\n%s\n", rem.to_string().c_str());
 
-	ASSERT_EQ( rem, Cube3( 1,2,1,2,0,100) );
+	EXPECT_EQ( Cube3( 1,2,1,2,0,100), rem );
 
 	auto r4 = createRaster(1,2,1,2);
 	cache.put(sem_id,r4, CacheEntry( CacheCube(*r4), 10, 1.0) );
 
 	qr = cache.query( sem_id, qrect );
-	ASSERT_FALSE(qr.has_remainder());
-	ASSERT_EQ( 4, qr.keys.size() );
+	EXPECT_FALSE(qr.has_remainder());
+	EXPECT_EQ( 4, qr.keys.size() );
 
 
 }

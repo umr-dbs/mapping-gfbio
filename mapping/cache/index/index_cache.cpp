@@ -40,7 +40,7 @@ IndexCacheEntry::IndexCacheEntry(uint32_t node_id, const NodeCacheRef &ref) :
 //////////////////////////////////////////////////////////////////
 
 IndexCache::IndexCache(const std::string &reorg_strategy) :
-	reorg_strategy(std::move(ReorgStrategy::by_name(*this,reorg_strategy))) {
+	reorg_strategy(ReorgStrategy::by_name(*this,reorg_strategy)) {
 }
 
 
@@ -113,6 +113,21 @@ void IndexCache::remove_all_by_node(uint32_t node_id) {
 	}
 	entries_by_node.erase(node_id);
 }
+
+std::vector<std::shared_ptr<const IndexCacheEntry> > IndexCache::get_all() const {
+	std::vector<std::shared_ptr<const IndexCacheEntry>> result;
+	size_t size = 0;
+	for ( auto &p : entries_by_node )
+		size += p.second.size();
+
+	result.reserve(size);
+	for ( auto &p : entries_by_node )
+		result.insert(result.end(), p.second.begin(), p.second.end());
+
+	return result;
+}
+
+
 
 CacheStructure<std::pair<uint32_t,uint64_t>,IndexCacheEntry>* IndexCache::get_structure(const std::string& semantic_id, bool create) const {
 	Log::trace("Retrieving cache-structure for semantic_id: %s", semantic_id.c_str() );

@@ -20,7 +20,6 @@
 // on imbalance
 
 class Node;
-class NodePos;
 
 //
 // Describes the reorganization-tasks for a specific node
@@ -28,7 +27,65 @@ class NodePos;
 class NodeReorgDescription : public ReorgDescription {
 public:
 	NodeReorgDescription( std::shared_ptr<Node> node );
+	NodeReorgDescription( const NodeReorgDescription & ) = delete;
+	NodeReorgDescription( NodeReorgDescription && ) = default;
+	NodeReorgDescription& operator=( const NodeReorgDescription & ) = delete;
+	NodeReorgDescription& operator=( NodeReorgDescription && ) = default;
+
 	const std::shared_ptr<Node> node;
+};
+
+
+class ReorgNode {
+	friend class ReorgStrategy;
+public:
+	static bool order_by_remaining_capacity_desc( const ReorgNode *n1, const ReorgNode *n2 );
+
+	ReorgNode( uint32_t id, size_t target_size );
+	ReorgNode( const ReorgNode & ) = delete;
+	ReorgNode( ReorgNode && ) = default;
+	ReorgNode& operator=( const ReorgNode & ) = delete;
+	ReorgNode& operator=( ReorgNode && ) = default;
+
+	void add( const std::shared_ptr<const IndexCacheEntry> &e );
+	bool fits( const std::shared_ptr<const IndexCacheEntry> &e ) const;
+	const std::vector<std::shared_ptr<const IndexCacheEntry>>& get_entries() const;
+	ssize_t remaining_capacity() const;
+	size_t get_current_size() const;
+
+	const uint32_t id;
+	const size_t target_size;
+private:
+	size_t size;
+	std::vector<std::shared_ptr<const IndexCacheEntry>> entries;
+};
+
+
+/**
+ * Defines an ordering on cache-entries, so
+ * that after sorting them, the least relevant entries
+ * are at the end of the sorted structure
+ */
+class RelevanceFunction {
+public:
+	static std::unique_ptr<RelevanceFunction> by_name( const std::string &name );
+	virtual ~RelevanceFunction() = default;
+	virtual void new_turn() {};
+	virtual bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 ) const = 0;
+};
+
+class LRU : public RelevanceFunction {
+public:
+	bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 ) const;
+};
+
+class CostLRU : public RelevanceFunction {
+public:
+	CostLRU();
+	void new_turn();
+	bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 ) const;
+private:
+	time_t now;
 };
 
 //
@@ -38,31 +95,21 @@ public:
 //
 class ReorgStrategy {
 public:
-	static std::unique_ptr<ReorgStrategy> by_name( const IndexCache &cache, const std::string &name);
-	virtual ~ReorgStrategy();
-	virtual bool requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
-	virtual void reorganize(std::map<uint32_t,NodeReorgDescription> &result ) const = 0 ;
-	virtual uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
+	static std::unique_ptr<ReorgStrategy> by_name( const IndexCache &cache, const std::string &name, const std::string &relevance = "LRU");
 
-	static bool entry_less(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
-	static bool entry_greater(const std::shared_ptr<IndexCacheEntry> &a, const std::shared_ptr<IndexCacheEntry> &b);
-	static double get_score( const IndexCacheEntry &entry );
+	ReorgStrategy( const IndexCache &cache, double max_usage, std::unique_ptr<RelevanceFunction> relevance_function);
+	virtual ~ReorgStrategy();
+
+	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	virtual uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
+	void reorganize( std::map<uint32_t,NodeReorgDescription> &result );
 protected:
-	ReorgStrategy(const IndexCache &cache, double target_usage);
-	double get_target_usage( const std::map<uint32_t,NodeReorgDescription> &result ) const;
+	uint32_t get_least_used_node( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	virtual void distribute( std::map<uint32_t, ReorgNode> &result, std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries ) = 0;
+private:
 	const IndexCache &cache;
 	const double max_target_usage;
-};
-
-//
-// This strategy never triggers reorganization
-//
-class NeverReorgStrategy : public ReorgStrategy {
-public:
-	NeverReorgStrategy(const IndexCache &cache);
-	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
-	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	const std::unique_ptr<RelevanceFunction> relevance_function;
 };
 
 //
@@ -72,32 +119,13 @@ public:
 //
 class CapacityReorgStrategy : public ReorgStrategy {
 public:
-	CapacityReorgStrategy(const IndexCache &cache, double target_usage);
-	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	static bool node_sort( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 );
+	CapacityReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);
 	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-};
-
-
-//
-// This strategy calculates the center of mass of over all entries
-// and clusters nearby entries at a single node
-//
-class GeographicReorgStrategy : public ReorgStrategy {
-	friend class NodePos;
-public:
-	GeographicReorgStrategy(const IndexCache &cache, double target_usage);
-	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
-	// It must be ensured that at least on node is present in the given map
-	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+protected:
+	void distribute( std::map<uint32_t, ReorgNode> &result, std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries );
 private:
-	std::map<uint32_t,NodePos> calculate_node_pos(const std::map<uint32_t,NodeReorgDescription> &result) const;
-	uint32_t get_closest_node( const QueryCube &cube ) const;
-
-	mutable std::map<uint32_t,NodePos> n_pos;
-	static GDAL::CRSTransformer geosmsg_trans;
-	static GDAL::CRSTransformer webmercator_trans;
+	void distribute_overflow( std::vector<std::shared_ptr<const IndexCacheEntry>> &entries, std::vector<ReorgNode*> underflow_nodes );
 };
 
 
@@ -109,57 +137,55 @@ class GraphReorgStrategy : public ReorgStrategy {
 private:
 	class GNode {
 	public:
-		typedef CacheStructure<std::pair<uint32_t,uint64_t>,IndexCacheEntry> Struct;
-
-		GNode( const std::string &semantic_id, const Struct *structure );
-
+		GNode( const std::string &semantic_id );
 		void append( std::shared_ptr<GNode> n );
-
+		void add( std::shared_ptr<const IndexCacheEntry> &entry );
 		void mark();
-
 		bool is_marked();
-
 		const std::string semantic_id;
-		const Struct *structure;
+		std::vector<std::shared_ptr<const IndexCacheEntry>> entries;
 		std::vector<std::shared_ptr<GNode>> children;
 	private:
 		bool _mark;
 	};
-
-	class TempNode {
-	public:
-		TempNode( uint32_t id, uint64_t max_size );
-
-		bool fits( const std::shared_ptr<GraphReorgStrategy::GNode> &gn, double target_usage ) const;
-		void add( const std::shared_ptr<GraphReorgStrategy::GNode> &gn );
-		std::shared_ptr<GraphReorgStrategy::GNode> remove_first();
-		double get_usage() const;
-		double get_usage_with(const std::shared_ptr<GraphReorgStrategy::GNode>& gn) const;
-		double get_usage_without(const std::shared_ptr<GraphReorgStrategy::GNode>& gn) const;
-
-		bool operator<( const TempNode &other ) const;
-
-		uint32_t id;
-		uint64_t max_size;
-		uint64_t size;
-		std::deque<std::shared_ptr<GraphReorgStrategy::GNode>> entries;
-
-	};
 public:
 	static void append( std::shared_ptr<GNode> node, std::vector<std::shared_ptr<GNode>> &roots );
-
-	GraphReorgStrategy(const IndexCache &cache, double target_usage);
-	bool requires_reorg( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
-	void reorganize( std::map<uint32_t,NodeReorgDescription> &result ) const;
+	GraphReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);
 	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+protected:
+	void distribute( std::map<uint32_t, ReorgNode> &result, std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries );
 private:
-	std::vector<std::shared_ptr<GNode>> build_graph() const;
-	std::vector<std::shared_ptr<GNode>> build_order( const std::vector<std::shared_ptr<GNode>> &roots ) const;
-	void shift_in( const std::shared_ptr<GNode> &node, std::vector<TempNode> &nodes ) const;
+	std::vector<std::shared_ptr<GNode>> build_graph( std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries );
+	static std::shared_ptr<GNode>& get_node( const std::string &sem_id, std::map<std::string,std::shared_ptr<GNode>> &nodes );
+	std::vector<std::shared_ptr<GNode>> build_order( const std::vector<std::shared_ptr<GNode>> &roots );
 	uint32_t find_node_for_graph( const GenericOperator &op ) const;
 	mutable std::map<std::string,uint32_t> assignments;
 };
 
+//
+// This strategy calculates the center of mass of over all entries
+// and clusters nearby entries at a single node
+//
+class GeographicReorgStrategy : public ReorgStrategy {
+public:
+	static uint32_t get_z_value( const QueryCube &c );
+	static bool z_comp( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 );
 
+	GeographicReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);
+	// It must be ensured that at least on node is present in the given map
+	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+protected:
+	void distribute( std::map<uint32_t, ReorgNode> &result, std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries );
+private:
+	static const uint32_t MAX_Z;
+	static const uint32_t MASKS[];
+	static const uint32_t SHIFTS[];
+	static const uint16_t SCALE_X;
+	static const uint16_t SCALE_Y;
+	static const GDAL::CRSTransformer TRANS_GEOSMSG;
+	static const GDAL::CRSTransformer TRANS_WEBMERCATOR;
+
+	std::vector<std::pair<uint32_t,uint32_t>> z_bounds;
+};
 
 #endif /* REORG_STRATEGY_H_ */

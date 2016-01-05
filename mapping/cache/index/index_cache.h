@@ -20,9 +20,9 @@
 #include <memory>
 #include <mutex>
 
-class ReorgStrategy;
 class Node;
 class NodeReorgDescription;
+class ReorgStrategy;
 
 //
 // Key for index entries
@@ -52,7 +52,6 @@ public:
 // One instance used per data-type.
 //
 class IndexCache {
-	friend class GraphReorgStrategy;
 public:
 	// Constructs a new instance with the given reorg-strategy
 	IndexCache( const std::string &reorg_strategy );
@@ -82,6 +81,8 @@ public:
 
 	// Removes all entries for the given node
 	void remove_all_by_node( uint32_t node_id );
+
+	std::vector<std::shared_ptr<const IndexCacheEntry>> get_all() const;
 
 	// Tells if a global reorganization is required
 	bool requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> > &nodes ) const;

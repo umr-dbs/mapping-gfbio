@@ -50,16 +50,14 @@ TEST(ReorgTest,CapacityReorg) {
 		res.emplace(kv.first, NodeReorgDescription(kv.second));
 	}
 
-	ASSERT_TRUE(cache.requires_reorg(nodes));
 	cache.reorganize(res);
+	EXPECT_EQ(2,res.at(2).node->id);
+	EXPECT_EQ(1,res.at(2).get_moves().size());
+	EXPECT_EQ(1,res.at(2).get_moves().at(0).entry_id);
+	EXPECT_TRUE(res.at(2).get_removals().empty());
 
-	ASSERT_TRUE(res.at(2).node->id == 2);
-	ASSERT_TRUE(res.at(2).get_moves().size() == 1);
-	ASSERT_TRUE(res.at(2).get_moves().at(0).entry_id == 1);
-	ASSERT_TRUE(res.at(2).get_removals().empty());
-
-	ASSERT_TRUE(res.at(1).node->id == 1);
-	ASSERT_TRUE(res.at(1).is_empty());
+	EXPECT_EQ(1, res.at(1).node->id);
+	EXPECT_TRUE(res.at(1).is_empty());
 }
 
 
@@ -101,18 +99,17 @@ TEST(ReorgTest,GeographicReorg) {
 		res.emplace(kv.first, NodeReorgDescription(kv.second));
 	}
 
-	ASSERT_TRUE(cache.requires_reorg(nodes));
 	cache.reorganize(res);
 
-	ASSERT_TRUE(res.at(2).node->id == 2);
+	EXPECT_EQ(2,res.at(2).node->id);
 	Log::error("Moves/Removes: %d/%d", res.at(1).get_moves().size(), res.at(1).get_removals().size());
 	Log::error("Moves/Removes: %d/%d", res.at(2).get_moves().size(), res.at(2).get_removals().size());
-	ASSERT_TRUE(res.at(2).get_moves().size() == 1);
-	ASSERT_TRUE(res.at(2).get_moves().at(0).entry_id == 1);
-	ASSERT_TRUE(res.at(2).get_removals().empty());
+	EXPECT_EQ(1,res.at(2).get_moves().size());
+	EXPECT_EQ(2,res.at(2).get_moves().at(0).entry_id);
+	EXPECT_TRUE(res.at(2).get_removals().empty());
 
-	ASSERT_TRUE(res.at(1).node->id == 1);
-	ASSERT_TRUE(res.at(1).is_empty());
+	EXPECT_EQ(1,res.at(1).node->id);
+	EXPECT_TRUE(res.at(1).is_empty());
 }
 
 IndexCacheEntry createGraphEntry( uint32_t node_id, uint64_t entry_id, const std::string &workflow, size_t size) {
@@ -144,7 +141,7 @@ TEST(ReorgTest,GraphReorg) {
 	auto e5 = createGraphEntry(1, 5, "OP1 {SRC}", 3 );
 	auto e6 = createGraphEntry(1, 6, "OP1 {SRC}", 3 );
 	auto e7 = createGraphEntry(1, 7, "OP1 {SRC}", 3 );
-	auto e8 = createGraphEntry(1, 5, "OP2 {SRC}", 2 );
+	auto e8 = createGraphEntry(1, 8, "OP2 {SRC}", 2 );
 
 	n1->capacity = Capacity(40, 29,0,0,0,0,0,0,0,0);
 
@@ -159,14 +156,14 @@ TEST(ReorgTest,GraphReorg) {
 
 	cache.reorganize(res);
 
-	ASSERT_TRUE(res.at(2).get_moves().size() == 4);
-	ASSERT_TRUE(res.at(2).get_moves().at(0).entry_id == 4);
-	ASSERT_TRUE(res.at(2).get_moves().at(1).entry_id == 5);
-	ASSERT_TRUE(res.at(2).get_moves().at(2).entry_id == 6);
-	ASSERT_TRUE(res.at(2).get_moves().at(3).entry_id == 7);
-	ASSERT_TRUE(res.at(2).get_removals().size() == 0);
+	EXPECT_EQ(4,res.at(2).get_moves().size());
+	EXPECT_EQ(1,res.at(2).get_moves().at(0).entry_id);
+	EXPECT_EQ(2,res.at(2).get_moves().at(1).entry_id);
+	EXPECT_EQ(3,res.at(2).get_moves().at(2).entry_id);
+	EXPECT_EQ(8,res.at(2).get_moves().at(3).entry_id);
+	EXPECT_EQ(0,res.at(2).get_removals().size());
 
-	ASSERT_TRUE(res.at(1).get_moves().size() == 0);
-	ASSERT_TRUE(res.at(1).get_removals().size() == 0);
+	EXPECT_TRUE(res.at(1).get_moves().empty());
+	EXPECT_TRUE(res.at(1).get_removals().empty());
 
 }

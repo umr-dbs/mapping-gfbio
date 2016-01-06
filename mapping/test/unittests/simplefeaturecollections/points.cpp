@@ -592,7 +592,7 @@ TEST(PointCollection, StreamSerialization){
 	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
 	EXPECT_EQ(0, status);
 
-	UnixSocket stream(fds[0], fds[1]);
+	BinaryFDStream stream(fds[0], fds[1]);
 
 	points.toStream(stream);
 

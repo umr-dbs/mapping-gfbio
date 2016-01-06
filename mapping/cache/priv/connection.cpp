@@ -15,7 +15,7 @@
 #include <fcntl.h>
 
 template<typename StateType>
-BaseConnection<StateType>::BaseConnection(StateType state, std::unique_ptr<UnixSocket> socket) :
+BaseConnection<StateType>::BaseConnection(StateType state, std::unique_ptr<BinaryFDStream> socket) :
 	id(next_id++), state(state), writing(false), reading(false), faulty(false), stream(*socket), socket(std::move(socket)) {
 	int flags = fcntl(get_read_fd(), F_GETFL, 0);
 	fcntl(get_read_fd(), F_SETFL, flags | O_NONBLOCK);
@@ -172,7 +172,7 @@ uint64_t BaseConnection<StateType>::next_id = 1;
 //
 /////////////////////////////////////////////////
 
-ClientConnection::ClientConnection(std::unique_ptr<UnixSocket> socket) :
+ClientConnection::ClientConnection(std::unique_ptr<BinaryFDStream> socket) :
 	BaseConnection(ClientState::IDLE, std::move(socket)) {
 }
 
@@ -248,7 +248,7 @@ const uint8_t ClientConnection::RESP_ERROR;
 //
 /////////////////////////////////////////////////
 
-WorkerConnection::WorkerConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node) :
+WorkerConnection::WorkerConnection(std::unique_ptr<BinaryFDStream> socket, const std::shared_ptr<Node> &node) :
 	BaseConnection(WorkerState::IDLE, std::move(socket)), node(node) {
 }
 
@@ -435,7 +435,7 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 //
 /////////////////////////////////////////////////
 
-ControlConnection::ControlConnection(std::unique_ptr<UnixSocket> socket, const std::string &hostname) :
+ControlConnection::ControlConnection(std::unique_ptr<BinaryFDStream> socket, const std::string &hostname) :
 	BaseConnection(ControlState::READING_HANDSHAKE, std::move(socket)), hostname(hostname) {
 	begin_read( make_unique<NBNodeHandshakeReader>() );
 }
@@ -607,7 +607,7 @@ const uint8_t ControlConnection::RESP_STATS;
 //
 /////////////////////////////////////////////////
 
-DeliveryConnection::DeliveryConnection(std::unique_ptr<UnixSocket> socket) :
+DeliveryConnection::DeliveryConnection(std::unique_ptr<BinaryFDStream> socket) :
 	BaseConnection(DeliveryState::IDLE, std::move(socket)), delivery_id(0), cache_key(CacheType::UNKNOWN,"", 0) {
 }
 

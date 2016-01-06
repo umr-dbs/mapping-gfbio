@@ -151,7 +151,7 @@ static std::string read_file_as_string(const std::string &filename) {
 
 
 void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
-	UnixSocket socket(sock_fd, sock_fd);
+	BinaryFDStream socket(sock_fd, sock_fd);
 	BinaryStream &stream = socket;
 
 	int magic;

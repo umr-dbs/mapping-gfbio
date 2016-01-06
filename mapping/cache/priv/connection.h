@@ -24,7 +24,7 @@ class Node;
 template<typename StateType>
 class BaseConnection {
 public:
-	BaseConnection(StateType state, std::unique_ptr<UnixSocket> socket);
+	BaseConnection(StateType state, std::unique_ptr<BinaryFDStream> socket);
 	virtual ~BaseConnection();
 	// Called if data is available on the unerlying socket and this connection is not in writing mode
 	void input();
@@ -73,7 +73,7 @@ private:
 	BinaryStream &stream;
 	std::unique_ptr<NBWriter> writer;
 	std::unique_ptr<NBReader> reader;
-	std::unique_ptr<UnixSocket> socket;
+	std::unique_ptr<BinaryFDStream> socket;
 	static uint64_t next_id;
 };
 
@@ -105,7 +105,7 @@ public:
 	// message:string -- a description of the error
 	static const uint8_t RESP_ERROR = 19;
 
-	ClientConnection(std::unique_ptr<UnixSocket> socket);
+	ClientConnection(std::unique_ptr<BinaryFDStream> socket);
 	virtual ~ClientConnection();
 
 	// Sends the given response and resets the state to IDLE
@@ -218,7 +218,7 @@ public:
 	// message:string -- a description of the error
 	static const uint8_t RESP_ERROR = 39;
 
-	WorkerConnection(std::unique_ptr<UnixSocket> socket, const std::shared_ptr<Node> &node);
+	WorkerConnection(std::unique_ptr<BinaryFDStream> socket, const std::shared_ptr<Node> &node);
 	virtual ~WorkerConnection();
 
 	void process_request(uint8_t command, const BaseRequest &request);
@@ -333,7 +333,7 @@ public:
 	const NodeStats& get_stats() const;
 
 
-	ControlConnection(std::unique_ptr<UnixSocket> socket, const std::string &hostname);
+	ControlConnection(std::unique_ptr<BinaryFDStream> socket, const std::string &hostname);
 	virtual ~ControlConnection();
 	std::shared_ptr<Node> node;
 	const std::string hostname;
@@ -408,7 +408,7 @@ public:
 	//
 	static const uint8_t RESP_ERROR = 80;
 
-	DeliveryConnection(std::unique_ptr<UnixSocket> socket);
+	DeliveryConnection(std::unique_ptr<BinaryFDStream> socket);
 	virtual ~DeliveryConnection();
 
 	const TypedNodeCacheKey& get_key() const;

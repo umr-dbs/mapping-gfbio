@@ -285,7 +285,7 @@ template<typename T>
 std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_id, const CacheRef& ref, QueryProfiler &qp) {
 	TypedNodeCacheKey key(cache.type,semantic_id,ref.entry_id);
 	Log::debug("Fetching cache-entry from: %s:%d, key: %d", ref.host.c_str(), ref.port, ref.entry_id );
-	UnixSocket sock(ref.host.c_str(), ref.port,true);
+	BinaryFDStream sock(ref.host.c_str(), ref.port,true);
 	BinaryStream &stream = sock;
 
 	buffered_write(sock,DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET_CACHED_ITEM,key);

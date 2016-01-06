@@ -21,6 +21,7 @@
 #include <errno.h>
 #include <string.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include <arpa/inet.h>
 #include <sys/wait.h>
@@ -74,27 +75,32 @@ int getListeningSocket(int port, int backlog = 10) {
 }
 
 
-
 class Connection {
 	public:
 		Connection(int fd);
 		int input();
+		void writeNB();
+		bool hasWriteBuffer() { return writebuffer != nullptr; }
 		int fd;
 		int id;
 	private:
-		std::unique_ptr<BinaryStream> stream;
+		std::unique_ptr<BinaryFDStream> stream;
 		std::shared_ptr<LocalRasterDBBackend> backend;
+		std::unique_ptr<BinaryWriteBuffer> writebuffer;
 };
 
 static int connection_id = 1;
 Connection::Connection(int fd) : fd(fd) {
 	id = connection_id++;
-	stream.reset( new UnixSocket(fd,fd) );
+	stream.reset( new BinaryFDStream(fd,fd) );
 	printf("%d: connected\n", id);
 	backend = make_unique<LocalRasterDBBackend>();
 }
 
 int Connection::input() {
+	if (writebuffer != nullptr)
+		return 0;
+
 	uint8_t OK = 48;
 
 	uint8_t c;
@@ -109,6 +115,8 @@ int Connection::input() {
 	if (backend == nullptr && c >= RemoteRasterDBBackend::FIRST_SOURCE_SPECIFIC_COMMAND)
 		return -1;
 
+	writebuffer = make_unique<BinaryWriteBuffer>();
+
 	switch (c) {
 		case RemoteRasterDBBackend::COMMAND_EXIT: {
 			return -1;
@@ -116,17 +124,19 @@ int Connection::input() {
 		}
 		case RemoteRasterDBBackend::COMMAND_ENUMERATESOURCES: {
 			std::vector<std::string> sourcenames = backend->enumerateSources();
+
 			size_t size = sourcenames.size();
-			stream->write(size);
+			writebuffer->write(size);
 			for (const auto &name : sourcenames)
-				stream->write(name);
+				writebuffer->write(name);
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_READANYJSON: {
 			std::string name;
 			stream->read(&name);
+
 			auto json = backend->readJSON(name);
-			stream->write(json);
+			writebuffer->write(json);
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_OPEN: {
@@ -134,13 +144,14 @@ int Connection::input() {
 				throw NetworkException("Cannot call open() twice!");
 			std::string path;
 			stream->read(&path);
+
 			backend->open(path, false);
-			stream->write(OK);
+			writebuffer->write(OK);
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_READJSON: {
 			auto json = backend->readJSON();
-			stream->write(json);
+			writebuffer->write(json);
 			break;
 		}
 		//case RemoteRasterDBBackend::COMMAND_CREATERASTER:
@@ -151,16 +162,17 @@ int Connection::input() {
 			double t1, t2;
 			stream->read(&t1);
 			stream->read(&t2);
+
 			try {
 				auto res = backend->getClosestRaster(channelid, t1, t2);
 				printf("%d: found closest raster with id %ld, time %f->%f\n", id, res.rasterid, res.time_start, res.time_end);
-				stream->write(res);
+				writebuffer->write(res);
 			}
 			catch (const SourceException &e) {
 				RasterDBBackend::RasterDescription r(-1, 0, 0);
-				stream->write(r);
+				writebuffer->write(r);
 				std::string error(e.what());
-				stream->write(error);
+				writebuffer->write(error);
 			}
 			break;
 		}
@@ -169,17 +181,18 @@ int Connection::input() {
 			stream->read(&rasterid);
 			AttributeMaps attributes;
 			backend->readAttributes(rasterid, attributes);
+
 			std::string empty("");
 			for (auto pair : attributes.textual()) {
-				stream->write(pair.first);
-				stream->write(pair.second);
+				writebuffer->write(pair.first);
+				writebuffer->write(pair.second);
 			}
-			stream->write(empty);
+			writebuffer->write(empty);
 			for (auto pair : attributes.numeric()) {
-				stream->write(pair.first);
-				stream->write(pair.second);
+				writebuffer->write(pair.first);
+				writebuffer->write(pair.second);
 			}
-			stream->write(empty);
+			writebuffer->write(empty);
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_GETBESTZOOM: {
@@ -187,8 +200,9 @@ int Connection::input() {
 			stream->read(&rasterid);
 			int desiredzoom;
 			stream->read(&desiredzoom);
+
 			int bestzoom = backend->getBestZoom(rasterid, desiredzoom);
-			stream->write(bestzoom);
+			writebuffer->write(bestzoom);
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_ENUMERATETILES: {
@@ -202,29 +216,51 @@ int Connection::input() {
 			stream->read(&x2);
 			stream->read(&y2);
 			stream->read(&zoom);
+
 			auto res = backend->enumerateTiles(channelid, rasterid, x1, y1, x2, y2, zoom);
 			size_t size = res.size();
 			printf("%d: (%d,%d) -> (%d,%d), channel %d, raster %ld at zoom %d yielded %lu tiles\n", id, x1, y1, x2, y2, channelid, rasterid, zoom, size);
-			stream->write(size);
+			writebuffer->write(size);
 			for (auto &td : res)
-				stream->write(td);
+				writebuffer->write(td);
 			break;
 		}
 		//case RemoteRasterDBBackend::COMMAND_HASTILE:
 		case RemoteRasterDBBackend::COMMAND_READTILE: {
 			RasterDBBackend::TileDescription tile(*stream);
 			printf("%d: returning tile, offset %lu, size %lu\n", id, tile.offset, tile.size);
-			auto buffer = backend->readTile(tile);
-			stream->write(buffer->size);
-			stream->write((const char *) buffer->data, buffer->size);
+
+			// To avoid copying the bytebuffer with the tiledata, we're linking the data in the writebuffer.
+			// To do this, our bytebuffer's lifetime must be managed by the writebuffer.
+			// Unfortunately, we have to replace our freshly allocated writebuffer with a different one right here.
+			BinaryWriteBufferWithObject<ByteBuffer> *response = new BinaryWriteBufferWithObject<ByteBuffer>();
+			writebuffer.reset(response);
+			response->object = backend->readTile(tile);
+			response->write(response->object->size);
+			response->enableLinking();
+			response->write((const char *) response->object->data, response->object->size);
+			response->disableLinking();
 			printf("%d: data sent\n", id);
 			break;
 		}
 		default:
 			return -1;
 	}
-	stream->flush();
+	writebuffer->prepareForWriting();
+	printf("%d: response of %d bytes\n", id, (int) writebuffer->getSize());
+	if (writebuffer->getSize() == 0)
+		writebuffer.reset(nullptr);
 	return 0;
+}
+
+void Connection::writeNB() {
+	if (!hasWriteBuffer())
+		return;
+	stream->writeNB(*writebuffer);
+	if (writebuffer->isFinished()) {
+		printf("%d: response sent\n", id);
+		writebuffer.reset(nullptr);
+	}
 }
 
 
@@ -242,25 +278,34 @@ int main(void) {
     while (true) {
         struct timeval tv{60,0};
         fd_set readfds;
+        fd_set writefds;
         int maxfd = 0;
 
         FD_ZERO(&readfds);
         for (auto &c : connections) {
         	int fd = c.fd;
-        	maxfd = std::max(fd, maxfd);
-        	FD_SET(fd, &readfds);
+    		maxfd = std::max(fd, maxfd);
+        	if (c.hasWriteBuffer()) {
+				FD_SET(fd, &writefds);
+        	}
+        	else {
+				FD_SET(fd, &readfds);
+        	}
         }
 
     	maxfd = std::max(listensocket, maxfd);
     	FD_SET(listensocket, &readfds);
 
-        select(maxfd+1, &readfds, nullptr, nullptr, &tv);
+        select(maxfd+1, &readfds, &writefds, nullptr, &tv);
 
         auto it = connections.begin();
         while (it != connections.end()) {
         	auto &c = *it;
     		bool needs_closing = false;
-        	if (FD_ISSET(c.fd, &readfds)) {
+    		if (c.hasWriteBuffer() && FD_ISSET(c.fd, &writefds)) {
+    			c.writeNB();
+    		}
+    		else if (FD_ISSET(c.fd, &readfds)) {
         		try {
         			if (c.input() < 0)
         				needs_closing = true;
@@ -289,6 +334,8 @@ int main(void) {
 				continue;
 			}
 
+			int one = 1;
+			setsockopt(new_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 			connections.push_back( Connection(new_fd) );
         }
     }

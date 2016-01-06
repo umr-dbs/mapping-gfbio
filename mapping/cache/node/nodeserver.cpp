@@ -39,7 +39,7 @@ void NodeServer::worker_loop() {
 	while (workers_up && !shutdown) {
 		try {
 			// Setup index connection
-			UnixSocket sock(index_host.c_str(), index_port,true);
+			BinaryFDStream sock(index_host.c_str(), index_port,true);
 			BinaryStream &stream = sock;
 			buffered_write(sock,WorkerConnection::MAGIC_NUMBER,my_id);
 			manager->set_index_connection(&sock);
@@ -350,7 +350,7 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 	try {
 		uint8_t del_resp;
 
-		UnixSocket us(item.from_host.c_str(), item.from_port, true);
+		BinaryFDStream us(item.from_host.c_str(), item.from_port, true);
 		BinaryStream &del_stream = us;
 
 		buffered_write(us,DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
@@ -426,7 +426,7 @@ void NodeServer::setup_control_connection() {
 	Log::info("Connecting to index-server: %s:%d", index_host.c_str(), index_port);
 
 	// Establish connection
-	this->control_connection.reset(new UnixSocket(index_host.c_str(), index_port,true));
+	this->control_connection.reset(new BinaryFDStream(index_host.c_str(), index_port,true));
 	BinaryStream &stream = *this->control_connection;
 	NodeHandshake hs = manager->create_handshake();
 

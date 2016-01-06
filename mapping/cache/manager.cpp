@@ -105,7 +105,7 @@ template<typename T, CacheType CType>
 std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
 		const GenericOperator& op, const QueryRectangle& rect) {
 
-	UnixSocket idx_con(idx_host.c_str(), idx_port, true);
+	BinaryFDStream idx_con(idx_host.c_str(), idx_port, true);
 	BinaryStream &idx_stream = idx_con;
 
 	BaseRequest req(type,op.getSemanticId(),rect);
@@ -117,7 +117,7 @@ std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
 		case ClientConnection::RESP_OK: {
 			DeliveryResponse dr(idx_con);
 			Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
-			UnixSocket del_sock(dr.host.c_str(),dr.port,true);
+			BinaryFDStream del_sock(dr.host.c_str(),dr.port,true);
 			BinaryStream &del_stream = del_sock;
 
 			buffered_write( del_sock, DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET, dr.delivery_id);

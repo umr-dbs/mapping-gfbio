@@ -13,9 +13,6 @@ class HTTPService {
 	public:
 		// class Params
 		class Params : public std::map<std::string, std::string> {
-			private:
-				Params() {};
-				friend class HTTPService;
 			public:
 				bool hasParam(const std::string& key) const {
 					return find(key) != end();

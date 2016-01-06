@@ -114,14 +114,25 @@ ReorgStrategy::~ReorgStrategy() {
 }
 
 bool ReorgStrategy::requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>>& nodes) const {
-	double maxru(0);
-	double minru(1);
+	double maxu = 0;
+	double sum = 0;
+	double sqsum = 0;
+
 
 	for (auto &e : nodes) {
-		maxru = std::max(maxru, cache.get_capacity_usage(e.second->capacity));
-		minru = std::min(minru, cache.get_capacity_usage(e.second->capacity));
+		double u = cache.get_capacity_usage(e.second->capacity);
+		sum += u;
+		sqsum += u*u;
+		maxu = std::max(maxu, u);
 	}
-	return  maxru - minru > 0.15 || maxru >= 1.0;
+
+	double stddev = 0;
+	if ( nodes.size() > 1 )
+		stddev = std::sqrt( std::max( 0.0,
+				// Incremental calculation of std-dev
+				(sqsum - (sum*sum) / nodes.size()) / (nodes.size()) ));
+
+	return  maxu >= 1.0 || stddev > 0.1;
 }
 
 

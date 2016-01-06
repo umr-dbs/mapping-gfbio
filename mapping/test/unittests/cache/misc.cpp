@@ -55,3 +55,34 @@ TEST(CubeTest, TestCube3) {
 	ASSERT_EQ( res.at(5), Cube3(1,9,1,9,9,10));
 }
 
+//TEST(Misc,StdDev) {
+//	std::vector<double> vals = {0.75,1.0,1.25};
+//
+//	double sum = 0;
+//	double sqsum = 0;
+//
+//	for (auto &v : vals) {
+//		sum += v;
+//		sqsum += v*v;
+//	}
+//
+//	double avg = sum / vals.size();
+//
+//	double stddev1 = 0;
+//	if ( vals.size() > 1 )
+//	stddev1 = std::sqrt( std::max(0.0,
+//			// Incremental calculation of std-dev
+//			(sqsum - (sum*sum) / vals.size()) / (vals.size()) ));
+//
+//	// Orig way to do it
+//	double stddev2 = 0;
+//	for ( auto &v : vals ) {
+//		stddev2 += (v-avg)*(v-avg);
+//	}
+//	stddev2 = std::sqrt(stddev2/vals.size());
+//
+//	printf("STDDEV: %f\n", stddev1);
+//
+//	EXPECT_DOUBLE_EQ(1,avg);
+//	EXPECT_DOUBLE_EQ(stddev2,stddev1);
+//}

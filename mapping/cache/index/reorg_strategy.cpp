@@ -416,6 +416,31 @@ std::vector<std::shared_ptr<GraphReorgStrategy::GNode>> GraphReorgStrategy::buil
 	for ( auto &p : nodes )
 		GraphReorgStrategy::append(p.second,roots);
 
+	// Keep old ordering;
+	std::map<std::string, std::shared_ptr<GNode>> root_map;
+	for ( auto &r : roots )
+		root_map.emplace( r->semantic_id, r );
+
+	roots.clear();
+
+	// Add all nodes still present from old order
+	for ( auto &s : last_root_order ) {
+		auto it = root_map.find(s);
+		if ( it != root_map.end() ) {
+			roots.push_back(it->second);
+			root_map.erase(it);
+		}
+	}
+
+	// Add remaining nodes
+	for ( auto &p : root_map )
+		roots.push_back(p.second);
+
+	// Store order
+	last_root_order.clear();
+	for ( auto & r : roots )
+		last_root_order.push_back(r->semantic_id);
+
 	return roots;
 }
 

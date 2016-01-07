@@ -159,7 +159,8 @@ private:
 	static std::shared_ptr<GNode>& get_node( const std::string &sem_id, std::map<std::string,std::shared_ptr<GNode>> &nodes );
 	std::vector<std::shared_ptr<GNode>> build_order( const std::vector<std::shared_ptr<GNode>> &roots );
 	uint32_t find_node_for_graph( const GenericOperator &op ) const;
-	mutable std::map<std::string,uint32_t> assignments;
+	std::map<std::string,uint32_t> assignments;
+	std::vector<std::string> last_root_order;
 };
 
 //

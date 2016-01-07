@@ -44,13 +44,12 @@ IndexCache::IndexCache(const std::string &reorg_strategy) :
 }
 
 
-void IndexCache::put( const IndexCacheEntry& entry) {
-	auto cache = get_structure(entry.semantic_id,true);
+void IndexCache::put( const std::shared_ptr<IndexCacheEntry>& entry) {
+	auto cache = get_structure(entry->semantic_id,true);
 	//FIXME: This sucks -- extra copy
-	std::shared_ptr<IndexCacheEntry> e( new IndexCacheEntry(entry) );
-	std::pair<uint32_t,uint64_t> id(entry.node_id,entry.entry_id);
-	cache->put(id, e);
-	get_node_entries(entry.node_id).push_back(e);
+	std::pair<uint32_t,uint64_t> id(entry->node_id,entry->entry_id);
+	cache->put(id, entry);
+	get_node_entries(entry->node_id).insert(entry);
 }
 
 std::shared_ptr<const IndexCacheEntry> IndexCache::get(const IndexCacheKey& key) const {
@@ -78,7 +77,7 @@ void IndexCache::remove(const IndexCacheKey& key) {
 		try {
 			std::pair<uint32_t,uint64_t> id(key.node_id,key.entry_id);
 			auto entry = cache->remove(id);
-			remove_from_node(key);
+			remove_from_node(entry);
 		} catch ( const NoSuchElementException &nse ) {
 			Log::warn("Removal of index-entry failed: %s", nse.what());
 		}
@@ -92,7 +91,7 @@ void IndexCache::move(const IndexCacheKey& old_key, const IndexCacheKey& new_key
 	if (cache != nullptr) {
 		std::pair<uint32_t,uint64_t> id(old_key.node_id,old_key.entry_id);
 		auto entry = cache->remove(id);
-		remove_from_node(old_key);
+		remove_from_node(entry);
 
 		id.first = new_key.node_id;
 		id.second = new_key.entry_id;
@@ -100,7 +99,7 @@ void IndexCache::move(const IndexCacheKey& old_key, const IndexCacheKey& new_key
 		entry->entry_id = new_key.entry_id;
 
 		cache->put(id,entry);
-		get_node_entries(new_key.node_id).push_back(entry);
+		get_node_entries(new_key.node_id).insert(entry);
 	}
 	else
 		throw NoSuchElementException("Entry not found");
@@ -145,12 +144,11 @@ CacheStructure<std::pair<uint32_t,uint64_t>,IndexCacheEntry>* IndexCache::get_st
 	return cache;
 }
 
-std::vector<std::shared_ptr<IndexCacheEntry>>& IndexCache::get_node_entries(uint32_t node_id) const {
+std::set<std::shared_ptr<const IndexCacheEntry>>& IndexCache::get_node_entries(uint32_t node_id) const {
 	try {
 		return entries_by_node.at(node_id);
 	} catch ( const std::out_of_range &oor ) {
-		entries_by_node.emplace( node_id, std::vector<std::shared_ptr<IndexCacheEntry>>() );
-		return entries_by_node.at(node_id);
+		return entries_by_node.emplace( node_id, std::set<std::shared_ptr<const IndexCacheEntry>>() ).first->second;
 	}
 }
 
@@ -160,18 +158,9 @@ double IndexCache::get_capacity_usage(const Capacity& capacity) const {
 	return 1;
 }
 
-void IndexCache::remove_from_node(const IndexCacheKey& key) {
-	auto &entries = get_node_entries(key.node_id);
-	auto iter = entries.begin();
-	while ( iter != entries.end() ) {
-		if ( (*iter)->semantic_id == key.semantic_id &&
-			 (*iter)->entry_id == key.entry_id ) {
-			iter = entries.erase(iter);
-			return;
-		}
-		iter++;
-	}
-	throw NoSuchElementException("Entry not found in node-list.");
+void IndexCache::remove_from_node(const std::shared_ptr<IndexCacheEntry> &e ) {
+	if ( get_node_entries(e->node_id).erase(e) != 1 )
+		throw NoSuchElementException("Entry not found in node-list.");
 }
 
 
@@ -331,7 +320,7 @@ void IndexCaches::remove_all_by_node(uint32_t node_id) {
 
 void IndexCaches::process_handshake(uint32_t node_id, const NodeHandshake& hs) {
 	for (auto &e : hs.get_entries())
-		get_cache(e.type).put( IndexCacheEntry(node_id,e) );
+		get_cache(e.type).put( std::shared_ptr<IndexCacheEntry>( new IndexCacheEntry(node_id,e) ) );
 }
 
 void IndexCaches::update_stats(uint32_t node_id, const NodeStats& stats) {

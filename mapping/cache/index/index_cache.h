@@ -15,6 +15,7 @@
 #include "cache/common.h"
 #include <utility>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <vector>
 #include <memory>
@@ -62,7 +63,7 @@ public:
 	IndexCache( IndexCache&& ) = delete;
 
 	// Adds an entry for the given semantic_id to the cache.
-	void put( const IndexCacheEntry &entry );
+	void put( const std::shared_ptr<IndexCacheEntry> &entry );
 
 	// Retrieves the entry with the given key.
 	std::shared_ptr<const IndexCacheEntry> get( const IndexCacheKey &key ) const;
@@ -76,19 +77,17 @@ public:
 	// Adds an entry for the given semantic_id to the cache.
 	void move( const IndexCacheKey &old_key, const IndexCacheKey &new_key );
 
-	// Gets all entries for the given node
-	std::vector<std::shared_ptr<IndexCacheEntry>> &get_node_entries(uint32_t node_id) const;
-
 	// Removes all entries for the given node
 	void remove_all_by_node( uint32_t node_id );
 
+	// Retrieves all elements currently stored
 	std::vector<std::shared_ptr<const IndexCacheEntry>> get_all() const;
-
-	// Tells if a global reorganization is required
-	bool requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> > &nodes ) const;
 
 	// Updates statistics of the entries
 	void update_stats( uint32_t node_id, const CacheStats &stats );
+
+	// Tells if a global reorganization is required
+	bool requires_reorg( const std::map<uint32_t, std::shared_ptr<Node> > &nodes ) const;
 
 	// Calculates an appropriate reorganization
 	void reorganize(std::map<uint32_t, NodeReorgDescription>& result );
@@ -111,11 +110,14 @@ private:
 	// Retrieves the cache-structure for the given semantic_id.
 	Struct* get_structure( const std::string &semantic_id, bool create = false) const;
 
+	// Gets all entries for the given node
+	std::set<std::shared_ptr<const IndexCacheEntry>> &get_node_entries(uint32_t node_id) const;
+
 	// Removes an entry from the corresponding node-list
-	void remove_from_node( const IndexCacheKey &key );
+	void remove_from_node( const std::shared_ptr<IndexCacheEntry> &e );
 
 	// Holds a reference to all entries clustered by node
-	mutable std::map<uint32_t, std::vector<std::shared_ptr<IndexCacheEntry>>> entries_by_node;
+	mutable std::map<uint32_t, std::set<std::shared_ptr<const IndexCacheEntry>>> entries_by_node;
 
 	// Holds all cache-structures accessable by the semantic_id
 	mutable std::unordered_map<std::string,Struct*> caches;

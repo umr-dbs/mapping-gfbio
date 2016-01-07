@@ -434,8 +434,8 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				}
 				case WorkerState::NEW_ENTRY: {
 					Log::debug("Worker added new raster-entry");
-					caches.get_cache( wc.get_new_entry().type )
-						.put(IndexCacheEntry(wc.node->id, wc.get_new_entry()));
+					std::shared_ptr<IndexCacheEntry> entry( new IndexCacheEntry(wc.node->id, wc.get_new_entry()) );
+					caches.get_cache( wc.get_new_entry().type ).put(entry);
 					wc.entry_cached();
 					break;
 				}

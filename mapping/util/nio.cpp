@@ -839,6 +839,9 @@ NBReorgMoveResultReader::NBReorgMoveResultReader() {
 NBCapacityReader::NBCapacityReader() : NBFixedSizeReader(10*sizeof(uint64_t)){
 }
 
+NBQueryStatsReader::NBQueryStatsReader() : NBFixedSizeReader( 7 * sizeof(uint32_t) ) {
+}
+
 NBNodeEntryStatsReader::NBNodeEntryStatsReader()
 	: NBFixedSizeReader(sizeof(uint64_t) + sizeof(time_t) + sizeof(uint32_t) ){
 }
@@ -852,6 +855,7 @@ NBCacheStatsReader::NBCacheStatsReader() {
 
 NBNodeStatsReader::NBNodeStatsReader() {
 	add_reader( make_unique<NBCapacityReader>() );
+	add_reader( make_unique<NBQueryStatsReader>() );
 	add_reader( make_unique<NBContainerReader>(
 					make_unique<NBCacheStatsReader>()
 			  ) );

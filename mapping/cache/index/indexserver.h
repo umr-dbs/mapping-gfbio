@@ -43,12 +43,22 @@ public:
 	const std::string host;
 	// The port for delivery connections on this node
 	const uint32_t port;
-	// The stats
-	Capacity capacity;
 	// The timestamp of the last stats update
 	time_t last_stat_update;
 	// The id of the control-connection
 	uint64_t control_connection;
+
+	void update_stats( const NodeStats &stats );
+	const Capacity& get_capacity() const;
+	const QueryStats& get_query_stats() const;
+	void reset_query_stats();
+
+	std::string to_string() const;
+
+private:
+	// The stats
+	Capacity capacity;
+	QueryStats query_stats;
 };
 
 //
@@ -105,6 +115,9 @@ private:
 
 	// Adjusts the cache according to the given reorg
 	void handle_reorg_result( const ReorgMoveResult &res );
+
+	// statistics for the index an all nodes;
+	std::string stats_string() const;
 
 	// The port the index-server is listening on
 	int port;

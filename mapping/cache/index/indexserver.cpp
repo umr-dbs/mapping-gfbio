@@ -10,7 +10,6 @@
 #include "util/make_unique.h"
 #include "util/concat.h"
 
-#include <unordered_map>
 #include <memory>
 
 #include <stdlib.h>
@@ -32,8 +31,33 @@
 ////////////////////////////////////////////////////////////
 
 Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &cap) :
-	id(id), host(host), port(port), capacity(cap), last_stat_update(time(nullptr)), control_connection(
-		-1) {
+	id(id), host(host), port(port), last_stat_update(time(nullptr)), control_connection(0), capacity(cap) {
+}
+
+void Node::update_stats(const NodeStats& stats) {
+	capacity = stats;
+	query_stats += stats.query_stats;
+}
+
+const Capacity& Node::get_capacity() const {
+	return capacity;
+}
+
+const QueryStats& Node::get_query_stats() const {
+	return query_stats;
+}
+
+void Node::reset_query_stats() {
+	query_stats.reset();
+}
+
+std::string Node::to_string() const {
+	std::ostringstream ss;
+	ss << "Node " << id << "[" << std::endl;
+	ss << "  " << capacity.to_string() << std::endl;
+	ss << "  " << query_stats.to_string() << std::endl;
+	ss << "]";
+	return ss.str();
 }
 
 ////////////////////////////////////////////////////////////
@@ -130,6 +154,11 @@ void IndexServer::run() {
 			}
 			// Remeber if all connections are idle -> Allows reorg
 			all_idle &= (cc.get_state() == ControlState::IDLE);
+		}
+
+		// Trace stats
+		if ( all_idle && now -oldest_stats >= 10 ) {
+			fprintf(stderr, "%s\n", stats_string().c_str() );
 		}
 
 		// Reorganize
@@ -335,7 +364,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 				case ControlState::STATS_RECEIVED: {
 					auto &stats = cc.get_stats();
 					Log::debug("Node %d delivered fresh statistics: %s", cc.node->id, stats.to_string().c_str());
-					cc.node->capacity = stats;
+					cc.node->update_stats(stats);
 					time(&cc.node->last_stat_update);
 					caches.update_stats(cc.node->id, stats);
 					cc.release();
@@ -451,4 +480,14 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 			}
 		}
 	}
+}
+
+std::string IndexServer::stats_string() const {
+	std::ostringstream out;
+	out << "============ STATISTICS ============" << std::endl;
+	out << query_manager.get_stats().to_string() << std::endl;
+	for ( auto &p : nodes )
+		out << p.second->to_string() << std::endl;
+	out << "====================================" << std::endl;
+	return out.str();
 }

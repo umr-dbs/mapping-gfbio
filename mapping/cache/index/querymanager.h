@@ -19,6 +19,25 @@
 #include <vector>
 #include <set>
 
+class IndexQueryStats {
+public:
+	IndexQueryStats();
+
+	void reset();
+
+	std::string to_string() const;
+
+	uint32_t single_hits;
+	uint32_t multi_hits_single_node;
+	uint32_t multi_hits_multi_node;
+	uint32_t partial_single_node;
+	uint32_t partial_multi_node;
+	uint32_t misses;
+	uint32_t queries_issued;
+	uint32_t queries_scheduled;
+};
+
+
 class CacheLocks {
 public:
 	class Lock : public IndexCacheKey {
@@ -187,10 +206,13 @@ public:
 
 	void handle_client_abort( uint64_t client_id );
 
-	bool is_locked( CacheType type, const IndexCacheKey &key );
+	bool is_locked( CacheType type, const IndexCacheKey &key ) const;
+
+	const IndexQueryStats& get_stats() const;
+	void reset_stats();
 
 private:
-	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req, const IndexCache &cache, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res);
+	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req, const IndexCache &cache, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res );
 
 	std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query );
 
@@ -199,6 +221,7 @@ private:
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> queries;
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> finished_queries;
 	std::vector<std::unique_ptr<PendingQuery>> pending_jobs;
+	IndexQueryStats stats;
 };
 
 #endif /* QUERYMANAGER_H_ */

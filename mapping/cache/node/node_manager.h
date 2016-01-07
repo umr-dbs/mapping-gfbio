@@ -28,6 +28,7 @@ class NodeCacheManager;
 
 template<typename T>
 class NodeCacheWrapper : public CacheWrapper<T> {
+	friend class NodeCacheManager;
 public:
 	NodeCacheWrapper( const NodeCacheManager &mgr, NodeCache<T> &cache, const CachingStrategy &strategy );
 	virtual ~NodeCacheWrapper() = default;
@@ -64,6 +65,7 @@ private:
 	NodeCache<T> &cache;
 	const CachingStrategy &strategy;
 	RWLock local_lock;
+	QueryStats stats;
 };
 
 class RasterCacheWrapper : public NodeCacheWrapper<GenericRaster> {
@@ -141,6 +143,10 @@ public:
 	NodeHandshake create_handshake() const;
 	NodeStats get_stats() const;
 
+	const QueryStats& get_query_stats() const;
+
+	void reset_query_stats();
+
 	NodeCacheWrapper<GenericRaster>& get_raster_cache();
 	NodeCacheWrapper<PointCollection>& get_point_cache();
 	NodeCacheWrapper<LineCollection>& get_line_cache();
@@ -153,17 +159,19 @@ private:
 	NodeCache<PolygonCollection> polygon_cache;
 	NodeCache<GenericPlot> plot_cache;
 
-	RasterCacheWrapper raster_wrapper;
-	PointCollectionCacheWrapper point_wrapper;
-	LineCollectionCacheWrapper line_wrapper;
-	PolygonCollectionCacheWrapper polygon_wrapper;
-	PlotCacheWrapper plot_wrapper;
+	mutable RasterCacheWrapper raster_wrapper;
+	mutable PointCollectionCacheWrapper point_wrapper;
+	mutable LineCollectionCacheWrapper line_wrapper;
+	mutable PolygonCollectionCacheWrapper polygon_wrapper;
+	mutable PlotCacheWrapper plot_wrapper;
 
 	// Holds the actual caching-strategy to use
 	std::unique_ptr<CachingStrategy> strategy;
 
 	std::string my_host;
 	uint32_t my_port;
+
+	mutable QueryStats cumulated_stats;
 };
 
 #endif /* CACHE_NODE_MANAGER_H_ */

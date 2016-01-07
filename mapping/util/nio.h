@@ -458,6 +458,11 @@ public:
 	NBCapacityReader();
 };
 
+class NBQueryStatsReader : public NBFixedSizeReader {
+public:
+	NBQueryStatsReader();
+};
+
 class NBNodeEntryStatsReader : public NBFixedSizeReader {
 public:
 	NBNodeEntryStatsReader();

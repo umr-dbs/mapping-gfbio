@@ -160,11 +160,11 @@ const std::unordered_map<std::string, std::vector<NodeEntryStats> >& CacheStats:
 	return stats;
 }
 
-NodeStats::NodeStats(const Capacity &capacity, std::vector<CacheStats> stats) :
-	Capacity(capacity), stats(stats) {
+NodeStats::NodeStats(const Capacity &capacity, const QueryStats &query_stats, std::vector<CacheStats> stats) :
+	Capacity(capacity), query_stats(query_stats), stats(stats) {
 }
 
-NodeStats::NodeStats(BinaryStream& stream) : Capacity(stream) {
+NodeStats::NodeStats(BinaryStream& stream) : Capacity(stream), query_stats(stream) {
 	uint64_t ssize;
 	stream.read(&ssize);
 	stats.reserve(ssize);
@@ -174,9 +174,79 @@ NodeStats::NodeStats(BinaryStream& stream) : Capacity(stream) {
 
 void NodeStats::toStream(BinaryStream& stream) const {
 	Capacity::toStream(stream);
+	query_stats.toStream(stream);
 	stream.write(static_cast<uint64_t>(stats.size()));
 	for ( auto &e : stats ) {
 		e.toStream(stream);
 	}
 }
 
+QueryStats::QueryStats() : single_local_hits(0), multi_local_hits(0), multi_local_partials(0),
+	single_remote_hits(0), multi_remote_hits(0), multi_remote_partials(0), misses(0) {
+}
+
+QueryStats::QueryStats(BinaryStream& stream) :
+	single_local_hits(stream.read<uint32_t>()),
+	multi_local_hits(stream.read<uint32_t>()),
+	multi_local_partials(stream.read<uint32_t>()),
+	single_remote_hits(stream.read<uint32_t>()),
+	multi_remote_hits(stream.read<uint32_t>()),
+	multi_remote_partials(stream.read<uint32_t>()),
+	misses(stream.read<uint32_t>()){
+}
+
+QueryStats QueryStats::operator +(const QueryStats& stats) const {
+	QueryStats res(*this);
+	res.single_local_hits += stats.single_local_hits;
+	res.multi_local_hits += stats.multi_local_hits;
+	res.multi_local_partials += stats.multi_local_partials;
+	res.single_remote_hits += stats.single_remote_hits;
+	res.multi_remote_hits += stats.multi_remote_hits;
+	res.multi_remote_partials += stats.multi_remote_partials;
+	res.misses += stats.misses;
+	return res;
+}
+
+QueryStats& QueryStats::operator +=(const QueryStats& stats) {
+	single_local_hits += stats.single_local_hits;
+	multi_local_hits += stats.multi_local_hits;
+	multi_local_partials += stats.multi_local_partials;
+	single_remote_hits += stats.single_remote_hits;
+	multi_remote_hits += stats.multi_remote_hits;
+	multi_remote_partials += stats.multi_remote_partials;
+	misses += stats.misses;
+	return *this;
+}
+
+void QueryStats::toStream(BinaryStream& stream) const {
+	stream.write( single_local_hits );
+	stream.write( multi_local_hits );
+	stream.write( multi_local_partials );
+	stream.write( single_remote_hits );
+	stream.write( multi_remote_hits );
+	stream.write( multi_remote_partials );
+	stream.write( misses );
+}
+
+void QueryStats::reset() {
+	single_local_hits = 0;
+	multi_local_hits = 0;
+	multi_local_partials = 0;
+	single_remote_hits = 0;
+	multi_remote_hits = 0;
+	multi_remote_partials = 0;
+	misses = 0;
+}
+
+std::string QueryStats::to_string() const {
+	std::ostringstream ss;
+	ss << "QueryStats:" << std::endl;
+	ss << "  local single hits : " << single_local_hits << std::endl;
+	ss << "  local multi hits  : " << multi_local_hits << std::endl;
+	ss << "  local partials    : " << multi_local_partials << std::endl;
+	ss << "  remote single hits: " << single_remote_hits << std::endl;
+	ss << "  remote multi hits : " << multi_remote_hits << std::endl;
+	ss << "  remote partials   : " << multi_remote_partials << std::endl;
+	ss << "  misses            : " << misses;
+	return ss.str();
+}

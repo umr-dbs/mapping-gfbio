@@ -15,7 +15,7 @@
 
 TEST(ReorgTest,CapacityReorg) {
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 0,0,0,0,0,0,0,0,0)));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 20,0,0,0,0,0,0,0,0)));
 	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0,0,0,0,0,0,0,0,0)));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
@@ -39,7 +39,6 @@ TEST(ReorgTest,CapacityReorg) {
 	std::shared_ptr<IndexCacheEntry> e2( new IndexCacheEntry(1, r2) );
 
 	// Increase count
-	n1->capacity.raster_cache_used = 20;
 	e2->access_count = 2;
 
 	cache.put(e1);
@@ -63,7 +62,7 @@ TEST(ReorgTest,CapacityReorg) {
 
 TEST(ReorgTest,GeographicReorg) {
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 0,0,0,0,0,0,0,0,0)));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 20,0,0,0,0,0,0,0,0)));
 	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(40, 0,0,0,0,0,0,0,0,0)));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
@@ -88,7 +87,6 @@ TEST(ReorgTest,GeographicReorg) {
 	std::shared_ptr<IndexCacheEntry> e2( new IndexCacheEntry(1, r2) );
 
 	// Increase count
-	n1->capacity.raster_cache_used = 20;
 	e2->access_count = 2;
 
 	cache.put(e1);
@@ -121,7 +119,7 @@ std::shared_ptr<IndexCacheEntry> createGraphEntry( uint32_t node_id, uint64_t en
 }
 
 TEST(ReorgTest,GraphReorg) {
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 0,0,0,0,0,0,0,0,0)));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 29,0,0,0,0,0,0,0,0)));
 	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(40, 0,0,0,0,0,0,0,0,0)));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
@@ -142,8 +140,6 @@ TEST(ReorgTest,GraphReorg) {
 	auto e6 = createGraphEntry(1, 6, "OP1 {SRC}", 3 );
 	auto e7 = createGraphEntry(1, 7, "OP1 {SRC}", 3 );
 	auto e8 = createGraphEntry(1, 8, "OP2 {SRC}", 2 );
-
-	n1->capacity = Capacity(40, 29,0,0,0,0,0,0,0,0);
 
 	cache.put(e1);
 	cache.put(e2);

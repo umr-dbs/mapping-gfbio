@@ -120,7 +120,7 @@ bool ReorgStrategy::requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>
 
 
 	for (auto &e : nodes) {
-		double u = cache.get_capacity_usage(e.second->capacity);
+		double u = cache.get_capacity_usage(e.second->get_capacity());
 		sum += u;
 		sqsum += u*u;
 		maxu = std::max(maxu, u);
@@ -143,7 +143,7 @@ uint32_t ReorgStrategy::get_least_used_node(
 	double min_usage = DoubleInfinity;
 
 	for ( auto &kv : nodes ) {
-		double usage = cache.get_capacity_usage(kv.second->capacity);
+		double usage = cache.get_capacity_usage(kv.second->get_capacity());
 		if (  usage < min_usage ) {
 			min_id = kv.first;
 			min_usage = usage;
@@ -160,8 +160,8 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 	double bytes_available = 0;
 
 	for ( auto &p : result ) {
-		bytes_used      += cache.get_used_capacity( p.second.node->capacity );
-		bytes_available += cache.get_total_capacity( p.second.node->capacity );
+		bytes_used      += cache.get_used_capacity( p.second.node->get_capacity() );
+		bytes_available += cache.get_total_capacity( p.second.node->get_capacity() );
 	}
 	double target_cap = std::min( bytes_used / bytes_available, max_target_usage );
 	auto all_entries = cache.get_all();
@@ -181,7 +181,7 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 
 	std::map<uint32_t, ReorgNode> distrib;
 	for ( auto &p : result ) {
-		size_t target_size = (target_cap * cache.get_total_capacity( p.second.node->capacity ));
+		size_t target_size = target_cap * cache.get_total_capacity( p.second.node->get_capacity() );
 		distrib.emplace( p.first, ReorgNode(p.first, target_size));
 	}
 

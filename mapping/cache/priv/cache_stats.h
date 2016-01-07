@@ -101,15 +101,40 @@ private:
 };
 
 
+class QueryStats {
+public:
+	QueryStats();
+	QueryStats( BinaryStream &stream );
+
+	QueryStats operator+( const QueryStats& stats ) const;
+	QueryStats& operator+=( const QueryStats& stats );
+
+	void toStream( BinaryStream &stream ) const;
+
+	std::string to_string() const;
+
+	void reset();
+
+	uint32_t single_local_hits;
+	uint32_t multi_local_hits;
+	uint32_t multi_local_partials;
+	uint32_t single_remote_hits;
+	uint32_t multi_remote_hits;
+	uint32_t multi_remote_partials;
+	uint32_t misses;
+};
+
+
 //
 // Holds an incremental list of access stats
 //
 
 class NodeStats : public Capacity {
 public:
-	NodeStats( const Capacity &capacity, std::vector<CacheStats> stats );
+	NodeStats( const Capacity &capacity, const QueryStats &query_stats, std::vector<CacheStats> stats );
 	NodeStats( BinaryStream &stream );
 	void toStream( BinaryStream &stream ) const;
+	QueryStats query_stats;
 	std::vector<CacheStats> stats;
 };
 

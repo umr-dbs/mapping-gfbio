@@ -131,6 +131,9 @@ public:
 	void toStream( BinaryStream &stream ) const;
 	std::string to_string() const;
 
+	size_t get_num_remainders() const;
+	bool has_remainders() const;
+
 	std::vector<QueryRectangle> get_remainder_queries(double pixel_scale_x = 0, double pixel_scale_y = 0, double xref = 0, double yref = 0) const;
 	std::vector<CacheRef> parts;
 private:

@@ -21,6 +21,15 @@
 #include <iostream>
 #include <mutex>
 
+#define TIME_EXEC(name) ((void)0)
+#define TIME_EXEC2(name) ((void)0)
+
+#ifdef ENABLE_TIMING
+#define TIME_EXEC(name) ExecTimer t(name)
+#define TIME_EXEC2(name) ExecTimer t2(name)
+#endif
+
+
 //
 // Provides helper functions for common tasks.
 //

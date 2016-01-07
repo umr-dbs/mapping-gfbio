@@ -277,3 +277,11 @@ void PuzzleRequest::snap_to_pixel_grid( double &v1, double &v2, double ref, doub
 		v1 = ref - std::ceil( (ref-v1) / scale)*scale;
 	v2 = v1 + std::ceil( (v2-v1) / scale)*scale;
 }
+
+size_t PuzzleRequest::get_num_remainders() const {
+	return remainder.size();
+}
+
+bool PuzzleRequest::has_remainders() const {
+	return !remainder.empty();
+}

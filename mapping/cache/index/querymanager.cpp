@@ -82,7 +82,8 @@ QueryManager::QueryManager(IndexCaches &caches, const std::map<uint32_t, std::sh
 }
 
 void QueryManager::add_request(uint64_t client_id, const BaseRequest &req ) {
-	ExecTimer t("QueryManager.add_request");
+	stats.queries_issued++;
+	TIME_EXEC("QueryManager.add_request");
 	// Check if running jobs satisfy the given query
 	for (auto &qi : queries) {
 		if (qi.second->satisfies(req)) {
@@ -126,6 +127,7 @@ void QueryManager::schedule_pending_jobs(
 	while (it != pending_jobs.end()) {
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
+			stats.queries_scheduled++;
 			Log::info("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
 			queries.emplace(con_id, std::move(*it));
 			it = pending_jobs.erase(it);
@@ -213,10 +215,11 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 //
 
 std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, const IndexCache &cache, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res) {
-	ExecTimer t("QueryManager.create_job");
+	TIME_EXEC("QueryManager.create_job");
 
 	// Full single hit
 	if (res.keys.size() == 1 && !res.has_remainder()) {
+		stats.single_hits++;
 		Log::debug("Full HIT. Sending reference.");
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
 		auto ref = cache.get(key);
@@ -230,7 +233,7 @@ std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, 
 	// Puzzle
 	else if (res.has_hit()) {
 		Log::debug("Partial HIT. Sending puzzle-request.");
-		std::vector<uint32_t> node_ids;
+		std::set<uint32_t> node_ids;
 		std::vector<IndexCacheKey> keys;
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
@@ -238,7 +241,7 @@ std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, 
 			auto ref = cache.get(key);
 			auto &node = nodes.at(ref->node_id);
 			keys.push_back(key);
-			node_ids.push_back(ref->node_id);
+			node_ids.insert(ref->node_id);
 			entries.push_back(CacheRef(node->host, node->port, ref->entry_id));
 		}
 		PuzzleRequest pr(
@@ -246,10 +249,27 @@ std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, 
 				req.semantic_id,
 				res.covered,
 				res.remainder, entries);
+
+		// STATS ONLY
+		if ( pr.has_remainders() && node_ids.size() == 1 ) {
+			stats.partial_single_node++;
+		}
+		else if ( pr.has_remainders() ) {
+			stats.partial_multi_node++;
+		}
+		if ( !pr.has_remainders() && node_ids.size() == 1 ) {
+			stats.multi_hits_single_node++;
+		}
+		else if ( pr.has_remainders() ) {
+			stats.multi_hits_multi_node++;
+		}
+		// END STATS ONLY
+
 		return make_unique<PuzzleJob>(std::move(pr), std::move(keys));
 	}
 	// Full miss
 	else {
+		stats.misses++;
 		Log::debug("Full MISS.");
 		return make_unique<CreateJob>(BaseRequest(req), nodes, cache);
 	}
@@ -281,6 +301,14 @@ void QueryManager::handle_client_abort(uint64_t client_id) {
 	}
 }
 
+const IndexQueryStats& QueryManager::get_stats() const {
+	return stats;
+}
+
+void QueryManager::reset_stats() {
+	stats.reset();
+}
+
 std::unique_ptr<PendingQuery> QueryManager::recreate_job(const RunningQuery& query) {
 	auto &req = query.get_request();
 	auto &cache = caches.get_cache(req.type);
@@ -290,7 +318,7 @@ std::unique_ptr<PendingQuery> QueryManager::recreate_job(const RunningQuery& que
 	return job;
 }
 
-bool QueryManager::is_locked( CacheType type, const IndexCacheKey& key) {
+bool QueryManager::is_locked( CacheType type, const IndexCacheKey& key) const {
 	return locks.is_locked(type,key);
 }
 
@@ -529,3 +557,38 @@ const BaseRequest& PuzzleJob::get_request() const {
 	return request;
 }
 
+IndexQueryStats::IndexQueryStats() :
+	single_hits(0),
+	multi_hits_single_node(0),
+	multi_hits_multi_node(0),
+	partial_single_node(0),
+	partial_multi_node(0),
+	misses(0),
+	queries_issued(0),
+	queries_scheduled(0) {
+}
+
+void IndexQueryStats::reset() {
+	single_hits = 0;
+	multi_hits_single_node = 0;
+	multi_hits_multi_node = 0;
+	partial_single_node = 0;
+	partial_multi_node = 0;
+	misses = 0;
+	queries_issued = 0;
+	queries_scheduled = 0;
+}
+
+std::string IndexQueryStats::to_string() const {
+	std::ostringstream ss;
+	ss << "Index-Stats:" << std::endl;
+	ss << "  single hits           : " << single_hits << std::endl;
+	ss << "  puzzle single node    : " << multi_hits_single_node << std::endl;
+	ss << "  puzzle multiple nodes : " << multi_hits_multi_node << std::endl;
+	ss << "  partial single node   : " << partial_single_node << std::endl;
+	ss << "  partial multiple nodes: " << partial_multi_node << std::endl;
+	ss << "  misses                : " << misses << std::endl;
+	ss << "  client queries        : " << queries_issued << std::endl;
+	ss << "  queries scheduled     : " << queries_scheduled;
+	return ss.str();
+}

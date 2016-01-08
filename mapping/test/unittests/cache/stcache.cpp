@@ -39,7 +39,6 @@ TEST(STCacheTest,SimpleTest) {
 		);
 		QueryProfiler qp;
 		CacheQueryResult<uint64_t> qres = cache.query(sem_id,qr);
-		printf("%s", qres.to_string().c_str());
 		EXPECT_TRUE( qres.has_remainder() );
 		auto res = GenericRaster::create(dd,qr,width,height);
 		CacheEntry meta( CacheCube(*res), 10, 1.0 );
@@ -88,7 +87,6 @@ TEST(STCacheTest,TestQuery) {
 
 
 	auto &rem = qr.remainder.at(0);
-	printf("Remainder:\n%s\n", rem.to_string().c_str());
 
 	EXPECT_EQ( Cube3( 1,2,1,2,0,100), rem );
 

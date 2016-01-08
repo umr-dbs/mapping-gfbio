@@ -83,8 +83,6 @@ TEST(DistributionTest,TestRedistibution) {
 
 	for (TP &t : ts)
 		t->join();
-
-	Log::error("DONE");
 }
 
 TEST(DistributionTest,TestRemoteNodeFetch) {
@@ -188,10 +186,10 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	// Reorg should be finished at this point
 
 	// Assert moved
-	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),1)),
+	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),2)),
 			NoSuchElementException );
 
-	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),2)));
+	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),1)));
 	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),1)));
 
 	ns2.stop();

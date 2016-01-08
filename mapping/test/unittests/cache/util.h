@@ -29,9 +29,54 @@
 time_t parseIso8601DateTime(std::string dateTimeString);
 
 void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg = EPSG_WEBMERCATOR, bool allow_infinite = false);
-
-
 typedef std::unique_ptr<std::thread> TP;
+
+
+template<class T>
+class LocalCacheWrapper : public CacheWrapper<T> {
+public:
+	LocalCacheWrapper( NodeCache<T> &cache, std::unique_ptr<Puzzler<T>> puzzler, const CachingStrategy &strategy );
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
+	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
+private:
+	std::unique_ptr<T> process_puzzle(const PuzzleRequest& request);
+	NodeCache<T> &cache;
+	LocalRetriever<T> retriever;
+	PuzzleUtil<T> puzzle_util;
+	const CachingStrategy &strategy;
+};
+
+
+class LocalCacheManager : public CacheManager {
+public:
+	LocalCacheManager( std::unique_ptr<CachingStrategy> strategy,
+			size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
+			size_t polygon_cache_size, size_t plot_cache_size );
+	CacheWrapper<GenericRaster>& get_raster_cache();
+	CacheWrapper<PointCollection>& get_point_cache();
+	CacheWrapper<LineCollection>& get_line_cache();
+	CacheWrapper<PolygonCollection>& get_polygon_cache();
+	CacheWrapper<GenericPlot>& get_plot_cache();
+private:
+	NodeCache<GenericRaster> rc;
+	NodeCache<PointCollection> pc;
+	NodeCache<LineCollection> lc;
+	NodeCache<PolygonCollection> poc;
+	NodeCache<GenericPlot> plc;
+
+	LocalCacheWrapper<GenericRaster> rw;
+	LocalCacheWrapper<PointCollection> pw;
+	LocalCacheWrapper<LineCollection> lw;
+	LocalCacheWrapper<PolygonCollection> pow;
+	LocalCacheWrapper<GenericPlot> plw;
+
+	std::unique_ptr<CachingStrategy> strategy;
+};
+
+
+
+
+
 
 class TestIdxServer : public IndexServer {
 public:

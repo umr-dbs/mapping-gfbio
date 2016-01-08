@@ -23,11 +23,6 @@ TEST(CubeTest, TestCube2_2) {
 	Cube2 query( 0,10,0,10 );
 	auto res = query.dissect_by(Cube2(0,9,0,9));
 
-	printf("Test2 remainder:\n");
-	for ( auto &r : res ) {
-		printf("  %s\n", r.to_string().c_str() );
-	}
-
 	ASSERT_EQ( res.size(), 2 );
 
 	ASSERT_EQ( res.at(0), Cube2(9,10,0,10));
@@ -37,11 +32,6 @@ TEST(CubeTest, TestCube2_2) {
 TEST(CubeTest, TestCube3) {
 	Cube3 query( 0, 10, 0, 10, 0, 10 );
 	auto res = query.dissect_by( Cube3(1,9,1,9,1,9) );
-
-	printf("Test3 remainder:\n");
-		for ( auto &r : res ) {
-			printf("  %s\n", r.to_string().c_str() );
-		}
 
 	ASSERT_EQ( res.size(), 6 );
 

@@ -11,38 +11,23 @@
 #include "util/nio.h"
 
 
-class AttributeArraysHelper {
-public:
-	static void append( AttributeArrays &dest, const AttributeArrays &src );
-private:
-	template <typename T>
-	static void append_arr( AttributeArrays::AttributeArray<T> &dest, const AttributeArrays::AttributeArray<T> &src );
-};
 
-void AttributeArraysHelper::append( AttributeArrays &dest, const AttributeArrays &src ) {
-	for (auto &n : dest._numeric) {
-		append_arr( n.second, src._numeric.at(n.first) );
-	}
-	for (auto &n : dest._textual) {
-		append_arr( n.second, src._textual.at(n.first) );
-	}
-}
 
-template<typename T>
-void AttributeArraysHelper::append_arr(
-		AttributeArrays::AttributeArray<T>& dest,
-		const AttributeArrays::AttributeArray<T>& src) {
-	dest.reserve(dest.array.size() + src.array.size() );
-	dest.array.insert(dest.array.end(), src.array.begin(), src.array.end() );
-}
+
 
 //
 // Node Wrapper
 //
 
 template<typename T>
-NodeCacheWrapper<T>::NodeCacheWrapper( const NodeCacheManager &mgr, NodeCache<T>& cache, const CachingStrategy &strategy) :
-	mgr(mgr), cache(cache), strategy(strategy) {
+NodeCacheWrapper<T>::NodeCacheWrapper( const NodeCacheManager &mgr, NodeCache<T> &cache,
+		std::unique_ptr<RemoteRetriever<T>> retriever,
+		std::unique_ptr<Puzzler<T>> puzzler,
+		const CachingStrategy &strategy ) :
+	mgr(mgr), cache(cache),
+	retriever(std::move(retriever)),
+	puzzle_util( make_unique<PuzzleUtil<T>>(*this->retriever, std::move(puzzler)) ),
+	strategy(strategy) {
 }
 
 template<typename T>
@@ -148,9 +133,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 				refs.push_back( mgr.create_self_ref(id) );
 
 			PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
-			QueryProfiler qp;
-			std::unique_ptr<T> result = process_puzzle(pr,qp);
-			return result;
+			return process_puzzle(pr);
 		}
 	}
 
@@ -169,7 +152,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 			stats.single_remote_hits++;
 			Log::trace("Full single remote HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 			QueryProfiler qp;
-			return fetch_item( op.getSemanticId(), CacheRef(stream), qp );
+			return retriever->load( op.getSemanticId(), CacheRef(stream), qp );
 		}
 		// Full miss on whole cache
 		case WorkerConnection::RESP_QUERY_MISS: {
@@ -196,9 +179,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 			// END STATS ONLY
 
 			Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
-			QueryProfiler qp;
-			auto res = process_puzzle(pr,qp);
-			return res;
+			return process_puzzle(pr);
 			break;
 		}
 		default: {
@@ -208,358 +189,14 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 }
 
 template<typename T>
-std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler) {
+std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request) {
 	TIME_EXEC("CacheManager.puzzle");
-	Log::trace("Processing puzzle-request: %s", request.to_string().c_str());
-
-	std::vector<std::shared_ptr<const T>> items;
-
-	{
-		TIME_EXEC("CacheManager.puzzle.fetch_parts");
-		// Fetch puzzle parts
-		Log::trace("Fetching all puzzle-parts");
-		for (const CacheRef &cr : request.parts) {
-			if ( mgr.is_self_ref(cr) ) {
-				Log::trace("Fetching puzzle-piece from local cache, key: %d", cr.entry_id);
-				items.push_back(get_ref( NodeCacheKey(request.semantic_id, cr.entry_id) ));
-			}
-			else {
-				Log::debug("Fetching puzzle-piece from %s:%d, key: %d", cr.host.c_str(), cr.port, cr.entry_id);
-
-				auto raster = fetch_item( request.semantic_id, cr, profiler );
-				items.push_back( std::shared_ptr<const T>(raster.release()) );
-			}
-		}
-	}
-
-	// Create remainder
-	Log::trace("Creating remainder queries.");
-	auto ref = items.front();
-	auto remainders = compute_remainders(request.semantic_id,*ref,request, profiler);
-
-	for ( auto &r : remainders )
-		items.push_back( std::shared_ptr<T>(r.release()));
-
-	auto result = do_puzzle( enlarge_puzzle(request.query,items), items);
-	put( request.semantic_id, result, request.query, profiler );
-	Log::trace("Finished processing puzzle-request: %s", request.to_string().c_str());
+	QueryProfiler qp;
+	auto result = puzzle_util->process_puzzle(request,qp);
+	put( request.semantic_id, result, request.query, qp );
 	return result;
 }
 
-template<typename T>
-SpatioTemporalReference NodeCacheWrapper<T>::enlarge_puzzle(const QueryRectangle& query,
-	const std::vector<std::shared_ptr<const T> >& items) {
-	TIME_EXEC("CacheManager.puzzle.enlarge");
-
-	// Calculated maximum covered rectangle
-	double values[6] = { DoubleNegInfinity, DoubleInfinity,
-						 DoubleNegInfinity, DoubleInfinity,
-						 DoubleNegInfinity, DoubleInfinity };
-	QueryCube qc(query);
-	for ( auto &item : items ) {
-		Cube3 ic( item->stref.x1, item->stref.x2,
-				  item->stref.y1, item->stref.y2,
-				  item->stref.t1, item->stref.t2 );
-
-		for ( int i = 0; i < 3; i++ ) {
-			auto &cdim = ic.get_dimension(i);
-			auto &qdim = qc.get_dimension(i);
-			int idx_l = 2*i;
-			int idx_r = idx_l + 1;
-
-			// If this item touches the bounds of the query.... extend
-			if ( cdim.a <= qdim.a )
-				values[idx_l] = std::max(values[idx_l],cdim.a);
-
-			if ( cdim.b >= qdim.b )
-				values[idx_r] = std::min(values[idx_r],cdim.b);
-		}
-	}
-
-	// Final check... stupid floating point stuff
-	for ( int i = 0; i < 6; i++ ) {
-		if ( !std::isfinite(values[i]) ) {
-			auto &d = qc.get_dimension(i/2);
-			values[i] = (i%2) == 0 ? d.a : d.b;
-		}
-	}
-
-	return SpatioTemporalReference(
-		SpatialReference( query.epsg, values[0], values[2], values[1], values[3] ),
-		TemporalReference( query.timetype, values[4], values[5] )
-	);
-}
-
-// TODO: Hack for plots
-template<>
-SpatioTemporalReference NodeCacheWrapper<GenericPlot>::enlarge_puzzle(const QueryRectangle& query,
-	const std::vector<std::shared_ptr<const GenericPlot> >& items) {
-	(void) items;
-	return SpatioTemporalReference(query,query);
-}
-
-
-template<typename T>
-std::unique_ptr<T> NodeCacheWrapper<T>::fetch_item(const std::string& semantic_id, const CacheRef& ref, QueryProfiler &qp) {
-	TypedNodeCacheKey key(cache.type,semantic_id,ref.entry_id);
-	Log::debug("Fetching cache-entry from: %s:%d, key: %d", ref.host.c_str(), ref.port, ref.entry_id );
-	BinaryFDStream sock(ref.host.c_str(), ref.port,true);
-	BinaryStream &stream = sock;
-
-	buffered_write(sock,DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET_CACHED_ITEM,key);
-	uint8_t resp;
-	stream.read(&resp);
-
-	switch (resp) {
-		case DeliveryConnection::RESP_OK: {
-			MoveInfo mi(stream);
-			qp.addIOCost( mi.size );
-			return read_item(stream);
-		}
-		case DeliveryConnection::RESP_ERROR: {
-			std::string err_msg;
-			stream.read(&err_msg);
-			Log::error("Delivery returned error: %s", err_msg.c_str());
-			throw DeliveryException(err_msg);
-		}
-		default: {
-			Log::error("Delivery returned unknown code: %d", resp);
-			throw DeliveryException("Delivery returned unknown code");
-		}
-	}
-}
-
-template<typename T>
-std::vector<std::unique_ptr<T>> NodeCacheWrapper<T>::compute_remainders(const std::string& semantic_id,
-	const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler ) {
-	TIME_EXEC("CacheManager.puzzle.remainer_calc");
-	(void) ref_result;
-	std::vector<std::unique_ptr<T>> result;
-	auto graph = GenericOperator::fromJSON(semantic_id);
-
-	for ( auto &rqr : request.get_remainder_queries() ) {
-		result.push_back( compute_item(*graph,rqr,profiler) );
-	}
-	return result;
-}
-
-template<>
-std::vector<std::unique_ptr<GenericRaster>> NodeCacheWrapper<GenericRaster>::compute_remainders(
-	const std::string& semantic_id, const GenericRaster& ref_result, const PuzzleRequest &request, QueryProfiler &profiler) {
-	TIME_EXEC("CacheManager.puzzle.remainer_calc");
-
-	std::vector<std::unique_ptr<GenericRaster>> result;
-	auto graph = GenericOperator::fromJSON(semantic_id);
-
-	auto remainders = request.get_remainder_queries( ref_result.pixel_scale_x, ref_result.pixel_scale_y,
-													 ref_result.stref.x1, ref_result.stref.y1 );
-
-	for ( auto &rqr : remainders ) {
-		try {
-			auto rem = compute_item(*graph,rqr,profiler);
-			if ( !CacheCommon::resolution_matches( ref_result, *rem ) ) {
-				Log::warn(
-					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s, result-dimension: %dx%d. Fitting result!",
-					ref_result.pixel_scale_x, ref_result.pixel_scale_y, rem->pixel_scale_x, rem->pixel_scale_y,
-					((rqr.x2 - rqr.x1) / rqr.xres), ((rqr.y2 - rqr.y1) / rqr.yres),
-					CacheCommon::qr_to_string(rqr).c_str(), rem->width, rem->height);
-
-				rem = rem->fitToQueryRectangle(rqr);
-				//throw OperatorException("Incompatible resolution on remainder");
-			}
-			result.push_back( std::move(rem) );
-		} catch ( const MetadataException &me) {
-			Log::error("Error fetching remainder: %s. Query: %s", me.what(), CacheCommon::qr_to_string(rqr).c_str());
-			throw;
-		} catch ( const ArgumentException &ae ) {
-			Log::warn("Error fetching remainder: %s. Query: %s", ae.what(), CacheCommon::qr_to_string(rqr).c_str() );
-			throw;
-		}
-	}
-	return result;
-}
-
-RasterCacheWrapper::RasterCacheWrapper(const NodeCacheManager &mgr, NodeCache<GenericRaster>& cache, const CachingStrategy &strategy) :
-		NodeCacheWrapper(mgr,cache,strategy) {
-}
-
-std::unique_ptr<GenericRaster> RasterCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
-	const std::vector<std::shared_ptr<const GenericRaster> >& items) {
-	TIME_EXEC("CacheManager.puzzle.do_puzzle");
-	Log::trace("Puzzling raster with %d pieces", items.size() );
-
-//	RasterWriter w = PuzzleTracer::get_writer();
-//	w.write_meta(query,covered);
-
-	// Bake result
-	Log::trace("Creating result raster");
-
-	auto &tmp = items.at(0);
-	uint32_t width = std::floor((bbox.x2-bbox.x1) / tmp->pixel_scale_x);
-	uint32_t height = std::floor((bbox.y2-bbox.y1) / tmp->pixel_scale_y);
-
-	std::unique_ptr<GenericRaster> result = GenericRaster::create(
-			tmp->dd,
-			bbox,
-			width,
-			height );
-
-	for ( auto &raster : items ) {
-		auto x = result->WorldToPixelX( raster->stref.x1 );
-		auto y = result->WorldToPixelY( raster->stref.y1 );
-
-		if ( x >= width || y >= height ||
-			 x + raster->width <= 0 || y + raster->height <= 0 )
-			Log::info("Puzzle piece out of result-raster, result: %s, piece: %s", CacheCommon::stref_to_string(result->stref).c_str(), CacheCommon::stref_to_string(raster->stref).c_str() );
-		else {
-			try {
-				result->blit( raster.get(), x, y );
-			} catch ( const MetadataException &me ) {
-				Log::error("Blit error. Result: %s, piece: %s", CacheCommon::stref_to_string(result->stref).c_str(), CacheCommon::stref_to_string(raster->stref).c_str() );
-			}
-		}
-//		w.write_raster(*result, "dest_");
-	}
-	return result;
-
-
-}
-
-std::unique_ptr<GenericRaster> RasterCacheWrapper::read_item(BinaryStream &stream) {
-	return GenericRaster::fromStream(stream);
-}
-
-std::unique_ptr<GenericRaster> RasterCacheWrapper::compute_item(GenericOperator& op,
-	const QueryRectangle& query, QueryProfiler &qp) {
-	return op.getCachedRaster(query, qp );
-}
-
-PlotCacheWrapper::PlotCacheWrapper(const NodeCacheManager &mgr, NodeCache<GenericPlot>& cache, const CachingStrategy &strategy) :
-	NodeCacheWrapper(mgr,cache,strategy) {
-}
-
-std::unique_ptr<GenericPlot> PlotCacheWrapper::do_puzzle(const SpatioTemporalReference &bbox,
-	const std::vector<std::shared_ptr<const GenericPlot> >& items) {
-	(void) bbox;
-	(void) items;
-	throw OperatorException("Puzzling not supported for plots");
-}
-
-std::unique_ptr<GenericPlot> PlotCacheWrapper::read_item(BinaryStream &stream) {
-	return GenericPlot::fromStream(stream);
-}
-
-std::unique_ptr<GenericPlot> PlotCacheWrapper::compute_item(GenericOperator& op,
-	const QueryRectangle& query, QueryProfiler &qp) {
-	return op.getCachedPlot(query,qp);
-}
-
-template<typename T>
-FeatureCollectionCacheWrapper<T>::FeatureCollectionCacheWrapper(const NodeCacheManager &mgr, NodeCache<T>& cache, const CachingStrategy &strategy) :
-	NodeCacheWrapper<T>(mgr,cache,strategy) {
-}
-
-template<typename T>
-std::unique_ptr<T> FeatureCollectionCacheWrapper<T>::do_puzzle(const SpatioTemporalReference &bbox,
-	const std::vector<std::shared_ptr<const T> >& items) {
-	TIME_EXEC("CacheManager.puzzle.do_puzzle");
-	auto result = make_unique<T>(bbox);
-
-	T& target = *result;
-	target.global_attributes = items.at(0)->global_attributes;
-
-	for ( auto &src : items ) {
-		std::vector<bool> keep;
-		keep.reserve( src->getFeatureCount() );
-
-		for ( auto feature : *src ) {
-			keep.push_back(
-				src->featureIntersectsRectangle( feature, bbox.x1,bbox.y1,bbox.x2,bbox.y2 ) &&
-				!(src->time_start[feature] > bbox.t2 || src->time_end[feature] < bbox.t1)
-			);
-		}
-		std::unique_ptr<T> filtered = src->filter(keep);
-
-		AttributeArraysHelper::append(target.feature_attributes, filtered->feature_attributes);
-
-		target.coordinates.reserve(target.coordinates.size() + filtered->coordinates.size());
-		target.time_start.reserve(target.time_start.size() + filtered->time_start.size());
-		target.time_end.reserve(target.time_end.size() + filtered->time_end.size());
-
-		target.coordinates.insert(target.coordinates.end(), filtered->coordinates.begin(),filtered->coordinates.end());
-		target.time_start.insert(target.time_start.end(), filtered->time_start.begin(),filtered->time_start.end());
-		target.time_end.insert(target.time_end.end(), filtered->time_end.begin(),filtered->time_end.end());
-
-		append_idxs(target,*filtered);
-	}
-	return result;
-}
-
-template<typename T>
-void FeatureCollectionCacheWrapper<T>::append_idx_vec(
-		std::vector<uint32_t>& dest, const std::vector<uint32_t>& src) {
-	dest.reserve( dest.size() + src.size() - 1 );
-	size_t ext = dest.back();
-	dest.pop_back();
-
-	for ( auto sf : src )
-		dest.push_back( sf + ext );
-}
-
-template<typename T>
-void FeatureCollectionCacheWrapper<T>::combine_feature_attributes(
-		AttributeArrays& dest, const AttributeArrays src) {
-}
-
-template<typename T>
-std::unique_ptr<T> FeatureCollectionCacheWrapper<T>::read_item(BinaryStream &stream) {
-	return make_unique<T>( stream );
-}
-
-PointCollectionCacheWrapper::PointCollectionCacheWrapper(const NodeCacheManager &mgr, NodeCache<PointCollection>& cache, const CachingStrategy &strategy) :
-		FeatureCollectionCacheWrapper(mgr,cache,strategy)  {
-}
-
-std::unique_ptr<PointCollection> PointCollectionCacheWrapper::compute_item(GenericOperator& op,
-	const QueryRectangle& query, QueryProfiler &qp) {
-	return op.getCachedPointCollection(query,qp);
-}
-
-void PointCollectionCacheWrapper::append_idxs(PointCollection& dest,
-		const PointCollection& src) {
-	append_idx_vec(dest.start_feature, src.start_feature);
-}
-
-LineCollectionCacheWrapper::LineCollectionCacheWrapper(const NodeCacheManager &mgr, NodeCache<LineCollection>& cache, const CachingStrategy &strategy) :
-		FeatureCollectionCacheWrapper(mgr,cache,strategy) {
-}
-
-std::unique_ptr<LineCollection> LineCollectionCacheWrapper::compute_item(GenericOperator& op,
-	const QueryRectangle& query, QueryProfiler &qp) {
-	return op.getCachedLineCollection(query,qp);
-}
-
-void LineCollectionCacheWrapper::append_idxs(LineCollection& dest,
-		const LineCollection& src) {
-	append_idx_vec(dest.start_feature, src.start_feature);
-	append_idx_vec(dest.start_line, src.start_line);
-}
-
-PolygonCollectionCacheWrapper::PolygonCollectionCacheWrapper(const NodeCacheManager &mgr, NodeCache<PolygonCollection>& cache, const CachingStrategy &strategy) :
-		FeatureCollectionCacheWrapper(mgr,cache,strategy) {
-}
-
-std::unique_ptr<PolygonCollection> PolygonCollectionCacheWrapper::compute_item(GenericOperator& op,
-	const QueryRectangle& query, QueryProfiler &qp) {
-	return op.getCachedPolygonCollection(query,qp);
-}
-
-void PolygonCollectionCacheWrapper::append_idxs(PolygonCollection& dest,
-		const PolygonCollection& src) {
-	append_idx_vec(dest.start_feature, src.start_feature);
-	append_idx_vec(dest.start_polygon, src.start_polygon);
-	append_idx_vec(dest.start_ring, src.start_ring);
-}
 
 ////////////////////////////////////////////////////////////
 //
@@ -577,9 +214,11 @@ NodeCacheManager::NodeCacheManager( std::unique_ptr<CachingStrategy> strategy,
 	line_cache(CacheType::LINE,line_cache_size),
 	polygon_cache(CacheType::POLYGON,polygon_cache_size),
 	plot_cache(CacheType::PLOT,plot_cache_size),
-	raster_wrapper(*this,raster_cache, *strategy), point_wrapper(*this,point_cache, *strategy),
-	line_wrapper(*this,line_cache, *strategy), polygon_wrapper(*this,polygon_cache, *strategy),
-	plot_wrapper(*this,plot_cache, *strategy),
+	raster_wrapper(*this,raster_cache, make_unique<RemoteRetriever<GenericRaster>>(raster_cache,*this), make_unique<RasterPuzzler>(), *strategy),
+	point_wrapper(*this,point_cache, make_unique<RemoteRetriever<PointCollection>>(point_cache,*this), make_unique<PointCollectionPuzzler>(), *strategy),
+	line_wrapper(*this,line_cache, make_unique<RemoteRetriever<LineCollection>>(line_cache,*this), make_unique<LineCollectionPuzzler>(), *strategy),
+	polygon_wrapper(*this,polygon_cache, make_unique<RemoteRetriever<PolygonCollection>>(polygon_cache,*this), make_unique<PolygonCollectionPuzzler>(), *strategy),
+	plot_wrapper(*this,plot_cache, make_unique<RemoteRetriever<GenericPlot>>(plot_cache,*this), make_unique<PlotPuzzler>(), *strategy),
 	strategy(std::move(strategy)),
 	my_port(0) {
 }

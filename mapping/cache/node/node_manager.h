@@ -9,6 +9,7 @@
 #define CACHE_NODE_MANAGER_H_
 
 #include "util/binarystream.h"
+#include "cache/node/puzzle_util.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/cache_stats.h"
 #include "cache/priv/caching_strategy.h"
@@ -30,7 +31,10 @@ template<typename T>
 class NodeCacheWrapper : public CacheWrapper<T> {
 	friend class NodeCacheManager;
 public:
-	NodeCacheWrapper( const NodeCacheManager &mgr, NodeCache<T> &cache, const CachingStrategy &strategy );
+	NodeCacheWrapper( const NodeCacheManager &mgr, NodeCache<T> &cache,
+			std::unique_ptr<RemoteRetriever<T>> retriever,
+			std::unique_ptr<Puzzler<T>> puzzler,
+			const CachingStrategy &strategy );
 	virtual ~NodeCacheWrapper() = default;
 
 	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
@@ -52,77 +56,18 @@ public:
 	NodeCacheRef get_entry_info( const NodeCacheKey &key);
 
 	// Proccesses the given puzzle-request
-	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler );
-protected:
-	virtual std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items) = 0;
-	virtual std::unique_ptr<T> read_item( BinaryStream &stream ) = 0;
-	virtual std::unique_ptr<T> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) = 0;
+	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request );
 private:
-	std::unique_ptr<T> fetch_item( const std::string &semantic_id, const CacheRef &ref, QueryProfiler &qp );
-	SpatioTemporalReference enlarge_puzzle( const QueryRectangle &query, const std::vector<std::shared_ptr<const T>>& items);
-	std::vector<std::unique_ptr<T>> compute_remainders( const std::string &semantic_id, const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler );
 	const NodeCacheManager &mgr;
 	NodeCache<T> &cache;
+	std::unique_ptr<RemoteRetriever<T>> retriever;
+	std::unique_ptr<PuzzleUtil<T>> puzzle_util;
 	const CachingStrategy &strategy;
 	RWLock local_lock;
 	QueryStats stats;
 };
 
-class RasterCacheWrapper : public NodeCacheWrapper<GenericRaster> {
-public:
-	RasterCacheWrapper( const NodeCacheManager &mgr, NodeCache<GenericRaster> &cache, const CachingStrategy &strategy );
-
-	std::unique_ptr<GenericRaster> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericRaster>>& items);
-	std::unique_ptr<GenericRaster> read_item( BinaryStream &stream );
-	std::unique_ptr<GenericRaster> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
-};
-
-class PlotCacheWrapper : public NodeCacheWrapper<GenericPlot> {
-public:
-	PlotCacheWrapper( const NodeCacheManager &mgr, NodeCache<GenericPlot> &cache, const CachingStrategy &strategy );
-	std::unique_ptr<GenericPlot> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericPlot>>& items);
-	std::unique_ptr<GenericPlot> read_item( BinaryStream &stream );
-	std::unique_ptr<GenericPlot> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
-};
-
-template<typename T>
-class FeatureCollectionCacheWrapper : public NodeCacheWrapper<T> {
-public:
-	FeatureCollectionCacheWrapper( const NodeCacheManager &mgr, NodeCache<T> &cache, const CachingStrategy &strategy );
-	virtual ~FeatureCollectionCacheWrapper<T>() = default;
-	std::unique_ptr<T> do_puzzle(const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>>& items);
-	std::unique_ptr<T> read_item( BinaryStream &stream );
-	virtual std::unique_ptr<T> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) = 0;
-	virtual void append_idxs( T &dest, const T &src ) = 0;
-protected:
-	void append_idx_vec( std::vector<uint32_t> &dest, const std::vector<uint32_t> &src );
-private:
-	void combine_feature_attributes( AttributeArrays &dest, const AttributeArrays src );
-};
-
-class PointCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PointCollection> {
-public:
-	PointCollectionCacheWrapper( const NodeCacheManager &mgr, NodeCache<PointCollection> &cache, const CachingStrategy &strategy );
-	std::unique_ptr<PointCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
-	void append_idxs( PointCollection &dest, const PointCollection &src );
-};
-
-class LineCollectionCacheWrapper : public FeatureCollectionCacheWrapper<LineCollection> {
-public:
-	LineCollectionCacheWrapper( const NodeCacheManager &mgr, NodeCache<LineCollection> &cache, const CachingStrategy &strategy );
-	std::unique_ptr<LineCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
-	void append_idxs( LineCollection &dest, const LineCollection &src );
-};
-
-class PolygonCollectionCacheWrapper : public FeatureCollectionCacheWrapper<PolygonCollection> {
-public:
-	PolygonCollectionCacheWrapper( const NodeCacheManager &mgr, NodeCache<PolygonCollection> &cache, const CachingStrategy &strategy );
-	std::unique_ptr<PolygonCollection> compute_item ( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp );
-	void append_idxs( PolygonCollection &dest, const PolygonCollection &src );
-};
-
-
-class NodeCacheManager : public CacheManager {
+class NodeCacheManager : public CacheManager, public CacheRefHandler {
 private:
 	static thread_local BinaryStream *index_connection;
 
@@ -159,11 +104,11 @@ private:
 	NodeCache<PolygonCollection> polygon_cache;
 	NodeCache<GenericPlot> plot_cache;
 
-	mutable RasterCacheWrapper raster_wrapper;
-	mutable PointCollectionCacheWrapper point_wrapper;
-	mutable LineCollectionCacheWrapper line_wrapper;
-	mutable PolygonCollectionCacheWrapper polygon_wrapper;
-	mutable PlotCacheWrapper plot_wrapper;
+	mutable NodeCacheWrapper<GenericRaster> raster_wrapper;
+	mutable NodeCacheWrapper<PointCollection> point_wrapper;
+	mutable NodeCacheWrapper<LineCollection> line_wrapper;
+	mutable NodeCacheWrapper<PolygonCollection> polygon_wrapper;
+	mutable NodeCacheWrapper<GenericPlot> plot_wrapper;
 
 	// Holds the actual caching-strategy to use
 	std::unique_ptr<CachingStrategy> strategy;

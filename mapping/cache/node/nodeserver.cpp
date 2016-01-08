@@ -146,31 +146,30 @@ void NodeServer::process_create_request(BinaryStream& index_stream,
 void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 		const PuzzleRequest& request) {
 	TIME_EXEC("RequestProcessing.puzzle");
-	QueryProfiler profiler;
 
 	switch ( request.type ) {
 		case CacheType::RASTER: {
-			auto res = manager->get_raster_cache().process_puzzle(request,profiler);
+			auto res = manager->get_raster_cache().process_puzzle(request);
 			finish_request( index_stream, std::shared_ptr<const GenericRaster>(res.release()) );
 			break;
 		}
 		case CacheType::POINT: {
-			auto res = manager->get_point_cache().process_puzzle(request,profiler);
+			auto res = manager->get_point_cache().process_puzzle(request);
 			finish_request( index_stream, std::shared_ptr<const PointCollection>(res.release()) );
 			break;
 		}
 		case CacheType::LINE: {
-			auto res = manager->get_line_cache().process_puzzle(request,profiler);
+			auto res = manager->get_line_cache().process_puzzle(request);
 			finish_request( index_stream, std::shared_ptr<const LineCollection>(res.release()) );
 			break;
 		}
 		case CacheType::POLYGON: {
-			auto res = manager->get_polygon_cache().process_puzzle(request,profiler);
+			auto res = manager->get_polygon_cache().process_puzzle(request);
 			finish_request( index_stream, std::shared_ptr<const PolygonCollection>(res.release()) );
 			break;
 		}
 		case CacheType::PLOT: {
-			auto res = manager->get_plot_cache().process_puzzle(request,profiler);
+			auto res = manager->get_plot_cache().process_puzzle(request);
 			finish_request( index_stream, std::shared_ptr<const GenericPlot>(res.release()) );
 			break;
 		}

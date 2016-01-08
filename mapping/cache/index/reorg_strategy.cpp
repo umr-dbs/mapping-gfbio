@@ -368,10 +368,10 @@ uint32_t GraphReorgStrategy::find_node_for_graph(const GenericOperator& op) cons
 		else {
 			int src_cnt = 0;
 			for ( int i = 0; i < GenericOperator::MAX_INPUT_TYPES; i++ )
-				src_cnt += op.sourcecounts[i];
+				src_cnt += current->sourcecounts[i];
 
 			for ( int i = 0; i < src_cnt; i++ ) {
-				queue.push_back( op.sources[i] );
+				queue.push_back( current->sources[i] );
 			}
 		}
 		queue.pop_front();

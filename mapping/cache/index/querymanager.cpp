@@ -193,10 +193,9 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
 			IndexCacheKey key(req.semantic_id, id);
-			auto ref = cache.get(key);
-			auto &node = nodes.at(ref->node_id);
+			auto &node = nodes.at(id.first);
 			query.add_lock(CacheLocks::Lock(req.type,key));
-			entries.push_back(CacheRef(node->host, node->port, ref->entry_id));
+			entries.push_back(CacheRef(node->host, node->port, id.second));
 		}
 		PuzzleRequest pr( req.type, req.semantic_id, req.query, res.remainder, entries);
 		con.send_partial_hit(pr);

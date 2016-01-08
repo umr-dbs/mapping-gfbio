@@ -180,9 +180,8 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 	if (res.keys.size() == 1 && !res.has_remainder()) {
 		Log::debug("Full HIT. Sending reference.");
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
-		auto ref = cache.get(key);
-		auto node = nodes.at(ref->node_id);
-		CacheRef cr(node->host, node->port, ref->entry_id);
+		auto node = nodes.at(key.node_id);
+		CacheRef cr(node->host, node->port, key.node_id);
 		// Apply lock
 		query.add_lock( CacheLocks::Lock(req.type,key) );
 		con.send_hit(cr);
@@ -192,9 +191,8 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f");
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
-			IndexCacheKey key(req.semantic_id, id);
 			auto &node = nodes.at(id.first);
-			query.add_lock(CacheLocks::Lock(req.type,key));
+			query.add_lock(CacheLocks::Lock(req.type,IndexCacheKey(req.semantic_id, id)));
 			entries.push_back(CacheRef(node->host, node->port, id.second));
 		}
 		PuzzleRequest pr( req.type, req.semantic_id, req.query, res.remainder, entries);
@@ -221,12 +219,11 @@ std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, 
 		stats.single_hits++;
 		Log::debug("Full HIT. Sending reference.");
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
-		auto ref = cache.get(key);
 		DeliveryRequest dr(
 				req.type,
 				req.semantic_id,
 				res.covered,
-				ref->entry_id);
+				key.entry_id);
 		return make_unique<DeliverJob>(std::move(dr), key);
 	}
 	// Puzzle
@@ -237,11 +234,10 @@ std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, 
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
 			IndexCacheKey key(req.semantic_id, id);
-			auto ref = cache.get(key);
-			auto &node = nodes.at(ref->node_id);
+			auto &node = nodes.at(key.node_id);
 			keys.push_back(key);
-			node_ids.insert(ref->node_id);
-			entries.push_back(CacheRef(node->host, node->port, ref->entry_id));
+			node_ids.insert(key.node_id);
+			entries.push_back(CacheRef(node->host, node->port, key.entry_id));
 		}
 		PuzzleRequest pr(
 				req.type,

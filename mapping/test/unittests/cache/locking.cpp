@@ -44,7 +44,7 @@ TEST(Locking,MgrLocks) {
 	std::map<uint32_t,std::shared_ptr<Node>> node_map;
 	std::string sem_id = "test";
 	node_map.emplace(n->id,n);
-	IndexCaches ic( "capacity" );
+	IndexCaches ic( "capacity","lru" );
 
 	QueryManager mgr(ic,node_map);
 

@@ -16,7 +16,7 @@ std::unique_ptr<CachingStrategy> CachingStrategy::by_name(const std::string& nam
 	else if ( name == "always")
 		return make_unique<CacheAll>();
 	else if ( name == "simple")
-		return make_unique<AuthmannStrategy>();
+		return make_unique<AuthmannStrategy>(2);
 	else if ( name == "twostep")
 		return make_unique<TwoStepStrategy>();
 	throw ArgumentException(concat("Unknown Caching-Strategy: ", name));
@@ -28,10 +28,9 @@ double CachingStrategy::get_costs(const QueryProfiler& profiler, size_t bytes, b
 	// TODO: Check this factor;
 	double cache_cpu = 0.000000005 * bytes;
 
-	return std::max(
-		io / (double) bytes,
-		proc / cache_cpu
-	);
+	double res = io / (double) bytes + proc / cache_cpu;
+
+	return res;
 }
 
 //
@@ -58,8 +57,11 @@ bool CacheNone::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 // Authmann Heuristik
 //
 
+AuthmannStrategy::AuthmannStrategy(double threshold) : threshold(threshold) {
+}
+
 bool AuthmannStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
-	return get_costs(profiler, bytes, true) > 2;
+	return get_costs(profiler, bytes, true) >= threshold;
 }
 
 //
@@ -71,7 +73,6 @@ TwoStepStrategy::TwoStepStrategy(double stacked_threshold, double immediate_thre
 }
 
 bool TwoStepStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
-	return get_costs(profiler,bytes, false) > immediate_threshold ||
-		   (profiler.uncached_depth >= stack_depth && get_costs(profiler,bytes,true) > stacked_threshold );
+	return get_costs(profiler,bytes, false) >= immediate_threshold ||
+		   (profiler.uncached_depth >= stack_depth && get_costs(profiler,bytes,true) >= stacked_threshold );
 }
-

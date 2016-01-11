@@ -78,7 +78,7 @@ private:
 class IndexServer {
 	friend class TestIdxServer;
 public:
-	IndexServer( int port, const std::string &reorg_strategy );
+	IndexServer( int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function );
 	virtual ~IndexServer();
 	// Fires up the index-server and will return after
 	// stop() is invoked by another thread
@@ -136,7 +136,8 @@ private:
 	// timestamp of the last reorganization
 	time_t last_reorg;
 
-	bool no_updates;
+	// Interval for stats-updates and reorg
+	time_t update_interval;
 };
 
 #endif /* INDEX_INDEXSERVER_H_ */

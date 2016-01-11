@@ -55,7 +55,7 @@ public:
 class IndexCache : public Cache<std::pair<uint32_t,uint64_t>,IndexCacheEntry> {
 public:
 	// Constructs a new instance with the given reorg-strategy
-	IndexCache( const std::string &reorg_strategy );
+	IndexCache( const std::string &reorg_strategy, const std::string &relevance_function );
 	virtual ~IndexCache() = default;
 
 	IndexCache() = delete;
@@ -117,7 +117,7 @@ private:
 
 class IndexRasterCache : public IndexCache {
 public:
-	IndexRasterCache(const std::string &reorg_strategy);
+	IndexRasterCache(const std::string &reorg_strategy, const std::string &relevance_function);
 	IndexRasterCache() = delete;
 	IndexRasterCache( const IndexRasterCache& ) = delete;
 	IndexRasterCache( IndexRasterCache&& ) = delete;
@@ -129,7 +129,7 @@ public:
 
 class IndexPointCache : public IndexCache {
 public:
-	IndexPointCache(const std::string &reorg_strategy);
+	IndexPointCache(const std::string &reorg_strategy, const std::string &relevance_function);
 	IndexPointCache() = delete;
 	IndexPointCache( const IndexPointCache& ) = delete;
 	IndexPointCache( IndexPointCache&& ) = delete;
@@ -140,7 +140,7 @@ public:
 
 class IndexLineCache : public IndexCache {
 public:
-	IndexLineCache(const std::string &reorg_strategy);
+	IndexLineCache(const std::string &reorg_strategy, const std::string &relevance_function);
 	IndexLineCache() = delete;
 	IndexLineCache( const IndexLineCache& ) = delete;
 	IndexLineCache( IndexLineCache&& ) = delete;
@@ -151,7 +151,7 @@ public:
 
 class IndexPolygonCache : public IndexCache {
 public:
-	IndexPolygonCache(const std::string &reorg_strategy);
+	IndexPolygonCache(const std::string &reorg_strategy, const std::string &relevance_function);
 	IndexPolygonCache() = delete;
 	IndexPolygonCache( const IndexPolygonCache& ) = delete;
 	IndexPolygonCache( IndexPolygonCache&& ) = delete;
@@ -162,7 +162,7 @@ public:
 
 class IndexPlotCache : public IndexCache {
 public:
-	IndexPlotCache(const std::string &reorg_strategy);
+	IndexPlotCache(const std::string &reorg_strategy, const std::string &relevance_function);
 	IndexPlotCache() = delete;
 	IndexPlotCache( const IndexPlotCache& ) = delete;
 	IndexPlotCache( IndexPlotCache&& ) = delete;
@@ -173,7 +173,7 @@ public:
 
 class IndexCaches {
 public:
-	IndexCaches( const std::string &reorg_strategy );
+	IndexCaches( const std::string &reorg_strategy, const std::string &relevance_function );
 	IndexCaches() = delete;
 	IndexCaches( const IndexCaches& ) = delete;
 	IndexCaches( IndexCaches&& ) = delete;

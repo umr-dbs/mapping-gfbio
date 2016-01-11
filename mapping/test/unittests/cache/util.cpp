@@ -8,6 +8,7 @@
 #include "test/unittests/cache/util.h"
 #include "util/sizeutil.h"
 #include "util/make_unique.h"
+#include "util/gdal.h"
 #include <chrono>
 #include <deque>
 
@@ -119,25 +120,49 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 	//bbox_normalized[3] = 1.0 - bbox_normalized[3];
 }
 
+QueryRectangle project(epsg_t epsg, const QueryRectangle& qr) {
+	if ( qr.epsg == epsg )
+		return QueryRectangle(qr);
+
+	GDAL::CRSTransformer trans(qr.epsg,epsg);
+	double x1 = qr.x1, y1=qr.y1, x2=qr.x2, y2=qr.y2;
+	if ( !trans.transform(x1,y1) ) {
+		Log::error("SHIT");
+	}
+	if ( !trans.transform(x2,y2) ) {
+		Log::error("SHIT");
+	}
+
+	return 	QueryRectangle(
+			SpatialReference(epsg,x1,y1,x2,y2),
+			qr,
+			qr
+	);
+}
+
+QueryRectangle rect(epsg_t epsg, double x1, double y1, double extend,
+		double time, uint32_t res) {
+
+	return QueryRectangle(
+		SpatialReference(epsg,x1,y1,x1+extend,y1+extend),
+		TemporalReference(TIMETYPE_UNIX,time,time),
+		(res > 0) ? QueryResolution::pixels(res,res) : QueryResolution::none()
+	);
+
+}
 
 QueryRectangle random_rect(epsg_t epsg, double extend, double time, uint32_t res) {
-	double x1, x2, y1, y2;
+	double x1, y1;
 
 	SpatialReference bounds = SpatialReference::extent(epsg);
 	double rx = bounds.x2 - bounds.x1 - extend;
 	double ry = bounds.y2 - bounds.y1 - extend;
 
 	x1 = drand48() * rx + bounds.x1;
-	x2 = x1+extend;
 
 	y1 = drand48() * ry + bounds.y1;
-	y2 = y1+extend;
 
-	return QueryRectangle(
-		SpatialReference(epsg,x1,y1,x2,y2),
-		TemporalReference(TIMETYPE_UNIX,time,time),
-		(res > 0) ? QueryResolution::pixels(res,res) : QueryResolution::none()
-	);
+	return rect(epsg,x1,y1,extend,time,res);
 }
 
 
@@ -148,7 +173,7 @@ QueryRectangle random_rect(epsg_t epsg, double extend, double time, uint32_t res
 
 template<class T, CacheType TYPE>
 TracingCacheWrapper<T,TYPE>::TracingCacheWrapper(
-		std::vector<QTriple>& query_log) : query_log(query_log) {
+		std::vector<QTriple>& query_log, size_t &size) : size(size), query_log(query_log) {
 }
 
 template<class T, CacheType TYPE>
@@ -156,6 +181,7 @@ void TracingCacheWrapper<T,TYPE>::put(const std::string& semantic_id,
 		const std::unique_ptr<T>& item, const QueryRectangle& query,
 		const QueryProfiler& profiler) {
 	(void) semantic_id; (void) item; (void) query; (void) profiler;
+	size += SizeUtil::get_byte_size(*item);
 }
 
 template<class T, CacheType TYPE>
@@ -167,7 +193,7 @@ std::unique_ptr<T> TracingCacheWrapper<T,TYPE>::query(
 
 
 TracingCacheManager::TracingCacheManager() :
-		query_log(), rw(query_log), pw(query_log), lw(query_log), pow(query_log), plw(query_log) {
+		size(0), query_log(), rw(query_log,size), pw(query_log,size), lw(query_log,size), pow(query_log,size), plw(query_log,size) {
 }
 
 CacheWrapper<GenericRaster>& TracingCacheManager::get_raster_cache() { return rw; }
@@ -354,6 +380,17 @@ void LocalCacheManager::set_strategy(
 	plw.strategy = this->strategy.get();
 }
 
+Capacity LocalCacheManager::get_capacity() const {
+	return Capacity(
+			rc.get_max_size(), rc.get_current_size(),
+			pc.get_max_size(), pc.get_current_size(),
+			lc.get_max_size(), lc.get_current_size(),
+			poc.get_max_size(), poc.get_current_size(),
+			plc.get_max_size(), plc.get_current_size()
+		);
+}
+
+
 //
 // Test extensions
 //
@@ -382,8 +419,8 @@ NodeCacheManager& TestNodeServer::get_cache_manager() {
 
 // Test index
 
-TestIdxServer::TestIdxServer(uint32_t port, const std::string &reorg_strategy)  : IndexServer(port,reorg_strategy) {
-	no_updates = true;
+TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function)
+	: IndexServer(port,update_interval,reorg_strategy,relevance_function) {
 }
 
 void TestIdxServer::trigger_reorg(uint32_t node_id, const ReorgDescription& desc)  {
@@ -477,9 +514,9 @@ NodeCacheManager& TestCacheMan::get_current_instance() const {
 
 const int LocalTestSetup::INDEX_PORT;
 
-LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers,
-		size_t capacity, std::string reorg_strat, std::string c_strat ) :
-		ccm("localhost",INDEX_PORT), idx_server(make_unique<TestIdxServer>(INDEX_PORT,reorg_strat)) {
+LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers, time_t update_interval, size_t capacity, std::string reorg_strat,
+	std::string relevance_function, std::string c_strat ) :
+		ccm("localhost",INDEX_PORT), idx_server(make_unique<TestIdxServer>(INDEX_PORT,update_interval,reorg_strat,relevance_function)) {
 
 	for ( int i = 1; i <= num_nodes; i++)
 		nodes.push_back( make_unique<TestNodeServer>(num_workers, INDEX_PORT+i,"localhost",INDEX_PORT,c_strat,capacity) );
@@ -517,4 +554,5 @@ TestIdxServer& LocalTestSetup::get_index() {
 std::vector<std::unique_ptr<TestNodeServer> >& LocalTestSetup::get_nodes() {
 	return nodes;
 }
+
 

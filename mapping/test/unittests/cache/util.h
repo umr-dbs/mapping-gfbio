@@ -35,6 +35,10 @@ typedef std::unique_ptr<std::thread> TP;
 
 QueryRectangle random_rect( epsg_t epsg, double extend, double time, uint32_t res );
 
+QueryRectangle rect( epsg_t epsg, double x1, double y1, double extend, double time, uint32_t res );
+
+QueryRectangle project( epsg_t epsg, const QueryRectangle &qr);
+
 class QTriple {
 public:
 	QTriple( CacheType type, const QueryRectangle &query, const std::string semantic_id ) :
@@ -50,11 +54,12 @@ public:
 template<class T, CacheType TYPE>
 class TracingCacheWrapper : public CacheWrapper<T> {
 public:
-	TracingCacheWrapper( std::vector<QTriple> &query_log );
+	TracingCacheWrapper( std::vector<QTriple> &query_log, size_t &size );
 	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
 private:
+	size_t &size;
 	std::vector<QTriple> &query_log;
 };
 
@@ -68,6 +73,7 @@ public:
 	CacheWrapper<LineCollection>& get_line_cache();
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
+	size_t size;
 	std::vector<QTriple> query_log;
 private:
 	TracingCacheWrapper<GenericRaster,CacheType::RASTER> rw;
@@ -116,6 +122,8 @@ public:
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
 
+	Capacity get_capacity() const;
+
 	void set_strategy(std::unique_ptr<CachingStrategy> strategy);
 private:
 	NodeCache<GenericRaster> rc;
@@ -139,6 +147,8 @@ private:
 
 class TestIdxServer : public IndexServer {
 public:
+	TestIdxServer( uint32_t port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function);
+
 	void trigger_reorg( uint32_t node_id, const ReorgDescription &desc );
 
 	void force_stat_update();
@@ -146,8 +156,6 @@ public:
 	void force_reorg();
 
 	void reset_stats();
-
-	TestIdxServer( uint32_t port, const std::string &reorg_strategy );
 private:
 	void wait_for_idle_control_connections();
 };
@@ -181,7 +189,7 @@ private:
 
 class LocalTestSetup {
 public:
-	LocalTestSetup(int num_nodes, int num_workers, size_t capacity, std::string reorg_strat, std::string c_strat );
+	LocalTestSetup(int num_nodes, int num_workers, time_t update_interval, size_t capacity, std::string reorg_strat, std::string relevance_function, std::string c_strat );
 	~LocalTestSetup();
 	ClientCacheManager &get_client();
 	TestIdxServer &get_index();

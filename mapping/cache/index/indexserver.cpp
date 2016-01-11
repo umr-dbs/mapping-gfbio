@@ -66,9 +66,9 @@ std::string Node::to_string() const {
 //
 ////////////////////////////////////////////////////////////
 
-IndexServer::IndexServer(int port, const std::string &reorg_strategy) :
-	caches(reorg_strategy), port(port), shutdown(false), next_node_id(1),
-	query_manager(caches,nodes), last_reorg(time(nullptr)), no_updates(false) {
+IndexServer::IndexServer(int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function) :
+	caches(reorg_strategy,relevance_function), port(port), shutdown(false), next_node_id(1),
+	query_manager(caches,nodes), last_reorg(time(nullptr)), update_interval(update_interval) {
 }
 
 IndexServer::~IndexServer() {
@@ -140,7 +140,7 @@ void IndexServer::run() {
 		// Schedule Jobs
 		query_manager.schedule_pending_jobs(worker_connections);
 
-		if ( no_updates )
+		if ( update_interval == 0 )
 			continue;
 
 		// Update stats
@@ -152,7 +152,7 @@ void IndexServer::run() {
 			oldest_stats = std::min(oldest_stats, node.last_stat_update);
 			ControlConnection &cc = *control_connections.at(node.control_connection);
 			// Fetch stats
-			if (cc.get_state() == ControlState::IDLE && (now - node.last_stat_update) > 10) {
+			if (cc.get_state() == ControlState::IDLE && (now - node.last_stat_update) > update_interval) {
 				cc.send_get_stats();
 			}
 			// Remeber if all connections are idle -> Allows reorg

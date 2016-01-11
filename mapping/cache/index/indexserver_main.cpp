@@ -56,7 +56,8 @@ int main(void) {
 	auto portnr = atoi(portstr.c_str());
 
 	std::string rs = Configuration::get("indexserver.reorg.strategy");
-	instance = new IndexServer(portnr, rs);
+	std::string rel = Configuration::get("indexserver.reorg.relevance","lru");
+	instance = new IndexServer(portnr, 10, rs, rel);
 	instance->run();
 	return 0;
 }

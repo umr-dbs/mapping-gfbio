@@ -23,9 +23,14 @@ NodeReorgDescription::NodeReorgDescription( std::shared_ptr<Node> node ) :
 
 std::unique_ptr<RelevanceFunction> RelevanceFunction::by_name(
 		const std::string& name) {
-	if ( name == "LRU" )
+
+	std::string lower;
+	lower.resize( name.size() );
+	std::transform(name.begin(),name.end(),lower.begin(),::tolower);
+
+	if ( lower == "lru" )
 		return make_unique<LRU>();
-	else if ( name == "costLRU" )
+	else if ( lower == "costlru" )
 		return make_unique<CostLRU>();
 	throw ArgumentException(concat("Unknown Relevance-Function: ", name));
 }
@@ -93,13 +98,17 @@ const std::vector<std::shared_ptr<const IndexCacheEntry> >& ReorgNode::get_entri
 std::unique_ptr<ReorgStrategy> ReorgStrategy::by_name(const IndexCache& cache,
 		const std::string& name, const std::string& relevance) {
 
+	std::string lower;
+	lower.resize( name.size() );
+	std::transform(name.begin(),name.end(),lower.begin(),::tolower);
+
 	double target_capacity = 0.8;
 	std::unique_ptr<RelevanceFunction> rel = RelevanceFunction::by_name(relevance);
-	if ( name == "capacity" )
+	if ( lower == "capacity" )
 		return make_unique<CapacityReorgStrategy>(cache,target_capacity,std::move(rel));
-	else if ( name == "geo" )
+	else if ( lower == "geo" )
 		return make_unique<GeographicReorgStrategy>(cache,target_capacity,std::move(rel));
-	else if ( name == "graph" )
+	else if ( lower == "graph" )
 		return make_unique<GraphReorgStrategy>(cache,target_capacity,std::move(rel));
 	throw ArgumentException(concat("Unknown Reorg-Strategy: ", name));
 }

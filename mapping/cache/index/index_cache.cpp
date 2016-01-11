@@ -39,8 +39,8 @@ IndexCacheEntry::IndexCacheEntry(uint32_t node_id, const NodeCacheRef &ref) :
 //
 //////////////////////////////////////////////////////////////////
 
-IndexCache::IndexCache(const std::string &reorg_strategy) :
-	reorg_strategy(ReorgStrategy::by_name(*this,reorg_strategy)) {
+IndexCache::IndexCache(const std::string &reorg_strategy, const std::string &relevance_function) :
+	reorg_strategy(ReorgStrategy::by_name(*this,reorg_strategy,relevance_function)) {
 }
 
 
@@ -152,7 +152,8 @@ void IndexCache::update_stats(uint32_t node_id, const CacheStats &stats) {
 // Raster-Cache
 //
 
-IndexRasterCache::IndexRasterCache(const std::string &reorg_strategy) : IndexCache(reorg_strategy) {
+IndexRasterCache::IndexRasterCache(const std::string &reorg_strategy, const std::string &relevance_function)
+	: IndexCache(reorg_strategy,relevance_function) {
 }
 
 size_t IndexRasterCache::get_total_capacity(const Capacity& capacity) const {
@@ -167,7 +168,8 @@ CacheType IndexRasterCache::get_reorg_type() const {
 	return CacheType::RASTER;
 }
 
-IndexPointCache::IndexPointCache(const std::string& reorg_strategy) : IndexCache(reorg_strategy) {
+IndexPointCache::IndexPointCache(const std::string& reorg_strategy, const std::string &relevance_function)
+	: IndexCache(reorg_strategy, relevance_function) {
 }
 
 size_t IndexPointCache::get_total_capacity(const Capacity& capacity) const {
@@ -182,7 +184,8 @@ CacheType IndexPointCache::get_reorg_type() const {
 	return CacheType::POINT;
 }
 
-IndexLineCache::IndexLineCache(const std::string& reorg_strategy) : IndexCache(reorg_strategy) {
+IndexLineCache::IndexLineCache(const std::string& reorg_strategy, const std::string &relevance_function)
+	: IndexCache(reorg_strategy,relevance_function) {
 }
 
 size_t IndexLineCache::get_total_capacity(const Capacity& capacity) const {
@@ -197,7 +200,8 @@ CacheType IndexLineCache::get_reorg_type() const {
 	return CacheType::LINE;
 }
 
-IndexPolygonCache::IndexPolygonCache(const std::string& reorg_strategy) : IndexCache(reorg_strategy) {
+IndexPolygonCache::IndexPolygonCache(const std::string& reorg_strategy, const std::string &relevance_function)
+	: IndexCache(reorg_strategy,relevance_function) {
 }
 
 size_t IndexPolygonCache::get_total_capacity(const Capacity& capacity) const {
@@ -212,7 +216,8 @@ CacheType IndexPolygonCache::get_reorg_type() const {
 	return CacheType::POLYGON;
 }
 
-IndexPlotCache::IndexPlotCache(const std::string& reorg_strategy) : IndexCache(reorg_strategy) {
+IndexPlotCache::IndexPlotCache(const std::string& reorg_strategy, const std::string &relevance_function)
+	: IndexCache(reorg_strategy,relevance_function) {
 }
 
 size_t IndexPlotCache::get_total_capacity(const Capacity& capacity) const {
@@ -231,12 +236,12 @@ CacheType IndexPlotCache::get_reorg_type() const {
 //
 //
 
-IndexCaches::IndexCaches(const std::string& reorg_strategy) :
-	raster_cache(reorg_strategy),
-	point_cache(reorg_strategy),
-	line_cache(reorg_strategy),
-	poly_cache(reorg_strategy),
-	plot_cache(reorg_strategy){
+IndexCaches::IndexCaches(const std::string& reorg_strategy, const std::string &relevance_function) :
+	raster_cache(reorg_strategy,relevance_function),
+	point_cache(reorg_strategy,relevance_function),
+	line_cache(reorg_strategy,relevance_function),
+	poly_cache(reorg_strategy,relevance_function),
+	plot_cache(reorg_strategy,relevance_function){
 
 	all_caches.push_back(raster_cache);
 	all_caches.push_back(point_cache);

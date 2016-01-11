@@ -22,7 +22,7 @@ TEST(ReorgTest,CapacityReorg) {
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexRasterCache cache("capacity");
+	IndexRasterCache cache("capacity","lru");
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
@@ -69,7 +69,7 @@ TEST(ReorgTest,GeographicReorg) {
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexRasterCache cache("geo");
+	IndexRasterCache cache("geo","lru");
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
@@ -124,7 +124,7 @@ TEST(ReorgTest,GraphReorg) {
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexRasterCache cache("graph");
+	IndexRasterCache cache("graph","lru");
 	std::map<uint32_t, NodeReorgDescription> res;
 	for ( auto &kv : nodes ) {
 		res.emplace(kv.first, NodeReorgDescription(kv.second));

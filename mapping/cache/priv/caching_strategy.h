@@ -46,7 +46,10 @@ public:
 //
 class AuthmannStrategy : public CachingStrategy {
 public:
+	AuthmannStrategy( double threshold );
 	bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
+private:
+	double threshold;
 };
 
 //

@@ -181,7 +181,7 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 		Log::debug("Full HIT. Sending reference.");
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
 		auto node = nodes.at(key.node_id);
-		CacheRef cr(node->host, node->port, key.node_id);
+		CacheRef cr(node->host, node->port, key.entry_id);
 		// Apply lock
 		query.add_lock( CacheLocks::Lock(req.type,key) );
 		con.send_hit(cr);

@@ -184,7 +184,6 @@ void ClientConnection::process_command(uint8_t cmd) {
 	switch (cmd) {
 		case CMD_GET:
 			set_state(ClientState::READING_REQUEST);
-			Log::debug("Reading request from client");
 			begin_read(make_unique<NBBaseRequestReader>());
 			break;
 		default:
@@ -261,25 +260,21 @@ void WorkerConnection::process_command(uint8_t cmd) {
 	switch (cmd) {
 		case RESP_RESULT_READY: {
 			// Read delivery id
-			Log::debug("Worker finished processing. Determinig delivery qty.");
 			set_state(WorkerState::DONE);
 			break;
 		}
 		case RESP_DELIVERY_READY: {
 			set_state(WorkerState::READING_DELIVERY_ID);
-			Log::debug("Worker created delivery. Done");
 			begin_read( make_unique<NBFixedSizeReader>( sizeof(uint64_t) ) );
 			break;
 		}
 		case CMD_QUERY_CACHE: {
 			set_state(WorkerState::READING_QUERY);
-			Log::debug("Worker requested raster cache query.");
 			begin_read( make_unique<NBBaseRequestReader>() );
 			break;
 		}
 		case RESP_NEW_CACHE_ENTRY: {
 			set_state(WorkerState::READING_ENTRY);
-			Log::debug("Worker returned new result to raster-cache");
 			begin_read( make_unique<NBNodeCacheRefReader>() );
 			break;
 		}
@@ -314,7 +309,6 @@ void WorkerConnection::read_finished(NBReader& reader) {
 			break;
 		case WorkerState::READING_ERROR:
 			reader.get_stream()->read(&error_msg);
-			Log::warn("Worker returned error: %s", error_msg.c_str());
 			set_state(WorkerState::ERROR);
 			break;
 		default:
@@ -463,7 +457,6 @@ void ControlConnection::process_command(uint8_t cmd) {
 		}
 		case RESP_STATS: {
 			set_state(ControlState::READING_STATS);
-			Log::debug("Reading NodeStats.");
 			begin_read(make_unique<NBNodeStatsReader>());
 			break;
 		}
@@ -620,19 +613,16 @@ void DeliveryConnection::process_command(uint8_t cmd) {
 	switch (cmd) {
 		case CMD_GET: {
 			set_state(DeliveryState::READING_DELIVERY_REQUEST);
-			Log::debug("Reading delivery id");
 			begin_read(make_unique<NBFixedSizeReader>(sizeof(delivery_id)));
 			break;
 		}
 		case CMD_GET_CACHED_ITEM: {
 			set_state(DeliveryState::READING_CACHE_REQUEST);
-			Log::debug("Reading TypedNodeCacheKey for direct delivery.");
 			begin_read(make_unique<NBTypedNodeCacheKeyReader>());
 			break;
 		}
 		case CMD_MOVE_ITEM: {
 			set_state(DeliveryState::READING_MOVE_REQUEST);
-			Log::debug("Reading TypedNodeCacheKey for move delivery.");
 			begin_read(make_unique<NBTypedNodeCacheKeyReader>());
 			break;
 		}

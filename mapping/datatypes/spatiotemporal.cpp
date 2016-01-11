@@ -71,11 +71,13 @@ void SpatialReference::toStream(BinaryStream &stream) const {
 bool SpatialReference::contains(const SpatialReference &other) const {
 	if (epsg != other.epsg)
 		throw ArgumentException("SpatialReference::contains(): epsg don't match");
+	if ( x1 <= other.x1 && x2 >= other.x2 && y1 <= other.y1 && y2 >= other.y2 )
+		return true;
 
 	//TODO: Talk about this
 	auto ex = SpatialReference::extent(epsg);
-	double xeps = ex.x2*std::numeric_limits<double>::epsilon();
-	double yeps = ex.y2*std::numeric_limits<double>::epsilon();
+	double xeps = (ex.x2-ex.x1)*std::numeric_limits<double>::epsilon();
+	double yeps = (ex.y2-ex.y1)*std::numeric_limits<double>::epsilon();
 
 	return ( (x1 - other.x1) < xeps  ) &&
 		   ( (other.x2 - x2) < xeps ) &&

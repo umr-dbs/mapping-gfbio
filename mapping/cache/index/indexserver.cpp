@@ -68,7 +68,7 @@ std::string Node::to_string() const {
 
 IndexServer::IndexServer(int port, const std::string &reorg_strategy) :
 	caches(reorg_strategy), port(port), shutdown(false), next_node_id(1),
-	query_manager(caches,nodes), last_reorg(time(nullptr)) {
+	query_manager(caches,nodes), last_reorg(time(nullptr)), no_updates(false) {
 }
 
 IndexServer::~IndexServer() {
@@ -140,6 +140,9 @@ void IndexServer::run() {
 		// Schedule Jobs
 		query_manager.schedule_pending_jobs(worker_connections);
 
+		if ( no_updates )
+			continue;
+
 		// Update stats
 		time_t now = time(nullptr);
 		time_t oldest_stats = now;
@@ -157,32 +160,13 @@ void IndexServer::run() {
 		}
 
 		// Trace stats
-		if ( all_idle && now -oldest_stats >= 10 ) {
-			fprintf(stderr, "%s\n", stats_string().c_str() );
-		}
+//		if ( all_idle && now -oldest_stats >= 10 ) {
+//			fprintf(stderr, "%s\n", stats_string().c_str() );
+//		}
 
 		// Reorganize
 		if (oldest_stats > last_reorg && all_idle && caches.require_reorg(nodes) ) {
-			std::map<uint32_t, NodeReorgDescription> reorgs;
-			for (auto &kv : nodes) {
-				reorgs.emplace(kv.first, NodeReorgDescription(kv.second));
-			}
-
-			// Remember time of this reorg
-			time(&last_reorg);
-
-			caches.reorganize(nodes,reorgs);
-
-			for (auto &d : reorgs) {
-				Log::debug("Processing removals locally and sending reorg-commands to nodes.");
-				for (auto &rm : d.second.get_removals()) {
-					caches.get_cache(rm.type).remove(IndexCacheKey(d.first, rm.semantic_id, rm.entry_id));
-				}
-
-				auto &cc = control_connections.at(d.second.node->control_connection);
-				if (!d.second.is_empty())
-					cc->send_reorg(d.second);
-			}
+			reorganize();
 		}
 	}
 
@@ -479,6 +463,26 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				}
 			}
 		}
+	}
+}
+
+void IndexServer::reorganize(bool force) {
+	std::map<uint32_t, NodeReorgDescription> reorgs;
+	for (auto &kv : nodes)
+		reorgs.emplace(kv.first, NodeReorgDescription(kv.second));
+
+	// Remember time of this reorg
+	time(&last_reorg);
+	caches.reorganize(nodes,reorgs,force);
+	for (auto &d : reorgs) {
+		Log::debug("Processing removals locally and sending reorg-commands to nodes.");
+		for (auto &rm : d.second.get_removals()) {
+			caches.get_cache(rm.type).remove(IndexCacheKey(d.first, rm.semantic_id, rm.entry_id));
+		}
+
+		auto &cc = control_connections.at(d.second.node->control_connection);
+		if (!d.second.is_empty())
+			cc->send_reorg(d.second);
 	}
 }
 

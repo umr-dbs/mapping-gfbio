@@ -7,7 +7,9 @@
 
 #include "test/unittests/cache/util.h"
 #include "util/sizeutil.h"
+#include "util/make_unique.h"
 #include <chrono>
+#include <deque>
 
 
 time_t parseIso8601DateTime(std::string dateTimeString) {
@@ -118,12 +120,124 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 }
 
 
+QueryRectangle random_rect(epsg_t epsg, double extend, double time, uint32_t res) {
+	double x1, x2, y1, y2;
+
+	SpatialReference bounds = SpatialReference::extent(epsg);
+	double rx = bounds.x2 - bounds.x1 - extend;
+	double ry = bounds.y2 - bounds.y1 - extend;
+
+	x1 = drand48() * rx + bounds.x1;
+	x2 = x1+extend;
+
+	y1 = drand48() * ry + bounds.y1;
+	y2 = y1+extend;
+
+	return QueryRectangle(
+		SpatialReference(epsg,x1,y1,x2,y2),
+		TemporalReference(TIMETYPE_UNIX,time,time),
+		(res > 0) ? QueryResolution::pixels(res,res) : QueryResolution::none()
+	);
+}
+
+
+
+//
+// TRACER
+//
+
+template<class T, CacheType TYPE>
+TracingCacheWrapper<T,TYPE>::TracingCacheWrapper(
+		std::vector<QTriple>& query_log) : query_log(query_log) {
+}
+
+template<class T, CacheType TYPE>
+void TracingCacheWrapper<T,TYPE>::put(const std::string& semantic_id,
+		const std::unique_ptr<T>& item, const QueryRectangle& query,
+		const QueryProfiler& profiler) {
+	(void) semantic_id; (void) item; (void) query; (void) profiler;
+}
+
+template<class T, CacheType TYPE>
+std::unique_ptr<T> TracingCacheWrapper<T,TYPE>::query(
+		const GenericOperator& op, const QueryRectangle& rect) {
+	query_log.push_back( QTriple(TYPE,rect,op.getSemanticId()) );
+	throw NoSuchElementException("NOP");
+}
+
+
+TracingCacheManager::TracingCacheManager() :
+		query_log(), rw(query_log), pw(query_log), lw(query_log), pow(query_log), plw(query_log) {
+}
+
+CacheWrapper<GenericRaster>& TracingCacheManager::get_raster_cache() { return rw; }
+CacheWrapper<PointCollection>& TracingCacheManager::get_point_cache() { return pw; }
+CacheWrapper<LineCollection>& TracingCacheManager::get_line_cache() { return lw; }
+CacheWrapper<PolygonCollection>& TracingCacheManager::get_polygon_cache() { return pow; }
+CacheWrapper<GenericPlot>& TracingCacheManager::get_plot_cache() { return plw; }
+
+
+void execute_operator(GenericOperator& op, const QueryRectangle& query,
+		CacheType type) {
+	QueryProfiler qp;
+	switch ( type ) {
+	case CacheType::RASTER:
+		op.getCachedRaster(query,qp);
+		break;
+	case CacheType::POINT:
+		op.getCachedPointCollection(query,qp);
+		break;
+	case CacheType::LINE:
+		op.getCachedLineCollection(query,qp);
+		break;
+	case CacheType::POLYGON:
+		op.getCachedPolygonCollection(query,qp);
+		break;
+	case CacheType::PLOT:
+		op.getCachedPlot(query,qp);
+		break;
+	default:
+		throw ArgumentException("Illegal query type");
+	}
+}
+
+void execute(const QTriple& t) {
+	auto op = GenericOperator::fromJSON(t.semantic_id);
+	execute_operator(*op,t.query,t.type);
+}
+
+
+std::vector<QTriple> get_query_steps(const std::string& semantic_id,
+		const QueryRectangle& query, CacheType type) {
+	CacheManager *orig =nullptr;
+	try {
+	 orig = &CacheManager::get_instance();
+	} catch ( const NotInitializedException &nie ) {
+	}
+	TracingCacheManager tcm;
+	auto op = GenericOperator::fromJSON(semantic_id);
+	CacheManager::init(&tcm);
+	execute_operator(*op,query,type);
+	auto res = tcm.query_log;
+	CacheManager::init(orig);
+	return res;
+}
+
+void execute_query_steps(const std::vector<QTriple>& queries) {
+	auto iter = queries.rbegin();
+	while ( iter != queries.rend() ) {
+		execute(*iter);
+		iter++;
+	}
+}
+
+
 //
 // Local cache manager
 //
 
 template<class T>
-LocalCacheWrapper<T>::LocalCacheWrapper(NodeCache<T>& cache, std::unique_ptr<Puzzler<T> > puzzler, const CachingStrategy &strategy) :
+LocalCacheWrapper<T>::LocalCacheWrapper(NodeCache<T>& cache, std::unique_ptr<Puzzler<T> > puzzler, CachingStrategy *strategy) :
 	cache(cache), retriever(cache), puzzle_util(this->retriever, std::move(puzzler)), strategy(strategy) {
 }
 
@@ -133,7 +247,7 @@ void LocalCacheWrapper<T>::put(const std::string &semantic_id,
 
 	size_t size = SizeUtil::get_byte_size(*item);
 
-	if ( strategy.do_cache(profiler,size) ) {
+	if ( strategy->do_cache(profiler,size) ) {
 		CacheCube cube(*item);
 		// Min/Max resolution hack
 		if ( query.restype == QueryResolution::Type::PIXELS ) {
@@ -155,7 +269,7 @@ void LocalCacheWrapper<T>::put(const std::string &semantic_id,
 			else if ( scale_y > cube.resolution_info.pixel_scale_y.b )
 				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
 		}
-		cache.put(semantic_id, item, CacheEntry( cube, size, strategy.get_costs(profiler,size)));
+		cache.put(semantic_id, item, CacheEntry( cube, size, strategy->get_costs(profiler,size)));
 	}
 }
 
@@ -202,11 +316,11 @@ LocalCacheManager::LocalCacheManager(std::unique_ptr<CachingStrategy> strategy,
 	lc(CacheType::LINE,line_cache_size),
 	poc(CacheType::POLYGON,polygon_cache_size),
 	plc(CacheType::PLOT,plot_cache_size),
-	rw(rc, make_unique<RasterPuzzler>(), *strategy),
-	pw(pc, make_unique<PointCollectionPuzzler>(), *strategy),
-	lw(lc, make_unique<LineCollectionPuzzler>(), *strategy),
-	pow(poc, make_unique<PolygonCollectionPuzzler>(), *strategy),
-	plw(plc, make_unique<PlotPuzzler>(), *strategy),
+	rw(rc, make_unique<RasterPuzzler>(), strategy.get()),
+	pw(pc, make_unique<PointCollectionPuzzler>(), strategy.get()),
+	lw(lc, make_unique<LineCollectionPuzzler>(), strategy.get()),
+	pow(poc, make_unique<PolygonCollectionPuzzler>(), strategy.get()),
+	plw(plc, make_unique<PlotPuzzler>(), strategy.get()),
 	strategy(std::move(strategy)) {
 }
 
@@ -230,13 +344,22 @@ CacheWrapper<GenericPlot>& LocalCacheManager::get_plot_cache() {
 	return plw;
 }
 
+void LocalCacheManager::set_strategy(
+		std::unique_ptr<CachingStrategy> strategy) {
+	this->strategy.reset( strategy.release() );
+	rw.strategy = this->strategy.get();
+	pw.strategy = this->strategy.get();
+	lw.strategy = this->strategy.get();
+	pow.strategy = this->strategy.get();
+	plw.strategy = this->strategy.get();
+}
 
 //
 // Test extensions
 //
 
-TestNodeServer::TestNodeServer(uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity)  :
-	NodeServer( make_unique<NodeCacheManager>( CachingStrategy::by_name(strategy), capacity,capacity,capacity,capacity,capacity ), my_port,index_host,index_port,1) {
+TestNodeServer::TestNodeServer(int num_threads, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity)  :
+	NodeServer( make_unique<NodeCacheManager>( CachingStrategy::by_name(strategy), capacity,capacity,capacity,capacity,capacity ), my_port,index_host,index_port,num_threads) {
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -253,9 +376,14 @@ void TestNodeServer::run_node_thread(TestNodeServer* ns) {
 	ns->run();
 }
 
+NodeCacheManager& TestNodeServer::get_cache_manager() {
+	return *manager;
+}
+
 // Test index
 
 TestIdxServer::TestIdxServer(uint32_t port, const std::string &reorg_strategy)  : IndexServer(port,reorg_strategy) {
+	no_updates = true;
 }
 
 void TestIdxServer::trigger_reorg(uint32_t node_id, const ReorgDescription& desc)  {
@@ -266,6 +394,42 @@ void TestIdxServer::trigger_reorg(uint32_t node_id, const ReorgDescription& desc
 		}
 	}
 	throw ArgumentException(concat("No node found for id ", node_id));
+}
+
+void TestIdxServer::wait_for_idle_control_connections() {
+	bool all_idle = true;
+	// Wait until connections are idle;
+	do {
+		all_idle = true;
+		if ( !all_idle )
+			std::this_thread::sleep_for( std::chrono::milliseconds(500) );
+
+		for ( auto &kv : control_connections ) {
+			all_idle &= kv.second->get_state() == ControlState::IDLE;
+		}
+	} while (!all_idle);
+}
+
+void TestIdxServer::force_stat_update() {
+	wait_for_idle_control_connections();
+
+	for ( auto &kv : control_connections ) {
+		kv.second->send_get_stats();
+	}
+
+	wait_for_idle_control_connections();
+}
+
+void TestIdxServer::force_reorg() {
+	force_stat_update();
+	reorganize(true);
+	wait_for_idle_control_connections();
+}
+
+void TestIdxServer::reset_stats() {
+	for ( auto &p : nodes )
+		p.second->reset_query_stats();
+	query_manager.reset_stats();
 }
 
 //
@@ -308,33 +472,49 @@ NodeCacheManager& TestCacheMan::get_current_instance() const {
 	throw ArgumentException("Unregistered instance called cache-manager");
 }
 
-void TestIdxServer::force_stat_update() {
 
-	bool all_idle = true;
 
-	// Wait until connections are idle;
-	do {
-		all_idle = true;
-		if ( !all_idle )
-			std::this_thread::sleep_for( std::chrono::milliseconds(500) );
 
-		for ( auto &kv : control_connections ) {
-			all_idle &= kv.second->get_state() == ControlState::IDLE;
-		}
-	} while (!all_idle);
+const int LocalTestSetup::INDEX_PORT;
 
-	for ( auto &kv : control_connections ) {
-		kv.second->send_get_stats();
-	}
+LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers,
+		size_t capacity, std::string reorg_strat, std::string c_strat ) :
+		ccm("localhost",INDEX_PORT), idx_server(make_unique<TestIdxServer>(INDEX_PORT,reorg_strat)) {
 
-	// Wait for finishing stat-update
-	do {
-		all_idle = true;
-		if ( !all_idle )
-			std::this_thread::sleep_for( std::chrono::milliseconds(500) );
+	for ( int i = 1; i <= num_nodes; i++)
+		nodes.push_back( make_unique<TestNodeServer>(num_workers, INDEX_PORT+i,"localhost",INDEX_PORT,c_strat,capacity) );
 
-		for ( auto &kv : control_connections ) {
-			all_idle &= kv.second->get_state() == ControlState::IDLE;
-		}
-	} while (!all_idle);
+	for ( auto &n : nodes )
+		mgr.add_instance(n.get());
+	CacheManager::init(&mgr);
+
+	threads.push_back( make_unique<std::thread>(&IndexServer::run, idx_server.get()) );
+	std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
+	for ( auto &n : nodes )
+		threads.push_back( make_unique<std::thread>(TestNodeServer::run_node_thread, n.get()));
 }
+
+LocalTestSetup::~LocalTestSetup() {
+
+	for ( auto &n : nodes )
+		n->stop();
+
+	idx_server->stop();
+
+	for (TP &t : threads )
+		t->join();
+}
+
+ClientCacheManager& LocalTestSetup::get_client() {
+	return ccm;
+}
+
+TestIdxServer& LocalTestSetup::get_index() {
+	return *idx_server;
+}
+
+std::vector<std::unique_ptr<TestNodeServer> >& LocalTestSetup::get_nodes() {
+	return nodes;
+}
+

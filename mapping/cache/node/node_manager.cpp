@@ -239,18 +239,22 @@ NodeCacheWrapper<PolygonCollection>& NodeCacheManager::get_polygon_cache() {
 	return polygon_wrapper;
 }
 
+NodeCacheWrapper<GenericPlot>& NodeCacheManager::get_plot_cache() {
+	return plot_wrapper;
+}
+
 const QueryStats& NodeCacheManager::get_query_stats() const {
 	return cumulated_stats;
 }
 
 void NodeCacheManager::reset_query_stats() {
+	raster_wrapper.stats.reset();
+	point_wrapper.stats.reset();
+	line_wrapper.stats.reset();
+	polygon_wrapper.stats.reset();
+	plot_wrapper.stats.reset();
 	cumulated_stats.reset();
 }
-
-NodeCacheWrapper<GenericPlot>& NodeCacheManager::get_plot_cache() {
-	return plot_wrapper;
-}
-
 
 void NodeCacheManager::set_self_port(uint32_t port) {
 	my_port = port;

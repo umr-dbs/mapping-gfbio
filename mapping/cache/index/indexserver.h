@@ -76,6 +76,7 @@ private:
 
 
 class IndexServer {
+	friend class TestIdxServer;
 public:
 	IndexServer( int port, const std::string &reorg_strategy );
 	virtual ~IndexServer();
@@ -86,16 +87,6 @@ public:
 	// Subsequent calls to run or run_async have undefined
 	// behaviour
 	virtual void stop();
-protected:
-	// The currently known nodes
-	std::map<uint32_t,std::shared_ptr<Node>> nodes;
-	// Connections
-	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
-	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
-	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
-
-	IndexCaches caches;
-
 private:
 	// Adds the fds of all connections to the read-set
 	// and kills faulty connections
@@ -119,6 +110,17 @@ private:
 	// statistics for the index an all nodes;
 	std::string stats_string() const;
 
+	void reorganize(bool force = false);
+
+	// The currently known nodes
+	std::map<uint32_t,std::shared_ptr<Node>> nodes;
+	// Connections
+	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
+	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
+	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
+
+	IndexCaches caches;
+
 	// The port the index-server is listening on
 	int port;
 
@@ -133,6 +135,8 @@ private:
 
 	// timestamp of the last reorganization
 	time_t last_reorg;
+
+	bool no_updates;
 };
 
 #endif /* INDEX_INDEXSERVER_H_ */

@@ -52,7 +52,7 @@ public:
 // Cache on the index-server.
 // One instance used per data-type.
 //
-class IndexCache {
+class IndexCache : public Cache<std::pair<uint32_t,uint64_t>,IndexCacheEntry> {
 public:
 	// Constructs a new instance with the given reorg-strategy
 	IndexCache( const std::string &reorg_strategy );
@@ -67,9 +67,6 @@ public:
 
 	// Retrieves the entry with the given key.
 	std::shared_ptr<const IndexCacheEntry> get( const IndexCacheKey &key ) const;
-
-	// Queries the cache with the given query-rectangle
-	CacheQueryResult<std::pair<uint32_t,uint64_t>> query( const std::string &semantic_id, const QueryRectangle &qr ) const;
 
 	// Adds an entry for the given semantic_id to the cache.
 	void remove( const IndexCacheKey &key );
@@ -105,11 +102,6 @@ public:
 	virtual CacheType get_reorg_type() const = 0;
 
 private:
-	typedef CacheStructure<std::pair<uint32_t,uint64_t>,IndexCacheEntry> Struct;
-
-	// Retrieves the cache-structure for the given semantic_id.
-	Struct* get_structure( const std::string &semantic_id, bool create = false) const;
-
 	// Gets all entries for the given node
 	std::set<std::shared_ptr<const IndexCacheEntry>> &get_node_entries(uint32_t node_id) const;
 
@@ -118,9 +110,6 @@ private:
 
 	// Holds a reference to all entries clustered by node
 	mutable std::map<uint32_t, std::set<std::shared_ptr<const IndexCacheEntry>>> entries_by_node;
-
-	// Holds all cache-structures accessable by the semantic_id
-	mutable std::unordered_map<std::string,Struct*> caches;
 
 	// The reorganization strategy
 	std::unique_ptr<ReorgStrategy> reorg_strategy;
@@ -198,7 +187,7 @@ public:
 	void remove_all_by_node( uint32_t node_id );
 
 	void update_stats( uint32_t node_id, const NodeStats& stats );
-	void reorganize(const std::map<uint32_t, std::shared_ptr<Node> > &nodes, std::map<uint32_t, NodeReorgDescription>& result );
+	void reorganize(const std::map<uint32_t, std::shared_ptr<Node> > &nodes, std::map<uint32_t, NodeReorgDescription>& result, bool force = false );
 
 private:
 	std::vector<std::reference_wrapper<IndexCache>> all_caches;

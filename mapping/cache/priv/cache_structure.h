@@ -15,6 +15,7 @@
 #include "cache/common.h"
 
 #include <map>
+#include <unordered_map>
 #include <queue>
 #include <memory>
 #include <mutex>
@@ -62,6 +63,8 @@ public:
 	void toStream( BinaryStream &stream ) const;
 
 	ResolutionInfo resolution_info;
+private:
+	static SpatialReference adjust_bounds( const GridSpatioTemporalResult &res );
 };
 
 // Information about data-access
@@ -198,6 +201,11 @@ template<typename KType, typename EType>
 class CacheStructure {
 public:
 	CacheStructure();
+	CacheStructure( const CacheStructure<KType,EType> & ) = delete;
+	CacheStructure( CacheStructure<KType,EType> && ) = delete;
+
+	CacheStructure<KType,EType>& operator=( const CacheStructure<KType,EType> & ) = delete;
+	CacheStructure<KType,EType>& operator=( CacheStructure<KType,EType> && ) = delete;
 
 	// Inserts the given result into the cache. The cache copies the content of the result.
 	void put( const KType &key, const std::shared_ptr<EType> &result );
@@ -231,6 +239,27 @@ private:
 	std::map<KType, std::shared_ptr<EType>> entries;
 	mutable RWLock lock;
 	uint64_t _size;
+};
+
+template<typename KType, typename EType>
+class Cache {
+public:
+	Cache() = default;
+	Cache( const Cache<KType,EType> & ) = delete;
+	Cache( Cache<KType,EType> && ) = delete;
+	Cache& operator=( const Cache<KType,EType> & ) = delete;
+	Cache& operator=( Cache<KType,EType> && ) = delete;
+
+	const CacheQueryResult<KType> query( const std::string &semantic_id, const QueryRectangle &qr ) const;
+protected:
+	void put_int( const std::string &semantic_id, const KType &key, const std::shared_ptr<EType> &entry );
+	std::unordered_map<std::string,std::vector<std::shared_ptr<EType>>> get_all_int() const;
+	std::shared_ptr<EType> get_int( const std::string &semantic_id, const KType &key ) const;
+	std::shared_ptr<EType> remove_int( const std::string &semantic_id, const KType &key );
+private:
+	CacheStructure<KType,EType>& get_cache( const std::string &semantic_id, bool create = false ) const;
+	mutable std::unordered_map<std::string,std::unique_ptr<CacheStructure<KType,EType>>> caches;
+	mutable std::mutex mtx;
 };
 
 #endif /* CACHE_STRUCTURE_H_ */

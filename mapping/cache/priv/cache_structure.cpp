@@ -120,6 +120,24 @@ void QueryCube::toStream(BinaryStream& stream) const {
 	stream.write(timetype);
 }
 
+
+
+SpatialReference CacheCube::adjust_bounds(const GridSpatioTemporalResult& result) {
+//	double ohspan = result.stref.x2 - result.stref.x1;
+//	double ovspan = result.stref.y2 - result.stref.y1;
+//
+//	// Enlarge result by degrees of 1/100 a pixel in each direction
+//	double h_spacing = ohspan / result.width / 50.0;
+//	double v_spacing = ovspan / result.height / 50.0;
+//
+//	double x1 = result.stref.x1 - h_spacing;
+//	double x2 = result.stref.x2 + h_spacing;
+//	double y1 = result.stref.y1 - v_spacing;
+//	double y2 = result.stref.y2 + v_spacing;
+//	return SpatialReference(result.stref.epsg,x1,y1,x2,y2);
+	return SpatialReference(result.stref);
+}
+
 CacheCube::CacheCube(const SpatialReference& sref, const TemporalReference& tref) :
 	QueryCube( sref, tref ) {
 }
@@ -128,21 +146,7 @@ CacheCube::CacheCube(const SpatioTemporalResult& result) : CacheCube( result.str
 }
 
 CacheCube::CacheCube(const GridSpatioTemporalResult& result) :
-	QueryCube(result.stref,result.stref), resolution_info(result) {
-//	double ohspan = result.stref.x2 - result.stref.x1;
-//	double ovspan = result.stref.y2 - result.stref.y1;
-//
-//	// Enlarge result by degrees of 1/100 a pixel in each direction
-//	double h_spacing = ohspan / result.width / 100.0;
-//	double v_spacing = ovspan / result.height / 100.0;
-//
-//	double x1 = result.stref.x1 - h_spacing;
-//	double x2 = result.stref.x2 + h_spacing;
-//	double y1 = result.stref.y1 - v_spacing;
-//	double y2 = result.stref.y2 + v_spacing;
-//
-//	set_dimension( 0, x1, x2 );
-//	set_dimension( 1, y1, y2 );
+	QueryCube(adjust_bounds(result),result.stref), resolution_info(result) {
 }
 
 CacheCube::CacheCube(const GenericPlot& result) :
@@ -363,6 +367,17 @@ std::shared_ptr<EType> CacheStructure<KType, EType>::remove(const KType& key) {
 	throw NoSuchElementException("No cache-entry found");
 }
 
+template<typename KType, typename EType>
+std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() const {
+	SharedLockGuard g(lock);
+	std::vector<std::shared_ptr<EType> > result;
+	result.reserve(entries.size());
+	for (auto &e : entries) {
+		result.push_back(e.second);
+	}
+	return result;
+}
+
 //
 // QUERY STUFF
 //
@@ -375,7 +390,6 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 	std::priority_queue<CacheQueryInfo<KType>> partials;
 
 	QueryCube qc( spec );
-
 	for (auto &e : entries) {
 		CacheCube &bounds = e.second->bounds;
 
@@ -395,8 +409,10 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 			partials.push(CacheQueryInfo<KType>( score, bounds, e.first ));
 
 			// Short circuit full hits
-			if ( (1.0-score) <= std::numeric_limits<double>::epsilon() )
+			if ( (1.0-score) <= std::numeric_limits<double>::epsilon() ) {
 				break;
+			}
+
 		}
 	}
 	Log::trace("Found %d candidates for query: %s", partials.size(), CacheCommon::qr_to_string(spec).c_str() );
@@ -462,7 +478,6 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 		Log::trace("Union produced %ld instead of %ld remainders", u_rems.size(), remainders.size());
 	else
 		Log::trace("Union had no effect, remainders: %ld", remainders.size() );
-
 
 	return enlarge_expected_result(spec, used_entries, u_rems);
 }
@@ -541,6 +556,7 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 	if ( rem_volume/qc.volume() > 0.9 )
 		return CacheQueryResult<KType>( orig );
 
+
 	// Do extend
 	for ( auto &cqi : hits ) {
 		ids.push_back( cqi.key );
@@ -596,15 +612,6 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 // END QUERY STUFF
 //
 
-template<typename KType, typename EType>
-std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() const {
-	std::vector<std::shared_ptr<EType> > result;
-	result.reserve(entries.size());
-	for (auto &e : entries) {
-		result.push_back(e.second);
-	}
-	return result;
-}
 
 template<typename KType, typename EType>
 uint64_t CacheStructure<KType, EType>::size() const {
@@ -626,6 +633,77 @@ std::string CacheStructure<KType, EType>::key_to_string(const std::pair<uint32_t
 	return concat("(",key.first,":",key.second,")");
 }
 
+
+//////////////////////////////////////////////////////////////
+//
+// Cache
+//
+//////////////////////////////////////////////////////////////
+
+template<typename KType, typename EType>
+const CacheQueryResult<KType> Cache<KType, EType>::query(
+	const std::string& semantic_id, const QueryRectangle& qr) const {
+	try {
+		return get_cache(semantic_id).query(qr);
+	} catch ( const NoSuchElementException &nse ) {
+		return CacheQueryResult<KType>(qr);
+	}
+}
+
+template<typename KType, typename EType>
+void Cache<KType, EType>::put_int(const std::string& semantic_id,
+		const KType& key, const std::shared_ptr<EType>& entry) {
+	get_cache(semantic_id,true).put( key, entry );
+}
+
+template<typename KType, typename EType>
+std::shared_ptr<EType> Cache<KType, EType>::get_int(
+	const std::string& semantic_id, const KType& key) const {
+	return get_cache(semantic_id).get(key);
+}
+
+template<typename KType, typename EType>
+std::shared_ptr<EType> Cache<KType, EType>::remove_int(
+	const std::string& semantic_id,const KType& key) {
+	return get_cache(semantic_id).remove(key);
+	// TODO: Find a safe way to remove structures
+//	auto &cache = get_cache(semantic_id);
+//	auto res = cache.remove(key);
+//	if ( cache.num_elements() == 0 )
+//		caches.erase(semantic_id);
+//	return res;
+}
+
+template<typename KType, typename EType>
+std::unordered_map<std::string, std::vector<std::shared_ptr<EType>> > Cache<KType,
+		EType>::get_all_int() const {
+	std::lock_guard<std::mutex> guard(mtx);
+
+	std::unordered_map<std::string, std::vector<std::shared_ptr<EType>>> result;
+	for ( auto &p : caches ) {
+		result.emplace( p.first, p.second->get_all() );
+	}
+	return result;
+}
+
+template<typename KType, typename EType>
+CacheStructure<KType, EType>& Cache<KType, EType>::get_cache(
+		const std::string& semantic_id, bool create) const {
+
+	std::lock_guard<std::mutex> guard(mtx);
+	Log::trace("Retrieving cache-structure for semantic_id: %s", semantic_id.c_str() );
+	auto got = caches.find(semantic_id);
+	if (got == caches.end() && create) {
+		Log::trace("No cache-structure found for semantic_id: %s. Creating.", semantic_id.c_str() );
+		auto e = caches.emplace(semantic_id, make_unique<CacheStructure<KType,EType>>());
+		return *e.first->second;
+	}
+	else if (got != caches.end())
+		return *got->second;
+	else
+		throw NoSuchElementException("No structure present for given semantic id");
+}
+
 template class CacheQueryResult<uint64_t>;
 template class CacheStructure<uint64_t, NodeCacheEntry<GenericRaster>>;
 template class CacheStructure<uint64_t, NodeCacheEntry<PointCollection>>;
@@ -633,5 +711,13 @@ template class CacheStructure<uint64_t, NodeCacheEntry<LineCollection>>;
 template class CacheStructure<uint64_t, NodeCacheEntry<PolygonCollection>>;
 template class CacheStructure<uint64_t, NodeCacheEntry<GenericPlot>>;
 
+template class Cache<uint64_t, NodeCacheEntry<GenericRaster>>;
+template class Cache<uint64_t, NodeCacheEntry<PointCollection>>;
+template class Cache<uint64_t, NodeCacheEntry<LineCollection>>;
+template class Cache<uint64_t, NodeCacheEntry<PolygonCollection>>;
+template class Cache<uint64_t, NodeCacheEntry<GenericPlot>>;
+
+
 template class CacheQueryResult<std::pair<uint32_t,uint64_t>>;
 template class CacheStructure<std::pair<uint32_t, uint64_t>, IndexCacheEntry> ;
+template class Cache<std::pair<uint32_t, uint64_t>, IndexCacheEntry> ;

@@ -45,70 +45,42 @@ IndexCache::IndexCache(const std::string &reorg_strategy) :
 
 
 void IndexCache::put( const std::shared_ptr<IndexCacheEntry>& entry) {
-	auto cache = get_structure(entry->semantic_id,true);
-	//FIXME: This sucks -- extra copy
 	std::pair<uint32_t,uint64_t> id(entry->node_id,entry->entry_id);
-	cache->put(id, entry);
+	this->put_int(entry->semantic_id,id,entry);
 	get_node_entries(entry->node_id).insert(entry);
 }
 
 std::shared_ptr<const IndexCacheEntry> IndexCache::get(const IndexCacheKey& key) const {
-	auto cache = get_structure(key.semantic_id);
-	if (cache != nullptr) {
-		std::pair<uint32_t,uint64_t> id(key.node_id,key.entry_id);
-		return cache->get(id);
-	}
-	throw NoSuchElementException("Entry not found");
-}
-
-CacheQueryResult<std::pair<uint32_t,uint64_t>> IndexCache::query(const std::string& semantic_id, const QueryRectangle& qr) const {
-	TIME_EXEC("IndexCache.query");
-	auto cache = get_structure(semantic_id);
-	if (cache != nullptr)
-		return cache->query(qr);
-	else {
-		return CacheQueryResult<std::pair<uint32_t,uint64_t>>(qr);
-	}
+	std::pair<uint32_t,uint64_t> id(key.node_id,key.entry_id);
+	return this->get_int(key.semantic_id,id);
 }
 
 void IndexCache::remove(const IndexCacheKey& key) {
-	auto cache = get_structure(key.semantic_id);
-	if (cache != nullptr) {
-		try {
-			std::pair<uint32_t,uint64_t> id(key.node_id,key.entry_id);
-			auto entry = cache->remove(id);
-			remove_from_node(entry);
-		} catch ( const NoSuchElementException &nse ) {
-			Log::warn("Removal of index-entry failed: %s", nse.what());
-		}
+	try {
+		std::pair<uint32_t,uint64_t> id(key.node_id,key.entry_id);
+		auto e = this->remove_int(key.semantic_id,id);
+		remove_from_node(e);
+	} catch ( const NoSuchElementException &nse ) {
+		Log::warn("Removal of index-entry failed: %s", nse.what());
 	}
-	else
-		Log::warn("Removal of index-entry failed. No structure for semantic_id: %s", key.semantic_id.c_str());
 }
 
 void IndexCache::move(const IndexCacheKey& old_key, const IndexCacheKey& new_key) {
-	auto cache = get_structure(old_key.semantic_id);
-	if (cache != nullptr) {
-		std::pair<uint32_t,uint64_t> id(old_key.node_id,old_key.entry_id);
-		auto entry = cache->remove(id);
-		remove_from_node(entry);
-
-		id.first = new_key.node_id;
-		id.second = new_key.entry_id;
-		entry->node_id = new_key.node_id;
-		entry->entry_id = new_key.entry_id;
-
-		cache->put(id,entry);
-		get_node_entries(new_key.node_id).insert(entry);
-	}
-	else
-		throw NoSuchElementException("Entry not found");
+	std::pair<uint32_t,uint64_t> id(old_key.node_id,old_key.entry_id);
+	auto entry = this->remove_int(old_key.semantic_id,id);
+	remove_from_node(entry);
+	id.first = new_key.node_id;
+	id.second = new_key.entry_id;
+	entry->node_id = new_key.node_id;
+	entry->entry_id = new_key.entry_id;
+	put_int(new_key.semantic_id,id,entry);
+	get_node_entries(new_key.node_id).insert(entry);
 }
 
 void IndexCache::remove_all_by_node(uint32_t node_id) {
 	auto entries = get_node_entries(node_id);
 	for ( auto &key : entries ) {
-		remove(*key);
+		this->remove_int(key->semantic_id,std::pair<uint32_t,uint64_t>(key->node_id,key->entry_id));
 	}
 	entries_by_node.erase(node_id);
 }
@@ -124,22 +96,6 @@ std::vector<std::shared_ptr<const IndexCacheEntry> > IndexCache::get_all() const
 		result.insert(result.end(), p.second.begin(), p.second.end());
 
 	return result;
-}
-
-CacheStructure<std::pair<uint32_t,uint64_t>,IndexCacheEntry>* IndexCache::get_structure(const std::string& semantic_id, bool create) const {
-	Log::trace("Retrieving cache-structure for semantic_id: %s", semantic_id.c_str() );
-	Struct *cache;
-	auto got = caches.find(semantic_id);
-	if (got == caches.end() && create) {
-		Log::trace("No cache-structure found for semantic_id: %s. Creating.", semantic_id.c_str() );
-		cache = new Struct();
-		caches.emplace(semantic_id,cache);
-	}
-	else if (got != caches.end())
-		cache = got->second;
-	else
-		cache = nullptr;
-	return cache;
 }
 
 std::set<std::shared_ptr<const IndexCacheEntry>>& IndexCache::get_node_entries(uint32_t node_id) const {
@@ -177,15 +133,17 @@ void IndexCache::reorganize(
 
 void IndexCache::update_stats(uint32_t node_id, const CacheStats &stats) {
 	for ( auto &kv : stats.get_stats() ) {
-		auto cache = get_structure(kv.first);
-		if ( cache == nullptr )
-			continue;
 		std::pair<uint32_t,uint64_t> id(node_id,0);
 		for ( auto &s : kv.second ) {
 			id.second = s.entry_id;
-			auto e = cache->get(id);
-			e->access_count = s.access_count;
-			e->last_access = s.last_access;
+			try {
+				auto e = get_int(kv.first,id);
+				e->access_count = s.access_count;
+				e->last_access = s.last_access;
+			}
+			catch ( const NoSuchElementException &nse ) {
+				// Nothing TO DO
+			}
 		}
 	}
 }
@@ -327,10 +285,10 @@ void IndexCaches::update_stats(uint32_t node_id, const NodeStats& stats) {
 	}
 }
 
-void IndexCaches::reorganize(const std::map<uint32_t, std::shared_ptr<Node> > &nodes, std::map<uint32_t, NodeReorgDescription>& result) {
+void IndexCaches::reorganize(const std::map<uint32_t, std::shared_ptr<Node> > &nodes, std::map<uint32_t, NodeReorgDescription>& result, bool force) {
 	Log::info("Calculating reorganization of cache");
 	for ( IndexCache &c : all_caches ) {
-		if ( c.requires_reorg(nodes) )
+		if ( c.requires_reorg(nodes) || force )
 			c.reorganize(result);
 	}
 	Log::info("Finished calculating reorganization of cache");

@@ -38,7 +38,7 @@ TEST(STCacheTest,SimpleTest) {
 			QueryResolution::pixels(width, height)
 		);
 		QueryProfiler qp;
-		CacheQueryResult<uint64_t> qres = cache.query(sem_id,qr);
+		auto qres = cache.query(sem_id,qr);
 		EXPECT_TRUE( qres.has_remainder() );
 		auto res = GenericRaster::create(dd,qr,width,height);
 		CacheEntry meta( CacheCube(*res), 10, 1.0 );
@@ -81,7 +81,7 @@ TEST(STCacheTest,TestQuery) {
 		TemporalReference(TIMETYPE_UNIX, 10, 10),
 		QueryResolution::pixels(2, 2)
 	);
-	CacheQueryResult<uint64_t> qr = cache.query(sem_id, qrect);
+	auto qr = cache.query(sem_id, qrect);
 
 	EXPECT_TRUE( qr.has_remainder() );
 

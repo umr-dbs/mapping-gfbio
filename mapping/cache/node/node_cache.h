@@ -47,12 +47,11 @@ public:
 // To be instantiated by entry-type
 //
 template<typename EType>
-class NodeCache {
+class NodeCache : public Cache<uint64_t,NodeCacheEntry<EType>> {
 public:
 	NodeCache( CacheType type, size_t max_size );
 	NodeCache() = delete;
 	NodeCache( const NodeCache& ) = delete;
-	~NodeCache();
 
 	// Adds an entry for the given semantic_id to the cache.
 	const NodeCacheRef put( const std::string &semantic_id, const std::unique_ptr<EType> &item, const CacheEntry &meta);
@@ -69,9 +68,6 @@ public:
 	// returns meta-information about the entry for the given key
 	const NodeCacheRef get_entry_metadata(const NodeCacheKey& key) const;
 
-	// Queries the cache with the given query-rectangle
-	CacheQueryResult<uint64_t> query( const std::string &semantic_id, const QueryRectangle &qr ) const;
-
 	// Returns references to all entries
 	std::vector<NodeCacheRef> get_all() const;
 
@@ -86,11 +82,6 @@ public:
 
 	const CacheType type;
 private:
-	typedef CacheStructure<uint64_t,NodeCacheEntry<EType>> Struct;
-
-	// Retrieves the cache-structure for the given semantic_id.
-	Struct* get_structure( const std::string &semantic_id, bool create = false) const;
-
 	// Tracks the access to the given item
 	void track_access( const NodeCacheKey &key, NodeCacheEntry<EType> &e ) const;
 
@@ -100,11 +91,6 @@ private:
 	std::atomic_ullong current_size;
 	std::atomic_ullong next_id;
 
-	//std::unique_ptr<ReplacementPolicy<EType>> policy;
-	// Holds all cache-structures accessable by the semantic_id
-	mutable std::unordered_map<std::string,Struct*> caches;
-	// Mutex used when accessing the cache-structures
-	mutable std::mutex mtx;
 	// Mutex used during access-tracking
 	mutable std::mutex access_mtx;
 	// Collects the ids of all accessed entries

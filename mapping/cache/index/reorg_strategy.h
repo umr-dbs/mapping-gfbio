@@ -71,19 +71,22 @@ public:
 	static std::unique_ptr<RelevanceFunction> by_name( const std::string &name );
 	virtual ~RelevanceFunction() = default;
 	virtual void new_turn() {};
-	virtual bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 ) const = 0;
+	virtual bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1,
+							  const std::shared_ptr<const IndexCacheEntry> &e2 ) const = 0;
 };
 
 class LRU : public RelevanceFunction {
 public:
-	bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 ) const;
+	bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1,
+					  const std::shared_ptr<const IndexCacheEntry> &e2 ) const;
 };
 
 class CostLRU : public RelevanceFunction {
 public:
 	CostLRU();
 	void new_turn();
-	bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 ) const;
+	bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1,
+					  const std::shared_ptr<const IndexCacheEntry> &e2 ) const;
 private:
 	time_t now;
 };
@@ -170,7 +173,7 @@ private:
 class GeographicReorgStrategy : public ReorgStrategy {
 public:
 	static uint32_t get_z_value( const QueryCube &c );
-	static bool z_comp( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 );
+	static bool z_comp( const std::shared_ptr<const IndexCacheEntry> &e1, const std::shared_ptr<const IndexCacheEntry> &e2 );
 
 	GeographicReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);
 	// It must be ensured that at least on node is present in the given map

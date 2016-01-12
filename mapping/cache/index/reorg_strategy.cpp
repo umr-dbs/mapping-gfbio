@@ -35,7 +35,8 @@ std::unique_ptr<RelevanceFunction> RelevanceFunction::by_name(
 	throw ArgumentException(concat("Unknown Relevance-Function: ", name));
 }
 
-bool LRU::operator ()(const std::shared_ptr<const IndexCacheEntry>& e1, std::shared_ptr<const IndexCacheEntry>& e2) const {
+bool LRU::operator ()( const std::shared_ptr<const IndexCacheEntry>& e1,
+					   const std::shared_ptr<const IndexCacheEntry>& e2) const {
 	return e1->last_access > e2->last_access;
 }
 
@@ -46,8 +47,8 @@ void CostLRU::new_turn() {
 	time(&now);
 }
 
-bool CostLRU::operator ()(const std::shared_ptr<const IndexCacheEntry>& e1,
-		std::shared_ptr<const IndexCacheEntry>& e2) const {
+bool CostLRU::operator ()( const std::shared_ptr<const IndexCacheEntry>& e1,
+						   const std::shared_ptr<const IndexCacheEntry>& e2) const {
 
 	double f1 = 1.0 - (((now - e1->last_access) / 60) * 0.01);
 	double f2 = 1.0 - (((now - e2->last_access) / 60) * 0.01);
@@ -94,17 +95,6 @@ const std::vector<std::shared_ptr<const IndexCacheEntry> >& ReorgNode::get_entri
 //
 // Strategy
 //
-
-class SortHelp {
-public:
-	SortHelp( RelevanceFunction *f ) : f(f) {};
-	bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 ) {
-		return (*f)(e1,e2);
-	}
-
-private:
-	RelevanceFunction* f;
-};
 
 std::unique_ptr<ReorgStrategy> ReorgStrategy::by_name(const IndexCache& cache,
 		const std::string& name, const std::string& relevance) {
@@ -189,7 +179,7 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 	// We have removals
 	if ( bytes_used / bytes_available >= max_target_usage ) {
 		relevance_function->new_turn();
-		std::sort( all_entries.begin(), all_entries.end(), SortHelp(relevance_function.get()) );
+		std::sort( all_entries.begin(), all_entries.end(), std::ref(*relevance_function) );
 
 		while ( bytes_used / bytes_available >= max_target_usage ) {
 			auto &e = all_entries.back();
@@ -549,7 +539,7 @@ uint32_t GeographicReorgStrategy::get_z_value(const QueryCube& c) {
 
 bool GeographicReorgStrategy::z_comp(
 		const std::shared_ptr<const IndexCacheEntry>& e1,
-		std::shared_ptr<const IndexCacheEntry>& e2) {
+		const std::shared_ptr<const IndexCacheEntry>& e2) {
 
 	return get_z_value( e1->bounds ) < get_z_value( e2->bounds );
 }

@@ -95,6 +95,17 @@ const std::vector<std::shared_ptr<const IndexCacheEntry> >& ReorgNode::get_entri
 // Strategy
 //
 
+class SortHelp {
+public:
+	SortHelp( RelevanceFunction *f ) : f(f) {};
+	bool operator() ( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 ) {
+		return (*f)(e1,e2);
+	}
+
+private:
+	RelevanceFunction* f;
+};
+
 std::unique_ptr<ReorgStrategy> ReorgStrategy::by_name(const IndexCache& cache,
 		const std::string& name, const std::string& relevance) {
 
@@ -178,7 +189,7 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 	// We have removals
 	if ( bytes_used / bytes_available >= max_target_usage ) {
 		relevance_function->new_turn();
-		std::sort( all_entries.begin(), all_entries.end(), std::ref(*relevance_function) );
+		std::sort( all_entries.begin(), all_entries.end(), SortHelp(relevance_function.get()) );
 
 		while ( bytes_used / bytes_available >= max_target_usage ) {
 			auto &e = all_entries.back();
@@ -231,7 +242,7 @@ CapacityReorgStrategy::CapacityReorgStrategy(const IndexCache& cache,
 }
 
 bool CapacityReorgStrategy::node_sort(
-		const std::shared_ptr<const IndexCacheEntry>& e1, std::shared_ptr<const IndexCacheEntry>& e2) {
+		const std::shared_ptr<const IndexCacheEntry>& e1, const std::shared_ptr<const IndexCacheEntry>& e2) {
 	return e1->node_id < e2->node_id;
 }
 

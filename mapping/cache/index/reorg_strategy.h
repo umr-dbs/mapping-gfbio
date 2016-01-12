@@ -119,7 +119,7 @@ private:
 //
 class CapacityReorgStrategy : public ReorgStrategy {
 public:
-	static bool node_sort( const std::shared_ptr<const IndexCacheEntry> &e1, std::shared_ptr<const IndexCacheEntry> &e2 );
+	static bool node_sort( const std::shared_ptr<const IndexCacheEntry> &e1, const std::shared_ptr<const IndexCacheEntry> &e2 );
 	CapacityReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);
 	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 protected:

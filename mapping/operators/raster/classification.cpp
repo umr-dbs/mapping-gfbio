@@ -103,7 +103,7 @@ std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRect
 	const double min = std::min(*min_max_classes.first, noDataClass);
 	const double max = std::max(*min_max_classes.second, noDataClass);
 
-	Unit output_unit = Unit(raster_in->dd.unit.getMeasurement(), "classification");
+	Unit output_unit = Unit(raster_in->dd.unit.getMeasurement(), "_classification");
 	output_unit.setMinMax(min, max);
 	// TODO: add classes
 

@@ -67,5 +67,8 @@ std::unique_ptr<GenericRaster> SourceOperator::getRaster(const QueryRectangle &r
 #endif
 
 void SourceOperator::writeSemanticParameters(std::ostringstream &stream) {
-	stream << "{\"sourcename\": \"" << sourcename << "\"}";
+	std::string trans = transform ? "true" : "false";
+	stream << "{\"sourcename\": \"" << sourcename << "\",";
+	stream << " \"channel\": " << channel << ",";
+	stream << " \"transform\": " << trans << "}";
 }

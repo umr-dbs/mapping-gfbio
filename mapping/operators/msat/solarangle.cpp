@@ -54,7 +54,7 @@ REGISTER_OPERATOR(MSATSolarAngleOperator, "msatsolarangle");
 
 void MSATSolarAngleOperator::writeSemanticParameters(std::ostringstream& stream) {
 	stream << "{";
-	stream << "\"solarAngle\":";
+	stream << "\"solarangle\":";
 	if (solarAngle == SolarAngles::AZIMUTH)
 		stream << "\"azimuth\"";
 	else if (solarAngle == SolarAngles::ZENITH)

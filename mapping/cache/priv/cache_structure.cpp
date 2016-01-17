@@ -15,6 +15,7 @@
 #include "util/concat.h"
 
 #include <iostream>
+#include <chrono>
 
 //
 // Key
@@ -172,7 +173,10 @@ void CacheCube::toStream(BinaryStream& stream) const {
 // AccessInfo
 //
 
-AccessInfo::AccessInfo() : last_access(time(nullptr)), access_count(1) {
+AccessInfo::AccessInfo() :
+		last_access( std::chrono::duration_cast<std::chrono::milliseconds>(
+				std::chrono::system_clock::now().time_since_epoch()).count() ),
+		access_count(1) {
 }
 
 AccessInfo::AccessInfo( time_t last_access, uint32_t access_count ) :
@@ -474,11 +478,6 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 	}
 
 	std::vector<Cube<3>> u_rems = union_remainders(remainders);
-	if ( u_rems.size() != remainders.size() )
-		Log::trace("Union produced %ld instead of %ld remainders", u_rems.size(), remainders.size());
-	else
-		Log::trace("Union had no effect, remainders: %ld", remainders.size() );
-
 	return enlarge_expected_result(spec, used_entries, u_rems);
 }
 
@@ -552,6 +551,7 @@ CacheQueryResult<KType> CacheStructure<KType, EType>::enlarge_expected_result(
 		}
 	}
 
+//	double coverage = 1.0 - (rem_volume/qc.volume());
 	// Return miss if we have a low coverage (<10%)
 	if ( rem_volume/qc.volume() > 0.9 )
 		return CacheQueryResult<KType>( orig );

@@ -29,7 +29,8 @@ BaseConnection<StateType>::~BaseConnection() {
 }
 
 template<typename StateType>
-void BaseConnection<StateType>::input() {
+bool BaseConnection<StateType>::input() {
+
 	// If we are processing a non-blocking read
 	if (reading) {
 		reader->read(socket->getReadFD());
@@ -38,12 +39,14 @@ void BaseConnection<StateType>::input() {
 			reading = false;
 			read_finished(*reader);
 			reader.reset();
+			return true;
 		}
 		else if (reader->has_error()) {
 			Log::warn("An error occured during read on connection: %d", id);
 			reading = false;
 			faulty = true;
 			reader.reset();
+			return true;
 		}
 		else
 			Log::trace("Read-buffer full. Continuing on next call on connection: %d", id);
@@ -51,18 +54,21 @@ void BaseConnection<StateType>::input() {
 	// If we are expecting commands
 	else {
 		uint8_t cmd;
-		try {
-			if (stream.read(&cmd, true))
-				process_command(cmd);
-			else {
-				Log::debug("Connection closed %d.", id);
-				faulty = true;
-			}
-		} catch (const std::exception &e) {
-			Log::error("Unexpected error on connection %d, setting faulty. Reason: %s", id, e.what());
+		ssize_t resp = ::read(socket->getReadFD(),&cmd,sizeof(cmd));
+		if ( resp == 0 ) {
+			Log::debug("Connection closed %d.", id);
 			faulty = true;
 		}
+		else if ( resp == -1 && errno != EAGAIN && errno != EWOULDBLOCK ) {
+			Log::error("Unexpected error on connection %d, setting faulty. Reason: %s", id, strerror(errno) );
+			faulty = true;
+		}
+		else if ( resp > 0 ) {
+			process_command(cmd);
+			return !reading;
+		}
 	}
+	return false;
 }
 
 template<typename StateType>

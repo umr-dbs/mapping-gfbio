@@ -15,23 +15,23 @@
 #include <sys/socket.h>
 
 Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const GenericRaster> raster) :
-	id(id), creation_time(time(0)), count(count), type(CacheType::RASTER), raster(raster) {
+	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::RASTER), raster(raster) {
 }
 
 Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const PointCollection> points) :
-	id(id), creation_time(time(0)), count(count), type(CacheType::POINT), points(points) {
+	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::POINT), points(points) {
 }
 
 Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const LineCollection> lines) :
-	id(id), creation_time(time(0)), count(count), type(CacheType::LINE), lines(lines) {
+	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::LINE), lines(lines) {
 }
 
 Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const PolygonCollection> polygons):
-	id(id), creation_time(time(0)), count(count), type(CacheType::POLYGON), polygons(polygons) {
+	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::POLYGON), polygons(polygons) {
 }
 
 Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const GenericPlot> plot):
-	id(id), creation_time(time(0)), count(count), type(CacheType::PLOT), plot(plot) {
+	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::PLOT), plot(plot) {
 }
 
 void Delivery::send(DeliveryConnection& connection) {
@@ -75,12 +75,12 @@ Delivery& DeliveryManager::get_delivery(uint64_t id) {
 }
 
 void DeliveryManager::remove_expired_deliveries() {
-	time_t now = time(nullptr);
+	time_t now = CacheCommon::time_millis();
 
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
 	auto iter = deliveries.begin();
 	while ( iter != deliveries.end() ) {
-		if ( iter->second.count == 0 || difftime(now, iter->second.creation_time) >= 30 )
+		if ( iter->second.count == 0 || now - iter->second.creation_time >= 30000 )
 			deliveries.erase(iter++);
 		else
 			iter++;
@@ -189,10 +189,11 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 			dc->output();
 		}
 		else if ( !dc->is_writing() && FD_ISSET(dc->get_read_fd(), readfds)) {
-			dc->input();
-			// Skip faulty/reading connections
-			if ( dc->is_faulty() || dc->is_reading() )
+
+			// Read from connection -- continue if nothing is to do
+			if ( !dc->input() )
 				continue;
+
 			switch ( dc->get_state() ) {
 				case DeliveryState::DELIVERY_REQUEST_READ: {
 					uint64_t id = dc->get_delivery_id();

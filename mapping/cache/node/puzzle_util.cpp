@@ -56,7 +56,9 @@ std::unique_ptr<T> LocalRetriever<T>::compute(GenericOperator& op, const QueryRe
 
 template<>
 std::unique_ptr<GenericRaster> LocalRetriever<GenericRaster>::compute(GenericOperator& op, const QueryRectangle& query, QueryProfiler& qp) const {
-	return op.getCachedRaster(query,qp);
+	auto res = op.getCachedRaster(query,qp);
+	res->setRepresentation(GenericRaster::Representation::CPU);
+	return res;
 }
 
 template<>
@@ -187,7 +189,7 @@ std::unique_ptr<GenericRaster> RasterPuzzler::puzzle(
 			try {
 				result->blit( raster.get(), x, y );
 			} catch ( const MetadataException &me ) {
-				Log::error("Blit error. Result: %s, piece: %s", CacheCommon::stref_to_string(result->stref).c_str(), CacheCommon::stref_to_string(raster->stref).c_str() );
+				Log::error("Blit error: %s\nResult: %s\npiece : %s", me.what(), CacheCommon::stref_to_string(result->stref).c_str(), CacheCommon::stref_to_string(raster->stref).c_str() );
 			}
 		}
 	}

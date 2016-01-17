@@ -39,7 +39,7 @@ std::atomic_int PuzzleTracer::next(1);
 std::string PuzzleTracer::dir = "/tmp/";
 
 void PuzzleTracer::init() {
-	time_t t = time(0);
+	time_t t = CacheCommon::time_millis();
 
 	std::ostringstream ss;
 	ss << "/tmp/" << t;

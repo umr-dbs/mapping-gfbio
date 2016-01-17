@@ -44,14 +44,14 @@ CostLRU::CostLRU() : now(0) {
 }
 
 void CostLRU::new_turn() {
-	time(&now);
+	now = CacheCommon::time_millis();
 }
 
 bool CostLRU::operator ()( const std::shared_ptr<const IndexCacheEntry>& e1,
 						   const std::shared_ptr<const IndexCacheEntry>& e2) const {
 
-	double f1 = 1.0 - (((now - e1->last_access) / 60) * 0.01);
-	double f2 = 1.0 - (((now - e2->last_access) / 60) * 0.01);
+	double f1 = 1.0 - (((now - e1->last_access) / 60000) * 0.01);
+	double f2 = 1.0 - (((now - e2->last_access) / 60000) * 0.01);
 
 	return (e1->costs * f1) > (e2->costs * f2);
 }

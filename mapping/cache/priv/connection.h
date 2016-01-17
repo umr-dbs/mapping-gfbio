@@ -27,7 +27,7 @@ public:
 	BaseConnection(StateType state, std::unique_ptr<BinaryFDStream> socket);
 	virtual ~BaseConnection();
 	// Called if data is available on the unerlying socket and this connection is not in writing mode
-	void input();
+	bool input();
 	// Called if data can be written to the unerlying socket and this connection is in writing-mode
 	void output();
 

@@ -82,7 +82,7 @@ GenericOperator::GenericOperator(int _sourcecounts[], GenericOperator *_sources[
 
 
 GenericOperator::~GenericOperator() {
-	for (int i=0;i<MAX_INPUT_TYPES;i++) {
+	for (int i=0;i<MAX_SOURCES;i++) {
 		delete sources[i];
 		sources[i] = nullptr;
 	}

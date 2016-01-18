@@ -89,13 +89,13 @@ void TimeShiftOperator::writeSemanticParameters(std::ostringstream& stream) {
 	if(has_shift) {
 		stream << "\"shift\":{";
 		if(shift_has_from) {
-			stream << "\"from\":{\"unit\":\"" << shift_from_unit << ",\"value\":" << shift_from_quote << shift_from_value << shift_from_quote << "}";
+			stream << "\"from\":{\"unit\":\"" << shift_from_unit << "\",\"value\":" << shift_from_quote << shift_from_value << shift_from_quote << "}";
 			if(shift_has_to) {
 				stream << ",";
 			}
 		}
 		if(shift_has_to) {
-			stream << "\"to\":{\"unit\":\"" << shift_to_unit << ",\"value:\"" << shift_to_quote << shift_to_value << shift_to_quote << "}";
+			stream << "\"to\":{\"unit\":\"" << shift_to_unit << "\",\"value\":" << shift_to_quote << shift_to_value << shift_to_quote << "}";
 		}
 		stream << "}";
 		if(has_stretch || has_snap) {

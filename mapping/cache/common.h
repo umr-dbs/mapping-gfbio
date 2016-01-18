@@ -128,6 +128,8 @@ private:
 class CacheCommon {
 public:
 
+	static time_t time_millis();
+
 	//
 	// Creates a listening socket on the given port.
 	//

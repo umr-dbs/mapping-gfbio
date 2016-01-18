@@ -136,7 +136,7 @@ private:
 	// timestamp of the last reorganization
 	time_t last_reorg;
 
-	// Interval for stats-updates and reorg
+	// Interval for stats-updates and reorg (in ms)
 	time_t update_interval;
 };
 

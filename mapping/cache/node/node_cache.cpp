@@ -126,7 +126,7 @@ void NodeCache<EType>::track_access(const NodeCacheKey& key,
 		NodeCacheEntry<EType> &e) const {
 	std::lock_guard<std::mutex> g(access_mtx);
 	e.access_count++;
-	time(&(e.last_access));
+	e.last_access = CacheCommon::time_millis();
 	try {
 		access_tracker.at(key.semantic_id).insert(key.entry_id);
 	} catch (const std::out_of_range &oor) {

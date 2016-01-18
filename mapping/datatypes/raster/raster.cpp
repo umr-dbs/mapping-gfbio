@@ -598,7 +598,9 @@ template<typename T>
 std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRectangle &qrect) {
 	setRepresentation(GenericRaster::Representation::CPU);
 
-	auto out = GenericRaster::create(dd, qrect, qrect.xres, qrect.yres);
+	QueryRectangle target( qrect, stref, qrect );
+
+	auto out = GenericRaster::create(dd, target, target.xres, target.yres);
 	Raster2D<T> *r = (Raster2D<T> *) out.get();
 
 	GridSpatioTemporalResultProjecter p(*this, *out);

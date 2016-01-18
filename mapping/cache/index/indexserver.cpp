@@ -31,7 +31,7 @@
 ////////////////////////////////////////////////////////////
 
 Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &cap) :
-	id(id), host(host), port(port), last_stat_update(time(nullptr)), control_connection(0), capacity(cap) {
+	id(id), host(host), port(port), last_stat_update( CacheCommon::time_millis() ), control_connection(0), capacity(cap) {
 }
 
 void Node::update_stats(const NodeStats& stats) {
@@ -68,7 +68,7 @@ std::string Node::to_string() const {
 
 IndexServer::IndexServer(int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function) :
 	caches(reorg_strategy,relevance_function), port(port), shutdown(false), next_node_id(1),
-	query_manager(caches,nodes), last_reorg(time(nullptr)), update_interval(update_interval) {
+	query_manager(caches,nodes), last_reorg(CacheCommon::time_millis()), update_interval(update_interval) {
 }
 
 IndexServer::~IndexServer() {
@@ -143,30 +143,38 @@ void IndexServer::run() {
 		if ( update_interval == 0 )
 			continue;
 
-		// Update stats
-		time_t now = time(nullptr);
+
+		time_t now = CacheCommon::time_millis();
 		time_t oldest_stats = now;
 		bool all_idle = true;
+		bool requires_reorg = false;
+
+		// Check timestamps
 		for (auto &kv : nodes) {
 			Node& node = *kv.second;
-			oldest_stats = std::min(oldest_stats, node.last_stat_update);
 			ControlConnection &cc = *control_connections.at(node.control_connection);
-			// Fetch stats
-			if (cc.get_state() == ControlState::IDLE && (now - node.last_stat_update) > update_interval) {
-				cc.send_get_stats();
-			}
+			oldest_stats = std::min(oldest_stats, node.last_stat_update);
 			// Remeber if all connections are idle -> Allows reorg
 			all_idle &= (cc.get_state() == ControlState::IDLE);
 		}
 
-		// Trace stats
-//		if ( all_idle && now -oldest_stats >= 10 ) {
-//			fprintf(stderr, "%s\n", stats_string().c_str() );
-//		}
 
 		// Reorganize
-		if (oldest_stats > last_reorg && all_idle && caches.require_reorg(nodes) ) {
-			reorganize();
+		if ( oldest_stats > last_reorg ) {
+			requires_reorg = caches.require_reorg( nodes );
+			if ( requires_reorg && all_idle )
+				reorganize();
+		}
+
+		// Update stats if applicable
+		if ( !requires_reorg ) {
+			for (auto &kv : nodes) {
+				Node& node = *kv.second;
+				ControlConnection &cc = *control_connections.at(node.control_connection);
+				if (cc.get_state() == ControlState::IDLE && (now - node.last_stat_update) > update_interval) {
+					cc.send_get_stats();
+				}
+			}
 		}
 	}
 
@@ -307,10 +315,8 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 			cc.output();
 		}
 		else if (!cc.is_writing() && FD_ISSET(cc.get_read_fd(), readfds)) {
-			// Read from connection
-			cc.input();
-			// Skip faulty connections
-			if (cc.is_faulty() || cc.is_reading())
+			// Read from connection -- continue if nothing is to do
+			if ( !cc.input() )
 				continue;
 
 			switch (cc.get_state()) {
@@ -349,7 +355,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					auto &stats = cc.get_stats();
 					Log::debug("Node %d delivered fresh statistics: %s", cc.node->id, stats.to_string().c_str());
 					cc.node->update_stats(stats);
-					time(&cc.node->last_stat_update);
+					cc.node->last_stat_update = CacheCommon::time_millis();
 					caches.update_stats(cc.node->id, stats);
 					cc.release();
 					break;
@@ -375,12 +381,10 @@ void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) 
 			cc.output();
 		}
 		else if (!cc.is_writing() && FD_ISSET(cc.get_read_fd(), readfds)) {
-			// Read from connection
-			cc.input();
-
-			// Skip faulty connections
-			if (cc.is_faulty() || cc.is_reading())
+			// Read from connection -- continue if nothing is to do
+			if ( !cc.input() )
 				continue;
+
 			// Handle state-changes
 			switch (cc.get_state()) {
 				case ClientState::AWAIT_RESPONSE:
@@ -403,12 +407,10 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 			wc.output();
 		}
 		else if (!wc.is_writing() && FD_ISSET(wc.get_read_fd(), readfds)) {
-			// Read from connection
-			wc.input();
-
-			// Skip faulty connections
-			if (wc.is_faulty() || wc.is_reading())
+			// Read from connection -- continue if nothing is to do
+			if ( !wc.input() )
 				continue;
+
 			// Handle state-changes
 			switch (wc.get_state()) {
 				case WorkerState::ERROR: {
@@ -472,7 +474,7 @@ void IndexServer::reorganize(bool force) {
 		reorgs.emplace(kv.first, NodeReorgDescription(kv.second));
 
 	// Remember time of this reorg
-	time(&last_reorg);
+	last_reorg = CacheCommon::time_millis();
 	caches.reorganize(nodes,reorgs,force);
 	for (auto &d : reorgs) {
 		Log::debug("Processing removals locally and sending reorg-commands to nodes.");

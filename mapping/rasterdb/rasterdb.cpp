@@ -549,7 +549,7 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 	int zoom = 0;
 	uint32_t pixel_width = pixel_x2 - pixel_x1;
 	uint32_t pixel_height = pixel_y2 - pixel_y1;
-	while (pixel_width > 2*rect.xres && pixel_height > 2*rect.yres) {
+	while (pixel_width >= 2*rect.xres && pixel_height >= 2*rect.yres) {
 		zoom++;
 		pixel_width >>= 1;
 		pixel_height >>= 1;

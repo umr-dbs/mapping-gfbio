@@ -62,7 +62,7 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
 		}
 
-		auto ref = put_local(semantic_id, item, CacheEntry( cube, size, strategy.get_costs(profiler,size)) );
+		auto ref = put_local(semantic_id, item, CacheEntry( cube, size + sizeof(NodeCacheEntry<T>), strategy.get_costs(profiler,size)) );
 		TIME_EXEC("CacheManager.put.remote");
 
 		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());

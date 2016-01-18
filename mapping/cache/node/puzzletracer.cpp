@@ -23,7 +23,11 @@ void RasterWriter::write_raster(GenericRaster& raster, std::string prefix) {
 	int id = file_no++;
 	std::ostringstream ss;
 	ss << dir << "/" << prefix << id << ".png";
-	auto col = Colorizer::make("");
+	auto col = Colorizer::create("");
+
+	std::ofstream file;
+	file.open (ss.str().c_str() );
+
 
 	meta << prefix << id << std::endl;
 	meta << "x: [" << raster.stref.x1 << "," << raster.stref.x2 << "], ";
@@ -32,7 +36,7 @@ void RasterWriter::write_raster(GenericRaster& raster, std::string prefix) {
 	meta << "size: "<< raster.width << "x" << raster.height << ", ";
 	meta << "res: " << raster.pixel_scale_x << "x" << raster.pixel_scale_y;
 	meta << std::endl;
-	raster.toPNG( ss.str().c_str(), *col, false, true );
+	raster.toPNG( file, *col, false, true );
 }
 
 std::atomic_int PuzzleTracer::next(1);

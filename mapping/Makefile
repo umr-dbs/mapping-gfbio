@@ -30,8 +30,8 @@ CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
 LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
-LDFLAGS_CGI=-lfcgi++ -lfcgi -luriparser
-LDFLAGS_GTEST=-lpthread -luriparser
+LDFLAGS_CGI=-lfcgi++ -lfcgi
+LDFLAGS_GTEST=-lpthread
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 

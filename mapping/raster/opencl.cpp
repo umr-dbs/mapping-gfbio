@@ -63,6 +63,10 @@ void init() {
 				std::ostringstream msg;
 				msg << "CL vendor " << i << ": " << platformName;
 				d(msg.str());
+
+				if ( platformName[platformName.length()-1] == 0 )
+					platformName = platformName.substr(0,platformName.length()-1);
+
 				if (platformName == preferredPlatformName)
 					selectedPlatform = i;
 			}
@@ -101,7 +105,6 @@ void init() {
 			cl_ulong _max_alloc_size = 0;
 			device.getInfo((cl_platform_info) CL_DEVICE_MAX_MEM_ALLOC_SIZE, &_max_alloc_size);
 			max_alloc_size = _max_alloc_size;
-
 
 			// Command Queue
 			// CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE is not set

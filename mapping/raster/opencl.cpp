@@ -11,13 +11,10 @@
 #include "util/debug.h"
 
 
-//#include <iostream>
-#include <fstream>
 #include <sstream>
-//#include <memory>
 #include <mutex>
 #include <atomic>
-//#include <string>
+#include <unordered_map>
 
 namespace RasterOpenCL {
 
@@ -239,9 +236,40 @@ const std::string &getRasterInfoStructSource() {
 }
 
 
+/*
+ * ProgramCache
+ */
+
+// For the first implementation, only one program may be compiled at a time, and
+// there's no replacement strategy; the cache just keeps on filling.
+static std::mutex program_cache_mutex;
+static std::unordered_map<std::string, cl::Program> program_cache;
+
+cl::Program compileSource(const std::string &sourcecode) {
+	std::lock_guard<std::mutex> guard(program_cache_mutex);
+
+	if (program_cache.count(sourcecode) == 1) {
+		return program_cache.at(sourcecode);
+	}
+
+	cl::Program program;
+	try {
+		cl::Program::Sources sources(1, std::make_pair(sourcecode.c_str(), sourcecode.length()));
+		program = cl::Program(context, sources);
+		program.build(deviceList,""); // "-cl-std=CL2.0"
+	}
+	catch (const cl::Error &e) {
+		throw OpenCLException(concat("Error building cl::Program: ", e.what(), " ", program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0])));
+	}
+
+	program_cache[sourcecode] = program;
+	return program;
+}
 
 
-
+/*
+ * CLProgram
+ */
 CLProgram::CLProgram() : profiler(nullptr), kernel(nullptr), argpos(0), finished(false), iteration_type(0), in_rasters(), out_rasters(), pointcollections() {
 }
 CLProgram::~CLProgram() {
@@ -292,9 +320,6 @@ struct getCLTypeName {
 };
 
 void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
-	// TODO: here, we could add everything into our cache.
-	// key: hash(source) . (in-types) . (out-types) . kernelname
-
 	if (iteration_type == 0)
 		throw OpenCLException("No raster or pointcollection added, cannot iterate");
 
@@ -316,19 +341,7 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 
 	assembled_source << sourcecode;
 
-	std::string final_source = assembled_source.str();
-
-	cl::Program program;
-	try {
-		cl::Program::Sources sources(1, std::make_pair(final_source.c_str(), final_source.length()));
-		program = cl::Program(context, sources);
-		program.build(deviceList,""); // "-cl-std=CL2.0"
-	}
-	catch (const cl::Error &e) {
-		std::stringstream msg;
-		msg << "Error building cl::Program: " << kernelname << ": " << e.what() << " " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0]);
-		throw OpenCLException(msg.str());
-	}
+	cl::Program program = compileSource(assembled_source.str());
 
 	try {
 		kernel = make_unique<cl::Kernel>(program, kernelname);

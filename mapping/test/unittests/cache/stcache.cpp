@@ -2,7 +2,7 @@
 #include <gtest/gtest.h>
 #include "cache/common.h"
 #include "cache/node/node_cache.h"
-#include "test/unittests/cache/util.h"
+#include "cache/experiments/exp_util.h"
 #include "operators/operator.h"
 #include "util/configuration.h"
 #include "util/make_unique.h"

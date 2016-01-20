@@ -11,6 +11,7 @@
 #include "cache/node/puzzletracer.h"
 #include "util/configuration.h"
 #include "util/log.h"
+#include "raster/opencl.h"
 #include <signal.h>
 
 NodeServer *instance = nullptr;
@@ -72,6 +73,8 @@ int main(void) {
 	size_t line_size = atoi(Configuration::get("nodeserver.cache.lines.size").c_str());
 	size_t polygon_size = atoi(Configuration::get("nodeserver.cache.polygons.size").c_str());
 	size_t plot_size = atoi(Configuration::get("nodeserver.cache.plots.size").c_str());
+
+	RasterOpenCL::init();
 
 	// Inititalize cache
 	std::unique_ptr<NodeCacheManager> cache_impl = make_unique<NodeCacheManager>(

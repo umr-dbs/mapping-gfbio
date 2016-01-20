@@ -25,6 +25,7 @@ class GenericPlot;
 class GenericOperator {
 	friend class CacheManager;
 	friend class GraphReorgStrategy;
+	friend class QuerySpec;
 	public:
 		enum class RasterQM {
 			EXACT,

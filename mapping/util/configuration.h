@@ -1,4 +1,7 @@
 
+#ifndef UTIL_CONFIGURATION_H_
+#define UTIL_CONFIGURATION_H_
+
 #include <string>
 
 class Configuration {
@@ -13,3 +16,5 @@ class Configuration {
 		static const std::string &get(const std::string &name, const std::string &defaultValue);
 		static bool getBool(const std::string &name, const bool defaultValue);
 };
+
+#endif

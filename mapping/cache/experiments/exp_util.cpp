@@ -125,14 +125,6 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 // Local cache manager
 //
 
-class PuzzleGuard {
-public:
-	PuzzleGuard( LocalCacheManager& mgr ) : mgr(mgr) { mgr.puzzling = true; };
-	~PuzzleGuard() { mgr.puzzling = false; };
-private:
-	LocalCacheManager& mgr;
-};
-
 template<class T>
 LocalCacheWrapper<T>::LocalCacheWrapper(NodeCache<T>& cache, std::unique_ptr<Puzzler<T> > puzzler, LocalCacheManager &mgr) :
 	cache(cache), retriever(cache), puzzle_util(this->retriever, std::move(puzzler)), mgr(mgr) {
@@ -140,13 +132,13 @@ LocalCacheWrapper<T>::LocalCacheWrapper(NodeCache<T>& cache, std::unique_ptr<Puz
 
 template<class T>
 void LocalCacheWrapper<T>::put(const std::string &semantic_id,
-		const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
+		const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler) {
 
 	mgr.costs.all_cpu += profiler.self_cpu;
 	mgr.costs.all_gpu += profiler.self_gpu;
 	mgr.costs.all_io  += profiler.self_io;
 
-	if ( mgr.puzzling )
+	if ( mgr.worker_context.is_puzzling() )
 		return;
 
 	size_t size = SizeUtil::get_byte_size(*item);
@@ -174,20 +166,24 @@ void LocalCacheWrapper<T>::put(const std::string &semantic_id,
 			else if ( scale_y > cube.resolution_info.pixel_scale_y.b )
 				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
 		}
-		cache.put(semantic_id, item, CacheEntry( cube, size, mgr.strategy->get_costs(profiler,size)));
+		cache.put(semantic_id, item, CacheEntry( cube, size, profiler));
+		// Tell the profiler this entry was cached!
+		profiler.cached();
 	}
 }
 
 template<class T>
 std::unique_ptr<T> LocalCacheWrapper<T>::query(const GenericOperator& op,
-		const QueryRectangle& rect) {
+		const QueryRectangle& rect, QueryProfiler &profiler) {
 
 	CacheQueryResult<uint64_t> qres = cache.query(op.getSemanticId(), rect);
 
 	// Full single local hit
 	if ( !qres.has_remainder() && qres.keys.size() == 1 ) {
 		NodeCacheKey key(op.getSemanticId(), qres.keys.at(0));
-		return cache.get_copy(key);
+		auto e = cache.get(key);
+		profiler.addTotalCosts(e->profile);
+		return e->copy_data();
 	}
 	// Partial or Full puzzle
 	else if ( qres.has_hit() ) {
@@ -197,7 +193,7 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(const GenericOperator& op,
 			refs.push_back( CacheRef("testhost",12345,id) );
 
 		PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
-		return process_puzzle(pr);
+		return process_puzzle(pr, profiler);
 	}
 	else {
 		throw NoSuchElementException("MISS");
@@ -205,11 +201,14 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(const GenericOperator& op,
 }
 
 template<class T>
-std::unique_ptr<T> LocalCacheWrapper<T>::process_puzzle(const PuzzleRequest& request) {
-	PuzzleGuard pg(mgr);
-	QueryProfiler qp;
-	auto result = puzzle_util.process_puzzle( request, qp );
-	put( request.semantic_id, result, request.query, qp );
+std::unique_ptr<T> LocalCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler) {
+	PuzzleGuard pg(mgr.worker_context);
+	std::unique_ptr<T> result;
+	{
+		QueryProfilerSimpleGuard guard(profiler);
+		result = puzzle_util.process_puzzle( request, profiler );
+	}
+	put( request.semantic_id, result, request.query, profiler );
 	return result;
 }
 
@@ -217,7 +216,6 @@ LocalCacheManager::LocalCacheManager(std::unique_ptr<CachingStrategy> strategy,
 		size_t raster_cache_size, size_t point_cache_size,
 		size_t line_cache_size, size_t polygon_cache_size,
 		size_t plot_cache_size ) :
-	puzzling(false),
 	rc(CacheType::RASTER,raster_cache_size),
 	pc(CacheType::POINT,point_cache_size),
 	lc(CacheType::LINE,line_cache_size),
@@ -262,7 +260,7 @@ void LocalCacheManager::reset_costs() {
 	costs.self_cpu = 0;
 	costs.self_gpu = 0;
 	costs.self_io = 0;
-	costs.uncached_depth = 1;
+	costs.cached();
 }
 
 void LocalCacheManager::set_strategy(
@@ -413,7 +411,7 @@ void TestCacheMan::reset_costs() {
 	costs.self_cpu = 0;
 	costs.self_gpu = 0;
 	costs.self_io = 0;
-	costs.uncached_depth = 1;
+	costs.cached();
 }
 
 
@@ -479,15 +477,16 @@ TracingCacheWrapper<T,TYPE>::TracingCacheWrapper(
 template<class T, CacheType TYPE>
 void TracingCacheWrapper<T,TYPE>::put(const std::string& semantic_id,
 		const std::unique_ptr<T>& item, const QueryRectangle& query,
-		const QueryProfiler& profiler) {
+		QueryProfiler& profiler) {
 	(void) semantic_id; (void) item; (void) query; (void) profiler;
 	size += SizeUtil::get_byte_size(*item);
 }
 
 template<class T, CacheType TYPE>
 std::unique_ptr<T> TracingCacheWrapper<T,TYPE>::query(
-		const GenericOperator& op, const QueryRectangle& rect) {
+		const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
 	query_log.push_back( QTriple(TYPE,rect,op.getSemanticId()) );
+	(void) profiler;
 	throw NoSuchElementException("NOP");
 }
 
@@ -655,22 +654,23 @@ void CacheExperiment::execute_query(const QTriple& query, QueryProfiler &qp) {
 }
 
 void CacheExperiment::execute_query(ClientCacheManager& mgr, const QTriple& t) {
+	QueryProfiler qp;
 	auto op = GenericOperator::fromJSON(t.semantic_id);
 	switch ( t.type ) {
 	case CacheType::RASTER:
-		mgr.get_raster_cache().query(*op,t.query);
+		mgr.get_raster_cache().query(*op,t.query,qp);
 		break;
 	case CacheType::POINT:
-		mgr.get_point_cache().query(*op,t.query);
+		mgr.get_point_cache().query(*op,t.query,qp);
 		break;
 	case CacheType::LINE:
-		mgr.get_line_cache().query(*op,t.query);
+		mgr.get_line_cache().query(*op,t.query,qp);
 		break;
 	case CacheType::POLYGON:
-		mgr.get_polygon_cache().query(*op,t.query);
+		mgr.get_polygon_cache().query(*op,t.query,qp);
 		break;
 	case CacheType::PLOT:
-		mgr.get_plot_cache().query(*op,t.query);
+		mgr.get_plot_cache().query(*op,t.query,qp);
 		break;
 	default:
 		throw ArgumentException("Illegal query type");

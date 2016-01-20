@@ -40,9 +40,8 @@ void NodeServer::worker_loop() {
 		try {
 			// Setup index connection
 			BinaryFDStream sock(index_host.c_str(), index_port,true);
-			BinaryStream &stream = sock;
 			buffered_write(sock,WorkerConnection::MAGIC_NUMBER,my_id);
-			manager->set_index_connection(&sock);
+			manager->get_worker_context().set_index_connection(&sock);
 
 			Log::debug("Worker connected to index-server");
 
@@ -50,7 +49,7 @@ void NodeServer::worker_loop() {
 				try {
 					uint8_t cmd;
 					if (CacheCommon::read(&cmd, sock, 2, true))
-						process_worker_command(cmd, stream);
+						process_worker_command(cmd, sock);
 					else {
 						Log::info("Disconnect on worker.");
 						break;
@@ -65,7 +64,7 @@ void NodeServer::worker_loop() {
 				} catch (const std::exception &e) {
 					Log::error("Unexpected error while processing request: %s", e.what());
 					auto msg = concat("Unexpected error while processing request: ", e.what());
-					buffered_write(stream,WorkerConnection::RESP_ERROR, msg);
+					buffered_write(sock,WorkerConnection::RESP_ERROR, msg);
 				}
 			}
 		} catch (const NetworkException &ne) {
@@ -146,30 +145,30 @@ void NodeServer::process_create_request(BinaryStream& index_stream,
 void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 		const PuzzleRequest& request) {
 	TIME_EXEC("RequestProcessing.puzzle");
-
+	QueryProfiler qp;
 	switch ( request.type ) {
 		case CacheType::RASTER: {
-			auto res = manager->get_raster_cache().process_puzzle(request);
+			auto res = manager->get_raster_cache().process_puzzle(request,qp);
 			finish_request( index_stream, std::shared_ptr<const GenericRaster>(res.release()) );
 			break;
 		}
 		case CacheType::POINT: {
-			auto res = manager->get_point_cache().process_puzzle(request);
+			auto res = manager->get_point_cache().process_puzzle(request,qp);
 			finish_request( index_stream, std::shared_ptr<const PointCollection>(res.release()) );
 			break;
 		}
 		case CacheType::LINE: {
-			auto res = manager->get_line_cache().process_puzzle(request);
+			auto res = manager->get_line_cache().process_puzzle(request,qp);
 			finish_request( index_stream, std::shared_ptr<const LineCollection>(res.release()) );
 			break;
 		}
 		case CacheType::POLYGON: {
-			auto res = manager->get_polygon_cache().process_puzzle(request);
+			auto res = manager->get_polygon_cache().process_puzzle(request,qp);
 			finish_request( index_stream, std::shared_ptr<const PolygonCollection>(res.release()) );
 			break;
 		}
 		case CacheType::PLOT: {
-			auto res = manager->get_plot_cache().process_puzzle(request);
+			auto res = manager->get_plot_cache().process_puzzle(request,qp);
 			finish_request( index_stream, std::shared_ptr<const GenericPlot>(res.release()) );
 			break;
 		}
@@ -185,19 +184,19 @@ void NodeServer::process_delivery_request(BinaryStream& index_stream,
 
 	switch ( request.type ) {
 		case CacheType::RASTER:
-			finish_request( index_stream, manager->get_raster_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_raster_cache().get(key)->data );
 			break;
 		case CacheType::POINT:
-			finish_request( index_stream, manager->get_point_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_point_cache().get(key)->data );
 			break;
 		case CacheType::LINE:
-			finish_request( index_stream, manager->get_line_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_line_cache().get(key)->data );
 			break;
 		case CacheType::POLYGON:
-			finish_request( index_stream, manager->get_polygon_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_polygon_cache().get(key)->data );
 			break;
 		case CacheType::PLOT:
-			finish_request( index_stream, manager->get_plot_cache().get_ref(key) );
+			finish_request( index_stream, manager->get_plot_cache().get(key)->data );
 			break;
 		default:
 			throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));

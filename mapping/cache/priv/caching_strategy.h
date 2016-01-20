@@ -19,10 +19,12 @@
 
 class CachingStrategy {
 public:
+	enum class Type { SELF, ALL, UNCACHED };
+
 	static std::unique_ptr<CachingStrategy> by_name( const std::string &name );
 	virtual ~CachingStrategy() = default;
 	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const = 0;
-	double get_costs( const QueryProfiler &profiler, size_t bytes, bool use_all = false ) const;
+	static double get_costs( const ProfilingData &profile, size_t bytes, Type type );
 };
 
 //
@@ -61,12 +63,11 @@ private:
 class TwoStepStrategy : public CachingStrategy {
 public:
 	// TODO: Figure out good values!
-	TwoStepStrategy(double stacked_threshold = 3, double immediate_threshold = 2, uint stack_depth = 3);
+	TwoStepStrategy(double stacked_threshold = 3, double immediate_threshold = 2);
 	bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
 private:
 	const double stacked_threshold;
 	const double immediate_threshold;
-	const uint stack_depth;
 };
 
 #endif /* CACHING_STRATEGY_H_ */

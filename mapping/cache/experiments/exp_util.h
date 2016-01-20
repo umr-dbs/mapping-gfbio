@@ -58,14 +58,14 @@ class TestCacheWrapper : public CacheWrapper<T> {
 public:
 	TestCacheWrapper( NodeCacheWrapper<T> &w, QueryProfiler &costs) : w(w), costs(costs) {};
 
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler) {
 		costs.all_cpu += profiler.self_cpu;
 		costs.all_gpu += profiler.self_gpu;
 		costs.all_io += profiler.self_io;
 		w.put(semantic_id,item,query,profiler);
 	}
 
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect) { return w.query(op,rect); };
+	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler) { return w.query(op,rect,profiler); };
 
 private:
 	NodeCacheWrapper<T> &w;
@@ -100,10 +100,10 @@ class LocalCacheWrapper : public CacheWrapper<T> {
 	friend class LocalCacheManager;
 public:
 	LocalCacheWrapper( NodeCache<T> &cache, std::unique_ptr<Puzzler<T>> puzzler, LocalCacheManager &mgr );
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler);
+	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 private:
-	std::unique_ptr<T> process_puzzle(const PuzzleRequest& request);
+	std::unique_ptr<T> process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler);
 	NodeCache<T> &cache;
 	LocalRetriever<T> retriever;
 	PuzzleUtil<T> puzzle_util;
@@ -113,7 +113,6 @@ private:
 
 class LocalCacheManager : public CacheManager {
 	template <class T> friend class LocalCacheWrapper;
-	friend class PuzzleGuard;
 public:
 	LocalCacheManager( std::unique_ptr<CachingStrategy> strategy,
 			size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
@@ -132,8 +131,7 @@ public:
 	void set_strategy(std::unique_ptr<CachingStrategy> strategy);
 private:
 	QueryProfiler costs;
-	bool puzzling;
-
+	WorkerContext worker_context;
 	NodeCache<GenericRaster> rc;
 	NodeCache<PointCollection> pc;
 	NodeCache<LineCollection> lc;
@@ -216,9 +214,8 @@ template<class T, CacheType TYPE>
 class TracingCacheWrapper : public CacheWrapper<T> {
 public:
 	TracingCacheWrapper( std::vector<QTriple> &query_log, size_t &size );
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
-
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
+	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler);
+	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 private:
 	size_t &size;
 	std::vector<QTriple> &query_log;

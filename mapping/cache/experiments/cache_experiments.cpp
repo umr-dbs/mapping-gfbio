@@ -443,11 +443,10 @@ void StrategyExperiment::run_once() {
 		exec(make_unique<AuthmannStrategy>(i), get_accum(concat("Simple (",i,")")));
 
 	for ( int fstacked = 2; fstacked < 10; fstacked++ )
-		for ( int fimm = 1; fimm < fstacked; fimm++ )
-			for ( uint16_t stackdepth = 1; stackdepth < 6; stackdepth++ ) {
-				auto m = concat("TwoStep (", fstacked,",",fimm,",",stackdepth,")");
-				exec(make_unique<TwoStepStrategy>(fstacked,fimm,stackdepth), get_accum(m));
-			}
+		for ( int fimm = 1; fimm < fstacked; fimm++ ) {
+			auto m = concat("TwoStep (", fstacked,",",fimm,")");
+			exec(make_unique<TwoStepStrategy>(fstacked,fimm), get_accum(m));
+		}
 }
 
 void StrategyExperiment::exec(std::unique_ptr<CachingStrategy> strategy, std::pair<uint64_t,uint64_t> &accum ) {

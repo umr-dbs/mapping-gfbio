@@ -37,8 +37,8 @@ class NodeCacheEntry : public CacheEntry {
 public:
 	NodeCacheEntry( uint64_t entry_id, const CacheEntry &meta, std::shared_ptr<EType> result );
 	const uint64_t entry_id;
-	const std::shared_ptr<EType> data;
-
+	const std::shared_ptr<const EType> data;
+	std::unique_ptr<EType> copy_data() const;
 	std::string to_string() const;
 };
 
@@ -59,14 +59,16 @@ public:
 	// Removes the entry with the given key from the cache
 	void remove( const NodeCacheKey &key );
 
-	// Retrieves the entry with the given key. A copy is returned which may be modified
-	std::unique_ptr<EType> get_copy( const NodeCacheKey &key ) const;
+	std::shared_ptr<const NodeCacheEntry<EType>> get( const NodeCacheKey &key ) const;
 
-	// Retrieves the entry with the given key. Cannot be modified.
-	const std::shared_ptr<const EType> get( const NodeCacheKey &key ) const;
+//	// Retrieves the entry with the given key. A copy is returned which may be modified
+//	std::unique_ptr<EType> get_copy( const NodeCacheKey &key ) const;
+//
+//	// Retrieves the entry with the given key. Cannot be modified.
+//	const std::shared_ptr<const EType> get( const NodeCacheKey &key ) const;
 
-	// returns meta-information about the entry for the given key
-	const NodeCacheRef get_entry_metadata(const NodeCacheKey& key) const;
+//	// returns meta-information about the entry for the given key
+//	const NodeCacheRef get_entry_metadata(const NodeCacheKey& key) const;
 
 	// Returns references to all entries
 	std::vector<NodeCacheRef> get_all() const;
@@ -96,5 +98,6 @@ private:
 	// Collects the ids of all accessed entries
 	mutable std::unordered_map<std::string,std::set<uint64_t>> access_tracker;
 };
+
 
 #endif /* NODE_CACHE_H_ */

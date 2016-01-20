@@ -7,6 +7,7 @@
 
 #include "cache/index/reorg_strategy.h"
 #include "cache/index/indexserver.h"
+#include "cache/priv/caching_strategy.h"
 #include "util/exceptions.h"
 #include "util/concat.h"
 #include <ctime>
@@ -53,7 +54,10 @@ bool CostLRU::operator ()( const std::shared_ptr<const IndexCacheEntry>& e1,
 	double f1 = 1.0 - (((now - e1->last_access) / 60000) * 0.01);
 	double f2 = 1.0 - (((now - e2->last_access) / 60000) * 0.01);
 
-	return (e1->costs * f1) > (e2->costs * f2);
+	double c1 = CachingStrategy::get_costs(e1->profile,e1->size,CachingStrategy::Type::SELF);
+	double c2 = CachingStrategy::get_costs(e2->profile,e2->size,CachingStrategy::Type::SELF);
+
+	return (c1 * f1) > (c2 * f2);
 }
 
 //

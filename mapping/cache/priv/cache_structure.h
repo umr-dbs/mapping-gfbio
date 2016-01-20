@@ -9,6 +9,7 @@
 #define CACHE_STRUCTURE_H_
 
 #include "operators/queryrectangle.h"
+#include "operators/queryprofiler.h"
 #include "datatypes/spatiotemporal.h"
 #include "cache/priv/cube.h"
 #include "util/binarystream.h"
@@ -82,14 +83,14 @@ public:
 
 class MoveInfo : public AccessInfo {
 public:
-	MoveInfo( uint64_t size, double costs );
-	MoveInfo( time_t last_access, uint32_t access_count, uint64_t size, double costs );
+	MoveInfo( uint64_t size, const ProfilingData &profile );
+	MoveInfo( time_t last_access, uint32_t access_count, uint64_t size, const ProfilingData &profile );
 	MoveInfo( BinaryStream &stream );
 
 	void toStream( BinaryStream &stream ) const;
 
+	ProfilingData profile;
 	uint64_t size;
-	double costs;
 };
 
 //
@@ -97,8 +98,8 @@ public:
 //
 class CacheEntry : public MoveInfo {
 public:
-	CacheEntry(CacheCube bounds, uint64_t size, double costs);
-	CacheEntry(CacheCube bounds, uint64_t size, double costs, time_t last_access, uint32_t access_count);
+	CacheEntry(CacheCube bounds, uint64_t size, const ProfilingData &profile);
+	CacheEntry(CacheCube bounds, uint64_t size, time_t last_access, uint32_t access_count, const ProfilingData &profile);
 	CacheEntry( BinaryStream &stream );
 
 	void toStream( BinaryStream &stream ) const;

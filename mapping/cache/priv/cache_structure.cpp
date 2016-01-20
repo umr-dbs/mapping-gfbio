@@ -196,33 +196,33 @@ void AccessInfo::toStream( BinaryStream &stream ) const {
 //
 // MoveInfo
 //
-MoveInfo::MoveInfo(uint64_t size, double costs) : size(size), costs(costs) {
+MoveInfo::MoveInfo(uint64_t size, const ProfilingData &profile) :
+		profile(profile), size(size) {
 }
 
-MoveInfo::MoveInfo(time_t last_access, uint32_t access_count, uint64_t size, double costs) :
-	AccessInfo(last_access,access_count), size(size), costs(costs) {
+MoveInfo::MoveInfo(time_t last_access, uint32_t access_count, uint64_t size, const ProfilingData &profile) :
+	AccessInfo(last_access,access_count), profile(profile), size(size) {
 }
 
-MoveInfo::MoveInfo(BinaryStream& stream) : AccessInfo(stream) {
-	stream.read(&size);
-	stream.read(&costs);
+MoveInfo::MoveInfo(BinaryStream& stream) : AccessInfo(stream), profile(stream), size(stream.read<uint64_t>()) {
 }
 
 void MoveInfo::toStream(BinaryStream& stream) const {
 	AccessInfo::toStream(stream);
+	profile.toStream(stream);
 	stream.write(size);
-	stream.write(costs);
 }
 
 //
 // CacheEntry
 //
-CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs) : MoveInfo(size, costs),
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, const ProfilingData &profile) :
+	MoveInfo(size, profile),
 	bounds(bounds) {
 }
 
-CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, double costs, time_t last_access, uint32_t access_count) :
-	MoveInfo(last_access,access_count,size,costs),
+CacheEntry::CacheEntry(CacheCube bounds, uint64_t size, time_t last_access, uint32_t access_count, const ProfilingData &profile) :
+	MoveInfo(last_access,access_count,size,profile),
 	bounds(bounds) {
 }
 
@@ -235,7 +235,7 @@ void CacheEntry::toStream(BinaryStream& stream) const {
 }
 
 std::string CacheEntry::to_string() const {
-	return concat("CacheEntry[size: ", size, ",costs: ", costs, ", last_access: ", last_access, ", access_count: ", access_count, ", bounds: ", bounds.to_string(), "]");
+	return concat("CacheEntry[size: ", size, ",profle: [",profile.to_string(),"], last_access: ", last_access, ", access_count: ", access_count, ", bounds: ", bounds.to_string(), "]");
 }
 
 //

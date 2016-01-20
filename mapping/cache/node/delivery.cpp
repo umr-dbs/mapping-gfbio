@@ -228,11 +228,31 @@ void DeliveryManager::handle_cache_request(DeliveryConnection& dc) {
 	try {
 		Log::debug("Sending cache-entry: %s", key.to_string().c_str());
 		switch ( key.type ) {
-			case CacheType::RASTER: dc.send_cache_entry( manager.get_raster_cache().get_entry_info(key), manager.get_raster_cache().get_ref(key) ); break;
-			case CacheType::POINT: dc.send_cache_entry( manager.get_point_cache().get_entry_info(key), manager.get_point_cache().get_ref(key) ); break;
-			case CacheType::LINE: dc.send_cache_entry( manager.get_line_cache().get_entry_info(key), manager.get_line_cache().get_ref(key) ); break;
-			case CacheType::POLYGON: dc.send_cache_entry( manager.get_polygon_cache().get_entry_info(key), manager.get_polygon_cache().get_ref(key) ); break;
-			case CacheType::PLOT: dc.send_cache_entry( manager.get_plot_cache().get_entry_info(key), manager.get_plot_cache().get_ref(key) ); break;
+			case CacheType::RASTER: {
+				auto e = manager.get_raster_cache().get(key);
+				dc.send_cache_entry( *e, e->data );
+				break;
+			}
+			case CacheType::POINT: {
+				auto e = manager.get_point_cache().get(key);
+				dc.send_cache_entry( *e, e->data );
+				break;
+			}
+			case CacheType::LINE: {
+				auto e = manager.get_line_cache().get(key);
+				dc.send_cache_entry( *e, e->data );
+				break;
+			}
+			case CacheType::POLYGON: {
+				auto e = manager.get_polygon_cache().get(key);
+				dc.send_cache_entry( *e, e->data );
+				break;
+			}
+			case CacheType::PLOT: {
+				auto e = manager.get_plot_cache().get(key);
+				dc.send_cache_entry( *e, e->data );
+				break;
+			}
 			default: throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
 		}
 	} catch (const NoSuchElementException &nse) {
@@ -245,21 +265,31 @@ void DeliveryManager::handle_move_request(DeliveryConnection& dc) {
 	try {
 		Log::debug("Moving cache-entry: %s", key.to_string().c_str());
 		switch ( key.type ) {
-			case CacheType::RASTER:
-				dc.send_move( manager.get_raster_cache().get_entry_info(key), manager.get_raster_cache().get_ref(key) );
+			case CacheType::RASTER: {
+				auto e = manager.get_raster_cache().get(key);
+				dc.send_move( *e, e->data );
 				break;
-			case CacheType::POINT:
-				dc.send_move( manager.get_point_cache().get_entry_info(key), manager.get_point_cache().get_ref(key) );
+			}
+			case CacheType::POINT: {
+				auto e = manager.get_point_cache().get(key);
+				dc.send_move( *e, e->data );
 				break;
-			case CacheType::LINE:
-				dc.send_move( manager.get_line_cache().get_entry_info(key), manager.get_line_cache().get_ref(key) );
+			}
+			case CacheType::LINE: {
+				auto e = manager.get_line_cache().get(key);
+				dc.send_move( *e, e->data );
 				break;
-			case CacheType::POLYGON:
-				dc.send_move( manager.get_polygon_cache().get_entry_info(key), manager.get_polygon_cache().get_ref(key) );
+			}
+			case CacheType::POLYGON: {
+				auto e = manager.get_polygon_cache().get(key);
+				dc.send_move( *e, e->data );
 				break;
-			case CacheType::PLOT:
-				dc.send_move( manager.get_plot_cache().get_entry_info(key), manager.get_plot_cache().get_ref(key) );
+			}
+			case CacheType::PLOT: {
+				auto e = manager.get_plot_cache().get(key);
+				dc.send_move( *e, e->data );
 				break;
+			}
 			default:
 				throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
 		}

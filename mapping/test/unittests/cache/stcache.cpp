@@ -41,7 +41,7 @@ TEST(STCacheTest,SimpleTest) {
 		auto qres = cache.query(sem_id,qr);
 		EXPECT_TRUE( qres.has_remainder() );
 		auto res = GenericRaster::create(dd,qr,width,height);
-		CacheEntry meta( CacheCube(*res), 10, 1.0 );
+		CacheEntry meta( CacheCube(*res), 10, ProfilingData() );
 		cache.put(sem_id, res, meta);
 		qres = cache.query(sem_id,qr);
 		EXPECT_TRUE( qres.has_hit() );
@@ -72,9 +72,9 @@ TEST(STCacheTest,TestQuery) {
 	auto r2 = createRaster(0,1,1,2);
 	auto r3 = createRaster(1,2,0,1);
 
-	cache.put( sem_id, r1, CacheEntry( CacheCube(*r1), 10, 1.0) );
-	cache.put( sem_id, r2, CacheEntry( CacheCube(*r2), 10, 1.0) );
-	cache.put( sem_id, r3, CacheEntry( CacheCube(*r3), 10, 1.0) );
+	cache.put( sem_id, r1, CacheEntry( CacheCube(*r1), 10, ProfilingData()) );
+	cache.put( sem_id, r2, CacheEntry( CacheCube(*r2), 10, ProfilingData()) );
+	cache.put( sem_id, r3, CacheEntry( CacheCube(*r3), 10, ProfilingData()) );
 
 	QueryRectangle qrect(
 		SpatialReference(EPSG_LATLON, 0, 0, 2, 2),
@@ -91,7 +91,7 @@ TEST(STCacheTest,TestQuery) {
 	EXPECT_EQ( Cube3( 1,2,1,2,0,100), rem );
 
 	auto r4 = createRaster(1,2,1,2);
-	cache.put(sem_id,r4, CacheEntry( CacheCube(*r4), 10, 1.0) );
+	cache.put(sem_id,r4, CacheEntry( CacheCube(*r4), 10, ProfilingData()) );
 
 	qr = cache.query( sem_id, qrect );
 	EXPECT_FALSE(qr.has_remainder());

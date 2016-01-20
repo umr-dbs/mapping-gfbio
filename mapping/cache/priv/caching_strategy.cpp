@@ -22,9 +22,30 @@ std::unique_ptr<CachingStrategy> CachingStrategy::by_name(const std::string& nam
 	throw ArgumentException(concat("Unknown Caching-Strategy: ", name));
 }
 
-double CachingStrategy::get_costs(const QueryProfiler& profiler, size_t bytes, bool use_all) const {
-	double io = use_all ? profiler.all_io : profiler.self_io;
-	double proc = use_all ? (profiler.all_cpu + profiler.all_gpu) : (profiler.self_cpu + profiler.self_gpu);
+double CachingStrategy::get_costs(const ProfilingData& profile, size_t bytes, Type type) {
+	double io;
+	double cpu;
+	double gpu;
+
+	switch ( type ) {
+	case Type::SELF:
+		cpu = profile.self_cpu;
+		gpu = profile.self_gpu;
+		io = profile.self_io;
+		break;
+	case Type::ALL:
+		cpu = profile.all_cpu;
+		gpu = profile.all_gpu;
+		io = profile.all_io;
+		break;
+	case Type::UNCACHED:
+		cpu = profile.uncached_cpu;
+		gpu = profile.uncached_gpu;
+		io = profile.uncached_io;
+		break;
+	}
+
+	double proc = cpu + gpu;
 	// TODO: Check this factor;
 	double cache_cpu = 0.000000005 * bytes;
 
@@ -61,18 +82,18 @@ AuthmannStrategy::AuthmannStrategy(double threshold) : threshold(threshold) {
 }
 
 bool AuthmannStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
-	return get_costs(profiler, bytes, true) >= threshold;
+	return get_costs(profiler, bytes, Type::UNCACHED) >= threshold;
 }
 
 //
 // 2-Step-strategy
 //
 
-TwoStepStrategy::TwoStepStrategy(double stacked_threshold, double immediate_threshold, uint stack_depth) :
-  stacked_threshold(stacked_threshold), immediate_threshold(immediate_threshold), stack_depth(stack_depth) {
+TwoStepStrategy::TwoStepStrategy(double stacked_threshold, double immediate_threshold) :
+  stacked_threshold(stacked_threshold), immediate_threshold(immediate_threshold) {
 }
 
 bool TwoStepStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
-	return get_costs(profiler,bytes, false) >= immediate_threshold ||
-		   (profiler.uncached_depth >= stack_depth && get_costs(profiler,bytes,true) >= stacked_threshold );
+	return get_costs(profiler,bytes, Type::SELF    ) >= immediate_threshold ||
+		   get_costs(profiler,bytes, Type::UNCACHED) >= stacked_threshold;
 }

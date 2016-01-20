@@ -38,34 +38,6 @@ OperatorRegistration::OperatorRegistration(const char *name, OPConstructor const
 }
 
 
-
-// these are two RAII helper classes to make sure that profiling works even when an operator throws an exception
-class QueryProfilerRunningGuard {
-	public:
-		QueryProfilerRunningGuard(QueryProfiler &parent_profiler, QueryProfiler &profiler)
-			: parent_profiler(parent_profiler), profiler(profiler) {
-			profiler.startTimer();
-		}
-		~QueryProfilerRunningGuard() {
-			profiler.stopTimer();
-			parent_profiler += profiler;
-
-		}
-		QueryProfiler &parent_profiler;
-		QueryProfiler &profiler;
-};
-class QueryProfilerStoppingGuard {
-	public:
-		QueryProfilerStoppingGuard(QueryProfiler &profiler) : profiler(profiler) {
-			profiler.stopTimer();
-		}
-		~QueryProfilerStoppingGuard() {
-			profiler.startTimer();
-		}
-		QueryProfiler &profiler;
-};
-
-
 /*
  * GenericOperator class
  */
@@ -169,12 +141,12 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::REQUIRED);
 	std::unique_ptr<GenericRaster> result;
+	QueryProfiler profiler;
 	try {
 		result = CacheManager::get_instance().get_raster_cache().query(
-				*this,
-				rect);
+				*this, rect, profiler );
+		parent_profiler += profiler;
 	} catch ( NoSuchElementException &nse ) {
-		QueryProfiler profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, profiler);
 			TIME_EXEC("Operator.getRaster");
@@ -182,8 +154,6 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 		}
 		CacheManager::get_instance().get_raster_cache().put(semantic_id,result,rect,profiler);
 	}
-	//d_profile(depth, type, "raster", profiler, result->getDataSize());
-
 	validateResult(rect, result.get());
 
 	// the costs of adjusting the result are assigned to the calling operator
@@ -193,14 +163,13 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 }
 std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
-
 	std::unique_ptr<PointCollection> result;
+	QueryProfiler profiler;
 	try {
 		result = CacheManager::get_instance().get_point_cache().query(
-				*this,
-				rect);
+				*this, rect, profiler );
+		parent_profiler += profiler;
 	} catch ( NoSuchElementException &nse ) {
-		QueryProfiler profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, profiler);
 			TIME_EXEC("Operator.getPointCollection");
@@ -221,15 +190,13 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 }
 std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
-
-	QueryProfiler profiler;
 	std::unique_ptr<LineCollection> result;
+	QueryProfiler profiler;
 	try {
 		result = CacheManager::get_instance().get_line_cache().query(
-				*this,
-				rect);
+				*this, rect, profiler );
+		parent_profiler += profiler;
 	} catch ( NoSuchElementException &nse ) {
-		QueryProfiler profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, profiler);
 			TIME_EXEC("Operator.getLineCollection");
@@ -250,13 +217,12 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 }
 std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
-
-	QueryProfiler profiler;
 	std::unique_ptr<PolygonCollection> result;
+	QueryProfiler profiler;
 	try {
 		result = CacheManager::get_instance().get_polygon_cache().query(
-				*this,
-				rect);
+				*this, rect, profiler);
+		parent_profiler += profiler;
 	} catch ( NoSuchElementException &nse ) {
 		QueryProfiler profiler;
 		{
@@ -282,8 +248,8 @@ std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle
 	validateQRect(rect, ResolutionRequirement::OPTIONAL);
 
 	// TODO: Plug plots into cache
-	QueryProfiler profiler;
 	std::unique_ptr<GenericPlot> result;
+	QueryProfiler profiler;
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		TIME_EXEC("Operator.getPlot");

@@ -45,8 +45,9 @@ LocalRetriever<T>::LocalRetriever( const NodeCache<T> &cache ) : cache(cache) {
 
 template<class T>
 std::shared_ptr<const T> LocalRetriever<T>::fetch( const std::string &semantic_id, const CacheRef& ref, QueryProfiler &qp) const {
-	((void) qp);
-	return cache.get( NodeCacheKey(semantic_id, ref.entry_id) );
+	auto e = cache.get( NodeCacheKey(semantic_id, ref.entry_id) );
+	qp.addTotalCosts(e->profile);
+	return e->data;
 }
 
 template<class T>
@@ -115,6 +116,9 @@ std::unique_ptr<T> RemoteRetriever<T>::load(
 	switch (resp) {
 		case DeliveryConnection::RESP_OK: {
 			MoveInfo mi(stream);
+			// Add the original costs
+			qp.addTotalCosts(mi.profile);
+			// Add the network-costs
 			qp.addIOCost( mi.size );
 			return read_item(stream);
 		}
@@ -284,7 +288,6 @@ std::unique_ptr<T> PuzzleUtil<T>::process_puzzle(const PuzzleRequest& request, Q
 
 	std::vector<std::shared_ptr<const T>> items;
 	items.reserve( request.parts.size() + request.get_num_remainders() );
-
 	{
 		TIME_EXEC("PuzzleUtil.puzzle.fetch_parts");
 		// Fetch puzzle parts
@@ -318,6 +321,8 @@ std::vector<std::unique_ptr<T> > PuzzleUtil<T>::compute_remainders(
 	std::vector<std::unique_ptr<T>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
 
+	// Stop computation time
+	QueryProfilerStoppingGuard guard(profiler);
 	for ( auto &rqr : request.get_remainder_queries() ) {
 		result.push_back( retriever.compute(*graph,rqr,profiler) );
 	}
@@ -336,6 +341,9 @@ std::vector<std::unique_ptr<GenericRaster>> PuzzleUtil<GenericRaster>::compute_r
 	auto remainders = request.get_remainder_queries( ref_result.pixel_scale_x, ref_result.pixel_scale_y,
 													 ref_result.stref.x1, ref_result.stref.y1 );
 
+
+	// Stop computation time
+	QueryProfilerStoppingGuard guard(profiler);
 	for ( auto &rqr : remainders ) {
 		try {
 			auto rem = retriever.compute(*graph,rqr,profiler);

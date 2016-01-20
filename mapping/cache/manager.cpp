@@ -40,7 +40,7 @@ NopCacheWrapper<T,CType>::NopCacheWrapper() {
 
 template<typename T, CacheType CType>
 void NopCacheWrapper<T,CType>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
+		const std::unique_ptr<T>& item, const QueryRectangle &query, QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
 	(void) query;
@@ -49,7 +49,7 @@ void NopCacheWrapper<T,CType>::put(const std::string& semantic_id,
 
 template<typename T, CacheType CType>
 std::unique_ptr<T> NopCacheWrapper<T,CType>::query(const GenericOperator& op,
-		const QueryRectangle& rect) {
+		const QueryRectangle& rect, QueryProfiler &profiler) {
 	(void) op;
 	(void) rect;
 	throw NoSuchElementException("NOP-Cache has no entries");
@@ -94,7 +94,7 @@ ClientCacheWrapper<T,CType>::ClientCacheWrapper(CacheType type, const std::strin
 
 template<typename T, CacheType CType>
 void ClientCacheWrapper<T,CType>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
+		const std::unique_ptr<T>& item, const QueryRectangle &query, QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
 	(void) query;
@@ -103,7 +103,7 @@ void ClientCacheWrapper<T,CType>::put(const std::string& semantic_id,
 
 template<typename T, CacheType CType>
 std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
-		const GenericOperator& op, const QueryRectangle& rect) {
+		const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
 
 	BinaryFDStream idx_con(idx_host.c_str(), idx_port, true);
 	BinaryStream &idx_stream = idx_con;

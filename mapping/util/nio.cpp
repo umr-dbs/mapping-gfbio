@@ -865,7 +865,14 @@ NBNodeStatsReader::NBNodeStatsReader() {
 NBAccessInfoReader::NBAccessInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t)) {
 }
 
-NBMoveInfoReader::NBMoveInfoReader() : NBFixedSizeReader(sizeof(time_t) + sizeof(uint32_t) + sizeof(uint64_t) + sizeof(double)) {
+NBMoveInfoReader::NBMoveInfoReader() :
+		NBFixedSizeReader(
+				// AccessInfo
+				sizeof(time_t) + sizeof(uint32_t) +
+				// Size
+				sizeof(uint64_t) +
+				// Profile
+				6 * sizeof(double) + 3 * sizeof(uint64_t) ) {
 }
 
 NBCacheCubeReader::NBCacheCubeReader() :

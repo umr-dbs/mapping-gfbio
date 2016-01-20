@@ -281,6 +281,7 @@ Raster<T, dimensions>::Raster(const DataDescription &datadescription, const Spat
 	data[count] = 42;
 }
 
+#define MAPPING_OPENCL_USE_HOST_PTR 1
 
 template<typename T, int dimensions>
 Raster<T, dimensions>::~Raster() {
@@ -296,10 +297,15 @@ Raster<T, dimensions>::~Raster() {
 	}
 #ifndef MAPPING_NO_OPENCL
 	if (clbuffer) {
+#if MAPPING_OPENCL_USE_HOST_PTR
+		if ( clhostptr )
+			RasterOpenCL::getQueue()->enqueueUnmapMemObject(*clbuffer, clhostptr);
+#endif
 		delete clbuffer;
 		clbuffer = nullptr;
 		delete clbuffer_info;
 		clbuffer_info = nullptr;
+		clhostptr = nullptr;
 	}
 #endif
 }
@@ -314,8 +320,6 @@ Raster2D<T>::Raster2D(const DataDescription &datadescription, const SpatioTempor
 template<typename T>
 Raster2D<T>::~Raster2D() {
 }
-
-#define MAPPING_OPENCL_USE_HOST_PTR 1
 
 template<typename T, int dimensions>
 void Raster<T, dimensions>::setRepresentation(Representation r) {

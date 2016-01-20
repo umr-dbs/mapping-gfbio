@@ -147,32 +147,6 @@ cl::CommandQueue *getQueue() {
 	return &queue;
 }
 
-cl::Kernel addProgram(const std::string &sourcecode, const char *kernelname) {
-	cl::Program::Sources source(1, std::make_pair(sourcecode.c_str(), sourcecode.length()));
-	cl::Program program(context, source);
-	try {
-		program.build(deviceList,"");
-	}
-	catch (cl::Error e) {
-		throw PlatformException(std::string("Error building cl::Program: ")+kernelname+": "+program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0]));
-	}
-
-	cl::Kernel kernel(program, kernelname);
-	return kernel;
-}
-
-
-static std::string readFileAsString(const char *filename) {
-	std::ifstream file(filename);
-	if (!file.is_open())
-		throw OpenCLException("Unable to open CL code file");
-	return std::string(std::istreambuf_iterator<char>(file), (std::istreambuf_iterator<char>()));
-
-}
-
-cl::Kernel addProgramFromFile(const char *filename, const char *kernelname) {
-	return addProgram(readFileAsString(filename), kernelname);
-}
 
 /*
 struct RasterInfo {
@@ -222,7 +196,7 @@ static const std::string rasterinfo_source(
 );
 
 
-cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster) {
+std::unique_ptr<cl::Buffer> getBufferWithRasterinfo(GenericRaster *raster) {
 	RasterInfo ri;
 	memset(&ri, 0, sizeof(RasterInfo));
 	ri.size[0] = raster->width;
@@ -243,7 +217,7 @@ cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster) {
 	ri.has_no_data = raster->dd.has_no_data;
 
 	try {
-		cl::Buffer *buffer = new cl::Buffer(
+		auto buffer = make_unique<cl::Buffer>(
 			*RasterOpenCL::getContext(),
 			CL_MEM_READ_ONLY,
 			sizeof(RasterInfo),
@@ -357,7 +331,7 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 	}
 
 	try {
-		kernel = new cl::Kernel(program, kernelname);
+		kernel = make_unique<cl::Kernel>(program, kernelname);
 
 		for (decltype(in_rasters.size()) idx = 0; idx < in_rasters.size(); idx++) {
 			GenericRaster *raster = in_rasters[idx];
@@ -378,8 +352,7 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 		}
 	}
 	catch (const cl::Error &e) {
-		delete kernel;
-		kernel = nullptr;
+		kernel.reset(nullptr);
 		std::stringstream msg;
 		msg << "CL Error in compile(): " << e.err() << ": " << e.what();
 		throw OpenCLException(msg.str());
@@ -387,9 +360,6 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 
 }
 
-void CLProgram::compileFromFile(const char *filename, const char *kernelname) {
-	compile(readFileAsString(filename), kernelname);
-}
 
 void CLProgram::run() {
 	try {
@@ -465,10 +435,7 @@ void CLProgram::cleanScratch() {
 }
 
 void CLProgram::reset() {
-	if (kernel) {
-		delete kernel;
-		kernel = nullptr;
-	}
+	kernel.reset(nullptr);
 	cleanScratch();
 	argpos = 0;
 	finished = false;

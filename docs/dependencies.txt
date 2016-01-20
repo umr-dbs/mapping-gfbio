@@ -3,7 +3,6 @@
 * GDAL - http://www.gdal.org/ (libgdal-dev, X/MIT)
 * SQLite 3 - http://www.sqlite.org/ (libsqlite3-dev, public domain)
 * jsonCPP 0.6.x - http://jsoncpp.sourceforge.net/ (libjsoncpp-dev, public domain/MIT)
-* uriparser - http://uriparser.sourceforge.net/ (liburiparser-dev, new BSD)
 * xxd (part of vim)
 * GEOS - http://trac.osgeo.org/geos/ (libgeos++-dev, LGPL)
 * libpq++ - postgres (libpqxx3-dev, BSD?)

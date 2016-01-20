@@ -28,33 +28,37 @@ RemoteRasterDBBackend::~RemoteRasterDBBackend() {
 
 std::vector<std::string> RemoteRasterDBBackend::enumerateSources() {
 	auto c = COMMAND_ENUMERATESOURCES;
-	BinaryWriteBuffer buffer;
-	buffer.write(c);
-	buffer.prepareForWriting();
-	stream->write(buffer);
+	BinaryWriteBuffer request;
+	request.write(c);
+	request.prepareForWriting();
+	stream->write(request);
 	stream->flush();
 
+	BinaryReadBuffer response;
+	stream->read(response);
+
 	std::vector<std::string> sourcenames;
-	size_t count;
-	stream->read(&count);
+	auto count = response.read<size_t>();
 	for (size_t i=0;i<count;i++) {
-		std::string name;
-		stream->read(&name);
+		auto name = response.read<std::string>();
 		sourcenames.push_back(name);
 	}
 	return sourcenames;
 }
+
 std::string RemoteRasterDBBackend::readJSON(const std::string &sourcename) {
 	auto c = COMMAND_READANYJSON;
-	BinaryWriteBuffer buffer;
-	buffer.write(c);
-	buffer.write(sourcename);
-	buffer.prepareForWriting();
-	stream->write(buffer);
+	BinaryWriteBuffer request;
+	request.write(c);
+	request.write(sourcename);
+	request.prepareForWriting();
+	stream->write(request);
 	stream->flush();
 
-	std::string json;
-	stream->read(&json);
+	BinaryReadBuffer response;
+	stream->read(response);
+
+	auto json = response.read<std::string>();
 	return json;
 }
 
@@ -69,16 +73,18 @@ void RemoteRasterDBBackend::open(const std::string &_sourcename, bool writeable)
 	is_writeable = writeable;
 
 	auto c = COMMAND_OPEN;
-	BinaryWriteBuffer buffer;
-	buffer.write(c);
-	buffer.write(this->sourcename);
-	buffer.prepareForWriting();
-	stream->write(buffer);
+	BinaryWriteBuffer request;
+	request.write(c);
+	request.write(this->sourcename);
+	request.prepareForWriting();
+	stream->write(request);
 	stream->flush();
 
-	uint8_t response;
-	stream->read(&response);
-	if (response != 48)
+	BinaryReadBuffer response;
+	stream->read(response);
+
+	auto responsecode = response.read<uint8_t>();
+	if (responsecode != 48)
 		throw NetworkException("RemoteRasterDBBackend: COMMAND_OPEN failed");
 
 	is_opened = true;
@@ -91,13 +97,16 @@ std::string RemoteRasterDBBackend::readJSON() {
 
 	if (json.size() == 0) {
 		auto c = COMMAND_READJSON;
-		BinaryWriteBuffer buffer;
-		buffer.write(c);
-		buffer.prepareForWriting();
-		stream->write(buffer);
+		BinaryWriteBuffer request;
+		request.write(c);
+		request.prepareForWriting();
+		stream->write(request);
 		stream->flush();
 
-		stream->read(&json);
+		BinaryReadBuffer response;
+		stream->read(response);
+
+		response.read(&json);
 	}
 	return json;
 }
@@ -108,20 +117,21 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 		throw ArgumentException("Cannot call getClosestRaster() before open() on a RasterDBBackend");
 
 	auto c = COMMAND_GETCLOSESTRASTER;
-	BinaryWriteBuffer buffer;
-	buffer.write(c);
-	buffer.write(channelid);
-	buffer.write(t1);
-	buffer.write(t2);
-	buffer.prepareForWriting();
-	stream->write(buffer);
+	BinaryWriteBuffer request;
+	request.write(c);
+	request.write(channelid);
+	request.write(t1);
+	request.write(t2);
+	request.prepareForWriting();
+	stream->write(request);
 	stream->flush();
 
+	BinaryReadBuffer response;
+	stream->read(response);
 
-	RasterDescription res(*stream);
+	RasterDescription res(response);
 	if (res.rasterid < 0) {
-		std::string error;
-		stream->read(&error);
+		auto error = response.read<std::string>();
 		throw SourceException(error);
 	}
 	return res;
@@ -132,31 +142,30 @@ void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &a
 		throw ArgumentException("Cannot call readAttributes() before open() on a RasterDBBackend");
 
 	auto c = COMMAND_READATTRIBUTES;
-	BinaryWriteBuffer buffer;
-	buffer.write(c);
-	buffer.write(rasterid);
-	buffer.prepareForWriting();
-	stream->write(buffer);
+	BinaryWriteBuffer request;
+	request.write(c);
+	request.write(rasterid);
+	request.prepareForWriting();
+	stream->write(request);
 	stream->flush();
+
+	BinaryReadBuffer response;
+	stream->read(response);
 
 	// read strings
 	while (true) {
-		std::string key;
-		stream->read(&key);
+		auto key = response.read<std::string>();
 		if (key == "")
 			break;
-		std::string value;
-		stream->read(&value);
+		auto value = response.read<std::string>();
 		attributes.setTextual(key, value);
 	}
 	// read values
 	while (true) {
-		std::string key;
-		stream->read(&key);
+		auto key = response.read<std::string>();
 		if (key == "")
 			break;
-		double value;
-		stream->read(&value);
+		auto value = response.read<double>();
 		attributes.setNumeric(key, value);
 	}
 }
@@ -166,16 +175,19 @@ int RemoteRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 		throw ArgumentException("Cannot call getBestZoom() before open() on a RasterDBBackend");
 
 	auto c = COMMAND_GETBESTZOOM;
-	BinaryWriteBuffer buffer;
-	buffer.write(c);
-	buffer.write(rasterid);
-	buffer.write(desiredzoom);
-	buffer.prepareForWriting();
-	stream->write(buffer);
+	BinaryWriteBuffer request;
+	request.write(c);
+	request.write(rasterid);
+	request.write(desiredzoom);
+	request.prepareForWriting();
+	stream->write(request);
 	stream->flush();
 
+	BinaryReadBuffer response;
+	stream->read(response);
+
 	int bestzoom;
-	stream->read(&bestzoom);
+	response.read(&bestzoom);
 	return bestzoom;
 }
 
@@ -184,24 +196,27 @@ const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enume
 		throw ArgumentException("Cannot call enumerateTiles() before open() on a RasterDBBackend");
 
 	auto c = COMMAND_ENUMERATETILES;
-	BinaryWriteBuffer buffer;
-	buffer.write(c);
-	buffer.write(channelid);
-	buffer.write(rasterid);
-	buffer.write(x1);
-	buffer.write(y1);
-	buffer.write(x2);
-	buffer.write(y2);
-	buffer.write(zoom);
-	buffer.prepareForWriting();
-	stream->write(buffer);
+	BinaryWriteBuffer request;
+	request.write(c);
+	request.write(channelid);
+	request.write(rasterid);
+	request.write(x1);
+	request.write(y1);
+	request.write(x2);
+	request.write(y2);
+	request.write(zoom);
+	request.prepareForWriting();
+	stream->write(request);
 	stream->flush();
+
+	BinaryReadBuffer response;
+	stream->read(response);
 
 	std::vector<TileDescription> result;
 	size_t count;
-	stream->read(&count);
+	response.read(&count);
 	for (size_t i=0;i<count;i++)
-		result.push_back(TileDescription(*stream));
+		result.push_back(TileDescription(response));
 	return result;
 }
 
@@ -237,18 +252,19 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 	}
 
 	auto c = COMMAND_READTILE;
-	BinaryWriteBuffer buffer;
-	buffer.write(c);
-	buffer.write(tiledesc);
-	buffer.prepareForWriting();
-	stream->write(buffer);
+	BinaryWriteBuffer request;
+	request.write(c);
+	request.write(tiledesc);
+	request.prepareForWriting();
+	stream->write(request);
 	stream->flush();
 
-	size_t size;
-	stream->read(&size);
+	BinaryReadBuffer response;
+	stream->read(response);
 
+	auto size = response.read<size_t>();
 	auto bb = make_unique<ByteBuffer>(size);
-	stream->read((char *) bb->data, bb->size);
+	response.read((char *) bb->data, bb->size);
 
 	if (cache_directory != "") {
 		std::ofstream file(cachepath);

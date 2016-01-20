@@ -13,12 +13,17 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <netinet/tcp.h>
+#include <fcntl.h>
 
 
-BinaryStream::BinaryStream() {
+BinaryStream::BinaryStream() : is_blocking(true) {
 }
 
 BinaryStream::~BinaryStream() {
+}
+
+void BinaryStream::makeNonBlocking() {
+	throw ArgumentException("This stream type does not support NonBlocking mode");
 }
 
 void BinaryStream::write(const std::string &string) {
@@ -54,6 +59,17 @@ void BinaryStream::write(BinaryWriteBuffer &buffer) {
 	for (size_t i=0;i<buffer.areas.size();i++)
 		write(buffer.areas[i].start, buffer.areas[i].len);
 	buffer.status = BinaryWriteBuffer::Status::FINISHED;
+}
+
+void BinaryStream::read(BinaryReadBuffer &buffer) {
+	throw ArgumentException("Do not use");
+	if (buffer.isRead())
+		throw ArgumentException("cannot read() a BinaryReadBuffer that's already fully read");
+
+	while (!buffer.isRead()) {
+		read(buffer.buffer.data(), buffer.size_total);
+		buffer.markBytesAsRead(buffer.size_total);
+	}
 }
 
 
@@ -117,6 +133,23 @@ BinaryFDStream::BinaryFDStream(const char *hostname, int port, bool no_delay) : 
 	freeaddrinfo(servinfo);
 }
 
+static void make_fd_nonblocking(int fd) {
+	int flags = fcntl(fd, F_GETFL, 0);
+	if (flags == -1)
+		throw NetworkException("Cannot make fd nonblocking, fcntl failed");
+	int res = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+	if (res == -1)
+		throw NetworkException("Cannot make fd nonblocking, fcntl failed");
+}
+
+void BinaryFDStream::makeNonBlocking() {
+	if (!is_blocking)
+		throw ArgumentException("BinaryFDStream::makeNonBlocking(): is already nonblocking");
+
+	make_fd_nonblocking(read_fd);
+	make_fd_nonblocking(write_fd);
+	is_blocking = false;
+}
 
 BinaryFDStream::BinaryFDStream(int read_fd, int write_fd, bool no_delay) : is_eof(false), read_fd(read_fd), write_fd(write_fd) {
 	if (write_fd == -2)
@@ -147,6 +180,9 @@ void BinaryFDStream::close() {
 
 
 void BinaryFDStream::write(const char *buffer, size_t len) {
+	if (!is_blocking)
+		throw NetworkException("Cannot write() to a a nonblocking stream");
+
 	if (write_fd < 0) {
 		throw NetworkException(concat("BinaryFDStream: cannot write to closed socket ", write_fd, " in pid ", getpid()));
 	}
@@ -168,6 +204,9 @@ void BinaryFDStream::write(const char *buffer, size_t len) {
 }
 
 void BinaryFDStream::write(BinaryWriteBuffer &buffer) {
+	if (!is_blocking)
+		throw NetworkException("Cannot write() to a nonblocking stream");
+
 	if (!buffer.isWriting())
 		throw ArgumentException("cannot write() a BinaryWriteBuffer when not prepared for writing");
 	while(!buffer.isFinished())
@@ -188,6 +227,8 @@ void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
 
 
 size_t BinaryFDStream::read(char *buffer, size_t len, bool allow_eof) {
+	if (!is_blocking)
+		throw NetworkException("Cannot read() on a nonblocking stream");
 	if (read_fd < 0)
 		throw NetworkException(concat("BinaryFDStream: cannot read from closed socket ", read_fd, " in pid ", getpid()));
 	if (is_eof)
@@ -218,13 +259,43 @@ size_t BinaryFDStream::read(char *buffer, size_t len, bool allow_eof) {
 	return bytes_read;
 }
 
+void BinaryFDStream::read(BinaryReadBuffer &buffer) {
+	if (!is_blocking)
+		throw NetworkException("Cannot read() on a nonblocking stream");
+
+	while(!buffer.isRead())
+		readNB(buffer);
+}
+
+bool BinaryFDStream::readNB(BinaryReadBuffer &buffer, bool allow_eof) {
+	if (buffer.isRead())
+		throw ArgumentException("cannot read() a BinaryReadBuffer that's already fully read");
+
+	auto left_to_read = buffer.size_total-buffer.size_read;
+
+	auto bytes_read = ::read(read_fd, buffer.buffer.data()+buffer.size_read, buffer.size_total-buffer.size_read);
+	if (bytes_read == -1) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK)
+			return false;
+		throw NetworkException("BinaryFDStream: unexpected error while reading a BinaryReadBuffer");
+	}
+	if (bytes_read == 0) {
+		is_eof = true;
+		if (!allow_eof || !buffer.isEmpty())
+			throw NetworkException("BinaryFDStream: unexpected eof while reading a BinaryReadBuffer");
+		return true;
+	}
+	buffer.markBytesAsRead(bytes_read);
+	return false;
+}
 
 
 /*
  * BinaryWriteBuffer
  */
 BinaryWriteBuffer::BinaryWriteBuffer() : may_link(false), status(Status::CREATING), next_area_start(0), size_total(0), size_sent(0), areas_sent(0) {
-
+	// always prefix with the size
+	areas.emplace_back((const char *) &size_total, sizeof(size_total));
 }
 BinaryWriteBuffer::~BinaryWriteBuffer() {
 }
@@ -259,7 +330,7 @@ void BinaryWriteBuffer::write(const char *data, size_t len) {
 
 	// This must not happen (according to the C++ spec), but if it does, we want to know.
 	if (buffer.data() != new_vec_start)
-		throw ArgumentException("ERROR: BinaryWriteBuffer, buffer.insert() had a reallocation.");
+		throw MustNotHappenException("ERROR: BinaryWriteBuffer, buffer.insert() had a reallocation.");
 }
 
 size_t BinaryWriteBuffer::read(char *buffer, size_t len, bool allow_eof) {
@@ -323,5 +394,64 @@ void BinaryWriteBuffer::markBytesAsWritten(size_t sent_bytes) {
 			area.len -= sent_bytes;
 			sent_bytes = 0;
 		}
+	}
+}
+
+
+/*
+ * BinaryReadBuffer
+ */
+BinaryReadBuffer::BinaryReadBuffer() {
+	status = Status::READING_SIZE;
+	prepareBuffer(sizeof(size_t));
+}
+BinaryReadBuffer::~BinaryReadBuffer() {
+
+}
+
+void BinaryReadBuffer::write(const char *data, size_t len) {
+	throw ArgumentException("A BinaryReadBuffer cannot write()");
+}
+
+size_t BinaryReadBuffer::read(char *buffer, size_t len, bool allow_eof) {
+	if (status != Status::FINISHED)
+		throw ArgumentException("cannot read() from a BinaryReadBuffer until it has been filled");
+
+	size_t remaining = size_total - size_read;
+	if (remaining < len) {
+		if (allow_eof && remaining == 0)
+			return 0;
+		throw NetworkException(concat("BinaryReadBuffer: unexpected eof with ", remaining, " of ", size_total, " remaining, ", len, " requested"));
+	}
+
+	// copy data where it should go.
+	const char *vec_start = this->buffer.data() + size_read;
+	memcpy(buffer, vec_start, len);
+	size_read += len;
+	return len;
+}
+
+void BinaryReadBuffer::prepareBuffer(size_t expected_size) {
+	size_read = 0;
+	size_total = expected_size;
+	buffer.assign(size_total, 0); // TODO: can we avoid pre-filling this vector?
+}
+
+void BinaryReadBuffer::markBytesAsRead(size_t read) {
+	size_read += read;
+	if (size_read > size_total)
+		throw MustNotHappenException(concat("Internal logic error: BinaryReadBuffer, size_read = ", size_read, " > size_total = ", size_total));
+	if (size_read == size_total) {
+		if (status == Status::READING_SIZE) {
+			status = Status::READING_DATA;
+			auto expected_size = *((size_t *) buffer.data()) - sizeof(size_t);
+			prepareBuffer(expected_size);
+		}
+		else if (status == Status::READING_DATA) {
+			status = Status::FINISHED;
+			size_read = 0;
+		}
+		else
+			throw MustNotHappenException("Internal logic error: BinaryReadBuffer was read in an invalid state");
 	}
 }

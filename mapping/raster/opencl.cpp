@@ -11,13 +11,10 @@
 #include "util/debug.h"
 
 
-//#include <iostream>
-#include <fstream>
 #include <sstream>
-//#include <memory>
 #include <mutex>
 #include <atomic>
-//#include <string>
+#include <unordered_map>
 
 namespace RasterOpenCL {
 
@@ -150,32 +147,6 @@ cl::CommandQueue *getQueue() {
 	return &queue;
 }
 
-cl::Kernel addProgram(const std::string &sourcecode, const char *kernelname) {
-	cl::Program::Sources source(1, std::make_pair(sourcecode.c_str(), sourcecode.length()));
-	cl::Program program(context, source);
-	try {
-		program.build(deviceList,"");
-	}
-	catch (cl::Error e) {
-		throw PlatformException(std::string("Error building cl::Program: ")+kernelname+": "+program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0]));
-	}
-
-	cl::Kernel kernel(program, kernelname);
-	return kernel;
-}
-
-
-static std::string readFileAsString(const char *filename) {
-	std::ifstream file(filename);
-	if (!file.is_open())
-		throw OpenCLException("Unable to open CL code file");
-	return std::string(std::istreambuf_iterator<char>(file), (std::istreambuf_iterator<char>()));
-
-}
-
-cl::Kernel addProgramFromFile(const char *filename, const char *kernelname) {
-	return addProgram(readFileAsString(filename), kernelname);
-}
 
 /*
 struct RasterInfo {
@@ -225,7 +196,7 @@ static const std::string rasterinfo_source(
 );
 
 
-cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster) {
+std::unique_ptr<cl::Buffer> getBufferWithRasterinfo(GenericRaster *raster) {
 	RasterInfo ri;
 	memset(&ri, 0, sizeof(RasterInfo));
 	ri.size[0] = raster->width;
@@ -246,7 +217,7 @@ cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster) {
 	ri.has_no_data = raster->dd.has_no_data;
 
 	try {
-		cl::Buffer *buffer = new cl::Buffer(
+		auto buffer = make_unique<cl::Buffer>(
 			*RasterOpenCL::getContext(),
 			CL_MEM_READ_ONLY,
 			sizeof(RasterInfo),
@@ -268,9 +239,40 @@ const std::string &getRasterInfoStructSource() {
 }
 
 
+/*
+ * ProgramCache
+ */
+
+// For the first implementation, only one program may be compiled at a time, and
+// there's no replacement strategy; the cache just keeps on filling.
+static std::mutex program_cache_mutex;
+static std::unordered_map<std::string, cl::Program> program_cache;
+
+cl::Program compileSource(const std::string &sourcecode) {
+	std::lock_guard<std::mutex> guard(program_cache_mutex);
+
+	if (program_cache.count(sourcecode) == 1) {
+		return program_cache.at(sourcecode);
+	}
+
+	cl::Program program;
+	try {
+		cl::Program::Sources sources(1, std::make_pair(sourcecode.c_str(), sourcecode.length()));
+		program = cl::Program(context, sources);
+		program.build(deviceList,""); // "-cl-std=CL2.0"
+	}
+	catch (const cl::Error &e) {
+		throw OpenCLException(concat("Error building cl::Program: ", e.what(), " ", program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0])));
+	}
+
+	program_cache[sourcecode] = program;
+	return program;
+}
 
 
-
+/*
+ * CLProgram
+ */
 CLProgram::CLProgram() : profiler(nullptr), kernel(nullptr), argpos(0), finished(false), iteration_type(0), in_rasters(), out_rasters(), pointcollections() {
 }
 CLProgram::~CLProgram() {
@@ -321,9 +323,6 @@ struct getCLTypeName {
 };
 
 void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
-	// TODO: here, we could add everything into our cache.
-	// key: hash(source) . (in-types) . (out-types) . kernelname
-
 	if (iteration_type == 0)
 		throw OpenCLException("No raster or pointcollection added, cannot iterate");
 
@@ -345,22 +344,10 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 
 	assembled_source << sourcecode;
 
-	std::string final_source = assembled_source.str();
-
-	cl::Program program;
-	try {
-		cl::Program::Sources sources(1, std::make_pair(final_source.c_str(), final_source.length()));
-		program = cl::Program(context, sources);
-		program.build(deviceList,""); // "-cl-std=CL2.0"
-	}
-	catch (const cl::Error &e) {
-		std::stringstream msg;
-		msg << "Error building cl::Program: " << kernelname << ": " << e.what() << " " << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(deviceList[0]);
-		throw OpenCLException(msg.str());
-	}
+	cl::Program program = compileSource(assembled_source.str());
 
 	try {
-		kernel = new cl::Kernel(program, kernelname);
+		kernel = make_unique<cl::Kernel>(program, kernelname);
 
 		for (decltype(in_rasters.size()) idx = 0; idx < in_rasters.size(); idx++) {
 			GenericRaster *raster = in_rasters[idx];
@@ -381,8 +368,7 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 		}
 	}
 	catch (const cl::Error &e) {
-		delete kernel;
-		kernel = nullptr;
+		kernel.reset(nullptr);
 		std::stringstream msg;
 		msg << "CL Error in compile(): " << e.err() << ": " << e.what();
 		throw OpenCLException(msg.str());
@@ -390,9 +376,6 @@ void CLProgram::compile(const std::string &sourcecode, const char *kernelname) {
 
 }
 
-void CLProgram::compileFromFile(const char *filename, const char *kernelname) {
-	compile(readFileAsString(filename), kernelname);
-}
 
 void CLProgram::run() {
 	try {
@@ -468,10 +451,7 @@ void CLProgram::cleanScratch() {
 }
 
 void CLProgram::reset() {
-	if (kernel) {
-		delete kernel;
-		kernel = nullptr;
-	}
+	kernel.reset(nullptr);
 	cleanScratch();
 	argpos = 0;
 	finished = false;

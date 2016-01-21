@@ -18,7 +18,7 @@
 
 namespace RasterOpenCL {
 
-static std::mutex opencl_mutex;
+static std::mutex opencl_init_mutex;
 static std::atomic<int> initialization_status(0); // 0: not initialized, 1: success, 2: failure
 
 
@@ -39,7 +39,7 @@ size_t getMaxAllocSize() {
 void init() {
 	if (initialization_status == 0) {
 		Profiler::Profiler p("CL_INIT");
-		std::lock_guard<std::mutex> guard(opencl_mutex);
+		std::lock_guard<std::mutex> guard(opencl_init_mutex);
 		if (initialization_status == 0) {
 			// ok, let's initialize everything. Default to "failure".
 			initialization_status = 2;
@@ -112,9 +112,12 @@ void init() {
 		throw PlatformException("could not initialize opencl");
 }
 
+void freeProgramCache();
 void free() {
-	std::lock_guard<std::mutex> guard(opencl_mutex);
+	std::lock_guard<std::mutex> guard(opencl_init_mutex);
 	if (initialization_status == 1) {
+		freeProgramCache();
+
 		platform = cl::Platform();
 
 		context = cl::Context();
@@ -244,6 +247,11 @@ const std::string &getRasterInfoStructSource() {
 // there's no replacement strategy; the cache just keeps on filling.
 static std::mutex program_cache_mutex;
 static std::unordered_map<std::string, cl::Program> program_cache;
+
+void freeProgramCache() {
+	std::lock_guard<std::mutex> guard(program_cache_mutex);
+	program_cache.clear();
+}
 
 cl::Program compileSource(const std::string &sourcecode) {
 	std::lock_guard<std::mutex> guard(program_cache_mutex);

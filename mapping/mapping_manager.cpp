@@ -533,7 +533,7 @@ static int testsemantic(int argc, char *argv[]) {
 		auto semantic2 = graph2->getSemanticId();
 		if (semantic1 != semantic2) {
 			printf("Semantic ID changes after reconstruction:\n%s\n%s\n", semantic1.c_str(), semantic2.c_str());
-			exit(5);
+			return 5;
 		}
 	}
 	catch (const std::exception &e) {
@@ -548,6 +548,7 @@ static int testsemantic(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
 
 	program_name = argv[0];
+	int returncode = 0;
 
 	if (argc < 2) {
 		usage();
@@ -579,10 +580,10 @@ int main(int argc, char *argv[]) {
 		runquery(argc, argv);
 	}
 	else if (strcmp(command, "testquery") == 0) {
-		return testquery(argc, argv);
+		returncode = testquery(argc, argv);
 	}
 	else if (strcmp(command, "testsemantic") == 0) {
-		return testsemantic(argc, argv);
+		returncode = testsemantic(argc, argv);
 	}
 	else if (strcmp(command, "enumeratesources") == 0) {
 		bool verbose = false;
@@ -623,5 +624,8 @@ int main(int argc, char *argv[]) {
 	else {
 		usage();
 	}
-	return 0;
+#ifndef MAPPING_NO_OPENCL
+	RasterOpenCL::free();
+#endif
+	return returncode;
 }

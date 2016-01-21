@@ -284,6 +284,20 @@ Raster<T, dimensions>::Raster(const DataDescription &datadescription, const Spat
 
 template<typename T, int dimensions>
 Raster<T, dimensions>::~Raster() {
+	// TODO: is a raster that's currently on the GPU correctly freed?
+	//setRepresentation(GenericRaster::Representation::CPU);
+
+#ifndef MAPPING_NO_OPENCL
+	if (clbuffer) {
+		delete clbuffer;
+		clbuffer = nullptr;
+	}
+	if (clbuffer_info) {
+		delete clbuffer_info;
+		clbuffer_info = nullptr;
+	}
+#endif
+
 	if (data) {
 		if (data[getPixelCount()] != 42) {
 			printf("Error in Raster: guard value was overwritten. Memory corruption!\n");
@@ -294,14 +308,6 @@ Raster<T, dimensions>::~Raster() {
 		//delete [] data;
 		data = nullptr;
 	}
-#ifndef MAPPING_NO_OPENCL
-	if (clbuffer) {
-		delete clbuffer;
-		clbuffer = nullptr;
-		delete clbuffer_info;
-		clbuffer_info = nullptr;
-	}
-#endif
 }
 
 
@@ -356,7 +362,7 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 			throw OpenCLException(ss.str());
 		}
 
-		clbuffer_info = RasterOpenCL::getBufferWithRasterinfo(this);
+		clbuffer_info = RasterOpenCL::getBufferWithRasterinfo(this).release();
 #endif
 	}
 	else if (r == Representation::CPU) {
@@ -378,10 +384,14 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 			RasterOpenCL::getQueue()->enqueueReadBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
 #endif
 		}
-		delete clbuffer;
-		clbuffer = nullptr;
-		delete clbuffer_info;
-		clbuffer_info = nullptr;
+		if (clbuffer) {
+			delete clbuffer;
+			clbuffer = nullptr;
+		}
+		if (clbuffer_info) {
+			delete clbuffer_info;
+			clbuffer_info = nullptr;
+		}
 #endif
 	}
 	else
@@ -598,7 +608,8 @@ template<typename T>
 std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRectangle &qrect) {
 	setRepresentation(GenericRaster::Representation::CPU);
 
-	QueryRectangle target( qrect, stref, qrect );
+	// adjust sref and resolution, but keep the tref.
+	QueryRectangle target(qrect, stref, qrect);
 
 	auto out = GenericRaster::create(dd, target, target.xres, target.yres);
 	Raster2D<T> *r = (Raster2D<T> *) out.get();

@@ -84,8 +84,11 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	// figure out the largest time interval common to all input rasters
 	TemporalReference tref(raster_in->stref);
 
-//	QueryRectangle exact_rect(*raster_in);
-	QueryRectangle exact_rect(raster_in->stref, rect, QueryResolution::pixels(raster_in->width,raster_in->height));
+	QueryRectangle exact_rect(
+		(SpatialReference &) raster_in->stref,
+		(TemporalReference &) rect, // we need to calculate the temporal intersection on our own, so always query with the same interval.
+		QueryResolution::pixels(raster_in->width,raster_in->height)
+	);
 	for (int i=1;i<rastercount;i++) {
 		in_rasters.push_back(getRasterFromSource(i, exact_rect, profiler, RasterQM::EXACT));
 		in_rasters[i]->setRepresentation(GenericRaster::OPENCL);

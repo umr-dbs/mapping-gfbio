@@ -16,6 +16,7 @@
 
 #include <string>
 #include <gdal_priv.h>
+#include <memory>
 
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/pointcollection.h"
@@ -30,10 +31,7 @@ namespace RasterOpenCL {
 	cl::Device *getDevice();
 	cl::CommandQueue *getQueue();
 
-	cl::Kernel addProgramFromFile(const char *filename, const char *kernelname);
-	cl::Kernel addProgram(const std::string &sourcecode, const char *kernelname);
-
-	cl::Buffer *getBufferWithRasterinfo(GenericRaster *raster);
+	std::unique_ptr<cl::Buffer> getBufferWithRasterinfo(GenericRaster *raster);
 
 	size_t getMaxAllocSize();
 
@@ -52,7 +50,6 @@ namespace RasterOpenCL {
 			void addPointCollectionAttribute(size_t idx, const std::string &name, bool readonly = false);
 
 			void compile(const std::string &source, const char *kernelname);
-			void compileFromFile(const char *filename, const char *kernelname);
 			template<typename T> void addArg(T arg) {
 				if (!kernel || finished)
 					throw OpenCLException("addArg() should only be called between compile() and run()");
@@ -92,7 +89,10 @@ namespace RasterOpenCL {
 		private:
 			void cleanScratch();
 			QueryProfiler *profiler;
-			cl::Kernel *kernel;
+			// yes, cl::Kernel is something like a shared_ptr around the handles returned by the C API,
+			// so why would we want a unique_ptr around a shared_ptr?
+			// Because cl::Kernel has no useful public way to check whether it contains a NULL handle.
+			std::unique_ptr<cl::Kernel> kernel;
 			cl_uint argpos;
 			bool finished;
 			int iteration_type; // 0 = unknown, 1 = first out_raster, 2 = first pointcollection

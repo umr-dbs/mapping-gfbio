@@ -26,6 +26,21 @@ class GenericOperator {
 	friend class CacheManager;
 	friend class GraphReorgStrategy;
 	public:
+		/*
+		 * Restricts the spatial extent and resolution of a raster returned from an operator.
+		 *
+		 * A LOOSE result can contain pixels outside the query rectangle and can be in a
+		 * resolution different from the resolution requested in the query rectangle.
+		 *
+		 * A EXACT raster has exactly the spatial extent and resolution requested. This can
+		 * cause rescaling of the raster, so use it sparingly.
+		 * The intended uses are for correlating multiple rasters (query the first one LOOSE,
+		 * query the others EXACT with the sref of the first one) and for the root of the
+		 * operator graph, because e.g. WMS needs to return images with just the right size and location.
+		 *
+		 * Note that this option only affects the spatial dimension. The temporal dimension will
+		 * not be adjusted to the query rectangle under any circumstance.
+		 */
 		enum class RasterQM {
 			EXACT,
 			LOOSE

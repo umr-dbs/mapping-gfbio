@@ -1,0 +1,61 @@
+{
+    "name": "Load points",
+    "query_result": "points",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 1438387200,
+        "end": 1440979200
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "query": {
+        "type": "timeShiftOperator",
+        "params": {
+            "shift": {
+                "from": {
+                    "unit": "months",
+                    "value": 1
+                },
+                "to": {
+                    "unit": "absolute",
+                    "value": "2015-09-30 00:00:00"
+                }
+            }
+        },
+        "sources": {
+            "points": [
+                {
+                    "params": {
+                        "filename": "test/systemtests/data/osm_large_cities/osm_large_cities.csv",
+                        "separator": ";",
+                        "geometry": "wkt",
+                        "time": "start",
+                        "time1_format": {
+                            "format": "custom",
+                            "custom_format": "%Y-%m-%d %H:%M:%S+%Z"
+                        },
+                        "columns": {
+                            "x": "wkt",
+                            "numeric": [
+                                "osm_id"
+                            ],
+                            "textual": [
+                                "name",
+                                "is_in"
+                            ],
+                            "time1": "time_start"
+                        }
+                    },
+                    "sources": null,
+                    "type": "csvpointsource"
+                }
+            ]
+        }
+    },
+    "query_expected_hash": "8cba52bdf40dc55d3facec202f75b562"
+}

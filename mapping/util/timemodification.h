@@ -5,6 +5,7 @@
 
 #include <map>
 #include <memory>
+#include <cmath>
 
 #include <ctime>
 #include <boost/date_time/gregorian/gregorian.hpp>
@@ -19,7 +20,7 @@ class TimeShift {
 		 *
 		 * @return shifted time
 		 */
-		virtual auto apply(const time_t& input) -> time_t = 0;
+		virtual auto apply(const double& input) -> double = 0;
 
 		/**
 		 * Revert the time shift for the output timestamp.
@@ -28,7 +29,7 @@ class TimeShift {
 		 *
 		 * @return reverted output time.
 		 */
-		virtual auto reverse(const time_t& input) -> time_t = 0;
+		virtual auto reverse(const double& input) -> double = 0;
 
 		virtual ~TimeShift() = default;
 	protected:
@@ -56,8 +57,8 @@ class TimeShift {
  */
 class Identity : public TimeShift {
 	public:
-		auto apply(const time_t& input) -> time_t;
-		auto reverse(const time_t& input) -> time_t;
+		auto apply(const double& input) -> double;
+		auto reverse(const double& input) -> double;
 };
 
 /**
@@ -92,8 +93,8 @@ class RelativeShift : public TimeShift {
 		 */
 		RelativeShift(int amount, ShiftUnit unit) : unit(unit), shift_value(amount) {}
 
-		auto apply(const time_t& input) -> time_t;
-		auto reverse(const time_t& input) -> time_t;
+		auto apply(const double& input) -> double;
+		auto reverse(const double& input) -> double;
 
 	private:
 		ShiftUnit unit;
@@ -103,7 +104,7 @@ class RelativeShift : public TimeShift {
 
 		auto shift(const PTime time) const -> PTime;
 
-		time_t time_difference = 0;
+		double time_difference = 0;
 };
 
 /**
@@ -116,14 +117,14 @@ class AbsoluteShift : public TimeShift {
 		 *
 		 * @param absolute_time
 		 */
-		AbsoluteShift(PTime absolute_time) : result_time(toTime_t(absolute_time)) {}
+		AbsoluteShift(PTime absolute_time) : result_time(static_cast<double>(toTime_t(absolute_time))) {}
 
-		auto apply(const time_t& input) -> time_t;
-		auto reverse(const time_t& input) -> time_t;
+		auto apply(const double& input) -> double;
+		auto reverse(const double& input) -> double;
 	private:
-		time_t result_time;
+		double result_time;
 
-		time_t time_difference = 0;
+		double time_difference = 0;
 };
 
 /**
@@ -137,15 +138,15 @@ class Stretch : public TimeShift {
 		 * @param fixedPoint A starting point on which to determine the stretch interval.
 		 * @param factor The stretching factor.
 		 */
-		Stretch(PTime fixedPoint, int factor) : fixedPoint(fixedPoint), factor(factor) {}
+		Stretch(PTime fixedPoint, int factor) : fixedPoint(static_cast<double>(toTime_t(fixedPoint))), factor(factor) {}
 
-		auto apply(const time_t& input) -> time_t;
-		auto reverse(const time_t& input) -> time_t;
+		auto apply(const double& input) -> double;
+		auto reverse(const double& input) -> double;
 	private:
-		PTime fixedPoint;
+		double fixedPoint;
 		int factor;
 
-		time_t time_difference = 0;
+		double time_difference = 0;
 };
 
 /**
@@ -180,8 +181,8 @@ class Snap : public TimeShift {
 		 */
 		Snap(SnapUnit unit, short unsigned int value, bool allow_reset) : unit(unit), value(value), allow_reset(allow_reset) {}
 
-		auto apply(const time_t& input) -> time_t;
-		auto reverse(const time_t& input) -> time_t;
+		auto apply(const double& input) -> double;
+		auto reverse(const double& input) -> double;
 	private:
 		SnapUnit unit;
 		short unsigned int value;
@@ -189,7 +190,7 @@ class Snap : public TimeShift {
 
 		static const std::map<std::string, SnapUnit> string_to_enum;
 
-		time_t time_difference = 0;
+		double time_difference = 0;
 };
 
 /**

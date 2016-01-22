@@ -46,7 +46,7 @@ HistogramFromFeaturesOperator::HistogramFromFeaturesOperator(int sourcecounts[],
 	autoRange = params.get("autoRange", true).asBool();
 	if(!autoRange) {
 		rangeMin = params.get("rangeMin", std::numeric_limits<double>::min()).asDouble();
-		rangeMin = params.get("rangeMin", std::numeric_limits<double>::max()).asDouble();
+		rangeMax = params.get("rangeMax", std::numeric_limits<double>::max()).asDouble();
 
 		// fallback if range is invalid or 0
 		if(rangeMax <= rangeMin) {

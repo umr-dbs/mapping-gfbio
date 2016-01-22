@@ -37,10 +37,12 @@ class QueryProfiler : public ProfilingData {
 		void stopTimer();
 		void addGPUCost(double seconds);
 		void addIOCost(size_t bytes);
-		void cached();
 
-		QueryProfiler & operator+=(QueryProfiler &other);
+
+		QueryProfiler & operator+=( const ProfilingData &other );
+		QueryProfiler & operator+=( const QueryProfiler &other );
 		void addTotalCosts( const ProfilingData &profile );
+		void cached( const ProfilingData &profile );
 
 
 	private:
@@ -48,18 +50,6 @@ class QueryProfiler : public ProfilingData {
 };
 
 // these are two RAII helper classes to make sure that profiling works even when an operator throws an exception
-class QueryProfilerSimpleGuard {
-	public:
-		QueryProfilerSimpleGuard(QueryProfiler &profiler) : profiler(profiler) {
-			profiler.startTimer();
-		}
-		~QueryProfilerSimpleGuard() {
-			profiler.stopTimer();
-		}
-		QueryProfiler &profiler;
-};
-
-
 class QueryProfilerRunningGuard {
 	public:
 		QueryProfilerRunningGuard(QueryProfiler &parent_profiler, QueryProfiler &profiler)

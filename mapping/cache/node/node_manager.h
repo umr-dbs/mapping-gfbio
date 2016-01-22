@@ -58,7 +58,7 @@ public:
 			const CachingStrategy &strategy );
 	virtual ~NodeCacheWrapper() = default;
 
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler);
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 
 	// Inserts an element into the local cache -- omitting any communication
@@ -79,7 +79,7 @@ public:
 //	NodeCacheRef get_entry_info( const NodeCacheKey &key);
 
 	// Proccesses the given puzzle-request
-	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &profiler );
+	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &parent_profiler );
 private:
 	NodeCacheManager &mgr;
 	NodeCache<T> &cache;

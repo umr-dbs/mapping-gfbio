@@ -23,6 +23,7 @@ std::unique_ptr<CachingStrategy> CachingStrategy::by_name(const std::string& nam
 }
 
 double CachingStrategy::get_costs(const ProfilingData& profile, size_t bytes, Type type) {
+	(void) bytes;
 	double io;
 	double cpu;
 	double gpu;
@@ -45,13 +46,11 @@ double CachingStrategy::get_costs(const ProfilingData& profile, size_t bytes, Ty
 		break;
 	}
 
-	double proc = cpu + gpu;
-	// TODO: Check this factor;
-	double cache_cpu = 0.000000005 * bytes;
-
-	double res = io / (double) bytes + proc / cache_cpu;
-
-	return res;
+	double time_fact = (cpu +
+			            gpu * 21); // This factor was roughly calculated from some experiments;
+	// Assume 1 sec per 512 MiB
+	double io_fact = (io / 1024 / 1024 / 512);
+	return io_fact + time_fact;
 }
 
 //

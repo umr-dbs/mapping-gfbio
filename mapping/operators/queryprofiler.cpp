@@ -95,9 +95,7 @@ void QueryProfiler::addIOCost(size_t bytes) {
 	uncached_io += bytes;
 }
 
-QueryProfiler & QueryProfiler::operator+=(QueryProfiler &other) {
-	if (other.t_start != 0)
-		throw OperatorException("QueryProfiler: tried adding a timer that had not been stopped");
+QueryProfiler& QueryProfiler::operator +=(const ProfilingData& other) {
 	all_cpu += other.all_cpu;
 	uncached_cpu += other.uncached_cpu;
 	all_gpu += other.all_gpu;
@@ -107,10 +105,16 @@ QueryProfiler & QueryProfiler::operator+=(QueryProfiler &other) {
 	return *this;
 }
 
-void QueryProfiler::cached() {
-	uncached_cpu = 0;
-	uncached_gpu = 0;
-	uncached_io  = 0;
+QueryProfiler & QueryProfiler::operator+=(const QueryProfiler &other) {
+	if (other.t_start != 0)
+		throw OperatorException("QueryProfiler: tried adding a timer that had not been stopped");
+	return operator +=((ProfilingData&)other);
+}
+
+void QueryProfiler::cached(const ProfilingData &data) {
+	uncached_cpu -= data.uncached_cpu;
+	uncached_gpu -= data.uncached_gpu;
+	uncached_io  -= data.uncached_io;
 }
 
 void QueryProfiler::addTotalCosts(const ProfilingData& profile) {

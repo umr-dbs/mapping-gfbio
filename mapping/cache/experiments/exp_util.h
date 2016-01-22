@@ -22,6 +22,7 @@
 #include <cmath>
 #include <thread>
 #include <memory>
+#include <random>
 
 time_t parseIso8601DateTime(std::string dateTimeString);
 
@@ -56,20 +57,20 @@ public:
 template<typename T>
 class TestCacheWrapper : public CacheWrapper<T> {
 public:
-	TestCacheWrapper( NodeCacheWrapper<T> &w, QueryProfiler &costs) : w(w), costs(costs) {};
+	TestCacheWrapper( NodeCacheWrapper<T> &w, ProfilingData &costs) : w(w), costs(costs) {};
 
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler) {
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
 		costs.all_cpu += profiler.self_cpu;
 		costs.all_gpu += profiler.self_gpu;
 		costs.all_io += profiler.self_io;
-		w.put(semantic_id,item,query,profiler);
+		return w.put(semantic_id,item,query,profiler);
 	}
 
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler) { return w.query(op,rect,profiler); };
 
 private:
 	NodeCacheWrapper<T> &w;
-	QueryProfiler &costs;
+	ProfilingData &costs;
 };
 
 class TestCacheMan : public CacheManager {
@@ -81,13 +82,13 @@ public:
 	CacheWrapper<LineCollection>& get_line_cache();
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
-	QueryProfiler &get_costs();
+	ProfilingData &get_costs();
 	void reset_costs();
 private:
 	std::map<TestNodeServer*, TestCacheWrapper<GenericRaster>> raster_wrapper;
 	NodeCacheManager& get_current_instance() const;
 	std::vector<TestNodeServer*> instances;
-	QueryProfiler costs;
+	ProfilingData costs;
 };
 
 class LocalCacheManager;
@@ -100,10 +101,10 @@ class LocalCacheWrapper : public CacheWrapper<T> {
 	friend class LocalCacheManager;
 public:
 	LocalCacheWrapper( NodeCache<T> &cache, std::unique_ptr<Puzzler<T>> puzzler, LocalCacheManager &mgr );
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler);
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 private:
-	std::unique_ptr<T> process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler);
+	std::unique_ptr<T> process_puzzle(const PuzzleRequest& request, QueryProfiler &parent_profiler);
 	NodeCache<T> &cache;
 	LocalRetriever<T> retriever;
 	PuzzleUtil<T> puzzle_util;
@@ -123,14 +124,14 @@ public:
 	CacheWrapper<PolygonCollection>& get_polygon_cache();
 	CacheWrapper<GenericPlot>& get_plot_cache();
 
-	QueryProfiler &get_costs();
+	ProfilingData &get_costs();
 	void reset_costs();
 
 	Capacity get_capacity() const;
 
 	void set_strategy(std::unique_ptr<CachingStrategy> strategy);
 private:
-	QueryProfiler costs;
+	ProfilingData costs;
 	WorkerContext worker_context;
 	NodeCache<GenericRaster> rc;
 	NodeCache<PointCollection> pc;
@@ -180,6 +181,9 @@ public:
 };
 
 class QuerySpec {
+private:
+	static std::default_random_engine generator;
+	static std::uniform_real_distribution<double> distrib;
 public:
 	QuerySpec( const std::string &workflow, epsg_t epsg, CacheType type, const TemporalReference &tref, std::string name = "" );
 	std::string workflow;
@@ -214,7 +218,7 @@ template<class T, CacheType TYPE>
 class TracingCacheWrapper : public CacheWrapper<T> {
 public:
 	TracingCacheWrapper( std::vector<QTriple> &query_log, size_t &size );
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler);
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 private:
 	size_t &size;

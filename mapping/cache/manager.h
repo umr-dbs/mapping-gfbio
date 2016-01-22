@@ -26,8 +26,8 @@ class CacheWrapper {
 public:
 	virtual ~CacheWrapper() = default;
 
-	// Inserts an item into the cache
-	virtual void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler) = 0;
+	// Inserts an item into the cache, if the strategy says YES
+	virtual bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) = 0;
 
 	// Queries for an item satisfying the given request
 	// The result is a copy of the cached version and may be modified
@@ -70,7 +70,7 @@ template<typename T, CacheType CType>
 class NopCacheWrapper : public CacheWrapper<T> {
 public:
 	NopCacheWrapper();
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler);
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
@@ -104,7 +104,7 @@ template<typename T, CacheType CType>
 class ClientCacheWrapper : public CacheWrapper<T> {
 public:
 	ClientCacheWrapper( CacheType type, const std::string &idx_host, int idx_port );
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler);
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
 	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 protected:
 	std::unique_ptr<T> read_result( BinaryStream &stream );

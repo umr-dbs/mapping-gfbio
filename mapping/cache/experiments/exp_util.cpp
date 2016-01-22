@@ -131,15 +131,15 @@ LocalCacheWrapper<T>::LocalCacheWrapper(NodeCache<T>& cache, std::unique_ptr<Puz
 }
 
 template<class T>
-void LocalCacheWrapper<T>::put(const std::string &semantic_id,
-		const std::unique_ptr<T> &item, const QueryRectangle &query, QueryProfiler &profiler) {
+bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
+		const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
 
 	mgr.costs.all_cpu += profiler.self_cpu;
 	mgr.costs.all_gpu += profiler.self_gpu;
 	mgr.costs.all_io  += profiler.self_io;
 
 	if ( mgr.worker_context.is_puzzling() )
-		return;
+		return false;
 
 	size_t size = SizeUtil::get_byte_size(*item);
 //	printf("Size of added entry: %ld bytes, workflow: %s\n",size, semantic_id.c_str());
@@ -167,9 +167,9 @@ void LocalCacheWrapper<T>::put(const std::string &semantic_id,
 				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
 		}
 		cache.put(semantic_id, item, CacheEntry( cube, size, profiler));
-		// Tell the profiler this entry was cached!
-		profiler.cached();
+		return true;
 	}
+	return false;
 }
 
 template<class T>
@@ -201,14 +201,16 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(const GenericOperator& op,
 }
 
 template<class T>
-std::unique_ptr<T> LocalCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler) {
-	PuzzleGuard pg(mgr.worker_context);
+std::unique_ptr<T> LocalCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &parent_profiler) {
 	std::unique_ptr<T> result;
+	QueryProfiler profiler;
 	{
-		QueryProfilerSimpleGuard guard(profiler);
-		result = puzzle_util.process_puzzle( request, profiler );
+		PuzzleGuard pg(mgr.worker_context);
+		QueryProfilerRunningGuard guard(parent_profiler,profiler);
+		result = puzzle_util.process_puzzle(request,profiler);
 	}
-	put( request.semantic_id, result, request.query, profiler );
+	if ( put( request.semantic_id, result, request.query, profiler ) )
+		parent_profiler.cached(profiler);
 	return result;
 }
 
@@ -249,7 +251,7 @@ CacheWrapper<GenericPlot>& LocalCacheManager::get_plot_cache() {
 	return plw;
 }
 
-QueryProfiler& LocalCacheManager::get_costs() {
+ProfilingData& LocalCacheManager::get_costs() {
 	return costs;
 }
 
@@ -260,7 +262,9 @@ void LocalCacheManager::reset_costs() {
 	costs.self_cpu = 0;
 	costs.self_gpu = 0;
 	costs.self_io = 0;
-	costs.cached();
+	costs.uncached_cpu = 0;
+	costs.uncached_gpu = 0;
+	costs.uncached_io  = 0;
 }
 
 void LocalCacheManager::set_strategy(
@@ -327,7 +331,7 @@ void TestIdxServer::wait_for_idle_control_connections() {
 	do {
 		if ( !all_idle )
 			std::this_thread::sleep_for( std::chrono::milliseconds(10) );
-
+		all_idle = true;
 		for ( auto &kv : control_connections ) {
 			all_idle &= kv.second->get_state() == ControlState::IDLE;
 		}
@@ -411,7 +415,9 @@ void TestCacheMan::reset_costs() {
 	costs.self_cpu = 0;
 	costs.self_gpu = 0;
 	costs.self_io = 0;
-	costs.cached();
+	costs.uncached_cpu = 0;
+	costs.uncached_gpu = 0;
+	costs.uncached_io  = 0;
 }
 
 
@@ -463,7 +469,7 @@ TestCacheMan& LocalTestSetup::get_manager() {
 	return mgr;
 }
 
-QueryProfiler& TestCacheMan::get_costs() {
+ProfilingData& TestCacheMan::get_costs() {
 	return costs;
 }
 
@@ -475,11 +481,12 @@ TracingCacheWrapper<T,TYPE>::TracingCacheWrapper(
 }
 
 template<class T, CacheType TYPE>
-void TracingCacheWrapper<T,TYPE>::put(const std::string& semantic_id,
+bool TracingCacheWrapper<T,TYPE>::put(const std::string& semantic_id,
 		const std::unique_ptr<T>& item, const QueryRectangle& query,
-		QueryProfiler& profiler) {
+		const QueryProfiler& profiler) {
 	(void) semantic_id; (void) item; (void) query; (void) profiler;
 	size += SizeUtil::get_byte_size(*item);
+	return false;
 }
 
 template<class T, CacheType TYPE>
@@ -557,6 +564,10 @@ QTriple& QTriple::operator =(const QTriple& t) {
 // SPEC
 //
 
+std::default_random_engine QuerySpec::generator(std::chrono::system_clock::now().time_since_epoch().count());
+std::uniform_real_distribution<double> QuerySpec::distrib(0,1);
+
+
 QuerySpec::QuerySpec(const std::string& workflow, epsg_t epsg, CacheType type,
 		const TemporalReference& tref, std::string name) :
 	workflow(workflow), epsg(epsg), type(type), tref(tref), name(name), bounds(SpatialReference::extent(epsg)) {
@@ -580,8 +591,9 @@ QueryRectangle QuerySpec::random_rectangle(double extend, uint32_t resolution) c
 	double rx = bounds.x2 - bounds.x1 - extend;
 	double ry = bounds.y2 - bounds.y1 - extend;
 	double x1, y1;
-	x1 = drand48() * rx + bounds.x1;
-	y1 = drand48() * ry + bounds.y1;
+
+	x1 = distrib(generator) * rx + bounds.x1;
+	y1 = distrib(generator) * ry + bounds.y1;
 	return rectangle(x1,y1,extend,resolution);
 }
 

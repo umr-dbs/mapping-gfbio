@@ -44,10 +44,10 @@ NodeCacheWrapper<T>::NodeCacheWrapper( NodeCacheManager &mgr, NodeCache<T> &cach
 }
 
 template<typename T>
-void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item, const QueryRectangle &query, QueryProfiler &profiler) {
+bool NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	// Do nothing if we are puzzling --> Do not cache remainder queries
 	if ( mgr.get_worker_context().is_puzzling() )
-		return;
+		return false;
 
 
 	TIME_EXEC("CacheManager.put");
@@ -84,12 +84,12 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 
 		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
 		buffered_write(stream,WorkerConnection::RESP_NEW_CACHE_ENTRY,ref);
-
-		// Remove costs from profiler
-		profiler.cached();
+		return true;
 	}
-	else
+	else {
 		Log::debug("Item will not be cached according to strategy");
+		return false;
+	}
 }
 
 template<typename T>
@@ -216,15 +216,17 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 }
 
 template<typename T>
-std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &profiler) {
+std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &parent_profiler) {
 	TIME_EXEC("CacheManager.puzzle");
 	std::unique_ptr<T> result;
+	QueryProfiler profiler;
 	{
 		PuzzleGuard pg(mgr.get_worker_context());
-		QueryProfilerSimpleGuard guard(profiler);
+		QueryProfilerRunningGuard guard(parent_profiler,profiler);
 		result = puzzle_util->process_puzzle(request,profiler);
 	}
-	put( request.semantic_id, result, request.query, profiler );
+	if ( put( request.semantic_id, result, request.query, profiler ) )
+		parent_profiler.cached(profiler);
 	return result;
 }
 

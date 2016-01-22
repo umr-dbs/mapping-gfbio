@@ -321,8 +321,6 @@ std::vector<std::unique_ptr<T> > PuzzleUtil<T>::compute_remainders(
 	std::vector<std::unique_ptr<T>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
 
-	// Stop computation time
-	QueryProfilerStoppingGuard guard(profiler);
 	for ( auto &rqr : request.get_remainder_queries() ) {
 		result.push_back( retriever.compute(*graph,rqr,profiler) );
 	}
@@ -341,9 +339,6 @@ std::vector<std::unique_ptr<GenericRaster>> PuzzleUtil<GenericRaster>::compute_r
 	auto remainders = request.get_remainder_queries( ref_result.pixel_scale_x, ref_result.pixel_scale_y,
 													 ref_result.stref.x1, ref_result.stref.y1 );
 
-
-	// Stop computation time
-	QueryProfilerStoppingGuard guard(profiler);
 	for ( auto &rqr : remainders ) {
 		try {
 			auto rem = retriever.compute(*graph,rqr,profiler);

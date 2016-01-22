@@ -3,13 +3,16 @@
 #include "datatypes/plot.h"
 #include "util/binarystream.h"
 #include "util/debug.h"
+#include "util/sizeutil.h"
 
 #include "operators/operator.h"
 #include "cache/manager.h"
 #include "cache/common.h"
+#include "cache/priv/caching_strategy.h"
 
 
 #include <unordered_map>
+#include <chrono>
 
 
 #include <json/json.h>
@@ -140,19 +143,22 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 
 std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::REQUIRED);
+	auto &cache = CacheManager::get_instance().get_raster_cache();
 	std::unique_ptr<GenericRaster> result;
-	QueryProfiler profiler;
 	try {
-		result = CacheManager::get_instance().get_raster_cache().query(
-				*this, rect, profiler );
-		parent_profiler += profiler;
+		QueryProfiler cache_profiler;
+		result = cache.query( *this, rect, cache_profiler );
+		parent_profiler += cache_profiler;
 	} catch ( NoSuchElementException &nse ) {
+		QueryProfiler exec_profiler;
 		{
-			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
 			TIME_EXEC("Operator.getRaster");
-			result = getRaster(rect,profiler);
+			result = getRaster(rect,exec_profiler);
 		}
-		CacheManager::get_instance().get_raster_cache().put(semantic_id,result,rect,profiler);
+		if ( cache.put(semantic_id,result,rect,exec_profiler) ) {
+			parent_profiler.cached(exec_profiler);
+		}
 	}
 	validateResult(rect, result.get());
 
@@ -163,22 +169,22 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 }
 std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
+	auto &cache = CacheManager::get_instance().get_point_cache();
 	std::unique_ptr<PointCollection> result;
-	QueryProfiler profiler;
 	try {
-		result = CacheManager::get_instance().get_point_cache().query(
-				*this, rect, profiler );
-		parent_profiler += profiler;
+		QueryProfiler cache_profiler;
+		result = cache.query( *this, rect, cache_profiler );
+		parent_profiler += cache_profiler;
 	} catch ( NoSuchElementException &nse ) {
+		QueryProfiler exec_profiler;
 		{
-			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
 			TIME_EXEC("Operator.getPointCollection");
-			result = getPointCollection(rect,profiler);
+			result = getPointCollection(rect,exec_profiler);
 		}
-		CacheManager::get_instance().get_point_cache().put(semantic_id,result,rect,profiler);
+		if ( cache.put(semantic_id,result,rect,exec_profiler) )
+			parent_profiler.cached(exec_profiler);
 	}
-	//d_profile(depth, type, "points", profiler);
-
 	// validate the SimpleFeature data structure
 	result->validate();
 	// validate the invariants of the operator graph
@@ -190,22 +196,22 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 }
 std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
+	auto &cache = CacheManager::get_instance().get_line_cache();
 	std::unique_ptr<LineCollection> result;
-	QueryProfiler profiler;
 	try {
-		result = CacheManager::get_instance().get_line_cache().query(
-				*this, rect, profiler );
-		parent_profiler += profiler;
+		QueryProfiler cache_profiler;
+		result = cache.query( *this, rect, cache_profiler );
+		parent_profiler += cache_profiler;
 	} catch ( NoSuchElementException &nse ) {
+		QueryProfiler exec_profiler;
 		{
-			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
 			TIME_EXEC("Operator.getLineCollection");
-			result = getLineCollection(rect,profiler);
+			result = getLineCollection(rect,exec_profiler);
 		}
-		CacheManager::get_instance().get_line_cache().put(semantic_id,result,rect,profiler);
+		if ( cache.put(semantic_id,result,rect,exec_profiler) )
+				parent_profiler.cached(exec_profiler);
 	}
-	//d_profile(depth, type, "lines", profiler);
-
 	// validate the SimpleFeature data structure
 	result->validate();
 	// validate the invariants of the operator graph
@@ -217,23 +223,22 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 }
 std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
+	auto &cache = CacheManager::get_instance().get_polygon_cache();
 	std::unique_ptr<PolygonCollection> result;
-	QueryProfiler profiler;
 	try {
-		result = CacheManager::get_instance().get_polygon_cache().query(
-				*this, rect, profiler);
-		parent_profiler += profiler;
+		QueryProfiler cache_profiler;
+		result = cache.query( *this, rect, cache_profiler );
+		parent_profiler += cache_profiler;
 	} catch ( NoSuchElementException &nse ) {
-		QueryProfiler profiler;
+		QueryProfiler exec_profiler;
 		{
-			QueryProfilerRunningGuard guard(parent_profiler, profiler);
+			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
 			TIME_EXEC("Operator.getPolygonCollection");
-			result = getPolygonCollection(rect,profiler);
+			result = getPolygonCollection(rect,exec_profiler);
 		}
-		CacheManager::get_instance().get_polygon_cache().put(semantic_id,result,rect,profiler);
+		if ( cache.put(semantic_id,result,rect,exec_profiler) )
+			parent_profiler.cached(exec_profiler);
 	}
-	//d_profile(depth, type, "polygons", profiler);
-
 	// validate the SimpleFeature data structure
 	result->validate();
 	// validate the invariants of the operator graph

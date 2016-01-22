@@ -39,12 +39,13 @@ NopCacheWrapper<T,CType>::NopCacheWrapper() {
 }
 
 template<typename T, CacheType CType>
-void NopCacheWrapper<T,CType>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item, const QueryRectangle &query, QueryProfiler &profiler) {
+bool NopCacheWrapper<T,CType>::put(const std::string& semantic_id,
+		const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
 	(void) query;
 	(void) profiler;
+	return false;
 }
 
 template<typename T, CacheType CType>
@@ -93,12 +94,13 @@ ClientCacheWrapper<T,CType>::ClientCacheWrapper(CacheType type, const std::strin
 }
 
 template<typename T, CacheType CType>
-void ClientCacheWrapper<T,CType>::put(const std::string& semantic_id,
-		const std::unique_ptr<T>& item, const QueryRectangle &query, QueryProfiler &profiler) {
+bool ClientCacheWrapper<T,CType>::put(const std::string& semantic_id,
+		const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
 	(void) query;
 	(void) profiler;
+	return false;
 }
 
 template<typename T, CacheType CType>

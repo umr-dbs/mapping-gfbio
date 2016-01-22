@@ -87,7 +87,7 @@ private:
 	std::unique_ptr<PuzzleUtil<T>> puzzle_util;
 	const CachingStrategy &strategy;
 	RWLock local_lock;
-	QueryStats stats;
+	ActiveQueryStats stats;
 };
 
 class NodeCacheManager : public CacheManager, public CacheRefHandler {

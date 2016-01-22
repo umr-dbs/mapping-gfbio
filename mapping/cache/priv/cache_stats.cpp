@@ -250,3 +250,50 @@ std::string QueryStats::to_string() const {
 	ss << "  misses            : " << misses;
 	return ss.str();
 }
+
+void ActiveQueryStats::add_single_local_hit() {
+	std::lock_guard<std::mutex> g(mtx);
+	single_local_hits++;
+}
+
+void ActiveQueryStats::add_multi_local_hit() {
+	std::lock_guard<std::mutex> g(mtx);
+	multi_local_hits++;
+}
+
+void ActiveQueryStats::add_multi_local_partial() {
+	std::lock_guard<std::mutex> g(mtx);
+	multi_local_partials++;
+}
+
+void ActiveQueryStats::add_single_remote_hit() {
+	std::lock_guard<std::mutex> g(mtx);
+	single_remote_hits++;
+}
+
+void ActiveQueryStats::add_multi_remote_hit() {
+	std::lock_guard<std::mutex> g(mtx);
+	multi_remote_hits++;
+}
+
+void ActiveQueryStats::add_multi_remote_partial() {
+	std::lock_guard<std::mutex> g(mtx);
+	multi_remote_partials++;
+}
+
+void ActiveQueryStats::add_miss() {
+	std::lock_guard<std::mutex> g(mtx);
+	misses++;
+}
+
+QueryStats ActiveQueryStats::get() const {
+	std::lock_guard<std::mutex> g(mtx);
+	return QueryStats(*this);
+}
+
+QueryStats ActiveQueryStats::get_and_reset() {
+	std::lock_guard<std::mutex> g(mtx);
+	auto res = QueryStats(*this);
+	reset();
+	return res;
+}

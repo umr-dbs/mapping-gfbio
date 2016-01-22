@@ -143,7 +143,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 
 		// Full single local hit
 		if ( !qres.has_remainder() && qres.keys.size() == 1 ) {
-			stats.single_local_hits++;
+			stats.add_single_local_hit();
 			TIME_EXEC("CacheManager.query.full_single_hit");
 			Log::trace("Full single local HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 			NodeCacheKey key(op.getSemanticId(), qres.keys.at(0));
@@ -153,7 +153,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 		}
 		// Full local hit (puzzle)
 		else if ( !qres.has_remainder() ) {
-			stats.multi_local_hits++;
+			stats.add_multi_local_hit();
 			TIME_EXEC("CacheManager.query.full_local_hit");
 			Log::trace("Full local HIT for query: %s on %s. Puzzling result.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 			std::vector<CacheRef> refs;
@@ -177,13 +177,13 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 	switch (resp) {
 		// Full hit on different client
 		case WorkerConnection::RESP_QUERY_HIT: {
-			stats.single_remote_hits++;
+			stats.add_single_remote_hit();
 			Log::trace("Full single remote HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 			return retriever->load( op.getSemanticId(), CacheRef(stream), profiler );
 		}
 		// Full miss on whole cache
 		case WorkerConnection::RESP_QUERY_MISS: {
-			stats.misses++;
+			stats.add_miss();
 			Log::trace("Full remote MISS for query: %s on %s.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 			throw NoSuchElementException("Cache-Miss.");
 			break;
@@ -198,11 +198,11 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 				local_only &= mgr.is_self_ref(ref);
 			}
 			if ( local_only )
-				stats.multi_local_partials++;
+				stats.add_multi_local_partial();
 			else if ( pr.has_remainders() )
-				stats.multi_remote_partials++;
+				stats.add_multi_remote_partial();
 			else
-				stats.multi_remote_hits++;
+				stats.add_multi_remote_hit();
 			// END STATS ONLY
 
 			Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
@@ -281,11 +281,11 @@ const QueryStats& NodeCacheManager::get_query_stats() const {
 }
 
 void NodeCacheManager::reset_query_stats() {
-	raster_wrapper.stats.reset();
-	point_wrapper.stats.reset();
-	line_wrapper.stats.reset();
-	polygon_wrapper.stats.reset();
-	plot_wrapper.stats.reset();
+	raster_wrapper.stats.get_and_reset();
+	point_wrapper.stats.get_and_reset();
+	line_wrapper.stats.get_and_reset();
+	polygon_wrapper.stats.get_and_reset();
+	plot_wrapper.stats.get_and_reset();
 	cumulated_stats.reset();
 }
 
@@ -339,21 +339,13 @@ NodeStats NodeCacheManager::get_stats() const {
 	);
 
 	QueryStats qs;
-	qs += raster_wrapper.stats;
-	qs += point_wrapper.stats;
-	qs += line_wrapper.stats;
-	qs += polygon_wrapper.stats;
-	qs += plot_wrapper.stats;
+	qs += raster_wrapper.stats.get_and_reset();
+	qs += point_wrapper.stats.get_and_reset();
+	qs += line_wrapper.stats.get_and_reset();
+	qs += polygon_wrapper.stats.get_and_reset();
+	qs += plot_wrapper.stats.get_and_reset();
 
 	cumulated_stats += qs;
-	raster_wrapper.stats.reset();
-	point_wrapper.stats.reset();
-	line_wrapper.stats.reset();
-	polygon_wrapper.stats.reset();
-	plot_wrapper.stats.reset();
-
-
-
 	std::vector<CacheStats> stats {
 		raster_cache.get_stats(),
 		point_cache.get_stats(),
@@ -361,7 +353,6 @@ NodeStats NodeCacheManager::get_stats() const {
 		polygon_cache.get_stats(),
 		plot_cache.get_stats()
 	};
-
 	return NodeStats( cap, qs, stats );
 }
 

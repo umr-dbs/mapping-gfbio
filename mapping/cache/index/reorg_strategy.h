@@ -110,6 +110,8 @@ protected:
 	uint32_t get_least_used_node( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
 	virtual void distribute( std::map<uint32_t, ReorgNode> &result, std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries ) = 0;
 private:
+	bool nodes_changed( const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	mutable std::set<uint32_t> last_nodes;
 	const IndexCache &cache;
 	const double max_target_usage;
 	const std::unique_ptr<RelevanceFunction> relevance_function;

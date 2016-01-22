@@ -1,5 +1,6 @@
 
 #include "util/exceptions.h"
+#include "util/make_unique.h"
 #include "datatypes/plots/histogram.h"
 
 #include <cstdio>
@@ -60,7 +61,7 @@ void Histogram::addMarker(double bucket, const std::string &label){
 	markers.emplace_back(bucket, label);
 }
 
-std::string Histogram::toJSON() {
+const std::string Histogram::toJSON() const {
 	std::stringstream buffer;
 	buffer << "{\"type\": \"histogram\", ";
 	buffer << "\"metadata\": {\"min\": " << min << ", \"max\": " << max << ", \"nodata\": " << nodata_count << ", \"numberOfBuckets\": " << counts.size() << "}, ";
@@ -85,4 +86,14 @@ std::string Histogram::toJSON() {
 	}
 	buffer << "} ";
 	return buffer.str();
+}
+
+std::unique_ptr<GenericPlot> Histogram::clone() const {
+	auto copy = make_unique<Histogram>(counts.size(), min, max);
+
+	copy->nodata_count = nodata_count;
+	copy->markers = markers;
+	copy->counts = counts;
+
+	return std::unique_ptr<GenericPlot>(copy.release());
 }

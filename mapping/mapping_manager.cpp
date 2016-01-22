@@ -368,6 +368,20 @@ static void runquery(int argc, char *argv[]) {
 		else
 			printf("No output filename given, discarding result\n");
 	}
+	else if (result == "plot") {
+			QueryProfiler profiler;
+			auto plot = graph->getCachedPlot(qrect, profiler);
+			auto json = plot->toJSON();
+			if (out_filename) {
+				FILE *f = fopen(out_filename, "w");
+				if (f) {
+					fwrite(json.c_str(), json.length(), 1, f);
+					fclose(f);
+				}
+			}
+			else
+				printf("No output filename given, discarding result\n");
+		}
 	else {
 		printf("Unknown result type: %s\n", result.c_str());
 		exit(5);
@@ -453,6 +467,12 @@ static int testquery(int argc, char *argv[]) {
 			auto polygons = graph->getCachedPolygonCollection(qrect, profiler);
 			real_hash = polygons->hash();
 			real_hash2 = polygons->clone()->hash();
+		}
+		else if (result == "plot") {
+			QueryProfiler profiler;
+			auto plot = graph->getCachedPlot(qrect, profiler);
+			real_hash = plot->hash();
+			real_hash2 = plot->clone()->hash();
 		}
 		else {
 			printf("Unknown result type: %s\n", result.c_str());

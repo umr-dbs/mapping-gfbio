@@ -84,6 +84,7 @@ auto PointsMetadataToGraph::createXYGraph(PointCollection& points) -> std::uniqu
 		}
 	}
 
+	xyGraph->sort();
 	return std::move(xyGraph);
 }
 

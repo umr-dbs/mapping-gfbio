@@ -10,7 +10,11 @@ class TextPlot : public GenericPlot {
 		TextPlot(const std::string &text);
 		virtual ~TextPlot();
 
-		std::string toJSON();
+		const std::string toJSON() const;
+
+		std::unique_ptr<GenericPlot> clone() const {
+			return std::unique_ptr<GenericPlot>();
+		}
 
 	private:
 		std::string text;

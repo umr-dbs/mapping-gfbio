@@ -1,0 +1,50 @@
+{
+    "name": "Points2Histogram 1",
+    "query_result": "plot",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "query": {
+        "params": {
+            "autoRange": false,
+            "name": "PLZ",
+            "rangeMin": 5,
+            "rangeMax": 99999,
+            "numberOfBuckets": 22
+        },
+        "sources": {
+            "points": [
+                {
+                    "params": {
+                        "filename": "test/systemtests/data/places_dump/places_dump_DE.csv",
+                        "geometry": "xy",
+                        "time": "none",
+                        "columns": {
+                            "x": "X",
+                            "y": "Y",
+                            "numeric": [
+                                "PLZ"
+                            ],
+                            "textual": [
+                                "Name"
+                            ]
+                        }
+                    },
+                    "sources": null,
+                    "type": "csvpointsource"
+                }
+            ]
+        },
+        "type": "histogram_from_features"
+    },
+    "query_expected_hash": "d704e210d713e870a38334643ee6664a"
+}

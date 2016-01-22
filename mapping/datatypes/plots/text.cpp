@@ -10,7 +10,7 @@ TextPlot::~TextPlot() {
 
 }
 
-std::string TextPlot::toJSON() {
+const std::string TextPlot::toJSON() const {
 	Json::Value root(Json::ValueType::objectValue);
 
 	root["type"] = "text";

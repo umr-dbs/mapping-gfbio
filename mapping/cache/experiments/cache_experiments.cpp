@@ -201,8 +201,6 @@ void RelevanceExperiment::exec(const std::string& relevance, size_t capacity, si
 		execute_query(setup.get_client(),q);
 		end = SysClock::now();
 		accum += duration(start,end);
-		//Pause between requests (for LRU);
-		std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	}
 }
 
@@ -325,7 +323,7 @@ void QueryBatchingExperiment::exec(int nodes, int threads) {
 
 ////////////////////////////////////////////////////////
 //
-// reorg experiment
+// Reorg experiment
 //
 ////////////////////////////////////////////////////////
 
@@ -347,23 +345,39 @@ void ReorgExperiment::global_setup() {
 	execute_query(t,qp);
 
 	size_t s = tcm.size;
-	capacity = s * 100 * 2;
+	capacity = s * 100 * 1.5;
 }
 
 void ReorgExperiment::setup() {
 	std::default_random_engine generator;
 	std::uniform_int_distribution<int> q_dist(0,query_specs.size()-1);
 
-	step1.clear();
-	step2.clear();
+	auto num_steps = query_specs[0].get_query_steps(query_specs[0].random_rectangle_percent(1,1024)).size();
+	std::vector<std::vector<QTriple>> steps;
+	steps.resize(num_steps, std::vector<QTriple>() );
 
-	while ( step1.size() < 100 ) {
-		auto &spec = query_specs.at( q_dist(generator) );
-		auto qr    = spec.random_rectangle_percent(1.0/32,256);
-		auto steps = spec.get_query_steps(qr);
-		step1.push_back(steps[1]);
-		step2.push_back(steps[0]);
+	while ( steps[0].size() < 100) {
+		auto spec = query_specs.at(q_dist(generator));
+		auto qr   = spec.random_rectangle_percent(1.0/32,256);
+		auto tmp  = spec.get_query_steps(qr);
+		for ( size_t i = 0; i < num_steps; i++ ) {
+			steps[i].push_back(tmp[tmp.size()-i-1]);
+		}
 	}
+
+	std::vector<QTriple> tmp = steps[0];
+	std::vector<QTriple> work;
+	for ( size_t k = 1; k < num_steps; k++ ) {
+		size_t i = 0, j = 0;
+		while ( i < tmp.size() || j < steps[k].size() ) {
+			if ( j < i/k && (q_dist(generator) == 1 || i == tmp.size()) )
+				work.push_back(steps[k][j++]);
+			else
+				work.push_back(tmp[i++]);
+		}
+		tmp = work;
+	}
+	queries = tmp;
 }
 
 void ReorgExperiment::print_results() {
@@ -387,19 +401,12 @@ void ReorgExperiment::run_once() {
 }
 
 void ReorgExperiment::exec(const std::string& strategy, QueryStats& stats) {
-	LocalTestSetup setup( 10, 1, 0, capacity, strategy, "costlru", "always" );
+	LocalTestSetup setup( 10, 1, 50, capacity, strategy, "costlru", "always" );
+	std::this_thread::sleep_for( std::chrono::milliseconds(500) );
+	setup.get_index().force_reorg();
 
-	std::default_random_engine generator;
-	std::uniform_int_distribution<int> q_dist(0,1);
-
-	size_t i = 0, j = 0;
-	while ( i < step1.size() && j < step2.size() ) {
-		if ( j < i && q_dist(generator) == 1 )
-			execute_query(setup.get_client(), step2[j++] );
-		else
-			execute_query(setup.get_client(), step1[i++] );
-
-		setup.get_index().force_reorg();
+	for ( auto &q : queries ) {
+		execute_query(setup.get_client(), q );
 	}
 
 	setup.get_index().force_stat_update();
@@ -486,93 +493,88 @@ std::pair<uint64_t, uint64_t>& StrategyExperiment::get_accum(
 
 
 
-////////////////////////////////////////////////////////
 //
-// Reorg experiment
+//ReorgExperimentOld::ReorgExperimentOld(const QuerySpec& spec, uint32_t num_runs) :
+//	CacheExperimentSingleQuery("Reorganization", spec, num_runs ), capacity(0) {
+//}
 //
-////////////////////////////////////////////////////////
-
-ReorgExperimentOld::ReorgExperimentOld(const QuerySpec& spec, uint32_t num_runs) :
-	CacheExperimentSingleQuery("Reorganization", spec, num_runs ), capacity(0) {
-}
-
-void ReorgExperimentOld::global_setup() {
-	capacity = 50*1024*1024; // 50M
-	for ( int i = 0; i < 3; i++)
-		accum[i].reset();
-}
-
-void ReorgExperimentOld::setup() {
-	step1.clear();
-	step2.clear();
-
-
-	auto bounds = SpatialReference::extent(query_spec.epsg);
-	double extend = (bounds.x2 - bounds.x1) / 150;
-	uint32_t res = 256;
-
-	// Create disjunct rectangles
-	std::vector<QueryRectangle> rects;
-	while( rects.size() < 100 ) {
-		auto rect = query_spec.random_rectangle(extend,res);
-		bool add = true;
-		for ( auto &r : rects  ) {
-			 add &= ( rect.x2 < r.x1 || rect.x1 > r.x2 ) && ( rect.y2 < r.y1 || rect.y1 > r.y2 );
-		}
-		if ( add )
-			rects.push_back( rect );
-	}
-
-	for ( auto &q : rects ) {
-		auto v = query_spec.get_query_steps(q);
-		step1.push_back( v[1] );
-		step2.push_back( v[0] );
-	}
-}
-
-void ReorgExperimentOld::print_results() {
-	std::vector<std::string> strats{ "capacity", "graph", "geo" };
-	for ( size_t i = 0; i < strats.size(); i++ ) {
-		auto &avg = accum[i];
-		double misses = (double) avg.misses / num_runs;
-		double local  = (double) (avg.multi_local_hits+avg.multi_local_partials+avg.single_local_hits) / num_runs;
-		double remote = (double) (avg.multi_remote_hits+avg.multi_remote_partials+avg.single_remote_hits) / num_runs;
-		std::cout << "Average stats for strategy \"" << strats[i] << "\": " << std::endl;
-		std::cout << "  Local hits : " << local  << std::endl;
-		std::cout << "  Remote hits: " << remote << std::endl;
-		std::cout << "  Misses     : " << misses << std::endl;
-	}
-}
-
-void ReorgExperimentOld::run_once() {
-	exec("capacity",accum[0]);
-	exec("graph",accum[1]);
-	exec("geo",accum[2]);
-
-}
-
-void ReorgExperimentOld::exec(const std::string& strategy, QueryStats &stats) {
-	LocalTestSetup setup( 10, 1, 0, capacity, strategy, "costlru", "always" );
-	for ( auto &q : step1 ) {
-		execute_query(setup.get_client(),q);
-	}
-
-	// Force reorg
-	setup.get_index().force_reorg();
-	setup.get_index().reset_stats();
-	for ( auto &n: setup.get_nodes() )
-		n->get_cache_manager().reset_query_stats();
-
-	// Process next step
-	for ( auto &q : step2 )
-		execute_query(setup.get_client(),q);
-
-	setup.get_index().force_stat_update();
-
-	for ( auto &n: setup.get_nodes() )
-		stats += n->get_cache_manager().get_query_stats();
-}
-
+//void ReorgExperimentOld::global_setup() {
+//	capacity = 50*1024*1024; // 50M
+//	for ( int i = 0; i < 3; i++)
+//		accum[i].reset();
+//}
+//
+//void ReorgExperimentOld::setup() {
+//	step1.clear();
+//	step2.clear();
+//
+//
+//	auto bounds = SpatialReference::extent(query_spec.epsg);
+//	double extend = (bounds.x2 - bounds.x1) / 150;
+//	uint32_t res = 256;
+//
+//	// Create disjunct rectangles
+//	std::vector<QueryRectangle> rects;
+//	while( rects.size() < 100 ) {
+//		auto rect = query_spec.random_rectangle(extend,res);
+//		bool add = true;
+//		for ( auto &r : rects  ) {
+//			 add &= ( rect.x2 < r.x1 || rect.x1 > r.x2 ) && ( rect.y2 < r.y1 || rect.y1 > r.y2 );
+//		}
+//		if ( add )
+//			rects.push_back( rect );
+//	}
+//
+//	for ( auto &q : rects ) {
+//		auto v = query_spec.get_query_steps(q);
+//		step1.push_back( v[1] );
+//		step2.push_back( v[0] );
+//	}
+//}
+//
+//void ReorgExperimentOld::print_results() {
+//	std::vector<std::string> strats{ "capacity", "graph", "geo" };
+//	for ( size_t i = 0; i < strats.size(); i++ ) {
+//		auto &avg = accum[i];
+//		double misses = (double) avg.misses / num_runs;
+//		double local  = (double) (avg.multi_local_hits+avg.multi_local_partials+avg.single_local_hits) / num_runs;
+//		double remote = (double) (avg.multi_remote_hits+avg.multi_remote_partials+avg.single_remote_hits) / num_runs;
+//		std::cout << "Average stats for strategy \"" << strats[i] << "\": " << std::endl;
+//		std::cout << "  Local hits : " << local  << std::endl;
+//		std::cout << "  Remote hits: " << remote << std::endl;
+//		std::cout << "  Misses     : " << misses << std::endl;
+//	}
+//}
+//
+//void ReorgExperimentOld::run_once() {
+//	exec("capacity",accum[0]);
+//	exec("graph",accum[1]);
+//	exec("geo",accum[2]);
+//
+//}
+//
+//void ReorgExperimentOld::exec(const std::string& strategy, QueryStats &stats) {
+//	LocalTestSetup setup( 10, 1, 0, capacity, strategy, "costlru", "always" );
+//	for ( auto &q : step1 ) {
+//		execute_query(setup.get_client(),q);
+//	}
+//
+//	// Force reorg
+//	setup.get_index().force_reorg();
+//	setup.get_index().reset_stats();
+//	for ( auto &n: setup.get_nodes() )
+//		n->get_cache_manager().reset_query_stats();
+//
+//	// Process next step
+//	for ( auto &q : step2 )
+//		execute_query(setup.get_client(),q);
+//
+//	setup.get_index().force_stat_update();
+//
+//	for ( auto &n: setup.get_nodes() )
+//		stats += n->get_cache_manager().get_query_stats();
+//}
+//
 //RelevanceExperimentOld::RelevanceExperimentOld(const QuerySpec& spec, uint32_t num_runs)
 //	: CacheExperiment("Relevance", spec, num_runs ), capacity(0) {
 //}

@@ -193,6 +193,8 @@ public:
 	std::string name;
 	QueryRectangle random_rectangle( double extend, uint32_t resolution = 0 ) const;
 	QueryRectangle random_rectangle_percent( double percent, uint32_t resolution = 0 ) const;
+	std::vector<QueryRectangle> disjunct_rectangles( int num, double extend, uint32_t resolution ) const;
+	std::vector<QueryRectangle> disjunct_rectangles_percent( int num, double percent, uint32_t resolution ) const;
 	QueryRectangle rectangle( double x1, double y1, double extend, uint32_t resolution = 0 ) const;
 	std::vector<QTriple> get_query_steps( const QueryRectangle &rect ) const;
 private:

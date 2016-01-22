@@ -97,25 +97,7 @@ protected:
 private:
 	void exec( const std::string &strategy, QueryStats &stats );
 	size_t capacity;
-	std::vector<QTriple> step1;
-	std::vector<QTriple> step2;
-	QueryStats accum[3];
-};
-
-
-class ReorgExperimentOld : public CacheExperimentSingleQuery {
-public:
-	ReorgExperimentOld( const QuerySpec& spec, uint32_t num_runs );
-protected:
-	void global_setup();
-	void setup();
-	void print_results();
-	void run_once();
-private:
-	void exec( const std::string &strategy, QueryStats &stats );
-	size_t capacity;
-	std::vector<QTriple> step1;
-	std::vector<QTriple> step2;
+	std::vector<QTriple> queries;
 	QueryStats accum[3];
 };
 
@@ -135,6 +117,21 @@ private:
 	std::map<std::string,std::pair<uint64_t,uint64_t>> accums;
 };
 
+//class ReorgExperimentOld : public CacheExperimentSingleQuery {
+//public:
+//	ReorgExperimentOld( const QuerySpec& spec, uint32_t num_runs );
+//protected:
+//	void global_setup();
+//	void setup();
+//	void print_results();
+//	void run_once();
+//private:
+//	void exec( const std::string &strategy, QueryStats &stats );
+//	size_t capacity;
+//	std::vector<QTriple> step1;
+//	std::vector<QTriple> step2;
+//	QueryStats accum[3];
+//};
 
 //class RelevanceExperimentOld : public CacheExperiment {
 //public:

@@ -605,6 +605,37 @@ std::vector<QTriple> QuerySpec::get_query_steps(const QueryRectangle& rect) cons
 	return result;
 }
 
+std::vector<QueryRectangle> QuerySpec::disjunct_rectangles(int num,
+		double extend, uint32_t resolution) const {
+
+	size_t guard = 0;
+
+	// Create disjunct rectangles
+	std::vector<QueryRectangle> rects;
+	while( rects.size() < num && guard < 10000 ) {
+		auto rect = random_rectangle(extend,resolution);
+		bool add = true;
+		for ( auto &r : rects  ) {
+			 add &= ( rect.x2 < r.x1 || rect.x1 > r.x2 ) && ( rect.y2 < r.y1 || rect.y1 > r.y2 );
+		}
+		if ( add ) {
+			guard = 0;
+			rects.push_back( rect );
+		}
+		else
+			guard++;
+	}
+	if ( rects.size() < num )
+		throw OperatorException("Impossible to create disjunct rectangles");
+
+	return rects;
+}
+
+std::vector<QueryRectangle> QuerySpec::disjunct_rectangles_percent(int num,
+		double percent, uint32_t resolution) const {
+	return disjunct_rectangles(num, (bounds.x2-bounds.x1) * percent, resolution);
+}
+
 void QuerySpec::get_op_spec( GenericOperator* op, QueryRectangle rect, std::vector<QTriple> &result ) const {
 	int offset = 0;
 	CacheType type[] = { CacheType::RASTER, CacheType::POINT, CacheType::LINE, CacheType::POLYGON };

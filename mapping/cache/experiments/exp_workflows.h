@@ -488,6 +488,26 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 
 		return QuerySpec( wf, EPSG_WEBMERCATOR, CacheType::RASTER,tref,"Monthly Temperature (Projected, Shifted to " + timestamp + ")" );
 	}
+
+	static QuerySpec shifted_temp( const std::string &timestamp ) {
+		std::string p1 = R"WF_ESCAPE(
+		{
+			  "type": "timeShiftOperator",
+			  "params": { "shift": { "from": { "unit": "absolute", "value": ")WF_ESCAPE";
+
+
+		std::string p2 = R"WF_ESCAPE(" }, "to": { "unit": "absolute", "value": ")WF_ESCAPE";
+
+
+		std::string p3 = R"WF_ESCAPE(" } }  },
+			  "sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] }
+		}
+		)WF_ESCAPE";
+
+		std::string wf = p1 + timestamp + p2 + timestamp + p3;
+
+		return QuerySpec( wf, EPSG_LATLON, CacheType::RASTER,tref,"Monthly Temperature (Shifted to " + timestamp + ")" );
+	}
 }
 
 #endif /* EXPERIMENTS_EXP_WORKFLOWS_H_ */

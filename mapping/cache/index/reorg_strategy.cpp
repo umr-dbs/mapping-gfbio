@@ -177,6 +177,8 @@ uint32_t ReorgStrategy::get_least_used_node(
 }
 
 void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) {
+	if ( result.empty() )
+		return;
 
 	double bytes_used = 0;
 	double bytes_available = 0;
@@ -565,9 +567,6 @@ uint32_t GeographicReorgStrategy::get_z_value(const QueryCube& c) {
 
 	uint32_t result = x | (y << 1);
 	return result;
-
-
-	return 0;
 }
 
 bool GeographicReorgStrategy::z_comp(
@@ -588,7 +587,7 @@ uint32_t GeographicReorgStrategy::get_node_for_job(const BaseRequest &request,
 	if ( !z_bounds.empty() ) {
 		uint32_t z_value = get_z_value( QueryCube(request.query) );
 		for ( auto &p : z_bounds )
-			if ( z_value < p.first )
+			if ( z_value <= p.first )
 				return p.second;
 		return z_bounds.back().second;
 	}
@@ -614,10 +613,14 @@ void GeographicReorgStrategy::distribute(std::map<uint32_t, ReorgNode>& result,
 		node.get().add(all_entries[0]);
 		for ( size_t i = 1; i < all_entries.size(); i++ ) {
 			if ( !node.get().fits(all_entries[i]) && node_idx < (nodes.size()-1) ) {
-				uint32_t b = get_z_value( all_entries[i-1]->bounds );
-				b =  b + (get_z_value( all_entries[i]->bounds) - b ) / 2;
-				z_bounds.push_back( std::make_pair(b,node.get().id) );
-				node = nodes[node_idx++];
+				uint32_t z1 = get_z_value( all_entries[i-1]->bounds );
+				uint32_t z2 = get_z_value( all_entries[i]->bounds);
+				// Do not separate entries with same z-value
+				if ( z2 > z1 ) {
+					uint32_t bound = z1 + (z2-z1) / 2;
+					z_bounds.push_back( std::make_pair(bound,node.get().id) );
+					node = nodes[++node_idx];
+				}
 			}
 			node.get().add(all_entries[i]);
 		}
@@ -634,5 +637,7 @@ void GeographicReorgStrategy::distribute(std::map<uint32_t, ReorgNode>& result,
 	}
 	// Add last bound
 	z_bounds.push_back( std::make_pair(MAX_Z,nodes.back().get().id) );
+
+
 }
 

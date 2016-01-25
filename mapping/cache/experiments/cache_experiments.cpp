@@ -477,8 +477,8 @@ void StrategyExperiment::print_results() {
 
 void StrategyExperiment::run_once() {
 	exec(make_unique<CacheAll>(), get_accum("Always"));
-	exec(make_unique<SimpleThresholdStrategy>(CachingStrategy::Type::SELF), get_accum(concat("Simple, Self")));
 	exec(make_unique<SimpleThresholdStrategy>(CachingStrategy::Type::UNCACHED), get_accum(concat("Simple, Uncached")));
+	exec(make_unique<SimpleThresholdStrategy>(CachingStrategy::Type::SELF), get_accum(concat("Simple, Self")));
 }
 
 void StrategyExperiment::exec(std::unique_ptr<CachingStrategy> strategy, std::pair<uint64_t,uint64_t> &accum ) {
@@ -511,12 +511,6 @@ std::pair<uint64_t, uint64_t>& StrategyExperiment::get_accum(
 	else
 		return it->second;
 }
-
-
-
-
-
-
 
 
 //

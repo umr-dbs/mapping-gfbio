@@ -113,6 +113,6 @@ SimpleThresholdStrategy::SimpleThresholdStrategy(Type type) :
 }
 
 bool SimpleThresholdStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
-	// Assume 1 put and at least 1 get
-	return get_costs(profiler,type) >= 2 * get_caching_costs(bytes);
+	// Assume 1 put and at least 2 gets
+	return get_costs(profiler,type) >= 3 * get_caching_costs(bytes);
 }

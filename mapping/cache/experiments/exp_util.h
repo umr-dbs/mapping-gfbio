@@ -193,11 +193,13 @@ public:
 	std::string name;
 	QueryRectangle random_rectangle( double extend, uint32_t resolution = 0 ) const;
 	QueryRectangle random_rectangle_percent( double percent, uint32_t resolution = 0 ) const;
-	std::vector<QueryRectangle> disjunct_rectangles( int num, double extend, uint32_t resolution ) const;
-	std::vector<QueryRectangle> disjunct_rectangles_percent( int num, double percent, uint32_t resolution ) const;
+	std::vector<QueryRectangle> disjunct_rectangles( size_t num, double extend, uint32_t resolution ) const;
+	std::vector<QueryRectangle> disjunct_rectangles_percent( size_t num, double percent, uint32_t resolution ) const;
 	QueryRectangle rectangle( double x1, double y1, double extend, uint32_t resolution = 0 ) const;
-	std::vector<QTriple> get_query_steps( const QueryRectangle &rect ) const;
+	size_t get_num_operators() const;
+	std::vector<QTriple> guess_query_steps( const QueryRectangle &rect ) const;
 private:
+	size_t get_num_operators(GenericOperator *op) const;
 	void get_op_spec( GenericOperator* op, QueryRectangle rect, std::vector<QTriple> &result ) const;
 	SpatialReference bounds;
 };
@@ -259,7 +261,7 @@ public:
 	static size_t duration( const TimePoint &start, const TimePoint &end );
 	static void execute_query( GenericOperator &op, const QueryRectangle &query, CacheType type, QueryProfiler &qp );
 	static void execute_query( const QTriple &query, QueryProfiler &qp );
-	static void execute_query_steps( const std::vector<QTriple> &queries, QueryProfiler &qp );
+	static void execute_queries( const std::vector<QTriple> &queries, QueryProfiler &qp );
 	static void execute_query( ClientCacheManager &mgr, const QTriple &t );
 public:
 	CacheExperiment( const std::string &name, uint32_t num_runs );

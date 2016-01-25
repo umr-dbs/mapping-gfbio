@@ -7,6 +7,7 @@
 
 #include "cache/experiments/cache_experiments.h"
 #include "util/nio.h"
+#include "util/gdal.h"
 #include <random>
 
 
@@ -24,7 +25,12 @@ LocalCacheExperiment::LocalCacheExperiment(const QuerySpec& spec, uint32_t num_r
 void LocalCacheExperiment::global_setup() {
 	capacity = 10*1024*1024;
 	auto qr = query_spec.random_rectangle_percent(percentage,query_resolution);
-	queries = query_spec.get_query_steps(qr);
+	TracingCacheManager tcm;
+	CacheManager::init(&tcm);
+	QueryProfiler qp;
+	execute_query( QTriple(query_spec.type, qr, query_spec.workflow), qp );
+	queries = tcm.query_log;
+
 	uncached_accum.clear();
 	cached_accum.clear();
 	uncached_accum.resize(queries.size(),0);
@@ -34,7 +40,11 @@ void LocalCacheExperiment::global_setup() {
 
 void LocalCacheExperiment::setup() {
 	auto qr = query_spec.random_rectangle_percent(percentage,query_resolution);
-	queries = query_spec.get_query_steps(qr);
+	TracingCacheManager tcm;
+	CacheManager::init(&tcm);
+	QueryProfiler qp;
+	execute_query( QTriple(query_spec.type, qr, query_spec.workflow), qp );
+	queries = tcm.query_log;
 }
 
 void LocalCacheExperiment::print_results() {
@@ -71,11 +81,11 @@ void LocalCacheExperiment::execute(CacheManager* mgr, std::vector<size_t>& accum
 
 	QueryProfiler qp;
 
-	for ( int i = queries.size()-1; i >= 0; i-- ) {
+	for ( size_t i = 0; i < queries.size(); i++ ) {
 		start = SysClock::now();
 		execute_query(queries[i],qp);
 		end = SysClock::now();
-		accum[queries.size()-1-i] += duration(start,end);
+		accum[i] += duration(start,end);
 	}
 }
 
@@ -86,7 +96,10 @@ void LocalCacheExperiment::execute(CacheManager* mgr, std::vector<size_t>& accum
 ////////////////////////////////////////////////////////
 
 PuzzleExperiment::PuzzleExperiment(const QuerySpec& spec, uint32_t num_runs, double p, uint32_t r) :
-		CacheExperimentSingleQuery("Puzzle-Performance", spec, num_runs), percentage(p), query_resolution(r), capacity(0) {
+		CacheExperimentSingleQuery("Puzzle-Performance", spec, num_runs), percentage(p), query_resolution(r), capacity(0),
+		query( QueryRectangle(SpatioTemporalReference::unreferenced(),
+				              SpatioTemporalReference::unreferenced(),
+							  QueryResolution::none()) ) {
 }
 
 void PuzzleExperiment::global_setup() {
@@ -98,53 +111,53 @@ void PuzzleExperiment::global_setup() {
 }
 
 void PuzzleExperiment::setup() {
-	queries.clear();
 	auto bounds = SpatialReference::extent(query_spec.epsg);
 	double extend = (bounds.x2 - bounds.x1) * percentage;
-	auto qr = query_spec.random_rectangle(extend,query_resolution);
+	query = query_spec.random_rectangle(extend,query_resolution);
 
-	while ( qr.x2 + extend > bounds.x2 || qr.x1-extend < bounds.x1 || qr.y2 + extend > bounds.y2 )
-		qr = query_spec.random_rectangle(extend,query_resolution);
-
-	double d = (qr.x2-qr.x1) / 4;
-
-	queries.push_back( QTriple(query_spec.type, qr, query_spec.workflow ) );
-	// 3/4 overlap
-	queries.push_back( QTriple(query_spec.type, QueryRectangle(
-		SpatialReference( query_spec.epsg, qr.x1 + d, qr.y1, qr.x2 + d, qr.y2 ), qr, qr ),
-		query_spec.workflow ) );
-
-	// 1/2 overlap
-	queries.push_back( QTriple(query_spec.type, QueryRectangle(
-		SpatialReference( query_spec.epsg, qr.x1 - 2*d, qr.y1, qr.x2 - 2*d, qr.y2 ), qr, qr ),
-		query_spec.workflow ) );
-
-	// 1/4 overlap
-	queries.push_back( QTriple(query_spec.type, QueryRectangle(
-			SpatialReference( query_spec.epsg, qr.x1, qr.y1+3*d, qr.x2, qr.y2+3*d ), qr, qr ),
-			query_spec.workflow ) );
+	while ( query.x2 + extend > bounds.x2 )
+		query = query_spec.random_rectangle(extend,query_resolution);
 }
 
 void PuzzleExperiment::print_results() {
-	std::cout << "Average execution time full query : " << (accum[0]/num_runs) << "ms" << std::endl;
-	std::cout << "Average execution time 3/4 overlap: " << (accum[1]/num_runs) << "ms" << std::endl;
-	std::cout << "Average execution time 1/2 overlap: " << (accum[2]/num_runs) << "ms" << std::endl;
-	std::cout << "Average execution time 1/4 overlap: " << (accum[3]/num_runs) << "ms" << std::endl;
+	std::cout << "Average execution time full query : " << (accum[0]/num_runs) << "s" << std::endl;
+	std::cout << "Average execution time 3/4 overlap: " << (accum[1]/num_runs) << "s" << std::endl;
+	std::cout << "Average execution time 1/2 overlap: " << (accum[2]/num_runs) << "s" << std::endl;
+	std::cout << "Average execution time 1/4 overlap: " << (accum[3]/num_runs) << "s" << std::endl;
 
 }
 
 void PuzzleExperiment::run_once() {
-	TimePoint start, end;
 	QueryProfiler qp;
+	double d = (query.x2-query.x1) / 4;
 
 	LocalCacheManager lcm(CachingStrategy::by_name("always"),capacity, capacity, capacity, capacity, capacity);
-
 	CacheManager::init(&lcm);
-	for ( size_t i = 0; i < queries.size(); i++ ) {
-		start = SysClock::now();
-		execute_query(queries[i],qp);
-		end = SysClock::now();
-		accum[i] += duration(start,end);
+
+	QueryProfiler timer;
+	timer.startTimer();
+	execute_query(QTriple(CacheType::RASTER,query,query_spec.workflow),qp);
+	timer.stopTimer();
+	accum[0] += timer.self_cpu;
+
+	for ( size_t i = 1; i < 4; i++ ) {
+		LocalCacheManager lcm(CachingStrategy::by_name("always"),capacity, capacity, capacity, capacity, capacity);
+		CacheManager::init(&lcm);
+		execute_query(QTriple(CacheType::RASTER,query,query_spec.workflow),qp);
+
+
+		double x1 = query.x1 + i*d;
+		double x2 = query.x2 + i*d;
+		QueryRectangle qr(
+			SpatialReference( query.epsg, x1, query.y1, x2, query.y2 ),
+			query, query
+		);
+
+		QueryProfiler timer;
+		timer.startTimer();
+		execute_query(QTriple(CacheType::RASTER,qr,query_spec.workflow),qp);
+		timer.stopTimer();
+		accum[i] += timer.self_cpu;
 	}
 }
 
@@ -158,16 +171,19 @@ void PuzzleExperiment::run_once() {
 
 RelevanceExperiment::RelevanceExperiment(const QuerySpec& spec, uint32_t num_runs) :
 	CacheExperimentSingleQuery("Relevance-Functions", spec, num_runs ), capacity(0) {
-	if ( query_spec.epsg != EPSG_LATLON )
-		throw ArgumentException("Only LatLon support for ReorgExperiment");
+//	if ( query_spec.epsg != EPSG_LATLON )
+//		throw ArgumentException("Only LatLon support for ReorgExperiment");
 }
 
 void RelevanceExperiment::global_setup() {
 	auto q = generate_queries();
 	TracingCacheManager tcm;
+//	LocalCacheManager tcm(CachingStrategy::by_name("always"), 50000000, 50000000, 50000000, 50000000, 50000000);
+
 	CacheManager::init(&tcm);
 	QueryProfiler qp;
 	execute_query(q[0],qp);
+//	abort();
 
 	// Capacity to store all tiles
 	capacity = (tcm.size * 16 * 5);
@@ -183,25 +199,27 @@ void RelevanceExperiment::setup() {
 void RelevanceExperiment::print_results() {
 	for ( size_t i = 0; i < rels.size(); i++ ) {
 		for ( size_t j = 0; j < ratios.size(); j++ )
-			std::cout << rels[i] << "(" << ratios[j] << "): " << (accums[i][j]/num_runs) << "ms" <<std::endl;
+			std::cout << rels[i] << "(" << ratios[j] << "): " << (accums[i][j]/num_runs) << "s" <<std::endl;
 	}
 }
 
 void RelevanceExperiment::run_once() {
 	for ( size_t i = 0; i < rels.size(); i++ )
-		for ( size_t j = 0; j < ratios.size(); j++ )
+		for ( size_t j = 0; j < ratios.size(); j++ ) {
 			exec(rels[i], capacity*ratios[j], accums[i][j]);
+		}
 }
 
-void RelevanceExperiment::exec(const std::string& relevance, size_t capacity, size_t &accum) {
+void RelevanceExperiment::exec(const std::string& relevance, size_t capacity, double &accum) {
 	LocalTestSetup setup( 1, 1, 100, capacity, "geo", relevance, "always" );
 	TimePoint start, end;
 	for ( auto &q : queries ) {
 		start = SysClock::now();
 		execute_query(setup.get_client(),q);
 		end = SysClock::now();
-		accum += duration(start,end);
+//		accum += duration(start,end);
 	}
+	accum+=setup.get_manager().get_costs().all_cpu + setup.get_manager().get_costs().all_gpu;
 }
 
 std::vector<QTriple> RelevanceExperiment::generate_queries() {
@@ -221,7 +239,15 @@ std::vector<QTriple> RelevanceExperiment::generate_queries() {
 		SpatialReference(EPSG_LATLON,  135.0, -45.0, 157.5, -22.5 )  // Australien
 	};
 
-	std::default_random_engine generator;
+	if ( EPSG_LATLON != query_spec.epsg ) {
+		for ( auto &sref : areas ) {
+			GDAL::CRSTransformer trans(EPSG_LATLON,query_spec.epsg);
+			trans.transform(sref.x1,sref.y1);
+			trans.transform(sref.x2,sref.y2);
+		}
+	}
+
+	std::default_random_engine generator(std::chrono::system_clock::now().time_since_epoch().count());
 	std::uniform_int_distribution<int> distribution(0,areas.size()-1);
 	std::uniform_int_distribution<int> tdist(0,15);
 
@@ -234,12 +260,12 @@ std::vector<QTriple> RelevanceExperiment::generate_queries() {
 		double extend = (area.x2-area.x1) / 4;
 
 		double x1 = area.x1 + x*extend,
-			   x2 = area.x1 + (x+1)*extend,
+			   x2 = x1 + extend,
 			   y1 = area.y1 + y*extend,
-			   y2 = area.y1 + (y+1)*extend;
+			   y2 = y1 + extend;
 
 		QueryRectangle qr(
-				SpatialReference(EPSG_LATLON, x1,y1,x2,y2),
+				SpatialReference(query_spec.epsg, x1,y1,x2,y2),
 				query_spec.tref,
 				QueryResolution::pixels(256,256)
 		);
@@ -301,7 +327,7 @@ void QueryBatchingExperiment::run_once() {
 	auto s = CachingStrategy::by_name("never");
 	LocalCacheManager lcm(std::move(s),capacity,capacity,capacity,capacity,capacity);
 	CacheManager::init(&lcm);
-	execute_query_steps(queries,accum_unbatched);
+	execute_queries(queries,accum_unbatched);
 	exec(1,1);
 }
 
@@ -352,22 +378,26 @@ void ReorgExperiment::setup() {
 	std::default_random_engine generator;
 	std::uniform_int_distribution<int> q_dist(0,query_specs.size()-1);
 
-	auto num_steps = query_specs[0].get_query_steps(query_specs[0].random_rectangle_percent(1,1024)).size();
+	size_t max_steps = 0;
+	for ( auto &qs : query_specs ) {
+		max_steps = std::max(max_steps, qs.get_num_operators());
+	}
+
 	std::vector<std::vector<QTriple>> steps;
-	steps.resize(num_steps, std::vector<QTriple>() );
+	steps.resize(max_steps, std::vector<QTriple>() );
 
 	while ( steps[0].size() < 100) {
 		auto spec = query_specs.at(q_dist(generator));
 		auto qr   = spec.random_rectangle_percent(1.0/32,256);
-		auto tmp  = spec.get_query_steps(qr);
-		for ( size_t i = 0; i < num_steps; i++ ) {
-			steps[i].push_back(tmp[tmp.size()-i-1]);
+		auto tmp  = spec.guess_query_steps(qr);
+		for ( size_t i = 0; i < tmp.size(); i++ ) {
+			steps[i].push_back(tmp[i]);
 		}
 	}
 
 	std::vector<QTriple> tmp = steps[0];
 	std::vector<QTriple> work;
-	for ( size_t k = 1; k < num_steps; k++ ) {
+	for ( size_t k = 1; k < max_steps; k++ ) {
 		size_t i = 0, j = 0;
 		while ( i < tmp.size() || j < steps[k].size() ) {
 			if ( j < i/k && (q_dist(generator) == 1 || i == tmp.size()) )
@@ -421,8 +451,8 @@ void ReorgExperiment::exec(const std::string& strategy, QueryStats& stats) {
 //
 ////////////////////////////////////////////////////////
 
-StrategyExperiment::StrategyExperiment(const QuerySpec& spec, uint32_t num_runs)
- : CacheExperimentSingleQuery("Caching-Strategy", spec, num_runs ), capacity(0) {
+StrategyExperiment::StrategyExperiment(const QuerySpec& spec, uint32_t num_runs, double p, uint32_t r)
+ : CacheExperimentSingleQuery("Caching-Strategy", spec, num_runs ), percentage(p), query_resolution(r), capacity(0) {
 }
 
 void StrategyExperiment::global_setup() {
@@ -431,10 +461,12 @@ void StrategyExperiment::global_setup() {
 }
 
 void StrategyExperiment::setup() {
-	auto bounds = SpatialReference::extent(query_spec.epsg);
-	double extend = (bounds.x2 - bounds.x1) / 16;
-	auto qr = query_spec.random_rectangle(extend,1024);
-	queries = query_spec.get_query_steps(qr);
+	auto qr = query_spec.random_rectangle_percent(percentage,query_resolution);
+	TracingCacheManager tcm;
+	CacheManager::init(&tcm);
+	QueryProfiler qp;
+	execute_query( QTriple(query_spec.type, qr, query_spec.workflow), qp );
+	queries = tcm.query_log;
 }
 
 void StrategyExperiment::print_results() {
@@ -445,15 +477,8 @@ void StrategyExperiment::print_results() {
 
 void StrategyExperiment::run_once() {
 	exec(make_unique<CacheAll>(), get_accum("Always"));
-
-	for ( int i = 1; i < 10; i++ )
-		exec(make_unique<AuthmannStrategy>(i), get_accum(concat("Simple (",i,")")));
-
-	for ( int fstacked = 2; fstacked < 10; fstacked++ )
-		for ( int fimm = 1; fimm < fstacked; fimm++ ) {
-			auto m = concat("TwoStep (", fstacked,",",fimm,")");
-			exec(make_unique<TwoStepStrategy>(fstacked,fimm), get_accum(m));
-		}
+	exec(make_unique<SimpleThresholdStrategy>(CachingStrategy::Type::SELF), get_accum(concat("Simple, Self")));
+	exec(make_unique<SimpleThresholdStrategy>(CachingStrategy::Type::UNCACHED), get_accum(concat("Simple, Uncached")));
 }
 
 void StrategyExperiment::exec(std::unique_ptr<CachingStrategy> strategy, std::pair<uint64_t,uint64_t> &accum ) {
@@ -463,7 +488,8 @@ void StrategyExperiment::exec(std::unique_ptr<CachingStrategy> strategy, std::pa
 
 	TimePoint start, end;
 	start = SysClock::now();
-	execute_query_steps(queries,qp);
+	for ( int i = 0; i < 2; i++ )
+		execute_queries(queries,qp);
 	end = SysClock::now();
 
 	auto cap = lcm.get_capacity();

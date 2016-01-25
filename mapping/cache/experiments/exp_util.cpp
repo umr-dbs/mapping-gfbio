@@ -12,6 +12,7 @@
 #include "cache/experiments/cheat.h"
 #include <chrono>
 #include <deque>
+#include <algorithm>
 
 time_t parseIso8601DateTime(std::string dateTimeString) {
 	const std::string dateTimeFormat { "%Y-%m-%dT%H:%M:%S" }; //TODO: we should allow millisec -> "%Y-%m-%dT%H:%M:%S.SSSZ" std::get_time and the tm struct dont have them.
@@ -134,15 +135,14 @@ template<class T>
 bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 		const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
 
-	mgr.costs.all_cpu += profiler.self_cpu;
-	mgr.costs.all_gpu += profiler.self_gpu;
-	mgr.costs.all_io  += profiler.self_io;
+	mgr.costs.all_cpu += profiler.uncached_cpu;
+	mgr.costs.all_gpu += profiler.uncached_gpu;
+	mgr.costs.all_io  += profiler.uncached_io;
 
 	if ( mgr.worker_context.is_puzzling() )
 		return false;
 
 	size_t size = SizeUtil::get_byte_size(*item);
-//	printf("Size of added entry: %ld bytes, workflow: %s\n",size, semantic_id.c_str());
 
 	if ( mgr.strategy->do_cache(profiler,size) ) {
 		CacheCube cube(*item);
@@ -193,6 +193,7 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(const GenericOperator& op,
 			refs.push_back( CacheRef("testhost",12345,id) );
 
 		PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
+		QueryProfilerStoppingGuard sg(profiler);
 		return process_puzzle(pr, profiler);
 	}
 	else {
@@ -205,8 +206,8 @@ std::unique_ptr<T> LocalCacheWrapper<T>::process_puzzle(const PuzzleRequest& req
 	std::unique_ptr<T> result;
 	QueryProfiler profiler;
 	{
-		PuzzleGuard pg(mgr.worker_context);
 		QueryProfilerRunningGuard guard(parent_profiler,profiler);
+		PuzzleGuard pg(mgr.worker_context);
 		result = puzzle_util.process_puzzle(request,profiler);
 	}
 	if ( put( request.semantic_id, result, request.query, profiler ) )
@@ -447,10 +448,12 @@ LocalTestSetup::~LocalTestSetup() {
 	for ( auto &n : nodes )
 		n->stop();
 
+	for ( size_t i = 1; i < threads.size(); i++)
+		threads[i]->join();
+
 	idx_server->stop();
 
-	for (auto &t : threads )
-		t->join();
+	threads[0]->join();
 }
 
 ClientCacheManager& LocalTestSetup::get_client() {
@@ -485,6 +488,7 @@ bool TracingCacheWrapper<T,TYPE>::put(const std::string& semantic_id,
 		const std::unique_ptr<T>& item, const QueryRectangle& query,
 		const QueryProfiler& profiler) {
 	(void) semantic_id; (void) item; (void) query; (void) profiler;
+	query_log.push_back( QTriple(TYPE,query,semantic_id) );
 	size += SizeUtil::get_byte_size(*item);
 	return false;
 }
@@ -492,7 +496,8 @@ bool TracingCacheWrapper<T,TYPE>::put(const std::string& semantic_id,
 template<class T, CacheType TYPE>
 std::unique_ptr<T> TracingCacheWrapper<T,TYPE>::query(
 		const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
-	query_log.push_back( QTriple(TYPE,rect,op.getSemanticId()) );
+	(void) op;
+	(void) rect;
 	(void) profiler;
 	throw NoSuchElementException("NOP");
 }
@@ -597,15 +602,7 @@ QueryRectangle QuerySpec::random_rectangle(double extend, uint32_t resolution) c
 	return rectangle(x1,y1,extend,resolution);
 }
 
-std::vector<QTriple> QuerySpec::get_query_steps(const QueryRectangle& rect) const {
-	std::vector<QTriple> result;
-	auto op = GenericOperator::fromJSON(workflow);
-	result.push_back( QTriple(type,rect,op->semantic_id) );
-	get_op_spec( op.get(), rect, result );
-	return result;
-}
-
-std::vector<QueryRectangle> QuerySpec::disjunct_rectangles(int num,
+std::vector<QueryRectangle> QuerySpec::disjunct_rectangles(size_t num,
 		double extend, uint32_t resolution) const {
 
 	size_t guard = 0;
@@ -631,9 +628,32 @@ std::vector<QueryRectangle> QuerySpec::disjunct_rectangles(int num,
 	return rects;
 }
 
-std::vector<QueryRectangle> QuerySpec::disjunct_rectangles_percent(int num,
+std::vector<QueryRectangle> QuerySpec::disjunct_rectangles_percent(size_t num,
 		double percent, uint32_t resolution) const {
 	return disjunct_rectangles(num, (bounds.x2-bounds.x1) * percent, resolution);
+}
+
+size_t QuerySpec::get_num_operators() const {
+	auto op = GenericOperator::fromJSON(workflow);
+	return get_num_operators(op.get());
+}
+
+size_t QuerySpec::get_num_operators(GenericOperator *op) const {
+	size_t res = 1;
+	for ( int i = 0; i < op->MAX_SOURCES; i++ ) {
+		if ( op->sources[i] )
+			res += get_num_operators(op->sources[i]);
+	}
+	return res;
+}
+
+std::vector<QTriple> QuerySpec::guess_query_steps(const QueryRectangle& rect) const {
+	std::vector<QTriple> result;
+	auto op = GenericOperator::fromJSON(workflow);
+	result.push_back( QTriple(type,rect,op->semantic_id) );
+	get_op_spec( op.get(), rect, result );
+	std::reverse(result.begin(),result.end());
+	return result;
 }
 
 void QuerySpec::get_op_spec( GenericOperator* op, QueryRectangle rect, std::vector<QTriple> &result ) const {
@@ -654,13 +674,12 @@ void QuerySpec::get_op_spec( GenericOperator* op, QueryRectangle rect, std::vect
 	}
 
 	for ( int i = 0; i < GenericOperator::MAX_INPUT_TYPES; i++ ) {
-		for ( int j = 0; j < op->sourcecounts[i]; j++ )
+		for ( int j = 0; j < op->sourcecounts[i]; j++ ) {
 			result.push_back( QTriple(type[i],rect,op->sources[offset+j]->semantic_id) );
+			get_op_spec( op->sources[offset+j], rect, result );
+		}
 		offset += op->sourcecounts[i];
 	}
-
-	for ( int i = 0; i < offset; i++ )
-		get_op_spec( op->sources[i], rect, result );
 }
 
 //
@@ -720,12 +739,9 @@ void CacheExperiment::execute_query(ClientCacheManager& mgr, const QTriple& t) {
 	}
 }
 
-void CacheExperiment::execute_query_steps(const std::vector<QTriple>& queries, QueryProfiler &qp) {
-	auto iter = queries.rbegin();
-	while ( iter != queries.rend() ) {
-		execute_query(*iter, qp);
-		iter++;
-	}
+void CacheExperiment::execute_queries(const std::vector<QTriple>& queries, QueryProfiler &qp) {
+	for ( auto &q : queries )
+		execute_query(q, qp);
 }
 
 size_t CacheExperiment::duration(const TimePoint& start, const TimePoint& end) {

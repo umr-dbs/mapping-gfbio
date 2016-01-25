@@ -44,9 +44,31 @@ private:
 	double percentage; // used area
 	uint32_t query_resolution;
 	size_t capacity;
-	std::vector<QTriple> queries;
-	size_t accum[4];
+	QueryRectangle query;
+	double accum[4];
 };
+
+class StrategyExperiment : public CacheExperimentSingleQuery {
+public:
+	StrategyExperiment( const QuerySpec& spec, uint32_t num_runs, double p, uint32_t r );
+protected:
+	void global_setup();
+	void setup();
+	void print_results();
+	void run_once();
+private:
+	void exec( std::unique_ptr<CachingStrategy> strategy, std::pair<uint64_t,uint64_t> &accum );
+	std::pair<uint64_t,uint64_t>& get_accum( const std::string &key );
+	double percentage; // used area
+	uint32_t query_resolution;
+	size_t capacity;
+	std::vector<QTriple> queries;
+	std::map<std::string,std::pair<uint64_t,uint64_t>> accums;
+};
+
+
+
+
 
 class RelevanceExperiment : public CacheExperimentSingleQuery {
 public:
@@ -58,12 +80,12 @@ protected:
 	void run_once();
 private:
 	std::vector<QTriple> generate_queries();
-	void exec(const std::string& relevance, size_t capacity, size_t &accum);
+	void exec(const std::string& relevance, size_t capacity, double &accum);
 	const std::vector<std::string> rels{"lru","costlru"};
-	const std::vector<double> ratios{0.05, 0.1, 0.2, 0.3, 0.4, 0.5 };
+	const std::vector<double> ratios{0.05,0.1,0.2,0.3,0.4,0.6};//0.01, 0.02, 0.05};//, 0.1, 0.2};
 	size_t capacity;
 	std::vector<QTriple> queries;
-	size_t accums[2][6];
+	double accums[2][6];
 };
 
 
@@ -99,22 +121,6 @@ private:
 	size_t capacity;
 	std::vector<QTriple> queries;
 	QueryStats accum[3];
-};
-
-class StrategyExperiment : public CacheExperimentSingleQuery {
-public:
-	StrategyExperiment( const QuerySpec& spec, uint32_t num_runs );
-protected:
-	void global_setup();
-	void setup();
-	void print_results();
-	void run_once();
-private:
-	void exec( std::unique_ptr<CachingStrategy> strategy, std::pair<uint64_t,uint64_t> &accum );
-	std::pair<uint64_t,uint64_t>& get_accum( const std::string &key );
-	size_t capacity;
-	std::vector<QTriple> queries;
-	std::map<std::string,std::pair<uint64_t,uint64_t>> accums;
 };
 
 //class ReorgExperimentOld : public CacheExperimentSingleQuery {

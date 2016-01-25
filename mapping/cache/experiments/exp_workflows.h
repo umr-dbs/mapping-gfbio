@@ -44,9 +44,9 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 {
   "type": "expression",
   "params":{
-		"expression":"(A>500) ? 1 : 2",
+		"expression":"(A > 5000) ? 1 : (A>1000) ? 2 : (A > 200) ? 3 : 4",
 		"datatype":"Int16",
-		"unit": { "measurement": "temperature", "unit": "c", "interpolation":"unknown", "min":1, "max": 2 }
+		"unit": { "measurement": "temperature", "unit": "c", "interpolation":"unknown", "min":1, "max": 4 }
   },
   "sources": { "raster": [
 {

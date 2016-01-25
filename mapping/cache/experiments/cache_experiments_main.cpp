@@ -15,8 +15,8 @@
 #include <iostream>
 #include <stdio.h>
 #include <gdal_priv.h>
-#include <random>
-#include <signal.h>
+
+
 
 void GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg) {
 	(void) eErrClass;
@@ -25,6 +25,7 @@ void GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg) {
 }
 
 int main(void) {
+	CachingStrategy::init();
 	// Swallow stderr;
 //	freopen("/dev/null","w",stderr);
 	Configuration::load("local_experiments.conf");
@@ -79,14 +80,16 @@ int main(void) {
 	experiments.push_back( make_unique<LocalCacheExperiment>(cache_exp::cloud_detection, num_runs, 1.0/4, 512) );
 	experiments.push_back( make_unique<PuzzleExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
 	experiments.push_back( make_unique<PuzzleExperiment>(cache_exp::cloud_detection, num_runs, 1.0/4, 512) );
+	experiments.push_back( make_unique<StrategyExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
+	experiments.push_back( make_unique<StrategyExperiment>(cache_exp::cloud_detection, num_runs, 1.0/4, 512) );
+
 	experiments.push_back( make_unique<QueryBatchingExperiment>(cache_exp::avg_temp, num_runs) );
 	experiments.push_back( make_unique<QueryBatchingExperiment>(cache_exp::cloud_detection, num_runs) );
-	experiments.push_back( make_unique<RelevanceExperiment>(cache_exp::avg_temp, num_runs) );
 	experiments.push_back( make_unique<ReorgExperiment>(qs1, num_runs) );
 	experiments.push_back( make_unique<ReorgExperiment>(qs2, num_runs) );
+	experiments.push_back( make_unique<RelevanceExperiment>(cache_exp::avg_temp, num_runs) );
+	experiments.push_back( make_unique<RelevanceExperiment>(cache_exp::srtm_ex, num_runs) );
 
-	// OK TO HERE
-//	experiments.push_back( make_unique<StrategyExperiment>(qs, 1) );
 
 	int exp = 0;
 

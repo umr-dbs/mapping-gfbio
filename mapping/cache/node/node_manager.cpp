@@ -161,6 +161,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 				refs.push_back( mgr.create_self_ref(id) );
 
 			PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
+			QueryProfilerStoppingGuard sg(profiler);
 			return process_puzzle(pr,profiler);
 		}
 	}
@@ -206,6 +207,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 			// END STATS ONLY
 
 			Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
+			QueryProfilerStoppingGuard sg(profiler);
 			return process_puzzle(pr,profiler);
 			break;
 		}
@@ -221,8 +223,8 @@ std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& requ
 	std::unique_ptr<T> result;
 	QueryProfiler profiler;
 	{
-		PuzzleGuard pg(mgr.get_worker_context());
 		QueryProfilerRunningGuard guard(parent_profiler,profiler);
+		PuzzleGuard pg(mgr.get_worker_context());
 		result = puzzle_util->process_puzzle(request,profiler);
 	}
 	if ( put( request.semantic_id, result, request.query, profiler ) )

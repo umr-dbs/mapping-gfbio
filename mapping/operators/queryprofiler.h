@@ -44,12 +44,25 @@ class QueryProfiler : public ProfilingData {
 		void addTotalCosts( const ProfilingData &profile );
 		void cached( const ProfilingData &profile );
 
-
 	private:
 		double t_start;
 };
 
-// these are two RAII helper classes to make sure that profiling works even when an operator throws an exception
+// these are three RAII helper classes to make sure that profiling works even when an operator throws an exception
+
+class QueryProfilerSimpleGuard {
+public:
+	QueryProfilerSimpleGuard( QueryProfiler &profiler ) : profiler(profiler) {
+		profiler.startTimer();
+	};
+
+	~QueryProfilerSimpleGuard() {
+		profiler.stopTimer();
+	}
+
+	QueryProfiler &profiler;
+};
+
 class QueryProfilerRunningGuard {
 	public:
 		QueryProfilerRunningGuard(QueryProfiler &parent_profiler, QueryProfiler &profiler)
@@ -64,6 +77,7 @@ class QueryProfilerRunningGuard {
 		QueryProfiler &parent_profiler;
 		QueryProfiler &profiler;
 };
+
 class QueryProfilerStoppingGuard {
 	public:
 		QueryProfilerStoppingGuard(QueryProfiler &profiler) : profiler(profiler) {

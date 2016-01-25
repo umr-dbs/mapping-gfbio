@@ -40,7 +40,7 @@ void ex_handler() {
 	}
 
 
-	Log::error("%s\n%s",out.str().c_str(), CacheCommon::get_stacktrace().c_str() );
+	fprintf(stderr, "%s\n%s", out.str().c_str(), CacheCommon::get_stacktrace().c_str() );
 	exit(1);
 }
 

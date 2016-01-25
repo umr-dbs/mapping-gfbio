@@ -142,14 +142,16 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 }
 
 std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
+	QueryProfilerSimpleGuard parent_guard(parent_profiler);
+
 	validateQRect(rect, ResolutionRequirement::REQUIRED);
 	auto &cache = CacheManager::get_instance().get_raster_cache();
 	std::unique_ptr<GenericRaster> result;
+
 	try {
-		QueryProfiler cache_profiler;
-		result = cache.query( *this, rect, cache_profiler );
-		parent_profiler += cache_profiler;
+		result = cache.query( *this, rect, parent_profiler );
 	} catch ( NoSuchElementException &nse ) {
+		QueryProfilerStoppingGuard stop_guard(parent_profiler);
 		QueryProfiler exec_profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
@@ -162,20 +164,21 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	}
 	validateResult(rect, result.get());
 
-	// the costs of adjusting the result are assigned to the calling operator
 	if (query_mode == RasterQM::EXACT)
 		result = result->fitToQueryRectangle(rect);
 	return result;
 }
+
 std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+	QueryProfilerSimpleGuard parent_guard(parent_profiler);
+
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
 	auto &cache = CacheManager::get_instance().get_point_cache();
 	std::unique_ptr<PointCollection> result;
 	try {
-		QueryProfiler cache_profiler;
-		result = cache.query( *this, rect, cache_profiler );
-		parent_profiler += cache_profiler;
+		result = cache.query( *this, rect, parent_profiler );
 	} catch ( NoSuchElementException &nse ) {
+		QueryProfilerStoppingGuard stop_guard(parent_profiler);
 		QueryProfiler exec_profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
@@ -195,14 +198,15 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 	return result;
 }
 std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+	QueryProfilerSimpleGuard parent_guard(parent_profiler);
+
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
 	auto &cache = CacheManager::get_instance().get_line_cache();
 	std::unique_ptr<LineCollection> result;
 	try {
-		QueryProfiler cache_profiler;
-		result = cache.query( *this, rect, cache_profiler );
-		parent_profiler += cache_profiler;
+		result = cache.query( *this, rect, parent_profiler );
 	} catch ( NoSuchElementException &nse ) {
+		QueryProfilerStoppingGuard stop_guard(parent_profiler);
 		QueryProfiler exec_profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
@@ -222,14 +226,15 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 	return result;
 }
 std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+	QueryProfilerSimpleGuard parent_guard(parent_profiler);
+
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
 	auto &cache = CacheManager::get_instance().get_polygon_cache();
 	std::unique_ptr<PolygonCollection> result;
 	try {
-		QueryProfiler cache_profiler;
-		result = cache.query( *this, rect, cache_profiler );
-		parent_profiler += cache_profiler;
+		result = cache.query( *this, rect, parent_profiler );
 	} catch ( NoSuchElementException &nse ) {
+		QueryProfilerStoppingGuard stop_guard(parent_profiler);
 		QueryProfiler exec_profiler;
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);

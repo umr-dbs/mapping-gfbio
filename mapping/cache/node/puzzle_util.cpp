@@ -321,8 +321,11 @@ std::vector<std::unique_ptr<T> > PuzzleUtil<T>::compute_remainders(
 	std::vector<std::unique_ptr<T>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
 
-	for ( auto &rqr : request.get_remainder_queries() ) {
-		result.push_back( retriever.compute(*graph,rqr,profiler) );
+	{
+		QueryProfilerStoppingGuard sg(profiler);
+		for ( auto &rqr : request.get_remainder_queries() ) {
+			result.push_back( retriever.compute(*graph,rqr,profiler) );
+		}
 	}
 	return result;
 }
@@ -341,7 +344,11 @@ std::vector<std::unique_ptr<GenericRaster>> PuzzleUtil<GenericRaster>::compute_r
 
 	for ( auto &rqr : remainders ) {
 		try {
-			auto rem = retriever.compute(*graph,rqr,profiler);
+			std::unique_ptr<GenericRaster> rem;
+			{
+				QueryProfilerStoppingGuard sg(profiler);
+				rem = retriever.compute(*graph,rqr,profiler);
+			}
 			if ( !CacheCommon::resolution_matches( ref_result, *rem ) ) {
 				Log::warn(
 					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s, result-dimension: %dx%d. Fitting result!",

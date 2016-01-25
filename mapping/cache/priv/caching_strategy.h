@@ -20,11 +20,18 @@
 class CachingStrategy {
 public:
 	enum class Type { SELF, ALL, UNCACHED };
+	static void init();
+	static double get_costs( const ProfilingData &profile, Type type );
+	static double get_caching_costs( size_t bytes );
+private:
+	static double caching_time( uint32_t w,uint32_t h);
+	static double fixed_caching_time;
+	static double caching_time_per_byte;
 
+public:
 	static std::unique_ptr<CachingStrategy> by_name( const std::string &name );
 	virtual ~CachingStrategy() = default;
 	virtual bool do_cache( const QueryProfiler &profiler, size_t bytes ) const = 0;
-	static double get_costs( const ProfilingData &profile, size_t bytes, Type type );
 };
 
 //
@@ -46,28 +53,12 @@ public:
 //
 // Strategy employed by christian authmann
 //
-class AuthmannStrategy : public CachingStrategy {
+class SimpleThresholdStrategy : public CachingStrategy {
 public:
-	AuthmannStrategy( double threshold );
+	SimpleThresholdStrategy( Type type );
 	bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
 private:
-	double threshold;
-};
-
-//
-// Two step strategy:
-// - First checks if the computation was that expensive, that the result should be cached anyway
-// - If not, checks if there have been numerous computations without caching a result which stack
-//   to a cache-worthy computation time
-//
-class TwoStepStrategy : public CachingStrategy {
-public:
-	// TODO: Figure out good values!
-	TwoStepStrategy(double stacked_threshold = 3, double immediate_threshold = 2);
-	bool do_cache( const QueryProfiler &profiler, size_t bytes ) const;
-private:
-	const double stacked_threshold;
-	const double immediate_threshold;
+	Type   type;
 };
 
 #endif /* CACHING_STRATEGY_H_ */

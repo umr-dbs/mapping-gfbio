@@ -54,8 +54,8 @@ bool CostLRU::operator ()( const std::shared_ptr<const IndexCacheEntry>& e1,
 	double f1 = 1.0 - (((now - e1->last_access) / 60000) * 0.01);
 	double f2 = 1.0 - (((now - e2->last_access) / 60000) * 0.01);
 
-	double c1 = CachingStrategy::get_costs(e1->profile,e1->size,CachingStrategy::Type::SELF);
-	double c2 = CachingStrategy::get_costs(e2->profile,e2->size,CachingStrategy::Type::SELF);
+	double c1 = CachingStrategy::get_costs(e1->profile,CachingStrategy::Type::UNCACHED);
+	double c2 = CachingStrategy::get_costs(e2->profile,CachingStrategy::Type::UNCACHED);
 
 	return (c1 * f1) > (c2 * f2);
 }

@@ -446,7 +446,7 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 	if (x1 >= x2 || y1 >= y2)
 		throw MetadataException("blit without overlapping region");
 
-#define BLIT_TYPE 1
+#define BLIT_TYPE 2
 #if BLIT_TYPE == 1 // 0.0286
 	for (int y=y1;y<y2;y++)
 		for (int x=x1;x<x2;x++) {

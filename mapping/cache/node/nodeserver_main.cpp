@@ -74,14 +74,18 @@ int main(void) {
 	size_t polygon_size = atoi(Configuration::get("nodeserver.cache.polygons.size").c_str());
 	size_t plot_size = atoi(Configuration::get("nodeserver.cache.plots.size").c_str());
 
+#ifndef MAPPING_NO_OPENCL
 	RasterOpenCL::init();
+#endif
 	CachingStrategy::init();
 
 	// Inititalize cache
 	std::unique_ptr<NodeCacheManager> cache_impl = make_unique<NodeCacheManager>(
 			CachingStrategy::by_name(cs), raster_size, point_size, line_size, polygon_size, plot_size);
 
+
 	CacheManager::init( cache_impl.get() );
+
 
 	// Fire it up
 	instance = new NodeServer( std::move(cache_impl), portnr,ihoststr,iportnr,num_threads);

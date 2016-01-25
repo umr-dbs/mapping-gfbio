@@ -31,7 +31,9 @@ int main(int argc, const char* argv[]) {
 	Log::setLevel( Configuration::get("log.level") );
 
 	// Init opencl
+#ifndef MAPPING_NO_OPENCL
 	RasterOpenCL::init();
+#endif
 
 	// Disable GDAL Error Messages
 	CPLSetErrorHandler(GDALErrorHandler);

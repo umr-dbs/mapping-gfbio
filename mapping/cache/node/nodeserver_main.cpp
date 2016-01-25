@@ -75,6 +75,7 @@ int main(void) {
 	size_t plot_size = atoi(Configuration::get("nodeserver.cache.plots.size").c_str());
 
 	RasterOpenCL::init();
+	CachingStrategy::init();
 
 	// Inititalize cache
 	std::unique_ptr<NodeCacheManager> cache_impl = make_unique<NodeCacheManager>(

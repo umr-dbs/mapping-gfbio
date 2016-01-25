@@ -32,7 +32,8 @@ void execute( QuerySpec &spec ) {
 	printf("Execution of %ld queries took: %ldms\n", num_queries, CacheExperiment::duration(start,end) );
 }
 
-int main(void) {
+int main(int argc, const char* argv[]) {
+	Configuration::loadFromDefaultPaths();
 	Configuration::load("cluster_experiment.conf");
 	Log::setLevel( Configuration::get("log.level") );
 
@@ -42,25 +43,37 @@ int main(void) {
 		cache_exp::srtm_proj
 	};
 
-	RasterOpenCL::init();
+	if ( argc < 2 ) {
+		printf("Usage: %s [1-%lu]\n", argv[0], specs.size());
+		exit(1);
+	}
 
-	int exp = 0;
+	int num = atoi(argv[1]);
+	if ( num < 1 || num > specs.size() ) {
+		printf("Usage: %s [1-%lu]\n", argv[0], specs.size());
+		exit(1);
+	}
 
-	do {
-		std::cout << "Select the query-type to use (-1 for exit):" << std::endl;
-		std::cout << " [0] All" << std::endl;
-		for ( size_t i = 0; i < specs.size(); i++ ) {
-			std::cout << " [" << (i+1) << "] " << specs[i].name << std::endl;
-		}
-		std:: cout << "Your choice: ";
-		std::cin >> exp;
+	execute( specs[num-1] );
 
-		if ( exp > 0 && exp <= (ssize_t) specs.size() )
-			execute( specs[exp-1] );
-		else if ( exp == 0 )
-			for ( auto &s : specs ) {
-				execute(s);
-			}
-	} while ( exp >= 0 );
-	std::cout << "Bye" << std::endl;
+//	int exp = 0;
+//
+//	do {
+//		std::cout << "Select the query-type to use (-1 for exit):" << std::endl;
+//		std::cout << " [0] All" << std::endl;
+//		for ( size_t i = 0; i < specs.size(); i++ ) {
+//			std::cout << " [" << (i+1) << "] " << specs[i].name << std::endl;
+//		}
+//		std:: cout << "Your choice: ";
+//		std::cin >> exp;
+//
+//		if ( exp > 0 && exp <= (ssize_t) specs.size() )
+//			execute( specs[exp-1] );
+//		else if ( exp == 0 )
+//			for ( auto &s : specs ) {
+//				execute(s);
+//			}
+//	} while ( exp >= 0 );
+//	std::cout << "Bye" << std::endl;
+	return 0;
 }

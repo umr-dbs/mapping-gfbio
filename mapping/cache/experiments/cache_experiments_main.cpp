@@ -24,10 +24,9 @@ void GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg) {
 	(void) msg;
 }
 
-int main(void) {
+int main(int argc, const char* argv[]) {
 	CachingStrategy::init();
-	// Swallow stderr;
-//	freopen("/dev/null","w",stderr);
+	Configuration::loadFromDefaultPaths();
 	Configuration::load("local_experiments.conf");
 	Log::setLevel( Configuration::get("log.level") );
 
@@ -71,9 +70,23 @@ int main(void) {
 	};
 
 
-	size_t num_runs = 1;
-	std::cout << "Enter the number of runs per experiment: ";
-	std::cin >> num_runs;
+	if ( argc < 3 ) {
+		printf("Usage: %s #num_runs [1-12]\n", argv[0]);
+		exit(1);
+	}
+
+	int num_runs = atoi(argv[1]);
+	int exp = atoi(argv[2]);
+
+	if ( num_runs < 1 ) {
+		printf("Usage: %s #num_runs [1-12]\n", argv[0]);
+		exit(1);
+	}
+
+
+//	size_t num_runs = 1;
+//	std::cout << "Enter the number of runs per experiment: ";
+//	std::cin >> num_runs;
 
 	std::vector<std::unique_ptr<CacheExperiment>> experiments;
 	experiments.push_back( make_unique<LocalCacheExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
@@ -90,25 +103,32 @@ int main(void) {
 	experiments.push_back( make_unique<RelevanceExperiment>(cache_exp::avg_temp, num_runs) );
 	experiments.push_back( make_unique<RelevanceExperiment>(cache_exp::srtm_ex, num_runs) );
 
+	if ( exp < 1 || exp > experiments.size() ) {
+		printf("Usage: %s #num_runs [1-%lu]\n", argv[0], experiments.size());
+		exit(1);
+	}
 
-	int exp = 0;
+	experiments[exp-1]->run();
 
-	do {
-		std::cout << "Choose the experiment to run (-1 for exit):" << std::endl;
-		std::cout << " [0] All" << std::endl;
-		for ( size_t i = 0; i < experiments.size(); i++ ) {
-			std::cout << " [" << (i+1) << "] " << experiments[i]->name << std::endl;
-		}
-		std:: cout << "Your choice: ";
-		std::cin >> exp;
-
-		if ( exp > 0 && exp <= (ssize_t) experiments.size() )
-			experiments[exp-1]->run();
-		else if ( exp == 0 )
-			for ( auto & e : experiments )
-				e->run();
-	} while ( exp >= 0 );
-	std::cout << "Bye" << std::endl;
+//
+//	int exp = 0;
+//
+//	do {
+//		std::cout << "Choose the experiment to run (-1 for exit):" << std::endl;
+//		std::cout << " [0] All" << std::endl;
+//		for ( size_t i = 0; i < experiments.size(); i++ ) {
+//			std::cout << " [" << (i+1) << "] " << experiments[i]->name << std::endl;
+//		}
+//		std:: cout << "Your choice: ";
+//		std::cin >> exp;
+//
+//		if ( exp > 0 && exp <= (ssize_t) experiments.size() )
+//			experiments[exp-1]->run();
+//		else if ( exp == 0 )
+//			for ( auto & e : experiments )
+//				e->run();
+//	} while ( exp >= 0 );
+//	std::cout << "Bye" << std::endl;
 
 	return 0;
 }

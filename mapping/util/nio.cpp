@@ -25,7 +25,7 @@
 //
 
 
-void StreamBuffer::write(const char* buffer, size_t len) {
+void StreamBuffer::write(const char* buffer, size_t len, bool is_persistent_memory) {
 	stream.write(buffer,len);
 }
 

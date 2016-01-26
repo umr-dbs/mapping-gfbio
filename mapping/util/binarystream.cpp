@@ -26,12 +26,12 @@ void BinaryStream::makeNonBlocking() {
 	throw ArgumentException("This stream type does not support NonBlocking mode");
 }
 
-void BinaryStream::write(const std::string &string) {
+void BinaryStream::write(const std::string &string, bool is_persistent_memory) {
 	size_t len = string.size();
 	if (len > (size_t) (1<<31))
 		throw NetworkException("BinaryStream: String too large to transmit");
 	write(len);
-	write(string.data(), len);
+	write(string.data(), len, is_persistent_memory);
 }
 
 void BinaryStream::flush() {
@@ -179,7 +179,7 @@ void BinaryFDStream::close() {
 }
 
 
-void BinaryFDStream::write(const char *buffer, size_t len) {
+void BinaryFDStream::write(const char *buffer, size_t len, bool is_persistent_memory) {
 	if (!is_blocking)
 		throw NetworkException("Cannot write() to a a nonblocking stream");
 
@@ -300,12 +300,12 @@ BinaryWriteBuffer::BinaryWriteBuffer() : may_link(false), status(Status::CREATIN
 BinaryWriteBuffer::~BinaryWriteBuffer() {
 }
 
-void BinaryWriteBuffer::write(const char *data, size_t len) {
+void BinaryWriteBuffer::write(const char *data, size_t len, bool is_persistent_memory) {
 	if (status != Status::CREATING)
 		throw ArgumentException("cannot write() to a BinaryWriteBuffer after it was prepared for sending");
 
 	// maybe we can just link to external memory, without touching our buffer
-	if (may_link && len >= 4096) {
+	if (may_link && is_persistent_memory && len >= 64) {
 		finishBufferedArea();
 		areas.emplace_back(data, len);
 		return;
@@ -409,7 +409,7 @@ BinaryReadBuffer::~BinaryReadBuffer() {
 
 }
 
-void BinaryReadBuffer::write(const char *data, size_t len) {
+void BinaryReadBuffer::write(const char *data, size_t len, bool is_persistent_memory) {
 	throw ArgumentException("A BinaryReadBuffer cannot write()");
 }
 

@@ -245,7 +245,7 @@ int Connection::processCommand() {
 			response->object = backend->readTile(tile);
 			response->write(response->object->size);
 			response->enableLinking();
-			response->write((const char *) response->object->data, response->object->size);
+			response->write((const char *) response->object->data, response->object->size, true);
 			response->disableLinking();
 			printf("%d: data sent\n", id);
 			break;

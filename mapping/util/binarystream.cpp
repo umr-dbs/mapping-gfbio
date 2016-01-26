@@ -217,7 +217,7 @@ void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
 	if (!buffer.isWriting())
 		throw ArgumentException("cannot writeNB() a BinaryWriteBuffer when not prepared for writing");
 
-	auto written = writev(write_fd, (const iovec *) buffer.areas.data(), buffer.areas.size());
+	auto written = writev(write_fd, (const iovec *) &buffer.areas.at(buffer.areas_sent), buffer.areas.size()-buffer.areas_sent);
 	if (written < 0)
 		throw NetworkException(concat("BinaryFDStream: writev() failed: ", strerror(errno)));
 	buffer.markBytesAsWritten(written);
@@ -305,7 +305,7 @@ void BinaryWriteBuffer::write(const char *data, size_t len) {
 		throw ArgumentException("cannot write() to a BinaryWriteBuffer after it was prepared for sending");
 
 	// maybe we can just link to external memory, without touching our buffer
-	if (may_link && len >= 64) {
+	if (may_link && len >= 4096) {
 		finishBufferedArea();
 		areas.emplace_back(data, len);
 		return;

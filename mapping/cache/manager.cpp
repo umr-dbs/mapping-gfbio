@@ -107,53 +107,58 @@ template<typename T, CacheType CType>
 std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
 		const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
 
-	BinaryFDStream idx_con(idx_host.c_str(), idx_port, true);
-	BinaryStream &idx_stream = idx_con;
+	try {
+		BinaryFDStream idx_con(idx_host.c_str(), idx_port, true);
+		BinaryStream &idx_stream = idx_con;
 
-	BaseRequest req(type,op.getSemanticId(),rect);
-	buffered_write(idx_con, ClientConnection::MAGIC_NUMBER, ClientConnection::CMD_GET, req );
+		BaseRequest req(type,op.getSemanticId(),rect);
+		buffered_write(idx_con, ClientConnection::MAGIC_NUMBER, ClientConnection::CMD_GET, req );
 
-	uint8_t idx_resp;
-	idx_stream.read(&idx_resp);
-	switch (idx_resp) {
-		case ClientConnection::RESP_OK: {
-			DeliveryResponse dr(idx_con);
-			Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
-			BinaryFDStream del_sock(dr.host.c_str(),dr.port,true);
-			BinaryStream &del_stream = del_sock;
+		uint8_t idx_resp;
+		idx_stream.read(&idx_resp);
+		switch (idx_resp) {
+			case ClientConnection::RESP_OK: {
+				DeliveryResponse dr(idx_con);
+				Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
+				BinaryFDStream del_sock(dr.host.c_str(),dr.port,true);
+				BinaryStream &del_stream = del_sock;
 
-			buffered_write( del_sock, DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET, dr.delivery_id);
+				buffered_write( del_sock, DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET, dr.delivery_id);
 
-			uint8_t resp;
-			del_stream.read(&resp);
-			switch (resp) {
-				case DeliveryConnection::RESP_OK: {
-					Log::debug("Delivery responded OK.");
-					return read_result(del_sock);
+				uint8_t resp;
+				del_stream.read(&resp);
+				switch (resp) {
+					case DeliveryConnection::RESP_OK: {
+						Log::debug("Delivery responded OK.");
+						return read_result(del_sock);
+					}
+					case DeliveryConnection::RESP_ERROR: {
+						std::string err_msg;
+						del_stream.read(&err_msg);
+						Log::error("Delivery returned error: %s", err_msg.c_str());
+						throw DeliveryException(err_msg);
+					}
+					default: {
+						Log::error("Delivery returned unknown code: %d", resp);
+						throw DeliveryException("Delivery returned unknown code");
+					}
 				}
-				case DeliveryConnection::RESP_ERROR: {
-					std::string err_msg;
-					del_stream.read(&err_msg);
-					Log::error("Delivery returned error: %s", err_msg.c_str());
-					throw DeliveryException(err_msg);
-				}
-				default: {
-					Log::error("Delivery returned unknown code: %d", resp);
-					throw DeliveryException("Delivery returned unknown code");
-				}
+				break;
 			}
-			break;
+			case ClientConnection::RESP_ERROR: {
+				std::string err_msg;
+				idx_stream.read(&err_msg);
+				Log::error("Cache returned error: %s", err_msg.c_str());
+				throw OperatorException(err_msg);
+			}
+			default: {
+				Log::error("Cache returned unknown code: %d", idx_resp);
+				throw OperatorException("Cache returned unknown code");
+			}
 		}
-		case ClientConnection::RESP_ERROR: {
-			std::string err_msg;
-			idx_stream.read(&err_msg);
-			Log::error("Cache returned error: %s", err_msg.c_str());
-			throw OperatorException(err_msg);
-		}
-		default: {
-			Log::error("Cache returned unknown code: %d", idx_resp);
-			throw OperatorException("Cache returned unknown code");
-		}
+	} catch ( const NetworkException &ne ) {
+		Log::error("Could not connect to index-server: %s", ne.what());
+		throw OperatorException(ne.what());
 	}
 }
 

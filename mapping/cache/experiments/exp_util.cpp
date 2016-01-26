@@ -437,7 +437,7 @@ LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers, time_t update_int
 	CacheManager::init(&mgr);
 
 	threads.push_back( make_unique<std::thread>(&IndexServer::run, idx_server.get()) );
-	std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
 	for ( auto &n : nodes )
 		threads.push_back( make_unique<std::thread>(TestNodeServer::run_node_thread, n.get()));

@@ -376,7 +376,7 @@ void BinaryWriteBuffer::markBytesAsWritten(size_t sent_bytes) {
 
 	size_sent += sent_bytes;
 	if (size_sent > size_total)
-		throw ArgumentException("markBytesAsWritten() exceeds size of buffer");
+		throw ArgumentException(concat("markBytesAsWritten() exceeds size of buffer, ", sent_bytes, " sent, now at ", size_sent, " of ", size_total));
 
 	if (size_sent == size_total) {
 		status = Status::FINISHED;

@@ -41,7 +41,7 @@ int main(int argc, const char* argv[]) {
 	// Open all dbs
 	std::vector<std::shared_ptr<RasterDB>> dbs{
 		RasterDB::open("srtm", RasterDB::READ_ONLY),
-		RasterDB::open("glc2000_global", RasterDB::READ_ONLY),
+//		RasterDB::open("glc2000_global", RasterDB::READ_ONLY),
 		RasterDB::open("worldclim", RasterDB::READ_ONLY),
 		RasterDB::open("msg9_geos", RasterDB::READ_ONLY)
 	};

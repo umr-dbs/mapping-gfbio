@@ -32,36 +32,36 @@ static std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::stri
 	return (std::pair<std::string, std::string>{"EPSG",crsCode});
 }
 
-static std::pair<double, double> getWfsParameterRangeDouble(std::string wfsParameterString, std::ostream &error){
+static std::pair<double, double> getWcsParameterRangeDouble(std::string wcsParameterString, std::ostream &error){
 	std::pair<double, double> resultPair;
 
-	size_t rangeStart = wfsParameterString.find_first_of("(");
-	size_t rangeEnd = wfsParameterString.find_last_of(")");
-	size_t rangeSeperator = wfsParameterString.find_first_of(",", rangeStart);
+	size_t rangeStart = wcsParameterString.find_first_of("(");
+	size_t rangeEnd = wcsParameterString.find_last_of(")");
+	size_t rangeSeperator = wcsParameterString.find_first_of(",", rangeStart);
 	size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
 
-	resultPair.first = std::stod(wfsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
+	resultPair.first = std::stod(wcsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
 
 	if(rangeSeperator == std::string::npos){
 		resultPair.second = resultPair.first;
 	}else{
-		resultPair.second = std::stod(wfsParameterString.substr(firstEnd+1, rangeEnd-firstEnd -1));
+		resultPair.second = std::stod(wcsParameterString.substr(firstEnd+1, rangeEnd-firstEnd -1));
 	}
-	error<<"getParameterRangeFromOGCUri openGisUri: "<<wfsParameterString<<" resultPair.first: "<<resultPair.first<<" resultPair.second: "<<resultPair.second<<std::endl;
+	error<<"getParameterRangeFromOGCUri openGisUri: "<<wcsParameterString<<" resultPair.first: "<<resultPair.first<<" resultPair.second: "<<resultPair.second<<std::endl;
 	return resultPair;
 }
 
-static int getWfsParameterInteger(const std::string &wfsParameterString, std::ostream &error){
+static int getWcsParameterInteger(const std::string &wcsParameterString, std::ostream &error){
 
-	size_t rangeStart = wfsParameterString.find_first_of("(");
-	size_t rangeEnd = wfsParameterString.find_last_of(")");
-	size_t rangeSeperator = wfsParameterString.find_first_of(",", rangeStart);
+	size_t rangeStart = wcsParameterString.find_first_of("(");
+	size_t rangeEnd = wcsParameterString.find_last_of(")");
+	size_t rangeSeperator = wcsParameterString.find_first_of(",", rangeStart);
 	size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
 
 	if(rangeSeperator != std::string::npos)
-		error<<"[getWFSIntegerParameter] "<<wfsParameterString<<" contains a range!"<<std::endl;
+		error<<"[getWCSIntegerParameter] "<<wcsParameterString<<" contains a range!"<<std::endl;
 
-	int parameterValue = std::stoi(wfsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
+	int parameterValue = std::stoi(wcsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
 	return parameterValue;
 }
 
@@ -100,11 +100,11 @@ void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		 *}
 		 */
 
-		std::pair<double, double> crsRangeLon = getWfsParameterRangeDouble(params.get("subset_lon"), error);
-		std::pair<double, double> crsRangeLat = getWfsParameterRangeDouble(params.get("subset_lat"), error);
+		std::pair<double, double> crsRangeLon = getWcsParameterRangeDouble(params.get("subset_lon"), error);
+		std::pair<double, double> crsRangeLat = getWcsParameterRangeDouble(params.get("subset_lat"), error);
 
-		unsigned int sizeX = getWfsParameterInteger(params.get("size_x"), error);
-		unsigned int sizeY = getWfsParameterInteger(params.get("size_y"), error);
+		unsigned int sizeX = getWcsParameterInteger(params.get("size_x"), error);
+		unsigned int sizeY = getWcsParameterInteger(params.get("size_y"), error);
 
 		double timestamp = 1295266500; // 2011-1-17 12:15
 		if(params.hasParam("time"))

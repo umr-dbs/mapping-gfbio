@@ -182,6 +182,8 @@ std::unique_ptr<GenericRaster> RasterPuzzler::puzzle(
 			width,
 			height );
 
+	result->global_attributes = items[0]->global_attributes;
+
 	for ( auto &raster : items ) {
 		auto x = result->WorldToPixelX( raster->stref.x1 );
 		auto y = result->WorldToPixelY( raster->stref.y1 );

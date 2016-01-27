@@ -218,8 +218,11 @@ void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
 		throw ArgumentException("cannot writeNB() a BinaryWriteBuffer when not prepared for writing");
 
 	auto written = writev(write_fd, (const iovec *) &buffer.areas.at(buffer.areas_sent), buffer.areas.size()-buffer.areas_sent);
-	if (written < 0)
+	if (written < 0) {
+		if (!is_blocking && (errno == EAGAIN || errno == EWOULDBLOCK))
+			return;
 		throw NetworkException(concat("BinaryFDStream: writev() failed: ", strerror(errno)));
+	}
 	buffer.markBytesAsWritten(written);
 	//printf("Wrote %d bytes of %d\n", (int) written, (int) buffer.size_total);
 }

@@ -11,10 +11,10 @@
 
 class Spec {
 public:
-	Spec(const QuerySpec &spec,double ratio,uint32_t res) :
-		spec(spec),ratio(ratio),res(res) {}
+	Spec(const QuerySpec &spec,uint32_t tiles,uint32_t res) :
+		spec(spec),tiles(tiles),res(res) {}
 	const QuerySpec &spec;
-	double ratio;
+	uint32_t tiles;
 	uint32_t res;
 };
 
@@ -25,9 +25,25 @@ void execute( Spec &s ) {
 	int num_threads = atoi( Configuration::get("experiment.threads").c_str() );
 	size_t num_queries = atoi( Configuration::get("experiment.queries").c_str() );
 
+
+	std::default_random_engine eng(std::chrono::system_clock::now().time_since_epoch().count());
+	std::uniform_int_distribution<uint16_t> dist(0, s.tiles*s.tiles-1);
+
+	double extend = std::min(
+		(s.spec.bounds.x2 - s.spec.bounds.x1) / 32,
+		(s.spec.bounds.y2 - s.spec.bounds.y1) / 32
+	);
+
 	std::deque<QTriple> queries;
 	for ( size_t i = 0; i < num_queries; i++ ) {
-		QueryRectangle qr = s.spec.random_rectangle_percent(s.ratio,s.res);
+		uint16_t tile = dist(eng);
+		uint16_t y = tile / 32;
+		uint16_t x = tile % 32;
+
+		double x1 = s.spec.bounds.x1 + x * extend;
+		double y1 = s.spec.bounds.y1 + y * extend;
+
+		QueryRectangle qr = s.spec.rectangle(x1,y1,extend,256);
 		queries.push_back( QTriple(CacheType::RASTER,qr,s.spec.workflow) );
 	}
 
@@ -47,10 +63,10 @@ int main(int argc, const char* argv[]) {
 	Log::setLevel( Configuration::get("log.level") );
 
 	std::vector<Spec> specs{
-		Spec( cache_exp::avg_temp, 1.0/64, 256 ),
-		Spec( cache_exp::srtm_ex, 1.0/64, 256 ),
-		Spec( cache_exp::srtm_proj, 1.0/64, 256 ),
-		Spec( cache_exp::cloud_detection, 1.0/14, 256 )
+		Spec( cache_exp::avg_temp, 32, 256 ),
+		Spec( cache_exp::srtm_ex, 32, 256 ),
+		Spec( cache_exp::srtm_proj, 32, 256 ),
+		Spec( cache_exp::cloud_detection, 14, 256 )
 	};
 
 	if ( argc < 2 ) {

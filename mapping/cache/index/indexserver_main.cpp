@@ -49,6 +49,10 @@ int main(void) {
 	CacheCommon::set_uncaught_exception_handler();
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
+
+	// Disable GDAL Error Messages
+	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
+
 	auto portstr = Configuration::get("indexserver.port");
 
 	Log::setLevel(Configuration::get("log.level","info"));

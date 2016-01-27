@@ -52,6 +52,9 @@ int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 
+	// Disable GDAL Error Messages
+	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
+
 	Log::setLevel(Configuration::get("log.level","info"));
 
 	auto portstr = Configuration::get("nodeserver.port");

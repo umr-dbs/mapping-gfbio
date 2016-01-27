@@ -11,6 +11,7 @@
 #include "util/binarystream.h"
 #include "util/exceptions.h"
 #include "util/log.h"
+#include <gdal_priv.h>
 #include <memory>
 
 #include <sstream>
@@ -127,6 +128,8 @@ private:
 
 class CacheCommon {
 public:
+
+	static void GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg);
 
 	static time_t time_millis();
 

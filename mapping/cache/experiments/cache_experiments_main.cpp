@@ -17,13 +17,6 @@
 #include <gdal_priv.h>
 
 
-
-void GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg) {
-	(void) eErrClass;
-	(void) err_no;
-	(void) msg;
-}
-
 int main(int argc, const char* argv[]) {
 	CachingStrategy::init();
 	Configuration::loadFromDefaultPaths();
@@ -36,7 +29,7 @@ int main(int argc, const char* argv[]) {
 #endif
 
 	// Disable GDAL Error Messages
-	CPLSetErrorHandler(GDALErrorHandler);
+	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
 
 	// Open all dbs
 	std::vector<std::shared_ptr<RasterDB>> dbs{
@@ -102,10 +95,10 @@ int main(int argc, const char* argv[]) {
 	experiments.push_back( make_unique<PuzzleExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
 	experiments.push_back( make_unique<PuzzleExperiment>(cache_exp::cloud_detection, num_runs, 1.0/3, 1024) );
 	experiments.push_back( make_unique<StrategyExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
-	experiments.push_back( make_unique<StrategyExperiment>(cache_exp::cloud_detection, num_runs, 1.0/4, 512) );
+	experiments.push_back( make_unique<StrategyExperiment>(cache_exp::cloud_detection, num_runs, 1.0/3, 1024) );
 
-	experiments.push_back( make_unique<QueryBatchingExperiment>(cache_exp::avg_temp, num_runs) );
-	experiments.push_back( make_unique<QueryBatchingExperiment>(cache_exp::cloud_detection, num_runs) );
+	experiments.push_back( make_unique<QueryBatchingExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
+	experiments.push_back( make_unique<QueryBatchingExperiment>(cache_exp::cloud_detection, num_runs, 1.0/3, 1024) );
 	experiments.push_back( make_unique<ReorgExperiment>(qs1, num_runs) );
 	experiments.push_back( make_unique<ReorgExperiment>(qs2, num_runs) );
 	experiments.push_back( make_unique<RelevanceExperiment>(cache_exp::avg_temp, num_runs) );

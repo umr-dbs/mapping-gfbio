@@ -277,8 +277,8 @@ std::vector<QTriple> RelevanceExperiment::generate_queries() {
 // batching experiment
 //
 
-QueryBatchingExperiment::QueryBatchingExperiment(const QuerySpec& spec, uint32_t num_runs )
-	: CacheExperimentSingleQuery("Query-Batching", spec, num_runs ), capacity(0), queries_scheduled(0) {
+QueryBatchingExperiment::QueryBatchingExperiment(const QuerySpec& spec, uint32_t num_runs, double percentage, uint32_t query_res )
+	: CacheExperimentSingleQuery("Query-Batching", spec, num_runs ), percentage(percentage), query_resolution(query_res), capacity(0), queries_scheduled(0) {
 }
 
 void QueryBatchingExperiment::global_setup() {
@@ -296,7 +296,7 @@ void QueryBatchingExperiment::global_setup() {
 void QueryBatchingExperiment::setup() {
 	uint tiles = 4;
 	queries.clear();
-	QueryRectangle all = query_spec.random_rectangle_percent(1.0/8, 1024 );
+	QueryRectangle all = query_spec.random_rectangle_percent(percentage, query_resolution);
 	double dx = (all.x2-all.x1) / tiles;
 	double dy = (all.y2-all.y1) / tiles;
 

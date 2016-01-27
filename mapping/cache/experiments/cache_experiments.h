@@ -82,7 +82,7 @@ private:
 	std::vector<QTriple> generate_queries();
 	void exec(const std::string& relevance, size_t capacity, double &accum);
 	const std::vector<std::string> rels{"lru","costlru"};
-	const std::vector<double> ratios{0.05,0.1,0.2,0.3,0.4,0.6};//0.01, 0.02, 0.05};//, 0.1, 0.2};
+	const std::vector<double> ratios{0.01,0.02,0.05,0.1,0.2};
 	size_t capacity;
 	std::vector<QTriple> queries;
 	double accums[2][6];

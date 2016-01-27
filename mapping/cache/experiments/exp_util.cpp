@@ -425,12 +425,12 @@ void TestCacheMan::reset_costs() {
 LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers, time_t update_interval, size_t capacity, std::string reorg_strat,
 	std::string relevance_function, std::string c_strat ) :
 		index_port(atoi(Configuration::get("indexserver.port").c_str())),
-		ccm("localhost", index_port),
+		ccm("127.0.0.1", index_port),
 		idx_server(make_unique<TestIdxServer>(index_port,
 		update_interval,reorg_strat,relevance_function) ) {
 
 	for ( int i = 1; i <= num_nodes; i++)
-		nodes.push_back( make_unique<TestNodeServer>(num_workers, index_port+i,"localhost",index_port,c_strat,capacity) );
+		nodes.push_back( make_unique<TestNodeServer>(num_workers, index_port+i,"127.0.0.1",index_port,c_strat,capacity) );
 
 	for ( auto &n : nodes )
 		mgr.add_instance(n.get());

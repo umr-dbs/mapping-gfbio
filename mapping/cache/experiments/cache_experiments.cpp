@@ -224,7 +224,6 @@ void RelevanceExperiment::exec(const std::string& relevance, size_t capacity, do
 
 std::vector<QTriple> RelevanceExperiment::generate_queries() {
 	std::vector<QTriple> result;
-
 	// [-112.5, -90  ], [ 22.5,  45  ] --> Nordamerika
 	// [   0  ,  22.5], [ 45  ,  67,5] --> Europa
 	// [   0  ,  22.5], [  0  ,  22,5] --> Afrika

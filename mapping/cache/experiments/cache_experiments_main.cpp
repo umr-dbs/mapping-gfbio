@@ -49,11 +49,17 @@ int main(int argc, const char* argv[]) {
 	// Queries for reorg
 	std::vector<QuerySpec> qs1{
 		cache_exp::shifted_temp("1995-01-15 12:00:00"),
+		cache_exp::shifted_temp("1995-02-15 12:00:00"),
 		cache_exp::shifted_temp("1995-03-15 12:00:00"),
+		cache_exp::shifted_temp("1995-04-15 12:00:00"),
 		cache_exp::shifted_temp("1995-05-15 12:00:00"),
+		cache_exp::shifted_temp("1995-06-15 12:00:00"),
 		cache_exp::shifted_temp("1995-07-15 12:00:00"),
+		cache_exp::shifted_temp("1995-08-15 12:00:00"),
 		cache_exp::shifted_temp("1995-09-15 12:00:00"),
+		cache_exp::shifted_temp("1995-10-15 12:00:00"),
 		cache_exp::shifted_temp("1995-11-15 12:00:00"),
+		cache_exp::shifted_temp("1995-12-15 12:00:00"),
 	};
 
 	std::vector<QuerySpec> qs2{
@@ -92,9 +98,9 @@ int main(int argc, const char* argv[]) {
 
 	std::vector<std::unique_ptr<CacheExperiment>> experiments;
 	experiments.push_back( make_unique<LocalCacheExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
-	experiments.push_back( make_unique<LocalCacheExperiment>(cache_exp::cloud_detection, num_runs, 1.0/4, 512) );
+	experiments.push_back( make_unique<LocalCacheExperiment>(cache_exp::cloud_detection, num_runs, 1.0/3, 1024) );
 	experiments.push_back( make_unique<PuzzleExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
-	experiments.push_back( make_unique<PuzzleExperiment>(cache_exp::cloud_detection, num_runs, 1.0/4, 512) );
+	experiments.push_back( make_unique<PuzzleExperiment>(cache_exp::cloud_detection, num_runs, 1.0/3, 1024) );
 	experiments.push_back( make_unique<StrategyExperiment>(cache_exp::avg_temp, num_runs, 1.0/8, 1024) );
 	experiments.push_back( make_unique<StrategyExperiment>(cache_exp::cloud_detection, num_runs, 1.0/4, 512) );
 

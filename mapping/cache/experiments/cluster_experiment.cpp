@@ -9,7 +9,16 @@
 #include "raster/opencl.h"
 #include "util/configuration.h"
 
-void execute( QuerySpec &spec ) {
+class Spec {
+public:
+	Spec(const QuerySpec &spec,double ratio,uint32_t res) :
+		spec(spec),ratio(ratio),res(res) {}
+	const QuerySpec &spec;
+	double ratio;
+	uint32_t res;
+};
+
+void execute( Spec &s ) {
 
 	std::string host = Configuration::get("indexserver.host");
 	int port = atoi( Configuration::get("indexserver.port").c_str() );
@@ -18,8 +27,8 @@ void execute( QuerySpec &spec ) {
 
 	std::deque<QTriple> queries;
 	for ( size_t i = 0; i < num_queries; i++ ) {
-		QueryRectangle qr = spec.random_rectangle_percent(1.0/64,256);
-		queries.push_back( QTriple(CacheType::RASTER,qr,spec.workflow) );
+		QueryRectangle qr = s.spec.random_rectangle_percent(s.ratio,s.res);
+		queries.push_back( QTriple(CacheType::RASTER,qr,s.spec.workflow) );
 	}
 
 	ClientCacheManager ccm(host,port);
@@ -37,10 +46,11 @@ int main(int argc, const char* argv[]) {
 	Configuration::load("cluster_experiment.conf");
 	Log::setLevel( Configuration::get("log.level") );
 
-	std::vector<QuerySpec> specs{
-		cache_exp::avg_temp,
-		cache_exp::srtm_ex,
-		cache_exp::srtm_proj
+	std::vector<Spec> specs{
+		Spec( cache_exp::avg_temp, 1.0/64, 256 ),
+		Spec( cache_exp::srtm_ex, 1.0/64, 256 ),
+		Spec( cache_exp::srtm_proj, 1.0/64, 256 ),
+		Spec( cache_exp::cloud_detection, 1.0/14, 256 )
 	};
 
 	if ( argc < 2 ) {

@@ -39,7 +39,7 @@ double CachingStrategy::get_caching_costs(size_t bytes) {
 
 
 double CachingStrategy::caching_time(uint32_t w, uint32_t h) {
-	int num_runs = 100;
+	int num_runs = 10;
 	NodeCache<GenericRaster> nc(CacheType::RASTER, 50000000);
 	QueryProfiler qp;
 	for ( int i = 0; i < num_runs; i++ ) {
@@ -52,7 +52,6 @@ double CachingStrategy::caching_time(uint32_t w, uint32_t h) {
 		qp.startTimer();
 		auto res = nc.put("test",raster, CacheEntry(CacheCube(*raster),w*h,ProfilingData()));
 		qp.stopTimer();
-		nc.remove(res);
 	}
 	return qp.self_cpu / num_runs;
 }
@@ -116,5 +115,5 @@ SimpleThresholdStrategy::SimpleThresholdStrategy(Type type) :
 
 bool SimpleThresholdStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	// Assume 1 put and at least 2 gets
-	return get_costs(profiler,type) >= 3 * get_caching_costs(bytes);
+	return get_costs(profiler,type) >= 3.5 * get_caching_costs(bytes);
 }

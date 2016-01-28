@@ -30,7 +30,7 @@ double CachingStrategy::caching_time_per_byte(0);
 void CachingStrategy::init() {
 	// Calibrate cache costs
 	fixed_caching_time    = caching_time(1,1);
-	caching_time_per_byte = (caching_time(1024,1024) - fixed_caching_time) / (1024*1024);
+	caching_time_per_byte = (caching_time(3072,3072) - fixed_caching_time) / (3072*3072);
 }
 
 double CachingStrategy::get_caching_costs(size_t bytes) {
@@ -39,9 +39,10 @@ double CachingStrategy::get_caching_costs(size_t bytes) {
 
 
 double CachingStrategy::caching_time(uint32_t w, uint32_t h) {
+	int num_runs = 100;
 	NodeCache<GenericRaster> nc(CacheType::RASTER, 50000000);
 	QueryProfiler qp;
-	for ( int i = 0; i < 100; i++ ) {
+	for ( int i = 0; i < num_runs; i++ ) {
 		DataDescription dd(GDT_Byte,Unit::unknown());
 		SpatioTemporalReference stref(
 			SpatialReference::extent(EPSG_WEBMERCATOR),
@@ -49,10 +50,11 @@ double CachingStrategy::caching_time(uint32_t w, uint32_t h) {
 		);
 		auto raster = GenericRaster::create(dd,stref,w,h);
 		qp.startTimer();
-		nc.put("test",raster, CacheEntry(CacheCube(*raster),w*h,ProfilingData()));
+		auto res = nc.put("test",raster, CacheEntry(CacheCube(*raster),w*h,ProfilingData()));
 		qp.stopTimer();
+		nc.remove(res);
 	}
-	return qp.self_cpu / 10;
+	return qp.self_cpu / num_runs;
 }
 
 double CachingStrategy::get_costs(const ProfilingData& profile, Type type) {
@@ -114,5 +116,5 @@ SimpleThresholdStrategy::SimpleThresholdStrategy(Type type) :
 
 bool SimpleThresholdStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	// Assume 1 put and at least 2 gets
-	return get_costs(profiler,type) >= 2 * get_caching_costs(bytes);
+	return get_costs(profiler,type) >= 3 * get_caching_costs(bytes);
 }

@@ -1,0 +1,25 @@
+{
+	"name" : "ABCD Example",	
+	"query_result": "points",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+	"query" : 
+	{
+		"params" : 
+		{
+			"path" : "test/systemtests/data/gfbio_abcd/abcd_example.xml"
+		},
+		"type" : "abcdsource"
+	},
+	"query_expected_hash" : "2624b54b8e3bced4e7c7a0e25ee6557c"
+}

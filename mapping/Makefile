@@ -68,7 +68,7 @@ OBJ_OPERATORS_COMBINED=o/operators/combined/points2raster.o o/operators/combined
 OBJ_OPERATORS_MSAT=o/operators/msat/temperature.o o/operators/msat/reflectance.o o/operators/msat/solarangle.o o/operators/msat/radiance.o o/operators/msat/pansharpening.o o/operators/msat/gccthermthresholddetection.o o/operators/msat/co2correction.o
 OBJ_OPERATORS_PLOTS=o/operators/plots/histogram.o o/operators/plots/points2histogram.o o/operators/plots/points_metadata_tograph.o
 OBJ_OPERATORS_TEMPORAL=o/operators/temporal/timeshiftoperator.o
-OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o
+OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o o/operators/gfbio/abcdsource.o
 OBJ_OPERATORS_ALL=$(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) $(OBJ_OPERATORS_GFBIO) ${OBJ_OPERATORS_TEMPORAL}
 
 OBJ_OPERATORS_ALLSTUBS=${OBJ_OPERATORS_ALL:o/operators/%=o/operators_stub/%}

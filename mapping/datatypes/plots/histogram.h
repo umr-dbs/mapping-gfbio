@@ -15,7 +15,7 @@ class Histogram : public GenericPlot {
 		void inc(double value);
 		void incNoData();
 
-		std::string toJSON();
+		const std::string toJSON() const;
 
 		static const int DEFAULT_NUMBER_OF_BUCKETS = 10000;
 
@@ -50,6 +50,8 @@ class Histogram : public GenericPlot {
 		 * add a marker
 		 */
 		void addMarker(double bucket, const std::string &label);
+
+		std::unique_ptr<GenericPlot> clone() const;
 
 	private:
 		std::vector<int> counts;

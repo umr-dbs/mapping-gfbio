@@ -45,8 +45,9 @@ LocalRetriever<T>::LocalRetriever( const NodeCache<T> &cache ) : cache(cache) {
 
 template<class T>
 std::shared_ptr<const T> LocalRetriever<T>::fetch( const std::string &semantic_id, const CacheRef& ref, QueryProfiler &qp) const {
-	((void) qp);
-	return cache.get( NodeCacheKey(semantic_id, ref.entry_id) );
+	auto e = cache.get( NodeCacheKey(semantic_id, ref.entry_id) );
+	qp.addTotalCosts(e->profile);
+	return e->data;
 }
 
 template<class T>
@@ -56,7 +57,9 @@ std::unique_ptr<T> LocalRetriever<T>::compute(GenericOperator& op, const QueryRe
 
 template<>
 std::unique_ptr<GenericRaster> LocalRetriever<GenericRaster>::compute(GenericOperator& op, const QueryRectangle& query, QueryProfiler& qp) const {
-	return op.getCachedRaster(query,qp);
+	auto res = op.getCachedRaster(query,qp);
+	res->setRepresentation(GenericRaster::Representation::CPU);
+	return res;
 }
 
 template<>
@@ -113,6 +116,9 @@ std::unique_ptr<T> RemoteRetriever<T>::load(
 	switch (resp) {
 		case DeliveryConnection::RESP_OK: {
 			MoveInfo mi(stream);
+			// Add the original costs
+			qp.addTotalCosts(mi.profile);
+			// Add the network-costs
 			qp.addIOCost( mi.size );
 			return read_item(stream);
 		}
@@ -176,6 +182,8 @@ std::unique_ptr<GenericRaster> RasterPuzzler::puzzle(
 			width,
 			height );
 
+	result->global_attributes = items[0]->global_attributes;
+
 	for ( auto &raster : items ) {
 		auto x = result->WorldToPixelX( raster->stref.x1 );
 		auto y = result->WorldToPixelY( raster->stref.y1 );
@@ -187,7 +195,7 @@ std::unique_ptr<GenericRaster> RasterPuzzler::puzzle(
 			try {
 				result->blit( raster.get(), x, y );
 			} catch ( const MetadataException &me ) {
-				Log::error("Blit error. Result: %s, piece: %s", CacheCommon::stref_to_string(result->stref).c_str(), CacheCommon::stref_to_string(raster->stref).c_str() );
+				Log::error("Blit error: %s\nResult: %s\npiece : %s", me.what(), CacheCommon::stref_to_string(result->stref).c_str(), CacheCommon::stref_to_string(raster->stref).c_str() );
 			}
 		}
 	}
@@ -282,7 +290,6 @@ std::unique_ptr<T> PuzzleUtil<T>::process_puzzle(const PuzzleRequest& request, Q
 
 	std::vector<std::shared_ptr<const T>> items;
 	items.reserve( request.parts.size() + request.get_num_remainders() );
-
 	{
 		TIME_EXEC("PuzzleUtil.puzzle.fetch_parts");
 		// Fetch puzzle parts
@@ -316,8 +323,11 @@ std::vector<std::unique_ptr<T> > PuzzleUtil<T>::compute_remainders(
 	std::vector<std::unique_ptr<T>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
 
-	for ( auto &rqr : request.get_remainder_queries() ) {
-		result.push_back( retriever.compute(*graph,rqr,profiler) );
+	{
+		QueryProfilerStoppingGuard sg(profiler);
+		for ( auto &rqr : request.get_remainder_queries() ) {
+			result.push_back( retriever.compute(*graph,rqr,profiler) );
+		}
 	}
 	return result;
 }
@@ -336,7 +346,11 @@ std::vector<std::unique_ptr<GenericRaster>> PuzzleUtil<GenericRaster>::compute_r
 
 	for ( auto &rqr : remainders ) {
 		try {
-			auto rem = retriever.compute(*graph,rqr,profiler);
+			std::unique_ptr<GenericRaster> rem;
+			{
+				QueryProfilerStoppingGuard sg(profiler);
+				rem = retriever.compute(*graph,rqr,profiler);
+			}
 			if ( !CacheCommon::resolution_matches( ref_result, *rem ) ) {
 				Log::warn(
 					"Resolution clash on remainder. Requires: [%f,%f], result: [%f,%f], QueryRectangle: [%f,%f], %s, result-dimension: %dx%d. Fitting result!",

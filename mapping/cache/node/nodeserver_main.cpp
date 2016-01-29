@@ -11,6 +11,7 @@
 #include "cache/node/puzzletracer.h"
 #include "util/configuration.h"
 #include "util/log.h"
+#include "raster/opencl.h"
 #include <signal.h>
 
 NodeServer *instance = nullptr;
@@ -51,6 +52,9 @@ int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 
+	// Disable GDAL Error Messages
+	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
+
 	Log::setLevel(Configuration::get("log.level","info"));
 
 	auto portstr = Configuration::get("nodeserver.port");
@@ -65,7 +69,6 @@ int main(void) {
 
 //	PuzzleTracer::init();
 
-
 	std::string cs = Configuration::get("nodeserver.cache.strategy");
 	size_t raster_size = atoi(Configuration::get("nodeserver.cache.raster.size").c_str());
 	size_t point_size = atoi(Configuration::get("nodeserver.cache.points.size").c_str());
@@ -73,11 +76,18 @@ int main(void) {
 	size_t polygon_size = atoi(Configuration::get("nodeserver.cache.polygons.size").c_str());
 	size_t plot_size = atoi(Configuration::get("nodeserver.cache.plots.size").c_str());
 
+#ifndef MAPPING_NO_OPENCL
+	RasterOpenCL::init();
+#endif
+	CachingStrategy::init();
+
 	// Inititalize cache
 	std::unique_ptr<NodeCacheManager> cache_impl = make_unique<NodeCacheManager>(
 			CachingStrategy::by_name(cs), raster_size, point_size, line_size, polygon_size, plot_size);
 
+
 	CacheManager::init( cache_impl.get() );
+
 
 	// Fire it up
 	instance = new NodeServer( std::move(cache_impl), portnr,ihoststr,iportnr,num_threads);

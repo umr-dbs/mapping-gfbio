@@ -15,11 +15,11 @@ auto TimeShift::toTime_t(PTime pTime) -> time_t {
 	return std::time_t(dur.total_seconds());
 }
 
-auto Identity::apply(const time_t& input) -> time_t {
+auto Identity::apply(const double& input) -> double {
 	return input;
 }
 
-auto Identity::reverse(const time_t& input) -> time_t {
+auto Identity::reverse(const double& input) -> double {
 	return input;
 }
 
@@ -36,14 +36,17 @@ auto RelativeShift::createUnit(std::string value) -> ShiftUnit {
 	return string_to_enum.at(value);
 }
 
-auto RelativeShift::apply(const time_t& input) -> time_t {
-	PTime ptime = shift(toPTime(input));
-	time_t result = toTime_t(ptime);
+auto RelativeShift::apply(const double& input) -> double {
+	double intPart;
+	double fracPart = std::modf(input, &intPart);
+
+	PTime ptime = shift(toPTime(static_cast<time_t>(intPart)));
+	double result = static_cast<double>(toTime_t(ptime)) + fracPart;
 	time_difference = result - input;
 	return result;
 }
 
-auto RelativeShift::reverse(const time_t& input) -> time_t {
+auto RelativeShift::reverse(const double& input) -> double {
 	return input - time_difference;
 }
 
@@ -62,34 +65,38 @@ auto RelativeShift::shift(const PTime time) const -> PTime {
 			return PTime(time.date() + boost::gregorian::months(shift_value), time.time_of_day());
 		case ShiftUnit::years:
 			return PTime(time.date() + boost::gregorian::years(shift_value), time.time_of_day());
+
+		default:
+			throw ArgumentException("Unknown shift unit.");
 	}
 }
 
-auto AbsoluteShift::apply(const time_t& input) -> time_t {
+auto AbsoluteShift::apply(const double& input) -> double {
 	time_difference = result_time - input;
 	return result_time;
 }
 
-auto AbsoluteShift::reverse(const time_t& input) -> time_t {
+auto AbsoluteShift::reverse(const double& input) -> double {
 	return input - time_difference;
 }
 
-auto Stretch::apply(const time_t& input) -> time_t {
-	PTime time = toPTime(input);
-
-	auto duration = time - fixedPoint;
-	auto result_time = toTime_t(time + (duration * factor));
+auto Stretch::apply(const double& input) -> double {
+	auto duration = input - fixedPoint;
+	auto result_time = fixedPoint + (duration * factor);
 
 	time_difference = result_time - input;
 	return result_time;
 }
 
-auto Stretch::reverse(const time_t& input) -> time_t {
+auto Stretch::reverse(const double& input) -> double {
 	return input - time_difference;
 }
 
-auto Snap::apply(const time_t& input) -> time_t {
-	PTime time = toPTime(input);
+auto Snap::apply(const double& input) -> double {
+	double intPart;
+	double fracPart = std::modf(input, &intPart);
+
+	PTime time = toPTime(static_cast<time_t>(intPart));
 
 	time_t result_time;
 
@@ -223,11 +230,13 @@ auto Snap::apply(const time_t& input) -> time_t {
 			break;
 	}
 
-	time_difference = result_time - input;
-	return result_time;
+	double result_time_with_fractions = static_cast<double>(result_time) + (allow_reset ? 0 : fracPart);
+
+	time_difference = result_time_with_fractions - input;
+	return result_time_with_fractions;
 }
 
-auto Snap::reverse(const time_t& input) -> time_t {
+auto Snap::reverse(const double& input) -> double {
 	return input - time_difference;
 }
 
@@ -258,8 +267,8 @@ auto TimeModification::apply(const TemporalReference& input) -> const TemporalRe
 			}
 		case TIMETYPE_UNIX:
 			{
-				std::time_t time_from = static_cast<std::time_t>(input.t1);
-				std::time_t time_to = static_cast<std::time_t>(input.t2);
+				double time_from = input.t1;
+				double time_to = input.t2;
 
 				time_from = from_shift->apply(time_from);
 				time_to = to_shift->apply(time_to);
@@ -297,8 +306,8 @@ auto TimeModification::reverse(const TemporalReference& input) -> const Temporal
 		case TIMETYPE_UNREFERENCED:
 			throw OperatorException("It is not possible to modify an unreferenced time type.");
 		case TIMETYPE_UNIX:
-			std::time_t time_from = static_cast<std::time_t>(input.t1);
-			std::time_t time_to = static_cast<std::time_t>(input.t2);
+			double time_from = input.t1;
+			double time_to = input.t2;
 
 			time_from = from_snap->reverse(time_from);
 			time_to = to_snap->reverse(time_to);
@@ -309,6 +318,6 @@ auto TimeModification::reverse(const TemporalReference& input) -> const Temporal
 			time_from = from_shift->reverse(time_from);
 			time_to = to_shift->reverse(time_to);
 
-			return TemporalReference{TIMETYPE_UNIX, static_cast<double>(time_from), static_cast<double>(time_to)};
+			return TemporalReference{TIMETYPE_UNIX, time_from, time_to};
 	}
 }

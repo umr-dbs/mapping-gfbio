@@ -74,14 +74,13 @@ REGISTER_OPERATOR(ClassificationOperator, "reclass");
 void ClassificationOperator::writeSemanticParameters(std::ostringstream& stream) {
 	const size_t size = classification_classes.size();
 	stream << "{";
-	stream << "\"RemapRange:\":[";
+	stream << "\"RemapRange\":[";
 	for(size_t i = 0; i < size; i++) {
 	  if (i > 0)
 	    stream << ",";
 	  stream << "[" << classification_lower_border[i] <<"," <<classification_upper_border[i] <<","<< classification_classes[i] << "]";
 	}
-	stream << "],\"reclassNoData\":" << reclassNoData <<",\"noDataClass\":" << noDataClass << "]";
-	stream << "}";
+	stream << "],\"reclassNoData\":" << reclassNoData <<",\"noDataClass\":" << noDataClass << "}";
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
@@ -103,7 +102,7 @@ std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRect
 	const double min = std::min(*min_max_classes.first, noDataClass);
 	const double max = std::max(*min_max_classes.second, noDataClass);
 
-	Unit output_unit = Unit(raster_in->dd.unit.getMeasurement(), "classification");
+	Unit output_unit = Unit(raster_in->dd.unit.getMeasurement(), "_classification");
 	output_unit.setMinMax(min, max);
 	// TODO: add classes
 

@@ -11,7 +11,7 @@ PNGPlot::~PNGPlot() {
 
 }
 
-std::string PNGPlot::toJSON() {
+const std::string PNGPlot::toJSON() const {
 	Json::Value root(Json::ValueType::objectValue);
 
 	root["type"] = "png";

@@ -16,7 +16,7 @@
 class Log {
 public:
 	enum class LogLevel {
-		ERROR, WARN, INFO, DEBUG, TRACE
+		OFF, ERROR, WARN, INFO, DEBUG, TRACE
 	};
 
 	static void setLogFd(FILE *fd);

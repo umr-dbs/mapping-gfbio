@@ -7,6 +7,7 @@
 
 #include "cache/index/reorg_strategy.h"
 #include "cache/index/indexserver.h"
+#include "cache/priv/caching_strategy.h"
 #include "util/exceptions.h"
 #include "util/concat.h"
 #include <ctime>
@@ -44,16 +45,19 @@ CostLRU::CostLRU() : now(0) {
 }
 
 void CostLRU::new_turn() {
-	time(&now);
+	now = CacheCommon::time_millis();
 }
 
 bool CostLRU::operator ()( const std::shared_ptr<const IndexCacheEntry>& e1,
 						   const std::shared_ptr<const IndexCacheEntry>& e2) const {
 
-	double f1 = 1.0 - (((now - e1->last_access) / 60) * 0.01);
-	double f2 = 1.0 - (((now - e2->last_access) / 60) * 0.01);
+	double f1 = 1.0 - (((now - e1->last_access) / 60000) * 0.01);
+	double f2 = 1.0 - (((now - e2->last_access) / 60000) * 0.01);
 
-	return (e1->costs * f1) > (e2->costs * f2);
+	double c1 = CachingStrategy::get_costs(e1->profile,CachingStrategy::Type::UNCACHED);
+	double c2 = CachingStrategy::get_costs(e2->profile,CachingStrategy::Type::UNCACHED);
+
+	return (c1 * f1) > (c2 * f2);
 }
 
 //
@@ -124,11 +128,17 @@ ReorgStrategy::~ReorgStrategy() {
 }
 
 bool ReorgStrategy::requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>>& nodes) const {
+	if ( nodes_changed(nodes) )
+		return true;
+	else if ( nodes.empty() )
+		return false;
+
 	double maxu = 0;
 	double sum = 0;
 	double sqsum = 0;
 
 
+	// Calculate variation
 	for (auto &e : nodes) {
 		double u = cache.get_capacity_usage(e.second->get_capacity());
 		sum += u;
@@ -136,13 +146,15 @@ bool ReorgStrategy::requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>
 		maxu = std::max(maxu, u);
 	}
 
+	double avg = sum / nodes.size();
 	double stddev = 0;
 	if ( nodes.size() > 1 )
 		stddev = std::sqrt( std::max( 0.0,
 				// Incremental calculation of std-dev
 				(sqsum - (sum*sum) / nodes.size()) / (nodes.size()) ));
 
-	return  maxu >= 1.0 || stddev > 0.1;
+	// Use Coefficient of variation
+	return  maxu >= 1.0 || (stddev / avg) > 0.1;
 }
 
 
@@ -165,6 +177,8 @@ uint32_t ReorgStrategy::get_least_used_node(
 }
 
 void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) {
+	if ( result.empty() )
+		return;
 
 	double bytes_used = 0;
 	double bytes_available = 0;
@@ -215,6 +229,27 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 			}
 		}
 	}
+}
+
+bool ReorgStrategy::nodes_changed(
+		const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
+	bool res = false;
+	std::set<uint32_t> new_nodes;
+	for ( auto &p : nodes ) {
+		new_nodes.insert( p.first );
+		// We have a new node
+		if ( last_nodes.count(p.first) != 1 )
+			res = true;
+	}
+	for ( auto &id : last_nodes ) {
+		// Node is gone
+		if ( nodes.count(id) != 1 ) {
+			res = false;
+			break;
+		}
+	}
+	std::swap(last_nodes, new_nodes);
+	return res;
 }
 
 
@@ -532,9 +567,6 @@ uint32_t GeographicReorgStrategy::get_z_value(const QueryCube& c) {
 
 	uint32_t result = x | (y << 1);
 	return result;
-
-
-	return 0;
 }
 
 bool GeographicReorgStrategy::z_comp(
@@ -555,7 +587,7 @@ uint32_t GeographicReorgStrategy::get_node_for_job(const BaseRequest &request,
 	if ( !z_bounds.empty() ) {
 		uint32_t z_value = get_z_value( QueryCube(request.query) );
 		for ( auto &p : z_bounds )
-			if ( z_value < p.first )
+			if ( z_value <= p.first )
 				return p.second;
 		return z_bounds.back().second;
 	}
@@ -569,24 +601,43 @@ void GeographicReorgStrategy::distribute(std::map<uint32_t, ReorgNode>& result,
 
 	std::sort(all_entries.begin(), all_entries.end(), GeographicReorgStrategy::z_comp);
 
-	auto niter = result.begin();
-	bool last_node = false;
-	for ( size_t i = 0; i < all_entries.size(); i++ ) {
-		if ( !niter->second.fits(all_entries[i]) && !last_node ) {
-			uint32_t current_node_id = niter->first;
-			niter++;
-			if ( niter == result.end() ) {
-				last_node = true;
-				niter--;
+	std::vector<std::reference_wrapper<ReorgNode>> nodes;
+	nodes.reserve( result.size() );
+	for ( auto &p : result )
+		nodes.push_back( p.second );
+
+	size_t node_idx  = 0;
+	auto&  node      = nodes.front();
+
+	if ( !all_entries.empty() ) {
+		node.get().add(all_entries[0]);
+		for ( size_t i = 1; i < all_entries.size(); i++ ) {
+			if ( !node.get().fits(all_entries[i]) && node_idx < (nodes.size()-1) ) {
+				uint32_t z1 = get_z_value( all_entries[i-1]->bounds );
+				uint32_t z2 = get_z_value( all_entries[i]->bounds);
+				// Do not separate entries with same z-value
+				if ( z2 > z1 ) {
+					uint32_t bound = z1 + (z2-z1) / 2;
+					z_bounds.push_back( std::make_pair(bound,node.get().id) );
+					node = nodes[++node_idx];
+				}
 			}
-			else {
-				uint32_t b = get_z_value( all_entries[i-1]->bounds );
-				b =  b + (get_z_value( all_entries[i]->bounds) - b ) / 2;
-				z_bounds.push_back( std::make_pair(b,current_node_id) );
-			}
+			node.get().add(all_entries[i]);
 		}
-		niter->second.add(all_entries[i]);
+	}
+
+	// Equally distribute remaining space
+	uint32_t end = all_entries.empty() ? 0 : get_z_value( all_entries.back()->bounds );
+	uint32_t space = (MAX_Z - end) / (nodes.size()-node_idx);
+
+	uint32_t z = end;
+	for ( ; node_idx < nodes.size()-1; node_idx++ ) {
+		z+=space;
+		z_bounds.push_back( std::make_pair(z,nodes[node_idx].get().id ) );
 	}
 	// Add last bound
-	z_bounds.push_back( std::make_pair(MAX_Z,result.end()->first) );
+	z_bounds.push_back( std::make_pair(MAX_Z,nodes.back().get().id) );
+
+
 }
+

@@ -49,6 +49,10 @@ int main(void) {
 	CacheCommon::set_uncaught_exception_handler();
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
+
+	// Disable GDAL Error Messages
+	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
+
 	auto portstr = Configuration::get("indexserver.port");
 
 	Log::setLevel(Configuration::get("log.level","info"));
@@ -57,7 +61,7 @@ int main(void) {
 
 	std::string rs = Configuration::get("indexserver.reorg.strategy");
 	std::string rel = Configuration::get("indexserver.reorg.relevance","lru");
-	instance = new IndexServer(portnr, 10, rs, rel);
+	instance = new IndexServer(portnr, 10000, rs, rel);
 	instance->run();
 	return 0;
 }

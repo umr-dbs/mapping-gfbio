@@ -13,6 +13,7 @@
 #include "datatypes/spatiotemporal.h"
 #include "operators/operator.h"
 
+#include <chrono>
 #include <stdlib.h>
 #include <stdio.h>
 #include <cstring>
@@ -39,7 +40,7 @@ void ex_handler() {
 	}
 
 
-	Log::error("%s\n%s",out.str().c_str(), CacheCommon::get_stacktrace().c_str() );
+	fprintf(stderr, "%s\n%s", out.str().c_str(), CacheCommon::get_stacktrace().c_str() );
 	exit(1);
 }
 
@@ -167,4 +168,15 @@ bool CacheCommon::resolution_matches(double scalex1, double scaley1,
 
 	return std::abs( 1.0 - scalex1 / scalex2) < 0.01 &&
 		   std::abs( 1.0 - scaley1 / scaley2) < 0.01;
+}
+
+time_t CacheCommon::time_millis() {
+	return std::chrono::duration_cast<std::chrono::milliseconds>(
+		std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
+void CacheCommon::GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg) {
+	(void) eErrClass;
+	(void) err_no;
+	(void) msg;
 }

@@ -30,6 +30,7 @@ void Log::setLevel(const std::string& level) {
 	else if ( lower == "info" ) setLevel(LogLevel::INFO);
 	else if ( lower == "warn" ) setLevel(LogLevel::WARN);
 	else if ( lower == "error" ) setLevel(LogLevel::ERROR);
+	else if ( lower == "off" ) setLevel(LogLevel::OFF);
 	else throw ArgumentException(concat("Illegal LogLevel: ",lower));
 }
 

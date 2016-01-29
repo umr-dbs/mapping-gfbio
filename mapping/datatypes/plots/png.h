@@ -10,7 +10,11 @@ class PNGPlot : public GenericPlot {
 		PNGPlot(const std::string &binary);
 		virtual ~PNGPlot();
 
-		std::string toJSON();
+		const std::string toJSON() const;
+
+		std::unique_ptr<GenericPlot> clone() const {
+			return std::unique_ptr<GenericPlot>();
+		}
 
 	private:
 		std::string binary;

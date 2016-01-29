@@ -9,6 +9,7 @@
 
 
 class BinaryWriteBuffer;
+class BinaryReadBuffer;
 
 /*
  * This is a stream class for IPC, meant to allow serialization of objects.
@@ -33,12 +34,40 @@ class BinaryStream {
 		BinaryStream();
 		BinaryStream(const BinaryStream &) = delete;
 		BinaryStream &operator=(const BinaryStream &) = delete;
+
+		bool is_blocking;
 	public:
 		virtual ~BinaryStream();
-		virtual void write(const char *buffer, size_t len) = 0;
+
+		/*
+		 * A stream can be either blocking or nonblocking.
+		 *
+		 * A blocking stream is guaranteed to read() or write() the exact amount of bytes requested.
+		 * The downside is that some streams can only guarantee this by blocking program execution for a while,
+		 * e.g. while waiting for new data to arrive over the network.
+		 *
+		 * Non-blocking means that partial reads and writes are possible. This is only useful when
+		 * combined with buffering.
+		 * To make sure that no attempts are made to do unbuffered reads or writes on a nonblocking stream,
+		 * the default read() and write() methods are disabled on nonblocking streams.
+		 *
+		 * This method turns a stream into nonblocking mode. There is currently no way to turn them back;
+		 * this may be implemented when a need arises.
+		 */
+		virtual void makeNonBlocking();
+
+		/*
+		 * Write a couple of raw bytes from a buffer
+		 *
+		 * @param buffer pointer to the first byte
+		 * @param len number of bytes to write
+		 * @param is_persistent_memory signals that the buffer will remain available after
+		 *        the write() call. This information can be used to avoid copies.
+		 */
+		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) = 0;
 		virtual void write(BinaryWriteBuffer &buffer);
 
-		void write(const std::string &string);
+		void write(const std::string &string, bool is_persistent_memory = false);
 		void write(std::string &string) { write( (const std::string &) string); };
 		template<typename T> void write(const T& t);
 		template<typename T> void write(T& t);
@@ -46,6 +75,7 @@ class BinaryStream {
 		void flush();
 
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) = 0;
+		virtual void read(BinaryReadBuffer &buffer);
 		size_t read(std::string *string, bool allow_eof = false);
 		/*
 		 * Note: reading classes must be implemented via constructors or static getters, e.g.
@@ -93,14 +123,18 @@ class BinaryFDStream : public BinaryStream {
 		BinaryFDStream(int read_fd, int write_fd = -2, bool no_delay = false);
 		virtual ~BinaryFDStream();
 
+		virtual void makeNonBlocking();
+
 		void close();
 
 		using BinaryStream::write;
 		using BinaryStream::read;
-		virtual void write(const char *buffer, size_t len);
+		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false);
 		virtual void write(BinaryWriteBuffer &buffer);
 		void writeNB(BinaryWriteBuffer &buffer);
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false);
+		virtual void read(BinaryReadBuffer &buffer);
+		bool readNB(BinaryReadBuffer &buffer, bool allow_eof = false);
 
 		int getReadFD() const { return read_fd; }
 		int getWriteFD() const { return write_fd; }
@@ -114,7 +148,7 @@ class BinaryFDStream : public BinaryStream {
 
 
 /**
- * A buffer used for sending data as a batch.
+ * A buffer used for sending data as a batch, always prefixed with the packet length.
  *
  * This is required when sending data over TCP sockets with NODELAY.
  * Otherwise, every single write() call would generate a new TCP packet.
@@ -142,7 +176,7 @@ class BinaryWriteBuffer : public BinaryStream {
 
 		using BinaryStream::write;
 		using BinaryStream::read;
-		virtual void write(const char *buffer, size_t len) final;
+		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
 
 		void enableLinking() { may_link = true; }
@@ -152,7 +186,7 @@ class BinaryWriteBuffer : public BinaryStream {
 		bool isFinished() { return status == Status::FINISHED; }
 		void prepareForWriting();
 		size_t getSize();
-		void markBytesAsWritten(size_t sent);
+		void markBytesAsWritten(size_t written);
 	private:
 		void finishBufferedArea();
 
@@ -178,5 +212,40 @@ class BinaryWriteBufferWithObject : public BinaryWriteBuffer {
 	public:
 		std::unique_ptr<T> object;
 };
+
+
+/**
+ * A buffer used for reading a batch of data sent using a BinaryWriteBuffer
+ *
+ * This is required for nonblocking reads: the buffer can be filled in a nonblocking manner, when it's
+ * full it can be deserialized and processed.
+ */
+class BinaryReadBuffer : public BinaryStream {
+		friend class BinaryStream;
+		friend class BinaryFDStream;
+		enum class Status {
+			READING_SIZE,
+			READING_DATA,
+			FINISHED
+		};
+	public:
+		BinaryReadBuffer();
+		virtual ~BinaryReadBuffer();
+
+		using BinaryStream::write;
+		using BinaryStream::read;
+		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
+		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
+
+		bool isRead() { return status == Status::FINISHED; }
+		bool isEmpty() { return size_read == 0 && status == BinaryReadBuffer::Status::READING_SIZE; }
+		void markBytesAsRead(size_t read);
+	private:
+		void prepareBuffer(size_t expected_size);
+		std::vector<char> buffer;
+		Status status;
+		size_t size_total, size_read;
+};
+
 
 #endif

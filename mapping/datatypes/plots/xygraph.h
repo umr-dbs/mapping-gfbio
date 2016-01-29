@@ -9,6 +9,7 @@
 #include <limits>
 
 #include "datatypes/plot.h"
+#include "util/make_unique.h"
 
 template<std::size_t dimensions>
 class XYGraph : public GenericPlot {
@@ -36,9 +37,9 @@ class XYGraph : public GenericPlot {
 
 		auto sort() -> void { std::sort(points.begin(), points.end()); sorted = true; }
 
-		auto toJSON() -> std::string {
+		auto toJSON() const -> const std::string {
 			if(!sorted)
-				sort();
+				throw OperatorException("The points must be sorted before exporting them.");
 
 			std::stringstream buffer;
 			buffer << "{\"type\": \"xygraph\", ";
@@ -48,9 +49,9 @@ class XYGraph : public GenericPlot {
 			}
 			buffer.seekp(((long) buffer.tellp()) - 1);
 			buffer << "]}, " << "\"data\": [";
-			for(std::array<double, dimensions>& point : points) {
+			for(const std::array<double, dimensions>& point : points) {
 				buffer << "[";
-				for(double& element : point) {
+				for(const double& element : point) {
 					buffer << element << ",";
 				}
 				buffer.seekp(((long) buffer.tellp()) - 1);
@@ -61,6 +62,18 @@ class XYGraph : public GenericPlot {
 			buffer << "]}";
 			return buffer.str();
 		}
+
+	auto clone() const -> std::unique_ptr<GenericPlot> {
+		auto copy = make_unique<XYGraph>();
+
+		copy->points = points;
+		copy->nodata_count = nodata_count;
+		copy->rangeMin = rangeMin;
+		copy->rangeMax = rangeMax;
+		copy->sorted = sorted;
+
+		return std::unique_ptr<GenericPlot>(copy.release());
+	}
 
 	private:
 		std::vector<std::array<double, dimensions>> points;

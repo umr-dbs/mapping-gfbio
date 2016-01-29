@@ -11,16 +11,29 @@
 #include "util/nio.h"
 
 
+WorkerContext::WorkerContext() : puzzling(false), index_connection(nullptr) {
+}
 
+bool WorkerContext::is_puzzling() const {
+	return puzzling;
+}
 
+BinaryStream& WorkerContext::get_index_connection() const {
+	if ( index_connection == nullptr )
+		throw IllegalStateException("No index-connection configured for this thread");
+	return *index_connection;
+}
 
+void WorkerContext::set_index_connection(BinaryStream* stream) {
+	index_connection = stream;
+}
 
 //
 // Node Wrapper
 //
 
 template<typename T>
-NodeCacheWrapper<T>::NodeCacheWrapper( const NodeCacheManager &mgr, NodeCache<T> &cache,
+NodeCacheWrapper<T>::NodeCacheWrapper( NodeCacheManager &mgr, NodeCache<T> &cache,
 		std::unique_ptr<RemoteRetriever<T>> retriever,
 		std::unique_ptr<Puzzler<T>> puzzler,
 		const CachingStrategy &strategy ) :
@@ -31,11 +44,15 @@ NodeCacheWrapper<T>::NodeCacheWrapper( const NodeCacheManager &mgr, NodeCache<T>
 }
 
 template<typename T>
-void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
+bool NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
+	// Do nothing if we are puzzling --> Do not cache remainder queries
+	if ( mgr.get_worker_context().is_puzzling() )
+		return false;
+
 
 	TIME_EXEC("CacheManager.put");
 
-	BinaryStream &stream = mgr.get_index_connection();
+	BinaryStream &stream = mgr.get_worker_context().get_index_connection();
 
 	size_t size = SizeUtil::get_byte_size(*item);
 
@@ -62,14 +79,17 @@ void NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
 		}
 
-		auto ref = put_local(semantic_id, item, CacheEntry( cube, size, strategy.get_costs(profiler,size)) );
+		auto ref = put_local(semantic_id, item, CacheEntry( cube, size + sizeof(NodeCacheEntry<T>), profiler) );
 		TIME_EXEC("CacheManager.put.remote");
 
 		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
 		buffered_write(stream,WorkerConnection::RESP_NEW_CACHE_ENTRY,ref);
+		return true;
 	}
-	else
+	else {
 		Log::debug("Item will not be cached according to strategy");
+		return false;
+	}
 }
 
 template<typename T>
@@ -88,18 +108,24 @@ void NodeCacheWrapper<T>::remove_local(const NodeCacheKey& key) {
 }
 
 template<typename T>
-const std::shared_ptr<const T> NodeCacheWrapper<T>::get_ref(const NodeCacheKey& key) {
+std::shared_ptr<const NodeCacheEntry<T>> NodeCacheWrapper<T>::get(const NodeCacheKey &key) {
 	Log::debug("Getting item from local cache. Key: %s", key.to_string().c_str());
 	return cache.get(key);
 }
 
-template<typename T>
-NodeCacheRef NodeCacheWrapper<T>::get_entry_info(const NodeCacheKey& key) {
-	return cache.get_entry_metadata(key);
-}
+//template<typename T>
+//const std::shared_ptr<const T> NodeCacheWrapper<T>::get_ref(const NodeCacheKey& key) {
+//	Log::debug("Getting item from local cache. Key: %s", key.to_string().c_str());
+//	return cache.get(key);
+//}
+//
+//template<typename T>
+//NodeCacheRef NodeCacheWrapper<T>::get_entry_info(const NodeCacheKey& key) {
+//	return cache.get_entry_metadata(key);
+//}
 
 template<typename T>
-std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const QueryRectangle& rect) {
+std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
 	if ( op.getDepth() == 0 ) {
 		Log::debug("Graph-Depth = 0, omitting index query, returning MISS.");
 		throw NoSuchElementException("Cache-Miss");
@@ -117,15 +143,17 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 
 		// Full single local hit
 		if ( !qres.has_remainder() && qres.keys.size() == 1 ) {
-			stats.single_local_hits++;
+			stats.add_single_local_hit();
 			TIME_EXEC("CacheManager.query.full_single_hit");
 			Log::trace("Full single local HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 			NodeCacheKey key(op.getSemanticId(), qres.keys.at(0));
-			return cache.get_copy(key);
+			auto e = cache.get(key);
+			profiler.addTotalCosts(e->profile);
+			return e->copy_data();
 		}
 		// Full local hit (puzzle)
 		else if ( !qres.has_remainder() ) {
-			stats.multi_local_hits++;
+			stats.add_multi_local_hit();
 			TIME_EXEC("CacheManager.query.full_local_hit");
 			Log::trace("Full local HIT for query: %s on %s. Puzzling result.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 			std::vector<CacheRef> refs;
@@ -133,7 +161,8 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 				refs.push_back( mgr.create_self_ref(id) );
 
 			PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
-			return process_puzzle(pr);
+			QueryProfilerStoppingGuard sg(profiler);
+			return process_puzzle(pr,profiler);
 		}
 	}
 
@@ -141,7 +170,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 	TIME_EXEC2("CacheManager.query.remote");
 	Log::debug("Local MISS for query: %s on %s. Querying index.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 	BaseRequest cr(CacheType::RASTER, op.getSemanticId(), rect);
-	BinaryStream &stream = mgr.get_index_connection();
+	BinaryStream &stream = mgr.get_worker_context().get_index_connection();
 
 	buffered_write(stream,WorkerConnection::CMD_QUERY_CACHE,cr);
 	uint8_t resp;
@@ -149,14 +178,13 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 	switch (resp) {
 		// Full hit on different client
 		case WorkerConnection::RESP_QUERY_HIT: {
-			stats.single_remote_hits++;
+			stats.add_single_remote_hit();
 			Log::trace("Full single remote HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
-			QueryProfiler qp;
-			return retriever->load( op.getSemanticId(), CacheRef(stream), qp );
+			return retriever->load( op.getSemanticId(), CacheRef(stream), profiler );
 		}
 		// Full miss on whole cache
 		case WorkerConnection::RESP_QUERY_MISS: {
-			stats.misses++;
+			stats.add_miss();
 			Log::trace("Full remote MISS for query: %s on %s.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 			throw NoSuchElementException("Cache-Miss.");
 			break;
@@ -171,15 +199,16 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 				local_only &= mgr.is_self_ref(ref);
 			}
 			if ( local_only )
-				stats.multi_local_partials++;
+				stats.add_multi_local_partial();
 			else if ( pr.has_remainders() )
-				stats.multi_remote_partials++;
+				stats.add_multi_remote_partial();
 			else
-				stats.multi_remote_hits++;
+				stats.add_multi_remote_hit();
 			// END STATS ONLY
 
 			Log::trace("Partial remote HIT for query: %s on %s: %s", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str(), pr.to_string().c_str() );
-			return process_puzzle(pr);
+			QueryProfilerStoppingGuard sg(profiler);
+			return process_puzzle(pr,profiler);
 			break;
 		}
 		default: {
@@ -189,11 +218,17 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 }
 
 template<typename T>
-std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request) {
+std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &parent_profiler) {
 	TIME_EXEC("CacheManager.puzzle");
-	QueryProfiler qp;
-	auto result = puzzle_util->process_puzzle(request,qp);
-	put( request.semantic_id, result, request.query, qp );
+	std::unique_ptr<T> result;
+	QueryProfiler profiler;
+	{
+		QueryProfilerRunningGuard guard(parent_profiler,profiler);
+		PuzzleGuard pg(mgr.get_worker_context());
+		result = puzzle_util->process_puzzle(request,profiler);
+	}
+	if ( put( request.semantic_id, result, request.query, profiler ) )
+		parent_profiler.cached(profiler);
 	return result;
 }
 
@@ -204,7 +239,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::process_puzzle(const PuzzleRequest& requ
 //
 ////////////////////////////////////////////////////////////
 
-thread_local BinaryStream* NodeCacheManager::index_connection = nullptr;
+thread_local WorkerContext NodeCacheManager::context;
 
 NodeCacheManager::NodeCacheManager( std::unique_ptr<CachingStrategy> strategy,
 	size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
@@ -248,11 +283,11 @@ const QueryStats& NodeCacheManager::get_query_stats() const {
 }
 
 void NodeCacheManager::reset_query_stats() {
-	raster_wrapper.stats.reset();
-	point_wrapper.stats.reset();
-	line_wrapper.stats.reset();
-	polygon_wrapper.stats.reset();
-	plot_wrapper.stats.reset();
+	raster_wrapper.stats.get_and_reset();
+	point_wrapper.stats.get_and_reset();
+	line_wrapper.stats.get_and_reset();
+	polygon_wrapper.stats.get_and_reset();
+	plot_wrapper.stats.get_and_reset();
 	cumulated_stats.reset();
 }
 
@@ -306,21 +341,13 @@ NodeStats NodeCacheManager::get_stats() const {
 	);
 
 	QueryStats qs;
-	qs += raster_wrapper.stats;
-	qs += point_wrapper.stats;
-	qs += line_wrapper.stats;
-	qs += polygon_wrapper.stats;
-	qs += plot_wrapper.stats;
+	qs += raster_wrapper.stats.get_and_reset();
+	qs += point_wrapper.stats.get_and_reset();
+	qs += line_wrapper.stats.get_and_reset();
+	qs += polygon_wrapper.stats.get_and_reset();
+	qs += plot_wrapper.stats.get_and_reset();
 
 	cumulated_stats += qs;
-	raster_wrapper.stats.reset();
-	point_wrapper.stats.reset();
-	line_wrapper.stats.reset();
-	polygon_wrapper.stats.reset();
-	plot_wrapper.stats.reset();
-
-
-
 	std::vector<CacheStats> stats {
 		raster_cache.get_stats(),
 		point_cache.get_stats(),
@@ -328,23 +355,17 @@ NodeStats NodeCacheManager::get_stats() const {
 		polygon_cache.get_stats(),
 		plot_cache.get_stats()
 	};
-
 	return NodeStats( cap, qs, stats );
 }
 
-void NodeCacheManager::set_index_connection(BinaryStream* con) {
-	NodeCacheManager::index_connection = con;
+WorkerContext& NodeCacheManager::get_worker_context() {
+	return NodeCacheManager::context;
 }
 
-BinaryStream& NodeCacheManager::get_index_connection() const {
-	if ( NodeCacheManager::index_connection == nullptr )
-		throw IllegalStateException("No index-connection configured for this thread");
-	return *NodeCacheManager::index_connection;
-}
 
 template class NodeCacheWrapper<GenericRaster>;
 template class NodeCacheWrapper<PointCollection>;
 template class NodeCacheWrapper<LineCollection>;
 template class NodeCacheWrapper<PolygonCollection>;
-template class NodeCacheWrapper<GenericPlot>;
+template class NodeCacheWrapper<GenericPlot> ;
 

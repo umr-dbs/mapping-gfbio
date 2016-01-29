@@ -3,6 +3,7 @@
 
 #include "util/exceptions.h"
 #include "util/binarystream.h"
+#include "util/hash.h"
 
 #include <string>
 #include <memory>
@@ -18,11 +19,9 @@ public:
 	/**
 	 * Creates a JSON representation of the data vector.
 	 */
-	virtual std::string toJSON() = 0;
+	virtual const std::string toJSON() const = 0;
 
-	virtual std::unique_ptr<GenericPlot> clone() const {
-		return std::unique_ptr<GenericPlot>();
-	}
+	virtual std::unique_ptr<GenericPlot> clone() const = 0;
 
 	virtual void toStream(BinaryStream &stream) const {
 		// TODO
@@ -31,6 +30,12 @@ public:
 	static std::unique_ptr<GenericPlot> fromStream(BinaryStream &stream) {
 		// TODO
 		throw OperatorException("Implement me!");
+	}
+
+	std::string hash() const {
+		std::string serialized = toJSON();
+
+		return calculateHash((const unsigned char *) serialized.c_str(), (int) serialized.length()).asHex();
 	}
 };
 

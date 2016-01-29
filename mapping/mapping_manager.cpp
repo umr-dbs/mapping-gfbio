@@ -368,6 +368,20 @@ static void runquery(int argc, char *argv[]) {
 		else
 			printf("No output filename given, discarding result\n");
 	}
+	else if (result == "plot") {
+			QueryProfiler profiler;
+			auto plot = graph->getCachedPlot(qrect, profiler);
+			auto json = plot->toJSON();
+			if (out_filename) {
+				FILE *f = fopen(out_filename, "w");
+				if (f) {
+					fwrite(json.c_str(), json.length(), 1, f);
+					fclose(f);
+				}
+			}
+			else
+				printf("No output filename given, discarding result\n");
+		}
 	else {
 		printf("Unknown result type: %s\n", result.c_str());
 		exit(5);
@@ -454,6 +468,12 @@ static int testquery(int argc, char *argv[]) {
 			real_hash = polygons->hash();
 			real_hash2 = polygons->clone()->hash();
 		}
+		else if (result == "plot") {
+			QueryProfiler profiler;
+			auto plot = graph->getCachedPlot(qrect, profiler);
+			real_hash = plot->hash();
+			real_hash2 = plot->clone()->hash();
+		}
 		else {
 			printf("Unknown result type: %s\n", result.c_str());
 			return 5;
@@ -533,7 +553,7 @@ static int testsemantic(int argc, char *argv[]) {
 		auto semantic2 = graph2->getSemanticId();
 		if (semantic1 != semantic2) {
 			printf("Semantic ID changes after reconstruction:\n%s\n%s\n", semantic1.c_str(), semantic2.c_str());
-			exit(5);
+			return 5;
 		}
 	}
 	catch (const std::exception &e) {
@@ -548,6 +568,7 @@ static int testsemantic(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
 
 	program_name = argv[0];
+	int returncode = 0;
 
 	if (argc < 2) {
 		usage();
@@ -579,10 +600,10 @@ int main(int argc, char *argv[]) {
 		runquery(argc, argv);
 	}
 	else if (strcmp(command, "testquery") == 0) {
-		return testquery(argc, argv);
+		returncode = testquery(argc, argv);
 	}
 	else if (strcmp(command, "testsemantic") == 0) {
-		return testsemantic(argc, argv);
+		returncode = testsemantic(argc, argv);
 	}
 	else if (strcmp(command, "enumeratesources") == 0) {
 		bool verbose = false;
@@ -623,5 +644,8 @@ int main(int argc, char *argv[]) {
 	else {
 		usage();
 	}
-	return 0;
+#ifndef MAPPING_NO_OPENCL
+	RasterOpenCL::free();
+#endif
+	return returncode;
 }

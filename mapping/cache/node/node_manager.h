@@ -21,6 +21,27 @@
 
 class NodeCacheManager;
 
+class WorkerContext {
+	friend class PuzzleGuard;
+public:
+	WorkerContext();
+	void set_index_connection( BinaryStream *stream );
+	bool is_puzzling() const;
+	BinaryStream& get_index_connection() const;
+private:
+	bool puzzling;
+	BinaryStream* index_connection;
+};
+
+class PuzzleGuard {
+public:
+	PuzzleGuard( WorkerContext& ctx ) : ctx(ctx) { ctx.puzzling = true; };
+	~PuzzleGuard() { ctx.puzzling = false; };
+private:
+	WorkerContext& ctx;
+};
+
+
 //
 // Node-Cache
 // Gives uniform access to the real cache-implementation
@@ -31,14 +52,14 @@ template<typename T>
 class NodeCacheWrapper : public CacheWrapper<T> {
 	friend class NodeCacheManager;
 public:
-	NodeCacheWrapper( const NodeCacheManager &mgr, NodeCache<T> &cache,
+	NodeCacheWrapper( NodeCacheManager &mgr, NodeCache<T> &cache,
 			std::unique_ptr<RemoteRetriever<T>> retriever,
 			std::unique_ptr<Puzzler<T>> puzzler,
 			const CachingStrategy &strategy );
 	virtual ~NodeCacheWrapper() = default;
 
-	void put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect);
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
+	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 
 	// Inserts an element into the local cache -- omitting any communication
 	// to the remote server
@@ -48,36 +69,36 @@ public:
 	// not notifying the index (if applicable)
 	void remove_local(const NodeCacheKey &key);
 
-	// Gets a reference to the cached element for the given key
-	// The result is not a copy and may only be used for delivery purposes
-	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
+	std::shared_ptr<const NodeCacheEntry<T>> get(const NodeCacheKey &key);
 
-	// Returns only meta-information about the entry for the given key
-	NodeCacheRef get_entry_info( const NodeCacheKey &key);
+//	// Gets a reference to the cached element for the given key
+//	// The result is not a copy and may only be used for delivery purposes
+//	const std::shared_ptr<const T> get_ref(const NodeCacheKey &key);
+//
+//	// Returns only meta-information about the entry for the given key
+//	NodeCacheRef get_entry_info( const NodeCacheKey &key);
 
 	// Proccesses the given puzzle-request
-	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request );
+	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &parent_profiler );
 private:
-	const NodeCacheManager &mgr;
+	NodeCacheManager &mgr;
 	NodeCache<T> &cache;
 	std::unique_ptr<RemoteRetriever<T>> retriever;
 	std::unique_ptr<PuzzleUtil<T>> puzzle_util;
 	const CachingStrategy &strategy;
 	RWLock local_lock;
-	QueryStats stats;
+	ActiveQueryStats stats;
 };
 
 class NodeCacheManager : public CacheManager, public CacheRefHandler {
 private:
-	static thread_local BinaryStream *index_connection;
-
+	static thread_local WorkerContext context;
 public:
 	NodeCacheManager( std::unique_ptr<CachingStrategy> strategy,
 			size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
 			size_t polygon_cache_size, size_t plot_cache_size );
 
-	void set_index_connection( BinaryStream *con );
-	BinaryStream &get_index_connection() const;
+	WorkerContext &get_worker_context();
 
 	void set_self_port(uint32_t port);
 	void set_self_host( const std::string &host );

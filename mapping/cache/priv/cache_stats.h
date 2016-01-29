@@ -125,6 +125,22 @@ public:
 };
 
 
+class ActiveQueryStats : private QueryStats {
+public:
+	void add_single_local_hit();
+	void add_multi_local_hit();
+	void add_multi_local_partial();
+	void add_single_remote_hit();
+	void add_multi_remote_hit();
+	void add_multi_remote_partial();
+	void add_miss();
+
+	QueryStats get() const;
+	QueryStats get_and_reset();
+private:
+	mutable std::mutex mtx;
+};
+
 //
 // Holds an incremental list of access stats
 //

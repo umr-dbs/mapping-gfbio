@@ -30,8 +30,8 @@ CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/
 LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time -lxerces-c
 LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
-LDFLAGS_CGI=-lfcgi++ -lfcgi -luriparser
-LDFLAGS_GTEST=-lpthread -luriparser
+LDFLAGS_CGI=-lfcgi++ -lfcgi
+LDFLAGS_GTEST=-lpthread
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 
@@ -93,6 +93,9 @@ EXEGTEST=gtest
 EXETILESERVER=tileserver
 EXECACHEINDEX=cache_index
 EXECACHENODE=cache_node
+EXECACHEEXP=cache_experiments
+EXECLUSEXP=cluster_experiment
+
 
 ifeq (${USE_R},true)
 	TARGET_EXERSERVER:=${EXERSERVER}
@@ -107,7 +110,7 @@ endif
 
 .SECONDEXPANSION:
 
-all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED}
+all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED} ${EXECACHEEXP} ${EXECLUSEXP}
 
 #
 # Dependencies and compiler flags of all executables
@@ -122,18 +125,23 @@ ${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES}
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o o/cache/common.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 	
-${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o ${OBJ_UNITTEST} o/libgtest.a
+${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o ${OBJ_UNITTEST} o/libgtest.a
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
-
+	
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/datatypes/unit.o o/util/binarystream.o o/util/sqlite.o o/util/configuration.o o/util/sizeutil.o 
 	${CPP} $+ -o $@  ${LDFLAGS}
 
-${EXECACHEINDEX}:	o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o ${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o 
+${EXECACHEINDEX}:	${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/raster/profiler.o 
 	${CPP} $+ -o $@ ${LDFLAGS}
 
-${EXECACHENODE}:	o/cache/node/nodeserver_main.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o ${OBJ_COMMON}
+${EXECACHENODE}:	${OBJ_COMMON} o/cache/node/nodeserver_main.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o
 	${CPP}  $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
+	
+${EXECACHEEXP}:	${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/cache_experiments_main.o
+	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 
+${EXECLUSEXP} : ${OBJ_COMMON} o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/cluster_experiment.o 
+	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 #
 # gtest library
 # instructions taken from https://github.com/google/googletest/blob/master/googletest/README.md
@@ -234,7 +242,7 @@ test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} test/syst
 	echo -n >$@
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE} testsemantic $< 2>&1) ; then echo "semantic_passed: yes" >>$@ ; else echo "semantic_passed: no\n$$EXELOG" >>$@ ; fi
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE} testquery $< 2>&1) ; then echo "hash_passed: yes" >>$@ ; else echo "hash_passed: no\n$$EXELOG" >>$@ ; fi
-	#MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if VGLOG=$$(timeout 180 ${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if VGLOG=$$(timeout 180 ${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
 
 unittest: ${EXEGTEST}
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes
@@ -248,7 +256,7 @@ doc:
 	./../docs/makeDoc
 
 clean:
-	rm -f ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST}
+	rm -f ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXECACHEEXP} ${EXECLUSEXP}
 	rm -f $(CL_HEADERS)
 	find o/ -type f -name '*.o' -delete
 	find o/ -type f -name '*.d' -delete

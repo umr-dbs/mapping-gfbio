@@ -222,7 +222,7 @@ void GenericRaster::toStream(BinaryStream &stream) {
 	stream.write(stref);
 	stream.write((uint32_t) width);
 	stream.write((uint32_t) height);
-	stream.write(data, len);
+	stream.write(data, len, true);
 	stream.write(global_attributes);
 }
 
@@ -281,9 +281,31 @@ Raster<T, dimensions>::Raster(const DataDescription &datadescription, const Spat
 	data[count] = 42;
 }
 
+#define MAPPING_OPENCL_USE_HOST_PTR 1
 
 template<typename T, int dimensions>
 Raster<T, dimensions>::~Raster() {
+	// TODO: is a raster that's currently on the GPU correctly freed?
+	//setRepresentation(GenericRaster::Representation::CPU);
+
+#ifndef MAPPING_NO_OPENCL
+#if MAPPING_OPENCL_USE_HOST_PTR
+	if ( clhostptr ) {
+		RasterOpenCL::getQueue()->enqueueUnmapMemObject(*clbuffer, clhostptr);
+		clhostptr = nullptr;
+	}
+#endif
+
+	if (clbuffer) {
+		delete clbuffer;
+		clbuffer = nullptr;
+	}
+	if (clbuffer_info) {
+		delete clbuffer_info;
+		clbuffer_info = nullptr;
+	}
+#endif
+
 	if (data) {
 		if (data[getPixelCount()] != 42) {
 			printf("Error in Raster: guard value was overwritten. Memory corruption!\n");
@@ -294,14 +316,6 @@ Raster<T, dimensions>::~Raster() {
 		//delete [] data;
 		data = nullptr;
 	}
-#ifndef MAPPING_NO_OPENCL
-	if (clbuffer) {
-		delete clbuffer;
-		clbuffer = nullptr;
-		delete clbuffer_info;
-		clbuffer_info = nullptr;
-	}
-#endif
 }
 
 
@@ -314,8 +328,6 @@ Raster2D<T>::Raster2D(const DataDescription &datadescription, const SpatioTempor
 template<typename T>
 Raster2D<T>::~Raster2D() {
 }
-
-#define MAPPING_OPENCL_USE_HOST_PTR 1
 
 template<typename T, int dimensions>
 void Raster<T, dimensions>::setRepresentation(Representation r) {
@@ -356,7 +368,7 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 			throw OpenCLException(ss.str());
 		}
 
-		clbuffer_info = RasterOpenCL::getBufferWithRasterinfo(this);
+		clbuffer_info = RasterOpenCL::getBufferWithRasterinfo(this).release();
 #endif
 	}
 	else if (r == Representation::CPU) {
@@ -378,10 +390,14 @@ void Raster<T, dimensions>::setRepresentation(Representation r) {
 			RasterOpenCL::getQueue()->enqueueReadBuffer(*clbuffer, CL_TRUE, 0, getDataSize(), data);
 #endif
 		}
-		delete clbuffer;
-		clbuffer = nullptr;
-		delete clbuffer_info;
-		clbuffer_info = nullptr;
+		if (clbuffer) {
+			delete clbuffer;
+			clbuffer = nullptr;
+		}
+		if (clbuffer_info) {
+			delete clbuffer_info;
+			clbuffer_info = nullptr;
+		}
 #endif
 	}
 	else
@@ -430,7 +446,7 @@ void Raster2D<T>::blit(const GenericRaster *genericraster, int destx, int desty,
 	if (x1 >= x2 || y1 >= y2)
 		throw MetadataException("blit without overlapping region");
 
-#define BLIT_TYPE 1
+#define BLIT_TYPE 2
 #if BLIT_TYPE == 1 // 0.0286
 	for (int y=y1;y<y2;y++)
 		for (int x=x1;x<x2;x++) {
@@ -598,7 +614,10 @@ template<typename T>
 std::unique_ptr<GenericRaster> Raster2D<T>::fitToQueryRectangle(const QueryRectangle &qrect) {
 	setRepresentation(GenericRaster::Representation::CPU);
 
-	auto out = GenericRaster::create(dd, qrect, qrect.xres, qrect.yres);
+	// adjust sref and resolution, but keep the tref.
+	QueryRectangle target(qrect, stref, qrect);
+
+	auto out = GenericRaster::create(dd, target, target.xres, target.yres);
 	Raster2D<T> *r = (Raster2D<T> *) out.get();
 
 	GridSpatioTemporalResultProjecter p(*this, *out);

@@ -6,11 +6,47 @@
 #include <time.h>
 
 
+ProfilingData::ProfilingData() : self_cpu(0), all_cpu(0), uncached_cpu(0),
+	self_gpu(0), all_gpu(0), uncached_gpu(0), self_io(0), all_io(0), uncached_io(0) {
+}
+
+ProfilingData::ProfilingData(BinaryStream& stream) :
+	self_cpu(stream.read<double>()),
+	all_cpu(stream.read<double>()),
+	uncached_cpu(stream.read<double>()),
+	self_gpu(stream.read<double>()),
+	all_gpu(stream.read<double>()),
+	uncached_gpu(stream.read<double>()),
+	self_io(stream.read<uint64_t>()),
+	all_io(stream.read<uint64_t>()),
+	uncached_io(stream.read<uint64_t>()) {
+}
+
+void ProfilingData::toStream(BinaryStream &stream) const {
+	stream.write(self_cpu);
+	stream.write(all_cpu);
+	stream.write(uncached_cpu);
+	stream.write(self_gpu);
+	stream.write(all_gpu);
+	stream.write(uncached_gpu);
+	stream.write(self_io);
+	stream.write(all_io);
+	stream.write(uncached_io);
+}
+
+std::string ProfilingData::to_string() const {
+	return concat(
+			"CPU: [", self_cpu,",",all_cpu,",", uncached_cpu, "], ",
+			"GPU: [", self_gpu,",",all_gpu,",", uncached_gpu, "], "
+			"IO: [", self_io,",",all_io,",", uncached_io, "], "
+	);
+}
+
+
 /*
  * QueryProfiler class
  */
-QueryProfiler::QueryProfiler() : self_cpu(0), all_cpu(0), self_gpu(0), all_gpu(0), self_io(0), all_io(0), uncached_depth(1), t_start(0) {
-
+QueryProfiler::QueryProfiler() : t_start(0) {
 }
 
 double QueryProfiler::getTimestamp() {
@@ -44,24 +80,45 @@ void QueryProfiler::stopTimer() {
 		throw OperatorException("QueryProfiler: Timer stopped a negative time");
 	self_cpu += cost;
 	all_cpu += cost;
+	uncached_cpu += cost;
 }
 
 void QueryProfiler::addGPUCost(double seconds) {
 	self_gpu += seconds;
 	all_gpu += seconds;
+	uncached_gpu += seconds;
 }
 
 void QueryProfiler::addIOCost(size_t bytes) {
 	self_io += bytes;
 	all_io += bytes;
+	uncached_io += bytes;
 }
 
-QueryProfiler & QueryProfiler::operator+=(QueryProfiler &other) {
+QueryProfiler& QueryProfiler::operator +=(const ProfilingData& other) {
+	all_cpu += other.all_cpu;
+	uncached_cpu += other.uncached_cpu;
+	all_gpu += other.all_gpu;
+	uncached_gpu += other.uncached_gpu;
+	all_io += other.all_io;
+	uncached_io += other.uncached_io;
+	return *this;
+}
+
+QueryProfiler & QueryProfiler::operator+=(const QueryProfiler &other) {
 	if (other.t_start != 0)
 		throw OperatorException("QueryProfiler: tried adding a timer that had not been stopped");
-	all_cpu += other.all_cpu;
-	all_gpu += other.all_gpu;
-	all_io += other.all_io;
-	uncached_depth += other.uncached_depth;
-	return *this;
+	return operator +=((ProfilingData&)other);
+}
+
+void QueryProfiler::cached(const ProfilingData &data) {
+	uncached_cpu -= data.uncached_cpu;
+	uncached_gpu -= data.uncached_gpu;
+	uncached_io  -= data.uncached_io;
+}
+
+void QueryProfiler::addTotalCosts(const ProfilingData& profile) {
+	all_cpu += profile.all_cpu;
+	all_gpu += profile.all_gpu;
+	all_io  += profile.all_io;
 }

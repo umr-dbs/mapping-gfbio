@@ -25,11 +25,28 @@ NodeCacheEntry<EType>::NodeCacheEntry(uint64_t entry_id, const CacheEntry &meta,
 }
 
 template<typename EType>
+std::unique_ptr<EType> NodeCacheEntry<EType>::copy_data() const {
+	return data->clone();
+}
+
+template<>
+std::unique_ptr<GenericRaster> NodeCacheEntry<GenericRaster>::copy_data() const {
+	return const_cast<GenericRaster*>(data.get())->clone();
+}
+
+
+template<typename EType>
 std::string NodeCacheEntry<EType>::to_string() const {
 	return concat("CacheEntry[id: ", entry_id, ", size: ", size,
 			", last_access: ", last_access, ", access_count: ", access_count,
 			", bounds: ", bounds.to_string(), "]");
 }
+
+template class NodeCacheEntry<GenericRaster>;
+template class NodeCacheEntry<PointCollection>;
+template class NodeCacheEntry<LineCollection>;
+template class NodeCacheEntry<PolygonCollection>;
+template class NodeCacheEntry<GenericPlot>;
 
 ///////////////////////////////////////////////////////////////////
 //
@@ -82,25 +99,32 @@ const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id,
 }
 
 template<typename EType>
-const std::shared_ptr<const EType> NodeCache<EType>::get(
-		const NodeCacheKey& key) const {
+std::shared_ptr<const NodeCacheEntry<EType>> NodeCache<EType>::get( const NodeCacheKey &key ) const {
 	auto res = this->get_int(key.semantic_id, key.entry_id);
 	track_access(key, *res);
-	return res->data;
+	return res;
 }
 
-template<typename EType>
-std::unique_ptr<EType> NodeCache<EType>::get_copy(
-		const NodeCacheKey& key) const {
-	return const_cast<EType*>(get(key).get())->clone();
-}
-
-template<typename EType>
-const NodeCacheRef NodeCache<EType>::get_entry_metadata(
-		const NodeCacheKey& key) const {
-	auto res = this->get_int(key.semantic_id, key.entry_id);
-	return NodeCacheRef(type, key, *res);
-}
+//template<typename EType>
+//const std::shared_ptr<const EType> NodeCache<EType>::get(
+//		const NodeCacheKey& key) const {
+//	auto res = this->get_int(key.semantic_id, key.entry_id);
+//	track_access(key, *res);
+//	return res->data;
+//}
+//
+//template<typename EType>
+//std::unique_ptr<EType> NodeCache<EType>::get_copy(
+//		const NodeCacheKey& key) const {
+//	return const_cast<EType*>(get(key).get())->clone();
+//}
+//
+//template<typename EType>
+//const NodeCacheRef NodeCache<EType>::get_entry_metadata(
+//		const NodeCacheKey& key) const {
+//	auto res = this->get_int(key.semantic_id, key.entry_id);
+//	return NodeCacheRef(type, key, *res);
+//}
 
 template<typename EType>
 CacheStats NodeCache<EType>::get_stats() const {
@@ -126,7 +150,7 @@ void NodeCache<EType>::track_access(const NodeCacheKey& key,
 		NodeCacheEntry<EType> &e) const {
 	std::lock_guard<std::mutex> g(access_mtx);
 	e.access_count++;
-	time(&(e.last_access));
+	e.last_access = CacheCommon::time_millis();
 	try {
 		access_tracker.at(key.semantic_id).insert(key.entry_id);
 	} catch (const std::out_of_range &oor) {

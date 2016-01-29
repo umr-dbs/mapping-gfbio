@@ -79,11 +79,11 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	RasterOpenCL::init();
 	auto raster = getRasterFromSource(0, rect, profiler);
 
-	if (raster->dd.unit.getMeasurement() != "radiance" || raster->dd.unit.getUnit() != "W·m^(-2)·sr^(-1)·cm^(-1)")
-		throw OperatorException("Input raster does not appear to be a meteosat radiance raster");
+	if (raster->dd.unit.getMeasurement() != "radiance") // || raster->dd.unit.getUnit() != "W·m^(-2)·sr^(-1)·cm^(-1)")
+		throw OperatorException(concat("Input raster does not appear to be a meteosat radiance raster, unit: ", raster->dd.unit.toJson()));
 
 	// get all the metadata:
-	int channel = (forceHRV) ? 11 : (int) raster->global_attributes.getNumeric("msg.Channel");
+	int channel = (forceHRV) ? 11 : ((int) raster->global_attributes.getNumeric("msg.Channel") - 1);
 	std::string timestamp = raster->global_attributes.getTextual("msg.TimeStamp");
 
 	msg::Satellite satellite;

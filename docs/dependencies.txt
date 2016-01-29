@@ -9,6 +9,7 @@
 * libpq++ - postgres (libpqxx3-dev, BSD?)
 * libcurl - (libcurl3-dev, MIT)
 * bzip2 - (libbz2-dev, ??)
+* xerces-c - (libxerces-c-dev, Apache) might already be present for GDAL
 
 Unused:
 * Proj.4 - http://trac.osgeo.org/proj/ (MIT)
@@ -48,6 +49,7 @@ apt-get install libsqlite3-dev
 apt-get install liburiparser-dev
 apt-get install libgtest-dev
 apt-get install libfcgi-dev
+apt-get install libxerces-c-dev
 
 apt-get install libproj-dev
 apt-get install git

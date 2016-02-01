@@ -191,6 +191,7 @@ public:
 	CacheType type;
 	TemporalReference tref;
 	std::string name;
+	SpatialReference bounds;
 	QueryRectangle random_rectangle( double extend, uint32_t resolution = 0 ) const;
 	QueryRectangle random_rectangle_percent( double percent, uint32_t resolution = 0 ) const;
 	std::vector<QueryRectangle> disjunct_rectangles( size_t num, double extend, uint32_t resolution ) const;
@@ -201,7 +202,6 @@ public:
 private:
 	size_t get_num_operators(GenericOperator *op) const;
 	void get_op_spec( GenericOperator* op, QueryRectangle rect, std::vector<QTriple> &result ) const;
-	SpatialReference bounds;
 };
 
 class ParallelExecutor {

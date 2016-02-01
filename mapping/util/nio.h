@@ -32,7 +32,7 @@
 //
 class StreamBuffer : public BinaryStream {
 public:
-	virtual void write(const char *buffer, size_t len);
+	virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false);
 	virtual size_t read(char *buffer, size_t len, bool allow_eof = false);
 	void reset();
 	std::string get_content() const;

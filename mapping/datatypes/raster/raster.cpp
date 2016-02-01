@@ -222,7 +222,7 @@ void GenericRaster::toStream(BinaryStream &stream) {
 	stream.write(stref);
 	stream.write((uint32_t) width);
 	stream.write((uint32_t) height);
-	stream.write(data, len);
+	stream.write(data, len, true);
 	stream.write(global_attributes);
 }
 

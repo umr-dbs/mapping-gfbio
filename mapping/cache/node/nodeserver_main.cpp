@@ -52,6 +52,9 @@ int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 
+	// Disable GDAL Error Messages
+	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
+
 	Log::setLevel(Configuration::get("log.level","info"));
 
 	auto portstr = Configuration::get("nodeserver.port");
@@ -65,7 +68,6 @@ int main(void) {
 	auto num_threads = atoi(numThreadsstr.c_str());
 
 //	PuzzleTracer::init();
-
 
 	std::string cs = Configuration::get("nodeserver.cache.strategy");
 	size_t raster_size = atoi(Configuration::get("nodeserver.cache.raster.size").c_str());

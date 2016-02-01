@@ -91,13 +91,15 @@ private:
 
 class QueryBatchingExperiment : public CacheExperimentSingleQuery {
 public:
-	QueryBatchingExperiment( const QuerySpec& spec, uint32_t num_runs );
+	QueryBatchingExperiment( const QuerySpec& spec, uint32_t num_runs, double percentage, uint32_t query_res );
 protected:
 	void global_setup();
 	void setup();
 	void print_results();
 	void run_once();
 private:
+	double percentage; // used area
+	uint32_t query_resolution;
 	size_t capacity;
 	void exec( int nodes, int threads );
 	std::vector<QTriple> queries;

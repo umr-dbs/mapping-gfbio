@@ -56,10 +56,18 @@ class BinaryStream {
 		 */
 		virtual void makeNonBlocking();
 
-		virtual void write(const char *buffer, size_t len) = 0;
+		/*
+		 * Write a couple of raw bytes from a buffer
+		 *
+		 * @param buffer pointer to the first byte
+		 * @param len number of bytes to write
+		 * @param is_persistent_memory signals that the buffer will remain available after
+		 *        the write() call. This information can be used to avoid copies.
+		 */
+		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) = 0;
 		virtual void write(BinaryWriteBuffer &buffer);
 
-		void write(const std::string &string);
+		void write(const std::string &string, bool is_persistent_memory = false);
 		void write(std::string &string) { write( (const std::string &) string); };
 		template<typename T> void write(const T& t);
 		template<typename T> void write(T& t);
@@ -121,7 +129,7 @@ class BinaryFDStream : public BinaryStream {
 
 		using BinaryStream::write;
 		using BinaryStream::read;
-		virtual void write(const char *buffer, size_t len);
+		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false);
 		virtual void write(BinaryWriteBuffer &buffer);
 		void writeNB(BinaryWriteBuffer &buffer);
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false);
@@ -168,7 +176,7 @@ class BinaryWriteBuffer : public BinaryStream {
 
 		using BinaryStream::write;
 		using BinaryStream::read;
-		virtual void write(const char *buffer, size_t len) final;
+		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
 
 		void enableLinking() { may_link = true; }
@@ -226,7 +234,7 @@ class BinaryReadBuffer : public BinaryStream {
 
 		using BinaryStream::write;
 		using BinaryStream::read;
-		virtual void write(const char *buffer, size_t len) final;
+		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
 
 		bool isRead() { return status == Status::FINISHED; }

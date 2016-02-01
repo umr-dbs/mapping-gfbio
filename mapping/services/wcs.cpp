@@ -13,7 +13,7 @@ class WCSService : public OGCService {
 REGISTER_HTTP_SERVICE(WCSService, "WCS");
 
 
-static std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string openGisUri,std::ostream &error){
+static std::pair<std::string, std::string> getCrsInformationFromOGCUri(const std::string &openGisUri, std::ostream &error){
 	size_t beforeAutorityId = openGisUri.find("crs")+3;
 	size_t behindAutorityId = openGisUri.find_first_of("/",beforeAutorityId+1);
 	std::string authorityId = openGisUri.substr(beforeAutorityId+1, behindAutorityId-beforeAutorityId-1);
@@ -32,7 +32,7 @@ static std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::stri
 	return (std::pair<std::string, std::string>{"EPSG",crsCode});
 }
 
-static std::pair<double, double> getWcsParameterRangeDouble(std::string wcsParameterString, std::ostream &error){
+static std::pair<double, double> getWcsParameterRangeDouble(const std::string &wcsParameterString, std::ostream &error){
 	std::pair<double, double> resultPair;
 
 	size_t rangeStart = wcsParameterString.find_first_of("(");

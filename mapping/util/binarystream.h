@@ -121,6 +121,10 @@ class BinaryFDStream : public BinaryStream {
 		BinaryFDStream(const char *server_path);
 		BinaryFDStream(const char *hostname, int port, bool no_delay = false);
 		BinaryFDStream(int read_fd, int write_fd = -2, bool no_delay = false);
+		struct PIPE_t {};
+		static constexpr PIPE_t PIPE = {};
+		BinaryFDStream(PIPE_t p);
+
 		virtual ~BinaryFDStream();
 
 		virtual void makeNonBlocking();
@@ -239,6 +243,7 @@ class BinaryReadBuffer : public BinaryStream {
 
 		bool isRead() { return status == Status::FINISHED; }
 		bool isEmpty() { return size_read == 0 && status == BinaryReadBuffer::Status::READING_SIZE; }
+		size_t getPayloadSize();
 		void markBytesAsRead(size_t read);
 	private:
 		void prepareBuffer(size_t expected_size);

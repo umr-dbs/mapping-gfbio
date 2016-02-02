@@ -51,6 +51,8 @@ size_t BinaryStream::read(std::string *string, bool allow_eof) {
 
 
 void BinaryStream::write(BinaryWriteBuffer &buffer) {
+	throw ArgumentException("Cannot write a BinaryWriteBuffer to a generic BinaryStream");
+	/*
 	if (!buffer.isWriting())
 		throw ArgumentException("cannot write() a BinaryWriteBuffer when not prepared for writing");
 	if (buffer.size_sent != 0)
@@ -59,10 +61,12 @@ void BinaryStream::write(BinaryWriteBuffer &buffer) {
 	for (size_t i=0;i<buffer.areas.size();i++)
 		write(buffer.areas[i].start, buffer.areas[i].len);
 	buffer.status = BinaryWriteBuffer::Status::FINISHED;
+	*/
 }
 
 void BinaryStream::read(BinaryReadBuffer &buffer) {
-	throw ArgumentException("Do not use");
+	throw ArgumentException("Cannot read a BinaryWriteBuffer from a generic BinaryStream");
+	/*
 	if (buffer.isRead())
 		throw ArgumentException("cannot read() a BinaryReadBuffer that's already fully read");
 
@@ -70,6 +74,7 @@ void BinaryStream::read(BinaryReadBuffer &buffer) {
 		read(buffer.buffer.data(), buffer.size_total);
 		buffer.markBytesAsRead(buffer.size_total);
 	}
+	*/
 }
 
 
@@ -165,6 +170,16 @@ BinaryFDStream::~BinaryFDStream() {
 	close();
 }
 
+BinaryFDStream::BinaryFDStream(PIPE_t p) {
+	int fds[2];
+	auto res = pipe(fds);
+	if (res != 0)
+		throw NetworkException(concat("pipe() call failed: ", strerror(errno)));
+	read_fd = fds[0];
+	write_fd = fds[1];
+	is_eof = false;
+}
+
 void BinaryFDStream::close() {
 	if (read_fd >= 0) {
 		::close(read_fd);
@@ -209,7 +224,7 @@ void BinaryFDStream::write(BinaryWriteBuffer &buffer) {
 
 	if (!buffer.isWriting())
 		throw ArgumentException("cannot write() a BinaryWriteBuffer when not prepared for writing");
-	while(!buffer.isFinished())
+	while (!buffer.isFinished())
 		writeNB(buffer);
 }
 
@@ -222,6 +237,11 @@ void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
 		if (!is_blocking && (errno == EAGAIN || errno == EWOULDBLOCK))
 			return;
 		throw NetworkException(concat("BinaryFDStream: writev() failed: ", strerror(errno)));
+	}
+	if (written == 0) {
+		if (is_blocking)
+			throw NetworkException(concat("BinaryFDStream: writev() wrote 0 bytes in blocking call"));
+		return;
 	}
 	buffer.markBytesAsWritten(written);
 	//printf("Wrote %d bytes of %d\n", (int) written, (int) buffer.size_total);
@@ -434,6 +454,12 @@ size_t BinaryReadBuffer::read(char *buffer, size_t len, bool allow_eof) {
 	return len;
 }
 
+size_t BinaryReadBuffer::getPayloadSize() {
+	if (status != Status::FINISHED)
+		throw ArgumentException("cannot getPayloadSize() from a BinaryReadBuffer until it has been filled");
+	return size_total;
+}
+
 void BinaryReadBuffer::prepareBuffer(size_t expected_size) {
 	size_read = 0;
 	size_total = expected_size;
@@ -444,6 +470,7 @@ void BinaryReadBuffer::markBytesAsRead(size_t read) {
 	size_read += read;
 	if (size_read > size_total)
 		throw MustNotHappenException(concat("Internal logic error: BinaryReadBuffer, size_read = ", size_read, " > size_total = ", size_total));
+
 	if (size_read == size_total) {
 		if (status == Status::READING_SIZE) {
 			status = Status::READING_DATA;

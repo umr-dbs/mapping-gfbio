@@ -357,11 +357,11 @@ AttributeArrays AttributeArrays::filter(const std::vector<char> &keep, size_t ke
 void AttributeArrays::validate(size_t expected_values) const {
 	for (auto &n : _numeric) {
 		if (n.second.array.size() != expected_values)
-			throw AttributeException(concat("Numeric attribute array ", n.first, " does not contain the expected amount of values"));
+			throw AttributeException(concat("Numeric attribute array ", n.first, " does not contain the expected amount of values (expected: ", expected_values, " actual: ", n.second.array.size(), ")"));
 	}
 	for (auto &n : _textual) {
 		if (n.second.array.size() != expected_values)
-			throw AttributeException(concat("Numeric attribute array ", n.first, " does not contain the expected amount of values"));
+			throw AttributeException(concat("Textual attribute array ", n.first, " does not contain the expected amount of values (expected: ", expected_values, " actual: ", n.second.array.size(), ")"));
 	}
 }
 

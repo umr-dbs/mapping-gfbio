@@ -14,6 +14,7 @@ CPP=clang++-3.5
 
 USE_R=true
 USE_OPENCL=true
+USE_ABCD=true
 
 LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
 CPATH := /usr/local/include/:$(CPATH)
@@ -27,7 +28,7 @@ OPT_FLAGS=-O2
 
 CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. -I${JSONCPP_INCLUDE_DIR} -I${GDAL_INCLUDE_DIR}
 CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
-LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time
+LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time 
 LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-lfcgi++ -lfcgi
@@ -68,7 +69,11 @@ OBJ_OPERATORS_COMBINED=o/operators/combined/points2raster.o o/operators/combined
 OBJ_OPERATORS_MSAT=o/operators/msat/temperature.o o/operators/msat/reflectance.o o/operators/msat/solarangle.o o/operators/msat/radiance.o o/operators/msat/pansharpening.o o/operators/msat/gccthermthresholddetection.o o/operators/msat/co2correction.o
 OBJ_OPERATORS_PLOTS=o/operators/plots/histogram.o o/operators/plots/points2histogram.o o/operators/plots/points_metadata_tograph.o
 OBJ_OPERATORS_TEMPORAL=o/operators/temporal/timeshiftoperator.o
-OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o
+OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o 
+ifeq (${USE_ABCD},true)
+	OBJ_OPERATORS_GFBIO += o/operators/gfbio/abcdsource.o
+	LDFLAGS += -lxerces-c
+endif
 OBJ_OPERATORS_ALL=$(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) $(OBJ_OPERATORS_GFBIO) ${OBJ_OPERATORS_TEMPORAL}
 
 OBJ_OPERATORS_ALLSTUBS=${OBJ_OPERATORS_ALL:o/operators/%=o/operators_stub/%}

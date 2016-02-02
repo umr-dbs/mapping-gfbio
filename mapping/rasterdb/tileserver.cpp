@@ -201,10 +201,11 @@ int main(void) {
 	auto portstr = Configuration::get("rasterdb.tileserver.port");
 	auto portnr = atoi(portstr.c_str());
 
-    Log::info("server: listening on port %d", portnr);
+	Log::info("server: listening on port %d", portnr);
 
-    TileServer server;
-    server.start(portnr);
+	TileServer server;
+	server.listen(portnr);
+	server.start();
 
-    return 0;
+	return 0;
 }

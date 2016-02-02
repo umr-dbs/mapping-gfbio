@@ -84,12 +84,15 @@ static int getListeningSocket(int port, int backlog = 10) {
  * Nonblocking Server
  */
 NonblockingServer::NonblockingServer()
-	: next_id(1), listensocket(-1), connections() {
+	: next_id(1), listensocket(-1), connections(), stop_pipe(BinaryFDStream::PIPE) {
 
 }
 
 NonblockingServer::~NonblockingServer() {
-
+	if (listensocket) {
+		close(listensocket);
+		listensocket = -1;
+	}
 }
 
 bool NonblockingServer::readNB(Connection &c) {
@@ -101,8 +104,10 @@ bool NonblockingServer::readNB(Connection &c) {
 		try {
 			auto response = c.processRequest(*this, std::move(c.readbuffer));
 			// no response? We're done, close the connection.
-			if (response == nullptr)
+			if (response == nullptr) {
+				Log::trace("%d: no response, disconnecting client", c.id);
 				return true;
+			}
 			c.writebuffer = std::move(response);
 		}
 		catch (const std::exception &e) {
@@ -123,76 +128,93 @@ void NonblockingServer::writeNB(Connection &c) {
 }
 
 
-void NonblockingServer::start(int portnr) {
+void NonblockingServer::listen(int portnr) {
 	listensocket = getListeningSocket(portnr);
+}
 
-	std::string status, oldstatus;
+void NonblockingServer::start() {
+	if (!listensocket)
+		throw ArgumentException("NonblockingServer: call listen() before start()");
 
-    while (true) {
-        struct timeval tv{60,0};
-        fd_set readfds;
-        fd_set writefds;
-        int maxfd = 0;
+	while (true) {
+		struct timeval tv{60,0};
+		fd_set readfds;
+		fd_set writefds;
+		int maxfd = 0;
 
-        oldstatus = status;
-        status = "";
-
-        FD_ZERO(&readfds);
-        for (auto &c : connections) {
-        	int fd = c->fd;
-    		maxfd = std::max(fd, maxfd);
-        	if (c->writebuffer != nullptr) {
+		FD_ZERO(&readfds);
+		FD_ZERO(&writefds);
+		for (auto &c : connections) {
+			int fd = c->fd;
+			maxfd = std::max(fd, maxfd);
+			if (c->writebuffer != nullptr)
 				FD_SET(fd, &writefds);
-				status += "W";
-        	}
-        	else if (c->readbuffer != nullptr) {
+			else if (c->readbuffer != nullptr)
 				FD_SET(fd, &readfds);
-				status += "R";
-        	}
-        	else
-        		status += "?";
-        }
+		}
+		maxfd = std::max(stop_pipe.getReadFD(), maxfd);
+		FD_SET(stop_pipe.getReadFD(), &readfds);
 
-        if (status != oldstatus)
-        	Log::debug("Status: %s", status.c_str());
+		maxfd = std::max(listensocket, maxfd);
+		FD_SET(listensocket, &readfds);
 
-    	maxfd = std::max(listensocket, maxfd);
-    	FD_SET(listensocket, &readfds);
+		auto res = select(maxfd+1, &readfds, &writefds, nullptr, &tv);
+		if (res == 0) // timeout
+			continue;
+		if (res < 0) {
+			if (errno == EINTR) // interrupted by signal
+				continue;
+			throw NetworkException(concat("select() call failed: ", strerror(errno)));
+		}
 
-        select(maxfd+1, &readfds, &writefds, nullptr, &tv);
+		if (FD_ISSET(stop_pipe.getReadFD(), &readfds)) {
+			Log::info("Stopping Server");
+			return;
+		}
 
-        auto it = connections.begin();
-        while (it != connections.end()) {
-        	auto &c = *it;
-    		bool needs_closing = false;
-    		if (c->writebuffer != nullptr && FD_ISSET(c->fd, &writefds)) {
-    			writeNB(*c);
-    		}
-    		else if (c->readbuffer != nullptr && FD_ISSET(c->fd, &readfds)) {
-    			needs_closing = (readNB(*c) != 0);
-        	}
-    		if (needs_closing) {
-    			auto id = c->id;
-    			it = connections.erase(it);
-    			Log::info("%d: closing, %lu clients remain", id, connections.size());
-    		}
-    		else
-    			++it;
-        }
+		auto it = connections.begin();
+		while (it != connections.end()) {
+			auto &c = *it;
+			bool needs_closing = false;
+			if (c->writebuffer != nullptr && FD_ISSET(c->fd, &writefds)) {
+				writeNB(*c);
+			}
+			else if (c->readbuffer != nullptr && FD_ISSET(c->fd, &readfds)) {
+				needs_closing = (readNB(*c) != 0);
+			}
+			if (needs_closing) {
+				auto id = c->id;
+				it = connections.erase(it);
+				Log::info("%d: closing, %lu clients remain", id, connections.size());
+			}
+			else
+				++it;
+		}
 
-        if (FD_ISSET(listensocket, &readfds)) {
+		if (FD_ISSET(listensocket, &readfds)) {
 			struct sockaddr_storage remote_addr;
 			socklen_t sin_size = sizeof(remote_addr);
 			int new_fd = accept(listensocket, (struct sockaddr *) &remote_addr, &sin_size);
 			if (new_fd == -1) {
-				if (errno != EAGAIN)
-					perror("accept");
-				continue;
+				if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+					continue;
+				if (errno == ECONNABORTED)
+					continue;
+
+				throw NetworkException(concat("accept() call failed: ", strerror(errno)));
 			}
 
 			int one = 1;
 			setsockopt(new_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 			connections.push_back( createConnection(new_fd, next_id++) );
-        }
-    }
+		}
+	}
+}
+
+
+void NonblockingServer::stop() {
+	// if the loop is currently in a select() phase, this write will wake it up.
+	Log::info("Sending signal to stop server");
+	char c = 0;
+	stop_pipe.write(c);
 }

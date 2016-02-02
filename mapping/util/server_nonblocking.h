@@ -32,7 +32,18 @@ class NonblockingServer {
 
 		NonblockingServer();
 		virtual ~NonblockingServer();
-		void start(int portnr);
+		/*
+		 * Sets up the listening socket, but does not accept any connections yet.
+		 */
+		void listen(int portnr);
+		/*
+		 * After listen() succeeded, start the main loop
+		 */
+		void start();
+		/*
+		 * Stop the server. As start() does not terminate, this must be called from a separate thread.
+		 */
+		void stop();
 	private:
 		bool readNB(Connection &connection);
 		void writeNB(Connection &connection);
@@ -41,6 +52,7 @@ class NonblockingServer {
 		int next_id;
 		int listensocket;
 		std::vector<std::unique_ptr<Connection>> connections;
+		BinaryFDStream stop_pipe;
 };
 
 

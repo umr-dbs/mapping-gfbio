@@ -528,3 +528,25 @@ void PolygonCollection::validateSpecifics() const {
 	if(start_feature.back() != start_polygon.size() - 1)
 		throw FeatureException("Feature not finished");
 }
+
+void PolygonCollection::removeLastFeature(){
+	bool time = hasTime();
+	if(start_feature.back() == start_polygon.size() - 1  &&
+			start_polygon.back() == start_ring.size() -1 &&
+			start_ring.back() == coordinates.size()){
+		start_feature.pop_back();
+	}
+	start_polygon.erase(start_polygon.begin() + start_feature.back() + 1, start_polygon.end());
+
+	start_ring.erase(start_ring.begin() + start_polygon.back() + 1, start_ring.end());
+
+	coordinates.erase(coordinates.begin() + start_ring.back(), coordinates.end());
+
+	size_t featureCount = getFeatureCount();
+
+	if(time) {
+		time_start.resize(featureCount);
+		time_end.resize(featureCount);
+	}
+	feature_attributes.resize(featureCount);
+}

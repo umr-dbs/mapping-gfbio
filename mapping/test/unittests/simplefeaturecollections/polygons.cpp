@@ -877,3 +877,80 @@ TEST(PolygonCollection, StreamSerialization){
 
 	CollectionTestUtil::checkEquality(polygons, polygons2);
 }
+
+TEST(PolygonCollection, removeLastFeature){
+	auto polygons = createPolygonsWithAttributesAndTime();
+
+	polygons->removeLastFeature();
+	polygons->validate();
+
+	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((10 10, 10 30, 25 20, 10 10)), POLYGON((15 70, 25 90, 45 90, 40 80, 50 70, 15 70), (30 75, 25 80, 30 85, 35 80, 30 75)), POLYGON((50 30, 65 60, 100 25, 50 30), (55 35, 65 45, 65 35, 55 35), (75 30, 75 35, 85 35, 85 30, 75 30)))";
+	auto result = WKBUtil::readPolygonCollection(wkt, SpatioTemporalReference::unreferenced());
+	result->time_start = {2, 4,  8};
+	result->time_end =   {4, 8, 16};
+
+	result->global_attributes.setTextual("info", "1234");
+	result->global_attributes.setNumeric("index", 42);
+
+	result->feature_attributes.addNumericAttribute("value", Unit::unknown(), {0.0, 1.1, 2.2});
+	result->feature_attributes.addTextualAttribute("label", Unit::unknown(), {"l0", "l1", "l2"});
+
+
+	result->validate();
+
+	CollectionTestUtil::checkEquality(*result, *polygons);
+}
+
+TEST(PolygonCollection, removeLastFeatureUnfinishedRing){
+	auto polygons = createPolygonsWithAttributesAndTime();
+
+	polygons->addCoordinate(2,3);
+	polygons->addCoordinate(3,3);
+	polygons->addCoordinate(5,3);
+	polygons->addCoordinate(2,3);
+	polygons->feature_attributes.textual("label").set(polygons->getFeatureCount(), "fail");
+
+	polygons->removeLastFeature();
+	polygons->validate();
+
+	auto result = createPolygonsWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *polygons);
+}
+
+TEST(PolygonCollection, removeLastFeatureUnfinishedPolygon){
+	auto polygons = createPolygonsWithAttributesAndTime();
+
+	polygons->addCoordinate(2,3);
+	polygons->addCoordinate(3,3);
+	polygons->addCoordinate(5,3);
+	polygons->addCoordinate(2,3);
+	polygons->finishRing();
+	polygons->feature_attributes.textual("label").set(polygons->getFeatureCount(), "fail");
+
+	polygons->removeLastFeature();
+	polygons->validate();
+
+	auto result = createPolygonsWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *polygons);
+}
+
+TEST(PolygonCollection, removeLastFeatureUnfinishedFeature){
+	auto polygons = createPolygonsWithAttributesAndTime();
+
+	polygons->addCoordinate(2,3);
+	polygons->addCoordinate(3,3);
+	polygons->addCoordinate(5,3);
+	polygons->addCoordinate(2,3);
+	polygons->finishRing();
+	polygons->finishPolygon();
+	polygons->feature_attributes.textual("label").set(polygons->getFeatureCount(), "fail");
+
+	polygons->removeLastFeature();
+	polygons->validate();
+
+	auto result = createPolygonsWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *polygons);
+}

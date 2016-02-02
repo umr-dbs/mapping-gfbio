@@ -99,6 +99,8 @@ public:
 	 */
 	size_t finishFeature();
 
+	virtual void removeLastFeature();
+
 	/**
 	 * filter the features of the collection based on keep vector
 	 * @param keep the vector specifying which features to keep

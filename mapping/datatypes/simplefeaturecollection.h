@@ -157,6 +157,12 @@ public:
 	 */
 	virtual size_t getFeatureCount() const = 0;
 
+	/**
+	 * Remove the last feature in this collection.
+	 * If the collection has an unfinished feature (finishFeature() not called) this will be removed instead.
+	 * If the collection is empty, nothing happens.
+	 */
+	virtual void removeLastFeature() = 0;
 
 	/**
 	 * Validate the contents of this collection. Ensure that the last feature is finished, feature_attributes and time information are in check.

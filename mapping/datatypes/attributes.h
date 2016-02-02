@@ -317,6 +317,12 @@ class AttributeArrays {
 		 */
 		AttributeArrays filter(const std::vector<bool> &keep, size_t kept_count = 0) const;
 		AttributeArrays filter(const std::vector<char> &keep, size_t kept_count = 0) const;
+
+		/**
+		 * Resize all AttributeArray to the given size
+		 * @param size the new size for the attribute arrays
+		 */
+		void resize(size_t size);
 	private:
 		template<typename T>
 			AttributeArrays filter_impl(const std::vector<T> &keep, size_t kept_count) const;

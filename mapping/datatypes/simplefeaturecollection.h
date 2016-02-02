@@ -80,7 +80,17 @@ public:
 	AttributeArrays feature_attributes;
 
 	// geometry
+	/**
+	 * get the minimum bounding rectangle of this collection as a SpatialReference
+	 * @return the minimum bounding rectangle of this collection as a SpatialReference
+	 */
 	virtual SpatialReference getCollectionMBR() const;
+
+	/**
+	 * get the minimum bounding rectangle of given feature in this collection
+	 * @param featureIndex the index of the feature
+	 * @return the minimum bounding rectangle of a feature in this collection as a SpatialReference
+	 */
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const = 0;
 
 	/**
@@ -102,18 +112,56 @@ public:
 	bool featureIntersectsRectangle(size_t featureIndex, const SpatialReference& sref) const;
 
 	// Export
+	/**
+	 * Get a representation of the collection as GeoJSON
+	 * @param displayMetadata if true, include attributes
+	 * @return a GeoJSON representation of this collection
+	 */
 	std::string toGeoJSON(bool displayMetadata = false) const;
+
+	/**
+	 * Get a CSV representation of this collection
+	 * @return a CSV representation of this collection
+	 */
 	virtual std::string toCSV() const = 0;
+
+	/**
+	 * Get a WKT representation of this collection
+	 * @eturn a WKT representation of this collection
+	 */
 	std::string toWKT() const;
+
+	/**
+	 * Get a ARFF representation of this collection
+	 * @param layerName the name of the relation in the ARFF file
+	 * @return a ARFF representation of this collection
+	 */
 	virtual std::string toARFF(std::string layerName = "export") const;
 
+	/**
+	 * Get a WKT representation of a given feature in this collection
+	 * @param featureIndex the index of the feature
+	 * @return a WKT representation of a given feature in this collection
+	 */
 	virtual std::string featureToWKT(size_t featureIndex) const;
 
-	// return true if all features consist of a single element
+	/**
+	 * Determine if collection is simple
+	 * @return true if all features consist of a single element
+	 */
 	virtual bool isSimple() const = 0;
 
+	/**
+	 * Get the number of features in this collection
+	 * @return the number of features in this collection
+	 */
 	virtual size_t getFeatureCount() const = 0;
 
+
+	/**
+	 * Validate the contents of this collection. Ensure that the last feature is finished, feature_attributes and time information are in check.
+	 * This function must be called after finishing the construction of a collection
+	 */
 	void validate() const;
 
 	/**

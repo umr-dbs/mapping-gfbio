@@ -97,6 +97,7 @@ void WKBUtil::addFeatureToCollection(PointCollection& collection, const std::str
 			if(collection.coordinates.size() != coordinates || collection.start_feature.size() != features){
 				collection.removeLastFeature();
 			}
+			gf->destroyGeometry(geom);
 			throw e;
 		}
 		gf->destroyGeometry(geom);
@@ -123,6 +124,7 @@ void WKBUtil::addFeatureToCollection(LineCollection& collection, const std::stri
 			if(collection.coordinates.size() != coordinates || collection.start_line.size() != lines || collection.start_feature.size() != features){
 				collection.removeLastFeature();
 			}
+			gf->destroyGeometry(geom);
 			throw e;
 		}
 		gf->destroyGeometry(geom);
@@ -149,6 +151,7 @@ void WKBUtil::addFeatureToCollection(PolygonCollection& collection, const std::s
 			if(collection.coordinates.size() != coordinates || collection.start_ring.size() != rings || collection.start_polygon.size() != polygons || collection.start_feature.size() != features){
 				collection.removeLastFeature();
 			}
+			gf->destroyGeometry(geom);
 			throw e;
 		}
 		gf->destroyGeometry(geom);

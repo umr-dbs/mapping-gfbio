@@ -3,6 +3,7 @@
 #include <geos/geom/MultiPolygon.h>
 #include <geos/io/WKBReader.h>
 #include <geos/io/WKTReader.h>
+#include <geos/util/IllegalArgumentException.h>
 #include "wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <sstream>
@@ -80,34 +81,78 @@ std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(const std::str
 
 
 void WKBUtil::addFeatureToCollection(PointCollection& collection, const std::string& wkt){
+	size_t coordinates = collection.coordinates.size();
+	size_t features = collection.start_feature.size();
+
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
-	geos::geom::Geometry* geom = wktreader.read(wkt);
+	geos::geom::Geometry* geom;
+	try {
+		geom = wktreader.read(wkt);
 
-	GeosGeomUtil::addFeatureToCollection(collection, *geom);
-
-	gf->destroyGeometry(geom);
+		try {
+			GeosGeomUtil::addFeatureToCollection(collection, *geom);
+		} catch(const FeatureException& e) {
+			if(collection.coordinates.size() != coordinates || collection.start_feature.size() != features){
+				collection.removeLastFeature();
+			}
+			throw e;
+		}
+		gf->destroyGeometry(geom);
+	} catch (const geos::util::IllegalArgumentException& e) {
+		throw e;
+	}
 }
 
 void WKBUtil::addFeatureToCollection(LineCollection& collection, const std::string& wkt){
+	size_t coordinates = collection.coordinates.size();
+	size_t lines = collection.start_line.size();
+	size_t features = collection.start_feature.size();
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
-	geos::geom::Geometry* geom = wktreader.read(wkt);
 
-	GeosGeomUtil::addFeatureToCollection(collection, *geom);
+	geos::geom::Geometry* geom;
+	try {
+		geom = wktreader.read(wkt);
 
-	gf->destroyGeometry(geom);
+		try {
+			GeosGeomUtil::addFeatureToCollection(collection, *geom);
+		} catch(const FeatureException& e) {
+			if(collection.coordinates.size() != coordinates || collection.start_line.size() != lines || collection.start_feature.size() != features){
+				collection.removeLastFeature();
+			}
+			throw e;
+		}
+		gf->destroyGeometry(geom);
+	} catch (const geos::util::IllegalArgumentException& e) {
+		throw e;
+	}
 }
 
 void WKBUtil::addFeatureToCollection(PolygonCollection& collection, const std::string& wkt){
+	size_t coordinates = collection.coordinates.size();
+	size_t rings = collection.start_ring.size();
+	size_t polygons = collection.start_polygon.size();
+	size_t features = collection.start_feature.size();
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
-	geos::geom::Geometry* geom = wktreader.read(wkt);
+	geos::geom::Geometry* geom;
+	try {
+		geom = wktreader.read(wkt);
 
-	GeosGeomUtil::addFeatureToCollection(collection, *geom);
-
-	gf->destroyGeometry(geom);
+		try {
+			GeosGeomUtil::addFeatureToCollection(collection, *geom);
+		} catch(const FeatureException& e) {
+			if(collection.coordinates.size() != coordinates || collection.start_ring.size() != rings || collection.start_polygon.size() != polygons || collection.start_feature.size() != features){
+				collection.removeLastFeature();
+			}
+			throw e;
+		}
+		gf->destroyGeometry(geom);
+	} catch (const geos::util::IllegalArgumentException& e) {
+		throw e;
+	}
 }

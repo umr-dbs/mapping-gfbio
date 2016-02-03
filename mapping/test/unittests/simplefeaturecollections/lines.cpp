@@ -464,6 +464,17 @@ TEST(LineCollection, WKTAddMultiFeature){
 	EXPECT_EQ(1, lines.coordinates[8].y);
 }
 
+TEST(LineCollection, WKTAddFeatureFail){
+	auto lines = createLinesWithAttributesAndTime();
+	std::string wkt = "POINT(3 foo)";
+	EXPECT_ANY_THROW(WKBUtil::addFeatureToCollection(*lines, wkt));
+
+	auto result = createLinesWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *lines);
+}
+
+
 std::unique_ptr<LineCollection> createLinesForSTRefFilter(){
 	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));

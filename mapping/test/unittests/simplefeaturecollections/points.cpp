@@ -16,6 +16,9 @@
 #include "raster/opencl.h"
 #include "test/unittests/simplefeaturecollections/util.h"
 
+#include <geos/io/WKTReader.h>
+#include <geos/geom/GeometryFactory.h>
+
 std::unique_ptr<PointCollection> createPointsWithAttributesAndTime(){
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 1), POINT(2 5), MULTIPOINT(8 6, 8 9, 88 99, 23 21), POINT(68 59), MULTIPOINT(42 6, 43 7))";
 	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
@@ -470,6 +473,17 @@ TEST(PointCollection, WKTAddMultiFeature){
 	EXPECT_EQ(5, points.coordinates[2].x);
 	EXPECT_EQ(6, points.coordinates[2].y);
 }
+
+TEST(PointCollection, WKTAddFeatureFail){
+	auto points = createPointsWithAttributesAndTime();
+	std::string wkt = "POINT(3 foo)";
+	EXPECT_ANY_THROW(WKBUtil::addFeatureToCollection(*points, wkt));
+
+	auto result = createPointsWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *points);
+}
+
 
 std::unique_ptr<PointCollection> createPointsForSTRefFilter(){
 	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),

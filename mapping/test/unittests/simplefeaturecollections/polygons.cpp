@@ -726,6 +726,16 @@ TEST(PolygonCollection, WKTAddMultiFeature){
 	EXPECT_EQ(2, polygons.getFeatureReference(1).size());
 }
 
+TEST(PolygonCollection, WKTAddFeatureFail){
+	auto polygons = createPolygonsWithAttributesAndTime();
+	std::string wkt = "POINT(3 foo)";
+	EXPECT_ANY_THROW(WKBUtil::addFeatureToCollection(*polygons, wkt));
+
+	auto result = createPolygonsWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *polygons);
+}
+
 std::unique_ptr<PolygonCollection> createPolygonsForSTRefFilter(){
 	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));

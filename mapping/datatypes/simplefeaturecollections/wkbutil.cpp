@@ -81,12 +81,8 @@ std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(const std::str
 }
 
 struct GeometryDeleter {
-	const geos::geom::GeometryFactory* gf;
-
-	GeometryDeleter(const geos::geom::GeometryFactory* gf) : gf(gf){}
-
-	void operator()(geos::geom::Geometry* ptr) const {
-		gf->destroyGeometry(ptr);
+	void operator()(geos::geom::Geometry* geom) const {
+		geom->getFactory()->destroyGeometry(geom);
 	}
 };
 
@@ -97,8 +93,7 @@ void WKBUtil::addFeatureToCollection(PointCollection& collection, const std::str
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
-	GeometryDeleter del(gf);
-	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt), del);
+	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt));
 
 	try {
 		GeosGeomUtil::addFeatureToCollection(collection, *geom);
@@ -106,7 +101,7 @@ void WKBUtil::addFeatureToCollection(PointCollection& collection, const std::str
 		if(collection.coordinates.size() != coordinates || collection.start_feature.size() != features){
 			collection.removeLastFeature();
 		}
-		throw e;
+		throw;
 	}
 }
 
@@ -117,9 +112,7 @@ void WKBUtil::addFeatureToCollection(LineCollection& collection, const std::stri
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
-
-	GeometryDeleter del(gf);
-	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt), del);
+	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt));
 
 	try {
 		GeosGeomUtil::addFeatureToCollection(collection, *geom);
@@ -127,7 +120,7 @@ void WKBUtil::addFeatureToCollection(LineCollection& collection, const std::stri
 		if(collection.coordinates.size() != coordinates || collection.start_line.size() != lines || collection.start_feature.size() != features){
 			collection.removeLastFeature();
 		}
-		throw e;
+		throw;
 	}
 }
 
@@ -139,8 +132,7 @@ void WKBUtil::addFeatureToCollection(PolygonCollection& collection, const std::s
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
-	GeometryDeleter del(gf);
-	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt), del);
+	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt));
 
 	try {
 		GeosGeomUtil::addFeatureToCollection(collection, *geom);
@@ -148,6 +140,6 @@ void WKBUtil::addFeatureToCollection(PolygonCollection& collection, const std::s
 		if(collection.coordinates.size() != coordinates || collection.start_ring.size() != rings || collection.start_polygon.size() != polygons || collection.start_feature.size() != features){
 			collection.removeLastFeature();
 		}
-		throw e;
+		throw;
 	}
 }

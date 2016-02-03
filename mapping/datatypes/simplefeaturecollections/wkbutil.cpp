@@ -9,6 +9,7 @@
 #include <sstream>
 #include "util/make_unique.h"
 #include "util/exceptions.h"
+#include <memory>
 
 
 std::unique_ptr<PointCollection> WKBUtil::readPointCollection(std::stringstream& wkb, const SpatioTemporalReference& stref){
@@ -79,6 +80,15 @@ std::unique_ptr<PolygonCollection> WKBUtil::readPolygonCollection(const std::str
 	return polygonCollection;
 }
 
+struct GeometryDeleter {
+	const geos::geom::GeometryFactory* gf;
+
+	GeometryDeleter(const geos::geom::GeometryFactory* gf) : gf(gf){}
+
+	void operator()(geos::geom::Geometry* ptr) const {
+		gf->destroyGeometry(ptr);
+	}
+};
 
 void WKBUtil::addFeatureToCollection(PointCollection& collection, const std::string& wkt){
 	size_t coordinates = collection.coordinates.size();
@@ -87,21 +97,15 @@ void WKBUtil::addFeatureToCollection(PointCollection& collection, const std::str
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
-	geos::geom::Geometry* geom;
-	try {
-		geom = wktreader.read(wkt);
+	GeometryDeleter del(gf);
+	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt), del);
 
-		try {
-			GeosGeomUtil::addFeatureToCollection(collection, *geom);
-		} catch(const FeatureException& e) {
-			if(collection.coordinates.size() != coordinates || collection.start_feature.size() != features){
-				collection.removeLastFeature();
-			}
-			gf->destroyGeometry(geom);
-			throw e;
+	try {
+		GeosGeomUtil::addFeatureToCollection(collection, *geom);
+	} catch(const FeatureException& e) {
+		if(collection.coordinates.size() != coordinates || collection.start_feature.size() != features){
+			collection.removeLastFeature();
 		}
-		gf->destroyGeometry(geom);
-	} catch (const geos::util::IllegalArgumentException& e) {
 		throw e;
 	}
 }
@@ -114,21 +118,15 @@ void WKBUtil::addFeatureToCollection(LineCollection& collection, const std::stri
 	geos::io::WKTReader wktreader(*gf);
 
 
-	geos::geom::Geometry* geom;
-	try {
-		geom = wktreader.read(wkt);
+	GeometryDeleter del(gf);
+	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt), del);
 
-		try {
-			GeosGeomUtil::addFeatureToCollection(collection, *geom);
-		} catch(const FeatureException& e) {
-			if(collection.coordinates.size() != coordinates || collection.start_line.size() != lines || collection.start_feature.size() != features){
-				collection.removeLastFeature();
-			}
-			gf->destroyGeometry(geom);
-			throw e;
+	try {
+		GeosGeomUtil::addFeatureToCollection(collection, *geom);
+	} catch(const FeatureException& e) {
+		if(collection.coordinates.size() != coordinates || collection.start_line.size() != lines || collection.start_feature.size() != features){
+			collection.removeLastFeature();
 		}
-		gf->destroyGeometry(geom);
-	} catch (const geos::util::IllegalArgumentException& e) {
 		throw e;
 	}
 }
@@ -141,21 +139,15 @@ void WKBUtil::addFeatureToCollection(PolygonCollection& collection, const std::s
 	const geos::geom::GeometryFactory *gf = geos::geom::GeometryFactory::getDefaultInstance();
 	geos::io::WKTReader wktreader(*gf);
 
-	geos::geom::Geometry* geom;
-	try {
-		geom = wktreader.read(wkt);
+	GeometryDeleter del(gf);
+	std::unique_ptr<geos::geom::Geometry, GeometryDeleter> geom(wktreader.read(wkt), del);
 
-		try {
-			GeosGeomUtil::addFeatureToCollection(collection, *geom);
-		} catch(const FeatureException& e) {
-			if(collection.coordinates.size() != coordinates || collection.start_ring.size() != rings || collection.start_polygon.size() != polygons || collection.start_feature.size() != features){
-				collection.removeLastFeature();
-			}
-			gf->destroyGeometry(geom);
-			throw e;
+	try {
+		GeosGeomUtil::addFeatureToCollection(collection, *geom);
+	} catch(const FeatureException& e) {
+		if(collection.coordinates.size() != coordinates || collection.start_ring.size() != rings || collection.start_polygon.size() != polygons || collection.start_feature.size() != features){
+			collection.removeLastFeature();
 		}
-		gf->destroyGeometry(geom);
-	} catch (const geos::util::IllegalArgumentException& e) {
 		throw e;
 	}
 }

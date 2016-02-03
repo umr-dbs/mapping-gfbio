@@ -1,0 +1,39 @@
+{
+	"name" : "Load polygons",	
+	"query_result": "polygons",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+	"query" : 
+	{
+		"type" : "csvpointsource",
+		"params" : 
+		{
+			"filename": "test/systemtests/data/un_countries/countries.csv",
+			"on_error": "skip",
+			"separator": ";",
+			"geometry": "wkt",
+			"time": "start",
+			"duration": 2147483647,
+			"time1_format": {
+				"format" : "custom",
+				"custom_format" : "%Y-%m-%d"
+			},
+			"columns": {
+				"x": "wkt",
+				"textual": ["type","name","iso","continent","region","subregion"],
+				"time1": "time_start"
+			}
+		}
+	},
+	"query_expected_hash" : "f53697e51d0b58c17a43e50b90768833"
+}

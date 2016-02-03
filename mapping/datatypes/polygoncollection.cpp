@@ -269,11 +269,6 @@ void PolygonCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostri
 	json << "}";
 }
 
-std::string PolygonCollection::toCSV() const {
-	 //TODO: implement
-	return "";
-}
-
 void PolygonCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) const {
 	if(featureIndex >= getFeatureCount()){
 		throw ArgumentException("featureIndex is greater than featureCount");

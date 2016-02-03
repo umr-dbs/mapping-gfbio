@@ -255,11 +255,6 @@ void LineCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostrings
 	json << "}";
 }
 
-std::string LineCollection::toCSV() const {
-	 //TODO: implement
-	return "";
-}
-
 void LineCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) const {
 	if(featureIndex >= getFeatureCount()){
 		throw ArgumentException("featureIndex is greater than featureCount");

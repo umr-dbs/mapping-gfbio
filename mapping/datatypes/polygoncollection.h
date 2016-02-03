@@ -202,8 +202,6 @@ public:
 	 */
 	std::string hash() const;
 
-	virtual std::string toCSV() const;
-
 	virtual bool isSimple() const final;
 
 	virtual size_t getFeatureCount() const final {

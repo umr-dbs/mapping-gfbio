@@ -166,8 +166,6 @@ public:
 
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
-	virtual std::string toCSV() const;
-
 	/**
 	 * compute the hash of the collection
 	 * @return the hash of the collection

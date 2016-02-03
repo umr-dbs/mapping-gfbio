@@ -123,7 +123,7 @@ public:
 	 * Get a CSV representation of this collection
 	 * @return a CSV representation of this collection
 	 */
-	virtual std::string toCSV() const = 0;
+	virtual std::string toCSV() const;
 
 	/**
 	 * Get a WKT representation of this collection

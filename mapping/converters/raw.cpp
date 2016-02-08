@@ -31,7 +31,7 @@ RawConverter::RawConverter() {
 
 std::unique_ptr<ByteBuffer> RawConverter::encode(GenericRaster *raster) {
 	size_t size = raster->getDataSize();
-	unsigned char *copy = new unsigned char[size];
+	auto copy = new char[size];
 	memcpy(copy, raster->getData(), size);
 
 	return make_unique<ByteBuffer>(copy, size);
@@ -53,11 +53,10 @@ BzipConverter::BzipConverter() {
 }
 
 std::unique_ptr<ByteBuffer> BzipConverter::encode(GenericRaster *raster) {
-	Profiler::Profiler p("Bzip::compress");
 	size_t raw_size = raster->getDataSize();
 	// per documentation, this amount of space is guaranteed to fit the compressed stream
 	unsigned int compressed_size = (unsigned int) (1.1 * raw_size) + 601;
-	unsigned char *compressed = new unsigned char[compressed_size];
+	auto compressed = new char[compressed_size];
 
 	int res = BZ2_bzBuffToBuffCompress(
 		(char *) compressed, &compressed_size,
@@ -73,14 +72,13 @@ std::unique_ptr<ByteBuffer> BzipConverter::encode(GenericRaster *raster) {
 }
 
 std::unique_ptr<GenericRaster> BzipConverter::decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth) {
-	//Profiler::Profiler p("Bzip::decompress");
 	auto raster = GenericRaster::create(datadescription, stref, width, height, depth);
 
 	char *data = (char *) raster->getDataForWriting();
 	unsigned int result_size = raster->getDataSize();
 	int res = BZ2_bzBuffToBuffDecompress(
 		data, &result_size,
-		(char *) buffer.data, buffer.size,
+		buffer.data, buffer.size,
 		0, 0
 	);
 
@@ -101,7 +99,6 @@ GzipConverter::GzipConverter() {
 }
 
 std::unique_ptr<ByteBuffer> GzipConverter::encode(GenericRaster *raster) {
-	Profiler::Profiler p("Gzip::compress");
 
 	z_stream stream;
 	stream.zalloc = Z_NULL;
@@ -113,12 +110,12 @@ std::unique_ptr<ByteBuffer> GzipConverter::encode(GenericRaster *raster) {
 	size_t raw_size = raster->getDataSize();
 	// per documentation, this amount of space is guaranteed to fit the compressed stream
 	unsigned int compressed_size = (unsigned int) (1.1 * raw_size) + 601;
-	std::unique_ptr<unsigned char []> compressed(new unsigned char[compressed_size]);
+	std::unique_ptr<char []> compressed(new char[compressed_size]);
 
 	stream.avail_in = raw_size;
 	stream.next_in = (unsigned char *) raster->getData();
 	stream.avail_out = compressed_size;
-	stream.next_out = compressed.get();
+	stream.next_out = (unsigned char *) compressed.get();
 	if (deflate(&stream, /* flush = */ Z_FINISH) != Z_STREAM_END) {
 		deflateEnd(&stream);
 		throw ConverterException("Error on deflate()");
@@ -136,11 +133,10 @@ std::unique_ptr<ByteBuffer> GzipConverter::encode(GenericRaster *raster) {
 }
 
 std::unique_ptr<GenericRaster> GzipConverter::decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth) {
-	//Profiler::Profiler p("Gzip::decompress");
 	auto raster = GenericRaster::create(datadescription, stref, width, height, depth);
 
 	char *data = (char *) raster->getDataForWriting();
-	unsigned int result_size = raster->getDataSize();
+	auto result_size = raster->getDataSize();
 
 	/*
 	std::stringstream msg;
@@ -158,7 +154,7 @@ std::unique_ptr<GenericRaster> GzipConverter::decode(ByteBuffer &buffer, const D
 	if (inflateInit(&stream) != Z_OK)
 		throw SourceException("Error on inflateInit()");
 
-	stream.next_in = buffer.data;
+	stream.next_in = (unsigned char *) buffer.data;
 	stream.avail_in = buffer.size;
 
 	stream.next_out = (unsigned char *) data;

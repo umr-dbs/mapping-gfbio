@@ -261,7 +261,7 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 			if (filesize >= 0 && filesize == tiledesc.size) {
 				if (lseek(fd, 0, SEEK_SET) == 0) {
 					auto bb = make_unique<ByteBuffer>(filesize);
-					if (read(fd, (char *) bb->data, bb->size) == bb->size) {
+					if (read(fd, bb->data, bb->size) == bb->size) {
 						Log::debug("RemoteRasterDBBackend::readTile(): returning from local cache");
 						return bb;
 					}

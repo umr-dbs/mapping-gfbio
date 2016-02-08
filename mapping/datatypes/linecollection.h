@@ -99,6 +99,8 @@ public:
 	 */
 	size_t finishFeature();
 
+	virtual void removeLastFeature();
+
 	/**
 	 * filter the features of the collection based on keep vector
 	 * @param keep the vector specifying which features to keep
@@ -163,8 +165,6 @@ public:
 	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
 
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
-
-	virtual std::string toCSV() const;
 
 	/**
 	 * compute the hash of the collection

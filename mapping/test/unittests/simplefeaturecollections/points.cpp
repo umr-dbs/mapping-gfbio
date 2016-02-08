@@ -16,6 +16,9 @@
 #include "raster/opencl.h"
 #include "test/unittests/simplefeaturecollections/util.h"
 
+#include <geos/io/WKTReader.h>
+#include <geos/geom/GeometryFactory.h>
+
 std::unique_ptr<PointCollection> createPointsWithAttributesAndTime(){
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 1), POINT(2 5), MULTIPOINT(8 6, 8 9, 88 99, 23 21), POINT(68 59), MULTIPOINT(42 6, 43 7))";
 	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
@@ -471,6 +474,17 @@ TEST(PointCollection, WKTAddMultiFeature){
 	EXPECT_EQ(6, points.coordinates[2].y);
 }
 
+TEST(PointCollection, WKTAddFeatureFail){
+	auto points = createPointsWithAttributesAndTime();
+	std::string wkt = "POINT(3 foo)";
+	EXPECT_ANY_THROW(WKBUtil::addFeatureToCollection(*points, wkt));
+
+	auto result = createPointsWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *points);
+}
+
+
 std::unique_ptr<PointCollection> createPointsForSTRefFilter(){
 	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));
@@ -599,4 +613,40 @@ TEST(PointCollection, StreamSerialization){
 	PointCollection points2(stream);
 
 	CollectionTestUtil::checkEquality(points, points2);
+}
+
+TEST(PointCollection, removeLastFeature){
+	auto points = createPointsWithAttributesAndTime();
+
+	points->removeLastFeature();
+	points->validate();
+
+	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 1), POINT(2 5), MULTIPOINT(8 6, 8 9, 88 99, 23 21), POINT(68 59))";
+	auto result = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
+	result->time_start = {2, 4,  8, 16};
+	result->time_end = {4, 8, 16, 32};
+
+	result->global_attributes.setTextual("info", "1234");
+	result->global_attributes.setNumeric("index", 42);
+
+	result->feature_attributes.addNumericAttribute("value", Unit::unknown(), {0.0, 1.1, 2.2, 3.3});
+	result->feature_attributes.addTextualAttribute("label", Unit::unknown(), {"l0", "l1", "l2", "l3"});
+
+	result->validate();
+
+	CollectionTestUtil::checkEquality(*result, *points);
+}
+
+TEST(PointCollection, removeLastFeatureUnfinished){
+	auto points = createPointsWithAttributesAndTime();
+
+	points->addCoordinate(2,3);
+	points->feature_attributes.textual("label").set(points->getFeatureCount(), "fail");
+
+	points->removeLastFeature();
+	points->validate();
+
+	auto result = createPointsWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *points);
 }

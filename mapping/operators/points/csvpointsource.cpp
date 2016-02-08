@@ -55,6 +55,20 @@ const std::vector< std::pair<TimeSpecification, std::string> > TimeSpecification
 
 EnumConverter<TimeSpecification> TimeSpecificationConverter(TimeSpecificationMap);
 
+enum class ErrorHandling {
+	ABORT,
+	SKIP,
+	KEEP
+};
+
+const std::vector< std::pair<ErrorHandling, std::string> > ErrorHandlingMap {
+	std::make_pair(ErrorHandling::ABORT, "abort"),
+	std::make_pair(ErrorHandling::SKIP, "skip"),
+	std::make_pair(ErrorHandling::KEEP, "keep")
+};
+
+
+EnumConverter<ErrorHandling>ErrorHandlingConverter(ErrorHandlingMap);
 
 /*
  * Now define the operator
@@ -90,6 +104,7 @@ class CSVPointSource : public GenericOperator {
 		std::vector<std::string> columns_numeric;
 		std::vector<std::string> columns_textual;
 		char field_separator;
+		ErrorHandling errorHandling;
 };
 
 
@@ -154,6 +169,12 @@ CSVPointSource::CSVPointSource(int sourcecounts[], GenericOperator *sources[], J
     std::sort(columns_numeric.begin(), columns_numeric.end());
 
     // TODO: make sure no column names are reused multiple times?
+
+    try {
+    	errorHandling = ErrorHandlingConverter.from_json(params, "on_error");
+    } catch (const ArgumentException& e){
+    	errorHandling = ErrorHandling::ABORT;
+    }
 }
 
 
@@ -297,7 +318,16 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 			added = addFeature(x_str, y_str);
 		}
 		catch (const std::exception &e) {
-			throw OperatorException(concat("Geometry in CSV could not be parsed: '", x_str, "', '", y_str, "'"));
+			switch(errorHandling) {
+				case ErrorHandling::ABORT:
+					throw OperatorException(concat("Geometry in CSV could not be parsed: '", x_str, "', '", y_str, "'"));
+				case ErrorHandling::SKIP:
+					continue;
+				case ErrorHandling::KEEP:
+					//TODO: ???? Insert 0-Feature?
+					continue;
+			}
+
 		}
 		if (!added)
 			continue;
@@ -305,26 +335,76 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 		// Step 2: extract the time information
 		if (time_specification != TimeSpecification::NONE) {
 			double t1, t2;
+			bool error = false;
 			if (time_specification == TimeSpecification::START) {
-				t1 = time1Parser->parse(tuple[pos_time1]);
-				t2 = t1+time_duration;
+				try {
+					t1 = time1Parser->parse(tuple[pos_time1]);
+					t2 = t1+time_duration;
+				} catch (const TimeParseException& e){
+					t1 = rect.beginning_of_time();
+					t2 = rect.end_of_time();
+					error = true;
+				}
 			}
 			else if (time_specification == TimeSpecification::START_END) {
-				t1 = time1Parser->parse(tuple[pos_time1]);
-				t2 = time2Parser->parse(tuple[pos_time2]);
+				try {
+					t1 = time1Parser->parse(tuple[pos_time1]);
+				} catch (const TimeParseException& e){
+					t1 = rect.beginning_of_time();
+					error = true;
+				}
+				try {
+					t2 = time2Parser->parse(tuple[pos_time2]);
+				} catch (const TimeParseException& e){
+					t2 = rect.end_of_time();
+					error = true;
+				}
 			}
 			else if (time_specification == TimeSpecification::START_DURATION) {
-				t1 = time1Parser->parse(tuple[pos_time1]);
-				t2 = t1 + time2Parser->parse(tuple[pos_time2]);
+				try {
+					t1 = time1Parser->parse(tuple[pos_time1]);
+					t2 = t1 + time2Parser->parse(tuple[pos_time2]);
+				} catch (const TimeParseException& e){
+					t1 = rect.beginning_of_time();
+					t2 = rect.end_of_time();
+					error = true;
+				}
+			}
+
+			if(error) {
+				switch(errorHandling) {
+					case ErrorHandling::ABORT:
+						throw OperatorException("CSVSource: could not parse time");
+					case ErrorHandling::SKIP:
+						collection->removeLastFeature();
+						continue;
+					case ErrorHandling::KEEP:
+						break;
+				}
 			}
 			collection->time_start.push_back(t1);
 			collection->time_end.push_back(t2);
 		}
 
 
+
 		// Step 3: extract the attributes
 		for (size_t k=0;k<columns_numeric.size();k++) {
-			collection->feature_attributes.numeric(columns_numeric[k]).set(current_idx, std::strtod(tuple[pos_numeric[k]].c_str(), nullptr));
+			double value;
+			try {
+				value = std::stod(tuple[pos_numeric[k]].c_str());
+			} catch (const std::exception& e) {
+				switch(errorHandling) {
+					case ErrorHandling::ABORT:
+						throw OperatorException("CSVSource: error parsing double value from string");
+					case ErrorHandling::SKIP:
+						collection->removeLastFeature();
+						continue;
+					case ErrorHandling::KEEP:
+						break;
+				}
+			}
+			collection->feature_attributes.numeric(columns_numeric[k]).set(current_idx, value);
 		}
 		for (size_t k=0;k<columns_textual.size();k++) {
 			collection->feature_attributes.textual(columns_textual[k]).set(current_idx, tuple[pos_textual[k]]);

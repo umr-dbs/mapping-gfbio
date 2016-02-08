@@ -255,11 +255,6 @@ void LineCollection::featureToGeoJSONGeometry(size_t featureIndex, std::ostrings
 	json << "}";
 }
 
-std::string LineCollection::toCSV() const {
-	 //TODO: implement
-	return "";
-}
-
 void LineCollection::featureToWKT(size_t featureIndex, std::ostringstream& wkt) const {
 	if(featureIndex >= getFeatureCount()){
 		throw ArgumentException("featureIndex is greater than featureCount");
@@ -313,4 +308,22 @@ void LineCollection::validateSpecifics() const {
 
 	if(start_feature.back() != start_line.size() - 1)
 		throw FeatureException("Feature not finished");
+}
+
+void LineCollection::removeLastFeature(){
+	bool time = hasTime();
+	if(start_feature.back() == start_line.size() - 1 && start_line.back() == coordinates.size()){
+		start_feature.pop_back();
+	}
+	start_line.erase(start_line.begin() + start_feature.back() + 1, start_line.end());
+
+	coordinates.erase(coordinates.begin() + start_line.back(), coordinates.end());
+
+	size_t featureCount = getFeatureCount();
+
+	if(time) {
+		time_start.resize(featureCount);
+		time_end.resize(featureCount);
+	}
+	feature_attributes.resize(featureCount);
 }

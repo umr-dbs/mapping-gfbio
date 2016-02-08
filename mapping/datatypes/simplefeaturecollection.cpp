@@ -132,6 +132,50 @@ std::string SimpleFeatureCollection::toWKT() const {
 	return wkt.str();
 }
 
+std::string SimpleFeatureCollection::toCSV() const {
+	//TODO: include global metadata
+	std::ostringstream csv;
+	csv << std::fixed; // std::setprecision(4);
+
+	auto string_keys = feature_attributes.getTextualKeys();
+	auto value_keys = feature_attributes.getNumericKeys();
+
+	bool isSimpleCollection = isSimple();
+
+	//header
+	csv << "wkt";
+	if (hasTime())
+		csv << ",\"time_start\",\"time_end\"";
+	for(auto &key : string_keys) {
+		csv << ",\"" << key << "\"";
+	}
+	for(auto &key : value_keys) {
+		csv << ",\"" << key << "\"";
+	}
+	csv << std::endl;
+
+	for (size_t featureIndex = 0; featureIndex < getFeatureCount(); ++featureIndex) {
+		csv << "\"";
+		featureToWKT(featureIndex, csv);
+		csv << "\"";
+		if (hasTime()){
+			csv << "," << "\"" << stref.toIsoString(time_start[featureIndex]) << "\"" << ","
+					 << "\"" << stref.toIsoString(time_end[featureIndex]) << "\"";
+		}
+
+		//TODO: handle missing metadata values
+		for(auto &key : string_keys) {
+			csv << ",\"" << feature_attributes.textual(key).get(featureIndex) << "\"";
+		}
+		for(auto &key : value_keys) {
+			csv << "," << feature_attributes.numeric(key).get(featureIndex);
+		}
+		csv << std::endl;
+	}
+
+	return csv.str();
+}
+
 std::string SimpleFeatureCollection::featureToWKT(size_t featureIndex) const{
 	std::ostringstream wkt;
 	featureToWKT(featureIndex, wkt);

@@ -112,6 +112,8 @@ public:
 	 */
 	size_t finishFeature();
 
+	virtual void removeLastFeature();
+
 	/**
 	 * filter the features of the collections based on keep vector
 	 * @param keep the vector specifying which features to keep
@@ -199,8 +201,6 @@ public:
 	 * @return the hash of the collection
 	 */
 	std::string hash() const;
-
-	virtual std::string toCSV() const;
 
 	virtual bool isSimple() const final;
 

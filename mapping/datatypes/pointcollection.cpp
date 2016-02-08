@@ -443,3 +443,20 @@ void PointCollection::validateSpecifics() const {
 	if(start_feature.back() != coordinates.size())
 		throw FeatureException("Feature not finished");
 }
+
+void PointCollection::removeLastFeature(){
+	bool time = hasTime();
+	if(start_feature.back() == coordinates.size()){
+		start_feature.pop_back();
+	}
+	coordinates.erase(coordinates.begin() + start_feature.back(), coordinates.end());
+
+
+	size_t featureCount = getFeatureCount();
+
+	if(time) {
+		time_start.resize(featureCount);
+		time_end.resize(featureCount);
+	}
+	feature_attributes.resize(featureCount);
+}

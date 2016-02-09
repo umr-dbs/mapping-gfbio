@@ -4,11 +4,19 @@
 #include "util/binarystream.h"
 #include "util/configuration.h"
 #include "util/make_unique.h"
+#include "util/log.h"
 
 #include <stdio.h>
 #include <cstdlib>
 #include <sstream>
-#include <fstream>
+//#include <fstream>
+
+// open(), seek() etc
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 
 RemoteRasterDBBackend::RemoteRasterDBBackend() {
 	auto servername = Configuration::get("rasterdb.remote.host");
@@ -224,6 +232,16 @@ bool RemoteRasterDBBackend::hasTile(rasterid_t rasterid, uint32_t width, uint32_
 	throw std::runtime_error("RemoteRasterDBBackend::hasTile() not implemented");
 }
 
+// Make sure a raw posix file descriptor is closed when going out of scope
+class FD_Guard {
+	public:
+		FD_Guard(int fd) : fd(fd) {}
+		~FD_Guard() { close(fd); }
+	private:
+		int fd;
+};
+
+
 std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescription &tiledesc) {
 	if (!this->is_opened)
 		throw ArgumentException("Cannot call readTile() before open() on a RasterDBBackend");
@@ -234,19 +252,23 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 		pathss << cache_directory << sourcename << "_" << tiledesc.channelid << "_" << tiledesc.tileid << ".tile";
 		cachepath = pathss.str();
 
-		std::ifstream file(cachepath);
-		if (file.is_open()) {
-			file.seekg(0, std::ios::end);
-			auto filesize = file.tellg();
-			if (filesize == tiledesc.size) {
-				file.seekg(0, std::ios::beg);
-				auto bb = make_unique<ByteBuffer>(filesize);
-				file.read((char *) bb->data, bb->size);
-				return bb;
+		// If a file exists, we try to read it.
+		// If it has the wrong size, or reading fails for any reason, ignore the file and request a copy over the network.
+		int fd = ::open(cachepath.c_str(), O_RDONLY);
+		if (fd >= 0) {
+			FD_Guard fd_guard(fd);
+			auto filesize = lseek(fd, 0, SEEK_END);
+			if (filesize >= 0 && filesize == tiledesc.size) {
+				if (lseek(fd, 0, SEEK_SET) == 0) {
+					auto bb = make_unique<ByteBuffer>(filesize);
+					if (read(fd, bb->data, bb->size) == bb->size) {
+						Log::debug("RemoteRasterDBBackend::readTile(): returning from local cache");
+						return bb;
+					}
+				}
 			}
 			else {
-				fprintf(stderr, "RemoteRasterDBBackend::readTile(): size in cache %lu, expected %lu\n", filesize, tiledesc.size);
-				file.close();
+				Log::warn("RemoteRasterDBBackend::readTile(): size in cache %lu, expected %lu", filesize, tiledesc.size);
 			}
 		}
 	}
@@ -267,9 +289,17 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 	response.read((char *) bb->data, bb->size);
 
 	if (cache_directory != "") {
-		std::ofstream file(cachepath);
-		file.write((char *) bb->data, bb->size);
-		file.close();
+		// Write the data to the cache. If the file already exists, open() with O_EXCL will fail.
+		int fd = ::open(cachepath.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IRGRP | S_IROTH);
+		if (fd >= 0) {
+			FD_Guard fd_guard(fd);
+			auto res = write(fd, (char *) bb->data, bb->size);
+			if (res != bb->size) {
+				Log::warn("RemoteRasterDBBackend::readTile(): failed to write tile to cache (got %ld, expected %lu, errno = %d, fd = %d)", res, bb->size, errno, fd);
+				// oops. Better try to remove the file, it's broken. Don't bother checking for errors, there's no way to handle them.
+				unlink(cachepath.c_str());
+			}
+		}
 	}
 	return bb;
 }

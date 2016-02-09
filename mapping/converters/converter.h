@@ -5,10 +5,10 @@
 
 class ByteBuffer {
 	public:
-		ByteBuffer(unsigned char *data, size_t size) : data(data), size(size) {};
-		ByteBuffer(size_t size) : data(nullptr), size(size) { data = new unsigned char[size]; }
+		ByteBuffer(char *data, size_t size) : data(data), size(size) {};
+		ByteBuffer(size_t size) : data(nullptr), size(size) { data = new char[size]; }
 		~ByteBuffer() { delete [] data; data = nullptr; size = 0; };
-		unsigned char *data;
+		char *data;
 		size_t size;
 	private:
 		void operator=(ByteBuffer &);

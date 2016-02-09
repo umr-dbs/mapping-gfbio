@@ -240,8 +240,10 @@ system_testcases: ${EXE} ${TEST_LOGS}
 
 system_testenvironment: ${EXE}
 	rm -f test/systemtests/data/world1.dat test/systemtests/data/world1.db
+	rm -f test/systemtests/data/ndvi.dat test/systemtests/data/ndvi.db
 	#./${EXE} createsource 4326 test/systemtests/data/world1.tif  >test/systemtests/data/test_world1.json
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXE} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; bash test/systemtests/data/ndvi/import.sh 
 
 test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} test/systemtests/data/world1.dat 
 	echo -n >$@

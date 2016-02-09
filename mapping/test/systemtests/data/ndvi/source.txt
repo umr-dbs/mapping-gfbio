@@ -1,0 +1,5 @@
+data set from Nasa Earth Observations (http://neo.sci.gsfc.nasa.gov/)
+link to data set: http://neo.sci.gsfc.nasa.gov/view.php?datasetId=MOD13A2_E_NDVI
+
+Credits
+Images by Reto Stockli, NASA's Earth Observatory Group, using data provided by the MODIS Land Science Team.

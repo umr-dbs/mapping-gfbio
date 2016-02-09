@@ -25,6 +25,8 @@ OPT_FLAGS=-O2
 # to override any of these options, create Makefile.local and set them there
 -include Makefile.local
 
+# AddressSanitizer, see for example http://clang.llvm.org/docs/AddressSanitizer.html
+ADDRSAN_FLAGS:=-fsanitize=address -fno-omit-frame-pointer
 
 CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. -I${JSONCPP_INCLUDE_DIR} -I${GDAL_INCLUDE_DIR}
 CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
@@ -35,9 +37,6 @@ LDFLAGS_CGI=-lfcgi++ -lfcgi
 LDFLAGS_GTEST=-lpthread
 CL_SOURCES:=$(wildcard operators/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
-
-VALGRIND=valgrind --tool=memcheck --leak-check=full --show-leak-kinds=all --suppressions=test/systemtests/valgrind_suppression.supp --error-exitcode=2
-TEST_MODE=run
 
 TEST_QUERIES:=$(wildcard test/systemtests/queries/*.json)
 TEST_LOGS:=$(TEST_QUERIES:.json=.log)
@@ -92,6 +91,7 @@ OBJ_UNITTEST:=$(patsubst test/%,o/test/%,$(SRC_UNITTEST:.cpp=.o))
 # All executables
 #
 EXE=mapping_manager
+EXE_ADDRSAN=mapping_manager.addrsan
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
 EXEGTEST=gtest
@@ -123,6 +123,9 @@ all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXEC
 
 ${EXE}:	o/mapping_manager.o ${OBJ_COMMON}
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
+	
+${EXE_ADDRSAN}:	$(patsubst %.o,%.as.o,o/mapping_manager.o ${OBJ_COMMON})
+	${CPP} $+ -o $@ $(ADDRSAN_FLAGS) ${LDFLAGS} ${LDFLAGS_CL}
 
 ${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES}
 	${CPP} $+ -o $@  ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_CGI}
@@ -178,8 +181,12 @@ o/rserver/%.o: rserver/%.cpp | $${@D}/.f
 o/operators_stub/%.o: operators/%.cpp | $${@D}/.f
 	${CPP} ${CPPFLAGS} -DMAPPING_OPERATOR_STUBS=1 -MMD -MF ${@:.o=.d} -c $< -o $@
 
-o/%.o: %.cpp | $${@D}/.f
+o/%.o: %.cpp | $${@D}/.f $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
+
+# .as.o = compiled with AddressSanitizer
+o/%.as.o: %.cpp | $${@D}/.f $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} ${ADDRSAN_FLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
 
 o/%/.f:
 	mkdir -p $(dir $@)
@@ -245,11 +252,11 @@ system_testenvironment: ${EXE}
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXE} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; bash test/systemtests/data/ndvi/import.sh 
 
-test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} test/systemtests/data/world1.dat 
+test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_ADDRSAN} 
 	echo -n >$@
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE} testsemantic $< 2>&1) ; then echo "semantic_passed: yes" >>$@ ; else echo "semantic_passed: no\n$$EXELOG" >>$@ ; fi
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE} testquery $< 2>&1) ; then echo "hash_passed: yes" >>$@ ; else echo "hash_passed: no\n$$EXELOG" >>$@ ; fi
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if VGLOG=$$(timeout 180 ${VALGRIND} ./${EXE} testquery $< 2>&1) ; then echo "valgrind_passed: yes" >>$@ ; else echo "valgrind_passed: no\n$$VGLOG" >>$@ ; fi
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE_ADDRSAN} testquery $< nosethash nofail 2>&1) ; then echo "addrsan_passed: yes" >>$@ ; else echo "addrsan_passed: no\n$$EXELOG" >>$@ ; fi
 
 unittest: ${EXEGTEST}
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes
@@ -263,7 +270,7 @@ doc:
 	./../docs/makeDoc
 
 clean:
-	rm -f ${EXE} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXECACHEEXP} ${EXECLUSEXP}
+	rm -f ${EXE} ${EXE_ADDRSAN} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXECACHEEXP} ${EXECLUSEXP}
 	rm -f $(CL_HEADERS)
 	find o/ -type f -name '*.o' -delete
 	find o/ -type f -name '*.d' -delete

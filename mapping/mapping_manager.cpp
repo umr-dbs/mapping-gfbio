@@ -402,6 +402,10 @@ static int testquery(int argc, char *argv[]) {
 	if (argc >= 4 && argv[3][0] == 'S')
 		set_hash = true;
 
+	int failure_exit_code = 5;
+	if (argc >= 5 && strcmp(argv[4], "nofail") == 0)
+		failure_exit_code = 0;
+
 	try {
 		/*
 		 * Step #1: open the query.json file and parse it
@@ -409,14 +413,14 @@ static int testquery(int argc, char *argv[]) {
 		std::ifstream file(in_filename);
 		if (!file.is_open()) {
 			printf("unable to open query file %s\n", in_filename);
-			return 5;
+			return failure_exit_code;
 		}
 
 		Json::Reader reader(Json::Features::strictMode());
 		Json::Value root;
 		if (!reader.parse(file, root)) {
 			printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
-			return 5;
+			return failure_exit_code;
 		}
 
 		auto graph = GenericOperator::fromJSON(root["query"]);
@@ -441,7 +445,7 @@ static int testquery(int argc, char *argv[]) {
 				queryMode = GenericOperator::RasterQM::LOOSE;
 			else {
 				fprintf(stderr, "invalid query mode");
-				exit(5);
+				return failure_exit_code;
 			}
 
 			auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
@@ -481,7 +485,7 @@ static int testquery(int argc, char *argv[]) {
 
 		if (real_hash != real_hash2) {
 			printf("Hashes of result and its clone differ, probably a bug in clone():original: %s\ncopy:      %s\n", real_hash.c_str(), real_hash2.c_str());
-			return 5;
+			return failure_exit_code;
 		}
 
 		if (root.isMember("query_expected_hash")) {
@@ -490,7 +494,7 @@ static int testquery(int argc, char *argv[]) {
 
 			if (expected_hash != real_hash) {
 				printf("MISMATCH!!!\n");
-				return 5;
+				return failure_exit_code;
 			}
 		}
 		else if (set_hash) {
@@ -499,16 +503,16 @@ static int testquery(int argc, char *argv[]) {
 			file << root;
 			file.close();
 			printf("No hash in query file, added %s\n", real_hash.c_str());
-			return 5;
+			return failure_exit_code;
 		}
 		else {
 			printf("No hash in query file\n");
-			return 5;
+			return failure_exit_code;
 		}
 	}
 	catch (const std::exception &e) {
 		printf("Exception: %s\n", e.what());
-		return 5;
+		return failure_exit_code;
 	}
 	return 0;
 }

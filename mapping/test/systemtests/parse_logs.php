@@ -3,7 +3,7 @@
 
 $date = date('r');
 
-$expected_results = array('semantic', 'hash', 'valgrind');
+$expected_results = array('semantic', 'hash', 'addrsan');
 
 echo <<<EOS
 <html>

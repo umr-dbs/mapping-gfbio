@@ -11,6 +11,11 @@ JSONCPP_INCLUDE_DIR=/usr/include/jsoncpp/
 
 #CPP=g++
 CPP=clang++-3.5
+LLVM_SYMBOLIZER=/usr/bin/llvm-symbolizer-3.5
+ASAN_OPTIONS=
+# if you need better stack traces, use something like this. This will slow down the tests by a factor of 5-10!
+#ASAN_OPTIONS=fast_unwind_on_malloc=0:malloc_context_size=10
+
 
 USE_R=true
 USE_OPENCL=true
@@ -254,9 +259,7 @@ system_testenvironment: ${EXE}
 
 test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_ADDRSAN} 
 	echo -n >$@
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE} testsemantic $< 2>&1) ; then echo "semantic_passed: yes" >>$@ ; else echo "semantic_passed: no\n$$EXELOG" >>$@ ; fi
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE} testquery $< 2>&1) ; then echo "hash_passed: yes" >>$@ ; else echo "hash_passed: no\n$$EXELOG" >>$@ ; fi
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; if EXELOG=$$(./${EXE_ADDRSAN} testquery $< nosethash nofail 2>&1) ; then echo "addrsan_passed: yes" >>$@ ; else echo "addrsan_passed: no\n$$EXELOG" >>$@ ; fi
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" ; if EXELOG=$$(./${EXE_ADDRSAN} testquery $< 2>&1) ; then echo "PASSED: all" >>$@ ; else echo "$$EXELOG" >>$@ ; fi
 
 unittest: ${EXEGTEST}
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes

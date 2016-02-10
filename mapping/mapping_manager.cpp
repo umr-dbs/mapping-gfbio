@@ -35,11 +35,9 @@ static void usage() {
 		printf("%s link <sourcename> <sourcechannel> <time_reference> <time_start> <duration>\n", program_name);
 		printf("%s query <queryname> <png_filename>\n", program_name);
 		printf("%s testquery <queryname>\n", program_name);
-		printf("%s testsemantic <queryname>\n", program_name);
 		printf("%s enumeratesources [verbose]\n", program_name);
 		exit(5);
 }
-
 
 static void convert(int argc, char *argv[]) {
 	if (argc < 3) {
@@ -393,6 +391,35 @@ static void runquery(int argc, char *argv[]) {
 	}
 }
 
+static bool testsemantic(GenericOperator *graph) {
+	/*
+	 * Make sure the graph's semantic id works
+	 */
+	try {
+		auto semantic1 = graph->getSemanticId();
+		std::unique_ptr<GenericOperator> graph2 = nullptr;
+		try {
+			graph2 = GenericOperator::fromJSON(semantic1);
+		}
+		catch (const std::exception &e) {
+			printf("\nFAILED: semantic\nException parsing graph from semantic id: %s\n%s", e.what(), semantic1.c_str());
+			return false;
+		}
+		auto semantic2 = graph2->getSemanticId();
+		if (semantic1 != semantic2) {
+			printf("\nFAILED: semantic\nSemantic ID changes after reconstruction:\n%s\n%s\n", semantic1.c_str(), semantic2.c_str());
+			return false;
+		}
+	}
+	catch (const std::exception &e) {
+		printf("\nFAILED: semantic\nException during testsemantic: %s\n", e.what());
+		return false;
+	}
+
+	printf("\nPASSED: semantic\n");
+	return true;
+}
+
 static int testquery(int argc, char *argv[]) {
 	if (argc < 3) {
 		usage();
@@ -402,9 +429,7 @@ static int testquery(int argc, char *argv[]) {
 	if (argc >= 4 && argv[3][0] == 'S')
 		set_hash = true;
 
-	int failure_exit_code = 5;
-	if (argc >= 5 && strcmp(argv[4], "nofail") == 0)
-		failure_exit_code = 0;
+	bool semantic_is_working = false;
 
 	try {
 		/*
@@ -413,20 +438,25 @@ static int testquery(int argc, char *argv[]) {
 		std::ifstream file(in_filename);
 		if (!file.is_open()) {
 			printf("unable to open query file %s\n", in_filename);
-			return failure_exit_code;
+			return 5;
 		}
 
 		Json::Reader reader(Json::Features::strictMode());
 		Json::Value root;
 		if (!reader.parse(file, root)) {
 			printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
-			return failure_exit_code;
+			return 5;
 		}
 
 		auto graph = GenericOperator::fromJSON(root["query"]);
 
 		/*
-		 * Step #2: run the query and see if the results match
+		 * Step #2: test if the semantic ID of this query is working
+		 */
+		semantic_is_working = testsemantic(graph.get());
+
+		/*
+		 * Step #3: run the query and see if the results match
 		 */
 		std::string result = root.get("query_result", "raster").asString();
 		std::string real_hash, real_hash2;
@@ -445,7 +475,7 @@ static int testquery(int argc, char *argv[]) {
 				queryMode = GenericOperator::RasterQM::LOOSE;
 			else {
 				fprintf(stderr, "invalid query mode");
-				return failure_exit_code;
+				return 5;
 			}
 
 			auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
@@ -485,16 +515,18 @@ static int testquery(int argc, char *argv[]) {
 
 		if (real_hash != real_hash2) {
 			printf("Hashes of result and its clone differ, probably a bug in clone():original: %s\ncopy:      %s\n", real_hash.c_str(), real_hash2.c_str());
-			return failure_exit_code;
+			return 5;
 		}
 
 		if (root.isMember("query_expected_hash")) {
 			std::string expected_hash = root.get("query_expected_hash", "#").asString();
-			printf("Expected: %s\nResult  : %s\n", expected_hash.c_str(), real_hash.c_str());
-
-			if (expected_hash != real_hash) {
-				printf("MISMATCH!!!\n");
-				return failure_exit_code;
+			if (expected_hash == real_hash) {
+				printf("\nPASSED: hash\n");
+				return semantic_is_working ? 0 : 5;
+			}
+			else {
+				printf("\nFAILED: hash\nExpected: %s\nResult  : %s\n", expected_hash.c_str(), real_hash.c_str());
+				return 5;
 			}
 		}
 		else if (set_hash) {
@@ -503,60 +535,10 @@ static int testquery(int argc, char *argv[]) {
 			file << root;
 			file.close();
 			printf("No hash in query file, added %s\n", real_hash.c_str());
-			return failure_exit_code;
+			return 5;
 		}
 		else {
 			printf("No hash in query file\n");
-			return failure_exit_code;
-		}
-	}
-	catch (const std::exception &e) {
-		printf("Exception: %s\n", e.what());
-		return failure_exit_code;
-	}
-	return 0;
-}
-
-static int testsemantic(int argc, char *argv[]) {
-	if (argc < 3) {
-		usage();
-	}
-	char *in_filename = argv[2];
-
-	try {
-		/*
-		 * Step #1: open the query.json file and parse it
-		 */
-		std::ifstream file(in_filename);
-		if (!file.is_open()) {
-			printf("unable to open query file %s\n", in_filename);
-			return 5;
-		}
-
-		Json::Reader reader(Json::Features::strictMode());
-		Json::Value root;
-		if (!reader.parse(file, root)) {
-			printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
-			return 5;
-		}
-
-		auto graph = GenericOperator::fromJSON(root["query"]);
-
-		/*
-		 * Step #2: make sure the graph's semantic id works
-		 */
-		auto semantic1 = graph->getSemanticId();
-		decltype(graph) graph2 = nullptr;
-		try {
-			graph2 = GenericOperator::fromJSON(semantic1);
-		}
-		catch (const std::exception &e) {
-			printf("Exception parsing graph from semantic id: %s\n%s", e.what(), semantic1.c_str());
-			return 5;
-		}
-		auto semantic2 = graph2->getSemanticId();
-		if (semantic1 != semantic2) {
-			printf("Semantic ID changes after reconstruction:\n%s\n%s\n", semantic1.c_str(), semantic2.c_str());
 			return 5;
 		}
 	}
@@ -564,8 +546,7 @@ static int testsemantic(int argc, char *argv[]) {
 		printf("Exception: %s\n", e.what());
 		return 5;
 	}
-	printf("Semantic ID is ok\n");
-	return 0;
+	return 10;
 }
 
 
@@ -605,9 +586,6 @@ int main(int argc, char *argv[]) {
 	}
 	else if (strcmp(command, "testquery") == 0) {
 		returncode = testquery(argc, argv);
-	}
-	else if (strcmp(command, "testsemantic") == 0) {
-		returncode = testsemantic(argc, argv);
 	}
 	else if (strcmp(command, "enumeratesources") == 0) {
 		bool verbose = false;

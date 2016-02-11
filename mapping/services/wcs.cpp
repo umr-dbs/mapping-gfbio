@@ -12,12 +12,15 @@ class WCSService : public OGCService {
 };
 REGISTER_HTTP_SERVICE(WCSService, "WCS");
 
-
-static std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::string openGisUri,std::ostream &error){
-	size_t beforeAutorityId = openGisUri.find("crs")+3;
-	size_t behindAutorityId = openGisUri.find_first_of("/",beforeAutorityId+1);
-	std::string authorityId = openGisUri.substr(beforeAutorityId+1, behindAutorityId-beforeAutorityId-1);
-	error<<"getCrsInformationFromOGCUri openGisUri: "<<openGisUri<<" beforeAutorityId: "<<beforeAutorityId<<" behindAutorityId: "<<behindAutorityId<<" authorityId: "<<authorityId<<std::endl;
+/**
+ * This method extracts the CRS information from a semantic opengis.net uri.
+ * It accepts simple CRS strings like http://www.opengis.net/def/crs/EPSG/0/4326
+ * It accepts complex strings which include a semantic opengis.net CRS like "lon,http://www.opengis.net/def/crs/EPSG/0/4326(-71,47)"
+ */
+static std::pair<std::string, std::string> getCrsInformationFromOGCUri(const std::string &openGisUri){
+	const size_t beforeAutorityId = openGisUri.find("crs")+3;
+	const size_t behindAutorityId = openGisUri.find_first_of("/",beforeAutorityId+1);
+	const std::string authorityId = openGisUri.substr(beforeAutorityId+1, behindAutorityId-beforeAutorityId-1);
 
 	//get the crsID
 	size_t beforeCrsCode = openGisUri.find_last_of("/");
@@ -26,42 +29,47 @@ static std::pair<std::string, std::string> getCrsInformationFromOGCUri(std::stri
 		behindCrsCode = openGisUri.length();
 
 	std::string crsCode = openGisUri.substr(beforeCrsCode+1, behindCrsCode-beforeCrsCode-1);
-	error<<"getCrsInformationFromOGCUri openGisUri: "<<openGisUri<<" beforeCrsCode: "<<beforeCrsCode<<" behindCrsCode: "<<behindCrsCode<<" crsCode: "<<crsCode<<std::endl;
 
-	//
 	return (std::pair<std::string, std::string>{"EPSG",crsCode});
 }
 
-static std::pair<double, double> getWfsParameterRangeDouble(std::string wfsParameterString, std::ostream &error){
+
+/**
+ * This method extracts a (double) parameter range from a wcs string. The string may start with a full semantic opengis.net uri.
+ * Examples: &subset=x,(-71,47), &subset=lon,http://www.opengis.net/def/crs/EPSG/0/4326(-71,47)
+ */
+static std::pair<double, double> getWcsParameterRangeDouble(const std::string &wcsParameterString){
 	std::pair<double, double> resultPair;
 
-	size_t rangeStart = wfsParameterString.find_first_of("(");
-	size_t rangeEnd = wfsParameterString.find_last_of(")");
-	size_t rangeSeperator = wfsParameterString.find_first_of(",", rangeStart);
-	size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
+	const size_t rangeStart = wcsParameterString.find_first_of("(");
+	const size_t rangeEnd = wcsParameterString.find_last_of(")");
+	const size_t rangeSeperator = wcsParameterString.find_first_of(",", rangeStart);
+	const size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
 
-	resultPair.first = std::stod(wfsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
+	resultPair.first = std::stod(wcsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
 
 	if(rangeSeperator == std::string::npos){
 		resultPair.second = resultPair.first;
 	}else{
-		resultPair.second = std::stod(wfsParameterString.substr(firstEnd+1, rangeEnd-firstEnd -1));
+		resultPair.second = std::stod(wcsParameterString.substr(firstEnd+1, rangeEnd-firstEnd -1));
 	}
-	error<<"getParameterRangeFromOGCUri openGisUri: "<<wfsParameterString<<" resultPair.first: "<<resultPair.first<<" resultPair.second: "<<resultPair.second<<std::endl;
 	return resultPair;
 }
 
-static int getWfsParameterInteger(const std::string &wfsParameterString, std::ostream &error){
 
-	size_t rangeStart = wfsParameterString.find_first_of("(");
-	size_t rangeEnd = wfsParameterString.find_last_of(")");
-	size_t rangeSeperator = wfsParameterString.find_first_of(",", rangeStart);
-	size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
+/**
+ * This method extracts a single int parameter from a wcs string. This is used for params like &size_x=(3712)
+ */
+static int getWcsParameterInteger(const std::string &wcsParameterString){
 
-	if(rangeSeperator != std::string::npos)
-		error<<"[getWFSIntegerParameter] "<<wfsParameterString<<" contains a range!"<<std::endl;
+	const size_t rangeStart = wcsParameterString.find_first_of("(");
+	const size_t rangeEnd = wcsParameterString.find_last_of(")");
+	const size_t rangeSeperator = wcsParameterString.find_first_of(",", rangeStart);
 
-	int parameterValue = std::stoi(wfsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
+	//TODO: currently we only support single time stamps. WCS does allow to query for a time range which should be handled somehow.
+	const size_t firstEnd = (rangeSeperator == std::string::npos) ? rangeEnd : rangeSeperator;
+
+	int parameterValue = std::stoi(wcsParameterString.substr(rangeStart+1, firstEnd-rangeStart -1));
 	return parameterValue;
 }
 
@@ -72,9 +80,11 @@ void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 	 * service=WCS &version=2.0
 	 * &request=GetCoverage
 	 * &coverageId=C0002
-	 * &subset=lon,http://www.opengis.net/def/crs/EPSG/0/4326(-71,47)
-	 * &subset=lat,http://www.opengis.net/def/crs/EPSG/0/4326(-66,51)
+	 * &subset=lon,(-71,47)
+	 * &subset=lat,(-66,51)
 	 * &subset=t,http://www.opengis.net/def/trs/ISO-8601/0/Gregorian+UTC("2009-11-06T23:20:52Z")
+	 * &OUTPUTCRS=http://www.opengis.net/def/crs/EPSG/0/4326
+	 * &SCALESIZE=axis(pixel)[,axis(size)]
 	 */
 
 	std::string version = params.get("version");
@@ -86,7 +96,7 @@ void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		auto graph = GenericOperator::fromJSON(params.get("coverageid"));
 
 		//now we will identify the parameters for the QueryRectangle
-		std::pair<std::string, std::string> crsInformation = getCrsInformationFromOGCUri(params.get("outputcrs"), error);
+		std::pair<std::string, std::string> crsInformation = getCrsInformationFromOGCUri(params.get("outputcrs"));
 		epsg_t query_crsId = (epsg_t) std::stoi(crsInformation.second);
 
 		/*
@@ -100,11 +110,12 @@ void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		 *}
 		 */
 
-		std::pair<double, double> crsRangeLon = getWfsParameterRangeDouble(params.get("subset_lon"), error);
-		std::pair<double, double> crsRangeLat = getWfsParameterRangeDouble(params.get("subset_lat"), error);
+		//TODO: Handle aliases of coordinate axes like "lon,lat".
+		std::pair<double, double> crsRangeX = getWcsParameterRangeDouble(params.get("subset_x"));
+		std::pair<double, double> crsRangeY = getWcsParameterRangeDouble(params.get("subset_y"));
 
-		unsigned int sizeX = getWfsParameterInteger(params.get("size_x"), error);
-		unsigned int sizeY = getWfsParameterInteger(params.get("size_y"), error);
+		unsigned int sizeX = getWcsParameterInteger(params.get("size_x"));
+		unsigned int sizeY = getWcsParameterInteger(params.get("size_y"));
 
 		double timestamp = 1295266500; // 2011-1-17 12:15
 		if(params.hasParam("time"))
@@ -113,13 +124,12 @@ void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		//build the queryRectangle and get the data
 		bool flipx, flipy;
 		QueryRectangle query_rect(
-			SpatialReference(query_crsId, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, flipx, flipy),
+			SpatialReference(query_crsId, crsRangeX.first, crsRangeY.first, crsRangeX.second, crsRangeY.second, flipx, flipy),
 			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 			QueryResolution::pixels(sizeX, sizeY)
 		);
 		QueryProfiler profiler;
 		auto result_raster = graph->getCachedRaster(query_rect,profiler);
-		// TODO: Raster flippen?
 
 		//setup the output parameters
 		std::string gdalDriver = "GTiff";

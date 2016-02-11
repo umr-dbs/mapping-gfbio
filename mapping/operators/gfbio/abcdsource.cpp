@@ -339,34 +339,35 @@ std::unique_ptr<PointCollection> ABCDSource::getPointCollection(const QueryRecta
 	//TODO: catch XML exceptions and throw OperatorException instead?
 
 	XMLPlatformUtils::Initialize(); //TODO: only do this once for long running process
+	{
+		//create parser
+		static const XMLCh gLS[] = { chLatin_L, chLatin_S, chNull };
+		DOMImplementation*  impl = DOMImplementationRegistry::getDOMImplementation(gLS); //deleted by XMLPlatform::Terminate
+		std::unique_ptr<DOMLSParserImpl> parser(dynamic_cast<DOMLSParserImpl*>(impl->createLSParser(DOMImplementationLS::MODE_SYNCHRONOUS, 0)));
 
-	//create parser
-	static const XMLCh gLS[] = { chLatin_L, chLatin_S, chNull };
-	DOMImplementation*  impl = DOMImplementationRegistry::getDOMImplementation(gLS); //deleted by XMLPlatform::Terminate
-	DOMLSParserImpl* parser = dynamic_cast<DOMLSParserImpl*>(impl->createLSParser(DOMImplementationLS::MODE_SYNCHRONOUS, 0)); //deleted by XMLPlatform::Terminate
+		//configure
+		parser->setParameter(XMLUni::fgXercesDOMHasPSVIInfo, true);  //collect schema info
+		parser->setParameter(XMLUni::fgDOMComments, false); //discard comments
+		parser->setExternalNoNamespaceSchemaLocation("ABCD_2.06.XSD");
+		parser->setDoSchema(true);
+		parser->setValidationScheme(xercesc::XercesDOMParser::Val_Always);
 
-	//configure
-	parser->setParameter(XMLUni::fgXercesDOMHasPSVIInfo, true);  //collect schema info
-	parser->setParameter(XMLUni::fgDOMComments, false); //discard comments
-	parser->setExternalNoNamespaceSchemaLocation("ABCD_2.06.XSD");
-	parser->setDoSchema(true);
-	parser->setValidationScheme(xercesc::XercesDOMParser::Val_Always);
+		parser->parseURI(inputFile.c_str());
 
-	parser->parseURI(inputFile.c_str());
-
-	DOMDocument* doc = parser->getDocument(); //deleted by parser when done
-	if(doc == nullptr)
-		throw OperatorException(concat("ABCDSource: could not parse document:", inputFile));
+		DOMDocument* doc = parser->getDocument(); //deleted by parser when done
+		if(doc == nullptr)
+			throw OperatorException(concat("ABCDSource: could not parse document:", inputFile));
 
 
-	//handle DataSet metadata
-	DOMNodeList* dataSets = doc->getElementsByTagName(tagNameDataSet);
-	if(dataSets->getLength() == 0)
-		throw OperatorException(concat("ABCDSource: could not parse document:", inputFile));
-	handleGlobalAttributes(dynamic_cast<DOMElement&>(*dataSets->item(0)));
+		//handle DataSet metadata
+		DOMNodeList* dataSets = doc->getElementsByTagName(tagNameDataSet);
+		if(dataSets->getLength() == 0)
+			throw OperatorException(concat("ABCDSource: could not parse document:", inputFile));
+		handleGlobalAttributes(dynamic_cast<DOMElement&>(*dataSets->item(0)));
 
-	//handle Units
-	handleUnits(*doc);
+		//handle Units
+		handleUnits(*doc);
+	}
 
 
 	XMLPlatformUtils::Terminate(); //TODO: only do this once for long running process

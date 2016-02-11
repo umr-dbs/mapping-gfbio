@@ -110,8 +110,9 @@ void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		 *}
 		 */
 
-		std::pair<double, double> crsRangeLon = getWcsParameterRangeDouble(params.get("subset_lon"));
-		std::pair<double, double> crsRangeLat = getWcsParameterRangeDouble(params.get("subset_lat"));
+		//TODO: Handle aliases of coordinate axes like "lon,lat".
+		std::pair<double, double> crsRangeX = getWcsParameterRangeDouble(params.get("subset_x"));
+		std::pair<double, double> crsRangeY = getWcsParameterRangeDouble(params.get("subset_y"));
 
 		unsigned int sizeX = getWcsParameterInteger(params.get("size_x"));
 		unsigned int sizeY = getWcsParameterInteger(params.get("size_y"));
@@ -123,7 +124,7 @@ void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		//build the queryRectangle and get the data
 		bool flipx, flipy;
 		QueryRectangle query_rect(
-			SpatialReference(query_crsId, crsRangeLat.first, crsRangeLon.first, crsRangeLat.second, crsRangeLon.second, flipx, flipy),
+			SpatialReference(query_crsId, crsRangeX.first, crsRangeY.first, crsRangeX.second, crsRangeY.second, flipx, flipy),
 			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
 			QueryResolution::pixels(sizeX, sizeY)
 		);

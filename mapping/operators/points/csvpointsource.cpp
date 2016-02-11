@@ -186,7 +186,9 @@ void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
 	Json::Value params(Json::ValueType::objectValue);
 
 	params["filename"] = filename;
+	params["on_error"] = ErrorHandlingConverter.to_string(errorHandling);
 	params["separator"] = std::string(1, field_separator);
+
 	params["geometry"] = GeometrySpecificationConverter.to_string(geometry_specification);
 	params["time"] = TimeSpecificationConverter.to_string(time_specification);
 	if (time_specification == TimeSpecification::START_DURATION)

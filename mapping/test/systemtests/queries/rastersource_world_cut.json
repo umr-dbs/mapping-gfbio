@@ -1,5 +1,5 @@
 {
-    "name": "Load world raster (loose)",
+    "name": "Load world raster (cut)",
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",
@@ -8,17 +8,17 @@
     },
     "spatial_reference": {
         "projection": "EPSG:4326",
-        "x1": -180,
+        "x1": 0,
         "x2": 180,
-        "y1": -90,
+        "y1": 0,
         "y2": 90
     },
     "resolution": {
     	"type": "pixels",
-        "x": 10800,
-        "y": 5400
+        "x": 5400,
+        "y": 2700
     },
-    "query_mode": "loose",
+    "query_mode": "exact",
     "query": {
         "channel": 0,
         "params": {
@@ -26,5 +26,5 @@
         },
         "type": "source"
     },
-    "query_expected_hash": ""
+    "query_expected_hash": "f90f44125f5e99d5e3921df8213a6e98"
 }

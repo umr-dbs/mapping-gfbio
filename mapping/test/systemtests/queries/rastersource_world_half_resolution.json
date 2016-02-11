@@ -1,5 +1,5 @@
 {
-    "name": "Load world raster (loose)",
+    "name": "Load world raster (half resolution)",
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",
@@ -15,10 +15,10 @@
     },
     "resolution": {
     	"type": "pixels",
-        "x": 10800,
-        "y": 5400
+        "x": 5400,
+        "y": 2700
     },
-    "query_mode": "loose",
+    "query_mode": "exact",
     "query": {
         "channel": 0,
         "params": {
@@ -26,5 +26,5 @@
         },
         "type": "source"
     },
-    "query_expected_hash": ""
+    "query_expected_hash": "65a9315ab6eb9a31b905b5b64fbca64c"
 }

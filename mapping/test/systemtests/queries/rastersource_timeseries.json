@@ -1,10 +1,10 @@
 {
-    "name": "Load world raster (loose)",
+    "name": "Load ndvi raster Okt 2015",
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",
-        "start": 0,
-        "end": 0
+        "start": 1443657600,
+        "end": 1443657601
     },
     "spatial_reference": {
         "projection": "EPSG:4326",
@@ -15,16 +15,16 @@
     },
     "resolution": {
     	"type": "pixels",
-        "x": 10800,
-        "y": 5400
+        "x": 3600,
+        "y": 1800
     },
-    "query_mode": "loose",
+    "query_mode": "exact",
     "query": {
         "channel": 0,
         "params": {
-            "sourcename": "world1"
+            "sourcename": "ndvi"
         },
         "type": "source"
     },
-    "query_expected_hash": ""
+    "query_expected_hash": "af717ed762a4e42ce431e3073c79a27b"
 }

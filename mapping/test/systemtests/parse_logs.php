@@ -3,7 +3,7 @@
 
 $date = date('r');
 
-$expected_results = array('semantic', 'hash', 'valgrind');
+$expected_passes = array('semantic', 'hash', 'addrsan');
 
 echo <<<EOS
 <html>
@@ -41,43 +41,53 @@ sort($logs);
 $collapse_id = 1;
 foreach ($logs as $file) {
 	$passed = array();
-	$log = array();
-	$lines = file(ROOT . $file);
-	$current_subject = $current_result = false;
-	foreach ($lines as $line) {
-		if (preg_match('/(.*)_passed: (.*)/', $line, $matches)) {
-			$current_subject = $matches[1];
-			$current_result = $matches[2] == 'yes' ? true : false;
-			$passed[$current_subject] = $current_result;
-			$log[$current_subject] = '';
-		}
-		if (!$current_subject)
-			continue;
-		if ($passed[$current_subject])
-			continue;
-		$log[$current_subject] .= $line;
-	}
-
 	$all_passed = true;
-	foreach($expected_results as $name) {
-		if (isset($passed[$name]) && !$passed[$name])
-			$all_passed = false;
+	$log = '';
+	$lines = file(ROOT . $file);
+
+	if (trim($lines[0]) == 'PASSED: all') {
+		foreach($expected_passes as $pass)
+			$passed[$pass] = true;
+		$all_passed = true;
+	}
+	else {
+		$log = implode($lines);
+
+		// If something failed, we need to manually search the log for indications of partial successes or failures
+		if (strpos($log, "\nPASSED: semantic\n") !== FALSE)
+			$passed['semantic'] = true;
+		if (strpos($log, "\nFAILED: semantic\n") !== FALSE)
+			$passed['semantic'] = false;
+
+		if (strpos($log, "\nPASSED: hash\n") !== FALSE)
+			$passed['hash'] = true;
+		if (strpos($log, "\nFAILED: hash\n") !== FALSE)
+			$passed['hash'] = false;
+
+		if (strpos($log, 'AddressSanitizer') === FALSE && strpos($log, 'LeakSanitizer') === FALSE)
+			$passed['addrsan'] = true;
+		else
+			$passed['addrsan'] = false;
+
+		foreach($expected_passes as $pass) {
+			if (!isset($passed[$pass]) || !$passed[$pass])
+				$all_passed = false;
+		}
 	}
 	echo '<tr'.($all_passed ? '' : ' onclick="toggle('.$collapse_id.');" style="cursor: pointer;"').'><td>'.$file.'</td>';
-	foreach($expected_results as $name) {
-		if (!isset($passed[$name]))
+
+	foreach($expected_passes as $pass) {
+		if (!isset($passed[$pass]))
 			$col = 'blue';
-		else if ($passed[$name])
+		else if ($passed[$pass])
 			$col = 'green';
 		else
 			$col = 'red';
-		echo '<td style="background-color: ' . $col . '">'.$name.'</td>';
+		echo '<td style="background-color: ' . $col . '">'.$pass.'</td>';
 	}
 	echo "</tr>\n";
-	foreach($expected_results as $name) {
-		if (!isset($passed[$name]) || $passed[$name])
-			continue;
-		echo '<tr class="collapse_'.$collapse_id.'" style="display: none"><td colspan="'.(count($expected_results)+1).'"><b>'.$name.'</b><br /><pre>'.$log[$name].'</pre></td></tr>'."\n";
+	if (!$all_passed) {
+		echo '<tr class="collapse_'.$collapse_id.'" style="display: none"><td colspan="'.(count($expected_passes)+1).'"><b>Execution log</b><br /><pre>'.$log.'</pre></td></tr>'."\n";
 	}
 
 	$collapse_id++;

@@ -1,0 +1,21 @@
+{
+   "channels" : [
+      {
+         "datatype" : "Byte",
+         "nodata" : 0.0,
+         "unit" : {
+            "interpolation" : "unknown",
+            "max" : 255.0,
+            "measurement" : "unknown",
+            "min" : 1.0,
+            "unit" : "unknown"
+         }
+      }
+   ],
+   "coords" : {
+      "epsg" : 4326,
+      "origin" : [ -180.0, -90 ],
+      "scale" : [ 0.10, 0.10 ],
+      "size" : [ 3600, 1800 ]
+   }
+}

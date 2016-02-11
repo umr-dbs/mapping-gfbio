@@ -383,3 +383,11 @@ AttributeArrays AttributeArrays::copy() const {
 template class AttributeArrays::AttributeArray<double>;
 template class AttributeArrays::AttributeArray<std::string>;
 
+void AttributeArrays::resize(size_t size) {
+	for(std::string key : getTextualKeys()) {
+		textual(key).resize(size);
+	}
+	for(std::string key : getNumericKeys()) {
+		numeric(key).resize(size);
+	}
+}

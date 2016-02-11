@@ -464,6 +464,17 @@ TEST(LineCollection, WKTAddMultiFeature){
 	EXPECT_EQ(1, lines.coordinates[8].y);
 }
 
+TEST(LineCollection, WKTAddFeatureFail){
+	auto lines = createLinesWithAttributesAndTime();
+	std::string wkt = "POINT(3 foo)";
+	EXPECT_ANY_THROW(WKBUtil::addFeatureToCollection(*lines, wkt));
+
+	auto result = createLinesWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *lines);
+}
+
+
 std::unique_ptr<LineCollection> createLinesForSTRefFilter(){
 	auto stref = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 100, 100),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 100));
@@ -592,4 +603,59 @@ TEST(LineCollection, StreamSerialization){
 	LineCollection lines2(stream);
 
 	CollectionTestUtil::checkEquality(lines, lines2);
+}
+
+TEST(LineCollection, removeLastFeature){
+	auto lines = createLinesWithAttributesAndTime();
+
+	lines->removeLastFeature();
+	lines->validate();
+
+	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 1, 2 3, 14 8), LINESTRING(14 10, 45 7, 26 3), MULTILINESTRING((8 6, 8 9, 88 99), (47 11, 47 8, 99 3)), LINESTRING(68 59, 11 15, 77 44, 84 13))";
+	auto result = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
+	result->time_start = {2, 4,  8, 16};
+	result->time_end = {4, 8, 16, 32};
+
+	result->global_attributes.setTextual("info", "1234");
+	result->global_attributes.setNumeric("index", 42);
+
+	result->feature_attributes.addNumericAttribute("value", Unit::unknown(), {0.0, 1.1, 2.2, 3.3});
+	result->feature_attributes.addTextualAttribute("label", Unit::unknown(), {"l0", "l1", "l2", "l3"});
+
+	result->validate();
+
+	CollectionTestUtil::checkEquality(*result, *lines);
+}
+
+TEST(LineCollection, removeLastFeatureUnfinishedLine){
+	auto lines = createLinesWithAttributesAndTime();
+
+	lines->addCoordinate(2,3);
+	lines->addCoordinate(3,3);
+	lines->addCoordinate(5,3);
+	lines->feature_attributes.textual("label").set(lines->getFeatureCount(), "fail");
+
+	lines->removeLastFeature();
+	lines->validate();
+
+	auto result = createLinesWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *lines);
+}
+
+TEST(LineCollection, removeLastFeatureUnfinishedFeature){
+	auto lines = createLinesWithAttributesAndTime();
+
+	lines->addCoordinate(2,3);
+	lines->addCoordinate(3,3);
+	lines->addCoordinate(5,3);
+	lines->finishLine();
+	lines->feature_attributes.textual("label").set(lines->getFeatureCount(), "fail");
+
+	lines->removeLastFeature();
+	lines->validate();
+
+	auto result = createLinesWithAttributesAndTime();
+
+	CollectionTestUtil::checkEquality(*result, *lines);
 }

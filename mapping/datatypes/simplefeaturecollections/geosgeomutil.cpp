@@ -198,7 +198,7 @@ void GeosGeomUtil::addPolygon(PolygonCollection& polygonCollection, const geos::
 	auto& coordinates = polygonCollection.coordinates;
 
 	//outer ring
-	auto outerRing = polygon.getExteriorRing()->getCoordinates();
+	auto outerRing = polygon.getExteriorRing()->getCoordinatesRO();
 	for(size_t i = 0; i < outerRing->getSize(); ++i){
 		polygonCollection.addCoordinate(outerRing->getX(i), outerRing->getY(i));
 	}
@@ -206,7 +206,7 @@ void GeosGeomUtil::addPolygon(PolygonCollection& polygonCollection, const geos::
 
 	//inner rings
 	for(size_t innerRingIndex = 0; innerRingIndex < polygon.getNumInteriorRing(); ++innerRingIndex){
-		auto innerRing = polygon.getInteriorRingN(innerRingIndex)->getCoordinates();
+		auto innerRing = polygon.getInteriorRingN(innerRingIndex)->getCoordinatesRO();
 
 		for(size_t i = 0; i < innerRing->getSize(); ++i){
 			polygonCollection.addCoordinate(innerRing->getX(i), innerRing->getY(i));

@@ -63,21 +63,21 @@ public:
 
 
 	/**
-	 * add a feature as well-known text to a PointCollection
+	 * add a feature as well-known text to a PointCollection, if an error occurs, the collection is reverted to original state
 	 * @param collection the collection
 	 * @param wkt the well-known text
 	 */
 	static void addFeatureToCollection(PointCollection& collection, const std::string& wkt);
 
 	/**
-	 * add a feature as well-known text to a LineCollection
+	 * add a feature as well-known text to a LineCollection, if an error occurs, the collection is reverted to original state
 	 * @param collection the collection
 	 * @param wkt the well-known text
 	 */
 	static void addFeatureToCollection(LineCollection& collection, const std::string& wkt);
 
 	/**
-	 * add a feature as well-known text to a PolygonCollection
+	 * add a feature as well-known text to a PolygonCollection, if an error occurs, the collection is reverted to original state
 	 * @param collection the collection
 	 * @param wkt the well-known text
 	 */

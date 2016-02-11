@@ -15,6 +15,7 @@
 #include <functional>
 #include <json/json.h>
 #include <sys/stat.h>
+#include <memory>
 
 
 

@@ -1,4 +1,5 @@
 #include "util/csvparser.h"
+#include "util/exceptions.h"
 
 #include <gtest/gtest.h>
 #include <string>
@@ -28,6 +29,10 @@ static std::vector<std::vector<std::string>> delimInQuotes(const std::string& de
 	std::vector<std::vector<std::string>> result = {{"a", "b", "c"}, {"\"test" + delim + "a1\"", "\"testb" + delim + delim + "\"\"1\"\"" + delim + "\"", "testc1"}, {"d", "e", "f"}};
 	return result;
 }
+
+static const std::vector<std::vector<std::string>> missingFields({{"a", "b", "c"}, {"d"}, {"e", "f", "g"}});
+
+static const std::vector<std::vector<std::string>> tooManyFields({{"a", "b", "c"}, {"d", "e", "f", "g"}, {"h", "i", "j"}});
 
 static void checkParseResult(CSVParser& parser, const std::vector<std::vector<std::string>> expected) {
 	for(std::vector<std::string> fields : expected) {
@@ -133,7 +138,7 @@ TEST(CSVParser, delimInQuotesComma) {
 }
 
 TEST(CSVParser, delimInQuotesSemicolon) {
-	std::string delim = ";,";
+	std::string delim = ";";
 	std::string endl = "\n";
 	auto input = delimInQuotes(delim);
 	std::stringstream ss;
@@ -141,3 +146,24 @@ TEST(CSVParser, delimInQuotesSemicolon) {
 	CSVParser parser(ss, delim.at(0));
 	checkParseResult(parser, input);
 }
+
+TEST(CSVParser, missingFields) {
+	std::string delim = ",";
+	std::string endl = "\n";
+	auto& input = missingFields;
+	std::stringstream ss;
+	toCSV(ss, input, delim, endl);
+	CSVParser parser(ss, delim.at(0));
+	EXPECT_THROW(checkParseResult(parser, input), ArgumentException);
+}
+
+TEST(CSVParser, tooManyFieldsFields) {
+	std::string delim = ",";
+	std::string endl = "\n";
+	auto& input = tooManyFields;
+	std::stringstream ss;
+	toCSV(ss, input, delim, endl);
+	CSVParser parser(ss, delim.at(0));
+	EXPECT_THROW(checkParseResult(parser, input), ArgumentException);
+}
+

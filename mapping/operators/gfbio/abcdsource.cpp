@@ -1,11 +1,13 @@
 #include "operators/operator.h"
 #include "datatypes/pointcollection.h"
 #include "util/make_unique.h"
+#include "util/exceptions.h"
+
 #include <sstream>
 #include <json/json.h>
-#include "util/exceptions.h"
 #include <algorithm>
 #include <functional>
+#include <memory>
 
 #include <xercesc/parsers/XercesDOMParser.hpp>
 #include <xercesc/parsers/DOMLSParserImpl.hpp>

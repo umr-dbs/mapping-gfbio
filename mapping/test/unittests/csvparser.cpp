@@ -43,6 +43,9 @@ static void checkParseResult(CSVParser& parser, const std::vector<std::vector<st
 			ASSERT_EQ(fields[i], tuple[i]);
 		}
 	}
+	// test if the file actually ended here
+	auto tuple = parser.readTuple();
+	ASSERT_EQ(0, tuple.size());
 }
 
 

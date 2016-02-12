@@ -242,7 +242,7 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 	std::ifstream data(filename);
 
 	//header
-	CSVParser parser(data, field_separator, '\n');
+	CSVParser parser(data, field_separator);
 	auto headers = parser.readHeaders();
 
 	// Try to match up all headers

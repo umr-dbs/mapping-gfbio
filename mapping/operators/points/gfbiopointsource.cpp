@@ -76,7 +76,7 @@ std::unique_ptr<PointCollection> GFBioPointSourceOperator::getPointCollection(co
 	profiler.addIOCost( data.tellp() );
 
 	try {
-		CSVParser parser(data, ',', '\n');
+		CSVParser parser(data, ',');
 
 		auto header = parser.readHeaders();
 		//TODO: distinguish between numeric and textual properties, figure out units

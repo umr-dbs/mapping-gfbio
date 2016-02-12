@@ -1,11 +1,21 @@
 
-#include "util/exceptions.h"
 #include "util/csvparser.h"
 
 
-CSVParser::CSVParser(std::istream &in, char field_separator, char line_separator)
-	: in(in), field_separator(field_separator), line_separator(line_separator) {
+// CSVParser::state is of this enum. It's declared as 'int' in the header to keep this enum private.
+enum State {
+	LINE_START,
+	FIELD_START,
+	IN_QUOTED_FIELD,
+	QUOTE_IN_QUOTED_FIELD,
+	IN_UNQUOTED_FIELD,
+	END_OF_FILE
+};
 
+
+CSVParser::CSVParser(std::istream &in, char field_separator)
+	: field_separator(field_separator), field_count(-1), in(in) {
+	state = LINE_START;
 }
 
 CSVParser::~CSVParser() {
@@ -14,101 +24,137 @@ CSVParser::~CSVParser() {
 
 
 std::vector<std::string> CSVParser::readHeaders() {
-	header_names = parseLine();
-	return header_names;
+	return readTuple();
 }
 std::vector<std::string> CSVParser::readTuple() {
-	// todo: compare tuple count to headers
-	// todo: statistics about quoted vs unquoted, string vs numerical
-	return parseLine();
+	// todo: statistics about quoted vs unquoted, string vs numerical?
+	auto tuple = parseLine();
+
+	if (!tuple.empty()) {
+		if (field_count < 0)
+			field_count = tuple.size();
+		else if (field_count != tuple.size())
+			throw parse_error("CSV invalid: file contains lines with different field counts");
+	}
+
+	return tuple;
 }
 
 std::vector<std::string> CSVParser::parseLine() {
-	std::string line = readNonemptyLine();
 
-	if (line == "")
-		return std::vector<std::string>();
+	std::string current_field;
+	std::vector<std::string> current_tuple;
 
-	std::vector<std::string> fields;
-
-	State state = State::FIELD_START;
-
-	char escape = '\"';
-	char quote = '\"';
-	size_t field_start = 0;
-
-	size_t linelen = line.length();
-	for (size_t i = 0; i < linelen; i++) {
-		char c = line[i];
-		switch(state) {
-			case State::FIELD_START:
-				if (c == field_separator) {
-					fields.push_back(std::string(""));
-					continue;
-				}
-				if (c == quote) {
-					state = State::FIELD_INSIDE_QUOTED;
-					field_start = i + 1;
-				}
-				else {
-					state = State::FIELD_INSIDE_NONQUOTED;
-					field_start = i;
-				}
-				break;
-			case State::FIELD_INSIDE_QUOTED:
-				if (c == line_separator)
-					throw OperatorException("CSV invalid: quoted field not terminated by quote"); // TODO: is that correct, or do we keep the separator as a literal?
-				if (c == quote) {
-					fields.push_back(line.substr(field_start, i-field_start));
-					state = State::BEFORE_SEPARATOR;
-				}
-				break;
-			case State::FIELD_INSIDE_NONQUOTED:
-				if (c == field_separator) {
-					fields.push_back(line.substr(field_start, i-field_start));
-					state = State::FIELD_START;
-				}
-				else if (c == quote)
-					throw OperatorException("CSV invalid: quote inside unquoted field");
-				break;
-			case State::BEFORE_SEPARATOR:
-				if (c == field_separator)
-					state = State::FIELD_START;
-				else
-					throw OperatorException("CSV invalid: quote inside unquoted field");
-				break;
-		}
-	}
-
-	// end of line, see which state we're in
-	switch(state) {
-		case State::FIELD_START:
-			// the line ends in an empty field. That's ok.
-			fields.push_back(std::string(""));
-			break;
-		case State::FIELD_INSIDE_QUOTED:
-			throw OperatorException("CSV invalid: end of line inside quoted field");
-		case State::FIELD_INSIDE_NONQUOTED:
-			fields.push_back(line.substr(field_start, std::string::npos));
-			break;
-		case State::BEFORE_SEPARATOR:
-			// this is ok, too.
-			break;
-	}
-
-	return fields;
-}
+	if (state == END_OF_FILE)
+		return current_tuple;
+	if (state != LINE_START)
+		throw MustNotHappenException("CSVParser::parseLine() started in a state != LINE_START");
 
 
-std::string CSVParser::readNonemptyLine() {
-	std::string line;
 	while (true) {
-		if (!in)
-			return std::string("");
-		std::getline(in,line);
-		while(line[ line.length() - 1] == '\r')
-			line.erase(line.length()-1);
-		if (line.length() > 0)
-			return line;
+		auto c = in.get();
+
+		bool is_eof = (c == std::char_traits<char>::eof());
+		bool is_line_separator = (c == '\r' || c == '\n');
+		bool is_field_separator = (c == field_separator);
+		bool is_quote = (c == '"');
+		bool is_other = !is_eof && !is_line_separator && !is_field_separator && !is_quote;
+
+		if (state == LINE_START) {
+			// We're at the beginning of the file or just encountered a line_separator.
+			if (is_eof) {
+				state = END_OF_FILE;
+				return current_tuple;
+			}
+			else if (is_line_separator) {
+				continue;
+			}
+			else if (is_field_separator) {
+				current_tuple.emplace_back("");
+				state = FIELD_START;
+			}
+			else if (is_quote) {
+				current_field.clear();
+				state = IN_QUOTED_FIELD;
+			}
+			else if (is_other) {
+				current_field = c;
+				state = IN_UNQUOTED_FIELD;
+			}
+		}
+		else if (state == FIELD_START) {
+			// We just encountered a field_separator
+			if (is_eof || is_line_separator) {
+				current_tuple.emplace_back("");
+				state = is_eof ? END_OF_FILE : LINE_START;
+				return current_tuple;
+			}
+			else if (is_field_separator) {
+				current_tuple.emplace_back("");
+			}
+			else if (is_quote) {
+				current_field.clear();
+				state = IN_QUOTED_FIELD;
+			}
+			else if (is_other) {
+				current_field = c;
+				state = IN_UNQUOTED_FIELD;
+			}
+		}
+		else if (state == IN_QUOTED_FIELD) {
+			// We encountered a quote and are now assembling the field's contents into current_field
+			if (is_eof) {
+				throw parse_error("CSV invalid: quoted field does not end with a quote");
+			}
+			else if (is_quote) {
+				state = QUOTE_IN_QUOTED_FIELD;
+			}
+			else if (is_line_separator || is_field_separator || is_other) {
+				current_field += c;
+			}
+		}
+		else if (state == QUOTE_IN_QUOTED_FIELD) {
+			// While assembling a quoted field, we encountered a quote.
+			// This may either end the field OR an escaped quote, depending on this next character.
+			if (is_eof || is_line_separator) {
+				current_tuple.emplace_back(current_field);
+				state = is_eof ? END_OF_FILE : LINE_START;
+				return current_tuple;
+			}
+			else if (is_field_separator) {
+				current_tuple.emplace_back(current_field);
+				state = FIELD_START;
+			}
+			else if (is_quote) {
+				current_field += '"';
+				state = IN_QUOTED_FIELD;
+			}
+			else if (is_other) {
+				throw parse_error("CSV invalid: quoted field was not followed by a separator");
+			}
+		}
+		else if (state == IN_UNQUOTED_FIELD) {
+			// We encountered no quote and are now assembling the field's contents into current_field
+			if (is_eof || is_line_separator) {
+				current_tuple.emplace_back(current_field);
+				state = is_eof ? END_OF_FILE : LINE_START;
+				return current_tuple;
+			}
+			else if (is_field_separator) {
+				current_tuple.emplace_back(current_field);
+				state = FIELD_START;
+			}
+			else if (is_quote) {
+				throw parse_error("CSV invalid: Found a quote inside an unquoted field");
+			}
+			else if (is_other) {
+				current_field += c;
+			}
+		}
+		else
+			throw MustNotHappenException("CSVParser: reached an invalid state");
 	}
+
+	// this is dead code, but it prevents eclipse from complaining..
+	return {};
 }

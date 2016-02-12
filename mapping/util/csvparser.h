@@ -1,30 +1,28 @@
 
-#include <iostream>
+#include "util/exceptions.h"
+
+#include <istream>
 #include <vector>
+
 
 class CSVParser {
 	public:
-		CSVParser(std::istream &in, char field_separator = ',', char line_separator = '\n');
+		CSVParser(std::istream &in, char field_separator = ',');
 		~CSVParser();
 
 		std::vector<std::string> readHeaders();
 		std::vector<std::string> readTuple();
 
+		class parse_error : public std::runtime_error {
+			using std::runtime_error::runtime_error;
+		};
+
 	private:
-		std::string readNonemptyLine();
 		std::vector<std::string> parseLine();
 
-		enum class State {
-			FIELD_START,
-			FIELD_INSIDE_QUOTED,
-			FIELD_INSIDE_NONQUOTED,
-			BEFORE_SEPARATOR
-		};
-		std::vector<std::string> header_names;
-		std::vector<int> header_types;
-
 		char field_separator;
-		char line_separator;
+		int field_count;
+		int state; // this should be an enum, but it isn't. See comment in .cpp.
 		std::istream &in;
 };
 

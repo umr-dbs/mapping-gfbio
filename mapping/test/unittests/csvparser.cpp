@@ -175,7 +175,7 @@ TEST(CSVParser, missingFields) {
 	std::stringstream ss;
 	toCSV(ss, input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	EXPECT_THROW(checkParseResult(parser, input), ArgumentException);
+	EXPECT_THROW(checkParseResult(parser, input), CSVParser::parse_error);
 }
 
 TEST(CSVParser, tooManyFieldsFields) {
@@ -185,6 +185,6 @@ TEST(CSVParser, tooManyFieldsFields) {
 	std::stringstream ss;
 	toCSV(ss, input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	EXPECT_THROW(checkParseResult(parser, input), ArgumentException);
+	EXPECT_THROW(checkParseResult(parser, input), CSVParser::parse_error);
 }
 

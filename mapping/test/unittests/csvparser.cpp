@@ -15,18 +15,36 @@ static void toCSV(std::stringstream& ss, const std::vector<std::vector<std::stri
 	}
 }
 
-static const std::vector<std::vector<std::string>> simple({{"a", "b", "c"}, {"testa1", "testb1", "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}});
+struct CSVTest {
+	const std::vector<std::vector<std::string>> input;
+	const std::vector<std::vector<std::string>> result;
+};
 
-static const std::vector<std::vector<std::string>> quotes({{"a", "b", "c"}, {"\"testa1\"", "\"testb \"\"1\"\"\"", "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}});
+static const CSVTest simple = {
+	{{"a", "b", "c"}, {"testa1", "testb1", "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}},
+	{{"a", "b", "c"}, {"testa1", "testb1", "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}}
+};
 
 
-static std::vector<std::vector<std::string>> lineBreaksInQuotes(const std::string& endl){
-	std::vector<std::vector<std::string>> result = {{"a", "b", "c"}, {"\"test" + endl + "a1\"", "\"testb" + endl + endl + "\"\"1\"\"" + endl + "\"", "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}};
+static const CSVTest quotes = {
+	{{"a", "b", "c"}, {"\"testa1\"", "\"testb \"\"1\"\"\"", "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}},
+	{{"a", "b", "c"}, {"testa1", "testb \"1\"", "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}}
+};
+
+
+static CSVTest lineBreaksInQuotes(const std::string& endl){
+	CSVTest result = {
+		{{"a", "b", "c"}, {"\"test" + endl + "a1\"", "\"testb" + endl + endl + "\"\"1\"\"" + endl + "\"", "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}},
+		{{"a", "b", "c"}, {"test" + endl + "a1", "testb" + endl + endl + "\"1\"" + endl, "testc1"}, {"d!\u00A7\00FC %&/()", "", "f"}},
+	};
 	return result;
 }
 
-static std::vector<std::vector<std::string>> delimInQuotes(const std::string& delim){
-	std::vector<std::vector<std::string>> result = {{"a", "b", "c"}, {"\"test" + delim + "a1\"", "\"testb" + delim + delim + "\"\"1\"\"" + delim + "\"", "testc1"}, {"d", "e", "f"}};
+static CSVTest delimInQuotes(const std::string& delim){
+	CSVTest result = {
+		{{"a", "b", "c"}, {"\"test" + delim + "a1\"", "\"testb" + delim + delim + "\"\"1\"\"" + delim + "\"", "testc1"}, {"d", "e", "f"}},
+		{{"a", "b", "c"}, {"test" + delim + "a1", "testb" + delim + delim + "\"1\"" + delim, "testc1"}, {"d", "e", "f"}}
+	};
 	return result;
 }
 
@@ -52,102 +70,102 @@ static void checkParseResult(CSVParser& parser, const std::vector<std::vector<st
 TEST(CSVParser, simpleComma) {
 	std::string delim = ",";
 	std::string endl = "\n";
-	auto& input = simple;
+	auto& test = simple;
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, simpleSemicolon) {
 	std::string delim = ";";
 	std::string endl = "\n";
-	auto& input = simple;
+	auto& test = simple;
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, simpleCommaCRLF) {
 	std::string delim = ",";
 	std::string endl = "\r\n";
-	auto& input = simple;
+	auto& test = simple;
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, simpleSemicolonCRLF) {
 	std::string delim = ";";
 	std::string endl = "\r\n";
-	auto& input = simple;
+	auto& test = simple;
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, DISABLED_simpleWrongDelim) {
 	std::string delim = ";";
 	std::string endl = "\n";
-	auto& input = simple;
+	auto& test = simple;
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, ',');
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, quotes) {
 	std::string delim = ",";
 	std::string endl = "\n";
-	auto& input = quotes;
+	auto& test = quotes;
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, lineBreaksLF) {
 	std::string delim = ",";
 	std::string endl = "\n";
-	auto input = lineBreaksInQuotes(endl);
+	auto test = lineBreaksInQuotes(endl);
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 
 }
 
 TEST(CSVParser, lineBreaksCRLF) {
 	std::string delim = ",";
 	std::string endl = "\r\n";
-	auto input = lineBreaksInQuotes(endl);
+	auto test = lineBreaksInQuotes(endl);
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, delimInQuotesComma) {
 	std::string delim = ",";
 	std::string endl = "\n";
-	auto input = delimInQuotes(delim);
+	auto test = delimInQuotes(delim);
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, delimInQuotesSemicolon) {
 	std::string delim = ";";
 	std::string endl = "\n";
-	auto input = delimInQuotes(delim);
+	auto test = delimInQuotes(delim);
 	std::stringstream ss;
-	toCSV(ss, input, delim, endl);
+	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, delim.at(0));
-	checkParseResult(parser, input);
+	checkParseResult(parser, test.result);
 }
 
 TEST(CSVParser, missingFields) {

@@ -476,6 +476,7 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 	backend->readAttributes(rasterid, result_attributes);
 
 	DataDescription transformed_dd = transform ? channels[channelid]->getTransformedDD(result_attributes) : channels[channelid]->dd;
+	transformed_dd.addNoData();
 	auto result = GenericRaster::create(transformed_dd, resultstref, width, height);
 	result->clear(transformed_dd.no_data);
 

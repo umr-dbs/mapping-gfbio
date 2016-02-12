@@ -126,11 +126,8 @@ void DataDescription::addNoData() {
 	else if (real_max >= unit.getMax() + 1) {
 		no_data = unit.getMax() + 1;
 	}
-	else {
-		std::ostringstream ss;
-		ss << "Cannot add value for no_data: range of datatype is exhausted.";
-		throw MetadataException(ss.str());
-	}
+	else
+		throw MetadataException("Cannot add value for no_data: range of datatype is exhausted.");
 
 	has_no_data = true;
 }

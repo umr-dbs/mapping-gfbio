@@ -188,11 +188,11 @@ class BinaryWriteBuffer : public BinaryStream {
 
 		bool isWriting() { return status == Status::WRITING; }
 		bool isFinished() { return status == Status::FINISHED; }
-		void prepareForWriting();
 		size_t getSize();
 		void markBytesAsWritten(size_t written);
 	private:
 		void finishBufferedArea();
+		void prepareForWriting();
 
 		std::vector<char> buffer;
 		std::vector<Area> areas;

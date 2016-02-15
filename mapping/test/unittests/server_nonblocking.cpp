@@ -55,7 +55,6 @@ std::unique_ptr<BinaryWriteBuffer> EchoServerConnection::processRequest(Nonblock
 		response->write(buffer, next_batch_size);
 		bytes_read += next_batch_size;
 	}
-	response->prepareForWriting();
 	return response;
 }
 
@@ -133,7 +132,6 @@ static void run_client(int id) {
 			BinaryWriteBuffer request;
 			request.enableLinking();
 			request.write(request_bytes.c_str(), request_bytes.size(), true);
-			request.prepareForWriting();
 			stream->write(request);
 
 			BinaryReadBuffer response;

@@ -38,7 +38,6 @@ std::vector<std::string> RemoteRasterDBBackend::enumerateSources() {
 	auto c = COMMAND_ENUMERATESOURCES;
 	BinaryWriteBuffer request;
 	request.write(c);
-	request.prepareForWriting();
 	stream->write(request);
 	stream->flush();
 
@@ -59,7 +58,6 @@ std::string RemoteRasterDBBackend::readJSON(const std::string &sourcename) {
 	BinaryWriteBuffer request;
 	request.write(c);
 	request.write(sourcename);
-	request.prepareForWriting();
 	stream->write(request);
 	stream->flush();
 
@@ -84,7 +82,6 @@ void RemoteRasterDBBackend::open(const std::string &_sourcename, bool writeable)
 	BinaryWriteBuffer request;
 	request.write(c);
 	request.write(this->sourcename);
-	request.prepareForWriting();
 	stream->write(request);
 	stream->flush();
 
@@ -107,7 +104,6 @@ std::string RemoteRasterDBBackend::readJSON() {
 		auto c = COMMAND_READJSON;
 		BinaryWriteBuffer request;
 		request.write(c);
-		request.prepareForWriting();
 		stream->write(request);
 		stream->flush();
 
@@ -130,7 +126,6 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 	request.write(channelid);
 	request.write(t1);
 	request.write(t2);
-	request.prepareForWriting();
 	stream->write(request);
 	stream->flush();
 
@@ -153,7 +148,6 @@ void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &a
 	BinaryWriteBuffer request;
 	request.write(c);
 	request.write(rasterid);
-	request.prepareForWriting();
 	stream->write(request);
 	stream->flush();
 
@@ -187,7 +181,6 @@ int RemoteRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 	request.write(c);
 	request.write(rasterid);
 	request.write(desiredzoom);
-	request.prepareForWriting();
 	stream->write(request);
 	stream->flush();
 
@@ -213,7 +206,6 @@ const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enume
 	request.write(x2);
 	request.write(y2);
 	request.write(zoom);
-	request.prepareForWriting();
 	stream->write(request);
 	stream->flush();
 
@@ -277,7 +269,6 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 	BinaryWriteBuffer request;
 	request.write(c);
 	request.write(tiledesc);
-	request.prepareForWriting();
 	stream->write(request);
 	stream->flush();
 

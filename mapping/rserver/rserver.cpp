@@ -79,28 +79,24 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 	Profiler::Profiler("requesting Raster");
 	Log::debug("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	is_sending = true;
-	stream.write((char) RSERVER_TYPE_RASTER);
-	stream.write(childidx);
-	stream.write(rect);
-	stream.flush();
+	BinaryWriteBuffer response;
+	response.write((char) RSERVER_TYPE_RASTER);
+	response.write(childidx);
+	response.write(rect);
+	stream.write(response);
 	is_sending = false;
 
-	auto raster = GenericRaster::fromStream(stream);
+	BinaryReadBuffer new_request;
+	stream.read(new_request);
+	auto raster = GenericRaster::fromStream(new_request);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 	return raster;
 }
 
 ***REMOVED***::NumericVector query_raster_source_as_array(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
-	Profiler::Profiler("requesting Raster");
-	Log::debug("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
-	is_sending = true;
-	stream.write((char) RSERVER_TYPE_RASTER);
-	stream.write(childidx);
-	stream.write(rect);
-	stream.flush();
-	is_sending = false;
+	auto raster = query_raster_source(stream, childidx, rect);
 
-	auto raster = GenericRaster::fromStream(stream);
+	// convert to vector
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 	int width = raster->width;
 	int height = raster->height;
@@ -122,13 +118,16 @@ std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int c
 	Profiler::Profiler("requesting Points");
 	Log::debug("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	is_sending = true;
-	stream.write((char) RSERVER_TYPE_POINTS);
-	stream.write(childidx);
-	stream.write(rect);
-	stream.flush();
+	BinaryWriteBuffer response;
+	response.write((char) RSERVER_TYPE_POINTS);
+	response.write(childidx);
+	response.write(rect);
+	stream.write(response);
 	is_sending = false;
 
-	auto points = make_unique<PointCollection>(stream);
+	BinaryReadBuffer new_request;
+	stream.read(new_request);
+	auto points = make_unique<PointCollection>(new_request);
 	return points;
 }
 
@@ -149,23 +148,21 @@ static std::string read_file_as_string(const std::string &filename) {
 
 
 void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
-	BinaryFDStream socket(sock_fd, sock_fd);
-	BinaryStream &stream = socket;
+	BinaryFDStream stream(sock_fd, sock_fd);
 
-	int magic;
-	stream.read(&magic);
+	BinaryReadBuffer request;
+	stream.read(request);
+	int magic = request.read<int>();;
 	if (magic != RSERVER_MAGIC_NUMBER)
 		throw PlatformException("Client sent the wrong magic number");
-	char type;
-	stream.read(&type);
+	auto type = request.read<char>();
 	Log::info("Requested type: %d", type);
 	std::string source;
-	stream.read(&source);
-	int rastersourcecount, pointssourcecount;
-	stream.read(&rastersourcecount);
-	stream.read(&pointssourcecount);
+	request.read(&source);
+	auto rastersourcecount = request.read<int>();
+	auto pointssourcecount = request.read<int>();
 	Log::info("Requested counts: %d %d", rastersourcecount, pointssourcecount);
-	QueryRectangle qrect(stream);
+	QueryRectangle qrect(request);
 	Log::info("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
 
 	if (type == RSERVER_TYPE_PLOT) {
@@ -207,20 +204,28 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 		if (type == RSERVER_TYPE_RASTER) {
 			auto raster = ***REMOVED***::as<std::unique_ptr<GenericRaster>>(result);
 			is_sending = true;
-			stream.write((char) -RSERVER_TYPE_RASTER);
-			stream.write(*raster);
+			BinaryWriteBuffer response;
+			response.enableLinking();
+			response.write((char) -RSERVER_TYPE_RASTER);
+			response.write(*raster);
+			stream.write(response);
 		}
 		else if (type == RSERVER_TYPE_POINTS) {
 			auto points = ***REMOVED***::as<std::unique_ptr<PointCollection>>(result);
 			is_sending = true;
-			stream.write((char) -RSERVER_TYPE_POINTS);
-			stream.write(*points);
+			BinaryWriteBuffer response;
+			response.enableLinking();
+			response.write((char) -RSERVER_TYPE_POINTS);
+			response.write(*points);
+			stream.write(response);
 		}
 		else if (type == RSERVER_TYPE_STRING) {
 			std::string output = Rcallbacks.getConsoleOutput();
 			is_sending = true;
-			stream.write((char) -RSERVER_TYPE_STRING);
-			stream.write(output);
+			BinaryWriteBuffer response;
+			response.write((char) -RSERVER_TYPE_STRING);
+			response.write(output);
+			stream.write(response);
 		}
 		else if (type == RSERVER_TYPE_PLOT) {
 			R.parseEval("dev.off()");
@@ -228,12 +233,13 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			std::string output = read_file_as_string(filename);
 			std::remove(filename.c_str());
 			is_sending = true;
-			stream.write((char) -RSERVER_TYPE_PLOT);
-			stream.write(output);
+			BinaryWriteBuffer response;
+			response.write((char) -RSERVER_TYPE_PLOT);
+			response.write(output);
+			stream.write(response);
 		}
 		else
 			throw PlatformException("Unknown result type requested");
-		stream.flush();
 	}
 	catch (const NetworkException &e) {
 		// don't do anything
@@ -247,8 +253,10 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 		auto what = e.what();
 		Log::warn("Exception: %s", what);
 		std::string msg(what);
-		stream.write((char) -RSERVER_TYPE_ERROR);
-		stream.write(msg);
+		BinaryWriteBuffer response;
+		response.write((char) -RSERVER_TYPE_ERROR);
+		response.write(msg);
+		stream.write(response);
 		return;
 	}
 
@@ -264,7 +272,7 @@ void signal_handler(int signum) {
 int main()
 {
 	Log::setLogFd(stdout);
-	Log::setLevel("info");
+	Log::setLevel("debug");
 
 	// Signal handlers
 	int signals[] = {SIGHUP, SIGINT, 0};

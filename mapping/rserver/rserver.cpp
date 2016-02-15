@@ -8,6 +8,7 @@
 #include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
+#include "util/log.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -26,9 +27,6 @@
 #include <poll.h>
 #include <signal.h>
 #include "datatypes/pointcollection.h"
-
-
-#define LOG(...) {fprintf(stderr, "%d: ", getpid());fprintf(stderr, __VA_ARGS__);fprintf(stderr, "\n");}
 
 
 const int TIMEOUT_SECONDS = 600;
@@ -79,7 +77,7 @@ std::atomic<bool> is_sending(false);
 
 std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
-	LOG("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	Log::debug("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	is_sending = true;
 	stream.write((char) RSERVER_TYPE_RASTER);
 	stream.write(childidx);
@@ -94,7 +92,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 
 ***REMOVED***::NumericVector query_raster_source_as_array(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Raster");
-	LOG("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	Log::debug("requesting raster %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	is_sending = true;
 	stream.write((char) RSERVER_TYPE_RASTER);
 	stream.write(childidx);
@@ -122,7 +120,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 
 std::unique_ptr<PointCollection> query_points_source(BinaryStream &stream, int childidx, const QueryRectangle &rect) {
 	Profiler::Profiler("requesting Points");
-	LOG("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
+	Log::debug("requesting points %d with rect (%f,%f -> %f,%f)", childidx, rect.x1,rect.y1, rect.x2,rect.y2);
 	is_sending = true;
 	stream.write((char) RSERVER_TYPE_POINTS);
 	stream.write(childidx);
@@ -160,16 +158,15 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 		throw PlatformException("Client sent the wrong magic number");
 	char type;
 	stream.read(&type);
-	LOG("Requested type: %d", type);
+	Log::info("Requested type: %d", type);
 	std::string source;
 	stream.read(&source);
-	//printf("Requested source: %s\n", source.c_str());
 	int rastersourcecount, pointssourcecount;
 	stream.read(&rastersourcecount);
 	stream.read(&pointssourcecount);
-	LOG("Requested counts: %d %d", rastersourcecount, pointssourcecount);
+	Log::info("Requested counts: %d %d", rastersourcecount, pointssourcecount);
 	QueryRectangle qrect(stream);
-	LOG("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
+	Log::info("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
 
 	if (type == RSERVER_TYPE_PLOT) {
 		R.parseEval("rserver_plot_tempfile = tempfile(\"rs_plot\", fileext=\".png\")");
@@ -199,11 +196,11 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 				break;
 			std::string line = source.substr(start, end-start);
 			start = end+delimiter.length();
-			LOG("src: %s", line.c_str());
+			Log::debug("src: %s", line.c_str());
 			R.parseEval(line);
 		}
 		std::string lastline = source.substr(start);
-		LOG("src: %s", lastline.c_str());
+		Log::info("src: %s", lastline.c_str());
 		auto result = R.parseEval(lastline);
 		Profiler::stop("running R script");
 
@@ -248,7 +245,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			throw;
 
 		auto what = e.what();
-		LOG("Exception: %s", what);
+		Log::warn("Exception: %s", what);
 		std::string msg(what);
 		stream.write((char) -RSERVER_TYPE_ERROR);
 		stream.write(msg);
@@ -259,32 +256,35 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 
 
 void signal_handler(int signum) {
-	LOG("Caught signal %d, exiting", signum);
+	Log::error("Caught signal %d, exiting", signum);
 	exit(signum);
 }
 
 
 int main()
 {
+	Log::setLogFd(stdout);
+	Log::setLevel("info");
+
 	// Signal handlers
 	int signals[] = {SIGHUP, SIGINT, 0};
 	for (int i=0;signals[i];i++) {
 		if (signal(signals[i], signal_handler) == SIG_ERR) {
-			perror("Cannot install signal handler");
+			Log::error("Cannot install signal handler: %s", strerror(errno));
 			exit(1);
 		}
 		else
-			printf("Signal handler for %d installed\n", signals[i]);
+			Log::debug("Signal handler for %d installed", signals[i]);
 	}
 	signal(SIGPIPE, SIG_IGN);
 
 	// Initialize R environment
 	***REMOVED***Callbacks *Rcallbacks = new ***REMOVED***Callbacks();
-	printf("...loading R\n");
+	Log::info("...loading R");
 	***REMOVED*** R;
 	R.set_callbacks( Rcallbacks );
 
-	printf("...loading packages\n");
+	Log::info("...loading packages");
 
 	try {
 		R.parseEvalQ("library(\"raster\")");
@@ -292,16 +292,17 @@ int main()
 		R.parseEvalQ("library(\"randomForest\")");
 	}
 	catch (const std::exception &e) {
-		printf("error loading packages: %s\nR's output:\n%s", e.what(), Rcallbacks->getConsoleOutput().c_str());
+		Log::error("error loading packages: %s", e.what());
+		Log::error("R's output:\n", Rcallbacks->getConsoleOutput().c_str());
 		exit(5);
 	}
 	Rcallbacks->resetConsoleOutput();
 
-	printf("Capturing functions..\n");
+	Log::info("Capturing functions..");
 	***REMOVED***::Function _attributes("attributes");
 	attributes = &_attributes;
 
-	printf("R is ready\n");
+	Log::info("R is ready");
 
 	// get rid of leftover sockets
 	unlink(rserver_socket_address);
@@ -311,7 +312,7 @@ int main()
 	// create a socket
 	listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (listen_fd < 0) {
-		perror("socket() failed");
+		Log::error("socket() failed: %s", strerror(errno));
 		exit(1);
 	}
 
@@ -321,8 +322,8 @@ int main()
 	server_addr.sun_family = AF_UNIX;
 	strcpy(server_addr.sun_path, rserver_socket_address);
 	if (bind(listen_fd, (sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
-		 perror("bind() failed");
-		 exit(1);
+		Log::error("bind() failed: %s", strerror(errno));
+		exit(1);
 	}
 
 	chmod(rserver_socket_address, 0777);
@@ -330,7 +331,7 @@ int main()
 
 	std::map<pid_t, timespec> running_clients;
 
-	printf("Socket started, listening..\n");
+	Log::info("Socket started, listening..");
 	// Start listening and fork()
 	listen(listen_fd, 5);
 	while (true) {
@@ -338,7 +339,7 @@ int main()
 		int status;
 		pid_t exited_pid;
 		while ((exited_pid = waitpid(-1, &status, WNOHANG)) > 0) {
-			LOG("Client %d no longer exists", (int) exited_pid);
+			Log::info("Client %d no longer exists", (int) exited_pid);
 			running_clients.erase(exited_pid);
 		}
 		// Kill all overdue children
@@ -349,10 +350,10 @@ int main()
 			auto timeout_t = it->second;
 			if (cmpTimespec(timeout_t, current_t) < 0) {
 				auto timeouted_pid = it->first;
-				LOG("Client %d gets killed due to timeout", (int) timeouted_pid);
+				Log::info("Client %d gets killed due to timeout", (int) timeouted_pid);
 
 				if (kill(timeouted_pid, SIGHUP) < 0) { // TODO: SIGKILL?
-					perror("kill() failed");
+					Log::error("kill() failed: %s", strerror(errno));
 				}
 				// the postincrement of the iterator is important to avoid using an invalid iterator
 				running_clients.erase(it++);
@@ -370,7 +371,7 @@ int main()
 
 		int poll_res = poll(pollfds, /* count = */ 1, /* timeout in ms = */ 5000);
 		if (poll_res < 0) {
-			perror("poll() failed");
+			Log::error("poll() failed: %s", strerror(errno));
 			exit(1);
 		}
 		if (poll_res == 0)
@@ -384,13 +385,13 @@ int main()
 		if (client_fd < 0) {
 			if (errno == EAGAIN || errno == EWOULDBLOCK)
 				continue;
-			perror("accept() failed");
+			Log::error("accept() failed: %s", strerror(errno));
 			exit(1);
 		}
 		// fork
 		pid_t pid = fork();
 		if (pid < 0) {
-			perror("fork() failed");
+			Log::error("fork() failed: %s", strerror(errno));
 			exit(1);
 		}
 
@@ -398,7 +399,7 @@ int main()
 			// This is the client
 			// TODO: drop privileges!
 			close(listen_fd);
-			LOG("Client starting");
+			Log::info("New client starting");
 			auto start_c = clock();
 			struct timespec start_t;
 			clock_gettime(CLOCK_MONOTONIC, &start_t);
@@ -406,7 +407,7 @@ int main()
 				client(client_fd, R, *Rcallbacks);
 			}
 			catch (const std::exception &e) {
-				LOG("Exception: %s", e.what());
+				Log::warn("Exception: %s", e.what());
 			}
 			auto end_c = clock();
 			struct timespec end_t;
@@ -415,10 +416,10 @@ int main()
 			double c = (double) (end_c - start_c) / CLOCKS_PER_SEC;
 			double t = (double) (end_t.tv_sec - start_t.tv_sec) + (double) (end_t.tv_nsec - start_t.tv_nsec) / 1000000000;
 
-			LOG("Client finished, %.3fs real, %.3fs CPU", t, c);
+			Log::info("Client finished, %.3fs real, %.3fs CPU", t, c);
 			auto p = Profiler::get();
 			for (auto &s : p) {
-				LOG("%s", s.c_str());
+				Log::info("%s", s.c_str());
 			}
 
 			exit(0);

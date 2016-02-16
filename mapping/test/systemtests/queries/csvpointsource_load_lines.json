@@ -1,0 +1,38 @@
+{
+	"name" : "Load lines",	
+	"query_result": "lines",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+	"query" : 
+	{
+		"type" : "csvpointsource",
+		"params" : 
+		{
+			"filename": "test/systemtests/data/osm_highways_3_lanes/osm_highways_3lanes.csv",
+			"separator": ";",
+			"geometry": "wkt",
+			"time": "start",
+			"time1_format": {
+				"format" : "custom",
+				"custom_format" : "%Y-%m-%d"
+			},
+			"columns": {
+				"x": "wkt",
+				"textual": ["name"],
+				"numeric": ["osm_id"],
+				"time1": "time_start"
+			}
+		}
+	},
+	"query_expected_hash" : "ab9bf2baa0113c0751a81e5cf7ede4b3"
+}

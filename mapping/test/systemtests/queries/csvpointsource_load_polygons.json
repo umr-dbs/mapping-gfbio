@@ -23,7 +23,6 @@
 			"separator": ";",
 			"geometry": "wkt",
 			"time": "start",
-			"duration": 2147483647,
 			"time1_format": {
 				"format" : "custom",
 				"custom_format" : "%Y-%m-%d"
@@ -35,5 +34,5 @@
 			}
 		}
 	},
-	"query_expected_hash" : "f53697e51d0b58c17a43e50b90768833"
+	"query_expected_hash" : "d5f55da10ae7729ee8edb5a92c697d4d"
 }

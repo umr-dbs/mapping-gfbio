@@ -1,8 +1,8 @@
 {
 	/*select osm_id, st_astext(geom), time_start, name from osm_large_cities
-	where ST_INTERSECTS(geom, 'POLYGON((0 0, 0 90, 180 90, 180 0, 0 0))'::geometry)
-	and time_start > timestamp '2015-01-01 00:00'
-	order by osm_id asc*/
+	  where ST_INTERSECTS(geom, ST_GeomFromText('POLYGON((0 0, 0 90, 180 90, 180 0, 0 0))', 4326))
+	  and (time_start, timestamp 'infinity') overlaps (timestamp '2015-01-01 00:00', timestamp 'infinity')
+	  order by osm_id asc*/
 	
 	"name" : "Load points",	
 	"query_result": "points",
@@ -40,5 +40,5 @@
 		"sources" : null,
 		"type" : "csvpointsource"
 	},
-	"query_expected_hash" : "df91c6f5559c37258cde6ec0e6886e31"
+	"query_expected_hash" : "fbdff8b649fd571c58162693ab1ec5db"
 }

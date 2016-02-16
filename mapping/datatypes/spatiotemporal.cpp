@@ -11,7 +11,6 @@
 #include <sstream>
 
 
-
 /**
  * SpatialReference
  */
@@ -113,6 +112,9 @@ SpatialReference SpatialReference::extent(epsg_t epsg) {
  * TemporalReference
  */
 
+const std::string TemporalReference::ISO_BEGIN_OF_TIME = "-infinity";
+const std::string TemporalReference::ISO_END_OF_TIME = "infinity";
+
 TemporalReference::TemporalReference(timetype_t timetype) : timetype(timetype) {
 	t1 = beginning_of_time();
 	t2 = end_of_time();
@@ -207,8 +209,14 @@ void TemporalReference::intersect(const TemporalReference &other) {
 std::string TemporalReference::toIsoString(double time) const {
 	std::ostringstream result;
 
+	if(time == beginning_of_time())
+		return TemporalReference::ISO_BEGIN_OF_TIME;
+	else if(time == end_of_time())
+		return ISO_END_OF_TIME;
+
 	if(timetype == TIMETYPE_UNIX){
 		result << boost::posix_time::to_iso_extended_string(boost::posix_time::from_time_t(time));
+		//TODO: incorporate fractions of seconds
 	} else {
 		throw ConverterException("can only convert UNIX timestamps");
 	}

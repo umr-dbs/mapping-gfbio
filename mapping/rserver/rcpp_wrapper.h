@@ -24,7 +24,7 @@ namespace ***REMOVED*** {
 namespace ***REMOVED*** {
 	// QueryRectangle
 	template<> SEXP wrap(const QueryRectangle &rect) {
-		Profiler::Profiler p("***REMOVED***: wrapping qrect");
+		//Profiler::Profiler p("***REMOVED***: wrapping qrect");
 		***REMOVED***::List list;
 
 		list["t1"] = rect.t1;
@@ -48,7 +48,7 @@ namespace ***REMOVED*** {
 		return ***REMOVED***::wrap(list);
 	}
 	template<> QueryRectangle as(SEXP sexp) {
-		Profiler::Profiler p("***REMOVED***: unwrapping qrect");
+		//Profiler::Profiler p("***REMOVED***: unwrapping qrect");
 		***REMOVED***::List list = ***REMOVED***::as<***REMOVED***::List>(sexp);
 
 		int xres = list["xres"];
@@ -304,8 +304,6 @@ namespace ***REMOVED*** {
 				for (size_t i=0;i<size;i++)
 					vec.set(i, (std::string) rvec[i]);
 			}
-
-			LOG("Attribute %d: %s", i, attr.c_str());
 		}
 
 		// TODO: convert time vector

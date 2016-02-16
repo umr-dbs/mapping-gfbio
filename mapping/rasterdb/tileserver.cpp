@@ -172,7 +172,6 @@ std::unique_ptr<BinaryWriteBuffer> TileServerConnection::processRequest(Nonblock
 			return nullptr;
 		}
 	}
-	response->prepareForWriting();
 	Log::info("%d: response of %d bytes", id, (int) response->getSize());
 	if (response->getSize() == 0)
 		throw ArgumentException("No response written");

@@ -262,12 +262,10 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const Qu
 	std::vector<bool> keep(points_in->getFeatureCount(), true);
 	bool has_filter = false;
 
-	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
-
 	for(auto feature : *points_in){
 		for(auto& coordinate : feature){
 			double x = coordinate.x, y = coordinate.y;
-			if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
+			if (!transformer.transform(x, y) || !rect.SpatialReference::contains(x, y)) {
 				keep[feature] = false;
 				has_filter = true;
 				break;
@@ -310,13 +308,11 @@ std::unique_ptr<LineCollection> ProjectionOperator::getLineCollection(const Quer
 	std::vector<bool> keep(lines_in->getFeatureCount(), true);
 	bool has_filter = false;
 
-	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
-
 	for(auto feature : *lines_in){
 		for(auto line : feature){
 			for(auto& coordinate : line){
 				double x = coordinate.x, y = coordinate.y;
-				if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
+				if (!transformer.transform(x, y) || !rect.SpatialReference::contains(x, y)) {
 					keep[feature] = false;
 					has_filter = true;
 					break;
@@ -361,14 +357,12 @@ std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(cons
 	std::vector<bool> keep(polygons_in->getFeatureCount(), true);
 	bool has_filter = false;
 
-	double minx = rect.minx(), maxx = rect.maxx(), miny = rect.miny(), maxy = rect.maxy();
-
 	for(auto feature : *polygons_in){
 		for(auto polygon : feature){
 			for(auto ring : polygon){
 				for(auto& coordinate : ring){
 					double x = coordinate.x, y = coordinate.y;
-					if (!transformer.transform(x, y) || x < minx || x > maxx || y < miny || y > maxy) {
+					if (!transformer.transform(x, y) || !rect.SpatialReference::contains(x, y)) {
 						keep[feature] = false;
 						has_filter = true;
 						break;

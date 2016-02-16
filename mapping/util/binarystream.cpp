@@ -222,13 +222,16 @@ void BinaryFDStream::write(BinaryWriteBuffer &buffer) {
 	if (!is_blocking)
 		throw NetworkException("Cannot write() to a nonblocking stream");
 
+	buffer.prepareForWriting();
 	if (!buffer.isWriting())
 		throw ArgumentException("cannot write() a BinaryWriteBuffer when not prepared for writing");
+
 	while (!buffer.isFinished())
 		writeNB(buffer);
 }
 
 void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
+	buffer.prepareForWriting();
 	if (!buffer.isWriting())
 		throw ArgumentException("cannot writeNB() a BinaryWriteBuffer when not prepared for writing");
 
@@ -371,20 +374,19 @@ void BinaryWriteBuffer::finishBufferedArea() {
 }
 
 void BinaryWriteBuffer::prepareForWriting() {
-	if (status != Status::CREATING)
-		throw ArgumentException("cannot prepare a BinaryWriteBuffer for writing twice");
+	if (status == Status::CREATING) {
+		finishBufferedArea();
 
-	finishBufferedArea();
+		// count size
+		size_total = 0;
+		for (auto &area : areas)
+			size_total += area.len;
 
-	// count size
-	size_total = 0;
-	for (auto &area : areas)
-		size_total += area.len;
+		size_sent = 0;
+		areas_sent = 0;
 
-	size_sent = 0;
-	areas_sent = 0;
-
-	status = Status::WRITING;
+		status = Status::WRITING;
+	}
 }
 
 size_t BinaryWriteBuffer::getSize() {

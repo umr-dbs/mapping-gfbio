@@ -8,7 +8,9 @@ class ***REMOVED***Callbacks : public Callbacks {
 
 		virtual void WriteConsole( const std::string& line, int type ) {
 			output_buffer << line;
-			printf("Got buffer of type %d: '%s'\n", type, line.c_str());
+			std::string trimmed = line;
+			trimmed.erase(trimmed.find_last_not_of(" \n\r\t")+1);
+			Log::info("Got buffer of type %d: '%s'", type, trimmed.c_str());
 		};
 
 		virtual void FlushConsole() {
@@ -24,7 +26,7 @@ class ***REMOVED***Callbacks : public Callbacks {
 		};
 
 		virtual void ShowMessage(const char* message) {
-			printf("Got Message: '%s'\n", message);
+			Log::info("Got Message: '%s'", message);
 		};
 
 		virtual void Suicide(const char* message) {

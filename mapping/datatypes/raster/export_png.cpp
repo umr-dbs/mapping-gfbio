@@ -153,8 +153,16 @@ template<typename T> void Raster2D<T>::toPNG(std::ostream &output, const Coloriz
 				else
 					row[x] = round(253.0 * ((float) v - actual_min) / (actual_max - actual_min)) + 2;
 			}
-			if (overlay && (x == 0 || y == 0 || x == width-1 || y == height-1))
-				row[x] = 1;
+			if (overlay && row[x] != 1) {
+				// calculate the distance to the closest image border
+				int distx = std::min(x, width-1 - x);
+				int disty = std::min(y, height-1 - y);
+				if (distx == 0 && (disty < 32 || disty > height/2-16))
+					row[x] = 1;
+				else if (disty == 0 && (distx < 32 || distx > width/2-16))
+					row[x] = 1;
+			}
+
 		}
 		png_write_row(png_ptr, (png_bytep) row);
 	}

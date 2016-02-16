@@ -39,13 +39,6 @@ void QueryRectangle::toStream(BinaryStream &stream) const {
 	QueryResolution::toStream(stream);
 }
 
-
-double QueryRectangle::minx() const { return std::min(x1, x2); }
-double QueryRectangle::maxx() const { return std::max(x1, x2); }
-double QueryRectangle::miny() const { return std::min(y1, y2); }
-double QueryRectangle::maxy() const { return std::max(y1, y2); }
-
-
 void QueryRectangle::enlarge(int pixels) {
 	if (restype != QueryResolution::Type::PIXELS)
 		throw ArgumentException("Cannot enlarge QueryRectangle without a proper pixel size");

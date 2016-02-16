@@ -41,11 +41,6 @@ class QueryRectangle : public SpatialReference, public TemporalReference, public
 
 		void toStream(BinaryStream &stream) const;
 
-		double minx() const;
-		double maxx() const;
-		double miny() const;
-		double maxy() const;
-
 		void enlarge(int pixels);
 };
 

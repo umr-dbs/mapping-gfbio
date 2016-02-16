@@ -535,18 +535,17 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 	std::lock_guard<std::mutex> guard(mutex);
 
 	// Get all pixel coordinates that need to be returned. The endpoints of the QueryRectangle are inclusive.
-	double px1 = crs->WorldToPixelX(rect.x1);
-	double py1 = crs->WorldToPixelY(rect.y1);
-	double px2 = crs->WorldToPixelX(rect.x2);
-	double py2 = crs->WorldToPixelY(rect.y2);
-
-	// All Pixels even partially inside the rectangle need to be returned.
 	// floor() returns the index of the pixel containing our boundary points.
-	int pixel_x1 = std::floor(std::min(px1,px2));
-	int pixel_y1 = std::floor(std::min(py1,py2));
-	// the qrect contains a closed interval, but we need a half-open interval now. So we have to add 1.
-	int pixel_x2 = std::floor(std::max(px1,px2))+1;
-	int pixel_y2 = std::floor(std::max(py1,py2))+1;
+	int px1 = std::floor(crs->WorldToPixelX(rect.x1));
+	int py1 = std::floor(crs->WorldToPixelY(rect.y1));
+	int px2 = std::floor(crs->WorldToPixelX(rect.x2));
+	int py2 = std::floor(crs->WorldToPixelY(rect.y2));
+
+	// Now transform the endpoints to half-open intervals with p1 < p2
+	int pixel_x1 = std::min(px1,px2);
+	int pixel_y1 = std::min(py1,py2);
+	int pixel_x2 = std::max(px1,px2)+1;
+	int pixel_y2 = std::max(py1,py2)+1;
 
 	// Figure out the desired zoom level
 	int zoom = 0;

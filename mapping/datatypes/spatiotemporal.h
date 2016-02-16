@@ -76,6 +76,13 @@ class SpatialReference {
 		 */
 		bool contains(const SpatialReference &other) const;
 
+		/*
+		 * Returns whether the point (x, y) is contained within this rectangle.
+		 */
+		bool contains(double x, double y) const {
+			return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+		}
+
 		/**
 		 * the size of this object in memory (in bytes)
 		 * @return the size of this object in bytes

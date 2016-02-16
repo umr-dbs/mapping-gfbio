@@ -308,8 +308,10 @@ std::string PointCollection::toCSV() const {
 				csv << (size_t) feature << ",";
 			csv << c.x << "," << c.y;
 
-			if (hasTime())
-				csv << "," << time_start[feature] << "," << time_end[feature];
+			if (hasTime()){
+				csv << "," << "\"" << stref.toIsoString(time_start[feature]) << "\"" << ","
+						 << "\"" << stref.toIsoString(time_end[feature]) << "\"";
+			}
 
 			//TODO: handle missing metadata values
 			for(auto &key : string_keys) {

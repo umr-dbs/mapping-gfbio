@@ -194,8 +194,9 @@ std::unique_ptr<NonblockingServer::Connection> TileServer::createConnection(int 
 
 int main(void) {
 	Configuration::loadFromDefaultPaths();
+
 	Log::setLogFd(stdout);
-	Log::setLevel("trace");
+	Log::setLevel(Configuration::get("rasterdb.tileserver.loglevel", "info"));
 
 	auto portstr = Configuration::get("rasterdb.tileserver.port");
 	auto portnr = atoi(portstr.c_str());

@@ -23,6 +23,7 @@ class CSVParser {
 		char field_separator;
 		int field_count;
 		int state; // this should be an enum, but it isn't. See comment in .cpp.
+		size_t line_number;
 		std::istream &in;
 };
 

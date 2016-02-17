@@ -14,7 +14,7 @@ enum State {
 
 
 CSVParser::CSVParser(std::istream &in, char field_separator)
-	: field_separator(field_separator), field_count(-1), in(in) {
+	: field_separator(field_separator), field_count(-1), in(in), line_number(0) {
 	state = LINE_START;
 }
 
@@ -29,6 +29,7 @@ std::vector<std::string> CSVParser::readHeaders() {
 std::vector<std::string> CSVParser::readTuple() {
 	// todo: statistics about quoted vs unquoted, string vs numerical?
 	auto tuple = parseLine();
+	++line_number;
 
 	if (!tuple.empty()) {
 		if (field_count < 0)
@@ -104,7 +105,7 @@ std::vector<std::string> CSVParser::parseLine() {
 		else if (state == IN_QUOTED_FIELD) {
 			// We encountered a quote and are now assembling the field's contents into current_field
 			if (is_eof) {
-				throw parse_error("CSV invalid: quoted field does not end with a quote");
+				throw parse_error(concat("CSV invalid: quoted field does not end with a quote on line ", line_number));
 			}
 			else if (is_quote) {
 				state = QUOTE_IN_QUOTED_FIELD;
@@ -130,7 +131,7 @@ std::vector<std::string> CSVParser::parseLine() {
 				state = IN_QUOTED_FIELD;
 			}
 			else if (is_other) {
-				throw parse_error("CSV invalid: quoted field was not followed by a separator");
+				throw parse_error(concat("CSV invalid: quoted field was not followed by a separator on line ", line_number));
 			}
 		}
 		else if (state == IN_UNQUOTED_FIELD) {
@@ -145,7 +146,7 @@ std::vector<std::string> CSVParser::parseLine() {
 				state = FIELD_START;
 			}
 			else if (is_quote) {
-				throw parse_error("CSV invalid: Found a quote inside an unquoted field");
+				throw parse_error(concat("CSV invalid: Found a quote inside an unquoted field on line ", line_number));
 			}
 			else if (is_other) {
 				current_field += c;

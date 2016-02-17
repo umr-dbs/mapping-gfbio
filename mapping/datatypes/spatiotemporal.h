@@ -193,6 +193,9 @@ class TemporalReference {
 		}
 		timetype_t timetype;
 		double t1, t2;
+
+		static const std::string ISO_BEGIN_OF_TIME;
+		static const std::string ISO_END_OF_TIME;
 };
 
 /**

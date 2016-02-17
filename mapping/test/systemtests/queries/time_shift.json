@@ -35,6 +35,7 @@
                         "separator": ";",
                         "geometry": "wkt",
                         "time": "start",
+                        "duration": 1,
                         "time1_format": {
                             "format": "custom",
                             "custom_format": "%Y-%m-%d %H:%M:%S+%Z"

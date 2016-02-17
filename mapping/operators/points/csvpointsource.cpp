@@ -141,7 +141,7 @@ CSVPointSource::CSVPointSource(int sourcecounts[], GenericOperator *sources[], J
 	time_specification = TimeSpecificationConverter.from_json(params, "time");
 	time_duration = 0.0;
 	if (time_specification == TimeSpecification::START)
-		time_duration = params.get("duration", 1.0).asDouble();
+		time_duration = params.get("duration", -1.0).asDouble();
 
 	if(time_specification != TimeSpecification::NONE){
 		column_time1 = columns.get("time1", "time1").asString();
@@ -323,7 +323,7 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 		catch (const std::exception &e) {
 			switch(errorHandling) {
 				case ErrorHandling::ABORT:
-					throw OperatorException(concat("Geometry in CSV could not be parsed: '", x_str, "', '", y_str, "'"));
+					throw OperatorException(concat("Geometry in CSV could not be parsed: '", x_str, "', '", y_str, "' ", e.what()));
 				case ErrorHandling::SKIP:
 					continue;
 				case ErrorHandling::KEEP:
@@ -342,7 +342,10 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 			if (time_specification == TimeSpecification::START) {
 				try {
 					t1 = time1Parser->parse(tuple[pos_time1]);
-					t2 = t1+time_duration;
+					if(time_duration >= 0.0)
+						t2 = t1+time_duration;
+					else
+						t2 = rect.end_of_time();
 				} catch (const TimeParseException& e){
 					t1 = rect.beginning_of_time();
 					t2 = rect.end_of_time();

@@ -26,6 +26,10 @@ TEST(TimeParser, testISO){
 	EXPECT_FLOAT_EQ(1447240271, parser->parse("2015-11-11T11:11:11"));
 
 	EXPECT_THROW(parser->parse("2015-11-32T11:11:11"), TimeParseException);
+
+	TemporalReference tref(timetype_t::TIMETYPE_UNIX);
+	EXPECT_FLOAT_EQ(tref.beginning_of_time(), parser->parse("-infinity"));
+	EXPECT_FLOAT_EQ(tref.end_of_time(), parser->parse("infinity"));
 }
 
 TEST(TimeParser, testCustom){

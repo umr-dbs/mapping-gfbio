@@ -54,6 +54,7 @@
 						"separator" : ";",
 						"geometry": "wkt",
 						"time": "start",
+						"duration": 1,
 						"time1_format": {
 							"format" : "custom",
 							"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
@@ -71,5 +72,5 @@
             ]
         }
     },
-	"query_expected_hash" : "3626eafaff87c3a763374a9166fda02e"
+	"query_expected_hash" : "9ffe0f9f180e4a5a1f874de1b8f3a1f2"
 }

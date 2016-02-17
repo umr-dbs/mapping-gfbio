@@ -93,8 +93,8 @@ std::unique_ptr<geos::geom::Geometry> GeosGeomUtil::createGeosPointCollection(co
 void GeosGeomUtil::addFeatureToCollection(LineCollection& lineCollection, const geos::geom::Geometry& geometry){
 
 	if(geometry.getGeometryTypeId() == geos::geom::GeometryTypeId::GEOS_LINESTRING){
-		const geos::geom::Geometry& lineString = geometry;
-		const auto& coordinates = lineString.getCoordinates();
+		const geos::geom::LineString& lineString = dynamic_cast<const geos::geom::LineString&>(geometry);
+		const auto& coordinates = lineString.getCoordinatesRO();
 		for(size_t coordinateIndex = 0; coordinateIndex < coordinates->size(); ++coordinateIndex){
 			lineCollection.addCoordinate(coordinates->getX(coordinateIndex), coordinates->getY(coordinateIndex));
 		}
@@ -105,8 +105,8 @@ void GeosGeomUtil::addFeatureToCollection(LineCollection& lineCollection, const 
 		const geos::geom::Geometry& multiLineString = geometry;
 
 		for(size_t lineIndex = 0; lineIndex < multiLineString.getNumGeometries(); ++lineIndex){
-			const geos::geom::Geometry& lineString = *multiLineString.getGeometryN(lineIndex);
-			const auto& coordinates = lineString.getCoordinates();
+			const geos::geom::LineString& lineString = dynamic_cast<const geos::geom::LineString&>(*multiLineString.getGeometryN(lineIndex));
+			const auto& coordinates = lineString.getCoordinatesRO();
 			for(size_t coordinateIndex = 0; coordinateIndex < coordinates->size(); ++coordinateIndex){
 				lineCollection.addCoordinate(coordinates->getX(coordinateIndex), coordinates->getY(coordinateIndex));
 			}
@@ -115,7 +115,7 @@ void GeosGeomUtil::addFeatureToCollection(LineCollection& lineCollection, const 
 		lineCollection.finishFeature();
 	}
 	else {
-		throw ConverterException("GEOS GeometryCollection contains non point element");
+		throw ConverterException("GEOS GeometryCollection contains non line element");
 	}
 }
 

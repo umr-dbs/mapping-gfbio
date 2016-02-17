@@ -16,7 +16,7 @@
     "temporal_reference": {
         "type": "UNIX",
         "start": 0,
-        "end": 2147483647
+        "end": 2000000000
     },
     "spatial_reference": {
         "projection": "EPSG:4326",
@@ -52,17 +52,11 @@
 						"filename" : "test/systemtests/data/osm_large_cities/osm_large_cities.csv",
 						"separator" : ";",
 						"geometry": "wkt",
-						"time": "start",
-						"duration": 1,
-						"time1_format": {
-							"format" : "custom",
-							"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
-						},
+						"time": "none",
 						"columns": {
 							"x": "wkt",
 							"numeric": ["osm_id"],
-							"textual": ["name", "is_in"],
-							"time1": "time_start"
+							"textual": ["name", "is_in"]
 						}
 					},
 					"sources" : null,
@@ -71,5 +65,5 @@
             ]
         }
     },
-	"query_expected_hash" : "5460cd824a0b266a7e885663adc81d5"
+	"query_expected_hash" : "5229652f34c4053c72e22a05c3df07c1"
 }

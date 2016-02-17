@@ -1,6 +1,6 @@
 {
-	"name" : "Load polygons",	
-	"query_result": "polygons",
+	"name" : "Load lines",	
+	"query_result": "lines",
     "temporal_reference": {
         "type": "UNIX",
         "start": 0,
@@ -18,8 +18,7 @@
 		"type" : "csvpointsource",
 		"params" : 
 		{
-			"filename": "test/systemtests/data/un_countries/countries.csv",
-			"on_error": "skip",
+			"filename": "test/systemtests/data/osm_highways_3_lanes/osm_highways_3lanes.csv",
 			"separator": ";",
 			"geometry": "wkt",
 			"time": "start",
@@ -29,10 +28,11 @@
 			},
 			"columns": {
 				"x": "wkt",
-				"textual": ["type","name","iso","continent","region","subregion"],
+				"textual": ["name"],
+				"numeric": ["osm_id"],
 				"time1": "time_start"
 			}
 		}
 	},
-	"query_expected_hash" : "d5f55da10ae7729ee8edb5a92c697d4d"
+	"query_expected_hash" : "ab9bf2baa0113c0751a81e5cf7ede4b3"
 }

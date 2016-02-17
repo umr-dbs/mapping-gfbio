@@ -14,7 +14,7 @@ TEST(STRef, toISOBeginEndOfTime) {
 	EXPECT_EQ("infinity", iso);
 }
 
-TEST(STRef, bla) {
+TEST(STRef, temporalIntersectionWithIntervalsToEndOfTime) {
 	auto parser = TimeParser::create(TimeParser::Format::ISO);
 
 	double time = parser->parse("2014-11-24T16:23:57");

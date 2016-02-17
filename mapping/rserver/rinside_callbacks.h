@@ -10,7 +10,7 @@ class ***REMOVED***Callbacks : public Callbacks {
 			output_buffer << line;
 			std::string trimmed = line;
 			trimmed.erase(trimmed.find_last_not_of(" \n\r\t")+1);
-			Log::info("Got buffer of type %d: '%s'", type, trimmed.c_str());
+			Log::info("R output, type %d: '%s'", type, trimmed.c_str());
 		};
 
 		virtual void FlushConsole() {
@@ -26,7 +26,7 @@ class ***REMOVED***Callbacks : public Callbacks {
 		};
 
 		virtual void ShowMessage(const char* message) {
-			Log::info("Got Message: '%s'", message);
+			Log::info("R Message: '%s'", message);
 		};
 
 		virtual void Suicide(const char* message) {

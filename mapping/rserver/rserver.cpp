@@ -5,10 +5,12 @@
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/plots/text.h"
+#include "datatypes/pointcollection.h"
 #include "raster/profiler.h"
 #include "operators/operator.h"
 #include "util/make_unique.h"
 #include "util/log.h"
+#include "util/configuration.h"
 
 #include <cstdlib>
 #include <cstdio>
@@ -26,7 +28,6 @@
 #include <sys/wait.h>
 #include <poll.h>
 #include <signal.h>
-#include "datatypes/pointcollection.h"
 
 
 const int TIMEOUT_SECONDS = 600;
@@ -271,8 +272,12 @@ void signal_handler(int signum) {
 
 int main()
 {
+	Configuration::loadFromDefaultPaths();
+
+	auto rserver_socket = Configuration::get("rserver.socket");
+
 	Log::setLogFd(stdout);
-	Log::setLevel("debug");
+	Log::setLevel(Configuration::get("rserver.loglevel", "info"));
 
 	// Signal handlers
 	int signals[] = {SIGHUP, SIGINT, 0};
@@ -294,10 +299,19 @@ int main()
 
 	Log::info("...loading packages");
 
+	std::string packages = Configuration::get("rserver.packages", "");
 	try {
-		R.parseEvalQ("library(\"raster\")");
-		R.parseEvalQ("library(\"caret\")");
-		R.parseEvalQ("library(\"randomForest\")");
+		std::string::size_type pos = 0;
+		while (pos != std::string::npos) {
+			auto next_pos = packages.find(",", pos);
+			auto name = packages.substr(pos, next_pos == std::string::npos ? next_pos : next_pos-pos);
+			Log::debug("Loading package '%s'", name.c_str());
+			std::string command = "library(\"" + name + "\")";
+			R.parseEvalQ(command);
+			pos = next_pos;
+			if (pos != std::string::npos)
+				pos++;
+		}
 	}
 	catch (const std::exception &e) {
 		Log::error("error loading packages: %s", e.what());
@@ -313,7 +327,7 @@ int main()
 	Log::info("R is ready");
 
 	// get rid of leftover sockets
-	unlink(rserver_socket_address);
+	unlink(rserver_socket.c_str());
 
 	int listen_fd;
 
@@ -328,13 +342,13 @@ int main()
 	struct sockaddr_un server_addr;
 	memset((void *) &server_addr, 0, sizeof(server_addr));
 	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, rserver_socket_address);
+	strcpy(server_addr.sun_path, rserver_socket.c_str());
 	if (bind(listen_fd, (sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
 		Log::error("bind() failed: %s", strerror(errno));
 		exit(1);
 	}
 
-	chmod(rserver_socket_address, 0777);
+	chmod(rserver_socket.c_str(), 0777);
 
 
 	std::map<pid_t, timespec> running_clients;

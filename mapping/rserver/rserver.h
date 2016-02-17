@@ -1,8 +1,6 @@
 #ifndef RSERVER_RSERVER_H
 #define RSERVER_RSERVER_H
 
-const char *rserver_socket_address = "/tmp/rserver_socket";
-
 const int RSERVER_MAGIC_NUMBER = 0x12345678;
 const char RSERVER_TYPE_RASTER = 1;
 const char RSERVER_TYPE_POINTS = 2;

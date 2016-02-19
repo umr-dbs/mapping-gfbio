@@ -76,6 +76,10 @@ public:
 	 */
 	void addDefaultTimestamps(double min, double max);
 
+	void addGlobalAttributesFromCollection(const SimpleFeatureCollection &collection);
+
+	void addFeatureAttributesFromCollection(const SimpleFeatureCollection &collection);
+
 	// feature attributes (one value per feature)
 	AttributeArrays feature_attributes;
 
@@ -190,6 +194,10 @@ protected:
 
 	// helper for filterBySpatioTemporalReferenceIntersection() implemented in the child classes
 	std::vector<bool> getKeepVectorForFilterBySpatioTemporalReferenceIntersection(const SpatioTemporalReference& stref) const;
+
+	//helper for addFeatureFromCollection
+	void setAttributesAndTimeFromCollection(const SimpleFeatureCollection &collection, size_t collectionIndex, size_t thisIndex, const std::vector<std::string> &textualAttributes, const std::vector<std::string> &numericAttributes);
+
 
 	//geometry helper functions
 

@@ -185,6 +185,16 @@ void PointCollection::toStream(BinaryStream &stream) const {
 	}
 }
 
+void PointCollection::addFeatureFromCollection(const PointCollection &collection, size_t feature, const std::vector<std::string> &textualAttributes, const std::vector<std::string> &numericAttributes) {
+	//coordinates
+	for(auto& coordinate : collection.getFeatureReference(feature)) {
+		addCoordinate(coordinate.x, coordinate.y);
+	}
+	finishFeature();
+
+	size_t index = getFeatureCount() - 1;
+	setAttributesAndTimeFromCollection(collection, feature, index, textualAttributes, numericAttributes);
+}
 
 void PointCollection::addCoordinate(double x, double y) {
 	coordinates.push_back(Coordinate(x, y));

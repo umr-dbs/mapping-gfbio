@@ -84,6 +84,15 @@ public:
 	void toStream(BinaryStream &stream) const;
 
 	/**
+	 * Add (copy) feature from another collection into this collection
+	 * @param collection the collection to add from
+	 * @param feature the index of the feature to copy
+	 * @param textualAttributes the textual attributes to copy from the collection
+	 * @param numericAttributes the numeric attributes to copy from the collection
+	 */
+	void addFeatureFromCollection(const PointCollection &collection, size_t feature, const std::vector<std::string> &textualAttributes, const std::vector<std::string> &numericAttributes);
+
+	/**
 	 * add a new coordinate to the current feature. After adding all coordinates, finishFeature() has to be called
 	 * @param x the x value of the coordinate
 	 * @param y the y value of the coordinate

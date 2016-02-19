@@ -650,3 +650,33 @@ TEST(PointCollection, removeLastFeatureUnfinished){
 
 	CollectionTestUtil::checkEquality(*result, *points);
 }
+
+TEST(PointCollection, addGlobalAttributesFromCollection){
+	PointCollection points(SpatioTemporalReference::unreferenced());
+	points.global_attributes.setNumeric("test", 12.2);
+	points.global_attributes.setNumeric("test2", 3.4);
+	points.global_attributes.setTextual("test3", "bar");
+	points.global_attributes.setTextual("test4", "foo");
+
+	PointCollection result(SpatioTemporalReference::unreferenced());
+	result.addGlobalAttributesFromCollection(points);
+
+	CollectionTestUtil::checkEquality(points, result);
+}
+
+TEST(PointCollection, addFeatureFromCollection){
+	auto points = createPointsWithAttributesAndTime();
+
+	PointCollection result(SpatioTemporalReference::unreferenced());
+	result.addGlobalAttributesFromCollection(*points);
+	result.addFeatureAttributesFromCollection(*points);
+
+	auto textualAttributes = points->feature_attributes.getTextualKeys();
+	auto numericAttributes = points->feature_attributes.getNumericKeys();
+
+	for(auto feature : *points) {
+		result.addFeatureFromCollection(*points, feature, textualAttributes, numericAttributes);
+	}
+
+	CollectionTestUtil::checkEquality(*points, result);
+}

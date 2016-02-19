@@ -389,3 +389,39 @@ size_t SimpleFeatureCollection::calculate_kept_count(const std::vector<char> &ke
 	}
 	return kept_count;
 }
+
+void SimpleFeatureCollection::addGlobalAttributesFromCollection(const SimpleFeatureCollection &collection) {
+	for(auto& attribute : collection.global_attributes.textual()){
+		global_attributes.setTextual(attribute.first, attribute.second);
+	}
+	for(auto& attribute : collection.global_attributes.numeric()){
+		global_attributes.setNumeric(attribute.first, attribute.second);
+	}
+}
+
+void SimpleFeatureCollection::addFeatureAttributesFromCollection(const SimpleFeatureCollection &collection) {
+	for(auto& attribute : collection.feature_attributes.getTextualKeys()){
+		feature_attributes.addTextualAttribute(attribute, collection.feature_attributes.textual(attribute).unit);
+	}
+	for(auto& attribute : collection.feature_attributes.getNumericKeys()){
+		feature_attributes.addNumericAttribute(attribute, collection.feature_attributes.numeric(attribute).unit);
+	}
+}
+
+void SimpleFeatureCollection::setAttributesAndTimeFromCollection(const SimpleFeatureCollection &collection, size_t collectionIndex, size_t thisIndex, const std::vector<std::string> &textualAttributes, const std::vector<std::string> &numericAttributes) {
+	//time
+	if(collection.hasTime()) {
+		if(!hasTime())
+			addDefaultTimestamps();
+		time_start[thisIndex] = collection.time_start[collectionIndex];
+		time_end[thisIndex] = collection.time_end[collectionIndex];
+	}
+
+	//feature attributes
+	for(auto& attribute : textualAttributes){
+		feature_attributes.textual(attribute).set(thisIndex, collection.feature_attributes.textual(attribute).get(collectionIndex));
+	}
+	for(auto& attribute : numericAttributes){
+		feature_attributes.numeric(attribute).set(thisIndex, collection.feature_attributes.numeric(attribute).get(collectionIndex));
+	}
+}

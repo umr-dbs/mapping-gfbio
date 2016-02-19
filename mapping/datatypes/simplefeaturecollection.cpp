@@ -30,7 +30,7 @@ bool SimpleFeatureCollection::hasTime() const {
 }
 
 void SimpleFeatureCollection::addDefaultTimestamps() {
-	addDefaultTimestamps(std::numeric_limits<double>::min(), std::numeric_limits<double>::max());
+	addDefaultTimestamps(stref.TemporalReference::beginning_of_time(), stref.TemporalReference::end_of_time());
 }
 
 void SimpleFeatureCollection::addDefaultTimestamps(double min, double max) {

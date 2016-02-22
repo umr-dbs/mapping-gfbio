@@ -220,7 +220,7 @@ std::unique_ptr<T> SimpleFeaturePuzzler<T>::puzzle(
 		for ( auto feature : *src ) {
 			keep.push_back(
 				src->featureIntersectsRectangle( feature, bbox.x1,bbox.y1,bbox.x2,bbox.y2 ) &&
-				!(src->time_start[feature] > bbox.t2 || src->time_end[feature] < bbox.t1)
+				!(src->time[feature].t1 > bbox.t2 || src->time[feature].t2 < bbox.t1)
 			);
 		}
 		std::unique_ptr<T> filtered = src->filter(keep);
@@ -228,12 +228,10 @@ std::unique_ptr<T> SimpleFeaturePuzzler<T>::puzzle(
 		AttributeArraysHelper::append(target.feature_attributes, filtered->feature_attributes);
 
 		target.coordinates.reserve(target.coordinates.size() + filtered->coordinates.size());
-		target.time_start.reserve(target.time_start.size() + filtered->time_start.size());
-		target.time_end.reserve(target.time_end.size() + filtered->time_end.size());
+		target.time.reserve(target.time.size() + filtered->time.size());
 
 		target.coordinates.insert(target.coordinates.end(), filtered->coordinates.begin(),filtered->coordinates.end());
-		target.time_start.insert(target.time_start.end(), filtered->time_start.begin(),filtered->time_start.end());
-		target.time_end.insert(target.time_end.end(), filtered->time_end.begin(),filtered->time_end.end());
+		target.time.insert(target.time.end(), filtered->time.begin(),filtered->time.end());
 
 		append_idxs(target,*filtered);
 	}

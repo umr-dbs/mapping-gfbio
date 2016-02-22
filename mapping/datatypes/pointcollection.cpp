@@ -16,8 +16,7 @@ std::unique_ptr<PointCollection> PointCollection::clone() const {
 	copy->global_attributes = global_attributes;
 	copy->feature_attributes = feature_attributes.clone();
 	copy->coordinates = coordinates;
-	copy->time_start = time_start;
-	copy->time_end = time_end;
+	copy->time = time;
 	copy->start_feature = start_feature;
 	return copy;
 }
@@ -52,12 +51,10 @@ std::unique_ptr<PointCollection> filter(const PointCollection &in, const std::ve
 
 	// copy time arrays
 	if (in.hasTime()) {
-		out->time_start.reserve(kept_count);
-		out->time_end.reserve(kept_count);
+		out->time.reserve(kept_count);
 		for (size_t idx = 0; idx < count; idx++) {
 			if (keep[idx]) {
-				out->time_start.push_back(in.time_start[idx]);
-				out->time_end.push_back(in.time_end[idx]);
+				out->time.push_back(in.time[idx]);
 			}
 		}
 	}
@@ -131,16 +128,9 @@ PointCollection::PointCollection(BinaryStream &stream) : SimpleFeatureCollection
 	feature_attributes.fromStream(stream);
 
 	if (hasTime) {
-		time_start.reserve(featureCount);
-		time_end.reserve(featureCount);
-		double time;
+		time.reserve(featureCount);
 		for (size_t i = 0; i < featureCount; i++) {
-			stream.read(&time);
-			time_start.push_back(time);
-		}
-		for (size_t i = 0; i < featureCount; i++) {
-			stream.read(&time);
-			time_end.push_back(time);
+			time.push_back(TimeInterval(stream));
 		}
 	}
 
@@ -169,10 +159,7 @@ void PointCollection::toStream(BinaryStream &stream) const {
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {
-			stream.write(time_start[i]);
-		}
-		for (size_t i = 0; i < featureCount; i++) {
-			stream.write(time_end[i]);
+			time[i].toStream(stream);
 		}
 	}
 
@@ -319,8 +306,8 @@ std::string PointCollection::toCSV() const {
 			csv << c.x << "," << c.y;
 
 			if (hasTime()){
-				csv << "," << "\"" << stref.toIsoString(time_start[feature]) << "\"" << ","
-						 << "\"" << stref.toIsoString(time_end[feature]) << "\"";
+				csv << "," << "\"" << stref.toIsoString(time[feature].t1) << "\"" << ","
+						 << "\"" << stref.toIsoString(time[feature].t2) << "\"";
 			}
 
 			//TODO: handle missing metadata values
@@ -402,8 +389,8 @@ std::string PointCollection::toARFF(std::string layerName) const {
 			arff << c.x << "," << c.y;
 
 			if (hasTime()){
-				arff << "," << "\"" << stref.toIsoString(time_start[feature]) << "\"" << ","
-						 << "\"" << stref.toIsoString(time_end[feature]) << "\"";
+				arff << "," << "\"" << stref.toIsoString(time[feature].t1) << "\"" << ","
+						 << "\"" << stref.toIsoString(time[feature].t2) << "\"";
 			}
 
 			for(auto &key : string_keys) {
@@ -457,7 +444,7 @@ void PointCollection::validateSpecifics() const {
 }
 
 void PointCollection::removeLastFeature(){
-	bool time = hasTime();
+	bool isTime = hasTime();
 	if(start_feature.back() == coordinates.size()){
 		start_feature.pop_back();
 	}
@@ -466,9 +453,8 @@ void PointCollection::removeLastFeature(){
 
 	size_t featureCount = getFeatureCount();
 
-	if(time) {
-		time_start.resize(featureCount);
-		time_end.resize(featureCount);
+	if(isTime) {
+		time.resize(featureCount);
 	}
 	feature_attributes.resize(featureCount);
 }

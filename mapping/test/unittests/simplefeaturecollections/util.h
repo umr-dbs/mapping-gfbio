@@ -119,8 +119,8 @@ public:
 		for(size_t feature = 0; feature < expected.getFeatureCount(); ++feature){
 			EXPECT_EQ(expected.getFeatureReference(feature).size(), actual.getFeatureReference(feature).size());
 			if(expected.hasTime()){
-				EXPECT_EQ(expected.time_start[feature], actual.time_start[feature]);
-				EXPECT_EQ(expected.time_end[feature], actual.time_end[feature]);
+				EXPECT_EQ(expected.time[feature].t1, actual.time[feature].t1);
+				EXPECT_EQ(expected.time[feature].t2, actual.time[feature].t2);
 			}
 
 			//check feature attributes equality
@@ -139,8 +139,8 @@ public:
 		for(size_t feature = 0; feature < expected.getFeatureCount(); ++feature){
 			EXPECT_EQ(expected.getFeatureReference(feature).size(), actual.getFeatureReference(feature).size());
 			if(expected.hasTime()){
-				EXPECT_EQ(expected.time_start[feature], actual.time_start[feature]);
-				EXPECT_EQ(expected.time_end[feature], actual.time_end[feature]);
+				EXPECT_EQ(expected.time[feature].t1, actual.time[feature].t1);
+				EXPECT_EQ(expected.time[feature].t2, actual.time[feature].t2);
 			}
 
 			//check feature attributes equality
@@ -164,8 +164,8 @@ public:
 		for(size_t feature = 0; feature < expected.getFeatureCount(); ++feature){
 			EXPECT_EQ(expected.getFeatureReference(feature).size(), actual.getFeatureReference(feature).size());
 			if(expected.hasTime()){
-				EXPECT_EQ(expected.time_start[feature], actual.time_start[feature]);
-				EXPECT_EQ(expected.time_end[feature], actual.time_end[feature]);
+				EXPECT_EQ(expected.time[feature].t1, actual.time[feature].t1);
+				EXPECT_EQ(expected.time[feature].t2, actual.time[feature].t2);
 			}
 
 			//check feature attributes equality

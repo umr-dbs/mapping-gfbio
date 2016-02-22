@@ -22,8 +22,7 @@
 std::unique_ptr<PointCollection> createPointsWithAttributesAndTime(){
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 1), POINT(2 5), MULTIPOINT(8 6, 8 9, 88 99, 23 21), POINT(68 59), MULTIPOINT(42 6, 43 7))";
 	auto points = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
-	points->time_start = {2, 4,  8, 16, 32};
-	points->time_end = {4, 8, 16, 32, 64};
+	points->setTimeStamps({2, 4,  8, 16, 32}, {4, 8, 16, 32, 64});
 
 	points->global_attributes.setTextual("info", "1234");
 	points->global_attributes.setNumeric("index", 42);
@@ -514,8 +513,7 @@ TEST(PointCollection, filterBySTRefIntersection){
 
 TEST(PointCollection, filterBySTRefIntersectionWithTime){
 	auto points = createPointsForSTRefFilter();
-	points->time_start = {1, 22, 3, 4 , 11};
-	points->time_end = {9, 30, 4, 88, 12};
+	points->setTimeStamps({1, 22, 3, 4 , 11}, {9, 30, 4, 88, 12});
 
 	EXPECT_NO_THROW(points->validate());
 
@@ -561,7 +559,7 @@ TEST(PointCollection, filterByPredicate){
 	auto points = createPointsWithAttributesAndTime();
 
 	auto filtered = points->filter([](const PointCollection &c, size_t feature) {
-		return c.time_start[feature] >= 16;
+		return c.time[feature].t1 >= 16;
 	});
 
 	std::vector<bool> keep({false, false, false, true, true});
@@ -577,7 +575,7 @@ TEST(PointCollection, filterByPredicateInPlace){
 	auto expected = points->filter(keep);
 
 	points->filterInPlace([](const PointCollection &c, size_t feature) {
-		return c.time_start[feature] >= 16;
+		return c.time[feature].t1 >= 16;
 	});
 
 	CollectionTestUtil::checkEquality(*expected, *points);
@@ -623,8 +621,7 @@ TEST(PointCollection, removeLastFeature){
 
 	std::string wkt = "GEOMETRYCOLLECTION(POINT(1 1), POINT(2 5), MULTIPOINT(8 6, 8 9, 88 99, 23 21), POINT(68 59))";
 	auto result = WKBUtil::readPointCollection(wkt, SpatioTemporalReference::unreferenced());
-	result->time_start = {2, 4,  8, 16};
-	result->time_end = {4, 8, 16, 32};
+	result->setTimeStamps({2, 4,  8, 16}, {4, 8, 16, 32});
 
 	result->global_attributes.setTextual("info", "1234");
 	result->global_attributes.setNumeric("index", 42);

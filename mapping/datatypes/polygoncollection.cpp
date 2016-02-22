@@ -12,8 +12,7 @@ std::unique_ptr<PolygonCollection> PolygonCollection::clone() const {
 	copy->global_attributes = global_attributes;
 	copy->feature_attributes = feature_attributes.clone();
 	copy->coordinates = coordinates;
-	copy->time_start = time_start;
-	copy->time_end = time_end;
+	copy->time = time;
 	copy->start_ring = start_ring;
 	copy->start_polygon = start_polygon;
 	copy->start_feature = start_feature;
@@ -45,16 +44,9 @@ PolygonCollection::PolygonCollection(BinaryStream &stream) : SimpleFeatureCollec
 	feature_attributes.fromStream(stream);
 
 	if (hasTime) {
-		time_start.reserve(featureCount);
-		time_end.reserve(featureCount);
-		double time;
+		time.reserve(featureCount);
 		for (size_t i = 0; i < featureCount; i++) {
-			stream.read(&time);
-			time_start.push_back(time);
-		}
-		for (size_t i = 0; i < featureCount; i++) {
-			stream.read(&time);
-			time_end.push_back(time);
+			time.push_back(TimeInterval(stream));
 		}
 	}
 
@@ -98,10 +90,7 @@ void PolygonCollection::toStream(BinaryStream &stream) const {
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {
-			stream.write(time_start[i]);
-		}
-		for (size_t i = 0; i < featureCount; i++) {
-			stream.write(time_end[i]);
+			time[i].toStream(stream);
 		}
 	}
 
@@ -158,12 +147,10 @@ std::unique_ptr<PolygonCollection> filter(const PolygonCollection &in, const std
 
 	// copy time arrays
 	if (in.hasTime()) {
-		out->time_start.reserve(kept_count);
-		out->time_end.reserve(kept_count);
+		out->time.reserve(kept_count);
 		for (size_t idx = 0; idx < count; idx++) {
 			if (keep[idx]) {
-				out->time_start.push_back(in.time_start[idx]);
-				out->time_end.push_back(in.time_end[idx]);
+				out->time.push_back(in.time[idx]);
 			}
 		}
 	}
@@ -525,7 +512,7 @@ void PolygonCollection::validateSpecifics() const {
 }
 
 void PolygonCollection::removeLastFeature(){
-	bool time = hasTime();
+	bool isTime = hasTime();
 	if(start_feature.back() == start_polygon.size() - 1  &&
 			start_polygon.back() == start_ring.size() -1 &&
 			start_ring.back() == coordinates.size()){
@@ -539,9 +526,8 @@ void PolygonCollection::removeLastFeature(){
 
 	size_t featureCount = getFeatureCount();
 
-	if(time) {
-		time_start.resize(featureCount);
-		time_end.resize(featureCount);
+	if(isTime) {
+		time.resize(featureCount);
 	}
 	feature_attributes.resize(featureCount);
 }

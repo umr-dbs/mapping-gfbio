@@ -20,8 +20,9 @@
 std::unique_ptr<LineCollection> createLinesWithAttributesAndTime(){
 	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 1, 2 3, 14 8), LINESTRING(14 10, 45 7, 26 3), MULTILINESTRING((8 6, 8 9, 88 99), (47 11, 47 8, 99 3)), LINESTRING(68 59, 11 15, 77 44, 84 13), LINESTRING(78 65, 32 14, 36 63))";
 	auto lines = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
-	lines->time_start = {2, 4,  8, 16, 32};
-	lines->time_end = {4, 8, 16, 32, 64};
+	lines->time = {TimeInterval(2, 4), TimeInterval(4, 8), TimeInterval(8, 16), TimeInterval (16, 32), TimeInterval(16, 32), TimeInterval(32, 64)};
+
+	lines->setTimeStamps({2, 4,  8, 16, 32}, {4, 8, 16, 32, 64});
 
 	lines->global_attributes.setTextual("info", "1234");
 	lines->global_attributes.setNumeric("index", 42);
@@ -504,8 +505,7 @@ TEST(LineCollection, filterBySTRefIntersection){
 
 TEST(LineCollection, filterBySTRefIntersectionWithTime){
 	auto lines = createLinesForSTRefFilter();
-	lines->time_start = {1,  20,  5  ,3,  4, 11};
-	lines->time_end =   {9,  22,  30,  4, 88, 12};
+	lines->setTimeStamps({1,  20,  5  ,3,  4, 11}, {9,  22,  30,  4, 88, 12});
 
 	EXPECT_NO_THROW(lines->validate());
 
@@ -551,7 +551,7 @@ TEST(LineCollection, filterByPredicate){
 	auto lines = createLinesWithAttributesAndTime();
 
 	auto filtered = lines->filter([](const LineCollection &c, size_t feature) {
-		return c.time_start[feature] >= 16;
+		return c.time[feature].t1 >= 16;
 	});
 
 	std::vector<bool> keep({false, false, false, true, true});
@@ -567,7 +567,7 @@ TEST(LineCollection, filterByPredicateInPlace){
 	auto expected = lines->filter(keep);
 
 	lines->filterInPlace([](LineCollection &c, size_t feature) {
-		return c.time_start[feature] >= 16;
+		return c.time[feature].t1 >= 16;
 	});
 
 	CollectionTestUtil::checkEquality(*expected, *lines);
@@ -613,8 +613,7 @@ TEST(LineCollection, removeLastFeature){
 
 	std::string wkt = "GEOMETRYCOLLECTION(LINESTRING(1 1, 2 3, 14 8), LINESTRING(14 10, 45 7, 26 3), MULTILINESTRING((8 6, 8 9, 88 99), (47 11, 47 8, 99 3)), LINESTRING(68 59, 11 15, 77 44, 84 13))";
 	auto result = WKBUtil::readLineCollection(wkt, SpatioTemporalReference::unreferenced());
-	result->time_start = {2, 4,  8, 16};
-	result->time_end = {4, 8, 16, 32};
+	result->setTimeStamps({2, 4,  8, 16}, {4, 8, 16, 32});
 
 	result->global_attributes.setTextual("info", "1234");
 	result->global_attributes.setNumeric("index", 42);

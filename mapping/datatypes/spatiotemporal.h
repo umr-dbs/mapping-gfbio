@@ -107,7 +107,81 @@ class SpatialReference {
 		double x1, y1, x2, y2;
 };
 
-class TemporalReference {
+/**
+ * This class represents a closed-open time interval [t1, t2)
+ */
+class TimeInterval {
+public:
+	TimeInterval(double t1, double t2);
+
+	TimeInterval(): t1(0), t2(0) {};
+
+	/*
+	 * Read a TimeInterval from a stream
+	 */
+	TimeInterval(BinaryStream &stream);
+
+	/*
+	 * Write to a binary stream
+	 */
+	void toStream(BinaryStream &stream) const;
+
+	/*
+	 * Validate if invariants are met
+	 */
+	void validate() const;
+
+	/**
+	 * Returns whether the other TimeInterval is contained (smaller or equal) within this.
+	 * @param other the other TimeInterval
+	 */
+	bool contains(const TimeInterval &other) const;
+
+	/**
+	 * Returns whether the other TimeInterval intersects this
+	 * @param other the other TimeInterval
+	 * @return whether the intervals intersect
+	 */
+	bool intersects(const TimeInterval &other) const;
+
+	/**
+	 * Returns whether the given interval intersects this.
+	 * @param t_start beginning of the interval
+	 * @param t_end end of the interval
+	 * @return whether the intervals intersect
+	 */
+	bool intersects(double t_start, double t_end) const;
+
+	/**
+	 * Sets this interval to the intersection of the two intervals.
+	 * @param other the time interval for intersection
+	 */
+	void intersect(const TimeInterval &other);
+
+	/**
+	 * compute the intersection of this interval with another
+	 * @param other the other time interval
+	 * @return a new interval representing the intersection of the two intervals
+	 */
+	TimeInterval intersection(const TimeInterval &other);
+
+	/**
+	 * Sets this interval to the union of the two intervals if they intersect
+	 * Throws an ArgumentException if the intervals don't intersect
+	 * @param other the other time interval
+	 */
+	void union_with(TimeInterval &other);
+
+	/**
+	 * the size of this object in memory (in bytes)
+	 * @return the size of this object in bytes
+	 */
+	size_t get_byte_size() const;
+
+	double t1, t2;
+};
+
+class TemporalReference : public TimeInterval {
 	public:
 		/*
 		 * No default constructor.
@@ -192,7 +266,6 @@ class TemporalReference {
 			return TemporalReference(TIMETYPE_UNREFERENCED, 0.0, 1.0);
 		}
 		timetype_t timetype;
-		double t1, t2;
 
 		static const std::string ISO_BEGIN_OF_TIME;
 		static const std::string ISO_END_OF_TIME;

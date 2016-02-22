@@ -55,14 +55,20 @@ public:
 	std::vector<Coordinate> coordinates;
 
 	// Timestamps
-	std::vector<double> time_start;
-	std::vector<double> time_end;
+	std::vector<TimeInterval> time;
 
 	/**
 	 * check if the features in the collection have associated timestamps
 	 * @return true if all features in the collection have associated timestamps
 	 */
 	bool hasTime() const;
+
+	/**
+	 * Set timestamps for features in this collection. Length of vectors must be equal to getFeatureCount
+	 * @param time_start the start values for the features
+	 * @param time_end the end values for the features
+	 */
+	void setTimeStamps(std::vector<double> &&time_start, std::vector<double> &&time_end);
 
 	/**
 	 * add default timestamps [minDouble, maxDouble) for all features in the collection

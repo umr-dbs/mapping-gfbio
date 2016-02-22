@@ -10,8 +10,7 @@ std::unique_ptr<LineCollection> LineCollection::clone() const {
 	copy->global_attributes = global_attributes;
 	copy->feature_attributes = feature_attributes.clone();
 	copy->coordinates = coordinates;
-	copy->time_start = time_start;
-	copy->time_end = time_end;
+	copy->time = time;
 	copy->start_line = start_line;
 	copy->start_feature = start_feature;
 	return copy;
@@ -38,16 +37,9 @@ LineCollection::LineCollection(BinaryStream &stream) : SimpleFeatureCollection(s
 	feature_attributes.fromStream(stream);
 
 	if (hasTime) {
-		time_start.reserve(featureCount);
-		time_end.reserve(featureCount);
-		double time;
+		time.reserve(featureCount);
 		for (size_t i = 0; i < featureCount; i++) {
-			stream.read(&time);
-			time_start.push_back(time);
-		}
-		for (size_t i = 0; i < featureCount; i++) {
-			stream.read(&time);
-			time_end.push_back(time);
+			time.push_back(TimeInterval(stream));
 		}
 	}
 
@@ -84,10 +76,7 @@ void LineCollection::toStream(BinaryStream &stream) const {
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {
-			stream.write(time_start[i]);
-		}
-		for (size_t i = 0; i < featureCount; i++) {
-			stream.write(time_end[i]);
+			stream.write(time[i]);
 		}
 	}
 
@@ -137,12 +126,10 @@ std::unique_ptr<LineCollection> filter(const LineCollection &in, const std::vect
 
 	// copy time arrays
 	if (in.hasTime()) {
-		out->time_start.reserve(kept_count);
-		out->time_end.reserve(kept_count);
+		out->time.reserve(kept_count);
 		for (size_t idx = 0; idx < count; idx++) {
 			if (keep[idx]) {
-				out->time_start.push_back(in.time_start[idx]);
-				out->time_end.push_back(in.time_end[idx]);
+				out->time.push_back(in.time[idx]);
 			}
 		}
 	}
@@ -311,7 +298,7 @@ void LineCollection::validateSpecifics() const {
 }
 
 void LineCollection::removeLastFeature(){
-	bool time = hasTime();
+	bool isTime = hasTime();
 	if(start_feature.back() == start_line.size() - 1 && start_line.back() == coordinates.size()){
 		start_feature.pop_back();
 	}
@@ -321,9 +308,8 @@ void LineCollection::removeLastFeature(){
 
 	size_t featureCount = getFeatureCount();
 
-	if(time) {
-		time_start.resize(featureCount);
-		time_end.resize(featureCount);
+	if(isTime) {
+		time.resize(featureCount);
 	}
 	feature_attributes.resize(featureCount);
 }

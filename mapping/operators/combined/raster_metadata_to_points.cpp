@@ -134,7 +134,7 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 		auto featurecount = points->getFeatureCount();
 		temporal_index.reserve(featurecount);
 		for (size_t i=0;i<featurecount;i++)
-			temporal_index.emplace_back(i, points->time_start[i]);
+			temporal_index.emplace_back(i, points->time[i].t1);
 
 		std::sort(temporal_index.begin(), temporal_index.end(), [=] (const p &a, const p&b) -> bool {
 			return a.second < b.second;

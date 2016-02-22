@@ -26,7 +26,19 @@ void Coordinate::toStream(BinaryStream &stream) const {
  * Timestamps
  */
 bool SimpleFeatureCollection::hasTime() const {
-	return time_start.size() == getFeatureCount();
+	return time.size() == getFeatureCount();
+}
+
+void SimpleFeatureCollection::setTimeStamps(std::vector<double> &&time_start, std::vector<double> &&time_end) {
+	if(time_start.size() != getFeatureCount())
+		throw ArgumentException("setTimeStamps: size of time_start invalid");
+	if(time_end.size() != getFeatureCount())
+		throw ArgumentException("setTimeStamps: size of time_end invalid");
+
+	time.resize(getFeatureCount());
+	for(size_t i = 0; i < time_start.size(); ++i) {
+		time[i] = TimeInterval(time_start[i], time_end[i]);
+	}
 }
 
 void SimpleFeatureCollection::addDefaultTimestamps() {
@@ -37,10 +49,8 @@ void SimpleFeatureCollection::addDefaultTimestamps(double min, double max) {
 	if (hasTime())
 		return;
 	auto fcount = getFeatureCount();
-	time_start.empty();
-	time_start.resize(fcount, min);
-	time_end.empty();
-	time_end.resize(fcount, max);
+	time.empty();
+	time.resize(fcount, TimeInterval(min, max));
 }
 
 /*
@@ -48,9 +58,13 @@ void SimpleFeatureCollection::addDefaultTimestamps(double min, double max) {
  */
 void SimpleFeatureCollection::validate() const {
 	auto fcount = getFeatureCount();
-	if (time_start.size() > 0 || time_end.size() > 0) {
-		if (time_start.size() != fcount || time_end.size() != fcount)
+	if (time.size() > 0 || time.size() > 0) {
+		if (time.size() != fcount || time.size() != fcount)
 			throw ArgumentException("SimpleFeatureCollection: size of the time-arrays doesn't match feature count");
+
+		for(auto& interval : time) {
+			interval.validate();
+		}
 	}
 
 	feature_attributes.validate(fcount);
@@ -97,7 +111,7 @@ std::string SimpleFeatureCollection::toGeoJSON(bool displayMetadata) const {
 			}
 
 			if (hasTime()) {
-				json << "\"time_start\":" << time_start[feature] << ",\"time_end\":" << time_end[feature] << ",";
+				json << "\"time_start\":" << time[feature].t1 << ",\"time_end\":" << time[feature].t2 << ",";
 			}
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
@@ -159,8 +173,8 @@ std::string SimpleFeatureCollection::toCSV() const {
 		featureToWKT(featureIndex, csv);
 		csv << "\"";
 		if (hasTime()){
-			csv << "," << "\"" << stref.toIsoString(time_start[featureIndex]) << "\"" << ","
-					 << "\"" << stref.toIsoString(time_end[featureIndex]) << "\"";
+			csv << "," << "\"" << stref.toIsoString(time[featureIndex].t1) << "\"" << ","
+					 << "\"" << stref.toIsoString(time[featureIndex].t2) << "\"";
 		}
 
 		//TODO: handle missing metadata values
@@ -212,8 +226,8 @@ std::string SimpleFeatureCollection::toARFF(std::string layerName) const {
 		featureToWKT(featureIndex, arff);
 		arff << "\"";
 		if (hasTime()){
-			arff << "," << "\"" << stref.toIsoString(time_start[featureIndex]) << "\"" << ","
-					 << "\"" << stref.toIsoString(time_end[featureIndex]) << "\"";
+			arff << "," << "\"" << stref.toIsoString(time[featureIndex].t1) << "\"" << ","
+					 << "\"" << stref.toIsoString(time[featureIndex].t2) << "\"";
 		}
 
 		//TODO: handle missing metadata values
@@ -300,8 +314,7 @@ Orientation orientation(const Coordinate& p1, const Coordinate& p2, const Coordi
 size_t SimpleFeatureCollection::get_byte_size() const {
 	return SpatioTemporalResult::get_byte_size() +
 		   SizeUtil::get_byte_size(coordinates) +
-		   SizeUtil::get_byte_size(time_start) +
-		   SizeUtil::get_byte_size(time_end) +
+		   SizeUtil::get_byte_size(time) +
 		   feature_attributes.get_byte_size();
 
 }
@@ -357,7 +370,7 @@ std::vector<bool> SimpleFeatureCollection::getKeepVectorForFilterBySpatioTempora
 	else {
 		for (size_t feature=0;feature<size;feature++)
 			keep[feature] = this->featureIntersectsRectangle(feature, stref.x1, stref.y1, stref.x2, stref.y2)
-				&& stref.intersects(this->time_start[feature], this->time_end[feature]);
+				&& stref.intersects(this->time[feature].t1, this->time[feature].t2);
 	}
 	return keep;
 }
@@ -413,8 +426,7 @@ void SimpleFeatureCollection::setAttributesAndTimeFromCollection(const SimpleFea
 	if(collection.hasTime()) {
 		if(!hasTime())
 			addDefaultTimestamps();
-		time_start[thisIndex] = collection.time_start[collectionIndex];
-		time_end[thisIndex] = collection.time_end[collectionIndex];
+		time[thisIndex] = collection.time[collectionIndex];
 	}
 
 	//feature attributes

@@ -291,13 +291,15 @@ inline auto TimeShiftOperator::reverse(TimeModification& time_modification, Spat
 }
 
 inline auto TimeShiftOperator::reverseElements(TimeModification& time_modification, SimpleFeatureCollection& collection) -> void {
-	if(collection.hasTime()) {
-		for(size_t i = 0; i < collection.getFeatureCount(); ++i) {
-			TemporalReference feature_tref{TIMETYPE_UNIX, static_cast<double>(collection.time_start[i]), static_cast<double>(collection.time_end[i])};
-			TemporalReference result_point_tref = time_modification.reverse(feature_tref);
-			collection.time_start[i] = static_cast<time_t>(result_point_tref.t1);
-			collection.time_end[i] = static_cast<time_t>(result_point_tref.t2);
-		}
+	if(!collection.hasTime()) {
+		collection.addDefaultTimestamps();
+	}
+
+	for(size_t i = 0; i < collection.getFeatureCount(); ++i) {
+		TemporalReference feature_tref{TIMETYPE_UNIX, static_cast<double>(collection.time[i].t1), static_cast<double>(collection.time[i].t2)};
+		TemporalReference result_point_tref = time_modification.reverse(feature_tref);
+		collection.time[i].t1 = result_point_tref.t1;
+		collection.time[i].t2 = result_point_tref.t2;
 	}
 }
 

@@ -93,6 +93,75 @@ void SpatialReference::validate() const {
 	}
 }
 
+/**
+ * TimeInterval
+ */
+
+TimeInterval::TimeInterval(double t1, double t2) : t1(t1), t2(t2) {
+	validate();
+}
+
+TimeInterval::TimeInterval(BinaryStream &stream) {
+	stream.read(&t1);
+	stream.read(&t2);
+
+	validate();
+}
+
+void TimeInterval::toStream(BinaryStream &stream) const {
+	stream.write(t1);
+	stream.write(t2);
+}
+
+void TimeInterval::validate() const {
+	if (t1 > t2)
+		throw ArgumentException(concat("TimeInterval invalid, requires t1:", t1, " <= t2:", t2, "\n", CacheCommon::get_stacktrace()));
+}
+
+
+bool TimeInterval::contains(const TimeInterval &other) const {
+	return t1 <= other.t1 && t2 >= other.t2;
+}
+
+bool TimeInterval::intersects(const TimeInterval &other) const {
+	return intersects(other.t1, other.t2);
+}
+
+bool TimeInterval::intersects(double t_start, double t_end) const {
+	return t_start < this->t2 && t_end > this->t1;
+}
+
+void TimeInterval::intersect(const TimeInterval &other) {
+	t1 = std::max(t1, other.t1);
+	t2 = std::min(t2, other.t2);
+	if (t1 > t2)
+		throw ArgumentException("intersect(): both TimeIntervals do not intersect");
+}
+
+TimeInterval TimeInterval::intersection(const TimeInterval &other) {
+	double intersectiont1 = std::max(t1, other.t1);
+	double intersectiont2 = std::min(t2, other.t2);
+	if (intersectiont1 > intersectiont2)
+		throw ArgumentException("intersect(): both TimeIntervals do not intersect");
+	return TimeInterval(intersectiont1, intersectiont2);
+}
+
+void TimeInterval::union_with(TimeInterval &other) {
+	if(!intersects(other))
+		throw ArgumentException("union_with() both TimeIntervals do not intersect");
+
+	t1 = std::min(t1, other.t1);
+	t2 = std::max(t2, other.t2);
+}
+
+size_t TimeInterval::get_byte_size() const {
+	return sizeof(TimeInterval);
+}
+
+/**
+ * TemporalReference
+ */
+
 size_t TemporalReference::get_byte_size() const {
 	return sizeof(TemporalReference);
 }
@@ -108,14 +177,10 @@ SpatialReference SpatialReference::extent(epsg_t epsg) {
 	throw ArgumentException("Cannot return extent of an unknown CRS");
 }
 
-/**
- * TemporalReference
- */
-
 const std::string TemporalReference::ISO_BEGIN_OF_TIME = "-infinity";
 const std::string TemporalReference::ISO_END_OF_TIME = "infinity";
 
-TemporalReference::TemporalReference(timetype_t timetype) : timetype(timetype) {
+TemporalReference::TemporalReference(timetype_t timetype) : TimeInterval(0, 0), timetype(timetype) {
 	t1 = beginning_of_time();
 	t2 = end_of_time();
 
@@ -124,32 +189,27 @@ TemporalReference::TemporalReference(timetype_t timetype) : timetype(timetype) {
 
 
 TemporalReference::TemporalReference(timetype_t timetype, double t1, double t2)
-	: timetype(timetype), t1(t1), t2(t2) {
+	: TimeInterval(t1, t2), timetype(timetype) {
 	validate();
 }
 
 
-TemporalReference::TemporalReference(BinaryStream &stream) {
+TemporalReference::TemporalReference(BinaryStream &stream) : TimeInterval(stream) {
 	uint32_t uint;
 	stream.read(&uint);
 	timetype = (timetype_t) uint;
-
-	stream.read(&t1);
-	stream.read(&t2);
 
 	validate();
 }
 
 void TemporalReference::toStream(BinaryStream &stream) const {
+	TimeInterval::toStream(stream);
 	stream.write((uint32_t) timetype);
-	stream.write(t1);
-	stream.write(t2);
 }
 
 
 void TemporalReference::validate() const {
-	if (t1 > t2)
-		throw ArgumentException(concat("TemporalReference invalid, requires t1:", t1, " <= t2:", t2, "\n", CacheCommon::get_stacktrace()));
+	TimeInterval::validate();
 	if (t1 < beginning_of_time())
 		throw ArgumentException(concat("TemporalReference invalid, requires t1:", t1, " >= bot:", beginning_of_time()));
 	if (t2 > end_of_time())
@@ -180,18 +240,18 @@ bool TemporalReference::contains(const TemporalReference &other) const {
 	if (timetype != other.timetype)
 		throw ArgumentException("TemporalReference::contains(): timetypes don't match");
 
-	return t1 <= other.t1 && t2 >= other.t2;
+	return TimeInterval::contains(other);
 }
 
 bool TemporalReference::intersects(const TemporalReference &other) const {
 	if (timetype != other.timetype)
 		throw ArgumentException("TemporalReference::contains(): timetypes don't match");
 
-	return intersects(other.t1, other.t2);
+	return TimeInterval::intersects(other);
 }
 
 bool TemporalReference::intersects(double t_start, double t_end) const {
-	return t_start < this->t2 && t_end > this->t1;
+	return TimeInterval::intersects(t_start, t_end);
 }
 
 
@@ -200,10 +260,7 @@ void TemporalReference::intersect(const TemporalReference &other) {
 	if (timetype != other.timetype)
 		throw ArgumentException("Cannot intersect() TemporalReferences with different timetype");
 
-	t1 = std::max(t1, other.t1);
-	t2 = std::min(t2, other.t2);
-	if (t1 > t2)
-		throw ArgumentException("intersect(): both TemporalReferences do not intersect");
+	TimeInterval::intersect(other);
 }
 
 std::string TemporalReference::toIsoString(double time) const {

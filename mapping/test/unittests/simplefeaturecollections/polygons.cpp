@@ -18,8 +18,7 @@
 std::unique_ptr<PolygonCollection> createPolygonsWithAttributesAndTime(){
 	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((10 10, 10 30, 25 20, 10 10)), POLYGON((15 70, 25 90, 45 90, 40 80, 50 70, 15 70), (30 75, 25 80, 30 85, 35 80, 30 75)), POLYGON((50 30, 65 60, 100 25, 50 30), (55 35, 65 45, 65 35, 55 35), (75 30, 75 35, 85 35, 85 30, 75 30)), MULTIPOLYGON(((15 50, 15 60, 30 65, 35 60 25 50, 15 50)), ((30 35, 35 45, 40 34, 30 35))))";
 	auto polygons = WKBUtil::readPolygonCollection(wkt, SpatioTemporalReference::unreferenced());
-	polygons->time_start = {2, 4,  8, 16};
-	polygons->time_end =   {4, 8, 16, 32};
+	polygons->setTimeStamps({2, 4,  8, 16}, {4, 8, 16, 32});
 
 	polygons->global_attributes.setTextual("info", "1234");
 	polygons->global_attributes.setNumeric("index", 42);
@@ -765,8 +764,7 @@ TEST(PolygonCollection, filterBySTRefIntersection){
 
 TEST(PolygonCollection, filterBySTRefIntersectionWithTime){
 	const auto polygons = createPolygonsForSTRefFilter();
-	polygons->time_start = {1,  5,  9, 15, 30, 1,  1};
-	polygons->time_end =   {9, 12, 11, 80, 44, 6, 99};
+	polygons->setTimeStamps({1,  5,  9, 15, 30, 1,  1}, {9, 12, 11, 80, 44, 6, 99});
 
 	auto filter = SpatioTemporalReference(SpatialReference(EPSG_UNKNOWN, 0, 0, 10, 10),
 					TemporalReference(TIMETYPE_UNKNOWN, 0, 10));
@@ -812,7 +810,7 @@ TEST(PolygonCollection, filterByPredicate){
 	auto polygons = createPolygonsWithAttributesAndTime();
 
 	auto filtered = polygons->filter([](const PolygonCollection &c, size_t feature) {
-		return c.time_start[feature] >= 8;
+		return c.time[feature].t1 >= 8;
 	});
 
 	std::vector<bool> keep({false, false, true, true});
@@ -828,7 +826,7 @@ TEST(PolygonCollection, filterByPredicateInPlace){
 	auto expected = polygons->filter(keep);
 
 	polygons->filterInPlace([](PolygonCollection &c, size_t feature) {
-		return c.time_start[feature] >= 8;
+		return c.time[feature].t1 >= 8;
 	});
 
 	CollectionTestUtil::checkEquality(*expected, *polygons);
@@ -896,8 +894,7 @@ TEST(PolygonCollection, removeLastFeature){
 
 	std::string wkt = "GEOMETRYCOLLECTION(POLYGON((10 10, 10 30, 25 20, 10 10)), POLYGON((15 70, 25 90, 45 90, 40 80, 50 70, 15 70), (30 75, 25 80, 30 85, 35 80, 30 75)), POLYGON((50 30, 65 60, 100 25, 50 30), (55 35, 65 45, 65 35, 55 35), (75 30, 75 35, 85 35, 85 30, 75 30)))";
 	auto result = WKBUtil::readPolygonCollection(wkt, SpatioTemporalReference::unreferenced());
-	result->time_start = {2, 4,  8};
-	result->time_end =   {4, 8, 16};
+	result->setTimeStamps({2, 4,  8}, {4, 8, 16});
 
 	result->global_attributes.setTextual("info", "1234");
 	result->global_attributes.setNumeric("index", 42);

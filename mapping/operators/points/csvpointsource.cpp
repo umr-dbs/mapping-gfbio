@@ -401,8 +401,7 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 						break;
 				}
 			}
-			collection->time_start.push_back(t1);
-			collection->time_end.push_back(t2);
+			collection->time.push_back(TimeInterval(t1, t2));
 		}
 
 

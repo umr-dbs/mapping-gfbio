@@ -23,6 +23,7 @@
 			"separator": ";",
 			"geometry": "wkt",
 			"time": "start",
+			"duration": "inf",
 			"time1_format": {
 				"format" : "custom",
 				"custom_format" : "%Y-%m-%d"

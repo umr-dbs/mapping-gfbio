@@ -140,8 +140,18 @@ CSVPointSource::CSVPointSource(int sourcecounts[], GenericOperator *sources[], J
 
 	time_specification = TimeSpecificationConverter.from_json(params, "time");
 	time_duration = 0.0;
-	if (time_specification == TimeSpecification::START)
-		time_duration = params.get("duration", -1.0).asDouble();
+	if (time_specification == TimeSpecification::START) {
+		if(!params.isMember("duration"))
+			throw ArgumentException("CSVSource: TimeSpecification::Start chosen, but no duration given.");
+
+		auto duration = params.get("duration", Json::Value());
+		if(duration.isString() && duration.asString() == "inf")
+			time_duration = -1.0;
+		else if (duration.isNumeric())
+			time_duration = duration.asDouble();
+		else
+			throw ArgumentException("CSVSource: invalid duration given.");
+	}
 
 	if(time_specification != TimeSpecification::NONE){
 		column_time1 = columns.get("time1", "time1").asString();
@@ -192,8 +202,11 @@ void CSVPointSource::writeSemanticParameters(std::ostringstream& stream) {
 
 	params["geometry"] = GeometrySpecificationConverter.to_string(geometry_specification);
 	params["time"] = TimeSpecificationConverter.to_string(time_specification);
-	if (time_specification == TimeSpecification::START_DURATION)
-		params["duration"] = time_duration;
+	if (time_specification == TimeSpecification::START)
+		if(time_duration == -1.0)
+			params["duration"] = "inf";
+		else
+			params["duration"] = time_duration;
 
 	Json::Value columns(Json::ValueType::objectValue);
 	columns["x"] = column_x;

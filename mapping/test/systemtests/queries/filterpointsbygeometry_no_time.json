@@ -1,0 +1,56 @@
+{
+	/**
+		select osm_id, st_astext(geom), time_start, 'infinity' as time_end, name from osm_large_cities
+  		where ST_CONTAINS(ST_GeomFromText('POLYGON((0 0, 0 90, 180 90, 180 0, 0 0))', 4326), geom)
+  		order by osm_id asc
+  	*/
+
+	"name" : "Filter Points by Geometry (no time)",	
+	"query_result": "points",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+	"query" : 
+	{
+		"type" : "filterpointsbygeometry",
+		"sources" : {
+			"points": [
+				{
+					"params" : 
+						{
+							"filename" : "test/systemtests/data/osm_large_cities/osm_large_cities.csv",
+							"separator" : ";",
+							"geometry": "wkt",
+							"time": "none",
+							"columns": {
+								"x": "wkt",
+								"numeric": ["osm_id"],
+								"textual": ["name", "is_in"]
+							}
+						},
+					"type" : "csvpointsource"
+				}
+			],
+			"polygons": [
+				{
+					"params" : 
+						{
+							"type": "polygons",
+							"wkt": "GEOMETRYCOLLECTION(POLYGON((0 0, 180 0, 180 90, 0 90, 0 0)))"
+						},
+					"type" : "wktsource"
+				}		
+			]
+		}		
+	},
+	"query_expected_hash" : "aedf8c97f2aae73afada776c7cee690d"
+}

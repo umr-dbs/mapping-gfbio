@@ -32,19 +32,19 @@ static size_t PACKET_SIZE = 6291457; // 6 MB + 1 Byte
  */
 class EchoServerConnection : public NonblockingServer::Connection {
 	public:
-		EchoServerConnection(int fd, int id);
+		EchoServerConnection(NonblockingServer &server, int fd, int id);
 		~EchoServerConnection();
 	private:
-		virtual std::unique_ptr<BinaryWriteBuffer> processRequest(NonblockingServer &server, std::unique_ptr<BinaryReadBuffer> request);
+		virtual void processData(std::unique_ptr<BinaryReadBuffer> request);
 };
 
-EchoServerConnection::EchoServerConnection(int fd, int id) : Connection(fd, id) {
+EchoServerConnection::EchoServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id) {
 }
 
 EchoServerConnection::~EchoServerConnection() {
 }
 
-std::unique_ptr<BinaryWriteBuffer> EchoServerConnection::processRequest(NonblockingServer &server, std::unique_ptr<BinaryReadBuffer> request) {
+void EchoServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request) {
 	auto response = make_unique<BinaryWriteBuffer>();
 	size_t bytes_read = 0, bytes_total = request->getPayloadSize();
 	char buffer[SERVER_BUFFER_SIZE];
@@ -55,7 +55,8 @@ std::unique_ptr<BinaryWriteBuffer> EchoServerConnection::processRequest(Nonblock
 		response->write(buffer, next_batch_size);
 		bytes_read += next_batch_size;
 	}
-	return response;
+
+	startWritingData(std::move(response));
 }
 
 
@@ -68,7 +69,7 @@ class EchoServer : public NonblockingServer {
 };
 
 std::unique_ptr<NonblockingServer::Connection> EchoServer::createConnection(int fd, int id) {
-	return make_unique<EchoServerConnection>(fd, id);
+	return make_unique<EchoServerConnection>(*this, fd, id);
 }
 
 /*

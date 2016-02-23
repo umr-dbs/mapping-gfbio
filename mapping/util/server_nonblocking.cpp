@@ -19,17 +19,63 @@
 /*
  * Connection
  */
-NonblockingServer::Connection::Connection(int fd, int id)
-	: fd(fd), id(id) {
+NonblockingServer::Connection::Connection(NonblockingServer &server, int fd, int id)
+	: server(server), fd(fd), id(id), state(State::INITIALIZING) {
 	stream.reset( new BinaryFDStream(fd,fd) );
 	stream->makeNonBlocking();
 	// the client is supposed to send the first data, so we'll start reading.
-	readbuffer.reset( new BinaryReadBuffer() );
+	waitForData();
 }
 
 NonblockingServer::Connection::~Connection() {
 
 }
+
+void NonblockingServer::Connection::startProcessing() {
+	if (state != State::READING_DATA)
+		throw MustNotHappenException("Connection::processData() can only be called while in state READING_DATA");
+	state = State::PROCESSING_DATA;
+	processData(std::move(readbuffer));
+}
+
+void NonblockingServer::Connection::waitForData() {
+	if (state != State::WRITING_DATA && state != State::INITIALIZING)
+		throw MustNotHappenException("Connection::waitForData() can only be called while in state WRITING_DATA");
+	writebuffer.reset(nullptr);
+	readbuffer.reset( new BinaryReadBuffer() );
+	state = State::READING_DATA;
+}
+
+void NonblockingServer::Connection::markAsClosed() {
+	readbuffer.reset(nullptr);
+	writebuffer.reset(nullptr);
+	state = State::CLOSED;
+}
+
+void NonblockingServer::Connection::startWritingData(std::unique_ptr<BinaryWriteBuffer> new_writebuffer) {
+	if (state != State::PROCESSING_DATA && state != State::PROCESSING_DATA_ASYNC && state != State::IDLE)
+		throw MustNotHappenException("Connection::startWritingData() cannot be called in current state");
+	readbuffer.reset(nullptr);
+	writebuffer = std::move(new_writebuffer);
+	state = State::WRITING_DATA;
+}
+
+void NonblockingServer::Connection::enqueueForAsyncProcessing() {
+	throw MustNotHappenException("enqueueForAsyncProcessing() not yet implemented!");
+}
+
+void NonblockingServer::Connection::goIdle() {
+	if (state != State::PROCESSING_DATA && state != State::PROCESSING_DATA_ASYNC)
+		throw MustNotHappenException("Connection::goIdle() cannot be called in current state");
+	readbuffer.reset(nullptr);
+	state = State::IDLE;
+}
+
+
+void NonblockingServer::Connection::processDataAsync() {
+	throw MustNotHappenException("processDataAsync not implemented on this server!");
+}
+
 
 
 /*
@@ -95,35 +141,53 @@ NonblockingServer::~NonblockingServer() {
 	}
 }
 
-bool NonblockingServer::readNB(Connection &c) {
-	auto is_eof = c.stream->readNB(*(c.readbuffer), true);
-	if (is_eof)
-		return true;
+void NonblockingServer::readNB(Connection &c) {
+	try {
+		auto is_eof = c.stream->readNB(*(c.readbuffer), true);
+		if (is_eof) {
+			c.markAsClosed();
+			return;
+		}
+	}
+	catch (const std::exception &e) {
+		Log::error("%d: Exception during readNB: %s", c.id, e.what());
+		c.markAsClosed();
+		return;
+	}
 
 	if (c.readbuffer->isRead()) {
 		try {
-			auto response = c.processRequest(*this, std::move(c.readbuffer));
+			c.startProcessing();
+			/*
 			// no response? We're done, close the connection.
 			if (response == nullptr) {
 				Log::trace("%d: no response, disconnecting client", c.id);
 				return true;
 			}
 			c.writebuffer = std::move(response);
+			*/
 		}
 		catch (const std::exception &e) {
 			Log::error("%d: Exception when processing command: %s", c.id, e.what());
-			return true;
+			// TODO: maybe the state changed to PROCESSING_ASYNC, can we really close it here?
+			c.markAsClosed();
+			return;
 		}
 	}
-	return false;
 }
 
 void NonblockingServer::writeNB(Connection &c) {
-	c.stream->writeNB(*(c.writebuffer));
-	if (c.writebuffer->isFinished()) {
-		Log::debug("%d: response sent", c.id);
-		c.writebuffer.reset(nullptr);
-		c.readbuffer.reset( new BinaryReadBuffer() );
+	try {
+		c.stream->writeNB(*(c.writebuffer));
+		if (c.writebuffer->isFinished()) {
+			Log::debug("%d: response sent", c.id);
+			c.waitForData();
+		}
+	}
+	catch (const std::exception &e) {
+		Log::error("%d: Exception during writeNB: %s", c.id, e.what());
+		c.markAsClosed();
+		return;
 	}
 }
 
@@ -144,13 +208,25 @@ void NonblockingServer::start() {
 
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
-		for (auto &c : connections) {
+		auto it = connections.begin();
+		while (it != connections.end()) {
+			auto &c = *it;
 			int fd = c->fd;
-			maxfd = std::max(fd, maxfd);
-			if (c->writebuffer != nullptr)
+			Connection::State state = c->state;
+			if (state == Connection::State::WRITING_DATA)
 				FD_SET(fd, &writefds);
-			else if (c->readbuffer != nullptr)
+			else if (state == Connection::State::READING_DATA)
 				FD_SET(fd, &readfds);
+			else if (state == Connection::State::CLOSED) {
+				auto id = c->id;
+				it = connections.erase(it);
+				Log::info("%d: closing, %lu clients remain", id, connections.size());
+				continue; // avoid the ++it
+			}
+			else
+				continue;
+			maxfd = std::max(fd, maxfd);
+			++it;
 		}
 		maxfd = std::max(stop_pipe.getReadFD(), maxfd);
 		FD_SET(stop_pipe.getReadFD(), &readfds);
@@ -172,23 +248,15 @@ void NonblockingServer::start() {
 			return;
 		}
 
-		auto it = connections.begin();
-		while (it != connections.end()) {
-			auto &c = *it;
+		for (auto &c : connections) {
 			bool needs_closing = false;
-			if (c->writebuffer != nullptr && FD_ISSET(c->fd, &writefds)) {
+			Connection::State state = c->state;
+			if (state == Connection::State::WRITING_DATA && FD_ISSET(c->fd, &writefds)) {
 				writeNB(*c);
 			}
-			else if (c->readbuffer != nullptr && FD_ISSET(c->fd, &readfds)) {
-				needs_closing = (readNB(*c) != 0);
+			else if (state == Connection::State::READING_DATA && FD_ISSET(c->fd, &readfds)) {
+				readNB(*c);
 			}
-			if (needs_closing) {
-				auto id = c->id;
-				it = connections.erase(it);
-				Log::info("%d: closing, %lu clients remain", id, connections.size());
-			}
-			else
-				++it;
 		}
 
 		if (FD_ISSET(listensocket, &readfds)) {

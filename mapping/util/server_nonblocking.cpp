@@ -20,7 +20,7 @@
  * Connection
  */
 NonblockingServer::Connection::Connection(NonblockingServer &server, int fd, int id)
-	: server(server), fd(fd), id(id), state(State::INITIALIZING) {
+	: fd(fd), state(State::INITIALIZING), server(server), id(id) {
 	stream.reset( new BinaryFDStream(fd,fd) );
 	stream->makeNonBlocking();
 	// the client is supposed to send the first data, so we'll start reading.
@@ -36,6 +36,9 @@ void NonblockingServer::Connection::startProcessing() {
 		throw MustNotHappenException("Connection::processData() can only be called while in state READING_DATA");
 	state = State::PROCESSING_DATA;
 	processData(std::move(readbuffer));
+	// processData() can either send a reply (WRITING_DATA), process async or go idle
+	if (state == Connection::State::PROCESSING_DATA)
+		throw MustNotHappenException("processData() did not change the state, expected PROCESS_ASYNC, IDLE or a reply");
 }
 
 void NonblockingServer::Connection::waitForData() {
@@ -53,11 +56,14 @@ void NonblockingServer::Connection::markAsClosed() {
 }
 
 void NonblockingServer::Connection::startWritingData(std::unique_ptr<BinaryWriteBuffer> new_writebuffer) {
-	if (state != State::PROCESSING_DATA && state != State::PROCESSING_DATA_ASYNC && state != State::IDLE)
+	bool was_idle = state == State::IDLE;
+	if (state != State::PROCESSING_DATA && state != State::PROCESSING_DATA_ASYNC && !was_idle)
 		throw MustNotHappenException("Connection::startWritingData() cannot be called in current state");
 	readbuffer.reset(nullptr);
 	writebuffer = std::move(new_writebuffer);
 	state = State::WRITING_DATA;
+	if (was_idle)
+		server.wake();
 }
 
 void NonblockingServer::Connection::enqueueForAsyncProcessing() {
@@ -130,8 +136,7 @@ static int getListeningSocket(int port, int backlog = 10) {
  * Nonblocking Server
  */
 NonblockingServer::NonblockingServer()
-	: next_id(1), listensocket(-1), connections(), stop_pipe(BinaryFDStream::PIPE) {
-
+	: next_id(1), listensocket(-1), connections(), wakeup_pipe(BinaryFDStream::PIPE) {
 }
 
 NonblockingServer::~NonblockingServer() {
@@ -158,14 +163,6 @@ void NonblockingServer::readNB(Connection &c) {
 	if (c.readbuffer->isRead()) {
 		try {
 			c.startProcessing();
-			/*
-			// no response? We're done, close the connection.
-			if (response == nullptr) {
-				Log::trace("%d: no response, disconnecting client", c.id);
-				return true;
-			}
-			c.writebuffer = std::move(response);
-			*/
 		}
 		catch (const std::exception &e) {
 			Log::error("%d: Exception when processing command: %s", c.id, e.what());
@@ -191,6 +188,15 @@ void NonblockingServer::writeNB(Connection &c) {
 	}
 }
 
+NonblockingServer::Connection *NonblockingServer::getIdleConnectionById(int id) {
+	// TODO: synchronize?
+	for (auto &c : connections) {
+		if (c->id == id && c->state == Connection::State::IDLE)
+			return c.get();
+	}
+	throw ArgumentException("No idle connection with the given ID found");
+}
+
 
 void NonblockingServer::listen(int portnr) {
 	listensocket = getListeningSocket(portnr);
@@ -199,6 +205,9 @@ void NonblockingServer::listen(int portnr) {
 void NonblockingServer::start() {
 	if (!listensocket)
 		throw ArgumentException("NonblockingServer: call listen() before start()");
+	bool expected = false;
+	if (!running.compare_exchange_strong(expected, true))
+		throw ArgumentException("NonblockingServer: already running");
 
 	while (true) {
 		struct timeval tv{60,0};
@@ -223,13 +232,15 @@ void NonblockingServer::start() {
 				Log::info("%d: closing, %lu clients remain", id, connections.size());
 				continue; // avoid the ++it
 			}
-			else
+			else {
+				++it;
 				continue;
+			}
 			maxfd = std::max(fd, maxfd);
 			++it;
 		}
-		maxfd = std::max(stop_pipe.getReadFD(), maxfd);
-		FD_SET(stop_pipe.getReadFD(), &readfds);
+		maxfd = std::max(wakeup_pipe.getReadFD(), maxfd);
+		FD_SET(wakeup_pipe.getReadFD(), &readfds);
 
 		maxfd = std::max(listensocket, maxfd);
 		FD_SET(listensocket, &readfds);
@@ -243,13 +254,18 @@ void NonblockingServer::start() {
 			throw NetworkException(concat("select() call failed: ", strerror(errno)));
 		}
 
-		if (FD_ISSET(stop_pipe.getReadFD(), &readfds)) {
+		if (!running) {
 			Log::info("Stopping Server");
 			return;
 		}
 
+		if (FD_ISSET(wakeup_pipe.getReadFD(), &readfds)) {
+			// we have been woken, now we need to read any outstanding data or the pipe will remain readable
+			char buf[1024];
+			read(wakeup_pipe.getReadFD(), buf, 1024);
+		}
+
 		for (auto &c : connections) {
-			bool needs_closing = false;
 			Connection::State state = c->state;
 			if (state == Connection::State::WRITING_DATA && FD_ISSET(c->fd, &writefds)) {
 				writeNB(*c);
@@ -279,10 +295,14 @@ void NonblockingServer::start() {
 	}
 }
 
+void NonblockingServer::wake() {
+	// if the loop is currently in a select() phase, this write will wake it up.
+	char c = 0;
+	wakeup_pipe.write(c);
+}
 
 void NonblockingServer::stop() {
-	// if the loop is currently in a select() phase, this write will wake it up.
 	Log::info("Sending signal to stop server");
-	char c = 0;
-	stop_pipe.write(c);
+	running = false;
+	wake();
 }

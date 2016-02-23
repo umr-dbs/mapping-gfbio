@@ -16,7 +16,7 @@ static const int NUM_CLIENTS = 3;
 static const int NUM_REQUESTS = 3;
 
 static const int SERVER_PORT = 51234;
-static const size_t SERVER_BUFFER_SIZE = 65536;
+static const size_t SERVER_BUFFER_SIZE = 1064960;
 
 // to see minimum/default/maximum buffer sizes, do:
 // cat /proc/sys/net/ipv4/tcp_{r,w}mem
@@ -100,7 +100,7 @@ static void run_server() {
 
 
 /*
- * The clients are running in their own threads, so they must not throw exceptions (that would terminat() the program).
+ * The clients are running in their own threads, so they must not throw exceptions (that would terminate() the program).
  * Instead, they'll print errors to stdout and report failure by setting this boolean to false.
  */
 static std::atomic<bool> all_clients_successful;

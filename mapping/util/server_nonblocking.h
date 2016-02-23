@@ -24,7 +24,6 @@ class NonblockingServer {
 				virtual void processData(std::unique_ptr<BinaryReadBuffer> request) = 0;
 				virtual void processDataAsync();
 
-				NonblockingServer &server;
 				const int fd;
 				std::unique_ptr<BinaryFDStream> stream;
 				std::unique_ptr<BinaryWriteBuffer> writebuffer;
@@ -61,6 +60,7 @@ class NonblockingServer {
 				void enqueueForAsyncProcessing();
 				void goIdle();
 
+				NonblockingServer &server;
 				const int id;
 		};
 
@@ -78,6 +78,15 @@ class NonblockingServer {
 		 * Stop the server. As start() does not terminate, this must be called from a separate thread.
 		 */
 		void stop();
+		/*
+		 * Gets a reference to a connection by id. Only IDLE connections are returned.
+		 */
+		Connection *getIdleConnectionById(int id);
+		/*
+		 * Wake the server up, interrupting a select() call. Used to notify the server about
+		 * changes in the connections or about stopping.
+		 */
+		void wake();
 	private:
 		void readNB(Connection &connection);
 		void writeNB(Connection &connection);
@@ -86,7 +95,8 @@ class NonblockingServer {
 		int next_id;
 		int listensocket;
 		std::vector<std::unique_ptr<Connection>> connections;
-		BinaryFDStream stop_pipe;
+		std::atomic<bool> running;
+		BinaryFDStream wakeup_pipe;
 };
 
 

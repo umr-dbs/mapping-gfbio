@@ -500,6 +500,36 @@ bool PolygonCollection::PointInCollectionBulkTester::pointInCollection(const Coo
 	return false;
 }
 
+std::vector<uint32_t> PolygonCollection::PointInCollectionBulkTester::polygonsContainingPoint(const Coordinate& coordinate) const {
+	std::vector<uint32_t> result;
+	for(auto feature : polygonCollection){
+		for(auto polygon : feature){
+			bool contained = true;
+			size_t ringIndex = 0;
+			for(auto ring : polygon){
+				if(ringIndex == 0){
+					if(!pointInRing(coordinate, polygonCollection.start_ring[ring.getRingIndex()], polygonCollection.start_ring[ring.getRingIndex() + 1])){
+						contained = false;
+						break;
+					}
+				}
+				else {
+					if(pointInRing(coordinate, polygonCollection.start_ring[ring.getRingIndex()], polygonCollection.start_ring[ring.getRingIndex() + 1])){
+						contained = false;
+						break;
+					}
+				}
+
+				++ringIndex;
+			}
+			if(contained)
+				result.push_back(feature);
+		}
+	}
+
+	return result;
+}
+
 void PolygonCollection::validateSpecifics() const {
 	if(start_ring.back() != coordinates.size())
 		throw FeatureException("Ring not finished");

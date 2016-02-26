@@ -3,13 +3,18 @@
 
 #include "util/binarystream.h"
 
+#include <vector>
+#include <queue>
+#include <thread>
+#include <mutex>
 #include <memory>
 #include <atomic>
+#include <condition_variable>
+
 
 /*
- * A single-threaded server based on non-blocking network IO.
+ * A server based on non-blocking network IO.
  *
- * TODO: allocate worker threads for command dispatch
  * TODO: allow multiple listen sockets (ipv4, ipv6, af_unix, multiple interfaces, ...)
  */
 class NonblockingServer {
@@ -38,7 +43,6 @@ class NonblockingServer {
 				 * - during PROCESSING, the connection got a packet and processes it in the main thread.
 				 * - during PROCESSING_ASYNC, the connection is working in a worker thread.
 				 * - during IDLE, it is the connection's turn to send a packet, but it is waiting for something.
-				 * - during CLOSED, the connection is inactive and shall be deleted by the Server.
 				 */
 				enum class State {
 					INITIALIZING,
@@ -46,19 +50,20 @@ class NonblockingServer {
 					PROCESSING_DATA,
 					PROCESSING_DATA_ASYNC,
 					WRITING_DATA,
-					IDLE,
-					CLOSED
+					IDLE
 				};
 				std::atomic<State> state;
+				std::atomic<bool> is_closed;
 
 				// The following methods all model state changes. Private methods are called by the Server, protected by the Connection.
 				void startProcessing();
 				void waitForData();
-				void markAsClosed();
 			protected:
 				void startWritingData(std::unique_ptr<BinaryWriteBuffer> writebuffer);
 				void enqueueForAsyncProcessing();
 				void goIdle();
+
+				void close();
 
 				NonblockingServer &server;
 				const int id;
@@ -70,6 +75,11 @@ class NonblockingServer {
 		 * Sets up the listening socket, but does not accept any connections yet.
 		 */
 		void listen(int portnr);
+		/*
+		 * Sets the number of worker threads to use. Defaults to 0, which forbids asynchronous processing.
+		 * Set this before calling start();
+		 */
+		void setWorkerThreads(int num_workers);
 		/*
 		 * After listen() succeeded, start the main loop
 		 */
@@ -92,9 +102,26 @@ class NonblockingServer {
 		void writeNB(Connection &connection);
 
 		virtual std::unique_ptr<Connection> createConnection(int fd, int id) = 0;
+
+		// Workers
+		int num_workers;
+		std::vector<std::thread> workers;
+		void worker_thread();
+		void stopAllWorkers();
+
+		// job-queue
+		std::queue<Connection *> job_queue;
+		std::mutex job_queue_mutex;
+		std::condition_variable job_queue_cond;
+		void enqueueTask(Connection *connection);
+		Connection *popTask();
+
+		// other things
 		int next_id;
 		int listensocket;
 		std::vector<std::unique_ptr<Connection>> connections;
+		std::recursive_mutex connections_mutex;
+
 		std::atomic<bool> running;
 		BinaryFDStream wakeup_pipe;
 };

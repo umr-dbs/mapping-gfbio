@@ -20,7 +20,7 @@
  * Connection
  */
 NonblockingServer::Connection::Connection(NonblockingServer &server, int fd, int id)
-	: fd(fd), state(State::INITIALIZING), server(server), id(id) {
+	: fd(fd), state(State::INITIALIZING), is_closed(false), server(server), id(id) {
 	stream.reset( new BinaryFDStream(fd,fd) );
 	stream->makeNonBlocking();
 	// the client is supposed to send the first data, so we'll start reading.
@@ -49,25 +49,34 @@ void NonblockingServer::Connection::waitForData() {
 	state = State::READING_DATA;
 }
 
-void NonblockingServer::Connection::markAsClosed() {
-	readbuffer.reset(nullptr);
-	writebuffer.reset(nullptr);
-	state = State::CLOSED;
+void NonblockingServer::Connection::close() {
+	is_closed = true;
+	if (state != State::PROCESSING_DATA_ASYNC) {
+		// we must not remove them while another thread may be using the connection.
+		readbuffer.reset(nullptr);
+		writebuffer.reset(nullptr);
+		stream->close();
+	}
 }
 
 void NonblockingServer::Connection::startWritingData(std::unique_ptr<BinaryWriteBuffer> new_writebuffer) {
-	bool was_idle = state == State::IDLE;
-	if (state != State::PROCESSING_DATA && state != State::PROCESSING_DATA_ASYNC && !was_idle)
+	State old_state = state;
+	if (old_state != State::PROCESSING_DATA && old_state != State::PROCESSING_DATA_ASYNC && old_state != State::IDLE)
 		throw MustNotHappenException("Connection::startWritingData() cannot be called in current state");
 	readbuffer.reset(nullptr);
 	writebuffer = std::move(new_writebuffer);
 	state = State::WRITING_DATA;
-	if (was_idle)
+	if (old_state != State::PROCESSING_DATA)
 		server.wake();
 }
 
 void NonblockingServer::Connection::enqueueForAsyncProcessing() {
-	throw MustNotHappenException("enqueueForAsyncProcessing() not yet implemented!");
+	if (state != State::PROCESSING_DATA)
+		throw MustNotHappenException("Connection::enqueueForAsyncProcessing() can only be called while in state PROCESSING");
+	if (!server.running || server.num_workers == 0)
+		throw MustNotHappenException("Connection::enqueueForAsyncProcessing(): server does not have any worker threads");
+
+	server.enqueueTask(this);
 }
 
 void NonblockingServer::Connection::goIdle() {
@@ -79,7 +88,7 @@ void NonblockingServer::Connection::goIdle() {
 
 
 void NonblockingServer::Connection::processDataAsync() {
-	throw MustNotHappenException("processDataAsync not implemented on this server!");
+	throw MustNotHappenException("processDataAsync not implemented on this connection!");
 }
 
 
@@ -136,7 +145,7 @@ static int getListeningSocket(int port, int backlog = 10) {
  * Nonblocking Server
  */
 NonblockingServer::NonblockingServer()
-	: next_id(1), listensocket(-1), connections(), wakeup_pipe(BinaryFDStream::PIPE) {
+	: num_workers(0), next_id(1), listensocket(-1), running(false), wakeup_pipe(BinaryFDStream::PIPE) {
 }
 
 NonblockingServer::~NonblockingServer() {
@@ -144,19 +153,20 @@ NonblockingServer::~NonblockingServer() {
 		close(listensocket);
 		listensocket = -1;
 	}
+	stopAllWorkers();
 }
 
 void NonblockingServer::readNB(Connection &c) {
 	try {
 		auto is_eof = c.stream->readNB(*(c.readbuffer), true);
 		if (is_eof) {
-			c.markAsClosed();
+			c.close();
 			return;
 		}
 	}
 	catch (const std::exception &e) {
 		Log::error("%d: Exception during readNB: %s", c.id, e.what());
-		c.markAsClosed();
+		c.close();
 		return;
 	}
 
@@ -166,8 +176,7 @@ void NonblockingServer::readNB(Connection &c) {
 		}
 		catch (const std::exception &e) {
 			Log::error("%d: Exception when processing command: %s", c.id, e.what());
-			// TODO: maybe the state changed to PROCESSING_ASYNC, can we really close it here?
-			c.markAsClosed();
+			c.close();
 			return;
 		}
 	}
@@ -183,13 +192,56 @@ void NonblockingServer::writeNB(Connection &c) {
 	}
 	catch (const std::exception &e) {
 		Log::error("%d: Exception during writeNB: %s", c.id, e.what());
-		c.markAsClosed();
+		c.close();
 		return;
 	}
 }
 
+/*
+ * job-queue
+ */
+void NonblockingServer::enqueueTask(Connection *connection) {
+	std::unique_lock<std::mutex> lock(job_queue_mutex);
+	try {
+		job_queue.push(connection);
+	}
+	catch (...) {
+		connection->close();
+		throw;
+	}
+	connection->state = Connection::State::PROCESSING_DATA_ASYNC;
+	lock.unlock();
+	job_queue_cond.notify_one();
+}
+
+// Waits for a task and returns it. If no further tasks are availabe, a nullptr is returned.
+NonblockingServer::Connection *NonblockingServer::popTask() {
+	std::unique_lock<std::mutex> lock(job_queue_mutex);
+	while (true) {
+		while (running && job_queue.empty()) {
+			job_queue_cond.wait(lock);
+		}
+		if (!running)
+			return nullptr;
+		auto connection = job_queue.front();
+		job_queue.pop();
+		if (connection->is_closed) {
+			// it's possible that the connection had a problem somewhere..
+			// We don't want to spend work on it, but we need to pass ownership back to the main thread so it can be reaped.
+			connection->state = Connection::State::IDLE;
+			continue;
+		}
+		if (connection->state != Connection::State::PROCESSING_DATA_ASYNC)
+			throw MustNotHappenException("NonblockingServer: popped a connection from the job queue which is not in state PROCESSING_ASYNC");
+		return connection;
+	}
+	// dear eclipse: please stop complaining
+	return nullptr;
+}
+
+
 NonblockingServer::Connection *NonblockingServer::getIdleConnectionById(int id) {
-	// TODO: synchronize?
+	std::lock_guard<std::recursive_mutex> connections_lock(connections_mutex);
 	for (auto &c : connections) {
 		if (c->id == id && c->state == Connection::State::IDLE)
 			return c.get();
@@ -198,8 +250,37 @@ NonblockingServer::Connection *NonblockingServer::getIdleConnectionById(int id) 
 }
 
 
+void NonblockingServer::setWorkerThreads(int num_workers) {
+	if (running)
+		throw MustNotHappenException("NonblockingServer: do not call setWorkerThreads() after start()");
+
+	this->num_workers = num_workers;
+}
+
 void NonblockingServer::listen(int portnr) {
+	if (running)
+		throw MustNotHappenException("NonblockingServer: do not call listen() after start()");
+
 	listensocket = getListeningSocket(portnr);
+}
+
+void NonblockingServer::worker_thread() {
+	try {
+		while (true) {
+			auto connection = popTask();
+			if (connection == nullptr)
+				return;
+			connection->processDataAsync();
+			// as soon as this method call returns, the main thread may or may not have deleted the connection,
+			// which means that unfortunately we cannot safely check this.
+			//if (connection->state == Connection::State::PROCESSING_DATA_ASYNC)
+			//	throw MustNotHappenException("processData() did not change the state, expected PROCESS_ASYNC, IDLE or a reply");
+		}
+	}
+	catch (const std::exception &e) {
+		Log::error("NonblockingServer: Worker thread terminated with exception %s", e.what());
+	}
+	Log::info("worker thread stopping..");
 }
 
 void NonblockingServer::start() {
@@ -209,6 +290,9 @@ void NonblockingServer::start() {
 	if (!running.compare_exchange_strong(expected, true))
 		throw ArgumentException("NonblockingServer: already running");
 
+	for (int i=0;i<num_workers;i++)
+		workers.emplace_back(&NonblockingServer::worker_thread, this);
+
 	while (true) {
 		struct timeval tv{60,0};
 		fd_set readfds;
@@ -217,28 +301,35 @@ void NonblockingServer::start() {
 
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
+		std::unique_lock<std::recursive_mutex> connections_lock(connections_mutex);
 		auto it = connections.begin();
 		while (it != connections.end()) {
 			auto &c = *it;
 			int fd = c->fd;
 			Connection::State state = c->state;
-			if (state == Connection::State::WRITING_DATA)
-				FD_SET(fd, &writefds);
-			else if (state == Connection::State::READING_DATA)
-				FD_SET(fd, &readfds);
-			else if (state == Connection::State::CLOSED) {
-				auto id = c->id;
-				it = connections.erase(it);
-				Log::info("%d: closing, %lu clients remain", id, connections.size());
-				continue; // avoid the ++it
+			if (c->is_closed) {
+				if (state != Connection::State::PROCESSING_DATA_ASYNC) {
+					auto id = c->id;
+					it = connections.erase(it);
+					Log::info("%d: closing, %lu clients remain", id, connections.size());
+					continue; // avoid the ++it
+				}
 			}
 			else {
-				++it;
-				continue;
+				if (state == Connection::State::WRITING_DATA)
+					FD_SET(fd, &writefds);
+				else if (state == Connection::State::READING_DATA)
+					FD_SET(fd, &readfds);
+				else {
+					++it;
+					continue;
+				}
 			}
 			maxfd = std::max(fd, maxfd);
 			++it;
 		}
+		connections_lock.unlock();
+
 		maxfd = std::max(wakeup_pipe.getReadFD(), maxfd);
 		FD_SET(wakeup_pipe.getReadFD(), &readfds);
 
@@ -256,7 +347,7 @@ void NonblockingServer::start() {
 
 		if (!running) {
 			Log::info("Stopping Server");
-			return;
+			break;
 		}
 
 		if (FD_ISSET(wakeup_pipe.getReadFD(), &readfds)) {
@@ -265,6 +356,7 @@ void NonblockingServer::start() {
 			read(wakeup_pipe.getReadFD(), buf, 1024);
 		}
 
+		connections_lock.lock();
 		for (auto &c : connections) {
 			Connection::State state = c->state;
 			if (state == Connection::State::WRITING_DATA && FD_ISSET(c->fd, &writefds)) {
@@ -274,6 +366,7 @@ void NonblockingServer::start() {
 				readNB(*c);
 			}
 		}
+		connections_lock.unlock();
 
 		if (FD_ISSET(listensocket, &readfds)) {
 			struct sockaddr_storage remote_addr;
@@ -290,8 +383,22 @@ void NonblockingServer::start() {
 
 			int one = 1;
 			setsockopt(new_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+			connections_lock.lock();
 			connections.push_back( createConnection(new_fd, next_id++) );
+			connections_lock.unlock();
 		}
+	}
+
+	stopAllWorkers();
+}
+
+void NonblockingServer::stopAllWorkers() {
+	if (!workers.empty()) {
+		running = false;
+		job_queue_cond.notify_all();
+		for (size_t i=0;i<workers.size();i++)
+			workers[i].join();
+		workers.clear();
 	}
 }
 

@@ -10,66 +10,69 @@
 #include <atomic>
 
 
-// Unit tests are supposed to be quick. If you want to really stress-test the server,
-// increase these values to something like 10/50.
+/*
+ * This is an echo-server with worker threads.
+ *
+ * Unlike the other echo-server, these clients will only send integers, not huge buffers.
+ * All even numbers will be echoed directly, all odd numbers will be echoed by the worker threads.
+ */
+
 static const int NUM_CLIENTS = 3;
-static const int NUM_REQUESTS = 3;
+static const int NUM_REQUESTS = 500;
 
-static const int SERVER_PORT = 51234;
-static const size_t SERVER_BUFFER_SIZE = 1064960;
-
-// to see minimum/default/maximum buffer sizes, do:
-// cat /proc/sys/net/ipv4/tcp_{r,w}mem
-// 4096    87380   6291456
-// 4096    16384   4194304
-// so on this machine, our buffers should be >6 MB to make sure we have partial reads and writes
-static size_t PACKET_SIZE = 6291457; // 6 MB + 1 Byte
-
+static const int SERVER_PORT = 51236;
+static const int SERVER_WORKER_THREADS = 3;
 
 
 /*
- * First, create an EchoServer, which writes back anything the client sends.
+ * First, create an MTEchoServer, which writes back anything the client sends.
  */
-class EchoServerConnection : public NonblockingServer::Connection {
+class MTEchoServerConnection : public NonblockingServer::Connection {
 	public:
-		EchoServerConnection(NonblockingServer &server, int fd, int id);
-		~EchoServerConnection();
+		MTEchoServerConnection(NonblockingServer &server, int fd, int id);
+		~MTEchoServerConnection();
 	private:
 		virtual void processData(std::unique_ptr<BinaryReadBuffer> request);
+		virtual void processDataAsync();
+		int data;
 };
 
-EchoServerConnection::EchoServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id) {
+MTEchoServerConnection::MTEchoServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id), data(0) {
 }
 
-EchoServerConnection::~EchoServerConnection() {
+MTEchoServerConnection::~MTEchoServerConnection() {
 }
 
-void EchoServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request) {
-	auto response = make_unique<BinaryWriteBuffer>();
-	size_t bytes_read = 0, bytes_total = request->getPayloadSize();
-	char buffer[SERVER_BUFFER_SIZE];
-	while (bytes_read < bytes_total) {
-		size_t remaining = bytes_total - bytes_read;
-		size_t next_batch_size = std::min(SERVER_BUFFER_SIZE, remaining);
-		request->read(buffer, next_batch_size);
-		response->write(buffer, next_batch_size);
-		bytes_read += next_batch_size;
+void MTEchoServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request) {
+	data = request->read<int>();
+
+	if (data % 2 == 0) {
+		enqueueForAsyncProcessing();
 	}
+	else {
+		auto response = make_unique<BinaryWriteBuffer>();
+		response->write(data);
+		startWritingData(std::move(response));
+	}
+}
 
+void MTEchoServerConnection::processDataAsync() {
+	auto response = make_unique<BinaryWriteBuffer>();
+	response->write(data);
 	startWritingData(std::move(response));
 }
 
 
-class EchoServer : public NonblockingServer {
+class MTEchoServer : public NonblockingServer {
 	public:
 		using NonblockingServer::NonblockingServer;
-		virtual ~EchoServer() {};
+		virtual ~MTEchoServer() {};
 	private:
 		virtual std::unique_ptr<Connection> createConnection(int fd, int id);
 };
 
-std::unique_ptr<NonblockingServer::Connection> EchoServer::createConnection(int fd, int id) {
-	return make_unique<EchoServerConnection>(*this, fd, id);
+std::unique_ptr<NonblockingServer::Connection> MTEchoServer::createConnection(int fd, int id) {
+	return make_unique<MTEchoServerConnection>(*this, fd, id);
 }
 
 /*
@@ -77,7 +80,7 @@ std::unique_ptr<NonblockingServer::Connection> EchoServer::createConnection(int 
  */
 static std::mutex server_initialization_mutex;
 static std::atomic<bool> server_thread_failed;
-static std::unique_ptr<EchoServer> server;
+static std::unique_ptr<MTEchoServer> server;
 
 static void run_server() {
 	try {
@@ -85,7 +88,8 @@ static void run_server() {
 
 		server_initialization_mutex.lock();
 
-		server = make_unique<EchoServer>();
+		server = make_unique<MTEchoServer>();
+		server->setWorkerThreads(SERVER_WORKER_THREADS);
 		server->listen(portnr);
 
 		server_initialization_mutex.unlock();
@@ -105,57 +109,35 @@ static void run_server() {
  */
 static std::atomic<bool> all_clients_successful;
 
-/*
- * Generate a random packet
- */
-std::string getRandomString() {
-	size_t size = PACKET_SIZE;
-	std::string random;
-	random.reserve(size);
-	for (size_t i=0;i<size;i++) {
-		char c = (i*7)%255;
-		random += c;
-	}
-	if (random.size() != size)
-		printf("Wrong string size, expected %lu, got %lu\n", size, random.size());
-	return random;
-}
-
 static void run_client(int id) {
 	int req=0;
 	try {
 		auto stream = make_unique<BinaryFDStream>("127.0.0.1", SERVER_PORT, true);
 
-		const auto request_bytes = getRandomString();
-
 		for (req=0;req<NUM_REQUESTS;req++) {
-			//printf("Client %d is at %d of %d\n", id, req, NUM_REQUESTS);
 			BinaryWriteBuffer request;
-			request.enableLinking();
-			request.write(request_bytes.c_str(), request_bytes.size(), true);
+			request.write((int) req);
 			stream->write(request);
 
 			BinaryReadBuffer response;
 			stream->read(response);
 
-			for (size_t pos=0;pos < request_bytes.size(); pos++) {
-				auto byte = response.read<char>();
-				if (byte != request_bytes[pos]) {
-					printf("Error in client %d, got mismatching bytes on request %d of %d at position %lu\n", id, req, NUM_REQUESTS, pos);
-					all_clients_successful = false;
-				}
+			auto res = response.read<int>();
+			if (res != req) {
+				printf("Error in client %d, got mismatching number on request %d, got %d\n", id, req, res);
+				all_clients_successful = false;
 			}
 		}
 	}
 	catch (const std::exception &e) {
-		printf("Client %d aborted with an exception in request %d of %d: %s\n", req, NUM_REQUESTS, id, e.what());
+		printf("Client %d aborted with an exception in request %d of %d: %s\n", id, req, NUM_REQUESTS, e.what());
 		all_clients_successful = false;
 	}
 }
 
 
 // Spawn a server and hammer it with concurrent requests. See if communication fails somewhere.
-TEST(NonblockingServer, EchoServer) {
+TEST(NonblockingServer, MTEchoServer) {
 	//Log::setLogFd(stdout);
 	Log::setLevel("off");
 	all_clients_successful = true;

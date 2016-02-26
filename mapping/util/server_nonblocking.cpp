@@ -65,6 +65,7 @@ void NonblockingServer::Connection::startWritingData(std::unique_ptr<BinaryWrite
 		throw MustNotHappenException("Connection::startWritingData() cannot be called in current state");
 	readbuffer.reset(nullptr);
 	writebuffer = std::move(new_writebuffer);
+	auto &server = this->server;
 	state = State::WRITING_DATA;
 	if (old_state != State::PROCESSING_DATA)
 		server.wake();

@@ -13,7 +13,9 @@ class TileServerConnection : public NonblockingServer::Connection {
 		~TileServerConnection();
 	private:
 		virtual void processData(std::unique_ptr<BinaryReadBuffer> request);
+		virtual void processDataAsync();
 		std::shared_ptr<LocalRasterDBBackend> backend;
+		std::unique_ptr<RasterDBBackend::TileDescription> tile;
 };
 
 TileServerConnection::TileServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id) {
@@ -150,21 +152,10 @@ void TileServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request
 		}
 		//case RemoteRasterDBBackend::COMMAND_HASTILE:
 		case RemoteRasterDBBackend::COMMAND_READTILE: {
-			RasterDBBackend::TileDescription tile(*request);
-			Log::info("%d: returning tile, offset %lu, size %lu", id, tile.offset, tile.size);
-
-			// To avoid copying the bytebuffer with the tiledata, we're linking the data in the writebuffer.
-			// To do this, our bytebuffer's lifetime must be managed by the writebuffer.
-			// Unfortunately, we have to replace our freshly allocated writebuffer with a different one right here.
-			BinaryWriteBufferWithObject<ByteBuffer> *response2 = new BinaryWriteBufferWithObject<ByteBuffer>();
-			response.reset(response2);
-			response2->object = backend->readTile(tile);
-			response2->write(response2->object->size);
-			response2->enableLinking();
-			response2->write((const char *) response2->object->data, response2->object->size, true);
-			response2->disableLinking();
-			Log::info("%d: data sent", id);
-			break;
+			tile = make_unique<RasterDBBackend::TileDescription>(*request);
+			Log::info("%d: returning tile, offset %lu, size %lu", id, tile->offset, tile->size);
+			enqueueForAsyncProcessing();
+			return;
 		}
 		default: {
 			Log::info("%d: got unknown command %d, disconnecting", id, c);
@@ -172,6 +163,24 @@ void TileServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request
 			return;
 		}
 	}
+	startWritingData(std::move(response));
+}
+
+void TileServerConnection::processDataAsync() {
+	// only one request is handled asynchronously: READTILE
+	// `tile` is set to the TileDescription read from the request
+
+	// To avoid copying the bytebuffer with the tiledata, we're linking the data in the writebuffer.
+	// To do this, our bytebuffer's lifetime must be managed by the writebuffer.
+	// Unfortunately, we have to replace our freshly allocated writebuffer with a different one right here.
+	auto response = make_unique<BinaryWriteBufferWithObject<ByteBuffer>>();
+	response->object = backend->readTile(*tile);
+	tile.reset(nullptr);
+	response->write(response->object->size);
+	response->enableLinking();
+	response->write((const char *) response->object->data, response->object->size, true);
+	response->disableLinking();
+	Log::info("%d: data sent", id);
 	startWritingData(std::move(response));
 }
 
@@ -198,10 +207,14 @@ int main(void) {
 	auto portstr = Configuration::get("rasterdb.tileserver.port");
 	auto portnr = atoi(portstr.c_str());
 
-	Log::info("server: listening on port %d", portnr);
+	auto threadsstr = Configuration::get("rasterdb.tileserver.threads", "1");
+	auto threads = std::max(1, atoi(threadsstr.c_str()));
+
+	Log::info("server: listening on port %d, using %d worker threads", portnr, threads);
 
 	TileServer server;
 	server.listen(portnr);
+	server.setWorkerThreads(threads);
 	server.start();
 
 	return 0;

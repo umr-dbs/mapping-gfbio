@@ -9,14 +9,14 @@
 
 class TileServerConnection : public NonblockingServer::Connection {
 	public:
-		TileServerConnection(int fd, int id);
+		TileServerConnection(NonblockingServer &server, int fd, int id);
 		~TileServerConnection();
 	private:
-		virtual std::unique_ptr<BinaryWriteBuffer> processRequest(NonblockingServer &server, std::unique_ptr<BinaryReadBuffer> request);
+		virtual void processData(std::unique_ptr<BinaryReadBuffer> request);
 		std::shared_ptr<LocalRasterDBBackend> backend;
 };
 
-TileServerConnection::TileServerConnection(int fd, int id) : Connection(fd, id) {
+TileServerConnection::TileServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id) {
 	Log::info("%d: connected", id);
 	backend = make_unique<LocalRasterDBBackend>();
 }
@@ -25,25 +25,24 @@ TileServerConnection::~TileServerConnection() {
 
 }
 
-std::unique_ptr<BinaryWriteBuffer> TileServerConnection::processRequest(NonblockingServer &server, std::unique_ptr<BinaryReadBuffer> request) {
+void TileServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request) {
 	uint8_t OK = 48;
 
-	uint8_t c;
-	if (!request->read(&c, true)) {
-		Log::info("%d: disconnected", id);
-		return nullptr;
-	}
+	auto c = request->read<uint8_t>();
 
 	Log::info("%d: got command %d", id, c);
 
-	if (backend == nullptr && c >= RemoteRasterDBBackend::FIRST_SOURCE_SPECIFIC_COMMAND)
-		return nullptr;
+	if (backend == nullptr && c >= RemoteRasterDBBackend::FIRST_SOURCE_SPECIFIC_COMMAND) {
+		close();
+		return;
+	}
 
 	auto response = make_unique<BinaryWriteBuffer>();
 
 	switch (c) {
 		case RemoteRasterDBBackend::COMMAND_EXIT: {
-			return nullptr;
+			close();
+			return;
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_ENUMERATESOURCES: {
@@ -164,18 +163,16 @@ std::unique_ptr<BinaryWriteBuffer> TileServerConnection::processRequest(Nonblock
 			response2->enableLinking();
 			response2->write((const char *) response2->object->data, response2->object->size, true);
 			response2->disableLinking();
-			Log::info("%d: data sent\n", id);
+			Log::info("%d: data sent", id);
 			break;
 		}
 		default: {
-			Log::info("%d: got unknown command %d, disconnecting\n", id, c);
-			return nullptr;
+			Log::info("%d: got unknown command %d, disconnecting", id, c);
+			close();
+			return;
 		}
 	}
-	Log::info("%d: response of %d bytes", id, (int) response->getSize());
-	if (response->getSize() == 0)
-		throw ArgumentException("No response written");
-	return response;
+	startWritingData(std::move(response));
 }
 
 
@@ -188,7 +185,7 @@ class TileServer : public NonblockingServer {
 };
 
 std::unique_ptr<NonblockingServer::Connection> TileServer::createConnection(int fd, int id) {
-	return make_unique<TileServerConnection>(fd, id);
+	return make_unique<TileServerConnection>(*this, fd, id);
 }
 
 

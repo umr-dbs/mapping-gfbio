@@ -414,7 +414,19 @@ private:
 	public:
 		PointInCollectionBulkTester(const PolygonCollection& polygonCollection);
 
+		/**
+		 * tests whether given coordinate is spatially contained by any feature in polygonCollection
+		 * @param coordinate the coordinate to test
+		 * @return true, if the coordinate is contained by at least one feature in polygonCollection
+		 */
 		bool pointInCollection(const Coordinate& coordinate) const;
+
+		/**
+		 * compute the indexes of all features that spatially contain the given coordinate
+		 * @param coordinate the coordinate to test
+		 * @return indexes of all features that contain the given coordinate
+		 */
+		std::vector<uint32_t> polygonsContainingPoint(const Coordinate& coordinate) const;
 
 	private:
 		const PolygonCollection& polygonCollection;

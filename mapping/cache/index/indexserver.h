@@ -23,13 +23,6 @@
 #include <deque>
 
 
-class NewConnection {
-public:
-	NewConnection( const std::string &hostname, int fd ) : hostname(hostname), fd(fd) {}
-	std::string hostname;
-	int fd;
-};
-
 //
 // Represents a cache-node.
 //
@@ -54,7 +47,6 @@ public:
 	void reset_query_stats();
 
 	std::string to_string() const;
-
 private:
 	// The stats
 	Capacity capacity;

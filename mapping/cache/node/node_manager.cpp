@@ -8,7 +8,6 @@
 #include "cache/node/node_manager.h"
 #include "cache/manager.h"
 #include "cache/priv/connection.h"
-#include "util/nio.h"
 
 
 WorkerContext::WorkerContext() : puzzling(false), index_connection(nullptr) {
@@ -83,7 +82,7 @@ bool NodeCacheWrapper<T>::put(const std::string& semantic_id, const std::unique_
 		TIME_EXEC("CacheManager.put.remote");
 
 		Log::debug("Adding item to remote cache: %s", ref.to_string().c_str());
-		buffered_write(stream,WorkerConnection::RESP_NEW_CACHE_ENTRY,ref);
+		BinaryStream::buffered_write(stream,WorkerConnection::RESP_NEW_CACHE_ENTRY,ref);
 		return true;
 	}
 	else {
@@ -170,17 +169,19 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 	TIME_EXEC2("CacheManager.query.remote");
 	Log::debug("Local MISS for query: %s on %s. Querying index.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 	BaseRequest cr(CacheType::RASTER, op.getSemanticId(), rect);
-	BinaryStream &stream = mgr.get_worker_context().get_index_connection();
 
-	buffered_write(stream,WorkerConnection::CMD_QUERY_CACHE,cr);
-	uint8_t resp;
-	stream.read(&resp);
-	switch (resp) {
+	BinaryStream &stream = mgr.get_worker_context().get_index_connection();
+	BinaryStream::buffered_write(stream,WorkerConnection::CMD_QUERY_CACHE,cr);
+
+	auto resp = BinaryStream::buffered_read(stream);
+
+	uint8_t rc = resp->read<uint8_t>();
+	switch (rc) {
 		// Full hit on different client
 		case WorkerConnection::RESP_QUERY_HIT: {
 			stats.add_single_remote_hit();
 			Log::trace("Full single remote HIT for query: %s on %s. Returning cached raster.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
-			return retriever->load( op.getSemanticId(), CacheRef(stream), profiler );
+			return retriever->load( op.getSemanticId(), CacheRef(*resp), profiler );
 		}
 		// Full miss on whole cache
 		case WorkerConnection::RESP_QUERY_MISS: {
@@ -191,7 +192,7 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 		}
 		// Puzzle time
 		case WorkerConnection::RESP_QUERY_PARTIAL: {
-			PuzzleRequest pr(stream);
+			PuzzleRequest pr(*resp);
 
 			// STATS ONLY
 			bool local_only = true;

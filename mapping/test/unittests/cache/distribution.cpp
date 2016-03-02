@@ -9,20 +9,22 @@
 
 #include <gtest/gtest.h>
 #include <vector>
-#include "test/unittests/cache/util.h"
 #include "util/make_unique.h"
 #include "cache/index/indexserver.h"
 #include "cache/node/nodeserver.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
 #include "cache/index/reorg_strategy.h"
+#include "cache/experiments/exp_util.h"
+
+typedef std::unique_ptr<std::thread> TP;
 
 TEST(DistributionTest,TestRedistibution) {
-
+	Log::setLevel(Log::LogLevel::WARN);
 	TestCacheMan cm;
-	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1(12347, "localhost", 12346, "always");
-	TestNodeServer ns2(12348, "localhost", 12346, "always");
+	TestIdxServer is(12346, 0, "capacity", "lru");
+	TestNodeServer ns1(1, 12347, "localhost", 12346, "always");
+	TestNodeServer ns2(1, 12348, "localhost", 12346, "always");
 
 	cm.add_instance(&ns1);
 	cm.add_instance(&ns2);
@@ -55,13 +57,13 @@ TEST(DistributionTest,TestRedistibution) {
 	std::string sem_id = GenericOperator::fromJSON(json)->getSemanticId();
 
 	//Should hit 1st node
+	QueryProfiler qp;
 	auto op = GenericOperator::fromJSON(json);
-
-	cc.query(*op, qr);
+	cc.query(*op, qr, qp);
 
 	NodeCacheKey key1(sem_id, 2);
 
-	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(key1));
+	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get(key1));
 
 	ReorgDescription rod;
 	ReorgMoveItem ri(CacheType::RASTER, sem_id, 2, 1, "localhost", 12347);
@@ -72,10 +74,10 @@ TEST(DistributionTest,TestRedistibution) {
 	std::this_thread::sleep_for(std::chrono::milliseconds(2500));
 
 	// Assert moved
-	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(key1), NoSuchElementException);
+	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get(key1), NoSuchElementException);
 
 	NodeCacheKey key_new(sem_id, 1);
-	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get_ref(key_new));
+	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get(key_new));
 
 	ns2.stop();
 	ns1.stop();
@@ -88,9 +90,9 @@ TEST(DistributionTest,TestRedistibution) {
 TEST(DistributionTest,TestRemoteNodeFetch) {
 	// Reset testnodeutil
 	TestCacheMan cm;
-	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1(12347, "localhost", 12346, "always");
-	TestNodeServer ns2(12348, "localhost", 12346, "always");
+	TestIdxServer is(12346, 0, "capacity", "lru");
+	TestNodeServer ns1(1, 12347, "localhost", 12346, "always");
+	TestNodeServer ns2(1, 12348, "localhost", 12346, "always");
 
 	cm.add_instance(&ns1);
 	cm.add_instance(&ns2);
@@ -122,13 +124,14 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 
 
 	auto op = GenericOperator::fromJSON(json);
+	QueryProfiler qp1, qp2;
 	//Should hit 1st node
-	cc.query(*op, qr);
+	cc.query(*op, qr, qp1);
 
 	std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
 	//Should hit 2nd node
-	cc.query(*op, qr);
+	cc.query(*op, qr, qp2);
 
 	ns2.stop();
 	ns1.stop();
@@ -141,9 +144,9 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 TEST(DistributionTest,TestStatsAndReorg) {
 	// Reset testnodeutil
 	TestCacheMan cm;
-	TestIdxServer is(12346, "capacity");
-	TestNodeServer ns1(12347, "localhost", 12346, "always", 204800 );
-	TestNodeServer ns2(12348, "localhost", 12346, "always", 204800 );
+	TestIdxServer is(12346, 500, "capacity", "lru");
+	TestNodeServer ns1(1, 12347, "localhost", 12346, "always", 204800 );
+	TestNodeServer ns2(1, 12348, "localhost", 12346, "always", 204800 );
 
 	cm.add_instance(&ns1);
 	cm.add_instance(&ns2);
@@ -174,11 +177,12 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	QueryRectangle qr1( SpatialReference(epsg, 0,0,45,45), tr, qres );
 	QueryRectangle qr2( SpatialReference(epsg, 45,0,90,45), tr, qres );
+	QueryProfiler qp1, qp2, qp3;
 
 	//Should hit 1st node
-	cc.query(*op, qr1);
-	cc.query(*op, qr2);
-	cc.query(*op, qr2);
+	cc.query(*op, qr1, qp1);
+	cc.query(*op, qr2, qp2);
+	cc.query(*op, qr2, qp3);
 
 	is.force_stat_update();
 
@@ -186,11 +190,11 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	// Reorg should be finished at this point
 
 	// Assert moved
-	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),2)),
+	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),2)),
 			NoSuchElementException );
 
-	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),1)));
-	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get_ref(NodeCacheKey(op->getSemanticId(),1)));
+	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1)));
+	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1)));
 
 	ns2.stop();
 	ns1.stop();

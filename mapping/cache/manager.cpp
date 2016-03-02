@@ -8,11 +8,8 @@
 #include "cache/manager.h"
 #include "cache/priv/transfer.h"
 #include "cache/priv/connection.h"
-#include "util/nio.h"
+#include "util/binarystream.h"
 
-//
-// STATICS
-//
 //
 // Cache-Manager
 //
@@ -109,50 +106,51 @@ std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
 
 	try {
 		BinaryFDStream idx_con(idx_host.c_str(), idx_port, true);
-		BinaryStream &idx_stream = idx_con;
 
 		BaseRequest req(type,op.getSemanticId(),rect);
-		buffered_write(idx_con, ClientConnection::MAGIC_NUMBER, ClientConnection::CMD_GET, req );
+		BinaryStream::buffered_write(idx_con, ClientConnection::MAGIC_NUMBER);
+		BinaryStream::buffered_write(idx_con, ClientConnection::CMD_GET, req );
 
-		uint8_t idx_resp;
-		idx_stream.read(&idx_resp);
-		switch (idx_resp) {
+		auto resp = BinaryStream::buffered_read(idx_con);
+
+		uint8_t idx_rc = resp->read<uint8_t>();
+		switch (idx_rc) {
 			case ClientConnection::RESP_OK: {
-				DeliveryResponse dr(idx_con);
+				DeliveryResponse dr(*resp);
 				Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
+
 				BinaryFDStream del_sock(dr.host.c_str(),dr.port,true);
-				BinaryStream &del_stream = del_sock;
 
-				buffered_write( del_sock, DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET, dr.delivery_id);
+				BinaryStream::buffered_write( del_sock, DeliveryConnection::MAGIC_NUMBER);
+				BinaryStream::buffered_write(del_sock,DeliveryConnection::CMD_GET, dr.delivery_id);
 
-				uint8_t resp;
-				del_stream.read(&resp);
-				switch (resp) {
+				auto del_resp = BinaryStream::buffered_read(del_sock);
+
+				uint8_t del_rc = del_resp->read<uint8_t>();
+				switch (del_rc) {
 					case DeliveryConnection::RESP_OK: {
 						Log::debug("Delivery responded OK.");
-						return read_result(del_sock);
+						return read_result(*del_resp);
 					}
 					case DeliveryConnection::RESP_ERROR: {
-						std::string err_msg;
-						del_stream.read(&err_msg);
+						std::string err_msg = del_resp->read<std::string>();
 						Log::error("Delivery returned error: %s", err_msg.c_str());
 						throw DeliveryException(err_msg);
 					}
 					default: {
-						Log::error("Delivery returned unknown code: %d", resp);
+						Log::error("Delivery returned unknown code: %d", del_rc);
 						throw DeliveryException("Delivery returned unknown code");
 					}
 				}
 				break;
 			}
 			case ClientConnection::RESP_ERROR: {
-				std::string err_msg;
-				idx_stream.read(&err_msg);
+				std::string err_msg = resp->read<std::string>();
 				Log::error("Cache returned error: %s", err_msg.c_str());
 				throw OperatorException(err_msg);
 			}
 			default: {
-				Log::error("Cache returned unknown code: %d", idx_resp);
+				Log::error("Cache returned unknown code: %d", idx_rc);
 				throw OperatorException("Cache returned unknown code");
 			}
 		}

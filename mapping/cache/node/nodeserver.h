@@ -67,34 +67,34 @@ private:
 	void setup_control_connection();
 
 	// Separation of command-processing for the workers
-	void process_worker_command(uint8_t cmd, BinaryStream &stream);
+	void process_worker_command(BinaryFDStream &index_stream, BinaryReadBuffer &payload);
 
 	// Handles a create-request received from the index
-	void process_create_request(BinaryStream &index_stream, const BaseRequest &request );
+	void process_create_request(BinaryFDStream  &index_stream, const BaseRequest &request );
 
 	// Handles a puzzle-request received from the index
-	void process_puzzle_request(BinaryStream &index_stream, const PuzzleRequest &request );
+	void process_puzzle_request(BinaryFDStream  &index_stream, const PuzzleRequest &request );
 
 	// Handles a delivery-request received from the index
-	void process_delivery_request(BinaryStream &index_stream, const DeliveryRequest &request );
-
-	// Process a command received on the control-connection
-	void process_control_command(uint8_t cmd, BinaryStream &stream);
-
-	// Manages the migration of the given item to this node
-	void handle_reorg_move_item( const ReorgMoveItem &item, BinaryStream &index_stream );
-
-	// Removes the given item from the local cache of this node
-	void handle_reorg_remove_item( const TypedNodeCacheKey &item, BinaryStream &index_stream );
-
+	void process_delivery_request(BinaryFDStream  &index_stream, const DeliveryRequest &request );
 
 	template <typename T>
-	void finish_request( BinaryStream &index_stream, const std::shared_ptr<const T> &item );
+	void finish_request( BinaryFDStream &index_stream, const std::shared_ptr<const T> &item );
+
+
+	// Process a command received on the control-connection
+	void process_control_command(BinaryFDStream &index_stream, BinaryReadBuffer &payload);
+
+	// Manages the migration of the given item to this node
+	void handle_reorg_move_item( BinaryFDStream &index_stream, const ReorgMoveItem &item );
+
+	// Removes the given item from the local cache of this node
+	void handle_reorg_remove_item( BinaryFDStream &index_stream, const TypedNodeCacheKey &item );
 
 
 	// Confirms the movement of the given item to the index as well
 	// as to the Node it was requested from
-	void confirm_move( const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream, BinaryStream &del_stream );
+	void confirm_move( BinaryFDStream &index_stream, BinaryFDStream &del_stream, const ReorgMoveItem& item, uint64_t new_id );
 
 	// Indicator telling if the server should shutdown
 	bool shutdown;

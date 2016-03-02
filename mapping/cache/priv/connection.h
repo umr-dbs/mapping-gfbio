@@ -14,12 +14,25 @@
 #include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
 #include "cache/common.h"
-#include "util/nio.h"
 
 #include <map>
 #include <memory>
 
 class Node;
+
+
+class NewConnection {
+public:
+	NewConnection( const std::string &hostname, int fd );
+	int read_fd() const;
+	bool read();
+	BinaryStream& get_data();
+	std::unique_ptr<BinaryFDStream> release_stream();
+	std::string hostname;
+private:
+	std::unique_ptr<BinaryFDStream> stream;
+	std::unique_ptr<BinaryReadBuffer> buffer;
+};
 
 template<typename StateType>
 class BaseConnection {
@@ -37,8 +50,6 @@ public:
 	int get_read_fd() const;
 	// Tells whether an error occured on this connection
 	bool is_faulty() const;
-	// Tells whether this connection is currently reading data
-	bool is_reading() const;
 	// Tells whether this connection is currently writing data
 	bool is_writing() const;
 
@@ -48,15 +59,11 @@ public:
 	const uint64_t id;
 protected:
 	// Callback for commands read from the socket
-	virtual void process_command( uint8_t cmd ) = 0;
+	virtual void process_command( uint8_t cmd, BinaryStream& payload ) = 0;
+	// Called by implementing classes to trigger a non-blocking write
+	void begin_write( std::unique_ptr<BinaryWriteBuffer> buffer );
 	// Callback for finished non-blocking writes
 	virtual void write_finished() = 0;
-	// Callback for finished non-blocking reads
-	virtual void read_finished( NBReader& reader) = 0;
-	// Called by implementing classes to trigger a non-blocking write
-	void begin_write( std::unique_ptr<NBWriter> writer );
-	// Called by implementing classes to trigger a non-blocking read
-	void begin_read( std::unique_ptr<NBReader> reader );
 
 	void set_state( StateType state );
 
@@ -67,18 +74,15 @@ private:
 	bool _ensure_state( StateType state, States... states) const;
 	bool _ensure_state( StateType state ) const;
 	StateType state;
-	bool writing;
-	bool reading;
 	bool faulty;
-	BinaryStream &stream;
-	std::unique_ptr<NBWriter> writer;
-	std::unique_ptr<NBReader> reader;
 	std::unique_ptr<BinaryFDStream> socket;
+	std::unique_ptr<BinaryReadBuffer> reader;
+	std::unique_ptr<BinaryWriteBuffer> writer;
 	static uint64_t next_id;
 };
 
 enum class ClientState {
-	IDLE, READING_REQUEST, AWAIT_RESPONSE, WRITING_RESPONSE
+	IDLE, AWAIT_RESPONSE, WRITING_RESPONSE
 };
 
 class ClientConnection: public BaseConnection<ClientState> {
@@ -116,11 +120,9 @@ public:
 	const BaseRequest& get_request() const;
 
 protected:
-	virtual void process_command( uint8_t cmd );
+	virtual void process_command( uint8_t cmd, BinaryStream& payload );
 	virtual void write_finished();
-	virtual void read_finished( NBReader& reader);
 private:
-	void reset();
 	std::unique_ptr<BaseRequest> request;
 };
 
@@ -128,11 +130,11 @@ private:
 
 enum class WorkerState {
 	IDLE,
-	SENDING_REQUEST, PROCESSING, READING_ENTRY, NEW_ENTRY,
-	READING_QUERY, QUERY_REQUESTED, SENDING_QUERY_RESPONSE,
+	SENDING_REQUEST, PROCESSING, NEW_ENTRY,
+	QUERY_REQUESTED, SENDING_QUERY_RESPONSE,
 	DONE,
-	SENDING_DELIVERY_QTY, WAITING_DELIVERY, READING_DELIVERY_ID, DELIVERY_READY,
-	READING_ERROR, ERROR
+	SENDING_DELIVERY_QTY, WAITING_DELIVERY, DELIVERY_READY,
+	ERROR
 };
 
 
@@ -238,9 +240,8 @@ public:
 	const std::shared_ptr<Node> node;
 
 protected:
-	virtual void process_command( uint8_t cmd );
+	virtual void process_command( uint8_t cmd, BinaryStream &payload );
 	virtual void write_finished();
-	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
 	std::unique_ptr<DeliveryResponse> result;
@@ -253,8 +254,7 @@ private:
 
 
 enum class ControlState {
-	READING_HANDSHAKE, HANDSHAKE_READ, SENDING_HELLO,
-	IDLE,
+	SENDING_HELLO, IDLE,
 	SENDING_REORG, REORGANIZING,
 	READING_MOVE_RESULT, MOVE_RESULT_READ, SENDING_MOVE_CONFIRM,
 	READING_REMOVE_REQUEST, REMOVE_REQUEST_READ, SENDING_REMOVE_CONFIRM,
@@ -319,7 +319,6 @@ public:
 
 	static const uint8_t RESP_REORG_REMOVE_REQUEST = 54;
 
-	void confirm_handshake( std::shared_ptr<Node> node );
 	void send_reorg( const ReorgDescription &desc );
 	void confirm_move();
 	void confirm_remove();
@@ -327,23 +326,19 @@ public:
 
 	void release();
 
-	const NodeHandshake& get_handshake() const;
 	const ReorgMoveResult& get_move_result() const;
 	const TypedNodeCacheKey& get_remove_request() const;
 	const NodeStats& get_stats() const;
 
 
-	ControlConnection(std::unique_ptr<BinaryFDStream> socket, const std::string &hostname);
+	ControlConnection(std::unique_ptr<BinaryFDStream> socket, std::shared_ptr<Node> node);
 	virtual ~ControlConnection();
 	std::shared_ptr<Node> node;
-	const std::string hostname;
 protected:
-	virtual void process_command( uint8_t cmd );
+	virtual void process_command( uint8_t cmd, BinaryStream &payload );
 	virtual void write_finished();
-	virtual void read_finished( NBReader& reader);
 private:
 	void reset();
-	std::unique_ptr<NodeHandshake> handshake;
 	std::unique_ptr<ReorgMoveResult> move_result;
 	std::unique_ptr<TypedNodeCacheKey> remove_request;
 	std::unique_ptr<NodeStats> stats;
@@ -357,9 +352,9 @@ private:
 
 enum class DeliveryState {
 	IDLE,
-	READING_DELIVERY_REQUEST, DELIVERY_REQUEST_READ,
-	READING_CACHE_REQUEST, CACHE_REQUEST_READ,
-	READING_MOVE_REQUEST, MOVE_REQUEST_READ,
+	DELIVERY_REQUEST_READ,
+	CACHE_REQUEST_READ,
+	MOVE_REQUEST_READ,
 	AWAITING_MOVE_CONFIRM, MOVE_DONE,
 	SENDING, SENDING_MOVE, SENDING_CACHE_ENTRY, SENDING_ERROR
 };
@@ -429,12 +424,12 @@ public:
 	void release();
 
 protected:
-	virtual void process_command( uint8_t cmd );
+	virtual void process_command( uint8_t cmd, BinaryStream &payload );
 	virtual void write_finished();
-	virtual void read_finished( NBReader& reader);
 private:
-template<typename T>
-std::unique_ptr<NBWriter> get_data_writer( std::shared_ptr<const T> item );
+	template<typename T>
+	void write_data( BinaryStream &stream, std::shared_ptr<const T> &item );
+
 	uint64_t delivery_id;
 	TypedNodeCacheKey cache_key;
 };

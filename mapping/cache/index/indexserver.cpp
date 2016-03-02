@@ -98,8 +98,8 @@ void IndexServer::run() {
 
 		// Add newly accepted sockets
 		for (auto &nc : new_cons) {
-			FD_SET(nc.fd, &readfds);
-			maxfd = std::max(maxfd, nc.fd);
+			FD_SET(nc.read_fd(), &readfds);
+			maxfd = std::max(maxfd, nc.read_fd());
 		}
 
 		// Setup existing connections
@@ -252,44 +252,45 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 void IndexServer::process_handshake(std::vector<NewConnection> &new_fds, fd_set* readfds) {
 	auto it = new_fds.begin();
 	while (it != new_fds.end()) {
-		if (FD_ISSET(it->fd, readfds)) {
-			try {
-				std::unique_ptr<BinaryFDStream> us = make_unique<BinaryFDStream>(it->fd, it->fd,true);
-				BinaryStream &s = *us;
-
-				uint32_t magic;
-				s.read(&magic);
+		try {
+			if (FD_ISSET(it->read_fd(), readfds) && it->read() ) {
+				auto &data = it->get_data();
+				uint32_t magic = data.read<uint32_t>();
 				switch (magic) {
 					case ClientConnection::MAGIC_NUMBER: {
-						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(std::move(us));
+						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(it->release_stream());
 						Log::trace("New client connections established");
 						client_connections.emplace(cc->id, std::move(cc));
 						break;
 					}
 					case WorkerConnection::MAGIC_NUMBER: {
-						uint32_t node_id;
-						s.read(&node_id);
-						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(std::move(us),
+						uint32_t node_id = data.read<uint32_t>();
+						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(it->release_stream(),
 							nodes.at(node_id));
 						Log::info("New worker registered for node: %d, id: %d", node_id, wc->id);
 						worker_connections.emplace(wc->id, std::move(wc));
 						break;
 					}
 					case ControlConnection::MAGIC_NUMBER: {
-						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us),it->hostname);
-						control_connections.emplace(cc->id, std::move(cc));
+						NodeHandshake hs(data);
+						auto node = std::make_shared<Node>(next_node_id++, it->hostname, hs.port, hs);
+						auto con  = make_unique<ControlConnection>(it->release_stream(), node);
+						nodes.emplace(node->id, node);
+						caches.process_handshake(node->id,hs);
+						Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, it->hostname.c_str(), con->id);
+						control_connections.emplace(con->id, std::move(con));
 						break;
 					}
 					default:
 						Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
 				}
-			} catch (const std::exception &e) {
-				Log::error("Error on new connection: %s. Dropping.", e.what());
+				it = new_fds.erase(it);
 			}
+			else
+				it++;
+		} catch (const std::exception &e) {
+			Log::error("Error on new connection: %s. Dropping.", e.what());
 			it = new_fds.erase(it);
-		}
-		else {
-			++it;
 		}
 	}
 }
@@ -320,16 +321,6 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 				continue;
 
 			switch (cc.get_state()) {
-				case ControlState::HANDSHAKE_READ: {
-					auto &hs = cc.get_handshake();
-					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, cc.hostname, hs.port, hs);
-					node->control_connection = cc.id;
-					nodes.emplace(node->id, node);
-					Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, cc.hostname.c_str(), cc.id);
-					caches.process_handshake(node->id,hs);
-					cc.confirm_handshake(node);
-					break;
-				}
 				case ControlState::MOVE_RESULT_READ: {
 					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
 					auto res = cc.get_move_result();

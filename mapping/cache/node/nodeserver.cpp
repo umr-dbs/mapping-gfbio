@@ -16,7 +16,6 @@
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/log.h"
-#include "util/nio.h"
 #include <sstream>
 
 #include <sys/select.h>
@@ -40,20 +39,15 @@ void NodeServer::worker_loop() {
 		try {
 			// Setup index connection
 			BinaryFDStream sock(index_host.c_str(), index_port,true);
-			buffered_write(sock,WorkerConnection::MAGIC_NUMBER,my_id);
+			BinaryStream::buffered_write(sock,WorkerConnection::MAGIC_NUMBER,my_id);
 			manager->get_worker_context().set_index_connection(&sock);
 
 			Log::debug("Worker connected to index-server");
 
 			while (workers_up && !shutdown) {
 				try {
-					uint8_t cmd;
-					if (CacheCommon::read(&cmd, sock, 2, true))
-						process_worker_command(cmd, sock);
-					else {
-						Log::info("Disconnect on worker.");
-						break;
-					}
+					auto res = CacheCommon::read(sock, 2);
+					process_worker_command(sock, *res);
 				} catch (const TimeoutException &te) {
 					//Log::trace("Read on worker-connection timed out. Trying again");
 				} catch (const InterruptedException &ie) {
@@ -64,7 +58,7 @@ void NodeServer::worker_loop() {
 				} catch (const std::exception &e) {
 					Log::error("Unexpected error while processing request: %s", e.what());
 					auto msg = concat("Unexpected error while processing request: ", e.what());
-					buffered_write(sock,WorkerConnection::RESP_ERROR, msg);
+					BinaryStream::buffered_write(sock,WorkerConnection::RESP_ERROR, msg);
 				}
 			}
 		} catch (const NetworkException &ne) {
@@ -75,26 +69,27 @@ void NodeServer::worker_loop() {
 	Log::info("Worker done.");
 }
 
-void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
+void NodeServer::process_worker_command(BinaryFDStream &index_stream, BinaryReadBuffer &payload) {
 	TIME_EXEC("RequestProcessing");
+	uint8_t cmd = payload.read<uint8_t>();
 	Log::debug("Processing command: %d", cmd);
 	switch (cmd) {
 		case WorkerConnection::CMD_CREATE: {
-			BaseRequest cr(stream);
+			BaseRequest cr(payload);
 			Log::debug("Processing create-request: %s", cr.to_string().c_str());
-			process_create_request(stream,cr);
+			process_create_request(index_stream,cr);
 			break;
 		}
 		case WorkerConnection::CMD_PUZZLE: {
-			PuzzleRequest pr(stream);
+			PuzzleRequest pr(payload);
 			Log::debug("Processing puzzle-request: %s", pr.to_string().c_str());
-			process_puzzle_request(stream,pr);
+			process_puzzle_request(index_stream,pr);
 			break;
 		}
 		case WorkerConnection::CMD_DELIVER: {
-			DeliveryRequest dr(stream);
+			DeliveryRequest dr(payload);
 			Log::debug("Processing delivery-request: %s", dr.to_string().c_str());
-			process_delivery_request(stream,dr);
+			process_delivery_request(index_stream,dr);
 			break;
 		}
 		default: {
@@ -105,7 +100,7 @@ void NodeServer::process_worker_command(uint8_t cmd, BinaryStream& stream) {
 	Log::debug("Finished processing command: %d", cmd);
 }
 
-void NodeServer::process_create_request(BinaryStream& index_stream,
+void NodeServer::process_create_request(BinaryFDStream &index_stream,
 		const BaseRequest& request) {
 	TIME_EXEC("RequestProcessing.create");
 	auto op = GenericOperator::fromJSON(request.semantic_id);
@@ -142,7 +137,7 @@ void NodeServer::process_create_request(BinaryStream& index_stream,
 	}
 }
 
-void NodeServer::process_puzzle_request(BinaryStream& index_stream,
+void NodeServer::process_puzzle_request(BinaryFDStream &index_stream,
 		const PuzzleRequest& request) {
 	TIME_EXEC("RequestProcessing.puzzle");
 	QueryProfiler qp;
@@ -177,7 +172,7 @@ void NodeServer::process_puzzle_request(BinaryStream& index_stream,
 	}
 }
 
-void NodeServer::process_delivery_request(BinaryStream& index_stream,
+void NodeServer::process_delivery_request(BinaryFDStream &index_stream,
 		const DeliveryRequest& request) {
 	TIME_EXEC("RequestProcessing.delivery");
 	NodeCacheKey key(request.semantic_id,request.entry_id);
@@ -205,31 +200,33 @@ void NodeServer::process_delivery_request(BinaryStream& index_stream,
 
 
 template<typename T>
-void NodeServer::finish_request(BinaryStream& stream,
+void NodeServer::finish_request(BinaryFDStream& index_stream,
 		const std::shared_ptr<const T>& item) {
 	TIME_EXEC("RequestProcessing.finish");
 
 	Log::debug("Processing request finished. Asking for delivery-qty");
-	stream.write(WorkerConnection::RESP_RESULT_READY);
-	uint8_t cmd_qty;
-	uint32_t qty;
+	BinaryStream::buffered_write(index_stream,WorkerConnection::RESP_RESULT_READY);
 
-	stream.read(&cmd_qty);
+	auto resp = BinaryStream::buffered_read(index_stream);
+
+	uint8_t cmd_qty = resp->read<uint8_t>();
+
+
 	if (cmd_qty != WorkerConnection::RESP_DELIVERY_QTY)
 		throw ArgumentException(
 			concat("Expected command ", WorkerConnection::RESP_DELIVERY_QTY, " but received ", cmd_qty));
-	stream.read(&qty);
+
+	uint32_t qty = resp->read<uint32_t>();
 	uint64_t delivery_id = delivery_manager.add_delivery(item, qty);
 
 	Log::debug("Sending delivery_id.");
-	buffered_write(stream,WorkerConnection::RESP_DELIVERY_READY,delivery_id);
+	BinaryStream::buffered_write(index_stream, WorkerConnection::RESP_DELIVERY_READY, delivery_id);
 }
 
 void NodeServer::run() {
 	Log::info("Starting Node-Server");
 
 	delivery_thread = delivery_manager.run_async();
-	uint8_t cmd;
 
 	while (!shutdown) {
 		try {
@@ -242,12 +239,8 @@ void NodeServer::run() {
 			// Read on control
 			while (!shutdown) {
 				try {
-					if (CacheCommon::read(&cmd, *control_connection, 2, true))
-						process_control_command(cmd, *control_connection);
-					else {
-						Log::info("Disconnect on control-connection. Reconnecting.");
-						break;
-					}
+					auto res = CacheCommon::read(*control_connection, 2);
+					process_control_command(*control_connection,*res);
 				} catch (const TimeoutException &te) {
 				} catch (const InterruptedException &ie) {
 					Log::info("Interrupt on read from control-connection.");
@@ -276,24 +269,25 @@ void NodeServer::run() {
 // Constrol connection
 //
 
-void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
+void NodeServer::process_control_command(BinaryFDStream &index_stream, BinaryReadBuffer &payload) {
+	uint8_t cmd = payload.read<uint8_t>();
 	switch (cmd) {
 		case ControlConnection::CMD_REORG: {
 			Log::debug("Received reorg command.");
-			ReorgDescription d(stream);
+			ReorgDescription d(payload);
 			for (auto &rem_item : d.get_removals()) {
-				handle_reorg_remove_item(rem_item, stream);
+				handle_reorg_remove_item(index_stream, rem_item);
 			}
 			for (auto &move_item : d.get_moves()) {
-				handle_reorg_move_item(move_item, stream);
+				handle_reorg_move_item(index_stream, move_item);
 			}
-			stream.write(ControlConnection::RESP_REORG_DONE);
+			BinaryStream::buffered_write(index_stream,ControlConnection::RESP_REORG_DONE);
 			break;
 		}
 		case ControlConnection::CMD_GET_STATS: {
 			Log::debug("Received stats-request.");
 			NodeStats stats = manager->get_stats();
-			buffered_write(stream,ControlConnection::RESP_STATS,stats);
+			BinaryStream::buffered_write(index_stream,ControlConnection::RESP_STATS,stats);
 			break;
 		}
 		default: {
@@ -303,15 +297,15 @@ void NodeServer::process_control_command(uint8_t cmd, BinaryStream &stream) {
 	}
 }
 
-void NodeServer::handle_reorg_remove_item(const TypedNodeCacheKey &item, BinaryStream &index_stream) {
+void NodeServer::handle_reorg_remove_item( BinaryFDStream &index_stream, const TypedNodeCacheKey &item ) {
 	Log::debug("Removing item from cache. Key: %s", item.to_string().c_str() );
 
-	uint8_t iresp;
-	buffered_write( index_stream, ControlConnection::RESP_REORG_REMOVE_REQUEST, item );
+	BinaryStream::buffered_write( index_stream, ControlConnection::RESP_REORG_REMOVE_REQUEST, item );
+	auto resp = BinaryStream::buffered_read( index_stream );
 
-	index_stream.read(&iresp);
+	uint8_t rc = resp->read<uint8_t>();
 
-	if ( iresp == ControlConnection::CMD_REMOVE_OK ) {
+	if ( rc == ControlConnection::CMD_REMOVE_OK ) {
 		switch (item.type) {
 			case CacheType::RASTER:
 				manager->get_raster_cache().remove_local(item);
@@ -333,11 +327,11 @@ void NodeServer::handle_reorg_remove_item(const TypedNodeCacheKey &item, BinaryS
 		}
 	}
 	else {
-		Log::error("Index did not confirm removal. Skipping. Response was: %d", iresp);
+		Log::error("Index did not confirm removal. Skipping. Response was: %d", rc);
 	}
 }
 
-void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream &index_stream) {
+void NodeServer::handle_reorg_move_item( BinaryFDStream &index_stream, const ReorgMoveItem& item ) {
 	uint64_t new_cache_id;
 
 	Log::debug("Moving item from node %d to node %d. Key: %s:%d ", item.from_node_id, my_id,
@@ -346,41 +340,42 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 
 	// Send move request
 	try {
-		uint8_t del_resp;
+		BinaryFDStream del_stream(item.from_host.c_str(), item.from_port, true);
+		// Process handshake
+		BinaryStream::buffered_write(del_stream,DeliveryConnection::MAGIC_NUMBER);
+		// Request data
+		BinaryStream::buffered_write(del_stream,DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
+		// Read response
+		auto resp = BinaryStream::buffered_read(del_stream);
 
-		BinaryFDStream us(item.from_host.c_str(), item.from_port, true);
-		BinaryStream &del_stream = us;
-
-		buffered_write(us,DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
-		del_stream.read(&del_resp);
+		uint8_t del_resp = resp->read<uint8_t>();
 		switch (del_resp) {
 			case DeliveryConnection::RESP_OK: {
-				CacheEntry ce(del_stream);
+				CacheEntry ce(*resp);
 				switch (item.type) {
 					case CacheType::RASTER:
 						new_cache_id = manager->get_raster_cache().put_local(
-							item.semantic_id, GenericRaster::fromStream(del_stream), std::move(ce)).entry_id;
+							item.semantic_id, GenericRaster::fromStream(*resp), std::move(ce)).entry_id;
 						break;
 					case CacheType::POINT:
 						new_cache_id = manager->get_point_cache().put_local(
-							item.semantic_id, make_unique<PointCollection>(del_stream), std::move(ce)).entry_id;
+							item.semantic_id, make_unique<PointCollection>(*resp), std::move(ce)).entry_id;
 					case CacheType::LINE:
 						new_cache_id = manager->get_line_cache().put_local(
-							item.semantic_id, make_unique<LineCollection>(del_stream), std::move(ce)).entry_id;
+							item.semantic_id, make_unique<LineCollection>(*resp), std::move(ce)).entry_id;
 					case CacheType::POLYGON:
 						new_cache_id = manager->get_polygon_cache().put_local(
-							item.semantic_id, make_unique<PolygonCollection>(del_stream), std::move(ce)).entry_id;
+							item.semantic_id, make_unique<PolygonCollection>(*resp), std::move(ce)).entry_id;
 					case CacheType::PLOT:
 						new_cache_id = manager->get_plot_cache().put_local(
-							item.semantic_id, GenericPlot::fromStream(del_stream), std::move(ce)).entry_id;
+							item.semantic_id, GenericPlot::fromStream(*resp), std::move(ce)).entry_id;
 					default:
 						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
 				}
 				break;
 			}
 			case DeliveryConnection::RESP_ERROR: {
-				std::string msg;
-				del_stream.read(&msg);
+				std::string msg = resp->read<std::string>();
 				throw NetworkException(
 					concat("Could not move item", item.semantic_id, ":", item.entry_id, " from ",
 						item.from_host, ":", item.from_port, ": ", msg));
@@ -388,26 +383,26 @@ void NodeServer::handle_reorg_move_item(const ReorgMoveItem& item, BinaryStream 
 			default:
 				throw NetworkException(concat("Received illegal response from delivery-node: ", del_resp));
 		}
-		confirm_move(item, new_cache_id, index_stream, del_stream);
+		confirm_move(index_stream, del_stream, item, new_cache_id);
 	} catch (const NetworkException &ne) {
 		Log::error("Could not process move: %s", ne.what());
 		return;
 	}
 }
 
-void NodeServer::confirm_move(const ReorgMoveItem& item, uint64_t new_id, BinaryStream &index_stream,
-	BinaryStream &del_stream) {
+void NodeServer::confirm_move(BinaryFDStream &index_stream, BinaryFDStream &del_stream, const ReorgMoveItem& item, uint64_t new_id) {
 	// Notify index
-	uint8_t iresp;
 	ReorgMoveResult rr(item.type, item.semantic_id, item.entry_id, item.from_node_id, my_id, new_id);
-	buffered_write(index_stream,ControlConnection::RESP_REORG_ITEM_MOVED,rr);
+	BinaryStream::buffered_write(index_stream,ControlConnection::RESP_REORG_ITEM_MOVED,rr);
 
-	index_stream.read(&iresp);
+	auto iresp = BinaryStream::buffered_read(index_stream);
+
 	try {
-		switch (iresp) {
+		uint8_t rc = iresp->read<uint8_t>();
+		switch (rc) {
 			case ControlConnection::CMD_MOVE_OK: {
 				Log::debug("Reorg of item finished. Notifying delivery instance.");
-				del_stream.write(DeliveryConnection::CMD_MOVE_DONE);
+				BinaryStream::buffered_write(del_stream,DeliveryConnection::CMD_MOVE_DONE);
 				break;
 			}
 			default: {
@@ -425,29 +420,26 @@ void NodeServer::setup_control_connection() {
 
 	// Establish connection
 	this->control_connection.reset(new BinaryFDStream(index_host.c_str(), index_port,true));
-	BinaryStream &stream = *this->control_connection;
 	NodeHandshake hs = manager->create_handshake();
 
 	Log::debug("Sending hello to index-server");
 	// Say hello
-	buffered_write(stream,ControlConnection::MAGIC_NUMBER,hs);
+	BinaryStream::buffered_write(*control_connection,ControlConnection::MAGIC_NUMBER,hs);
 
 	Log::debug("Waiting for response from index-server");
 	// Read node-id
-	uint8_t resp;
-	stream.read(&resp);
-	if (resp == ControlConnection::CMD_HELLO) {
-		std::string my_host;
 
-		stream.read(&my_id);
-		stream.read(&my_host);
+	auto resp = BinaryStream::buffered_read(*control_connection);
+
+	uint8_t rc = resp->read<uint8_t>();
+	if (rc == ControlConnection::CMD_HELLO) {
+		resp->read(&my_id);
+		std::string my_host = resp->read<std::string>();
 		manager->set_self_host(my_host);
 		Log::info("Successfuly connected to index-server. My Id is: %d", my_id);
 	}
 	else {
-		std::ostringstream msg;
-		msg << "Index returned unknown response-code to: " << resp << ".";
-		throw NetworkException(msg.str());
+		throw NetworkException(concat("Index returned unknown response-code to: ", rc));
 	}
 }
 

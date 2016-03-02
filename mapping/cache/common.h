@@ -166,17 +166,18 @@ public:
 	// harmful to the underlying connection.
 	// On a harmful error, a NetworkException is thrown.
 	//
-	template<typename T>
-	static size_t read(T *t, BinaryFDStream &sock, int timeout, bool allow_eof = false) {
+	static std::unique_ptr<BinaryReadBuffer> read(BinaryFDStream &sock, int timeout) {
 		struct timeval tv { timeout, 0 };
 		fd_set readfds;
 		FD_ZERO(&readfds);
 		FD_SET(sock.getReadFD(), &readfds);
-		BinaryStream &stream = sock;
 
 		int ret = select(sock.getReadFD()+1, &readfds, nullptr, nullptr, &tv);
-		if ( ret > 0 )
-			return stream.read(t,allow_eof);
+		if ( ret > 0 ) {
+			auto res = make_unique<BinaryReadBuffer>();
+			sock.read(*res);
+			return res;
+		}
 		else if ( ret == 0 )
 			throw TimeoutException("No data available");
 		else if ( errno == EINTR )

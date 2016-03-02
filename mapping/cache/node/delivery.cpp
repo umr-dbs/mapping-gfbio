@@ -13,6 +13,8 @@
 
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/types.h>
+#include <netdb.h>
 
 Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const GenericRaster> raster) :
 	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::RASTER), raster(raster) {
@@ -91,7 +93,7 @@ void DeliveryManager::run() {
 	Log::info("Starting Delivery-Manager");
 	int delivery_fd = CacheCommon::get_listening_socket(listen_port);
 
-	std::vector<int> new_fds;
+	std::vector<NewConnection> new_cons;
 
 	// Read on delivery-socket
 	while (!shutdown) {
@@ -104,9 +106,10 @@ void DeliveryManager::run() {
 
 		int maxfd = delivery_fd;
 
-		for (auto &fd : new_fds) {
-			FD_SET(fd, &readfds);
-			maxfd = std::max(maxfd, fd);
+		// Add newly accepted sockets
+		for (auto &nc : new_cons) {
+			FD_SET(nc.read_fd(), &readfds);
+			maxfd = std::max(maxfd, nc.read_fd());
 		}
 
 		maxfd = std::max(maxfd, setup_fdset(&readfds,&writefds));
@@ -120,25 +123,27 @@ void DeliveryManager::run() {
 		process_connections(&readfds,&writefds);
 
 		// Handshake
-		auto fd_it = new_fds.begin();
-		while (fd_it != new_fds.end()) {
-			if (FD_ISSET(*fd_it, &readfds)) {
-				std::unique_ptr<BinaryFDStream> socket = make_unique<BinaryFDStream>(*fd_it, *fd_it,true);
-				BinaryStream &stream = *socket;
-				uint32_t magic;
-				stream.read(&magic);
-				if (magic == DeliveryConnection::MAGIC_NUMBER) {
-					std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(std::move(socket));
-					Log::debug("New delivery-connection created on fd: %d", *fd_it);
-					connections.push_back(std::move(dc));
+		auto it = new_cons.begin();
+		while (it != new_cons.end()) {
+			try {
+				if (FD_ISSET(it->read_fd(), &readfds) && it->read() ) {
+					auto &data = it->get_data();
+					uint32_t magic = data.read<uint32_t>();
+					if (magic == DeliveryConnection::MAGIC_NUMBER) {
+						std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(it->release_stream());
+						Log::debug("New delivery-connection created on fd: %d", dc->get_read_fd());
+						connections.push_back(std::move(dc));
+					}
+					else {
+						Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
+					}
+					it = new_cons.erase(it);
 				}
-				else {
-					Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
-				}
-				fd_it = new_fds.erase(fd_it);
-			}
-			else {
-				++fd_it;
+				else
+					it++;
+			} catch (const std::exception &e) {
+				Log::error("Error on new connection: %s. Dropping.", e.what());
+				it = new_cons.erase(it);
 			}
 		}
 
@@ -151,8 +156,14 @@ void DeliveryManager::run() {
 				Log::error("Accept failed: %d", strerror(errno));
 			}
 			else if (new_fd > 0) {
-				Log::debug("New delivery-connection accepted on fd: %d", new_fd);
-				new_fds.push_back(new_fd);
+				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+				getnameinfo ((struct sockaddr *) &remote_addr, sin_size,
+							 hbuf, sizeof hbuf,
+							 sbuf, sizeof sbuf,
+							 NI_NUMERICHOST | NI_NUMERICSERV);
+
+				Log::debug("New connection established host: %s, service: %s, fd: %d", hbuf, sbuf, new_fd);
+				new_cons.push_back( NewConnection(hbuf,new_fd) );
 			}
 		}
 

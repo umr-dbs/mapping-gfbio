@@ -6,7 +6,6 @@
  */
 
 #include "cache/experiments/cache_experiments.h"
-#include "util/nio.h"
 #include "util/gdal.h"
 #include <random>
 

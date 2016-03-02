@@ -8,7 +8,6 @@
 #include "cache/node/puzzle_util.h"
 #include "cache/priv/connection.h"
 #include "util/make_unique.h"
-#include "util/nio.h"
 
 class AttributeArraysHelper {
 public:
@@ -107,29 +106,30 @@ std::unique_ptr<T> RemoteRetriever<T>::load(
 	TypedNodeCacheKey key( LocalRetriever<T>::cache.type, semantic_id,ref.entry_id);
 	Log::debug("Fetching cache-entry from: %s:%d, key: %d", ref.host.c_str(), ref.port, ref.entry_id );
 	BinaryFDStream sock(ref.host.c_str(), ref.port,true);
-	BinaryStream &stream = sock;
 
-	buffered_write(sock,DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET_CACHED_ITEM,key);
-	uint8_t resp;
-	stream.read(&resp);
+	BinaryStream::buffered_write(sock,DeliveryConnection::MAGIC_NUMBER);
+	BinaryStream::buffered_write(sock,DeliveryConnection::CMD_GET_CACHED_ITEM,key);
 
-	switch (resp) {
+	auto resp = BinaryStream::buffered_read(sock);
+
+	uint8_t rc = resp->read<uint8_t>();
+
+	switch (rc) {
 		case DeliveryConnection::RESP_OK: {
-			MoveInfo mi(stream);
+			MoveInfo mi(*resp);
 			// Add the original costs
 			qp.addTotalCosts(mi.profile);
 			// Add the network-costs
 			qp.addIOCost( mi.size );
-			return read_item(stream);
+			return read_item(*resp);
 		}
 		case DeliveryConnection::RESP_ERROR: {
-			std::string err_msg;
-			stream.read(&err_msg);
+			std::string err_msg = resp->read<std::string>();
 			Log::error("Delivery returned error: %s", err_msg.c_str());
 			throw DeliveryException(err_msg);
 		}
 		default: {
-			Log::error("Delivery returned unknown code: %d", resp);
+			Log::error("Delivery returned unknown code: %d", rc);
 			throw DeliveryException("Delivery returned unknown code");
 		}
 	}

@@ -9,14 +9,16 @@
 
 class TileServerConnection : public NonblockingServer::Connection {
 	public:
-		TileServerConnection(int fd, int id);
+		TileServerConnection(NonblockingServer &server, int fd, int id);
 		~TileServerConnection();
 	private:
-		virtual std::unique_ptr<BinaryWriteBuffer> processRequest(NonblockingServer &server, std::unique_ptr<BinaryReadBuffer> request);
+		virtual void processData(std::unique_ptr<BinaryReadBuffer> request);
+		virtual void processDataAsync();
 		std::shared_ptr<LocalRasterDBBackend> backend;
+		std::unique_ptr<RasterDBBackend::TileDescription> tile;
 };
 
-TileServerConnection::TileServerConnection(int fd, int id) : Connection(fd, id) {
+TileServerConnection::TileServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id) {
 	Log::info("%d: connected", id);
 	backend = make_unique<LocalRasterDBBackend>();
 }
@@ -25,25 +27,24 @@ TileServerConnection::~TileServerConnection() {
 
 }
 
-std::unique_ptr<BinaryWriteBuffer> TileServerConnection::processRequest(NonblockingServer &server, std::unique_ptr<BinaryReadBuffer> request) {
+void TileServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request) {
 	uint8_t OK = 48;
 
-	uint8_t c;
-	if (!request->read(&c, true)) {
-		Log::info("%d: disconnected", id);
-		return nullptr;
-	}
+	auto c = request->read<uint8_t>();
 
 	Log::info("%d: got command %d", id, c);
 
-	if (backend == nullptr && c >= RemoteRasterDBBackend::FIRST_SOURCE_SPECIFIC_COMMAND)
-		return nullptr;
+	if (backend == nullptr && c >= RemoteRasterDBBackend::FIRST_SOURCE_SPECIFIC_COMMAND) {
+		close();
+		return;
+	}
 
 	auto response = make_unique<BinaryWriteBuffer>();
 
 	switch (c) {
 		case RemoteRasterDBBackend::COMMAND_EXIT: {
-			return nullptr;
+			close();
+			return;
 			break;
 		}
 		case RemoteRasterDBBackend::COMMAND_ENUMERATESOURCES: {
@@ -151,31 +152,36 @@ std::unique_ptr<BinaryWriteBuffer> TileServerConnection::processRequest(Nonblock
 		}
 		//case RemoteRasterDBBackend::COMMAND_HASTILE:
 		case RemoteRasterDBBackend::COMMAND_READTILE: {
-			RasterDBBackend::TileDescription tile(*request);
-			Log::info("%d: returning tile, offset %lu, size %lu", id, tile.offset, tile.size);
-
-			// To avoid copying the bytebuffer with the tiledata, we're linking the data in the writebuffer.
-			// To do this, our bytebuffer's lifetime must be managed by the writebuffer.
-			// Unfortunately, we have to replace our freshly allocated writebuffer with a different one right here.
-			BinaryWriteBufferWithObject<ByteBuffer> *response2 = new BinaryWriteBufferWithObject<ByteBuffer>();
-			response.reset(response2);
-			response2->object = backend->readTile(tile);
-			response2->write(response2->object->size);
-			response2->enableLinking();
-			response2->write((const char *) response2->object->data, response2->object->size, true);
-			response2->disableLinking();
-			Log::info("%d: data sent\n", id);
-			break;
+			tile = make_unique<RasterDBBackend::TileDescription>(*request);
+			Log::info("%d: returning tile, offset %lu, size %lu", id, tile->offset, tile->size);
+			enqueueForAsyncProcessing();
+			return;
 		}
 		default: {
-			Log::info("%d: got unknown command %d, disconnecting\n", id, c);
-			return nullptr;
+			Log::info("%d: got unknown command %d, disconnecting", id, c);
+			close();
+			return;
 		}
 	}
-	Log::info("%d: response of %d bytes", id, (int) response->getSize());
-	if (response->getSize() == 0)
-		throw ArgumentException("No response written");
-	return response;
+	startWritingData(std::move(response));
+}
+
+void TileServerConnection::processDataAsync() {
+	// only one request is handled asynchronously: READTILE
+	// `tile` is set to the TileDescription read from the request
+
+	// To avoid copying the bytebuffer with the tiledata, we're linking the data in the writebuffer.
+	// To do this, our bytebuffer's lifetime must be managed by the writebuffer.
+	// Unfortunately, we have to replace our freshly allocated writebuffer with a different one right here.
+	auto response = make_unique<BinaryWriteBufferWithObject<ByteBuffer>>();
+	response->object = backend->readTile(*tile);
+	tile.reset(nullptr);
+	response->write(response->object->size);
+	response->enableLinking();
+	response->write((const char *) response->object->data, response->object->size, true);
+	response->disableLinking();
+	Log::info("%d: data sent", id);
+	startWritingData(std::move(response));
 }
 
 
@@ -188,7 +194,7 @@ class TileServer : public NonblockingServer {
 };
 
 std::unique_ptr<NonblockingServer::Connection> TileServer::createConnection(int fd, int id) {
-	return make_unique<TileServerConnection>(fd, id);
+	return make_unique<TileServerConnection>(*this, fd, id);
 }
 
 
@@ -201,10 +207,14 @@ int main(void) {
 	auto portstr = Configuration::get("rasterdb.tileserver.port");
 	auto portnr = atoi(portstr.c_str());
 
-	Log::info("server: listening on port %d", portnr);
+	auto threadsstr = Configuration::get("rasterdb.tileserver.threads", "1");
+	auto threads = std::max(1, atoi(threadsstr.c_str()));
+
+	Log::info("server: listening on port %d, using %d worker threads", portnr, threads);
 
 	TileServer server;
 	server.listen(portnr);
+	server.setWorkerThreads(threads);
 	server.start();
 
 	return 0;

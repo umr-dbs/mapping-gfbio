@@ -16,7 +16,7 @@ static const int NUM_CLIENTS = 3;
 static const int NUM_REQUESTS = 3;
 
 static const int SERVER_PORT = 51234;
-static const size_t SERVER_BUFFER_SIZE = 65536;
+static const size_t SERVER_BUFFER_SIZE = 1064960;
 
 // to see minimum/default/maximum buffer sizes, do:
 // cat /proc/sys/net/ipv4/tcp_{r,w}mem
@@ -32,19 +32,19 @@ static size_t PACKET_SIZE = 6291457; // 6 MB + 1 Byte
  */
 class EchoServerConnection : public NonblockingServer::Connection {
 	public:
-		EchoServerConnection(int fd, int id);
+		EchoServerConnection(NonblockingServer &server, int fd, int id);
 		~EchoServerConnection();
 	private:
-		virtual std::unique_ptr<BinaryWriteBuffer> processRequest(NonblockingServer &server, std::unique_ptr<BinaryReadBuffer> request);
+		virtual void processData(std::unique_ptr<BinaryReadBuffer> request);
 };
 
-EchoServerConnection::EchoServerConnection(int fd, int id) : Connection(fd, id) {
+EchoServerConnection::EchoServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id) {
 }
 
 EchoServerConnection::~EchoServerConnection() {
 }
 
-std::unique_ptr<BinaryWriteBuffer> EchoServerConnection::processRequest(NonblockingServer &server, std::unique_ptr<BinaryReadBuffer> request) {
+void EchoServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request) {
 	auto response = make_unique<BinaryWriteBuffer>();
 	size_t bytes_read = 0, bytes_total = request->getPayloadSize();
 	char buffer[SERVER_BUFFER_SIZE];
@@ -55,7 +55,8 @@ std::unique_ptr<BinaryWriteBuffer> EchoServerConnection::processRequest(Nonblock
 		response->write(buffer, next_batch_size);
 		bytes_read += next_batch_size;
 	}
-	return response;
+
+	startWritingData(std::move(response));
 }
 
 
@@ -68,7 +69,7 @@ class EchoServer : public NonblockingServer {
 };
 
 std::unique_ptr<NonblockingServer::Connection> EchoServer::createConnection(int fd, int id) {
-	return make_unique<EchoServerConnection>(fd, id);
+	return make_unique<EchoServerConnection>(*this, fd, id);
 }
 
 /*
@@ -99,7 +100,7 @@ static void run_server() {
 
 
 /*
- * The clients are running in their own threads, so they must not throw exceptions (that would terminat() the program).
+ * The clients are running in their own threads, so they must not throw exceptions (that would terminate() the program).
  * Instead, they'll print errors to stdout and report failure by setting this boolean to false.
  */
 static std::atomic<bool> all_clients_successful;
@@ -140,7 +141,7 @@ static void run_client(int id) {
 			for (size_t pos=0;pos < request_bytes.size(); pos++) {
 				auto byte = response.read<char>();
 				if (byte != request_bytes[pos]) {
-					printf("Error in client %d, got mismatching bytes on request %d of %d at position %d\n", id, req, NUM_REQUESTS, pos);
+					printf("Error in client %d, got mismatching bytes on request %d of %d at position %lu\n", id, req, NUM_REQUESTS, pos);
 					all_clients_successful = false;
 				}
 			}

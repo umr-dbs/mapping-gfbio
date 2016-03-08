@@ -1,6 +1,6 @@
 {
 	/*
-		select * from places_dump where PLZ <= 20000
+		select * from places_dump where PLZ between 54000 and 55000
 	*/
 	"name": "Point filter",
 	"query_result": "points",
@@ -22,7 +22,8 @@
 		"params" : 
 		{
 			"name" : "PLZ",
-			"rangeMax" : 20000
+			"rangeMin" : 54000,
+			"rangeMax" : 55000
 		},
 		"sources" : 
 		{
@@ -48,5 +49,5 @@
 		},
 		"type" : "points_filter_by_range"
 	},
-	"query_expected_hash" : "b1792aeacbcb267c47ea0ffe74c30d40"
+	"query_expected_hash" : "7e40b122778895a4968fed05ed0495ba"
 }

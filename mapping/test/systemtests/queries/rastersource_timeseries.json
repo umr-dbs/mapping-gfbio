@@ -19,9 +19,9 @@
         "y": 1800
     },
     "query_mode": "exact",
-    "query": {
-        "channel": 0,
+    "query": {        
         "params": {
+        	"channel": 0,
             "sourcename": "ndvi"
         },
         "type": "source"

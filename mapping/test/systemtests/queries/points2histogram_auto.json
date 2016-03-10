@@ -1,11 +1,11 @@
 {
 	/**
-		select least(floor((PLZ - (select min(PLZ) from places_dump))/(select (max(PLZ) - min(PLZ))/22 from places_dump)), 21) as bucket, count(*)
+		select least(floor((PLZ - (select min(PLZ) from places_dump))/(select (max(PLZ) - min(PLZ))/10000 from places_dump)), 9999) as bucket, count(*)
 		from places_dump
 		group by bucket
 		order by bucket
 	*/
-    "name": "Points2Histogram 1",
+    "name": "Points2Histogram auto range",
     "query_result": "plot",
     "temporal_reference": {
         "type": "UNIX",
@@ -21,11 +21,8 @@
     },
     "query": {
         "params": {
-            "autoRange": false,
-            "name": "PLZ",
-            "rangeMin": 5,
-            "rangeMax": 99999,
-            "numberOfBuckets": 22
+            "autoRange": true,
+            "name": "PLZ"
         },
         "sources": {
             "points": [
@@ -52,5 +49,5 @@
         },
         "type": "histogram_from_features"
     },
-    "query_expected_hash": "d704e210d713e870a38334643ee6664a"
+    "query_expected_hash": "6ac998dba26c228d0cb72e05a74421a"
 }

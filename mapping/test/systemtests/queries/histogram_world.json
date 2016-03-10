@@ -1,0 +1,39 @@
+{
+    "name": "Histogram world",
+    "query_result": "plot",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 0
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "resolution": {
+    	"type": "pixels",
+        "x": 10800,
+        "y": 5400
+    },
+    "query_mode": "exact",
+    "query": {
+        "params": {
+        },
+        "sources": {
+            "raster": [
+              {        
+		        "params": {
+		       		"channel": 0,
+		            "sourcename": "world1"
+		        },
+		        "type": "source"
+		       }
+            ]
+        },
+        "type": "histogram"
+    },
+    "query_expected_hash": "a61611b57ca4dcde26f26b233fbe9c99"
+}

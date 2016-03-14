@@ -7,12 +7,35 @@
 
 #include "cache/node/puzzle_util.h"
 #include "cache/priv/connection.h"
+
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
+#include "datatypes/plot.h"
+
 #include "util/make_unique.h"
 
+#include <limits>
+
+/**
+ * Helper class to combine attribtue arrays
+ * of SimpleFeatureCollections
+ */
 class AttributeArraysHelper {
 public:
+	/**
+	 * Appends the given source-array to the given destination-array
+	 * @param dest the target array
+	 * @param src the source array
+	 */
 	static void append( AttributeArrays &dest, const AttributeArrays &src );
 private:
+	/**
+	 * Appends the given source-array to the given destination-array
+	 * @param dest the target array
+	 * @param src the source array
+	 */
 	template <typename T>
 	static void append_arr( AttributeArrays::AttributeArray<T> &dest, const AttributeArrays::AttributeArray<T> &src );
 };
@@ -34,9 +57,11 @@ void AttributeArraysHelper::append_arr(
 	dest.array.insert(dest.array.end(), src.array.begin(), src.array.end() );
 }
 
+/////////////////////////////////////
 //
-// Retriever for puzzle pieces
+// LocalRetriever
 //
+/////////////////////////////////////
 
 template<class T>
 LocalRetriever<T>::LocalRetriever( const NodeCache<T> &cache ) : cache(cache) {
@@ -81,7 +106,11 @@ std::unique_ptr<GenericPlot> LocalRetriever<GenericPlot>::compute(GenericOperato
 	return op.getCachedPlot(query,qp);
 }
 
-// Remote
+/////////////////////////////////////
+//
+// RemoteRetriever
+//
+/////////////////////////////////////
 
 template<class T>
 RemoteRetriever<T>::RemoteRetriever(const NodeCache<T> &cache, const CacheRefHandler &handler) :
@@ -90,7 +119,7 @@ RemoteRetriever<T>::RemoteRetriever(const NodeCache<T> &cache, const CacheRefHan
 
 template<class T>
 std::shared_ptr<const T> RemoteRetriever<T>::fetch(const std::string &semantic_id, const CacheRef& ref, QueryProfiler &qp) const {
-	if ( ref_handler.is_self_ref(ref) ) {
+	if ( ref_handler.is_local_ref(ref) ) {
 		return LocalRetriever<T>::fetch(semantic_id,ref,qp);
 	}
 	else {
@@ -105,18 +134,14 @@ std::unique_ptr<T> RemoteRetriever<T>::load(
 
 	TypedNodeCacheKey key( LocalRetriever<T>::cache.type, semantic_id,ref.entry_id);
 	Log::debug("Fetching cache-entry from: %s:%d, key: %d", ref.host.c_str(), ref.port, ref.entry_id );
-	BinaryFDStream sock(ref.host.c_str(), ref.port,true);
 
-	BinaryStream::buffered_write(sock,DeliveryConnection::MAGIC_NUMBER);
-	BinaryStream::buffered_write(sock,DeliveryConnection::CMD_GET_CACHED_ITEM,key);
-
-	auto resp = BinaryStream::buffered_read(sock);
-
+	auto con = BlockingConnection::create(ref.host,ref.port,true,DeliveryConnection::MAGIC_NUMBER);
+	auto resp = con->write_and_read(DeliveryConnection::CMD_GET_CACHED_ITEM,key);
 	uint8_t rc = resp->read<uint8_t>();
 
 	switch (rc) {
 		case DeliveryConnection::RESP_OK: {
-			MoveInfo mi(*resp);
+			FetchInfo mi(*resp);
 			// Add the original costs
 			qp.addTotalCosts(mi.profile);
 			// Add the network-costs
@@ -137,25 +162,26 @@ std::unique_ptr<T> RemoteRetriever<T>::load(
 
 
 template<class T>
-std::unique_ptr<T> RemoteRetriever<T>::read_item(BinaryStream& stream) const {
-	return make_unique<T>(stream);
+std::unique_ptr<T> RemoteRetriever<T>::read_item(BinaryReadBuffer& buffer) const {
+	return make_unique<T>(buffer);
 }
 
 template<>
-std::unique_ptr<GenericRaster> RemoteRetriever<GenericRaster>::read_item(BinaryStream& stream) const {
-	return GenericRaster::fromStream(stream);
+std::unique_ptr<GenericRaster> RemoteRetriever<GenericRaster>::read_item(BinaryReadBuffer& buffer) const {
+	return GenericRaster::fromStream(buffer);
 }
 
 template<>
-std::unique_ptr<GenericPlot> RemoteRetriever<GenericPlot>::read_item(BinaryStream& stream) const {
-	return GenericPlot::fromStream(stream);
+std::unique_ptr<GenericPlot> RemoteRetriever<GenericPlot>::read_item(BinaryReadBuffer& buffer) const {
+	return GenericPlot::fromStream(buffer);
 }
 
-///////////////////////////////////////////////////////////////////////
+/////////////////////////////////////
 //
-// PUZZLER
+// Puzzler
 //
-///////////////////////////////////////////////////////////////////////
+/////////////////////////////////////
+
 
 std::unique_ptr<GenericPlot> PlotPuzzler::puzzle(
 		const SpatioTemporalReference& bbox,
@@ -317,13 +343,12 @@ std::vector<std::unique_ptr<T> > PuzzleUtil<T>::compute_remainders(
 		const std::string& semantic_id, const T& ref_result,
 		const PuzzleRequest& request, QueryProfiler& profiler) const {
 	TIME_EXEC("PuzzleUtil.compute_remainders");
-	(void) ref_result;
 	std::vector<std::unique_ptr<T>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
 
 	{
 		QueryProfilerStoppingGuard sg(profiler);
-		for ( auto &rqr : request.get_remainder_queries() ) {
+		for ( auto &rqr : request.get_remainder_queries(ref_result) ) {
 			result.push_back( retriever.compute(*graph,rqr,profiler) );
 		}
 	}
@@ -339,8 +364,7 @@ std::vector<std::unique_ptr<GenericRaster>> PuzzleUtil<GenericRaster>::compute_r
 	std::vector<std::unique_ptr<GenericRaster>> result;
 	auto graph = GenericOperator::fromJSON(semantic_id);
 
-	auto remainders = request.get_remainder_queries( ref_result.pixel_scale_x, ref_result.pixel_scale_y,
-													 ref_result.stref.x1, ref_result.stref.y1 );
+	auto remainders = request.get_remainder_queries( ref_result );
 
 	for ( auto &rqr : remainders ) {
 		try {
@@ -379,9 +403,9 @@ SpatioTemporalReference PuzzleUtil<T>::enlarge_puzzle(
 	TIME_EXEC("PuzzleUtil.enlarge");
 
 	// Calculated maximum covered rectangle
-	double values[6] = { DoubleNegInfinity, DoubleInfinity,
-						 DoubleNegInfinity, DoubleInfinity,
-						 DoubleNegInfinity, DoubleInfinity };
+	double values[6] = { -std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(),
+						 -std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(),
+						 -std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity() };
 	QueryCube qc(query);
 	for ( auto &item : items ) {
 		Cube3 ic( item->stref.x1, item->stref.x2,

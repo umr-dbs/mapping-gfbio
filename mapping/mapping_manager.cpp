@@ -1,4 +1,5 @@
 #include "datatypes/raster.h"
+#include "datatypes/plot.h"
 #include "datatypes/colorizer.h"
 #include "rasterdb/rasterdb.h"
 #include "raster/opencl.h"

@@ -8,7 +8,6 @@
 #include "cache/node/nodeserver.h"
 #include "cache/manager.h"
 #include "cache/common.h"
-#include "cache/node/puzzletracer.h"
 #include "util/configuration.h"
 #include "util/log.h"
 #include "raster/opencl.h"
@@ -66,8 +65,6 @@ int main(void) {
 
 	auto numThreadsstr = Configuration::get("nodeserver.threads", "4");
 	auto num_threads = atoi(numThreadsstr.c_str());
-
-//	PuzzleTracer::init();
 
 	std::string cs = Configuration::get("nodeserver.cache.strategy");
 	size_t raster_size = atoi(Configuration::get("nodeserver.cache.raster.size").c_str());

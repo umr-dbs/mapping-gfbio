@@ -439,7 +439,7 @@ void ReorgExperiment::exec(const std::string& strategy, QueryStats& stats) {
 
 	setup.get_index().force_stat_update();
 	for ( auto &n: setup.get_nodes() )
-		stats += n->get_cache_manager().get_query_stats();
+		stats += n->get_cache_manager().get_cumulated_query_stats();
 }
 
 
@@ -490,10 +490,11 @@ void StrategyExperiment::exec(std::unique_ptr<CachingStrategy> strategy, std::pa
 		execute_queries(queries,qp);
 	end = SysClock::now();
 
-	auto cap = lcm.get_capacity();
-	size_t bytes_used = cap.raster_cache_used + cap.point_cache_used +
-						cap.line_cache_used + cap.polygon_cache_used +
-						cap.plot_cache_used;
+
+	std::vector<CacheType> types{ CacheType::RASTER,CacheType::POINT,CacheType::LINE,CacheType::POLYGON,CacheType::PLOT};
+	size_t bytes_used = 0;
+	for ( auto &t : types )
+		bytes_used += lcm.get_usage(t).capacity_used;
 
 	accum.first  += duration(start,end);
 	accum.second += bytes_used;

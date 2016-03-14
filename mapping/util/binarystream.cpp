@@ -16,15 +16,6 @@
 #include <fcntl.h>
 
 
-std::unique_ptr<BinaryReadBuffer> BinaryStream::buffered_read(
-		BinaryStream& stream) {
-
-	auto result = make_unique<BinaryReadBuffer>();
-	stream.read(*result);
-	return result;
-}
-
-
 BinaryStream::BinaryStream() : is_blocking(true) {
 }
 

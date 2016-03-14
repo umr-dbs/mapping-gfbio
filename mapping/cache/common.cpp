@@ -38,8 +38,6 @@ void ex_handler() {
 	catch (std::exception &ex) {
 	    out << "Uncaught exception: " << ex.what();
 	}
-
-
 	fprintf(stderr, "%s\n%s", out.str().c_str(), CacheCommon::get_stacktrace().c_str() );
 	exit(1);
 }

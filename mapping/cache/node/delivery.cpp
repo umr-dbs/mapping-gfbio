@@ -13,27 +13,25 @@
 
 #include <sys/select.h>
 #include <sys/socket.h>
-#include <sys/types.h>
-#include <netdb.h>
 
-Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const GenericRaster> raster) :
-	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::RASTER), raster(raster) {
+Delivery::Delivery(uint64_t id, uint16_t count, std::shared_ptr<const GenericRaster> raster, time_t expiration_time) :
+	id(id), expiration_time(expiration_time), count(count), type(CacheType::RASTER), raster(raster) {
 }
 
-Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const PointCollection> points) :
-	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::POINT), points(points) {
+Delivery::Delivery(uint64_t id, uint16_t count, std::shared_ptr<const PointCollection> points, time_t expiration_time) :
+	id(id), expiration_time(expiration_time), count(count), type(CacheType::POINT), points(points) {
 }
 
-Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const LineCollection> lines) :
-	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::LINE), lines(lines) {
+Delivery::Delivery(uint64_t id, uint16_t count, std::shared_ptr<const LineCollection> lines, time_t expiration_time) :
+	id(id), expiration_time(expiration_time), count(count), type(CacheType::LINE), lines(lines) {
 }
 
-Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const PolygonCollection> polygons):
-	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::POLYGON), polygons(polygons) {
+Delivery::Delivery(uint64_t id, uint16_t count, std::shared_ptr<const PolygonCollection> polygons, time_t expiration_time):
+	id(id), expiration_time(expiration_time), count(count), type(CacheType::POLYGON), polygons(polygons) {
 }
 
-Delivery::Delivery(uint64_t id, unsigned int count, std::shared_ptr<const GenericPlot> plot):
-	id(id), creation_time(CacheCommon::time_millis()), count(count), type(CacheType::PLOT), plot(plot) {
+Delivery::Delivery(uint64_t id, uint16_t count, std::shared_ptr<const GenericPlot> plot, time_t expiration_time):
+	id(id), expiration_time(expiration_time), count(count), type(CacheType::PLOT), plot(plot) {
 }
 
 void Delivery::send(DeliveryConnection& connection) {
@@ -62,10 +60,10 @@ DeliveryManager::DeliveryManager(uint32_t listen_port, NodeCacheManager &manager
 }
 
 template <typename T>
-uint64_t DeliveryManager::add_delivery(std::shared_ptr<const T> result, unsigned int count) {
+uint64_t DeliveryManager::add_delivery(std::shared_ptr<const T> result, uint32_t count) {
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
 	uint64_t res = delivery_id++;
-	deliveries.emplace( res, Delivery(res,count,result) );
+	deliveries.emplace( res, Delivery(res,count,result, CacheCommon::time_millis() + 30000) );
 	Log::trace("Added delivery with id: %d", res);
 	return res;
 }
@@ -77,12 +75,11 @@ Delivery& DeliveryManager::get_delivery(uint64_t id) {
 }
 
 void DeliveryManager::remove_expired_deliveries() {
-	time_t now = CacheCommon::time_millis();
-
 	std::lock_guard<std::mutex> del_lock(delivery_mutex);
+	time_t now = CacheCommon::time_millis();
 	auto iter = deliveries.begin();
 	while ( iter != deliveries.end() ) {
-		if ( iter->second.count == 0 || now - iter->second.creation_time >= 30000 )
+		if ( iter->second.count == 0 || now >= iter->second.expiration_time )
 			deliveries.erase(iter++);
 		else
 			iter++;
@@ -93,7 +90,7 @@ void DeliveryManager::run() {
 	Log::info("Starting Delivery-Manager");
 	int delivery_fd = CacheCommon::get_listening_socket(listen_port);
 
-	std::vector<NewConnection> new_cons;
+	std::vector<NewNBConnection> new_cons;
 
 	// Read on delivery-socket
 	while (!shutdown) {
@@ -108,8 +105,8 @@ void DeliveryManager::run() {
 
 		// Add newly accepted sockets
 		for (auto &nc : new_cons) {
-			FD_SET(nc.read_fd(), &readfds);
-			maxfd = std::max(maxfd, nc.read_fd());
+			FD_SET(nc.get_read_fd(), &readfds);
+			maxfd = std::max(maxfd, nc.get_read_fd());
 		}
 
 		maxfd = std::max(maxfd, setup_fdset(&readfds,&writefds));
@@ -126,17 +123,16 @@ void DeliveryManager::run() {
 		auto it = new_cons.begin();
 		while (it != new_cons.end()) {
 			try {
-				if (FD_ISSET(it->read_fd(), &readfds) && it->read() ) {
+				if (FD_ISSET(it->get_read_fd(), &readfds) && it->input() ) {
 					auto &data = it->get_data();
 					uint32_t magic = data.read<uint32_t>();
 					if (magic == DeliveryConnection::MAGIC_NUMBER) {
 						std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(it->release_stream());
-						Log::debug("New delivery-connection created on fd: %d", dc->get_read_fd());
+						Log::debug("New delivery-connection createdm, id: %d", dc->id);
 						connections.push_back(std::move(dc));
 					}
-					else {
+					else
 						Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
-					}
 					it = new_cons.erase(it);
 				}
 				else
@@ -152,21 +148,13 @@ void DeliveryManager::run() {
 			struct sockaddr_storage remote_addr;
 			socklen_t sin_size = sizeof(remote_addr);
 			int new_fd = accept(delivery_fd, (struct sockaddr *) &remote_addr, &sin_size);
-			if (new_fd == -1 && errno != EAGAIN && errno != EWOULDBLOCK) {
+			if (new_fd == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
 				Log::error("Accept failed: %d", strerror(errno));
-			}
 			else if (new_fd > 0) {
-				char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-				getnameinfo ((struct sockaddr *) &remote_addr, sin_size,
-							 hbuf, sizeof hbuf,
-							 sbuf, sizeof sbuf,
-							 NI_NUMERICHOST | NI_NUMERICSERV);
-
-				Log::debug("New connection established host: %s, service: %s, fd: %d", hbuf, sbuf, new_fd);
-				new_cons.push_back( NewConnection(hbuf,new_fd) );
+				Log::debug("New connection established, fd: %d", new_fd);
+				new_cons.push_back( NewNBConnection(&remote_addr,new_fd) );
 			}
 		}
-
 		remove_expired_deliveries();
 	}
 	close(delivery_fd);
@@ -212,6 +200,9 @@ void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
 						auto &res = get_delivery(id);
 						Log::debug("Sending delivery: %d", id);
 						res.send(*dc);
+					} catch ( const DeliveryException &dce ) {
+						Log::info("Could send delivery: %s", dce.what());
+						dc->send_error(dce.what());
 					} catch (const std::out_of_range &oor) {
 						Log::info("Received request for unknown delivery-id: %d", id);
 						dc->send_error(concat("Invalid delivery id: ",id));
@@ -320,7 +311,7 @@ void DeliveryManager::handle_move_done(DeliveryConnection& dc) {
 		case CacheType::PLOT: manager.get_plot_cache().remove_local(key); break;
 		default: throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
 	}
-	dc.release();
+	dc.finish_move();
 }
 
 std::unique_ptr<std::thread> DeliveryManager::run_async() {
@@ -336,8 +327,8 @@ DeliveryManager::~DeliveryManager() {
 	stop();
 }
 
-template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const GenericRaster>, unsigned int);
-template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const PointCollection>, unsigned int);
-template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const LineCollection>, unsigned int);
-template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const PolygonCollection>, unsigned int);
-template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const GenericPlot>, unsigned int);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const GenericRaster>, uint32_t);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const PointCollection>, uint32_t);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const LineCollection>, uint32_t);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const PolygonCollection>, uint32_t);
+template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const GenericPlot>, uint32_t);

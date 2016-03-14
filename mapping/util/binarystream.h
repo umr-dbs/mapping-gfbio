@@ -31,18 +31,6 @@ class BinaryReadBuffer;
  */
 
 class BinaryStream {
-		template<typename Head>
-		static void _internal_write(BinaryWriteBuffer &ss, const Head &head);
-
-		template<typename Head, typename... Tail>
-		static void _internal_write(BinaryWriteBuffer &ss, const Head &head, const Tail &... tail);
-
-	public:
-		template<typename... Params>
-		static void buffered_write(BinaryStream &stream, const Params &... params);
-		static std::unique_ptr<BinaryReadBuffer> buffered_read(BinaryStream &stream );
-
-
 	protected:
 		BinaryStream();
 		BinaryStream(const BinaryStream &) = delete;
@@ -171,8 +159,13 @@ class BinaryWriteBuffer : public BinaryStream {
 		BinaryWriteBuffer();
 		virtual ~BinaryWriteBuffer();
 
-		using BinaryStream::write;
 		using BinaryStream::read;
+
+		template<typename T> void write(const T& t);
+		template<typename T> void write(T& t);
+		void write(const std::string &string, bool is_persistent_memory = false) { BinaryStream::write(string, is_persistent_memory); }
+		void write(std::string &string) { BinaryStream::write(string); };
+
 		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
 
@@ -273,6 +266,18 @@ typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(Bin
 	t.toStream(stream);
 }
 
+template <typename T>
+typename std::enable_if< !std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &stream, T& t) {
+	stream.write((const char *) &t, sizeof(T));
+}
+
+template <typename T>
+typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &stream, T& t) {
+	t.toStream(stream);
+}
+
+
+
 template<typename T> void BinaryStream::write(const T& t) {
 	stream_write_helper<const T>(*this, t);
 }
@@ -281,22 +286,13 @@ template<typename T> void BinaryStream::write(T& t) {
 	stream_write_helper<T>(*this, t);
 }
 
-template<typename Head>
-void BinaryStream::_internal_write(BinaryWriteBuffer &ss, const Head &head) {
-	ss.write(head);
+
+template<typename T> void BinaryWriteBuffer::write(const T& t) {
+	stream_write_helper<const T>(*this, t);
 }
 
-template<typename Head, typename... Tail>
-void BinaryStream::_internal_write(BinaryWriteBuffer &ss, const Head &head, const Tail &... tail) {
-	ss.write(head);
-	_internal_write(ss, tail...);
-}
-
-template<typename... Params>
-void BinaryStream::buffered_write(BinaryStream &stream, const Params &... params) {
-	BinaryWriteBuffer wb;
-	_internal_write(wb, params...);
-	stream.write(wb);
+template<typename T> void BinaryWriteBuffer::write(T& t) {
+	stream_write_helper<T>(*this, t);
 }
 
 #endif

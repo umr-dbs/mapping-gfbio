@@ -12,10 +12,10 @@
 #include "util/make_unique.h"
 #include "cache/index/indexserver.h"
 #include "cache/node/nodeserver.h"
-#include "cache/priv/transfer.h"
 #include "cache/priv/redistribution.h"
 #include "cache/index/reorg_strategy.h"
 #include "cache/experiments/exp_util.h"
+#include "datatypes/raster.h"
 
 typedef std::unique_ptr<std::thread> TP;
 
@@ -48,7 +48,7 @@ TEST(DistributionTest,TestRedistibution) {
 	time_t timestamp = parseIso8601DateTime(timestr);
 	double bbox[4];
 
-	ClientCacheWrapper<GenericRaster,CacheType::RASTER> cc(CacheType::RASTER, "localhost", 12346);
+	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER,"localhost", 12346);
 
 	parseBBOX(bbox, bbox_str, epsg, false);
 	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
@@ -66,7 +66,7 @@ TEST(DistributionTest,TestRedistibution) {
 	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get(key1));
 
 	ReorgDescription rod;
-	ReorgMoveItem ri(CacheType::RASTER, sem_id, 2, 1, "localhost", 12347);
+	ReorgMoveItem ri(CacheType::RASTER, key1.semantic_id, 1, key1.entry_id, "localhost", 12347);
 	rod.add_move(ri);
 
 	is.trigger_reorg(2, rod);
@@ -116,7 +116,7 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 	time_t timestamp = parseIso8601DateTime(timestr);
 	double bbox[4];
 
-	ClientCacheWrapper<GenericRaster,CacheType::RASTER> cc(CacheType::RASTER, "localhost", 12346);
+	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER, "localhost", 12346);
 
 	parseBBOX(bbox, bbox_str, epsg, false);
 	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
@@ -169,7 +169,7 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	auto op = GenericOperator::fromJSON(json);
 
-	ClientCacheWrapper<GenericRaster,CacheType::RASTER> cc(CacheType::RASTER, "localhost", 12346);
+	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER,"localhost", 12346);
 
 	TemporalReference tr(TIMETYPE_UNIX, timestamp, timestamp);
 	QueryResolution   qres = QueryResolution::pixels(256, 256);
@@ -190,10 +190,10 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	// Reorg should be finished at this point
 
 	// Assert moved
-	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),2)),
+	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1)),
 			NoSuchElementException );
 
-	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1)));
+	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),2)));
 	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1)));
 
 	ns2.stop();

@@ -8,12 +8,17 @@
 #ifndef INDEX_INDEXSERVER_H_
 #define INDEX_INDEXSERVER_H_
 
-#include "cache/index/index_cache.h"
-#include "cache/common.h"
+#include "cache/index/node.h"
+#include "cache/index/index_cache_manager.h"
 #include "cache/index/querymanager.h"
+
+#include "cache/common.h"
+
 #include "cache/priv/connection.h"
-#include "cache/priv/transfer.h"
+#include "cache/priv/shared.h"
+#include "cache/priv/requests.h"
 #include "cache/priv/redistribution.h"
+
 #include "util/log.h"
 
 #include <string>
@@ -22,86 +27,96 @@
 #include <vector>
 #include <deque>
 
-
-//
-// Represents a cache-node.
-//
-
-class Node {
-public:
-	Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &cap = Capacity(0,0,0,0,0,0,0,0,0,0));
-	// The unique id of this node
-	const uint32_t id;
-	// The hostname of this node
-	const std::string host;
-	// The port for delivery connections on this node
-	const uint32_t port;
-	// The timestamp of the last stats update
-	time_t last_stat_update;
-	// The id of the control-connection
-	uint64_t control_connection;
-
-	void update_stats( const NodeStats &stats );
-	const Capacity& get_capacity() const;
-	const QueryStats& get_query_stats() const;
-	void reset_query_stats();
-
-	std::string to_string() const;
-private:
-	// The stats
-	Capacity capacity;
-	QueryStats query_stats;
-};
-
-//
-// The heart of the cache.
-// The index accepts connections from clients as well
-// as from cache-nodes.
-// Cache-nodes have to establish a so called control-connection
-// on which they send their hostname and delivery port. After
-// doing so, a unique id is assigned to the node. All workers of
-// this node must use this id to register themselves at the index.
-//
-// Client-connections may issue requests to the server.
-// The server handles everything in a single thread.
-//
-
-
+/**
+ * The heart of the cache.
+ * The index accepts connections from clients as well
+ * as from cache-nodes.
+ * Cache-nodes have to establish a so called control-connection
+ * on which they send their hostname and delivery port. After
+ * doing so, a unique id is assigned to the node. All workers of
+ * this node must use this id to register themselves at the index.
+ *
+ * Client-connections may issue requests to the server.
+ * The server handles everything in a single thread.
+ */
 class IndexServer {
 	friend class TestIdxServer;
 public:
+	/**
+	 * Constructs a new instance
+	 * @param port the port to listen on
+	 * @param update_interval the interval for fetching fresh statistics and triggering reorganization (in ms).
+	 * @param reorg_strategy the name of the reorg-strategy to use
+	 * @param relevance_function the name of the relevance-function to use
+	 */
 	IndexServer( int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function );
-	virtual ~IndexServer();
-	// Fires up the index-server and will return after
-	// stop() is invoked by another thread
+	virtual ~IndexServer() = default;
+
+	/* Fires up the index-server and will return after
+	 * stop() is invoked by another thread
+	 */
 	void run();
-	// Triggers the shutdown of the index-server
-	// Subsequent calls to run or run_async have undefined
-	// behaviour
+
+	/* Triggers the shutdown of the index-server
+	 * Subsequent calls to run or run_async have undefined
+	 * behaviour
+	 */
 	virtual void stop();
 private:
-	// Adds the fds of all connections to the read-set
-	// and kills faulty connections
+	/**
+	 * Adds the fds of all connections to the read-/write-set and kills faulty connections
+	 * @param readfds the set of fds to wait for data to read
+	 * @param writefds the set of fds to wait for data to write
+	 * @return the number of the "greatest" fd
+	 */
 	int setup_fdset( fd_set *readfds, fd_set *writefds);
 
 	// Processes the handshake on newly established connections
-	void process_handshake( std::vector<NewConnection> &new_fds, fd_set *readfds);
+	/**
+	 * Processes the handshake with newly accepted connections
+	 * @param new_fds the accepted but not initialized connections
+	 * @param readfds the set of fds
+	 */
+	void process_handshake( std::vector<NewNBConnection> &new_fds, fd_set *readfds);
 
-	// Processes actions on control-connections
+	/**
+	 * Processes actions on control-connections
+	 * @param readfds the set of fds to wait for data to read
+	 * @param writefds the set of fds to wait for data to write
+	 */
 	void process_control_connections(fd_set *readfds, fd_set* writefds);
 
-	// Processes actions on worker-connections
+	/**
+	 * Processes actions on worker-connections
+	 * @param readfds the set of fds to wait for data to read
+	 * @param writefds the set of fds to wait for data to write
+	 */
 	void process_worker_connections(fd_set *readfds, fd_set* writefds);
 
-	// Processes actions on client-connections
+	/**
+	 * Processes actions on client-connections
+	 * @param readfds the set of fds to wait for data to read
+	 * @param writefds the set of fds to wait for data to write
+	 */
 	void process_client_connections(fd_set *readfds, fd_set* writefds);
 
 	// Adjusts the cache according to the given reorg
+	/**
+	 * After successful movement of entries, this method reflects the new location
+	 * to the global cache.
+	 * @param res the information about the new location of an entry
+	 */
 	void handle_reorg_result( const ReorgMoveResult &res );
 
-	// statistics for the index an all nodes;
+	/**
+	 * @return a humand readable statistics string
+	 */
 	std::string stats_string() const;
 
+	/**
+	 * Triggers reorganization if required
+	 * @param force whether to force reorg
+	 */
 	void reorganize(bool force = false);
 
 	// The currently known nodes
@@ -111,7 +126,7 @@ private:
 	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
 
-	IndexCaches caches;
+	IndexCacheManager caches;
 
 	// The port the index-server is listening on
 	int port;

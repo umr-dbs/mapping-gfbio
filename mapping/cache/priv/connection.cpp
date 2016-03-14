@@ -6,28 +6,52 @@
  */
 
 #include "cache/priv/connection.h"
+#include "cache/priv/shared.h"
 #include "cache/index/indexserver.h"
+
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
+#include "datatypes/plot.h"
+
 #include "util/exceptions.h"
 #include "util/log.h"
 #include "util/make_unique.h"
 #include "util/concat.h"
 
+
 #include <fcntl.h>
+#include <netdb.h>
 
 
+///////////////////////////////////////////////////////////
+//
+// NewNBConnection
+//
+///////////////////////////////////////////////////////////
 
-NewConnection::NewConnection( const std::string &hostname, int fd ) : hostname(hostname),
-		stream( make_unique<BinaryFDStream>(fd,fd,true)), buffer( make_unique<BinaryReadBuffer>()  ) {
+NewNBConnection::NewNBConnection( struct sockaddr_storage *remote_addr, int fd ) :
+	stream( make_unique<BinaryFDStream>(fd,fd,true)), buffer( make_unique<BinaryReadBuffer>()  ) {
+
+	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+
+	getnameinfo ((struct sockaddr *) remote_addr, sizeof(struct sockaddr_storage),
+				 hbuf, sizeof(hbuf),
+				 sbuf, sizeof(sbuf),
+				 NI_NUMERICHOST | NI_NUMERICSERV);
+
+	hostname.assign(hbuf);
 	stream->makeNonBlocking();
 }
 
-int NewConnection::read_fd() const {
+int NewNBConnection::get_read_fd() const {
 	if ( stream )
 		return stream->getReadFD();
 	throw IllegalStateException("Stream released already");
 }
 
-bool NewConnection::read() {
+bool NewNBConnection::input() {
 	if ( stream ) {
 		stream->readNB(*buffer);
 		return buffer->isRead();
@@ -35,27 +59,28 @@ bool NewConnection::read() {
 	throw IllegalStateException("Stream released already");
 }
 
-BinaryStream& NewConnection::get_data() {
+BinaryReadBuffer& NewNBConnection::get_data() {
 	if ( buffer->isRead() )
 		return *buffer;
 	else
 		throw IllegalStateException("Buffer not fully read");
 }
 
-std::unique_ptr<BinaryFDStream> NewConnection::release_stream() {
+std::unique_ptr<BinaryFDStream> NewNBConnection::release_stream() {
 	auto res = std::move(stream);
 	stream.reset();
 	return res;
 }
 
+///////////////////////////////////////////////////////////
+//
+// CacheAll
+//
+///////////////////////////////////////////////////////////
 
 template<typename StateType>
 BaseConnection<StateType>::BaseConnection(StateType state, std::unique_ptr<BinaryFDStream> socket) :
 	id(next_id++), state(state), faulty(false), socket(std::move(socket)), reader(new BinaryReadBuffer() ) {
-}
-
-template<typename StateType>
-BaseConnection<StateType>::~BaseConnection() {
 }
 
 template<typename StateType>
@@ -170,10 +195,7 @@ ClientConnection::ClientConnection(std::unique_ptr<BinaryFDStream> socket) :
 	BaseConnection(ClientState::IDLE, std::move(socket)) {
 }
 
-ClientConnection::~ClientConnection() {
-}
-
-void ClientConnection::process_command(uint8_t cmd, BinaryStream& payload) {
+void ClientConnection::process_command(uint8_t cmd, BinaryReadBuffer& payload) {
 	ensure_state(ClientState::IDLE);
 	switch (cmd) {
 		case CMD_GET:
@@ -230,14 +252,11 @@ const uint8_t ClientConnection::RESP_ERROR;
 //
 /////////////////////////////////////////////////
 
-WorkerConnection::WorkerConnection(std::unique_ptr<BinaryFDStream> socket, const std::shared_ptr<Node> &node) :
-	BaseConnection(WorkerState::IDLE, std::move(socket)), node(node) {
+WorkerConnection::WorkerConnection(std::unique_ptr<BinaryFDStream> socket, uint32_t node_id) :
+	BaseConnection(WorkerState::IDLE, std::move(socket)), node_id(node_id), delivery_id(0) {
 }
 
-WorkerConnection::~WorkerConnection() {
-}
-
-void WorkerConnection::process_command(uint8_t cmd, BinaryStream &payload) {
+void WorkerConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) {
 	ensure_state(WorkerState::PROCESSING, WorkerState::WAITING_DELIVERY);
 
 	switch (cmd) {
@@ -247,8 +266,7 @@ void WorkerConnection::process_command(uint8_t cmd, BinaryStream &payload) {
 			break;
 		}
 		case RESP_DELIVERY_READY: {
-			uint64_t delivery_id = payload.read<uint64_t>();
-			result.reset(new DeliveryResponse(node->host, node->port, delivery_id));
+			payload.read(&delivery_id);
 			set_state(WorkerState::DELIVERY_READY);
 			break;
 		}
@@ -258,7 +276,7 @@ void WorkerConnection::process_command(uint8_t cmd, BinaryStream &payload) {
 			break;
 		}
 		case RESP_NEW_CACHE_ENTRY: {
-			new_entry.reset(new NodeCacheRef(payload));
+			new_entry.reset(new MetaCacheEntry(payload));
 			set_state(WorkerState::NEW_ENTRY);
 			break;
 		}
@@ -349,7 +367,7 @@ void WorkerConnection::release() {
 // GETTER
 //
 
-const NodeCacheRef& WorkerConnection::get_new_entry() const {
+const MetaCacheEntry& WorkerConnection::get_new_entry() const {
 	ensure_state(WorkerState::NEW_ENTRY);
 	return *new_entry;
 }
@@ -359,9 +377,9 @@ const BaseRequest& WorkerConnection::get_query() const {
 	return *query;
 }
 
-const DeliveryResponse& WorkerConnection::get_result() const {
+uint64_t WorkerConnection::get_delivery_id() const {
 	ensure_state(WorkerState::DELIVERY_READY);
-	return *result;
+	return delivery_id;
 }
 
 const std::string& WorkerConnection::get_error_message() const {
@@ -371,7 +389,7 @@ const std::string& WorkerConnection::get_error_message() const {
 
 void WorkerConnection::reset() {
 	error_msg = "";
-	result.reset();
+	delivery_id = 0;
 	new_entry.reset();
 	query.reset();
 	set_state(WorkerState::IDLE);
@@ -397,20 +415,16 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 //
 /////////////////////////////////////////////////
 
-ControlConnection::ControlConnection(std::unique_ptr<BinaryFDStream> socket, std::shared_ptr<Node> node) :
-	BaseConnection(ControlState::SENDING_HELLO, std::move(socket)), node(node) {
-	this->node->control_connection = id;
+ControlConnection::ControlConnection(std::unique_ptr<BinaryFDStream> socket, uint32_t node_id, const std::string &hostname) :
+	BaseConnection(ControlState::SENDING_HELLO, std::move(socket)), node_id(node_id) {
 	auto buffer = make_unique<BinaryWriteBuffer>();
 	buffer->write(CMD_HELLO);
-	buffer->write(this->node->id);
-	buffer->write(this->node->host);
+	buffer->write(node_id);
+	buffer->write(hostname);
 	begin_write(std::move(buffer));
 }
 
-ControlConnection::~ControlConnection() {
-}
-
-void ControlConnection::process_command(uint8_t cmd, BinaryStream &payload) {
+void ControlConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) {
 	switch (cmd) {
 		case RESP_REORG_ITEM_MOVED: {
 			ensure_state(ControlState::REORGANIZING);
@@ -437,7 +451,7 @@ void ControlConnection::process_command(uint8_t cmd, BinaryStream &payload) {
 		}
 		default: {
 			throw NetworkException(
-				concat("Received illegal command on control-connection for node: ", node->id));
+				concat("Received illegal command on control-connection for node: ", node_id));
 		}
 	}
 }
@@ -551,10 +565,7 @@ DeliveryConnection::DeliveryConnection(std::unique_ptr<BinaryFDStream> socket) :
 	BaseConnection(DeliveryState::IDLE, std::move(socket)), delivery_id(0), cache_key(CacheType::UNKNOWN,"", 0) {
 }
 
-DeliveryConnection::~DeliveryConnection() {
-}
-
-void DeliveryConnection::process_command(uint8_t cmd, BinaryStream &payload) {
+void DeliveryConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) {
 	ensure_state( DeliveryState::IDLE, DeliveryState::AWAITING_MOVE_CONFIRM );
 
 	switch (cmd) {
@@ -622,22 +633,22 @@ void DeliveryConnection::send(std::shared_ptr<const T> item) {
 	set_state(DeliveryState::SENDING);
 
 	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
-	buffer->enableLinking();
 	buffer->write(RESP_OK);
+	buffer->enableLinking();
 	write_data(*buffer,item);
 	begin_write(std::move(buffer));
 }
 
 template<typename T>
-void DeliveryConnection::send_cache_entry(const MoveInfo& info,
+void DeliveryConnection::send_cache_entry(const FetchInfo& info,
 		std::shared_ptr<const T> item) {
 	ensure_state(DeliveryState::CACHE_REQUEST_READ);
 	set_state(DeliveryState::SENDING_CACHE_ENTRY);
 
 	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
-	buffer->enableLinking();
 	buffer->write(RESP_OK);
 	buffer->write(info);
+	buffer->enableLinking();
 	write_data(*buffer,item);
 	begin_write(std::move(buffer));
 }
@@ -649,9 +660,9 @@ void DeliveryConnection::send_move(const CacheEntry& info,
 	ensure_state(DeliveryState::MOVE_REQUEST_READ);
 	set_state(DeliveryState::SENDING_MOVE);
 	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
-	buffer->enableLinking();
 	buffer->write(RESP_OK);
 	buffer->write(info);
+	buffer->enableLinking();
 	write_data(*buffer,item);
 	begin_write(std::move(buffer));
 }
@@ -660,9 +671,7 @@ void DeliveryConnection::send_move(const CacheEntry& info,
 void DeliveryConnection::send_error(const std::string& msg) {
 	ensure_state( DeliveryState::CACHE_REQUEST_READ,
 				  DeliveryState::DELIVERY_REQUEST_READ,
-				  DeliveryState::MOVE_REQUEST_READ,
-				  DeliveryState::SENDING,
-				  DeliveryState::SENDING_MOVE);
+				  DeliveryState::MOVE_REQUEST_READ);
 
 	set_state(DeliveryState::SENDING_ERROR);
 
@@ -672,23 +681,23 @@ void DeliveryConnection::send_error(const std::string& msg) {
 	begin_write(std::move(buffer));
 }
 
-void DeliveryConnection::release() {
+void DeliveryConnection::finish_move() {
 	ensure_state(DeliveryState::MOVE_DONE);
 	set_state( DeliveryState::IDLE );
 }
 
 template<typename T>
-void DeliveryConnection::write_data(BinaryStream& stream,
+void DeliveryConnection::write_data(BinaryWriteBuffer& buffer,
 		std::shared_ptr<const T> &item) {
-	stream.write( *item );
+	buffer.write( *item );
 }
 
 // Hack for GenericRaster since toStream is not const
 template<>
-void DeliveryConnection::write_data(BinaryStream& stream,
+void DeliveryConnection::write_data(BinaryWriteBuffer& buffer,
 		std::shared_ptr<const GenericRaster> &item) {
 	auto p = const_cast<GenericRaster*>(item.get());
-	stream.write( *p );
+	buffer.write( *p );
 }
 
 
@@ -712,11 +721,11 @@ template void DeliveryConnection::send(std::shared_ptr<const LineCollection>);
 template void DeliveryConnection::send(std::shared_ptr<const PolygonCollection>);
 template void DeliveryConnection::send(std::shared_ptr<const GenericPlot>);
 
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const GenericRaster> );
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const PointCollection> );
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const LineCollection> );
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const PolygonCollection> );
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const GenericPlot> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const GenericRaster> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const PointCollection> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const LineCollection> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const PolygonCollection> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const GenericPlot> );
 
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const GenericRaster> );
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const PointCollection> );
@@ -724,8 +733,8 @@ template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const PolygonCollection> );
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const GenericPlot> );
 
-template void DeliveryConnection::write_data( BinaryStream&, std::shared_ptr<const PointCollection>& );
-template void DeliveryConnection::write_data( BinaryStream&, std::shared_ptr<const LineCollection>& );
-template void DeliveryConnection::write_data( BinaryStream&, std::shared_ptr<const PolygonCollection>& );
-template void DeliveryConnection::write_data( BinaryStream&, std::shared_ptr<const GenericPlot>& );
+template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const PointCollection>& );
+template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const LineCollection>& );
+template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const PolygonCollection>& );
+template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const GenericPlot>& );
 

@@ -22,7 +22,7 @@ public:
 		start_ring.push_back(0); //start of first ring
 	}
 
-	PolygonCollection( BinaryStream &stream );
+	PolygonCollection(BinaryReadBuffer &buffer);
 
 	// allow move construction and move assignment
 	PolygonCollection(PolygonCollection &&other) = default;
@@ -82,10 +82,10 @@ public:
 	std::vector<uint32_t> start_feature;
 
 	/**
-	 * Serialize collection to stream
-	 * @param stream the stream to serialize to
+	 * Serialize collection to a buffer
+	 * @param buffer the buffer to serialize to
 	 */
-	void toStream(BinaryStream &stream) const;
+	void serialize(BinaryWriteBuffer &buffer) const;
 
 	/**
 	 * add a new coordinate to the current ring. After adding all coordinates, finishRing() has to be called

@@ -168,12 +168,12 @@ std::unique_ptr<T> RemoteRetriever<T>::read_item(BinaryReadBuffer& buffer) const
 
 template<>
 std::unique_ptr<GenericRaster> RemoteRetriever<GenericRaster>::read_item(BinaryReadBuffer& buffer) const {
-	return GenericRaster::fromStream(buffer);
+	return GenericRaster::deserialize(buffer);
 }
 
 template<>
 std::unique_ptr<GenericPlot> RemoteRetriever<GenericPlot>::read_item(BinaryReadBuffer& buffer) const {
-	return GenericPlot::fromStream(buffer);
+	return GenericPlot::deserialize(buffer);
 }
 
 /////////////////////////////////////

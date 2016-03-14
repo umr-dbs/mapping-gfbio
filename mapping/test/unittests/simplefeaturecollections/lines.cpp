@@ -597,10 +597,13 @@ TEST(LineCollection, StreamSerialization){
 	EXPECT_EQ(0, status);
 
 	BinaryFDStream stream(fds[0], fds[1]);
+	BinaryWriteBuffer wb;
+	wb.write(lines);
+	stream.write(wb);
 
-	lines.toStream(stream);
-
-	LineCollection lines2(stream);
+	BinaryReadBuffer rb;
+	stream.read(rb);
+	LineCollection lines2(rb);
 
 	CollectionTestUtil::checkEquality(lines, lines2);
 }

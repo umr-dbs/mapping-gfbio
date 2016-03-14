@@ -129,7 +129,7 @@ std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect, 
 	auto response = runScript(socket, rect, RSERVER_TYPE_RASTER, profiler);
 	socket.close();
 
-	auto raster = GenericRaster::fromStream(*(response.get()));
+	auto raster = GenericRaster::deserialize(*(response.get()));
 	return raster;
 }
 

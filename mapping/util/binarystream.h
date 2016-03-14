@@ -25,9 +25,12 @@ class BinaryReadBuffer;
  * Third, deserialization using operator>> will only work for mutable objects
  * with a default constructor. Rasters do not fit that definition.
  *
- * Instead, we're opting for a very simple binary stream implementation
- * providing nothing but read() and write() functions, including some
- * overloads.
+ * Instead, we're opting for a very simple binary stream implementation.
+ *
+ * All IPC is buffered. While this incurs an additional copy, it is still a
+ * performance improvement because it reduces syscalls to read() and write().
+ *
+ * Buffered IO is also required to implement nonblocking IO.
  */
 
 class BinaryStream {
@@ -47,10 +50,8 @@ class BinaryStream {
 		 * The downside is that some streams can only guarantee this by blocking program execution for a while,
 		 * e.g. while waiting for new data to arrive over the network.
 		 *
-		 * Non-blocking means that partial reads and writes are possible. This is only useful when
-		 * combined with buffering.
-		 * To make sure that no attempts are made to do unbuffered reads or writes on a nonblocking stream,
-		 * the default read() and write() methods are disabled on nonblocking streams.
+		 * Non-blocking means that partial reads and writes are possible. Always check the buffer's state
+		 * to know whether a read or write was completed.
 		 *
 		 * This method turns a stream into nonblocking mode. There is currently no way to turn them back;
 		 * this may be implemented when a need arises.
@@ -58,37 +59,15 @@ class BinaryStream {
 		virtual void makeNonBlocking();
 
 		/*
-		 * Write a couple of raw bytes from a buffer
-		 *
-		 * @param buffer pointer to the first byte
-		 * @param len number of bytes to write
-		 * @param is_persistent_memory signals that the buffer will remain available after
-		 *        the write() call. This information can be used to avoid copies.
+		 * Write the contents of a BinaryWriteBuffer to the stream (blocking)
 		 */
-		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) = 0;
 		virtual void write(BinaryWriteBuffer &buffer);
-
-		void write(const std::string &string, bool is_persistent_memory = false);
-		void write(std::string &string) { write( (const std::string &) string); };
-		template<typename T> void write(const T& t);
-		template<typename T> void write(T& t);
-
-		void flush();
-
-		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) = 0;
-		virtual void read(BinaryReadBuffer &buffer);
-		size_t read(std::string *string, bool allow_eof = false);
 		/*
-		 * Note: reading classes must be implemented via constructors or static getters, e.g.
-		 * QueryRectangle rect(stream)
-		 * auto raster = GenericRaster::fromStream(stream)
+		 * Fill a BinaryReadBuffer with contents from the stream (blocking)
 		 */
-		template<typename T> typename std::enable_if< !std::is_class<T>::value, size_t>::type
-			read(T *t, bool allow_eof = false) { return read((char *) t, sizeof(T), allow_eof); }
-		template<typename T>
-			T read() {
-				T t; read(&t); return t;
-		}
+		virtual void read(BinaryReadBuffer &buffer);
+
+		void flush() {}; // TODO: remove
 };
 
 
@@ -112,12 +91,8 @@ class BinaryFDStream : public BinaryStream {
 
 		void close();
 
-		using BinaryStream::write;
-		using BinaryStream::read;
-		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false);
 		virtual void write(BinaryWriteBuffer &buffer);
 		void writeNB(BinaryWriteBuffer &buffer);
-		virtual size_t read(char *buffer, size_t len, bool allow_eof = false);
 		virtual void read(BinaryReadBuffer &buffer);
 		bool readNB(BinaryReadBuffer &buffer, bool allow_eof = false);
 
@@ -142,7 +117,7 @@ class BinaryFDStream : public BinaryStream {
  * this buffer supports linking external memory. The programmer must take care to guarantee that the
  * external memory is neither changed nor deallocated before this buffer is sent.
  */
-class BinaryWriteBuffer : public BinaryStream {
+class BinaryWriteBuffer {
 		friend class BinaryStream;
 		friend class BinaryFDStream;
 		struct Area {
@@ -157,17 +132,33 @@ class BinaryWriteBuffer : public BinaryStream {
 		};
 	public:
 		BinaryWriteBuffer();
-		virtual ~BinaryWriteBuffer();
+		~BinaryWriteBuffer();
 
-		using BinaryStream::read;
+		/*
+		 * Methods for writing.
+		 */
 
+		/*
+		 * Write a couple of raw bytes from a buffer
+		 *
+		 * @param buffer pointer to the first byte
+		 * @param len number of bytes to write
+		 * @param is_persistent_memory signals that the buffer will remain available after
+		 *        the write() call. This information can be used to avoid copies.
+		 */
+		void write(const char *buffer, size_t len, bool is_persistent_memory = false);
+		void write(const std::string &string, bool is_persistent_memory = false);
+		void write(std::string &string, bool is_persistent_memory = false) {
+			write( (const std::string &) string, is_persistent_memory );
+		}
+
+		/*
+		 * This will serialize based on the type. Native types will be serialized by their binary represenation.
+		 * When writing an object, this will call object.serialize(buffer).
+		 */
 		template<typename T> void write(const T& t);
 		template<typename T> void write(T& t);
-		void write(const std::string &string, bool is_persistent_memory = false) { BinaryStream::write(string, is_persistent_memory); }
-		void write(std::string &string) { BinaryStream::write(string); };
 
-		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
-		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
 
 		void enableLinking() { may_link = true; }
 		void disableLinking() { may_link = false; }
@@ -191,6 +182,25 @@ class BinaryWriteBuffer : public BinaryStream {
 		size_t size_sent;
 		size_t areas_sent;
 };
+
+// We need to make sure that classes are never serialized by their binary representation; always call serialize() on them
+template <typename T>
+typename std::enable_if< !std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &buffer, T& t) {
+	buffer.write((const char *) &t, sizeof(T));
+}
+
+template <typename T>
+typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &buffer, T& t) {
+	t.serialize(buffer);
+}
+
+template<typename T> void BinaryWriteBuffer::write(const T& t) {
+	stream_write_helper<const T>(*this, t);
+}
+
+template<typename T> void BinaryWriteBuffer::write(T& t) {
+	stream_write_helper<T>(*this, t);
+}
 
 
 /**
@@ -224,7 +234,7 @@ class BinaryWriteBufferWithSharedObject : public BinaryWriteBuffer {
  * This is required for nonblocking reads: the buffer can be filled in a nonblocking manner, when it's
  * full it can be deserialized and processed.
  */
-class BinaryReadBuffer : public BinaryStream {
+class BinaryReadBuffer {
 		friend class BinaryStream;
 		friend class BinaryFDStream;
 		enum class Status {
@@ -234,12 +244,23 @@ class BinaryReadBuffer : public BinaryStream {
 		};
 	public:
 		BinaryReadBuffer();
-		virtual ~BinaryReadBuffer();
+		~BinaryReadBuffer();
 
-		using BinaryStream::write;
-		using BinaryStream::read;
-		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
-		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
+		/*
+		 * Methods for reading.
+		 *
+		 * Note: reading classes must be implemented via constructors or static getters, e.g.
+		 * QueryRectangle rect(buffer)
+		 * auto raster = GenericRaster::deserialize(buffer)
+		 */
+		size_t read(char *buffer, size_t len, bool allow_eof = false);
+		size_t read(std::string *string, bool allow_eof = false);
+		template<typename T> typename std::enable_if< !std::is_class<T>::value, size_t>::type
+			read(T *t, bool allow_eof = false) { return read((char *) t, sizeof(T), allow_eof); }
+		template<typename T>
+			T read() {
+				T t; read(&t); return t;
+		}
 
 		bool isRead() const { return status == Status::FINISHED; }
 		bool isEmpty() const { return size_read == 0 && status == BinaryReadBuffer::Status::READING_SIZE; }
@@ -252,47 +273,5 @@ class BinaryReadBuffer : public BinaryStream {
 		size_t size_total, size_read;
 };
 
-
-
-
-// We need to make sure that classes are never serialized by their binary representation; always call toStream() on them
-template <typename T>
-typename std::enable_if< !std::is_class<T>::value >::type stream_write_helper(BinaryStream &stream, T& t) {
-	stream.write((const char *) &t, sizeof(T));
-}
-
-template <typename T>
-typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(BinaryStream &stream, T& t) {
-	t.toStream(stream);
-}
-
-template <typename T>
-typename std::enable_if< !std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &stream, T& t) {
-	stream.write((const char *) &t, sizeof(T));
-}
-
-template <typename T>
-typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &stream, T& t) {
-	t.toStream(stream);
-}
-
-
-
-template<typename T> void BinaryStream::write(const T& t) {
-	stream_write_helper<const T>(*this, t);
-}
-
-template<typename T> void BinaryStream::write(T& t) {
-	stream_write_helper<T>(*this, t);
-}
-
-
-template<typename T> void BinaryWriteBuffer::write(const T& t) {
-	stream_write_helper<const T>(*this, t);
-}
-
-template<typename T> void BinaryWriteBuffer::write(T& t) {
-	stream_write_helper<T>(*this, t);
-}
 
 #endif

@@ -15,10 +15,10 @@ private:
 public:
 
 	/**
-	 * Create PointCollection by deserializing from a stream
-	 * @param stream the stream to deserialize collection from
+	 * Create PointCollection by deserializing from a buffer
+	 * @param buffer the buffer to deserialize collection from
 	 */
-	PointCollection(BinaryStream &stream);
+	PointCollection(BinaryReadBuffer &buffer);
 
 	/**
 	 * Create PointCollection with given SpatioTemporalReference
@@ -78,10 +78,10 @@ public:
 	std::vector<uint32_t> start_feature;
 
 	/**
-	 * Serialize collection to stream
-	 * @param stream the stream to serialize to
+	 * Serialize collection to buffer
+	 * @param buffer the buffer to serialize to
 	 */
-	void toStream(BinaryStream &stream) const;
+	void serialize(BinaryWriteBuffer &buffer) const;
 
 	/**
 	 * Add (copy) feature from another collection into this collection

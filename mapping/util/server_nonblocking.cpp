@@ -406,7 +406,7 @@ void NonblockingServer::stopAllWorkers() {
 void NonblockingServer::wake() {
 	// if the loop is currently in a select() phase, this write will wake it up.
 	char c = 0;
-	wakeup_pipe.write(c);
+	write(wakeup_pipe.getWriteFD(), &c, 1);
 }
 
 void NonblockingServer::stop() {

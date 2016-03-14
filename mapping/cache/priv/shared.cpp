@@ -37,9 +37,9 @@ ResolutionInfo::ResolutionInfo(BinaryReadBuffer& buffer) :
 	actual_pixel_scale_x(buffer.read<double>()), actual_pixel_scale_y(buffer.read<double>()) {
 }
 
-void ResolutionInfo::toStream(BinaryWriteBuffer& buffer) const {
-	pixel_scale_x.toStream(buffer);
-	pixel_scale_y.toStream(buffer);
+void ResolutionInfo::serialize(BinaryWriteBuffer& buffer) const {
+	buffer.write(pixel_scale_x);
+	buffer.write(pixel_scale_y);
 	buffer.write(restype);
 	buffer.write(actual_pixel_scale_x);
 	buffer.write(actual_pixel_scale_y);
@@ -75,8 +75,8 @@ QueryCube::QueryCube(BinaryReadBuffer& buffer) : Cube3(buffer),
 	epsg(buffer.read<epsg_t>()), timetype(buffer.read<timetype_t>()) {
 }
 
-void QueryCube::toStream(BinaryWriteBuffer& buffer) const {
-	Cube3::toStream(buffer);
+void QueryCube::serialize(BinaryWriteBuffer& buffer) const {
+	Cube3::serialize(buffer);
 	buffer.write(epsg);
 	buffer.write(timetype);
 }
@@ -109,9 +109,9 @@ CacheCube::CacheCube(const GenericPlot& result) :
 CacheCube::CacheCube(BinaryReadBuffer& buffer) : QueryCube(buffer), resolution_info(buffer) {
 }
 
-void CacheCube::toStream(BinaryWriteBuffer& buffer) const {
-	QueryCube::toStream(buffer);
-	resolution_info.toStream(buffer);
+void CacheCube::serialize(BinaryWriteBuffer& buffer) const {
+	QueryCube::serialize(buffer);
+	buffer.write(resolution_info);
 }
 
 
@@ -134,9 +134,9 @@ FetchInfo::FetchInfo(BinaryReadBuffer& buffer) :
 	size(buffer.read<uint64_t>()), profile(buffer) {
 }
 
-void FetchInfo::toStream(BinaryWriteBuffer& buffer) const {
+void FetchInfo::serialize(BinaryWriteBuffer& buffer) const {
 	buffer.write(size);
-	profile.toStream(buffer);
+	buffer.write(profile);
 }
 
 ///////////////////////////////////////////////////////////
@@ -165,11 +165,11 @@ CacheEntry::CacheEntry(BinaryReadBuffer& buffer) :
 		access_count(buffer.read<uint32_t>()), bounds(buffer) {
 }
 
-void CacheEntry::toStream(BinaryWriteBuffer& buffer) const {
-	FetchInfo::toStream(buffer);
+void CacheEntry::serialize(BinaryWriteBuffer& buffer) const {
+	FetchInfo::serialize(buffer);
 	buffer.write(last_access);
 	buffer.write(access_count);
-	bounds.toStream(buffer);
+	buffer.write(bounds);
 }
 
 std::string CacheEntry::to_string() const {
@@ -190,7 +190,7 @@ NodeCacheKey::NodeCacheKey(BinaryReadBuffer &buffer) :
 	semantic_id( buffer.read<std::string>() ), entry_id( buffer.read<uint64_t>() ){
 }
 
-void NodeCacheKey::toStream(BinaryWriteBuffer &buffer) const {
+void NodeCacheKey::serialize(BinaryWriteBuffer &buffer) const {
 	buffer.write(semantic_id);
 	buffer.write(entry_id);
 }
@@ -212,8 +212,8 @@ TypedNodeCacheKey::TypedNodeCacheKey(CacheType type, const std::string& semantic
 TypedNodeCacheKey::TypedNodeCacheKey(BinaryReadBuffer &buffer) : NodeCacheKey(buffer), type( buffer.read<CacheType>() ) {
 }
 
-void TypedNodeCacheKey::toStream(BinaryWriteBuffer &buffer) const {
-	NodeCacheKey::toStream(buffer);
+void TypedNodeCacheKey::serialize(BinaryWriteBuffer &buffer) const {
+	NodeCacheKey::serialize(buffer);
 	buffer.write(type);
 }
 
@@ -243,9 +243,9 @@ MetaCacheEntry::MetaCacheEntry(BinaryReadBuffer &buffer) :
 	TypedNodeCacheKey(buffer), CacheEntry(buffer) {
 }
 
-void MetaCacheEntry::toStream(BinaryWriteBuffer &buffer) const {
-	TypedNodeCacheKey::toStream(buffer);
-	CacheEntry::toStream(buffer);
+void MetaCacheEntry::serialize(BinaryWriteBuffer &buffer) const {
+	TypedNodeCacheKey::serialize(buffer);
+	CacheEntry::serialize(buffer);
 }
 
 std::string MetaCacheEntry::to_string() const {
@@ -266,7 +266,7 @@ ForeignRef::ForeignRef(BinaryReadBuffer& buffer) :
 	host( buffer.read<std::string>() ), port( buffer.read<uint32_t>() ) {
 }
 
-void ForeignRef::toStream(BinaryWriteBuffer& buffer) const {
+void ForeignRef::serialize(BinaryWriteBuffer& buffer) const {
 	buffer.write(host);
 	buffer.write(port);
 }
@@ -285,8 +285,8 @@ DeliveryResponse::DeliveryResponse(BinaryReadBuffer& buffer) :
 	ForeignRef(buffer), delivery_id( buffer.read<uint64_t>()) {
 }
 
-void DeliveryResponse::toStream(BinaryWriteBuffer& buffer) const {
-	ForeignRef::toStream(buffer);
+void DeliveryResponse::serialize(BinaryWriteBuffer& buffer) const {
+	ForeignRef::serialize(buffer);
 	buffer.write(delivery_id);
 }
 
@@ -308,8 +308,8 @@ CacheRef::CacheRef(const std::string& host, uint32_t port, uint64_t entry_id) :
 CacheRef::CacheRef(BinaryReadBuffer& buffer) : ForeignRef(buffer), entry_id( buffer.read<uint64_t>() ) {
 }
 
-void CacheRef::toStream(BinaryWriteBuffer& buffer) const {
-	ForeignRef::toStream(buffer);
+void CacheRef::serialize(BinaryWriteBuffer& buffer) const {
+	ForeignRef::serialize(buffer);
 	buffer.write(entry_id);
 }
 

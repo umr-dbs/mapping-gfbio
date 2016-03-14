@@ -605,10 +605,13 @@ TEST(PointCollection, StreamSerialization){
 	EXPECT_EQ(0, status);
 
 	BinaryFDStream stream(fds[0], fds[1]);
+	BinaryWriteBuffer wb;
+	wb.write(points);
+	stream.write(wb);
 
-	points.toStream(stream);
-
-	PointCollection points2(stream);
+	BinaryReadBuffer rb;
+	stream.read(rb);
+	PointCollection points2(rb);
 
 	CollectionTestUtil::checkEquality(points, points2);
 }

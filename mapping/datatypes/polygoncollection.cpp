@@ -20,94 +20,89 @@ std::unique_ptr<PolygonCollection> PolygonCollection::clone() const {
 }
 
 
-PolygonCollection::PolygonCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
-	bool hasTime;
-	stream.read(&hasTime);
+PolygonCollection::PolygonCollection(BinaryReadBuffer &buffer) : SimpleFeatureCollection(SpatioTemporalReference(buffer)) {
+	auto hasTime = buffer.read<bool>();
 
-	size_t featureCount;
-	stream.read(&featureCount);
+	auto featureCount = buffer.read<size_t>();
 	start_feature.reserve(featureCount);
 
-	size_t polygonCount;
-	stream.read(&polygonCount);
+	auto polygonCount = buffer.read<size_t>();
 	start_polygon.reserve(polygonCount);
 
-	size_t ringCount;
-	stream.read(&ringCount);
+	auto ringCount = buffer.read<size_t>();
 	start_ring.reserve(ringCount);
 
-	size_t coordinateCount;
-	stream.read(&coordinateCount);
+	auto coordinateCount = buffer.read<size_t>();
 	coordinates.reserve(coordinateCount);
 
-	global_attributes.fromStream(stream);
-	feature_attributes.fromStream(stream);
+	global_attributes.deserialize(buffer);
+	feature_attributes.deserialize(buffer);
 
 	if (hasTime) {
 		time.reserve(featureCount);
 		for (size_t i = 0; i < featureCount; i++) {
-			time.push_back(TimeInterval(stream));
+			time.push_back(TimeInterval(buffer));
 		}
 	}
 
 	uint32_t offset;
 	for (size_t i = 0; i < featureCount; i++) {
-		stream.read(&offset);
+		buffer.read(&offset);
 		start_feature.push_back(offset);
 	}
 
 	for (size_t i = 0; i < polygonCount; i++) {
-		stream.read(&offset);
+		buffer.read(&offset);
 		start_polygon.push_back(offset);
 	}
 
 	for (size_t i = 0; i < ringCount; i++) {
-		stream.read(&offset);
+		buffer.read(&offset);
 		start_ring.push_back(offset);
 	}
 
 	for (size_t i = 0; i < coordinateCount; i++) {
-		coordinates.push_back(Coordinate(stream));
+		coordinates.push_back(Coordinate(buffer));
 	}
 }
 
-void PolygonCollection::toStream(BinaryStream &stream) const {
-	stream.write(stref);
-	stream.write(hasTime());
+void PolygonCollection::serialize(BinaryWriteBuffer &buffer) const {
+	buffer.write(stref);
+	buffer.write(hasTime());
 
 	size_t featureCount = start_feature.size();
-	stream.write(featureCount);
+	buffer.write(featureCount);
 	size_t polygonCount = start_polygon.size();
-	stream.write(polygonCount);
+	buffer.write(polygonCount);
 	size_t ringCount = start_ring.size();
-	stream.write(ringCount);
+	buffer.write(ringCount);
 	size_t coordinateCount = coordinates.size();
-	stream.write(coordinateCount);
+	buffer.write(coordinateCount);
 
 
-	stream.write(global_attributes);
-	stream.write(feature_attributes);
+	buffer.write(global_attributes);
+	buffer.write(feature_attributes);
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {
-			time[i].toStream(stream);
+			buffer.write(time[i]);
 		}
 	}
 
 	for (size_t i = 0; i < featureCount; i++) {
-		stream.write(start_feature[i]);
+		buffer.write(start_feature[i]);
 	}
 
 	for (size_t i = 0; i < polygonCount; i++) {
-		stream.write(start_polygon[i]);
+		buffer.write(start_polygon[i]);
 	}
 
 	for (size_t i = 0; i < ringCount; i++) {
-		stream.write(start_ring[i]);
+		buffer.write(start_ring[i]);
 	}
 
 	for (size_t i = 0; i < coordinateCount; i++) {
-		coordinates[i].toStream(stream);
+		buffer.write(coordinates[i]);
 	}
 }
 

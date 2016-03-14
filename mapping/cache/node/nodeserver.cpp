@@ -348,7 +348,7 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item ) {
 				switch (item.type) {
 					case CacheType::RASTER:
 						new_cache_id = manager->get_raster_cache().put_local(
-							item.semantic_id, GenericRaster::fromStream(*resp), std::move(ce)).entry_id;
+							item.semantic_id, GenericRaster::deserialize(*resp), std::move(ce)).entry_id;
 						break;
 					case CacheType::POINT:
 						new_cache_id = manager->get_point_cache().put_local(
@@ -364,7 +364,7 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item ) {
 						break;
 					case CacheType::PLOT:
 						new_cache_id = manager->get_plot_cache().put_local(
-							item.semantic_id, GenericPlot::fromStream(*resp), std::move(ce)).entry_id;
+							item.semantic_id, GenericPlot::deserialize(*resp), std::move(ce)).entry_id;
 						break;
 					default:
 						throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));

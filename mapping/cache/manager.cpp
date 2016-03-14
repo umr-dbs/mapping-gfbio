@@ -171,13 +171,13 @@ std::unique_ptr<T> ClientCacheWrapper<T>::read_result(
 template<>
 std::unique_ptr<GenericRaster> ClientCacheWrapper<GenericRaster>::read_result(
 		BinaryReadBuffer &buffer) {
-	return GenericRaster::fromStream(buffer);
+	return GenericRaster::deserialize(buffer);
 }
 
 template<>
 std::unique_ptr<GenericPlot> ClientCacheWrapper<GenericPlot>::read_result(
 		BinaryReadBuffer &buffer) {
-	return GenericPlot::fromStream(buffer);
+	return GenericPlot::deserialize(buffer);
 }
 
 //

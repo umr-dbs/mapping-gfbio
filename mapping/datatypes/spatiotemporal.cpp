@@ -42,25 +42,25 @@ SpatialReference::SpatialReference(epsg_t epsg, double x1, double y1, double x2,
 	validate();
 }
 
-SpatialReference::SpatialReference(BinaryStream &stream) {
+SpatialReference::SpatialReference(BinaryReadBuffer &buffer) {
 	uint32_t uint;
-	stream.read(&uint);
+	buffer.read(&uint);
 	epsg = (epsg_t) uint;
 
-	stream.read(&x1);
-	stream.read(&y1);
-	stream.read(&x2);
-	stream.read(&y2);
+	buffer.read(&x1);
+	buffer.read(&y1);
+	buffer.read(&x2);
+	buffer.read(&y2);
 
 	validate();
 }
 
-void SpatialReference::toStream(BinaryStream &stream) const {
-	stream.write((uint32_t) epsg);
-	stream.write(x1);
-	stream.write(y1);
-	stream.write(x2);
-	stream.write(y2);
+void SpatialReference::serialize(BinaryWriteBuffer &buffer) const {
+	buffer.write((uint32_t) epsg);
+	buffer.write(x1);
+	buffer.write(y1);
+	buffer.write(x2);
+	buffer.write(y2);
 }
 
 /*
@@ -101,16 +101,16 @@ TimeInterval::TimeInterval(double t1, double t2) : t1(t1), t2(t2) {
 	validate();
 }
 
-TimeInterval::TimeInterval(BinaryStream &stream) {
-	stream.read(&t1);
-	stream.read(&t2);
+TimeInterval::TimeInterval(BinaryReadBuffer &buffer) {
+	buffer.read(&t1);
+	buffer.read(&t2);
 
 	validate();
 }
 
-void TimeInterval::toStream(BinaryStream &stream) const {
-	stream.write(t1);
-	stream.write(t2);
+void TimeInterval::serialize(BinaryWriteBuffer &buffer) const {
+	buffer.write(t1);
+	buffer.write(t2);
 }
 
 void TimeInterval::validate() const {
@@ -194,17 +194,15 @@ TemporalReference::TemporalReference(timetype_t timetype, double t1, double t2)
 }
 
 
-TemporalReference::TemporalReference(BinaryStream &stream) : TimeInterval(stream) {
-	uint32_t uint;
-	stream.read(&uint);
-	timetype = (timetype_t) uint;
+TemporalReference::TemporalReference(BinaryReadBuffer &buffer) : TimeInterval(buffer) {
+	timetype = (timetype_t) buffer.read<uint32_t>();;
 
 	validate();
 }
 
-void TemporalReference::toStream(BinaryStream &stream) const {
-	TimeInterval::toStream(stream);
-	stream.write((uint32_t) timetype);
+void TemporalReference::serialize(BinaryWriteBuffer &buffer) const {
+	TimeInterval::serialize(buffer);
+	buffer.write((uint32_t) timetype);
 }
 
 
@@ -289,12 +287,12 @@ size_t SpatialReference::get_byte_size() const {
 /**
  * SpatioTemporalReference
  */
-SpatioTemporalReference::SpatioTemporalReference(BinaryStream &stream) : SpatialReference(stream), TemporalReference(stream) {
+SpatioTemporalReference::SpatioTemporalReference(BinaryReadBuffer &buffer) : SpatialReference(buffer), TemporalReference(buffer) {
 }
 
-void SpatioTemporalReference::toStream(BinaryStream &stream) const {
-	SpatialReference::toStream(stream);
-	TemporalReference::toStream(stream);
+void SpatioTemporalReference::serialize(BinaryWriteBuffer &buffer) const {
+	SpatialReference::serialize(buffer);
+	TemporalReference::serialize(buffer);
 }
 
 SpatioTemporalReference::SpatioTemporalReference(const QueryRectangle &rect) : SpatialReference(rect), TemporalReference(rect) {

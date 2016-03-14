@@ -878,10 +878,13 @@ TEST(PolygonCollection, StreamSerialization){
 	EXPECT_EQ(0, status);
 
 	BinaryFDStream stream(fds[0], fds[1]);
+	BinaryWriteBuffer wb;
+	wb.write(polygons);
+	stream.write(wb);
 
-	polygons.toStream(stream);
-
-	PolygonCollection polygons2(stream);
+	BinaryReadBuffer rb;
+	stream.read(rb);
+	PolygonCollection polygons2(rb);
 
 	CollectionTestUtil::checkEquality(polygons, polygons2);
 }

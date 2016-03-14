@@ -14,7 +14,6 @@
 #include "datatypes/unit.h"
 
 class QueryRectangle;
-class BinaryStream;
 
 
 class DataDescription {
@@ -25,7 +24,7 @@ class DataDescription {
 		DataDescription(GDALDataType datatype, const Unit &unit, bool has_no_data, double no_data)
 			: datatype(datatype), unit(unit), has_no_data(has_no_data), no_data(has_no_data ? no_data : 0.0) {};
 
-		DataDescription(BinaryStream &stream);
+		DataDescription(BinaryReadBuffer &buffer);
 
 		DataDescription() = delete;
 		~DataDescription() = default;
@@ -40,7 +39,7 @@ class DataDescription {
 
 		void verify() const;
 
-		void toStream(BinaryStream &stream) const;
+		void serialize(BinaryWriteBuffer &buffer) const;
 
 		int getBPP() const; // Bytes per Pixel
 		double getMinByDatatype() const;
@@ -109,8 +108,8 @@ class GenericRaster : public GridSpatioTemporalResult {
 		GenericRaster(const GenericRaster &) = delete;
 		GenericRaster &operator=(const GenericRaster &) = delete;
 
-		void toStream(BinaryStream &stream);
-		static std::unique_ptr<GenericRaster> fromStream(BinaryStream &stream);
+		void serialize(BinaryWriteBuffer &buffer);
+		static std::unique_ptr<GenericRaster> deserialize(BinaryReadBuffer &buffer);
 
 		std::unique_ptr<GenericRaster> clone();
 

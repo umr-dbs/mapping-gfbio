@@ -692,7 +692,7 @@ void DeliveryConnection::write_data(BinaryWriteBuffer& buffer,
 	buffer.write( *item );
 }
 
-// Hack for GenericRaster since toStream is not const
+// Hack for GenericRaster since serialize is not const
 template<>
 void DeliveryConnection::write_data(BinaryWriteBuffer& buffer,
 		std::shared_ptr<const GenericRaster> &item) {

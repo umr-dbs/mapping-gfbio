@@ -1,6 +1,7 @@
 
 #include "operators/queryprofiler.h"
 #include "util/exceptions.h"
+#include "util/binarystream.h"
 
 #include <unistd.h>
 #include <time.h>
@@ -10,28 +11,28 @@ ProfilingData::ProfilingData() : self_cpu(0), all_cpu(0), uncached_cpu(0),
 	self_gpu(0), all_gpu(0), uncached_gpu(0), self_io(0), all_io(0), uncached_io(0) {
 }
 
-ProfilingData::ProfilingData(BinaryStream& stream) :
-	self_cpu(stream.read<double>()),
-	all_cpu(stream.read<double>()),
-	uncached_cpu(stream.read<double>()),
-	self_gpu(stream.read<double>()),
-	all_gpu(stream.read<double>()),
-	uncached_gpu(stream.read<double>()),
-	self_io(stream.read<uint64_t>()),
-	all_io(stream.read<uint64_t>()),
-	uncached_io(stream.read<uint64_t>()) {
+ProfilingData::ProfilingData(BinaryReadBuffer& buffer) :
+	self_cpu(buffer.read<double>()),
+	all_cpu(buffer.read<double>()),
+	uncached_cpu(buffer.read<double>()),
+	self_gpu(buffer.read<double>()),
+	all_gpu(buffer.read<double>()),
+	uncached_gpu(buffer.read<double>()),
+	self_io(buffer.read<uint64_t>()),
+	all_io(buffer.read<uint64_t>()),
+	uncached_io(buffer.read<uint64_t>()) {
 }
 
-void ProfilingData::toStream(BinaryStream &stream) const {
-	stream.write(self_cpu);
-	stream.write(all_cpu);
-	stream.write(uncached_cpu);
-	stream.write(self_gpu);
-	stream.write(all_gpu);
-	stream.write(uncached_gpu);
-	stream.write(self_io);
-	stream.write(all_io);
-	stream.write(uncached_io);
+void ProfilingData::serialize(BinaryWriteBuffer &buffer) const {
+	buffer.write(self_cpu);
+	buffer.write(all_cpu);
+	buffer.write(uncached_cpu);
+	buffer.write(self_gpu);
+	buffer.write(all_gpu);
+	buffer.write(uncached_gpu);
+	buffer.write(self_io);
+	buffer.write(all_io);
+	buffer.write(uncached_io);
 }
 
 std::string ProfilingData::to_string() const {

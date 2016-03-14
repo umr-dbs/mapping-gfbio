@@ -89,7 +89,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 
 	BinaryReadBuffer new_request;
 	stream.read(new_request);
-	auto raster = GenericRaster::fromStream(new_request);
+	auto raster = GenericRaster::deserialize(new_request);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 	return raster;
 }

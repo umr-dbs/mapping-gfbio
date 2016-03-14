@@ -18,8 +18,8 @@ ReorgMoveResult::ReorgMoveResult(BinaryReadBuffer& buffer) :
 	to_node_id(buffer.read<uint32_t>() ), to_cache_id(buffer.read<uint64_t>() ) {
 }
 
-void ReorgMoveResult::toStream(BinaryWriteBuffer& buffer) const {
-	TypedNodeCacheKey::toStream(buffer);
+void ReorgMoveResult::serialize(BinaryWriteBuffer& buffer) const {
+	TypedNodeCacheKey::serialize(buffer);
 	buffer.write(from_node_id);
 	buffer.write(to_node_id);
 	buffer.write(to_cache_id);
@@ -42,8 +42,8 @@ ReorgMoveItem::ReorgMoveItem(BinaryReadBuffer& buffer) :
 	from_host(buffer.read<std::string>()), from_port(buffer.read<uint32_t>()) {
 }
 
-void ReorgMoveItem::toStream(BinaryWriteBuffer& buffer) const {
-	TypedNodeCacheKey::toStream(buffer);
+void ReorgMoveItem::serialize(BinaryWriteBuffer& buffer) const {
+	TypedNodeCacheKey::serialize(buffer);
 	buffer.write(from_node_id);
 	buffer.write(from_host);
 	buffer.write(from_port);
@@ -91,12 +91,12 @@ bool ReorgDescription::is_empty() const {
 	return moves.empty() && removals.empty();
 }
 
-void ReorgDescription::toStream(BinaryWriteBuffer& buffer) const {
+void ReorgDescription::serialize(BinaryWriteBuffer& buffer) const {
 	buffer.write(static_cast<uint64_t>(moves.size()));
 	for (auto &item : moves)
-		item.toStream(buffer);
+		buffer.write(item);
 
 	buffer.write(static_cast<uint64_t>(removals.size()));
 	for (auto &item : removals)
-		item.toStream(buffer);
+		buffer.write(item);
 }

@@ -25,7 +25,7 @@ NodeEntryStats::NodeEntryStats(BinaryReadBuffer& buffer) :
 	access_count( buffer.read<uint32_t>() ) {
 }
 
-void NodeEntryStats::toStream(BinaryWriteBuffer& buffer) const {
+void NodeEntryStats::serialize(BinaryWriteBuffer& buffer) const {
 	buffer.write(entry_id);
 	buffer.write(last_access);
 	buffer.write(access_count);
@@ -42,8 +42,8 @@ HandshakeEntry::HandshakeEntry(uint64_t entry_id, const CacheEntry& entry) : Cac
 HandshakeEntry::HandshakeEntry(BinaryReadBuffer& buffer) : CacheEntry(buffer), entry_id(buffer.read<uint64_t>()){
 }
 
-void HandshakeEntry::toStream(BinaryWriteBuffer& buffer) const {
-	CacheEntry::toStream(buffer);
+void HandshakeEntry::serialize(BinaryWriteBuffer& buffer) const {
+	CacheEntry::serialize(buffer);
 	buffer.write(entry_id);
 }
 
@@ -58,7 +58,7 @@ CacheUsage::CacheUsage(BinaryReadBuffer& buffer) :
 		capacity_used(buffer.read<uint64_t>()){
 }
 
-void CacheUsage::toStream(BinaryWriteBuffer& buffer) const {
+void CacheUsage::serialize(BinaryWriteBuffer& buffer) const {
 	buffer.write(type);
 	buffer.write(capacity_total);
 	buffer.write(capacity_used);
@@ -102,8 +102,8 @@ CacheContent<T>::CacheContent(BinaryReadBuffer& buffer) : CacheUsage(buffer) {
 }
 
 template<class T>
-void CacheContent<T>::toStream(BinaryWriteBuffer& buffer) const {
-	CacheUsage::toStream(buffer);
+void CacheContent<T>::serialize(BinaryWriteBuffer& buffer) const {
+	CacheUsage::serialize(buffer);
 
 	buffer.write(static_cast<uint64_t>(items.size()));
 	for ( auto &e : items ) {
@@ -191,7 +191,7 @@ QueryStats& QueryStats::operator +=(const QueryStats& stats) {
 	return *this;
 }
 
-void QueryStats::toStream(BinaryWriteBuffer& buffer) const {
+void QueryStats::serialize(BinaryWriteBuffer& buffer) const {
 	buffer.write( single_local_hits );
 	buffer.write( multi_local_hits );
 	buffer.write( multi_local_partials );
@@ -241,11 +241,11 @@ NodeStats::NodeStats(BinaryReadBuffer& buffer) : query_stats(buffer) {
 		stats.push_back( CacheStats(buffer) );
 }
 
-void NodeStats::toStream(BinaryWriteBuffer& buffer) const {
-	query_stats.toStream(buffer);
+void NodeStats::serialize(BinaryWriteBuffer& buffer) const {
+	buffer.write(query_stats);
 	buffer.write(static_cast<uint64_t>(stats.size()));
 	for ( auto &e : stats ) {
-		e.toStream(buffer);
+		buffer.write(e);
 	}
 }
 
@@ -268,11 +268,11 @@ NodeHandshake::NodeHandshake(BinaryReadBuffer& buffer) {
 		data.push_back( CacheHandshake(buffer) );
 }
 
-void NodeHandshake::toStream(BinaryWriteBuffer& buffer) const {
+void NodeHandshake::serialize(BinaryWriteBuffer& buffer) const {
 	buffer.write(port);
 	buffer.write( static_cast<uint64_t>(data.size()) );
 	for ( auto &e : data )
-		e.toStream(buffer);
+		buffer.write(e);
 }
 
 const std::vector<CacheHandshake>& NodeHandshake::get_data() const {

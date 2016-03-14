@@ -3,46 +3,46 @@
 #include "util/binarystream.h"
 
 
-RasterDBBackend::TileDescription::TileDescription(BinaryStream &stream) {
-	stream.read(&tileid);
-	stream.read(&channelid);
-	stream.read(&fileid);
-	stream.read(&offset);
-	stream.read(&size);
-	stream.read(&x1);
-	stream.read(&y1);
-	stream.read(&z1);
-	stream.read(&width);
-	stream.read(&height);
-	stream.read(&depth);
-	stream.read(&compression);
+RasterDBBackend::TileDescription::TileDescription(BinaryReadBuffer &buffer) {
+	buffer.read(&tileid);
+	buffer.read(&channelid);
+	buffer.read(&fileid);
+	buffer.read(&offset);
+	buffer.read(&size);
+	buffer.read(&x1);
+	buffer.read(&y1);
+	buffer.read(&z1);
+	buffer.read(&width);
+	buffer.read(&height);
+	buffer.read(&depth);
+	buffer.read(&compression);
 }
 
-void RasterDBBackend::TileDescription::toStream(BinaryStream &stream) const {
-	stream.write(tileid);
-	stream.write(channelid);
-	stream.write(fileid);
-	stream.write(offset);
-	stream.write(size);
-	stream.write(x1);
-	stream.write(y1);
-	stream.write(z1);
-	stream.write(width);
-	stream.write(height);
-	stream.write(depth);
-	stream.write(compression);
+void RasterDBBackend::TileDescription::serialize(BinaryWriteBuffer &buffer) const {
+	buffer.write(tileid);
+	buffer.write(channelid);
+	buffer.write(fileid);
+	buffer.write(offset);
+	buffer.write(size);
+	buffer.write(x1);
+	buffer.write(y1);
+	buffer.write(z1);
+	buffer.write(width);
+	buffer.write(height);
+	buffer.write(depth);
+	buffer.write(compression);
 }
 
-RasterDBBackend::RasterDescription::RasterDescription(BinaryStream &stream) {
-	stream.read(&rasterid);
-	stream.read(&time_start);
-	stream.read(&time_end);
+RasterDBBackend::RasterDescription::RasterDescription(BinaryReadBuffer &buffer) {
+	buffer.read(&rasterid);
+	buffer.read(&time_start);
+	buffer.read(&time_end);
 }
 
-void RasterDBBackend::RasterDescription::toStream(BinaryStream &stream) const {
-	stream.write(rasterid);
-	stream.write(time_start);
-	stream.write(time_end);
+void RasterDBBackend::RasterDescription::serialize(BinaryWriteBuffer &buffer) const {
+	buffer.write(rasterid);
+	buffer.write(time_start);
+	buffer.write(time_end);
 }
 
 

@@ -132,21 +132,20 @@ void DataDescription::addNoData() {
 	has_no_data = true;
 }
 
-void DataDescription::toStream(BinaryStream &stream) const {
-	stream.write(datatype);
-	stream.write(unit.toJson());
-	stream.write(has_no_data);
+void DataDescription::serialize(BinaryWriteBuffer &buffer) const {
+	buffer.write(datatype);
+	buffer.write(unit.toJson());
+	buffer.write(has_no_data);
 	if (has_no_data)
-		stream.write(no_data);
+		buffer.write(no_data);
 }
-DataDescription::DataDescription(BinaryStream &stream) : unit{Unit::UNINITIALIZED} {
-	stream.read(&datatype);
-	std::string unitstr;
-	stream.read(&unitstr);
+DataDescription::DataDescription(BinaryReadBuffer &buffer) : unit{Unit::UNINITIALIZED} {
+	buffer.read(&datatype);
+	auto unitstr = buffer.read<std::string>();
 	unit = Unit(unitstr);
-	stream.read(&has_no_data);
+	buffer.read(&has_no_data);
 	if (has_no_data)
-		stream.read(&no_data);
+		buffer.read(&no_data);
 	else
 		no_data = 0.0;
 }
@@ -212,29 +211,29 @@ GenericRaster::GenericRaster(const DataDescription &datadescription, const Spati
 GenericRaster::~GenericRaster() {
 }
 
-void GenericRaster::toStream(BinaryStream &stream) {
+void GenericRaster::serialize(BinaryWriteBuffer &buffer) {
 	const char *data = (const char *) getData();
 	size_t len = getDataSize();
-	stream.write(dd);
-	stream.write(stref);
-	stream.write((uint32_t) width);
-	stream.write((uint32_t) height);
-	stream.write(data, len, true);
-	stream.write(global_attributes);
+	buffer.write(dd);
+	buffer.write(stref);
+	buffer.write((uint32_t) width);
+	buffer.write((uint32_t) height);
+	buffer.write(data, len, true);
+	buffer.write(global_attributes);
 }
 
-std::unique_ptr<GenericRaster> GenericRaster::fromStream(BinaryStream &stream) {
-	DataDescription dd(stream);
-	SpatioTemporalReference stref(stream);
+std::unique_ptr<GenericRaster> GenericRaster::deserialize(BinaryReadBuffer &buffer) {
+	DataDescription dd(buffer);
+	SpatioTemporalReference stref(buffer);
 	uint32_t width, height;
-	stream.read(&width);
-	stream.read(&height);
+	buffer.read(&width);
+	buffer.read(&height);
 
 	auto raster = GenericRaster::create(dd, stref, width, height);
 	char *data = (char *) raster->getDataForWriting();
 	size_t len = raster->getDataSize();
-	stream.read(data, len);
-	raster->global_attributes.fromStream(stream);
+	buffer.read(data, len);
+	raster->global_attributes.deserialize(buffer);
 
 	return raster;
 }

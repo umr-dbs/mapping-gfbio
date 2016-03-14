@@ -26,30 +26,6 @@ void BinaryStream::makeNonBlocking() {
 	throw ArgumentException("This stream type does not support NonBlocking mode");
 }
 
-void BinaryStream::write(const std::string &string, bool is_persistent_memory) {
-	size_t len = string.size();
-	if (len > (size_t) (1<<31))
-		throw NetworkException("BinaryStream: String too large to transmit");
-	write(len);
-	write(string.data(), len, is_persistent_memory);
-}
-
-void BinaryStream::flush() {
-
-}
-
-size_t BinaryStream::read(std::string *string, bool allow_eof) {
-	size_t len;
-	if (read(&len, allow_eof) == 0)
-		return 0;
-
-	std::unique_ptr<char[]> buffer( new char[len] );
-	read(buffer.get(), len);
-	string->assign(buffer.get(), len);
-	return len + sizeof(len);
-}
-
-
 void BinaryStream::write(BinaryWriteBuffer &buffer) {
 	throw ArgumentException("Cannot write a BinaryWriteBuffer to a generic BinaryStream");
 	/*
@@ -194,30 +170,6 @@ void BinaryFDStream::close() {
 }
 
 
-void BinaryFDStream::write(const char *buffer, size_t len, bool is_persistent_memory) {
-	if (!is_blocking)
-		throw NetworkException("Cannot write() to a a nonblocking stream");
-
-	if (write_fd < 0) {
-		throw NetworkException(concat("BinaryFDStream: cannot write to closed socket ", write_fd, " in pid ", getpid()));
-	}
-	//auto res = ::send(write_fd, buffer, len, MSG_NOSIGNAL);
-	size_t written = 0;
-	while (written < len) {
-		size_t remaining = len - written;
-		auto res = ::write(write_fd, &buffer[written], remaining);
-		if ((size_t) res == remaining)
-			return;
-		if (res <= 0)
-			throw NetworkException(concat("BinaryFDStream: write() failed: ", strerror(errno), "(", remaining, " requested, ", res, " written)"));
-
-		if ((size_t) res > remaining)
-			throw NetworkException(concat("BinaryFDStream: write() wrote too much bytes: ", remaining, " requested, ", res, " written"));
-		written += res;
-	}
-	//fprintf(stderr, "BinaryFDStream: written %lu bytes\n", len);
-}
-
 void BinaryFDStream::write(BinaryWriteBuffer &buffer) {
 	if (!is_blocking)
 		throw NetworkException("Cannot write() to a nonblocking stream");
@@ -250,40 +202,6 @@ void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
 	//printf("Wrote %d bytes of %d\n", (int) written, (int) buffer.size_total);
 }
 
-
-
-size_t BinaryFDStream::read(char *buffer, size_t len, bool allow_eof) {
-	if (!is_blocking)
-		throw NetworkException("Cannot read() on a nonblocking stream");
-	if (read_fd < 0)
-		throw NetworkException(concat("BinaryFDStream: cannot read from closed socket ", read_fd, " in pid ", getpid()));
-	if (is_eof)
-		throw NetworkException("BinaryFDStream: tried to read from a socket which is eof'ed");
-
-	size_t remaining = len;
-	size_t bytes_read = 0;
-	while (remaining > 0) {
-		// Note: MSG_WAITALL does not guarantee that the whole buffer is filled; the loop is still required
-		//auto r = ::recv(read_fd, buffer, remaining, MSG_WAITALL);
-		auto r = ::read(read_fd, buffer, remaining);
-		if (r == 0) {
-			is_eof = true;
-			if (!allow_eof || bytes_read > 0)
-				throw NetworkException("BinaryFDStream: unexpected eof");
-			return bytes_read;
-		}
-		if (r < 0)
-			throw NetworkException(concat("BinaryFDStream: read() failed: ", strerror(errno)));
-		bytes_read += r;
-		buffer += r;
-		remaining -= r;
-	}
-	if (bytes_read != len)
-		throw NetworkException("BinaryFDStream: invalid read");
-
-	//fprintf(stderr, "BinaryFDStream: read %lu bytes\n", bytes_read);
-	return bytes_read;
-}
 
 void BinaryFDStream::read(BinaryReadBuffer &buffer) {
 	if (!is_blocking)
@@ -359,9 +277,14 @@ void BinaryWriteBuffer::write(const char *data, size_t len, bool is_persistent_m
 		throw MustNotHappenException("ERROR: BinaryWriteBuffer, buffer.insert() had a reallocation.");
 }
 
-size_t BinaryWriteBuffer::read(char *buffer, size_t len, bool allow_eof) {
-	throw ArgumentException("A BinaryWriteBuffer cannot read()");
+void BinaryWriteBuffer::write(const std::string &string, bool is_persistent_memory) {
+	size_t len = string.size();
+	if (len > (size_t) (1<<31))
+		throw NetworkException("BinaryStream: String too large to transmit");
+	write(len);
+	write(string.data(), len, is_persistent_memory);
 }
+
 
 void BinaryWriteBuffer::finishBufferedArea() {
 	if (next_area_start < buffer.size()) {
@@ -434,10 +357,6 @@ BinaryReadBuffer::~BinaryReadBuffer() {
 
 }
 
-void BinaryReadBuffer::write(const char *data, size_t len, bool is_persistent_memory) {
-	throw ArgumentException("A BinaryReadBuffer cannot write()");
-}
-
 size_t BinaryReadBuffer::read(char *buffer, size_t len, bool allow_eof) {
 	if (status != Status::FINISHED)
 		throw ArgumentException("cannot read() from a BinaryReadBuffer until it has been filled");
@@ -455,6 +374,18 @@ size_t BinaryReadBuffer::read(char *buffer, size_t len, bool allow_eof) {
 	size_read += len;
 	return len;
 }
+
+size_t BinaryReadBuffer::read(std::string *string, bool allow_eof) {
+	size_t len;
+	if (read(&len, allow_eof) == 0)
+		return 0;
+
+	std::unique_ptr<char[]> buffer( new char[len] );
+	read(buffer.get(), len);
+	string->assign(buffer.get(), len);
+	return len + sizeof(len);
+}
+
 
 size_t BinaryReadBuffer::getPayloadSize() const {
 	if (status != Status::FINISHED)

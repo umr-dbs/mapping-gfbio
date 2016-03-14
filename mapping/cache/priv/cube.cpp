@@ -59,7 +59,7 @@ double Interval::distance() const {
 	return b-a;
 }
 
-void Interval::toStream(BinaryWriteBuffer& buffer) const {
+void Interval::serialize(BinaryWriteBuffer& buffer) const {
 	buffer.write(a);
 	buffer.write(b);
 }
@@ -284,9 +284,9 @@ Point<DIM> Cube<DIM>::get_centre_of_mass() const {
 }
 
 template<int DIM>
-void Cube<DIM>::toStream(BinaryWriteBuffer& buffer) const {
+void Cube<DIM>::serialize(BinaryWriteBuffer& buffer) const {
 	for ( int i = 0; i < DIM; i++ ) {
-		dims[i].toStream(buffer);
+		buffer.write(dims[i]);
 	}
 }
 

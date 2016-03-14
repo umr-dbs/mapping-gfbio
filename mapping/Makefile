@@ -119,7 +119,7 @@ else
 endif
 
 
-.PHONY: clean systemtest system_testenvironment system_testcases unittest doc
+.PHONY: clean systemtest systemtest_testenvironment systemtest_testcases unittest doc
 
 .DELETE_ON_ERROR:
 
@@ -246,16 +246,16 @@ worldclim_datasource:	${EXE}
 # All the remaining phony targets
 #
 systemtest:
-	${MAKE} system_testenvironment
-	${MAKE} system_testcases
+	${MAKE} systemtest_testenvironment
+	${MAKE} systemtest_testcases
 	php test/systemtests/parse_logs.php >test/systemtests/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log
 	rm -f ${TEST_LOGS}
 	echo "Testcases done";
 	
-system_testcases: ${EXE} ${TEST_LOGS}
+systemtest_testcases: ${EXE} ${TEST_LOGS}
 	echo "All logs written"
 
-system_testenvironment: ${EXE}
+systemtest_testenvironment: ${EXE}
 	rm -f test/systemtests/data/world1.dat test/systemtests/data/world1.db
 	rm -f test/systemtests/data/ndvi.dat test/systemtests/data/ndvi.db
 	#./${EXE} createsource 4326 test/systemtests/data/world1.tif  >test/systemtests/data/test_world1.json

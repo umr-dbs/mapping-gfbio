@@ -119,7 +119,7 @@ std::unique_ptr<T> ClientCacheWrapper<T>::query(
 		BaseRequest req(type,op.getSemanticId(),rect);
 		auto resp = idx_con->write_and_read(ClientConnection::CMD_GET, req);
 
-		uint8_t idx_rc = resp->read<uint8_t>();
+		uint8_t idx_rc = resp->template read<uint8_t>();
 		switch (idx_rc) {
 			case ClientConnection::RESP_OK: {
 				DeliveryResponse dr(*resp);
@@ -147,7 +147,7 @@ std::unique_ptr<T> ClientCacheWrapper<T>::query(
 				break;
 			}
 			case ClientConnection::RESP_ERROR: {
-				std::string err_msg = resp->read<std::string>();
+				std::string err_msg = resp->template read<std::string>();
 				Log::error("Cache returned error: %s", err_msg.c_str());
 				throw OperatorException(err_msg);
 			}

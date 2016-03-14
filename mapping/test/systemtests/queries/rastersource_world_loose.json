@@ -20,8 +20,8 @@
     },
     "query_mode": "loose",
     "query": {
-        "channel": 0,
         "params": {
+        	"channel": 0,
             "sourcename": "world1"
         },
         "type": "source"

@@ -1,6 +1,6 @@
 {
-    "name": "Load world raster",
-	"query_result": "raster",
+    "name": "Histogram world",
+    "query_result": "plot",
     "temporal_reference": {
         "type": "UNIX",
         "start": 0,
@@ -19,12 +19,21 @@
         "y": 5400
     },
     "query_mode": "exact",
-    "query": {        
+    "query": {
         "params": {
-       		"channel": 0,
-            "sourcename": "world1"
         },
-        "type": "source"
+        "sources": {
+            "raster": [
+              {        
+		        "params": {
+		       		"channel": 0,
+		            "sourcename": "world1"
+		        },
+		        "type": "source"
+		       }
+            ]
+        },
+        "type": "histogram"
     },
-    "query_expected_hash": "4854d04d559df4f643cb73e8b352f348"
+    "query_expected_hash": "a61611b57ca4dcde26f26b233fbe9c99"
 }

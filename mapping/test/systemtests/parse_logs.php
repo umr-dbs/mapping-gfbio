@@ -3,7 +3,7 @@
 
 $date = date('r');
 
-$expected_passes = array('semantic', 'hash', 'addrsan');
+$expected_passes = array('semantic', 'hash', 'sanitizer', 'returncode');
 
 echo <<<EOS
 <html>
@@ -45,34 +45,28 @@ foreach ($logs as $file) {
 	$log = '';
 	$lines = file(ROOT . $file);
 
-	if (trim($lines[0]) == 'PASSED: all') {
-		foreach($expected_passes as $pass)
+	$log = implode($lines);
+
+	// If something failed, we need to manually search the log for indications of partial successes or failures
+
+	// These two are always passed unless the log indicates otherwise.
+	$passed['sanitizer'] = true;
+	$passed['returncode'] = true;
+
+	foreach($expected_passes as $pass) {
+		if (strpos($log, "PASSED: $pass\n") !== FALSE)
 			$passed[$pass] = true;
-		$all_passed = true;
+		if (strpos($log, "FAILED: $pass\n") !== FALSE)
+			$passed[$pass] = false;
 	}
-	else {
-		$log = implode($lines);
 
-		// If something failed, we need to manually search the log for indications of partial successes or failures
-		if (strpos($log, "\nPASSED: semantic\n") !== FALSE)
-			$passed['semantic'] = true;
-		if (strpos($log, "\nFAILED: semantic\n") !== FALSE)
-			$passed['semantic'] = false;
+	if (strpos($log, 'AddressSanitizer') !== FALSE || strpos($log, 'LeakSanitizer') !== FALSE || strpos($log, ': runtime error: ') !== FALSE)
+		$passed['sanitizer'] = false;
 
-		if (strpos($log, "\nPASSED: hash\n") !== FALSE)
-			$passed['hash'] = true;
-		if (strpos($log, "\nFAILED: hash\n") !== FALSE)
-			$passed['hash'] = false;
 
-		if (strpos($log, 'AddressSanitizer') === FALSE && strpos($log, 'LeakSanitizer') === FALSE)
-			$passed['addrsan'] = true;
-		else
-			$passed['addrsan'] = false;
-
-		foreach($expected_passes as $pass) {
-			if (!isset($passed[$pass]) || !$passed[$pass])
-				$all_passed = false;
-		}
+	foreach($expected_passes as $pass) {
+		if (!isset($passed[$pass]) || !$passed[$pass])
+			$all_passed = false;
 	}
 	echo '<tr'.($all_passed ? '' : ' onclick="toggle('.$collapse_id.');" style="cursor: pointer;"').'><td>'.$file.'</td>';
 
@@ -83,7 +77,7 @@ foreach ($logs as $file) {
 			$col = 'green';
 		else
 			$col = 'red';
-		echo '<td style="background-color: ' . $col . '">'.$pass.'</td>';
+		echo '<td style="text-align: center; min-width: 100px; background-color: ' . $col . '">'.$pass.'</td>';
 	}
 	echo "</tr>\n";
 	if (!$all_passed) {

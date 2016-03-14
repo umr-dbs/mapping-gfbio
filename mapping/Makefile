@@ -15,6 +15,7 @@ LLVM_SYMBOLIZER=/usr/bin/llvm-symbolizer-3.5
 ASAN_OPTIONS=
 # if you need better stack traces, use something like this. This will slow down the tests by a factor of 5-10!
 #ASAN_OPTIONS=fast_unwind_on_malloc=0:malloc_context_size=10
+UBSAN_OPTIONS=print_stacktrace=1
 
 
 USE_R=true
@@ -30,8 +31,12 @@ OPT_FLAGS=-O2
 # to override any of these options, create Makefile.local and set them there
 -include Makefile.local
 
-# AddressSanitizer, see for example http://clang.llvm.org/docs/AddressSanitizer.html
-ADDRSAN_FLAGS:=-fsanitize=address -fno-omit-frame-pointer
+# The testcases are run with full error checking. Currently, the following two tools are used:
+# AddressSanitizer, see http://clang.llvm.org/docs/AddressSanitizer.html
+# UndefinedBehaviorSanitizer, see http://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
+SANITIZE_FLAGS:=-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer
+# -fno-sanitize-recover=undefined would exit on undefined behaviour, but needs a more recent version of clang
+# -fsanitize=integer for warnings on (defined) unsigned overflows
 
 CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. -I${JSONCPP_INCLUDE_DIR} -I${GDAL_INCLUDE_DIR}
 CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
@@ -96,7 +101,7 @@ OBJ_UNITTEST:=$(patsubst test/%,o/test/%,$(SRC_UNITTEST:.cpp=.o))
 # All executables
 #
 EXE=mapping_manager
-EXE_ADDRSAN=mapping_manager.addrsan
+EXE_SANITIZED=mapping_manager.san
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
 EXEGTEST=gtest
@@ -129,8 +134,8 @@ all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXEC
 ${EXE}:	o/mapping_manager.o ${OBJ_COMMON}
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 	
-${EXE_ADDRSAN}:	$(patsubst %.o,%.as.o,o/mapping_manager.o ${OBJ_COMMON})
-	${CPP} $+ -o $@ $(ADDRSAN_FLAGS) ${LDFLAGS} ${LDFLAGS_CL}
+${EXE_SANITIZED}:	$(patsubst %.o,%.san.o,o/mapping_manager.o ${OBJ_COMMON})
+	${CPP} $+ -o $@ $(SANITIZE_FLAGS) ${LDFLAGS} ${LDFLAGS_CL}
 
 ${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES}
 	${CPP} $+ -o $@  ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_CGI}
@@ -189,9 +194,9 @@ o/operators_stub/%.o: operators/%.cpp | $${@D}/.f
 o/%.o: %.cpp | $${@D}/.f $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
 
-# .as.o = compiled with AddressSanitizer
-o/%.as.o: %.cpp | $${@D}/.f $(CL_HEADERS)
-	${CPP} ${CPPFLAGS} ${ADDRSAN_FLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
+# .san.o = compiled with Sanitation
+o/%.san.o: %.cpp | $${@D}/.f $(CL_HEADERS)
+	${CPP} ${CPPFLAGS} ${SANITIZE_FLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
 
 o/%/.f:
 	mkdir -p $(dir $@)
@@ -257,9 +262,8 @@ system_testenvironment: ${EXE}
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXE} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; bash test/systemtests/data/ndvi/import.sh 
 
-test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_ADDRSAN} 
-	echo -n >$@
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" ; if EXELOG=$$(./${EXE_ADDRSAN} testquery $< 2>&1) ; then echo "PASSED: all" >>$@ ; else echo "$$EXELOG" >>$@ ; fi
+test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_SANITIZED}
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; if EXELOG=$$(./${EXE_SANITIZED} testquery $< 2>&1) ; then echo "$$EXELOG" >$@ ; else echo "FAILED: returncode\n$$EXELOG" >$@ ; fi
 
 unittest: ${EXEGTEST}
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes
@@ -273,7 +277,7 @@ doc:
 	./../docs/makeDoc
 
 clean:
-	rm -f ${EXE} ${EXE_ADDRSAN} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXECACHEEXP} ${EXECLUSEXP}
+	rm -f ${EXE} ${EXE_SANITIZED} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXECACHEEXP} ${EXECLUSEXP}
 	rm -f $(CL_HEADERS)
 	find o/ -type f -name '*.o' -delete
 	find o/ -type f -name '*.d' -delete

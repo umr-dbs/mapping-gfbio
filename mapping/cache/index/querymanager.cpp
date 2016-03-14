@@ -12,21 +12,56 @@
 
 #include <algorithm>
 
+IndexQueryStats::IndexQueryStats() :
+	single_hits(0),
+	multi_hits_single_node(0),
+	multi_hits_multi_node(0),
+	partial_single_node(0),
+	partial_multi_node(0),
+	misses(0),
+	queries_issued(0),
+	queries_scheduled(0) {
+}
+
+void IndexQueryStats::reset() {
+	single_hits = 0;
+	multi_hits_single_node = 0;
+	multi_hits_multi_node = 0;
+	partial_single_node = 0;
+	partial_multi_node = 0;
+	misses = 0;
+	queries_issued = 0;
+	queries_scheduled = 0;
+}
+
+std::string IndexQueryStats::to_string() const {
+	std::ostringstream ss;
+	ss << "Index-Stats:" << std::endl;
+	ss << "  single hits           : " << single_hits << std::endl;
+	ss << "  puzzle single node    : " << multi_hits_single_node << std::endl;
+	ss << "  puzzle multiple nodes : " << multi_hits_multi_node << std::endl;
+	ss << "  partial single node   : " << partial_single_node << std::endl;
+	ss << "  partial multiple nodes: " << partial_multi_node << std::endl;
+	ss << "  misses                : " << misses << std::endl;
+	ss << "  client queries        : " << queries_issued << std::endl;
+	ss << "  queries scheduled     : " << queries_scheduled;
+	return ss.str();
+}
+
 CacheLocks::Lock::Lock(CacheType type, const IndexCacheKey& key) :
 	IndexCacheKey(key), type(type) {
 }
 
 bool CacheLocks::Lock::operator <(const Lock& l) const {
 	return (type <  l.type) ||
-		   (type == l.type && entry_id <  l.entry_id) ||
-		   (type == l.type && entry_id == l.entry_id && node_id <  l.node_id) ||
-		   (type == l.type && entry_id == l.entry_id && node_id == l.node_id && semantic_id < l.semantic_id);
+		   (type == l.type && id.first <  l.id.first) ||
+		   (type == l.type && id.first == l.id.first && id.second <  l.id.second) ||
+		   (type == l.type && id.first == l.id.first && id.second == l.id.second && semantic_id < l.semantic_id);
 }
 
 bool CacheLocks::Lock::operator ==(const Lock& l) const {
 	return type == l.type &&
-		   entry_id == l.entry_id &&
-		   node_id == l.node_id &&
+		   id == l.id &&
 		   semantic_id == l.semantic_id;
 }
 
@@ -77,7 +112,7 @@ void CacheLocks::remove_locks(const std::vector<Lock>& locks) {
 
 CacheLocks QueryManager::locks;
 
-QueryManager::QueryManager(IndexCaches &caches, const std::map<uint32_t, std::shared_ptr<Node>> &nodes) :
+QueryManager::QueryManager(IndexCacheManager &caches, const std::map<uint32_t, std::shared_ptr<Node>> &nodes) :
 	caches(caches), nodes(nodes) {
 }
 
@@ -115,7 +150,7 @@ void QueryManager::add_request(uint64_t client_id, const BaseRequest &req ) {
 		}
 	}
 	// Create a new job
-	auto job = create_job(req,cache,res);
+	auto job = create_job(req,res);
 	job->add_client(client_id);
 	pending_jobs.push_back(std::move(job));
 }
@@ -139,6 +174,8 @@ void QueryManager::schedule_pending_jobs(
 
 size_t QueryManager::close_worker(uint64_t worker_id) {
 	auto it = queries.find(worker_id);
+	if ( it == queries.end() )
+		throw IllegalStateException(concat("No active query found for worker: ",worker_id));
 	size_t res = it->second->get_clients().size();
 	finished_queries.insert(std::move(*it));
 	queries.erase(it);
@@ -147,6 +184,9 @@ size_t QueryManager::close_worker(uint64_t worker_id) {
 
 std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
 	auto it = finished_queries.find(worker_id);
+	if ( it == finished_queries.end() )
+		throw IllegalStateException(concat("No finished query found for worker: ",worker_id));
+
 	std::set<uint64_t> clients = it->second->get_clients();
 	finished_queries.erase(it);
 	return clients;
@@ -180,8 +220,8 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 	if (res.keys.size() == 1 && !res.has_remainder()) {
 		Log::debug("Full HIT. Sending reference.");
 		IndexCacheKey key(req.semantic_id, res.keys.at(0));
-		auto node = nodes.at(key.node_id);
-		CacheRef cr(node->host, node->port, key.entry_id);
+		auto node = nodes.at(key.get_node_id());
+		CacheRef cr(node->host, node->port, key.get_entry_id());
 		// Apply lock
 		query.add_lock( CacheLocks::Lock(req.type,key) );
 		con.send_hit(cr);
@@ -190,12 +230,12 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 	else if (res.has_hit() ) {
 		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f");
 		std::vector<CacheRef> entries;
-		for (auto id : res.keys) {
+		for (auto &id : res.keys) {
 			auto &node = nodes.at(id.first);
 			query.add_lock(CacheLocks::Lock(req.type,IndexCacheKey(req.semantic_id, id)));
 			entries.push_back(CacheRef(node->host, node->port, id.second));
 		}
-		PuzzleRequest pr( req.type, req.semantic_id, req.query, res.remainder, entries);
+		PuzzleRequest pr( req.type, req.semantic_id, req.query, std::move(res.remainder), std::move(entries) );
 		con.send_partial_hit(pr);
 	}
 	// Full miss
@@ -211,7 +251,7 @@ void QueryManager::process_worker_query(WorkerConnection& con) {
 // PRIVATE
 //
 
-std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, const IndexCache &cache, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res) {
+std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res) {
 	TIME_EXEC("QueryManager.create_job");
 
 	// Full single hit
@@ -223,7 +263,7 @@ std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, 
 				req.type,
 				req.semantic_id,
 				res.covered,
-				key.entry_id);
+				key.get_entry_id());
 		return make_unique<DeliverJob>(std::move(dr), key);
 	}
 	// Puzzle
@@ -234,16 +274,16 @@ std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, 
 		std::vector<CacheRef> entries;
 		for (auto id : res.keys) {
 			IndexCacheKey key(req.semantic_id, id);
-			auto &node = nodes.at(key.node_id);
+			auto &node = nodes.at(key.get_node_id());
 			keys.push_back(key);
-			node_ids.insert(key.node_id);
-			entries.push_back(CacheRef(node->host, node->port, key.entry_id));
+			node_ids.insert(key.get_node_id());
+			entries.push_back(CacheRef(node->host, node->port, key.get_entry_id()));
 		}
 		PuzzleRequest pr(
 				req.type,
 				req.semantic_id,
 				res.covered,
-				res.remainder, entries);
+				std::move(res.remainder), std::move(entries));
 
 		// STATS ONLY
 		if ( pr.has_remainders() && node_ids.size() == 1 ) {
@@ -266,7 +306,7 @@ std::unique_ptr<PendingQuery> QueryManager::create_job( const BaseRequest &req, 
 	else {
 		stats.misses++;
 		Log::debug("Full MISS.");
-		return make_unique<CreateJob>(BaseRequest(req), nodes, cache);
+		return make_unique<CreateJob>(BaseRequest(req), *this);
 	}
 }
 
@@ -276,8 +316,7 @@ void QueryManager::node_failed(uint32_t node_id) {
 	while ( iter != pending_jobs.end() ) {
 		if ( (*iter)->is_affected_by_node(node_id) ) {
 			auto nj = recreate_job(**iter);
-			iter = pending_jobs.erase(iter);
-			iter = pending_jobs.insert(iter,std::move(nj));
+			*iter = std::move(nj);
 		}
 		iter++;
 	}
@@ -308,7 +347,7 @@ std::unique_ptr<PendingQuery> QueryManager::recreate_job(const RunningQuery& que
 	auto &req = query.get_request();
 	auto &cache = caches.get_cache(req.type);
 	auto res = cache.query(req.semantic_id, req.query);
-	auto job = create_job( req, cache, res );
+	auto job = create_job( req, res );
 	job->add_clients( query.get_clients() );
 	return job;
 }
@@ -392,12 +431,11 @@ PendingQuery::PendingQuery( std::vector<CacheLocks::Lock> &&locks ) :
 	RunningQuery(std::move(locks)) {
 }
 
-CreateJob::CreateJob( BaseRequest&& request,
-					 const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const IndexCache &cache) :
+CreateJob::CreateJob( BaseRequest&& request, const QueryManager &mgr ) :
 	PendingQuery(), request(request),
 	orig_query(this->request.query),
 	orig_area( (this->request.query.x2 - this->request.query.x1) * (this->request.query.y2 - this->request.query.y1)),
-	nodes(nodes), cache(cache) {
+	mgr(mgr) {
 }
 
 bool CreateJob::extend(const BaseRequest& req) {
@@ -446,13 +484,13 @@ bool CreateJob::extend(const BaseRequest& req) {
 
 uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
 	// Do not schedule if we have no nodes
-	if ( nodes.empty() )
+	if ( mgr.nodes.empty() )
 		return 0;
 
-	uint32_t node_id = cache.get_node_for_job(request,nodes);
+	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
 	for (auto &e : connections) {
 		auto &con = *e.second;
-		if (!con.is_faulty() && con.node->id == node_id && con.get_state() == WorkerState::IDLE) {
+		if (!con.is_faulty() && con.node_id == node_id && con.get_state() == WorkerState::IDLE) {
 			con.process_request(WorkerConnection::CMD_CREATE, request);
 			return con.id;
 		}
@@ -465,8 +503,6 @@ uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 			return con.id;
 		}
 	}
-
-
 	return 0;
 }
 
@@ -486,13 +522,13 @@ const BaseRequest& CreateJob::get_request() const {
 DeliverJob::DeliverJob(DeliveryRequest&& request, const IndexCacheKey &key) :
 	PendingQuery(std::vector<CacheLocks::Lock>{CacheLocks::Lock(request.type,key)}),
 	request(request),
-	node(key.node_id) {
+	node(key.get_node_id()) {
 }
 
 uint64_t DeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
 	for (auto &e : connections) {
 		auto &con = *e.second;
-		if (!con.is_faulty() && con.node->id == node && con.get_state() == WorkerState::IDLE) {
+		if (!con.is_faulty() && con.node_id == node && con.get_state() == WorkerState::IDLE) {
 			con.process_request(WorkerConnection::CMD_DELIVER, request);
 			return con.id;
 		}
@@ -520,7 +556,7 @@ PuzzleJob::PuzzleJob(PuzzleRequest&& request, const std::vector<IndexCacheKey> &
 	PendingQuery(),
 	request(std::move(request)) {
 	for ( auto &k : keys ) {
-		nodes.insert(k.node_id);
+		nodes.insert(k.get_node_id());
 		add_lock( CacheLocks::Lock(request.type,k) );
 	}
 }
@@ -529,7 +565,7 @@ uint64_t PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConn
 	for (auto &node : nodes) {
 		for (auto &e : connections) {
 			auto &con = *e.second;
-			if (!con.is_faulty() && con.node->id == node
+			if (!con.is_faulty() && con.node_id == node
 				&& con.get_state() == WorkerState::IDLE) {
 				con.process_request(WorkerConnection::CMD_PUZZLE, request);
 				return con.id;
@@ -550,40 +586,4 @@ bool PuzzleJob::extend(const BaseRequest&) {
 
 const BaseRequest& PuzzleJob::get_request() const {
 	return request;
-}
-
-IndexQueryStats::IndexQueryStats() :
-	single_hits(0),
-	multi_hits_single_node(0),
-	multi_hits_multi_node(0),
-	partial_single_node(0),
-	partial_multi_node(0),
-	misses(0),
-	queries_issued(0),
-	queries_scheduled(0) {
-}
-
-void IndexQueryStats::reset() {
-	single_hits = 0;
-	multi_hits_single_node = 0;
-	multi_hits_multi_node = 0;
-	partial_single_node = 0;
-	partial_multi_node = 0;
-	misses = 0;
-	queries_issued = 0;
-	queries_scheduled = 0;
-}
-
-std::string IndexQueryStats::to_string() const {
-	std::ostringstream ss;
-	ss << "Index-Stats:" << std::endl;
-	ss << "  single hits           : " << single_hits << std::endl;
-	ss << "  puzzle single node    : " << multi_hits_single_node << std::endl;
-	ss << "  puzzle multiple nodes : " << multi_hits_multi_node << std::endl;
-	ss << "  partial single node   : " << partial_single_node << std::endl;
-	ss << "  partial multiple nodes: " << partial_multi_node << std::endl;
-	ss << "  misses                : " << misses << std::endl;
-	ss << "  client queries        : " << queries_issued << std::endl;
-	ss << "  queries scheduled     : " << queries_scheduled;
-	return ss.str();
 }

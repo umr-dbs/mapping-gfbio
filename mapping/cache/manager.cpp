@@ -6,13 +6,16 @@
  */
 
 #include "cache/manager.h"
-#include "cache/priv/transfer.h"
 #include "cache/priv/connection.h"
-#include "util/nio.h"
 
-//
-// STATICS
-//
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
+#include "datatypes/plot.h"
+
+#include "util/binarystream.h"
+
 //
 // Cache-Manager
 //
@@ -34,12 +37,12 @@ void CacheManager::init( CacheManager *instance ) {
 // NOP-Wrapper
 //
 
-template<typename T, CacheType CType>
-NopCacheWrapper<T,CType>::NopCacheWrapper() {
+template<typename T>
+NopCacheWrapper<T>::NopCacheWrapper() {
 }
 
-template<typename T, CacheType CType>
-bool NopCacheWrapper<T,CType>::put(const std::string& semantic_id,
+template<typename T>
+bool NopCacheWrapper<T>::put(const std::string& semantic_id,
 		const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
@@ -48,11 +51,12 @@ bool NopCacheWrapper<T,CType>::put(const std::string& semantic_id,
 	return false;
 }
 
-template<typename T, CacheType CType>
-std::unique_ptr<T> NopCacheWrapper<T,CType>::query(const GenericOperator& op,
+template<typename T>
+std::unique_ptr<T> NopCacheWrapper<T>::query(const GenericOperator& op,
 		const QueryRectangle& rect, QueryProfiler &profiler) {
 	(void) op;
 	(void) rect;
+	(void) profiler;
 	throw NoSuchElementException("NOP-Cache has no entries");
 }
 
@@ -88,13 +92,13 @@ CacheWrapper<GenericPlot>& NopCacheManager::get_plot_cache() {
 //
 
 
-template<typename T, CacheType CType>
-ClientCacheWrapper<T,CType>::ClientCacheWrapper(CacheType type, const std::string& idx_host,
+template<typename T>
+ClientCacheWrapper<T>::ClientCacheWrapper(CacheType type, const std::string& idx_host,
 		int idx_port) : type(type), idx_host(idx_host), idx_port(idx_port) {
 }
 
-template<typename T, CacheType CType>
-bool ClientCacheWrapper<T,CType>::put(const std::string& semantic_id,
+template<typename T>
+bool ClientCacheWrapper<T>::put(const std::string& semantic_id,
 		const std::unique_ptr<T>& item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	(void) semantic_id;
 	(void) item;
@@ -103,56 +107,52 @@ bool ClientCacheWrapper<T,CType>::put(const std::string& semantic_id,
 	return false;
 }
 
-template<typename T, CacheType CType>
-std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
+template<typename T>
+std::unique_ptr<T> ClientCacheWrapper<T>::query(
 		const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
 
+	(void) profiler;
+
 	try {
-		BinaryFDStream idx_con(idx_host.c_str(), idx_port, true);
-		BinaryStream &idx_stream = idx_con;
+		auto idx_con = BlockingConnection::create(idx_host, idx_port, true, ClientConnection::MAGIC_NUMBER);
 
 		BaseRequest req(type,op.getSemanticId(),rect);
-		buffered_write(idx_con, ClientConnection::MAGIC_NUMBER, ClientConnection::CMD_GET, req );
+		auto resp = idx_con->write_and_read(ClientConnection::CMD_GET, req);
 
-		uint8_t idx_resp;
-		idx_stream.read(&idx_resp);
-		switch (idx_resp) {
+		uint8_t idx_rc = resp->template read<uint8_t>();
+		switch (idx_rc) {
 			case ClientConnection::RESP_OK: {
-				DeliveryResponse dr(idx_con);
+				DeliveryResponse dr(*resp);
 				Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
-				BinaryFDStream del_sock(dr.host.c_str(),dr.port,true);
-				BinaryStream &del_stream = del_sock;
 
-				buffered_write( del_sock, DeliveryConnection::MAGIC_NUMBER,DeliveryConnection::CMD_GET, dr.delivery_id);
+				auto del_con = BlockingConnection::create(dr.host, dr.port, true, DeliveryConnection::MAGIC_NUMBER);
+				auto del_resp = del_con->write_and_read(DeliveryConnection::CMD_GET, dr.delivery_id);
 
-				uint8_t resp;
-				del_stream.read(&resp);
-				switch (resp) {
+				uint8_t del_rc = del_resp->read<uint8_t>();
+				switch (del_rc) {
 					case DeliveryConnection::RESP_OK: {
 						Log::debug("Delivery responded OK.");
-						return read_result(del_sock);
+						return read_result(*del_resp);
 					}
 					case DeliveryConnection::RESP_ERROR: {
-						std::string err_msg;
-						del_stream.read(&err_msg);
+						std::string err_msg = del_resp->read<std::string>();
 						Log::error("Delivery returned error: %s", err_msg.c_str());
 						throw DeliveryException(err_msg);
 					}
 					default: {
-						Log::error("Delivery returned unknown code: %d", resp);
+						Log::error("Delivery returned unknown code: %d", del_rc);
 						throw DeliveryException("Delivery returned unknown code");
 					}
 				}
 				break;
 			}
 			case ClientConnection::RESP_ERROR: {
-				std::string err_msg;
-				idx_stream.read(&err_msg);
+				std::string err_msg = resp->template read<std::string>();
 				Log::error("Cache returned error: %s", err_msg.c_str());
 				throw OperatorException(err_msg);
 			}
 			default: {
-				Log::error("Cache returned unknown code: %d", idx_resp);
+				Log::error("Cache returned unknown code: %d", idx_rc);
 				throw OperatorException("Cache returned unknown code");
 			}
 		}
@@ -162,22 +162,22 @@ std::unique_ptr<T> ClientCacheWrapper<T,CType>::query(
 	}
 }
 
-template<typename T, CacheType CType>
-std::unique_ptr<T> ClientCacheWrapper<T,CType>::read_result(
-		BinaryStream& stream) {
-	return make_unique<T>(stream);
+template<typename T>
+std::unique_ptr<T> ClientCacheWrapper<T>::read_result(
+		BinaryReadBuffer &buffer ) {
+	return make_unique<T>(buffer);
 }
 
 template<>
-std::unique_ptr<GenericRaster> ClientCacheWrapper<GenericRaster,CacheType::RASTER>::read_result(
-		BinaryStream& stream) {
-	return GenericRaster::fromStream(stream);
+std::unique_ptr<GenericRaster> ClientCacheWrapper<GenericRaster>::read_result(
+		BinaryReadBuffer &buffer) {
+	return GenericRaster::fromStream(buffer);
 }
 
 template<>
-std::unique_ptr<GenericPlot> ClientCacheWrapper<GenericPlot,CacheType::PLOT>::read_result(
-		BinaryStream& stream) {
-	return GenericPlot::fromStream(stream);
+std::unique_ptr<GenericPlot> ClientCacheWrapper<GenericPlot>::read_result(
+		BinaryReadBuffer &buffer) {
+	return GenericPlot::fromStream(buffer);
 }
 
 //
@@ -213,15 +213,15 @@ CacheWrapper<GenericPlot>& ClientCacheManager::get_plot_cache() {
 	return plot_cache;
 }
 
-template class NopCacheWrapper<GenericRaster,CacheType::RASTER> ;
-template class NopCacheWrapper<PointCollection,CacheType::POINT> ;
-template class NopCacheWrapper<LineCollection,CacheType::LINE> ;
-template class NopCacheWrapper<PolygonCollection,CacheType::POLYGON> ;
-template class NopCacheWrapper<GenericPlot,CacheType::PLOT> ;
+template class NopCacheWrapper<GenericRaster> ;
+template class NopCacheWrapper<PointCollection> ;
+template class NopCacheWrapper<LineCollection> ;
+template class NopCacheWrapper<PolygonCollection> ;
+template class NopCacheWrapper<GenericPlot> ;
 
 
-template class ClientCacheWrapper<GenericRaster,CacheType::RASTER> ;
-template class ClientCacheWrapper<PointCollection,CacheType::POINT> ;
-template class ClientCacheWrapper<LineCollection,CacheType::LINE> ;
-template class ClientCacheWrapper<PolygonCollection,CacheType::POLYGON> ;
-template class ClientCacheWrapper<GenericPlot,CacheType::PLOT> ;
+template class ClientCacheWrapper<GenericRaster> ;
+template class ClientCacheWrapper<PointCollection> ;
+template class ClientCacheWrapper<LineCollection> ;
+template class ClientCacheWrapper<PolygonCollection> ;
+template class ClientCacheWrapper<GenericPlot> ;

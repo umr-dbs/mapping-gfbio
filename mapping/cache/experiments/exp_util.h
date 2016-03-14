@@ -127,7 +127,7 @@ public:
 	ProfilingData &get_costs();
 	void reset_costs();
 
-	Capacity get_capacity() const;
+	CacheUsage get_usage(CacheType type) const;
 
 	void set_strategy(std::unique_ptr<CachingStrategy> strategy);
 private:

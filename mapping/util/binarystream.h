@@ -7,6 +7,7 @@
 #include <vector>
 #include <memory>
 
+#include "util/make_unique.h"
 
 class BinaryWriteBuffer;
 class BinaryReadBuffer;
@@ -91,26 +92,6 @@ class BinaryStream {
 };
 
 
-// We need to make sure that classes are never serialized by their binary representation; always call toStream() on them
-template <typename T>
-typename std::enable_if< !std::is_class<T>::value >::type stream_write_helper(BinaryStream &stream, T& t) {
-	stream.write((const char *) &t, sizeof(T));
-}
-
-template <typename T>
-typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(BinaryStream &stream, T& t) {
-	t.toStream(stream);
-}
-
-template<typename T> void BinaryStream::write(const T& t) {
-	stream_write_helper<const T>(*this, t);
-}
-
-template<typename T> void BinaryStream::write(T& t) {
-	stream_write_helper<T>(*this, t);
-}
-
-
 /**
  * An implementation using posix file descriptors
  *
@@ -178,8 +159,13 @@ class BinaryWriteBuffer : public BinaryStream {
 		BinaryWriteBuffer();
 		virtual ~BinaryWriteBuffer();
 
-		using BinaryStream::write;
 		using BinaryStream::read;
+
+		template<typename T> void write(const T& t);
+		template<typename T> void write(T& t);
+		void write(const std::string &string, bool is_persistent_memory = false) { BinaryStream::write(string, is_persistent_memory); }
+		void write(std::string &string) { BinaryStream::write(string); };
+
 		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
 
@@ -219,6 +205,20 @@ class BinaryWriteBufferWithObject : public BinaryWriteBuffer {
 
 
 /**
+ * Sometimes, a writebuffer needs to manage the lifetime of another object, mostly when part of the object's memory
+ * was linked in the buffer. This is an attempt at a helper class.
+ */
+template<typename T>
+class BinaryWriteBufferWithSharedObject : public BinaryWriteBuffer {
+	public:
+		BinaryWriteBufferWithSharedObject( std::shared_ptr<T> obj ) : object(obj) {}
+	private:
+		std::shared_ptr<T> object;
+};
+
+
+
+/**
  * A buffer used for reading a batch of data sent using a BinaryWriteBuffer
  *
  * This is required for nonblocking reads: the buffer can be filled in a nonblocking manner, when it's
@@ -241,9 +241,9 @@ class BinaryReadBuffer : public BinaryStream {
 		virtual void write(const char *buffer, size_t len, bool is_persistent_memory = false) final;
 		virtual size_t read(char *buffer, size_t len, bool allow_eof = false) final;
 
-		bool isRead() { return status == Status::FINISHED; }
-		bool isEmpty() { return size_read == 0 && status == BinaryReadBuffer::Status::READING_SIZE; }
-		size_t getPayloadSize();
+		bool isRead() const { return status == Status::FINISHED; }
+		bool isEmpty() const { return size_read == 0 && status == BinaryReadBuffer::Status::READING_SIZE; }
+		size_t getPayloadSize() const;
 		void markBytesAsRead(size_t read);
 	private:
 		void prepareBuffer(size_t expected_size);
@@ -252,5 +252,47 @@ class BinaryReadBuffer : public BinaryStream {
 		size_t size_total, size_read;
 };
 
+
+
+
+// We need to make sure that classes are never serialized by their binary representation; always call toStream() on them
+template <typename T>
+typename std::enable_if< !std::is_class<T>::value >::type stream_write_helper(BinaryStream &stream, T& t) {
+	stream.write((const char *) &t, sizeof(T));
+}
+
+template <typename T>
+typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(BinaryStream &stream, T& t) {
+	t.toStream(stream);
+}
+
+template <typename T>
+typename std::enable_if< !std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &stream, T& t) {
+	stream.write((const char *) &t, sizeof(T));
+}
+
+template <typename T>
+typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &stream, T& t) {
+	t.toStream(stream);
+}
+
+
+
+template<typename T> void BinaryStream::write(const T& t) {
+	stream_write_helper<const T>(*this, t);
+}
+
+template<typename T> void BinaryStream::write(T& t) {
+	stream_write_helper<T>(*this, t);
+}
+
+
+template<typename T> void BinaryWriteBuffer::write(const T& t) {
+	stream_write_helper<const T>(*this, t);
+}
+
+template<typename T> void BinaryWriteBuffer::write(T& t) {
+	stream_write_helper<T>(*this, t);
+}
 
 #endif

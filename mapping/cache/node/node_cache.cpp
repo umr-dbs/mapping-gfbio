@@ -6,15 +6,18 @@
  */
 
 #include "cache/node/node_cache.h"
-#include "util/log.h"
-#include "util/make_unique.h"
-#include "util/sizeutil.h"
 
-#include <cstring>
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
+#include "datatypes/plot.h"
+
+#include "util/log.h"
 
 //////////////////////////////////////////////////////////////
 //
-// Value objects
+// NodeCacheEntry
 //
 //////////////////////////////////////////////////////////////
 
@@ -50,7 +53,7 @@ template class NodeCacheEntry<GenericPlot>;
 
 ///////////////////////////////////////////////////////////////////
 //
-// NODE-CACHE IMPLEMENTATION
+// NodeCache
 //
 ///////////////////////////////////////////////////////////////////
 
@@ -61,17 +64,16 @@ NodeCache<EType>::NodeCache(CacheType type, size_t max_size) :
 }
 
 template<typename EType>
-std::vector<NodeCacheRef> NodeCache<EType>::get_all() const {
-	std::vector<NodeCacheRef> result;
-	size_t size = 0;
-	auto all_int = this->get_all_int();
-	for (auto &p : all_int)
-		size += p.second.size();
+CacheHandshake NodeCache<EType>::get_all() const {
 
-	result.reserve(size);
-	for (auto &p : all_int)
-		for (auto &ne : p.second)
-			result.push_back(NodeCacheRef(type, p.first, ne->entry_id, *ne));
+	CacheHandshake result(type,get_max_size(),get_current_size());
+
+	auto all_int = this->get_all_int();
+	for (auto &p : all_int) {
+		for ( auto &ne : p.second ) {
+			result.add_item(p.first, HandshakeEntry(ne->entry_id,*ne) );
+		}
+	}
 	return result;
 }
 
@@ -86,16 +88,16 @@ void NodeCache<EType>::remove(const NodeCacheKey& key) {
 }
 
 template<typename EType>
-const NodeCacheRef NodeCache<EType>::put(const std::string &semantic_id,
+const MetaCacheEntry NodeCache<EType>::put(const std::string &semantic_id,
 		const std::unique_ptr<EType> &item, const CacheEntry &meta) {
 	uint64_t id = next_id++;
-	auto cpy = const_cast<EType*>(item.get())->clone();
+	auto cpy = item->clone();
 	auto entry = std::shared_ptr<NodeCacheEntry<EType>>(
 			new NodeCacheEntry<EType>(id, meta,
 					std::shared_ptr<EType>(cpy.release())));
 	this->put_int(semantic_id, id, entry);
 	current_size += entry->size;
-	return NodeCacheRef(type, semantic_id, id, *entry);
+	return MetaCacheEntry(type, semantic_id, id, *entry);
 }
 
 template<typename EType>
@@ -105,36 +107,15 @@ std::shared_ptr<const NodeCacheEntry<EType>> NodeCache<EType>::get( const NodeCa
 	return res;
 }
 
-//template<typename EType>
-//const std::shared_ptr<const EType> NodeCache<EType>::get(
-//		const NodeCacheKey& key) const {
-//	auto res = this->get_int(key.semantic_id, key.entry_id);
-//	track_access(key, *res);
-//	return res->data;
-//}
-//
-//template<typename EType>
-//std::unique_ptr<EType> NodeCache<EType>::get_copy(
-//		const NodeCacheKey& key) const {
-//	return const_cast<EType*>(get(key).get())->clone();
-//}
-//
-//template<typename EType>
-//const NodeCacheRef NodeCache<EType>::get_entry_metadata(
-//		const NodeCacheKey& key) const {
-//	auto res = this->get_int(key.semantic_id, key.entry_id);
-//	return NodeCacheRef(type, key, *res);
-//}
-
 template<typename EType>
 CacheStats NodeCache<EType>::get_stats() const {
 	std::lock_guard<std::mutex> g(access_mtx);
-	CacheStats result(type);
+	CacheStats result(type, get_max_size(), get_current_size() );
 	for (auto &kv : access_tracker) {
 		for (auto &id : kv.second) {
 			try {
 				auto e = this->get_int(kv.first, id);
-				result.add_stats(kv.first,
+				result.add_item(kv.first,
 						NodeEntryStats(id, e->last_access, e->access_count));
 			} catch (const NoSuchElementException &nse2) {
 				// Nothing to do... entry gone due to reorg
@@ -154,9 +135,7 @@ void NodeCache<EType>::track_access(const NodeCacheKey& key,
 	try {
 		access_tracker.at(key.semantic_id).insert(key.entry_id);
 	} catch (const std::out_of_range &oor) {
-		std::set<uint64_t> ids;
-		ids.insert(key.entry_id);
-		access_tracker.emplace(key.semantic_id, ids);
+		access_tracker.emplace(key.semantic_id, std::set<uint64_t>{key.entry_id});
 	}
 }
 

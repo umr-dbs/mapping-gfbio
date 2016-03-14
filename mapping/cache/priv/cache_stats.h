@@ -8,111 +8,156 @@
 #ifndef CACHE_STATS_H_
 #define CACHE_STATS_H_
 
-#include "cache/priv/cache_structure.h"
+#include "cache/priv/shared.h"
 #include "util/binarystream.h"
 
 #include <vector>
 #include <unordered_map>
 
-//
-// Holds memory usage information of
-// the caches
-//
-
-class Capacity {
-public:
-	Capacity( uint64_t raster_cache_total, uint64_t raster_cache_used,
-			  uint64_t point_cache_total, uint64_t point_cache_used,
-			  uint64_t line_cache_total, uint64_t line_cache_used,
-			  uint64_t polygon_cache_total, uint64_t polygon_cache_used,
-			  uint64_t plot_cache_total, uint64_t plot_cache_used );
-	Capacity( BinaryStream &stream );
-
-	void toStream( BinaryStream &stream ) const;
-
-	std::string to_string() const;
-
-	uint64_t raster_cache_total;
-	uint64_t raster_cache_used;
-	uint64_t point_cache_total;
-	uint64_t point_cache_used;
-	uint64_t line_cache_total;
-	uint64_t line_cache_used;
-	uint64_t polygon_cache_total;
-	uint64_t polygon_cache_used;
-	uint64_t plot_cache_total;
-	uint64_t plot_cache_used;
-};
-
-//
-// Information send on handshake with index
-// Contains current memory usage as well as
-// infos about currently cached items
-//
-
-class NodeHandshake : public Capacity {
-public:
-	NodeHandshake( uint32_t port, const Capacity &capacity, std::vector<NodeCacheRef> entries );
-	NodeHandshake( BinaryStream &stream );
-
-	const std::vector<NodeCacheRef>& get_entries() const;
-
-	void toStream( BinaryStream &stream ) const;
-	std::string to_string() const;
-
-	uint32_t port;
-
-private:
-	std::vector<NodeCacheRef> entries;
-};
-
-//
-// Stats
-//
+/**
+ * This class holds access information about a cache entry
+ */
 class NodeEntryStats {
 public:
-	NodeEntryStats( uint64_t id, time_t last_access, uint32_t access_count );
-	NodeEntryStats( BinaryStream &stream );
 
-	void toStream( BinaryStream &stream ) const;
+	NodeEntryStats( uint64_t id, uint64_t last_access, uint32_t access_count );
+
+	/**
+	 * Constructs an instance from the given buffer
+	 * @param buffer The buffer holding the instance data
+	 */
+	NodeEntryStats( BinaryReadBuffer &buffer );
+
+	/**
+	 * Serializes this instance to the given buffer
+	 * @param buffer The buffer to write to
+	 */
+	void toStream( BinaryWriteBuffer &buffer ) const;
 
 	uint64_t entry_id;
-	time_t last_access;
+	uint64_t last_access;
 	uint32_t access_count;
 };
 
-//
-// Holds statistics about a single cache - e.g. raster
-//
-class CacheStats {
+class HandshakeEntry : public CacheEntry {
 public:
-	CacheStats( CacheType type );
-	CacheStats( BinaryStream &stream );
+	HandshakeEntry(uint64_t entry_id, const CacheEntry &entry );
+	HandshakeEntry( BinaryReadBuffer &buffer );
+	void toStream( BinaryWriteBuffer &buffer ) const;
 
-	void toStream( BinaryStream &stream ) const;
+	uint64_t entry_id;
+};
 
-	void add_stats( const std::string &semantic_id, NodeEntryStats stats );
+class CacheUsage {
+public:
+	CacheUsage ( CacheType type, uint64_t capacity_total, uint64_t capacity_used );
+	CacheUsage ( BinaryReadBuffer &buffer );
 
-	const std::unordered_map<std::string,std::vector<NodeEntryStats>>& get_stats() const;
+	double get_ratio() const;
+
+
+	/**
+	 * Serializes this instance to the given buffer
+	 * @param buffer The buffer to write to
+	 */
+	void toStream( BinaryWriteBuffer &buffer ) const;
 
 	CacheType type;
-private:
-	std::unordered_map<std::string,std::vector<NodeEntryStats>> stats;
+	uint64_t capacity_total;
+	uint64_t capacity_used;
 };
 
 
+/**
+ * Holds statistics about a single cache - e.g. raster
+ */
+template<class T>
+class CacheContent : public CacheUsage{
+protected:
+	CacheContent( CacheType type, uint64_t capacity_total, uint64_t capacity_used );
+
+	/**
+	 * Constructs an instance from the given buffer
+	 * @param buffer The buffer holding the instance data
+	 */
+	CacheContent( BinaryReadBuffer &buffer );
+
+public:
+	/**
+	 * Serializes this instance to the given buffer
+	 * @param buffer The buffer to write to
+	 */
+	void toStream( BinaryWriteBuffer &buffer ) const;
+
+	/**
+	 * Add a specific item
+	 * @param semantic_id the semantic id
+	 * @param item the item to add
+	 */
+	void add_item( const std::string &semantic_id, T item );
+
+	/**
+	 * Retrieves all statistic-updates
+	 */
+	const std::unordered_map<std::string,std::vector<T>>& get_items() const;
+private:
+	std::unordered_map<std::string,std::vector<T>> items;
+};
+
+class CacheStats : public CacheContent<NodeEntryStats> {
+public:
+	CacheStats( CacheType type, uint64_t capacity_total, uint64_t capacity_used );
+	CacheStats( BinaryReadBuffer &buffer );
+};
+
+class CacheHandshake : public CacheContent<HandshakeEntry> {
+public:
+	CacheHandshake( CacheType type, uint64_t capacity_total, uint64_t capacity_used );
+	CacheHandshake( BinaryReadBuffer &buffer );
+};
+
+
+/**
+ * Holds statistics about cache-queries
+ */
 class QueryStats {
 public:
 	QueryStats();
-	QueryStats( BinaryStream &stream );
 
+	/**
+	 * Constructs an instance from the given buffer
+	 * @param buffer The buffer holding the instance data
+	 */
+	QueryStats( BinaryReadBuffer &buffer );
+
+	/**
+	 * Adds the given stats and returns a new instance
+	 * @param stats the stats to add
+	 * @return the cumulated stats
+	 */
 	QueryStats operator+( const QueryStats& stats ) const;
+
+	/**
+	 * Adds the given stats to this instance
+	 * @param stats the stats to add
+	 * @return this instance
+	 */
 	QueryStats& operator+=( const QueryStats& stats );
 
-	void toStream( BinaryStream &stream ) const;
+	/**
+	 * Serializes this instance to the given buffer
+	 * @param buffer The buffer to write to
+	 */
+	void toStream( BinaryWriteBuffer &buffer ) const;
 
+	/**
+	 * @return a human readable respresentation
+	 */
 	std::string to_string() const;
 
+	/**
+	 * Resets this stats (setting all counts to 0)
+	 */
 	void reset();
 
 	uint32_t single_local_hits;
@@ -125,36 +170,66 @@ public:
 };
 
 
-class ActiveQueryStats : private QueryStats {
+/**
+ * Statistics retrieved by the index-server for each node
+ * Contains delta of accessed entries and query-statistics
+ */
+class NodeStats {
 public:
-	void add_single_local_hit();
-	void add_multi_local_hit();
-	void add_multi_local_partial();
-	void add_single_remote_hit();
-	void add_multi_remote_hit();
-	void add_multi_remote_partial();
-	void add_miss();
+	NodeStats( const QueryStats &query_stats, std::vector<CacheStats> &&stats );
 
-	QueryStats get() const;
-	QueryStats get_and_reset();
-private:
-	mutable std::mutex mtx;
-};
+	/**
+	 * Constructs an instance from the given buffer
+	 * @param buffer The buffer holding the instance data
+	 */
+	NodeStats( BinaryReadBuffer &buffer );
 
-//
-// Holds an incremental list of access stats
-//
+	/**
+	 * Serializes this instance to the given buffer
+	 * @param buffer The buffer to write to
+	 */
+	void toStream( BinaryWriteBuffer &buffer ) const;
 
-class NodeStats : public Capacity {
-public:
-	NodeStats( const Capacity &capacity, const QueryStats &query_stats, std::vector<CacheStats> stats );
-	NodeStats( BinaryStream &stream );
-	void toStream( BinaryStream &stream ) const;
+
 	QueryStats query_stats;
 	std::vector<CacheStats> stats;
 };
 
+/**
+ * Information send on handshake with the index-server.
+ * Contains current memory usage as well as infos about currently cached items.
+ */
+class NodeHandshake {
+public:
+	NodeHandshake( uint32_t port, std::vector<CacheHandshake> &&entries );
 
+	/**
+	 * Constructs an instance from the given buffer
+	 * @param buffer The buffer holding the instance data
+	 */
+	NodeHandshake( BinaryReadBuffer &buffer );
+
+	/**
+	 * Serializes this instance to the given buffer
+	 * @param buffer The buffer to write to
+	 */
+	void toStream( BinaryWriteBuffer &buffer ) const;
+
+	/**
+	 * @return The entries held by the cache
+	 */
+	const std::vector<CacheHandshake>& get_data() const;
+
+	/**
+	 * @return a human readable respresentation
+	 */
+	std::string to_string() const;
+
+	uint32_t port;
+
+private:
+	std::vector<CacheHandshake> data;
+};
 
 
 #endif /* CACHE_STATS_H_ */

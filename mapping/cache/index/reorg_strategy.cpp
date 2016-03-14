@@ -140,7 +140,7 @@ bool ReorgStrategy::requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>
 
 	// Calculate variation
 	for (auto &e : nodes) {
-		double u = cache.get_capacity_usage(e.second->get_capacity());
+		double u = e.second->get_usage(cache.type).get_ratio();
 		sum += u;
 		sqsum += u*u;
 		maxu = std::max(maxu, u);
@@ -162,10 +162,10 @@ uint32_t ReorgStrategy::get_least_used_node(
 		const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
 
 	uint32_t min_id = 0;
-	double min_usage = DoubleInfinity;
+	double min_usage = std::numeric_limits<double>::infinity();
 
 	for ( auto &kv : nodes ) {
-		double usage = cache.get_capacity_usage(kv.second->get_capacity());
+		double usage = kv.second->get_usage(cache.type).get_ratio();
 		if (  usage < min_usage ) {
 			min_id = kv.first;
 			min_usage = usage;
@@ -184,8 +184,9 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 	double bytes_available = 0;
 
 	for ( auto &p : result ) {
-		bytes_used      += cache.get_used_capacity( p.second.node->get_capacity() );
-		bytes_available += cache.get_total_capacity( p.second.node->get_capacity() );
+		auto &u = p.second.node->get_usage(cache.type);
+		bytes_used      += u.capacity_used;
+		bytes_available += u.capacity_total;
 	}
 	double target_cap = std::min( bytes_used / bytes_available, max_target_usage );
 	auto all_entries = cache.get_all();
@@ -198,14 +199,14 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 		while ( bytes_used / bytes_available >= max_target_usage ) {
 			auto &e = all_entries.back();
 			bytes_used -= e->size;
-			result.at(e->node_id).add_removal( TypedNodeCacheKey(cache.get_reorg_type(),e->semantic_id,e->entry_id) );
+			result.at(e->get_node_id()).add_removal( TypedNodeCacheKey(cache.type,e->semantic_id,e->get_entry_id()) );
 			all_entries.pop_back();
 		}
 	}
 
 	std::map<uint32_t, ReorgNode> distrib;
 	for ( auto &p : result ) {
-		size_t target_size = target_cap * cache.get_total_capacity( p.second.node->get_capacity() );
+		size_t target_size = target_cap * p.second.node->get_usage(cache.type).capacity_total;
 		distrib.emplace( p.first, ReorgNode(p.first, target_size));
 	}
 
@@ -216,13 +217,13 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 	for ( auto &p : distrib ) {
 		auto &tmp_res = result.at(p.first);
 		for ( auto &e : p.second.entries ) {
-			if ( e->node_id != p.first ) {
-				auto &remote_node = result.at(e->node_id).node;
+			if ( e->get_node_id() != p.first ) {
+				auto &remote_node = result.at(e->get_node_id()).node;
 				tmp_res.add_move( ReorgMoveItem(
-					cache.get_reorg_type(),
+					cache.type,
 					e->semantic_id,
-					e->entry_id,
 					remote_node->id,
+					e->get_entry_id(),
 					remote_node->host,
 					remote_node->port
 				) );
@@ -233,23 +234,15 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 
 bool ReorgStrategy::nodes_changed(
 		const std::map<uint32_t, std::shared_ptr<Node> >& nodes) const {
-	bool res = false;
 	std::set<uint32_t> new_nodes;
-	for ( auto &p : nodes ) {
+	for ( auto &p : nodes )
 		new_nodes.insert( p.first );
-		// We have a new node
-		if ( last_nodes.count(p.first) != 1 )
-			res = true;
+
+	if ( last_nodes != new_nodes ) {
+		std::swap(last_nodes, new_nodes);
+		return true;
 	}
-	for ( auto &id : last_nodes ) {
-		// Node is gone
-		if ( nodes.count(id) != 1 ) {
-			res = false;
-			break;
-		}
-	}
-	std::swap(last_nodes, new_nodes);
-	return res;
+	return false;
 }
 
 
@@ -268,7 +261,7 @@ CapacityReorgStrategy::CapacityReorgStrategy(const IndexCache& cache,
 
 bool CapacityReorgStrategy::node_sort(
 		const std::shared_ptr<const IndexCacheEntry>& e1, const std::shared_ptr<const IndexCacheEntry>& e2) {
-	return e1->node_id < e2->node_id;
+	return e1->get_node_id() < e2->get_node_id();
 }
 
 uint32_t CapacityReorgStrategy::get_node_for_job(const BaseRequest &request,
@@ -292,8 +285,8 @@ void CapacityReorgStrategy::distribute(std::map<uint32_t, ReorgNode>& result,
 	// Try to keep them on the same node
 	while ( !all_entries.empty() ) {
 		auto &e = all_entries.back();
-		if ( e->node_id != current_nid ) {
-			current_nid = e->node_id;
+		if ( e->get_node_id() != current_nid ) {
+			current_nid = e->get_node_id();
 			current_node = &result.at(current_nid);
 		}
 		if ( current_node->fits(e) )
@@ -637,7 +630,5 @@ void GeographicReorgStrategy::distribute(std::map<uint32_t, ReorgNode>& result,
 	}
 	// Add last bound
 	z_bounds.push_back( std::make_pair(MAX_Z,nodes.back().get().id) );
-
-
 }
 

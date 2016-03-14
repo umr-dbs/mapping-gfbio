@@ -6,113 +6,131 @@
  */
 
 #include "cache/priv/connection.h"
+#include "cache/priv/shared.h"
 #include "cache/index/indexserver.h"
+
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
+#include "datatypes/plot.h"
+
 #include "util/exceptions.h"
 #include "util/log.h"
 #include "util/make_unique.h"
 #include "util/concat.h"
 
+
 #include <fcntl.h>
+#include <netdb.h>
+
+
+///////////////////////////////////////////////////////////
+//
+// NewNBConnection
+//
+///////////////////////////////////////////////////////////
+
+NewNBConnection::NewNBConnection( struct sockaddr_storage *remote_addr, int fd ) :
+	stream( make_unique<BinaryFDStream>(fd,fd,true)), buffer( make_unique<BinaryReadBuffer>()  ) {
+
+	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+
+	getnameinfo ((struct sockaddr *) remote_addr, sizeof(struct sockaddr_storage),
+				 hbuf, sizeof(hbuf),
+				 sbuf, sizeof(sbuf),
+				 NI_NUMERICHOST | NI_NUMERICSERV);
+
+	hostname.assign(hbuf);
+	stream->makeNonBlocking();
+}
+
+int NewNBConnection::get_read_fd() const {
+	if ( stream )
+		return stream->getReadFD();
+	throw IllegalStateException("Stream released already");
+}
+
+bool NewNBConnection::input() {
+	if ( stream ) {
+		stream->readNB(*buffer);
+		return buffer->isRead();
+	}
+	throw IllegalStateException("Stream released already");
+}
+
+BinaryReadBuffer& NewNBConnection::get_data() {
+	if ( buffer->isRead() )
+		return *buffer;
+	else
+		throw IllegalStateException("Buffer not fully read");
+}
+
+std::unique_ptr<BinaryFDStream> NewNBConnection::release_stream() {
+	auto res = std::move(stream);
+	stream.reset();
+	return res;
+}
+
+///////////////////////////////////////////////////////////
+//
+// CacheAll
+//
+///////////////////////////////////////////////////////////
 
 template<typename StateType>
 BaseConnection<StateType>::BaseConnection(StateType state, std::unique_ptr<BinaryFDStream> socket) :
-	id(next_id++), state(state), writing(false), reading(false), faulty(false), stream(*socket), socket(std::move(socket)) {
-	int flags = fcntl(get_read_fd(), F_GETFL, 0);
-	fcntl(get_read_fd(), F_SETFL, flags | O_NONBLOCK);
-
-	flags = fcntl(get_write_fd(), F_GETFL, 0);
-	fcntl(get_write_fd(), F_SETFL, flags | O_NONBLOCK);
-}
-
-template<typename StateType>
-BaseConnection<StateType>::~BaseConnection() {
+	id(next_id++), state(state), faulty(false), socket(std::move(socket)), reader(new BinaryReadBuffer() ) {
 }
 
 template<typename StateType>
 bool BaseConnection<StateType>::input() {
 
-	// If we are processing a non-blocking read
-	if (reading) {
-		reader->read(socket->getReadFD());
-		if (reader->is_finished()) {
-			Log::trace("Finished reading on connection: %d, read %d bytes", id, reader->get_total_read());
-			reading = false;
-			read_finished(*reader);
-			reader.reset();
+	try {
+		bool eof = socket->readNB(*reader, true );
+		if ( eof ) {
+			Log::debug("Connection closed %d", id);
+			faulty = true;
+		}
+		else if ( reader->isRead() ) {
+			process_command( reader->read<uint8_t>(), *reader );
+			reader.reset( new BinaryReadBuffer() );
 			return true;
 		}
-		else if (reader->has_error()) {
-			Log::warn("An error occured during read on connection: %d", id);
-			reading = false;
-			faulty = true;
-			reader.reset();
-			return true;
-		}
-		else
-			Log::trace("Read-buffer full. Continuing on next call on connection: %d", id);
-	}
-	// If we are expecting commands
-	else {
-		uint8_t cmd;
-		ssize_t resp = ::read(socket->getReadFD(),&cmd,sizeof(cmd));
-		if ( resp == 0 ) {
-			Log::debug("Connection closed %d.", id);
-			faulty = true;
-		}
-		else if ( resp == -1 && errno != EAGAIN && errno != EWOULDBLOCK ) {
-			Log::error("Unexpected error on connection %d, setting faulty. Reason: %s", id, strerror(errno) );
-			faulty = true;
-		}
-		else if ( resp > 0 ) {
-			process_command(cmd);
-			return !reading;
-		}
+	} catch ( const NetworkException &ne ) {
+		Log::warn("An error occured during read on connection %d: %s", id, ne.what());
+		faulty = true;
+		reader.reset(new BinaryReadBuffer());
 	}
 	return false;
 }
 
 template<typename StateType>
 void BaseConnection<StateType>::output() {
-	if (writing) {
-		writer->write(socket->getWriteFD());
-		if (writer->is_finished()) {
-			writing = false;
-			write_finished();
-			writer.reset(nullptr);
-		}
-		else if (writer->has_error()) {
+	if ( writer ) {
+		try {
+			socket->writeNB(*writer);
+			if ( writer->isFinished() ) {
+				write_finished();
+				writer.reset();
+			}
+		} catch ( const NetworkException &ne ) {
 			Log::warn("An error occured during write on connection: %d", id);
-			writing = false;
 			faulty = true;
-			writer.reset(nullptr);
+			writer.reset();
 		}
-		else
-			Log::trace("Write-buffer full. Continuing on next call.");
 	}
 	else
 		throw IllegalStateException("Cannot trigger write while not in writing state.");
 }
 
 template<typename StateType>
-void BaseConnection<StateType>::begin_write(std::unique_ptr<NBWriter> writer) {
-	if (!writing && !reading) {
-		this->writer = std::move(writer);
-		this->writing = true;
-//		output();
+void BaseConnection<StateType>::begin_write(std::unique_ptr<BinaryWriteBuffer> buffer) {
+	if ( reader->isEmpty() && !writer ) {
+		this->writer = std::move(buffer);
 	}
 	else
-		throw IllegalStateException("Cannot start nb-write. Another read or write action is in progress.");
-}
-
-template<typename StateType>
-void BaseConnection<StateType>::begin_read(std::unique_ptr<NBReader> reader) {
-	if (!writing && !reading) {
-		this->reader = std::move(reader);
-		this->reading = true;
-//		input();
-	}
-	else
-		throw IllegalStateException("Cannot start nb-read. Another read or write action is in progress.");
+		throw IllegalStateException("Cannot start write. Another read or write action is in progress.");
 }
 
 template<typename StateType>
@@ -126,13 +144,8 @@ int BaseConnection<StateType>::get_write_fd() const {
 }
 
 template<typename StateType>
-bool BaseConnection<StateType>::is_reading() const {
-	return reading;
-}
-
-template<typename StateType>
 bool BaseConnection<StateType>::is_writing() const {
-	return writing;
+	return writer != nullptr;
 }
 
 template<typename StateType>
@@ -182,36 +195,23 @@ ClientConnection::ClientConnection(std::unique_ptr<BinaryFDStream> socket) :
 	BaseConnection(ClientState::IDLE, std::move(socket)) {
 }
 
-ClientConnection::~ClientConnection() {
-}
-
-void ClientConnection::process_command(uint8_t cmd) {
+void ClientConnection::process_command(uint8_t cmd, BinaryReadBuffer& payload) {
 	ensure_state(ClientState::IDLE);
 	switch (cmd) {
 		case CMD_GET:
-			set_state(ClientState::READING_REQUEST);
-			begin_read(make_unique<NBBaseRequestReader>());
+			request.reset(new BaseRequest(payload));
+			set_state(ClientState::AWAIT_RESPONSE);
 			break;
 		default:
 			throw NetworkException(concat("Unknown command on client connection: ", cmd));
 	}
 }
 
-void ClientConnection::read_finished(NBReader& reader) {
-	switch (get_state()) {
-		case ClientState::READING_REQUEST:
-			request.reset(new BaseRequest(*reader.get_stream()));
-			set_state(ClientState::AWAIT_RESPONSE);
-			break;
-		default:
-			throw IllegalStateException("Unexpected end of reading in ClientConnection");
-	}
-}
-
 void ClientConnection::write_finished() {
 	switch (get_state()) {
 		case ClientState::WRITING_RESPONSE:
-			reset();
+			request.reset();
+			set_state(ClientState::IDLE);
 			break;
 		default:
 			throw IllegalStateException("Unexpected end of writing in ClientConnection");
@@ -221,25 +221,24 @@ void ClientConnection::write_finished() {
 void ClientConnection::send_response(const DeliveryResponse& response) {
 	ensure_state(ClientState::AWAIT_RESPONSE);
 	set_state(ClientState::WRITING_RESPONSE);
-	begin_write(
-		make_unique<NBMessageWriter<DeliveryResponse>>(RESP_OK, response)
-	);
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_OK);
+	buffer->write(response);
+	begin_write(std::move(buffer));
 }
 
 void ClientConnection::send_error(const std::string& message) {
 	ensure_state(ClientState::AWAIT_RESPONSE);
 	set_state(ClientState::WRITING_RESPONSE);
-	begin_write(make_unique<NBMessageWriter<std::string>>(RESP_ERROR, message));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_ERROR);
+	buffer->write(message);
+	begin_write(std::move(buffer));
 }
 
 const BaseRequest& ClientConnection::get_request() const {
 	ensure_state(ClientState::AWAIT_RESPONSE);
 	return *request;
-}
-
-void ClientConnection::reset() {
-	request.reset();
-	set_state(ClientState::IDLE);
 }
 
 const uint32_t ClientConnection::MAGIC_NUMBER;
@@ -253,72 +252,43 @@ const uint8_t ClientConnection::RESP_ERROR;
 //
 /////////////////////////////////////////////////
 
-WorkerConnection::WorkerConnection(std::unique_ptr<BinaryFDStream> socket, const std::shared_ptr<Node> &node) :
-	BaseConnection(WorkerState::IDLE, std::move(socket)), node(node) {
+WorkerConnection::WorkerConnection(std::unique_ptr<BinaryFDStream> socket, uint32_t node_id) :
+	BaseConnection(WorkerState::IDLE, std::move(socket)), node_id(node_id), delivery_id(0) {
 }
 
-WorkerConnection::~WorkerConnection() {
-}
-
-void WorkerConnection::process_command(uint8_t cmd) {
+void WorkerConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) {
 	ensure_state(WorkerState::PROCESSING, WorkerState::WAITING_DELIVERY);
 
 	switch (cmd) {
 		case RESP_RESULT_READY: {
-			// Read delivery id
+			// Send back qty!
 			set_state(WorkerState::DONE);
 			break;
 		}
 		case RESP_DELIVERY_READY: {
-			set_state(WorkerState::READING_DELIVERY_ID);
-			begin_read( make_unique<NBFixedSizeReader>( sizeof(uint64_t) ) );
+			payload.read(&delivery_id);
+			set_state(WorkerState::DELIVERY_READY);
 			break;
 		}
 		case CMD_QUERY_CACHE: {
-			set_state(WorkerState::READING_QUERY);
-			begin_read( make_unique<NBBaseRequestReader>() );
+			query.reset( new BaseRequest(payload) );
+			set_state(WorkerState::QUERY_REQUESTED);
 			break;
 		}
 		case RESP_NEW_CACHE_ENTRY: {
-			set_state(WorkerState::READING_ENTRY);
-			begin_read( make_unique<NBNodeCacheRefReader>() );
+			new_entry.reset(new MetaCacheEntry(payload));
+			set_state(WorkerState::NEW_ENTRY);
 			break;
 		}
 		case RESP_ERROR: {
-			set_state(WorkerState::READING_ERROR);
-			begin_read( make_unique<NBStringReader>() );
+			error_msg = payload.read<std::string>();
+			set_state(WorkerState::ERROR);
 			break;
 		}
 		default: {
 			Log::error("Worker returned unknown code: %d. Terminating worker-connection.", cmd);
 			throw NetworkException(concat("Unknown response from worker: ", cmd));
 		}
-	}
-}
-
-void WorkerConnection::read_finished(NBReader& reader) {
-	switch (get_state()) {
-		case WorkerState::READING_DELIVERY_ID: {
-			uint64_t delivery_id;
-			reader.get_stream()->read(&delivery_id);
-			result.reset(new DeliveryResponse(node->host, node->port, delivery_id));
-			set_state(WorkerState::DELIVERY_READY);
-			break;
-		}
-		case WorkerState::READING_QUERY:
-			query.reset(new BaseRequest(*reader.get_stream()));
-			set_state(WorkerState::QUERY_REQUESTED);
-			break;
-		case WorkerState::READING_ENTRY:
-			new_entry.reset(new NodeCacheRef(*reader.get_stream()));
-			set_state(WorkerState::NEW_ENTRY);
-			break;
-		case WorkerState::READING_ERROR:
-			reader.get_stream()->read(&error_msg);
-			set_state(WorkerState::ERROR);
-			break;
-		default:
-			throw IllegalStateException("Unexpected end of reading in WorkerConnection");
 	}
 }
 
@@ -341,8 +311,10 @@ void WorkerConnection::write_finished() {
 void WorkerConnection::process_request(uint8_t command, const BaseRequest& request) {
 	ensure_state(WorkerState::IDLE);
 	set_state(WorkerState::SENDING_REQUEST);
-	begin_write(
-		make_unique<NBMessageWriter<BaseRequest>>(command, request, true));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(command);
+	buffer->write(request);
+	begin_write(std::move(buffer));
 }
 
 void WorkerConnection::entry_cached() {
@@ -354,28 +326,36 @@ void WorkerConnection::entry_cached() {
 void WorkerConnection::send_hit(const CacheRef& cr) {
 	ensure_state(WorkerState::QUERY_REQUESTED);
 	set_state(WorkerState::SENDING_QUERY_RESPONSE);
-	begin_write(
-		make_unique<NBMessageWriter<CacheRef>>(RESP_QUERY_HIT, cr));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_QUERY_HIT);
+	buffer->write(cr);
+	begin_write(std::move(buffer));
 }
 
 void WorkerConnection::send_partial_hit(const PuzzleRequest& pr) {
 	ensure_state(WorkerState::QUERY_REQUESTED);
 	set_state(WorkerState::SENDING_QUERY_RESPONSE);
-	begin_write(
-		make_unique<NBMessageWriter<PuzzleRequest>>(RESP_QUERY_PARTIAL, pr));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_QUERY_PARTIAL);
+	buffer->write(pr);
+	begin_write(std::move(buffer));
 }
 
 void WorkerConnection::send_miss() {
 	ensure_state(WorkerState::QUERY_REQUESTED);
 	set_state(WorkerState::SENDING_QUERY_RESPONSE);
-	begin_write(make_unique<NBSimpleWriter<uint8_t>>(RESP_QUERY_MISS));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_QUERY_MISS);
+	begin_write(std::move(buffer));
 }
 
 void WorkerConnection::send_delivery_qty(uint32_t qty) {
 	ensure_state(WorkerState::DONE);
 	set_state(WorkerState::SENDING_DELIVERY_QTY);
-	begin_write(
-		make_unique<NBMessageWriter<uint32_t>>(RESP_DELIVERY_QTY, qty));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_DELIVERY_QTY);
+	buffer->write(qty);
+	begin_write(std::move(buffer));
 }
 
 void WorkerConnection::release() {
@@ -387,7 +367,7 @@ void WorkerConnection::release() {
 // GETTER
 //
 
-const NodeCacheRef& WorkerConnection::get_new_entry() const {
+const MetaCacheEntry& WorkerConnection::get_new_entry() const {
 	ensure_state(WorkerState::NEW_ENTRY);
 	return *new_entry;
 }
@@ -397,9 +377,9 @@ const BaseRequest& WorkerConnection::get_query() const {
 	return *query;
 }
 
-const DeliveryResponse& WorkerConnection::get_result() const {
+uint64_t WorkerConnection::get_delivery_id() const {
 	ensure_state(WorkerState::DELIVERY_READY);
-	return *result;
+	return delivery_id;
 }
 
 const std::string& WorkerConnection::get_error_message() const {
@@ -409,7 +389,7 @@ const std::string& WorkerConnection::get_error_message() const {
 
 void WorkerConnection::reset() {
 	error_msg = "";
-	result.reset();
+	delivery_id = 0;
 	new_entry.reset();
 	query.reset();
 	set_state(WorkerState::IDLE);
@@ -435,64 +415,44 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 //
 /////////////////////////////////////////////////
 
-ControlConnection::ControlConnection(std::unique_ptr<BinaryFDStream> socket, const std::string &hostname) :
-	BaseConnection(ControlState::READING_HANDSHAKE, std::move(socket)), hostname(hostname) {
-	begin_read( make_unique<NBNodeHandshakeReader>() );
+ControlConnection::ControlConnection(std::unique_ptr<BinaryFDStream> socket, uint32_t node_id, const std::string &hostname) :
+	BaseConnection(ControlState::SENDING_HELLO, std::move(socket)), node_id(node_id) {
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(CMD_HELLO);
+	buffer->write(node_id);
+	buffer->write(hostname);
+	begin_write(std::move(buffer));
 }
 
-ControlConnection::~ControlConnection() {
-}
-
-void ControlConnection::process_command(uint8_t cmd) {
-	ensure_state(ControlState::IDLE,ControlState::REORGANIZING,ControlState::STATS_REQUESTED);
-
+void ControlConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) {
 	switch (cmd) {
 		case RESP_REORG_ITEM_MOVED: {
-			set_state(ControlState::READING_MOVE_RESULT);
-			begin_read(make_unique<NBReorgMoveResultReader>());
+			ensure_state(ControlState::REORGANIZING);
+			move_result.reset(new ReorgMoveResult(payload));
+			set_state(ControlState::MOVE_RESULT_READ);
 			break;
 		}
 		case RESP_REORG_REMOVE_REQUEST: {
-			set_state(ControlState::READING_REMOVE_REQUEST);
-			begin_read(make_unique<NBTypedNodeCacheKeyReader>());
+			ensure_state(ControlState::REORGANIZING);
+			remove_request.reset(new TypedNodeCacheKey(payload));
+			set_state(ControlState::REMOVE_REQUEST_READ);
 			break;
 		}
 		case RESP_REORG_DONE: {
+			ensure_state(ControlState::REORGANIZING);
 			set_state(ControlState::REORG_FINISHED);
 			break;
 		}
 		case RESP_STATS: {
-			set_state(ControlState::READING_STATS);
-			begin_read(make_unique<NBNodeStatsReader>());
+			ensure_state(ControlState::STATS_REQUESTED);
+			stats.reset(new NodeStats(payload));
+			set_state(ControlState::STATS_RECEIVED);
 			break;
 		}
 		default: {
 			throw NetworkException(
-				concat("Received illegal command on control-connection for node: ", node->id));
+				concat("Received illegal command on control-connection for node: ", node_id));
 		}
-	}
-}
-
-void ControlConnection::read_finished(NBReader& reader) {
-	switch (get_state()) {
-		case ControlState::READING_MOVE_RESULT:
-			move_result.reset(new ReorgMoveResult(*reader.get_stream()));
-			set_state(ControlState::MOVE_RESULT_READ);
-			break;
-		case ControlState::READING_REMOVE_REQUEST:
-			remove_request.reset(new TypedNodeCacheKey(*reader.get_stream()));
-			set_state(ControlState::REMOVE_REQUEST_READ);
-			break;
-		case ControlState::READING_STATS:
-			stats.reset(new NodeStats(*reader.get_stream()));
-			set_state(ControlState::STATS_RECEIVED);
-			break;
-		case ControlState::READING_HANDSHAKE:
-			handshake.reset( new NodeHandshake(*reader.get_stream()));
-			set_state(ControlState::HANDSHAKE_READ);
-			break;
-		default:
-			throw IllegalStateException("Unexpected end of reading in ControlConnection");
 	}
 }
 
@@ -518,38 +478,37 @@ void ControlConnection::write_finished() {
 
 // ACTIONS
 
-void ControlConnection::confirm_handshake(std::shared_ptr<Node> node) {
-	ensure_state(ControlState::HANDSHAKE_READ );
-	this->node = node;
-	set_state(ControlState::SENDING_HELLO);
-	begin_write(
-		make_unique<NBHelloWriter>( node->id, hostname )
-	);
-}
-
 void ControlConnection::send_reorg(const ReorgDescription& desc) {
 	ensure_state(ControlState::IDLE);
 	set_state(ControlState::SENDING_REORG);
-	begin_write(
-		make_unique<NBMessageWriter<ReorgDescription>>(CMD_REORG, desc));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(CMD_REORG);
+	buffer->write(desc);
+	begin_write(std::move(buffer));
 }
 
 void ControlConnection::confirm_move() {
 	ensure_state(ControlState::MOVE_RESULT_READ);
 	set_state(ControlState::SENDING_MOVE_CONFIRM);
-	begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_MOVE_OK));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(CMD_MOVE_OK);
+	begin_write(std::move(buffer));
 }
 
 void ControlConnection::confirm_remove() {
 	ensure_state(ControlState::REMOVE_REQUEST_READ);
 	set_state(ControlState::SENDING_REMOVE_CONFIRM);
-	begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_REMOVE_OK));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(CMD_REMOVE_OK);
+	begin_write(std::move(buffer));
 }
 
 void ControlConnection::send_get_stats() {
 	ensure_state(ControlState::IDLE);
 	set_state(ControlState::SENDING_STATS_REQUEST);
-	begin_write(make_unique<NBSimpleWriter<uint8_t>>(CMD_GET_STATS));
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(CMD_GET_STATS);
+	begin_write(std::move(buffer));
 }
 
 void ControlConnection::release() {
@@ -560,11 +519,6 @@ void ControlConnection::release() {
 //
 // GETTER
 //
-
-const NodeHandshake& ControlConnection::get_handshake() const {
-	ensure_state(ControlState::HANDSHAKE_READ );
-	return *handshake;
-}
 
 const ReorgMoveResult& ControlConnection::get_move_result() const {
 	ensure_state(ControlState::MOVE_RESULT_READ);
@@ -585,6 +539,7 @@ const NodeStats& ControlConnection::get_stats() const {
 
 void ControlConnection::reset() {
 	move_result.reset();
+	remove_request.reset();
 	stats.reset();
 	set_state(ControlState::IDLE);
 }
@@ -610,26 +565,23 @@ DeliveryConnection::DeliveryConnection(std::unique_ptr<BinaryFDStream> socket) :
 	BaseConnection(DeliveryState::IDLE, std::move(socket)), delivery_id(0), cache_key(CacheType::UNKNOWN,"", 0) {
 }
 
-DeliveryConnection::~DeliveryConnection() {
-}
-
-void DeliveryConnection::process_command(uint8_t cmd) {
+void DeliveryConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) {
 	ensure_state( DeliveryState::IDLE, DeliveryState::AWAITING_MOVE_CONFIRM );
 
 	switch (cmd) {
 		case CMD_GET: {
-			set_state(DeliveryState::READING_DELIVERY_REQUEST);
-			begin_read(make_unique<NBFixedSizeReader>(sizeof(delivery_id)));
+			delivery_id = payload.read<uint64_t>();
+			set_state(DeliveryState::DELIVERY_REQUEST_READ);
 			break;
 		}
 		case CMD_GET_CACHED_ITEM: {
-			set_state(DeliveryState::READING_CACHE_REQUEST);
-			begin_read(make_unique<NBTypedNodeCacheKeyReader>());
+			cache_key = TypedNodeCacheKey(payload);
+			set_state(DeliveryState::CACHE_REQUEST_READ);
 			break;
 		}
 		case CMD_MOVE_ITEM: {
-			set_state(DeliveryState::READING_MOVE_REQUEST);
-			begin_read(make_unique<NBTypedNodeCacheKeyReader>());
+			cache_key = TypedNodeCacheKey(payload);
+			set_state(DeliveryState::MOVE_REQUEST_READ);
 			break;
 		}
 		case CMD_MOVE_DONE: {
@@ -639,28 +591,6 @@ void DeliveryConnection::process_command(uint8_t cmd) {
 		default:
 			// Unknown command
 			throw NetworkException(concat("Unknown command on delivery connection: ", cmd));
-	}
-}
-
-void DeliveryConnection::read_finished(NBReader& reader) {
-	switch (get_state()) {
-		case DeliveryState::READING_DELIVERY_REQUEST: {
-			reader.get_stream()->read(&delivery_id);
-			set_state(DeliveryState::DELIVERY_REQUEST_READ);
-			break;
-		}
-		case DeliveryState::READING_CACHE_REQUEST: {
-			cache_key = TypedNodeCacheKey(*reader.get_stream());
-			set_state(DeliveryState::CACHE_REQUEST_READ);
-			break;
-		}
-		case DeliveryState::READING_MOVE_REQUEST: {
-			cache_key = TypedNodeCacheKey(*reader.get_stream());
-			set_state(DeliveryState::MOVE_REQUEST_READ);
-			break;
-		}
-		default:
-			throw IllegalStateException("Unexpected end of reading in DeliveryConnection");
 	}
 }
 
@@ -701,26 +631,26 @@ template<typename T>
 void DeliveryConnection::send(std::shared_ptr<const T> item) {
 	ensure_state(DeliveryState::CACHE_REQUEST_READ, DeliveryState::DELIVERY_REQUEST_READ);
 	set_state(DeliveryState::SENDING);
-	begin_write (
-		make_unique<NBMultiWriter>(
-				make_unique<NBSimpleWriter<uint8_t>>(RESP_OK),
-				get_data_writer(item)
-		)
-	);
+
+	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
+	buffer->write(RESP_OK);
+	buffer->enableLinking();
+	write_data(*buffer,item);
+	begin_write(std::move(buffer));
 }
 
 template<typename T>
-void DeliveryConnection::send_cache_entry(const MoveInfo& info,
+void DeliveryConnection::send_cache_entry(const FetchInfo& info,
 		std::shared_ptr<const T> item) {
 	ensure_state(DeliveryState::CACHE_REQUEST_READ);
 	set_state(DeliveryState::SENDING_CACHE_ENTRY);
-	begin_write(
-		make_unique<NBMultiWriter>(
-			make_unique<NBSimpleWriter<uint8_t>>(RESP_OK),
-			make_unique<NBSimpleWriter<MoveInfo>>(info),
-			get_data_writer(item)
-		)
-	);
+
+	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
+	buffer->write(RESP_OK);
+	buffer->write(info);
+	buffer->enableLinking();
+	write_data(*buffer,item);
+	begin_write(std::move(buffer));
 }
 
 template<typename T>
@@ -729,67 +659,47 @@ void DeliveryConnection::send_move(const CacheEntry& info,
 
 	ensure_state(DeliveryState::MOVE_REQUEST_READ);
 	set_state(DeliveryState::SENDING_MOVE);
-	begin_write(
-		make_unique<NBMultiWriter>(
-			make_unique<NBSimpleWriter<uint8_t>>(RESP_OK),
-			make_unique<NBSimpleWriter<CacheEntry>>(info),
-			get_data_writer(item)
-		)
-	);
+	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
+	buffer->write(RESP_OK);
+	buffer->write(info);
+	buffer->enableLinking();
+	write_data(*buffer,item);
+	begin_write(std::move(buffer));
 }
 
 
 void DeliveryConnection::send_error(const std::string& msg) {
 	ensure_state( DeliveryState::CACHE_REQUEST_READ,
 				  DeliveryState::DELIVERY_REQUEST_READ,
-				  DeliveryState::MOVE_REQUEST_READ,
-				  DeliveryState::SENDING,
-				  DeliveryState::SENDING_MOVE);
+				  DeliveryState::MOVE_REQUEST_READ);
 
 	set_state(DeliveryState::SENDING_ERROR);
-	begin_write(make_unique<NBMessageWriter<std::string>>(RESP_ERROR, msg));
+
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_ERROR);
+	buffer->write(msg);
+	begin_write(std::move(buffer));
 }
 
-void DeliveryConnection::release() {
+void DeliveryConnection::finish_move() {
 	ensure_state(DeliveryState::MOVE_DONE);
 	set_state( DeliveryState::IDLE );
 }
 
 template<typename T>
-std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
-		std::shared_ptr<const T> item) {
-	throw ArgumentException("No writer present for given type");
+void DeliveryConnection::write_data(BinaryWriteBuffer& buffer,
+		std::shared_ptr<const T> &item) {
+	buffer.write( *item );
 }
 
+// Hack for GenericRaster since toStream is not const
 template<>
-std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
-		std::shared_ptr<const PointCollection> item) {
-	return make_unique<NBPointsWriter>( item );
+void DeliveryConnection::write_data(BinaryWriteBuffer& buffer,
+		std::shared_ptr<const GenericRaster> &item) {
+	auto p = const_cast<GenericRaster*>(item.get());
+	buffer.write( *p );
 }
 
-template<>
-std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
-		std::shared_ptr<const LineCollection> item) {
-	return make_unique<NBLinesWriter>( item );
-}
-
-template<>
-std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
-		std::shared_ptr<const PolygonCollection> item) {
-	return make_unique<NBPolygonsWriter>( item );
-}
-
-template<>
-std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
-		std::shared_ptr<const GenericPlot> item) {
-	return make_unique<NBPlotWriter>( item );
-}
-
-template<>
-std::unique_ptr<NBWriter> DeliveryConnection::get_data_writer(
-		std::shared_ptr<const GenericRaster> item) {
-	return make_unique<NBRasterWriter>( item );
-}
 
 const uint32_t DeliveryConnection::MAGIC_NUMBER;
 const uint8_t DeliveryConnection::CMD_GET;
@@ -811,15 +721,20 @@ template void DeliveryConnection::send(std::shared_ptr<const LineCollection>);
 template void DeliveryConnection::send(std::shared_ptr<const PolygonCollection>);
 template void DeliveryConnection::send(std::shared_ptr<const GenericPlot>);
 
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const GenericRaster> );
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const PointCollection> );
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const LineCollection> );
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const PolygonCollection> );
-template void DeliveryConnection::send_cache_entry( const MoveInfo&, std::shared_ptr<const GenericPlot> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const GenericRaster> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const PointCollection> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const LineCollection> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const PolygonCollection> );
+template void DeliveryConnection::send_cache_entry( const FetchInfo&, std::shared_ptr<const GenericPlot> );
 
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const GenericRaster> );
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const PointCollection> );
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const LineCollection> );
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const PolygonCollection> );
 template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<const GenericPlot> );
+
+template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const PointCollection>& );
+template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const LineCollection>& );
+template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const PolygonCollection>& );
+template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const GenericPlot>& );
 

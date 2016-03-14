@@ -8,7 +8,9 @@
 #ifndef EXPERIMENTS_CHEAT_H_
 #define EXPERIMENTS_CHEAT_H_
 
+#include "datatypes/simplefeaturecollection.h"
 #include "util/timemodification.h"
+#include "util/gdal.h"
 
 class ProjectionOperator : public GenericOperator {
 	friend class QuerySpec;

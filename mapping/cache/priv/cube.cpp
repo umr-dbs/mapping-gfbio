@@ -10,7 +10,12 @@
 #include "util/concat.h"
 #include <sstream>
 #include <limits>
-#include <cstring>
+
+///////////////////////////////////////////////////////////
+//
+// INTERVAL
+//
+///////////////////////////////////////////////////////////
 
 Interval::Interval() : a(0), b(0) {
 }
@@ -18,9 +23,7 @@ Interval::Interval() : a(0), b(0) {
 Interval::Interval(double a, double b) : a(a), b(b) {
 }
 
-Interval::Interval(BinaryStream& stream) {
-	stream.read(&a);
-	stream.read(&b);
+Interval::Interval(BinaryReadBuffer& buffer) : a(buffer.read<double>()), b(buffer.read<double>()) {
 }
 
 bool Interval::empty() const {
@@ -28,15 +31,17 @@ bool Interval::empty() const {
 }
 
 bool Interval::intersects(const Interval& other) const {
-	return !(a > other.b || b < other.a);
+	return a <= other.b && b >= other.a;
 }
 
 bool Interval::contains(const Interval& other) const {
-	return a - std::numeric_limits<double>::epsilon() <= other.a && b + std::numeric_limits<double>::epsilon() >= other.b;
+	return a - std::numeric_limits<double>::epsilon() <= other.a &&
+		   b + std::numeric_limits<double>::epsilon() >= other.b;
 }
 
 bool Interval::contains(double value) const {
-	return a - std::numeric_limits<double>::epsilon() <= value && b + std::numeric_limits<double>::epsilon() >= value;
+	return a - std::numeric_limits<double>::epsilon() <= value &&
+		   b + std::numeric_limits<double>::epsilon() >= value;
 }
 
 Interval Interval::combine(const Interval& other) const {
@@ -54,9 +59,9 @@ double Interval::distance() const {
 	return b-a;
 }
 
-void Interval::toStream(BinaryStream& stream) const {
-	stream.write(a);
-	stream.write(b);
+void Interval::toStream(BinaryWriteBuffer& buffer) const {
+	buffer.write(a);
+	buffer.write(b);
 }
 
 bool Interval::operator ==(const Interval& o) const {
@@ -65,16 +70,18 @@ bool Interval::operator ==(const Interval& o) const {
 }
 
 bool Interval::operator !=(const Interval& o) const {
-	return !(*this == o);
+	return !this->operator ==(o);
 }
 
 std::string Interval::to_string() const {
 	return concat("[",a,", ",b,"]");
 }
 
+///////////////////////////////////////////////////////////
 //
-// Point
+// POINT
 //
+///////////////////////////////////////////////////////////
 
 template<int DIM>
 Point<DIM>::Point() {
@@ -122,9 +129,11 @@ std::string Point<DIM>::to_string() const {
 	return ss.str();
 }
 
+///////////////////////////////////////////////////////////
 //
-// Cube
+// CUBE
 //
+///////////////////////////////////////////////////////////
 
 template<int DIM>
 Cube<DIM>::Cube() {
@@ -133,9 +142,9 @@ Cube<DIM>::Cube() {
 
 
 template<int DIM>
-Cube<DIM>::Cube(BinaryStream& stream) {
+Cube<DIM>::Cube(BinaryReadBuffer& buffer) {
 	for ( int i = 0; i < DIM; i++ ) {
-		dims[i] = Interval( stream );
+		dims[i] = Interval( buffer );
 	}
 }
 
@@ -275,9 +284,9 @@ Point<DIM> Cube<DIM>::get_centre_of_mass() const {
 }
 
 template<int DIM>
-void Cube<DIM>::toStream(BinaryStream& stream) const {
+void Cube<DIM>::toStream(BinaryWriteBuffer& buffer) const {
 	for ( int i = 0; i < DIM; i++ ) {
-		dims[i].toStream(stream);
+		dims[i].toStream(buffer);
 	}
 }
 

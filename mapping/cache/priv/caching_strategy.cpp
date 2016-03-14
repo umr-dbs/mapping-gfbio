@@ -7,10 +7,20 @@
 
 #include "cache/priv/caching_strategy.h"
 #include "cache/node/node_cache.h"
+
+#include "datatypes/raster.h"
+
 #include "util/exceptions.h"
 #include "util/make_unique.h"
 #include "util/concat.h"
 
+
+
+///////////////////////////////////////////////////////////
+//
+// CachingStrategy
+//
+///////////////////////////////////////////////////////////
 
 std::unique_ptr<CachingStrategy> CachingStrategy::by_name(const std::string& name) {
 	if ( name == "never")
@@ -85,9 +95,11 @@ double CachingStrategy::get_costs(const ProfilingData& profile, Type type) {
 	return io_fact + time_fact;
 }
 
+///////////////////////////////////////////////////////////
 //
-// Cache All
+// CacheAll
 //
+///////////////////////////////////////////////////////////
 
 bool CacheAll::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	(void) profiler;
@@ -95,9 +107,11 @@ bool CacheAll::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	return true;
 }
 
+///////////////////////////////////////////////////////////
 //
-// Cache None
+// CacheNone
 //
+///////////////////////////////////////////////////////////
 
 bool CacheNone::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	(void) profiler;
@@ -105,9 +119,11 @@ bool CacheNone::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	return false;
 }
 
+///////////////////////////////////////////////////////////
 //
-// Threshold strategy
+// SimpleThresholdStrategy
 //
+///////////////////////////////////////////////////////////
 
 SimpleThresholdStrategy::SimpleThresholdStrategy(Type type) :
 	type(type) {
@@ -115,5 +131,5 @@ SimpleThresholdStrategy::SimpleThresholdStrategy(Type type) :
 
 bool SimpleThresholdStrategy::do_cache(const QueryProfiler& profiler, size_t bytes) const {
 	// Assume 1 put and at least 2 gets
-	return get_costs(profiler,type) >= 3.5 * get_caching_costs(bytes);
+	return get_costs(profiler,type) >= 3 * get_caching_costs(bytes);
 }

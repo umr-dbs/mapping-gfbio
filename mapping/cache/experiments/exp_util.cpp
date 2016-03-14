@@ -6,10 +6,19 @@
  */
 
 #include "cache/experiments/exp_util.h"
+#include "cache/experiments/cheat.h"
+
+#include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
+#include "datatypes/plot.h"
+
 #include "util/sizeutil.h"
 #include "util/make_unique.h"
 #include "util/gdal.h"
-#include "cache/experiments/cheat.h"
+
+
 #include <chrono>
 #include <deque>
 #include <algorithm>
@@ -268,21 +277,21 @@ void LocalCacheManager::reset_costs() {
 	costs.uncached_io  = 0;
 }
 
+CacheUsage LocalCacheManager::get_usage(CacheType type) const {
+	switch(type) {
+	case CacheType::RASTER: return CacheUsage(type,rc.get_max_size(),rc.get_current_size());
+	case CacheType::POINT: return CacheUsage(type,pc.get_max_size(),pc.get_current_size());
+	case CacheType::LINE: return CacheUsage(type,lc.get_max_size(),lc.get_current_size());
+	case CacheType::POLYGON: return CacheUsage(type,poc.get_max_size(),poc.get_current_size());
+	case CacheType::PLOT: return CacheUsage(type,plc.get_max_size(),plc.get_current_size());
+	default: throw ArgumentException("Illegal type");
+	}
+}
+
 void LocalCacheManager::set_strategy(
 		std::unique_ptr<CachingStrategy> strategy) {
 	this->strategy.reset( strategy.release() );
 }
-
-Capacity LocalCacheManager::get_capacity() const {
-	return Capacity(
-			rc.get_max_size(), rc.get_current_size(),
-			pc.get_max_size(), pc.get_current_size(),
-			lc.get_max_size(), lc.get_current_size(),
-			poc.get_max_size(), poc.get_current_size(),
-			plc.get_max_size(), plc.get_current_size()
-		);
-}
-
 
 //
 // Test extensions
@@ -318,7 +327,7 @@ TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval, const std::s
 
 void TestIdxServer::trigger_reorg(uint32_t node_id, const ReorgDescription& desc)  {
 	for ( auto &cc : control_connections ) {
-		if ( cc.second->node->id == node_id ) {
+		if ( cc.second->node_id == node_id ) {
 			cc.second->send_reorg(desc);
 			return;
 		}

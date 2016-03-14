@@ -15,27 +15,31 @@
 
 TEST(ReorgTest,CapacityReorg) {
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(30, 20,0,0,0,0,0,0,0,0)));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(30, 0,0,0,0,0,0,0,0,0)));
+	NodeHandshake h1(42, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 30, 20) } );
+	NodeHandshake h2(4711, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 30, 0) } );
+
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexRasterCache cache("capacity","lru");
+	IndexCache cache(CacheType::RASTER);
+	auto reorg = ReorgStrategy::by_name(cache,"capacity","lru");
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
 	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c1(b1, 10, ProfilingData());
-	NodeCacheRef r1(CacheType::RASTER, k1, c1);
+	MetaCacheEntry r1(CacheType::RASTER, k1, c1);
 	std::shared_ptr<IndexCacheEntry> e1( new IndexCacheEntry(1, r1) );
 
 	// Entry 2
 	NodeCacheKey k2("key", 2);
 	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c2(b2, 10, ProfilingData());
-	NodeCacheRef r2(CacheType::RASTER, k2, c2);
+	MetaCacheEntry r2(CacheType::RASTER, k2, c2);
 	std::shared_ptr<IndexCacheEntry> e2( new IndexCacheEntry(1, r2) );
 
 	// Increase count
@@ -49,7 +53,7 @@ TEST(ReorgTest,CapacityReorg) {
 		res.emplace(kv.first, NodeReorgDescription(kv.second));
 	}
 
-	cache.reorganize(res);
+	reorg->reorganize(res);
 	EXPECT_EQ(2,res.at(2).node->id);
 	EXPECT_EQ(1,res.at(2).get_moves().size());
 //	EXPECT_EQ(1,res.at(2).get_moves().at(0).entry_id);
@@ -62,20 +66,24 @@ TEST(ReorgTest,CapacityReorg) {
 
 TEST(ReorgTest,GeographicReorg) {
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 20,0,0,0,0,0,0,0,0)));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(40, 0,0,0,0,0,0,0,0,0)));
+	NodeHandshake h1(42, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 40, 20) } );
+	NodeHandshake h2(4711, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 40, 0) } );
+
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexRasterCache cache("geo","lru");
+	IndexCache cache(CacheType::RASTER);
+	auto reorg = ReorgStrategy::by_name(cache,"geo","lru");
 
 	// Entry 1
 	NodeCacheKey k1("key", 1);
 	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c1(b1, 10, ProfilingData());
-	NodeCacheRef r1(CacheType::RASTER, k1, c1);
+	MetaCacheEntry r1(CacheType::RASTER, k1, c1);
 	std::shared_ptr<IndexCacheEntry> e1( new IndexCacheEntry(1, r1) );
 
 	// Entry 2
@@ -83,7 +91,7 @@ TEST(ReorgTest,GeographicReorg) {
 	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45),
 		TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c2(b2, 10, ProfilingData());
-	NodeCacheRef r2(CacheType::RASTER, k2, c2);
+	MetaCacheEntry r2(CacheType::RASTER, k2, c2);
 	std::shared_ptr<IndexCacheEntry> e2( new IndexCacheEntry(1, r2) );
 
 	// Increase count
@@ -97,7 +105,7 @@ TEST(ReorgTest,GeographicReorg) {
 		res.emplace(kv.first, NodeReorgDescription(kv.second));
 	}
 
-	cache.reorganize(res);
+	reorg->reorganize(res);
 
 	EXPECT_EQ(2,res.at(2).node->id);
 	EXPECT_EQ(1,res.at(2).get_moves().size());
@@ -112,19 +120,23 @@ std::shared_ptr<IndexCacheEntry> createGraphEntry( uint32_t node_id, uint64_t en
 	NodeCacheKey k1(workflow, entry_id);
 	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 180, 90), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c1(b1, size, ProfilingData());
-	NodeCacheRef r1(CacheType::RASTER, k1, c1);
+	MetaCacheEntry r1(CacheType::RASTER, k1, c1);
 	return std::shared_ptr<IndexCacheEntry>( new IndexCacheEntry(node_id, r1) );
 }
 
 TEST(ReorgTest,GraphReorg) {
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", 42, Capacity(40, 29,0,0,0,0,0,0,0,0)));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", 4711, Capacity(40, 0,0,0,0,0,0,0,0,0)));
+	NodeHandshake h1(42, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 40, 29) } );
+	NodeHandshake h2(4711, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 40, 0) } );
+
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);
 	nodes.emplace(2, n2);
 
-	IndexRasterCache cache("graph","lru");
+	IndexCache cache(CacheType::RASTER);
+	auto reorg = ReorgStrategy::by_name(cache,"graph","lru");
 	std::map<uint32_t, NodeReorgDescription> res;
 	for ( auto &kv : nodes ) {
 		res.emplace(kv.first, NodeReorgDescription(kv.second));
@@ -148,7 +160,7 @@ TEST(ReorgTest,GraphReorg) {
 	cache.put(e7);
 	cache.put(e8);
 
-	cache.reorganize(res);
+	reorg->reorganize(res);
 
 	EXPECT_EQ(4,res.at(2).get_moves().size());
 //	EXPECT_EQ(3,res.at(2).get_moves().at(0).entry_id);

@@ -18,47 +18,9 @@
 // socket() etc
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
 
 #include <unistd.h>
 #include <errno.h>
-
-
-////////////////////////////////////////////////////////////
-//
-// NODE
-//
-////////////////////////////////////////////////////////////
-
-Node::Node(uint32_t id, const std::string &host, uint32_t port, const Capacity &cap) :
-	id(id), host(host), port(port), last_stat_update( CacheCommon::time_millis() ), control_connection(0), capacity(cap) {
-}
-
-void Node::update_stats(const NodeStats& stats) {
-	capacity = stats;
-	query_stats += stats.query_stats;
-}
-
-const Capacity& Node::get_capacity() const {
-	return capacity;
-}
-
-const QueryStats& Node::get_query_stats() const {
-	return query_stats;
-}
-
-void Node::reset_query_stats() {
-	query_stats.reset();
-}
-
-std::string Node::to_string() const {
-	std::ostringstream ss;
-	ss << "Node " << id << "[" << std::endl;
-	ss << "  " << capacity.to_string() << std::endl;
-	ss << "  " << query_stats.to_string() << std::endl;
-	ss << "]";
-	return ss.str();
-}
 
 ////////////////////////////////////////////////////////////
 //
@@ -71,9 +33,6 @@ IndexServer::IndexServer(int port, time_t update_interval, const std::string &re
 	query_manager(caches,nodes), last_reorg(CacheCommon::time_millis()), update_interval(update_interval) {
 }
 
-IndexServer::~IndexServer() {
-}
-
 void IndexServer::stop() {
 	Log::info("Shutting down.");
 	shutdown = true;
@@ -83,7 +42,7 @@ void IndexServer::run() {
 	int listen_socket = CacheCommon::get_listening_socket(port);
 	Log::info("index-server: listening on node-port: %d", port);
 
-	std::vector<NewConnection> new_cons;
+	std::vector<NewNBConnection> new_cons;
 
 	while (!shutdown) {
 		struct timeval tv { 2, 0 };
@@ -98,8 +57,8 @@ void IndexServer::run() {
 
 		// Add newly accepted sockets
 		for (auto &nc : new_cons) {
-			FD_SET(nc.fd, &readfds);
-			maxfd = std::max(maxfd, nc.fd);
+			FD_SET(nc.get_read_fd(), &readfds);
+			maxfd = std::max(maxfd, nc.get_read_fd());
 		}
 
 		// Setup existing connections
@@ -125,15 +84,8 @@ void IndexServer::run() {
 					Log::error("Accept failed: %d", strerror(errno));
 				}
 				else if (new_fd > 0) {
-					char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-
-					getnameinfo ((struct sockaddr *) &remote_addr, sin_size,
-					             hbuf, sizeof hbuf,
-					             sbuf, sizeof sbuf,
-					             NI_NUMERICHOST | NI_NUMERICSERV);
-
-					Log::debug("New connection established host: %s, service: %s, fd: %d", hbuf, sbuf, new_fd);
-					new_cons.push_back( NewConnection(hbuf,new_fd) );
+					Log::debug("New connection established, fd: %d", new_fd);
+					new_cons.push_back( NewNBConnection(&remote_addr,new_fd) );
 				}
 			}
 		}
@@ -208,9 +160,9 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	while (ccit != control_connections.end()) {
 		ControlConnection &cc = *ccit->second;
 		if (cc.is_faulty()) {
-			caches.remove_all_by_node(cc.node->id);
-			nodes.erase(cc.node->id);
-			query_manager.node_failed(cc.node->id);
+			caches.remove_all_by_node(cc.node_id);
+			nodes.erase(cc.node_id);
+			query_manager.node_failed(cc.node_id);
 			control_connections.erase(ccit++);
 		}
 		else if (cc.is_writing()) {
@@ -249,47 +201,48 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	return maxfd;
 }
 
-void IndexServer::process_handshake(std::vector<NewConnection> &new_fds, fd_set* readfds) {
+void IndexServer::process_handshake(std::vector<NewNBConnection> &new_fds, fd_set* readfds) {
 	auto it = new_fds.begin();
 	while (it != new_fds.end()) {
-		if (FD_ISSET(it->fd, readfds)) {
-			try {
-				std::unique_ptr<BinaryFDStream> us = make_unique<BinaryFDStream>(it->fd, it->fd,true);
-				BinaryStream &s = *us;
-
-				uint32_t magic;
-				s.read(&magic);
+		try {
+			if (FD_ISSET(it->get_read_fd(), readfds) && it->input() ) {
+				auto &data = it->get_data();
+				uint32_t magic = data.read<uint32_t>();
 				switch (magic) {
 					case ClientConnection::MAGIC_NUMBER: {
-						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(std::move(us));
+						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(it->release_stream());
 						Log::trace("New client connections established");
 						client_connections.emplace(cc->id, std::move(cc));
 						break;
 					}
 					case WorkerConnection::MAGIC_NUMBER: {
-						uint32_t node_id;
-						s.read(&node_id);
-						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(std::move(us),
-							nodes.at(node_id));
+						uint32_t node_id = data.read<uint32_t>();
+						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(it->release_stream(),node_id);
 						Log::info("New worker registered for node: %d, id: %d", node_id, wc->id);
 						worker_connections.emplace(wc->id, std::move(wc));
 						break;
 					}
 					case ControlConnection::MAGIC_NUMBER: {
-						std::unique_ptr<ControlConnection> cc = make_unique<ControlConnection>(std::move(us),it->hostname);
-						control_connections.emplace(cc->id, std::move(cc));
+						NodeHandshake hs(data);
+						auto node = std::make_shared<Node>(next_node_id++, it->hostname, hs);
+						auto con  = make_unique<ControlConnection>(it->release_stream(), node->id, node->host);
+						node->control_connection = con->id;
+						nodes.emplace(node->id, node);
+						caches.process_handshake(node->id,hs);
+						Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, it->hostname.c_str(), con->id);
+						control_connections.emplace(con->id, std::move(con));
 						break;
 					}
 					default:
 						Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
 				}
-			} catch (const std::exception &e) {
-				Log::error("Error on new connection: %s. Dropping.", e.what());
+				it = new_fds.erase(it);
 			}
+			else
+				it++;
+		} catch (const std::exception &e) {
+			Log::error("Error on new connection: %s. Dropping.", e.what());
 			it = new_fds.erase(it);
-		}
-		else {
-			++it;
 		}
 	}
 }
@@ -300,13 +253,13 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 		// Check if node is waiting for a confirmation
 		if ( cc.get_state() == ControlState::MOVE_RESULT_READ ) {
 			auto res = cc.get_move_result();
-			IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
+			IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
 			if ( !query_manager.is_locked(res.type, old) )
 				cc.confirm_move();
 		}
 		else if ( cc.get_state() == ControlState::REMOVE_REQUEST_READ ) {
 			auto &node_key = cc.get_remove_request();
-			IndexCacheKey key(cc.node->id, node_key.semantic_id, node_key.entry_id );
+			IndexCacheKey key(key.semantic_id, cc.node_id, node_key.entry_id );
 			if ( !query_manager.is_locked( node_key.type, key ) )
 				cc.confirm_remove();
 		}
@@ -320,43 +273,34 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 				continue;
 
 			switch (cc.get_state()) {
-				case ControlState::HANDSHAKE_READ: {
-					auto &hs = cc.get_handshake();
-					std::shared_ptr<Node> node = make_unique<Node>(next_node_id++, cc.hostname, hs.port, hs);
-					node->control_connection = cc.id;
-					nodes.emplace(node->id, node);
-					Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, cc.hostname.c_str(), cc.id);
-					caches.process_handshake(node->id,hs);
-					cc.confirm_handshake(node);
-					break;
-				}
 				case ControlState::MOVE_RESULT_READ: {
-					Log::trace("Node %d migrated one cache-entry.", cc.node->id);
+					Log::trace("Node %d migrated one cache-entry.", cc.node_id);
 					auto res = cc.get_move_result();
 					handle_reorg_result(res);
-					IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
+					IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
 					if ( !query_manager.is_locked(res.type, old) )
 						cc.confirm_move();
 					break;
 				}
 				case ControlState::REMOVE_REQUEST_READ: {
-					Log::trace("Node %d requested removal of entry: %s", cc.node->id, cc.get_remove_request().to_string().c_str() );
+					Log::trace("Node %d requested removal of entry: %s", cc.node_id, cc.get_remove_request().to_string().c_str() );
 					auto &node_key = cc.get_remove_request();
-					IndexCacheKey key(cc.node->id, node_key.semantic_id, node_key.entry_id );
+					IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
 					if ( !query_manager.is_locked( node_key.type, key ) )
 						cc.confirm_remove();
 					break;
 				}
 				case ControlState::REORG_FINISHED:
-					Log::debug("Node %d finished reorganization.", cc.node->id);
+					Log::debug("Node %d finished reorganization.", cc.node_id);
 					cc.release();
 					break;
 				case ControlState::STATS_RECEIVED: {
 					auto &stats = cc.get_stats();
-					Log::debug("Node %d delivered fresh statistics: %s", cc.node->id, stats.to_string().c_str());
-					cc.node->update_stats(stats);
-					cc.node->last_stat_update = CacheCommon::time_millis();
-					caches.update_stats(cc.node->id, stats);
+					Log::debug("Node %d delivered fresh statistics", cc.node_id);
+					auto &node = nodes.at(cc.node_id);
+					node->update_stats(stats);
+					node->last_stat_update = CacheCommon::time_millis();
+					caches.update_stats(cc.node_id, stats);
 					cc.release();
 					break;
 				}
@@ -369,8 +313,8 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 }
 
 void IndexServer::handle_reorg_result(const ReorgMoveResult& res) {
-	IndexCacheKey old(res.from_node_id, res.semantic_id, res.entry_id);
-	IndexCacheKey new_key(res.to_node_id, res.semantic_id, res.to_cache_id);
+	IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
+	IndexCacheKey new_key(res.semantic_id, res.to_node_id, res.to_cache_id);
 	caches.get_cache(res.type).move(old,new_key);
 }
 
@@ -435,11 +379,13 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 					break;
 				}
 				case WorkerState::DELIVERY_READY: {
-					Log::debug("Worker returned delivery: %s", wc.get_result().to_string().c_str());
+					auto &node = nodes.at(wc.node_id);
+					DeliveryResponse response(node->host,node->port, wc.get_delivery_id());
+					Log::debug("Worker returned delivery: %s", response.to_string().c_str());
 					auto clients = query_manager.release_worker(wc.id);
 					for (auto &cid : clients) {
 						try {
-							client_connections.at(cid)->send_response(wc.get_result());
+							client_connections.at(cid)->send_response(response);
 						} catch (const std::out_of_range &oor) {
 							Log::warn("Client %d does not exist.", cid);
 						}
@@ -449,7 +395,7 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				}
 				case WorkerState::NEW_ENTRY: {
 					Log::debug("Worker added new raster-entry");
-					std::shared_ptr<IndexCacheEntry> entry( new IndexCacheEntry(wc.node->id, wc.get_new_entry()) );
+					std::shared_ptr<IndexCacheEntry> entry( new IndexCacheEntry(wc.node_id, wc.get_new_entry()) );
 					caches.get_cache( wc.get_new_entry().type ).put(entry);
 					wc.entry_cached();
 					break;
@@ -469,22 +415,17 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 }
 
 void IndexServer::reorganize(bool force) {
-	std::map<uint32_t, NodeReorgDescription> reorgs;
-	for (auto &kv : nodes)
-		reorgs.emplace(kv.first, NodeReorgDescription(kv.second));
-
 	// Remember time of this reorg
 	last_reorg = CacheCommon::time_millis();
-	caches.reorganize(nodes,reorgs,force);
+	auto reorgs = caches.reorganize(nodes,force);
 	for (auto &d : reorgs) {
 		Log::debug("Processing removals locally and sending reorg-commands to nodes.");
 		for (auto &rm : d.second.get_removals()) {
-			caches.get_cache(rm.type).remove(IndexCacheKey(d.first, rm.semantic_id, rm.entry_id));
+			caches.get_cache(rm.type).remove(IndexCacheKey(rm.semantic_id, d.first, rm.entry_id));
 		}
 
-		auto &cc = control_connections.at(d.second.node->control_connection);
 		if (!d.second.is_empty())
-			cc->send_reorg(d.second);
+			control_connections.at(d.second.node->control_connection)->send_reorg(d.second);
 	}
 }
 
@@ -497,3 +438,4 @@ std::string IndexServer::stats_string() const {
 	out << "====================================" << std::endl;
 	return out.str();
 }
+

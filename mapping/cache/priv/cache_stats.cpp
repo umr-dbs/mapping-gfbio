@@ -8,191 +8,164 @@
 #include "cache/priv/cache_stats.h"
 #include "util/concat.h"
 
-Capacity::Capacity(uint64_t raster_cache_total, uint64_t raster_cache_used,
-	  uint64_t point_cache_total, uint64_t point_cache_used,
-	  uint64_t line_cache_total, uint64_t line_cache_used,
-	  uint64_t polygon_cache_total, uint64_t polygon_cache_used,
-	  uint64_t plot_cache_total, uint64_t plot_cache_used) :
-	raster_cache_total(raster_cache_total), raster_cache_used(raster_cache_used),
-	point_cache_total(point_cache_total), point_cache_used(point_cache_used),
-	line_cache_total(line_cache_total), line_cache_used(line_cache_used),
-	polygon_cache_total(polygon_cache_total), polygon_cache_used(polygon_cache_used),
-	plot_cache_total(plot_cache_total), plot_cache_used(plot_cache_used) {
-}
 
-Capacity::Capacity(BinaryStream& stream) {
-	stream.read(&raster_cache_total);
-	stream.read(&raster_cache_used);
-	stream.read(&point_cache_total);
-	stream.read(&point_cache_used);
-	stream.read(&line_cache_total);
-	stream.read(&line_cache_used);
-	stream.read(&polygon_cache_total);
-	stream.read(&polygon_cache_used);
-	stream.read(&plot_cache_total);
-	stream.read(&plot_cache_used);
-}
-
-void Capacity::toStream(BinaryStream& stream) const {
-	stream.write( raster_cache_total );
-	stream.write( raster_cache_used );
-	stream.write( point_cache_total );
-	stream.write( point_cache_used );
-	stream.write( line_cache_total );
-	stream.write( line_cache_used );
-	stream.write( polygon_cache_total );
-	stream.write( polygon_cache_used );
-	stream.write( plot_cache_total );
-	stream.write( plot_cache_used );
-}
-
-std::string Capacity::to_string() const {
-	return concat("Capacity[ ", "",
-		"Raster: ", raster_cache_used, "/", raster_cache_total,
-		", Point: ", point_cache_used, "/", point_cache_total,
-		", Line: ", line_cache_used, "/", line_cache_total,
-		", Polygon: ", polygon_cache_used, "/", polygon_cache_total,
-		", Plot: ", plot_cache_used, "/", plot_cache_total, "]");
-}
-
+///////////////////////////////////////////////////////////
 //
-// Handshake
+// ENTRY-STATS
 //
+///////////////////////////////////////////////////////////
 
-NodeHandshake::NodeHandshake( uint32_t port, const Capacity &cap, std::vector<NodeCacheRef> entries ) :
-	Capacity(cap), port(port), entries(entries) {
-}
-
-NodeHandshake::NodeHandshake(BinaryStream& stream) : Capacity(stream) {
-	uint64_t r_size;
-	stream.read(&port);
-
-	stream.read(&r_size);
-	entries.reserve(r_size);
-	for ( uint64_t i = 0; i < r_size; i++ )
-		entries.push_back( NodeCacheRef(stream) );
-}
-
-void NodeHandshake::toStream(BinaryStream& stream) const {
-	Capacity::toStream(stream);
-	stream.write(port);
-	stream.write( static_cast<uint64_t>(entries.size()) );
-	for ( auto &e : entries )
-		e.toStream(stream);
-}
-
-const std::vector<NodeCacheRef>& NodeHandshake::get_entries() const {
-	return entries;
-}
-
-std::string NodeHandshake::to_string() const {
-	return concat("NodeHandshake[port: ", port, ", "
-		"capacity: ", Capacity::to_string(), ", entries: ", entries.size(), "]");
-}
-
-//
-// Stats
-//
-
-NodeEntryStats::NodeEntryStats(uint64_t id, time_t last_access, uint32_t access_count) :
+NodeEntryStats::NodeEntryStats(uint64_t id, uint64_t last_access, uint32_t access_count) :
 	entry_id(id), last_access(last_access), access_count(access_count) {
 }
 
-NodeEntryStats::NodeEntryStats(BinaryStream& stream) {
-	stream.read(&entry_id);
-	stream.read(&last_access);
-	stream.read(&access_count);
+NodeEntryStats::NodeEntryStats(BinaryReadBuffer& buffer) :
+	entry_id( buffer.read<uint64_t>() ),
+	last_access( buffer.read<uint64_t>() ),
+	access_count( buffer.read<uint32_t>() ) {
 }
 
-void NodeEntryStats::toStream(BinaryStream& stream) const {
-	stream.write(entry_id);
-	stream.write(last_access);
-	stream.write(access_count);
+void NodeEntryStats::toStream(BinaryWriteBuffer& buffer) const {
+	buffer.write(entry_id);
+	buffer.write(last_access);
+	buffer.write(access_count);
 }
 
-CacheStats::CacheStats(CacheType type) : type(type) {
+///////////////////////////////////////////////////////////
+//
+// HandshakeEntry
+//
+///////////////////////////////////////////////////////////
+HandshakeEntry::HandshakeEntry(uint64_t entry_id, const CacheEntry& entry) : CacheEntry(entry), entry_id(entry_id) {
 }
 
-CacheStats::CacheStats(BinaryStream& stream) {
-	stream.read(&type);
+HandshakeEntry::HandshakeEntry(BinaryReadBuffer& buffer) : CacheEntry(buffer), entry_id(buffer.read<uint64_t>()){
+}
+
+void HandshakeEntry::toStream(BinaryWriteBuffer& buffer) const {
+	CacheEntry::toStream(buffer);
+	buffer.write(entry_id);
+}
+
+
+CacheUsage::CacheUsage(CacheType type, uint64_t capacity_total,
+		uint64_t capacity_used) : type(type), capacity_total(capacity_total), capacity_used(capacity_used) {
+}
+
+CacheUsage::CacheUsage(BinaryReadBuffer& buffer) :
+		type(buffer.read<CacheType>()),
+		capacity_total(buffer.read<uint64_t>()),
+		capacity_used(buffer.read<uint64_t>()){
+}
+
+void CacheUsage::toStream(BinaryWriteBuffer& buffer) const {
+	buffer.write(type);
+	buffer.write(capacity_total);
+	buffer.write(capacity_used);
+}
+
+double CacheUsage::get_ratio() const {
+	return (capacity_total != 0) ? (double) capacity_used/ (double) capacity_total : 1;
+}
+
+///////////////////////////////////////////////////////////
+//
+// CACHE-CONTENT
+//
+///////////////////////////////////////////////////////////
+template<class T>
+CacheContent<T>::CacheContent(CacheType type, uint64_t capacity_total,
+		uint64_t capacity_used) : CacheUsage(type,capacity_total,capacity_used) {
+}
+
+template<class T>
+CacheContent<T>::CacheContent(BinaryReadBuffer& buffer) : CacheUsage(buffer) {
+
 	uint64_t size;
 	uint64_t v_size;
-	stream.read(&size);
+	std::string semantic_id;
 
-	stats.reserve(size);
+	buffer.read(&size);
+	items.reserve(size);
 
 	for ( size_t i = 0; i < size; i++ ) {
-		std::string semantic_id;
-		stream.read(&semantic_id);
-		stream.read(&v_size);
-		std::vector<NodeEntryStats> items;
-		items.reserve(v_size);
+		buffer.read(&semantic_id);
+		buffer.read(&v_size);
+		std::vector<T> elems;
+		elems.reserve(v_size);
 
 		for ( size_t j = 0; j < v_size; j++ ) {
-			items.push_back( NodeEntryStats(stream) );
+			elems.push_back( T(buffer) );
 		}
-		stats.emplace( semantic_id, items );
+		items.emplace( semantic_id, std::move(elems) );
 	}
 }
 
-void CacheStats::toStream(BinaryStream& stream) const {
-	stream.write(type);
-	stream.write(static_cast<uint64_t>(stats.size()));
-	for ( auto &e : stats ) {
-		stream.write(e.first);
-		stream.write(static_cast<uint64_t>(e.second.size()));
-		for ( auto &s : e.second )
-			s.toStream(stream);
+template<class T>
+void CacheContent<T>::toStream(BinaryWriteBuffer& buffer) const {
+	CacheUsage::toStream(buffer);
+
+	buffer.write(static_cast<uint64_t>(items.size()));
+	for ( auto &e : items ) {
+		buffer.write(e.first);
+		buffer.write(static_cast<uint64_t>(e.second.size()));
+		for ( auto & nes : e.second )
+			buffer.write(nes);
 	}
 }
 
-void CacheStats::add_stats(const std::string &semantic_id, NodeEntryStats stats) {
+template<class T>
+void CacheContent<T>::add_item(const std::string& semantic_id, T item) {
 	try {
-		this->stats.at( semantic_id ).push_back(stats);
+		items.at( semantic_id ).push_back(item);
 	} catch ( const std::out_of_range &oor ) {
-		std::vector<NodeEntryStats> sv;
-		sv.push_back(stats);
-		this->stats.emplace( semantic_id, sv );
+		items.emplace( semantic_id, std::vector<T>{item} );
 	}
 }
 
-const std::unordered_map<std::string, std::vector<NodeEntryStats> >& CacheStats::get_stats() const {
-	return stats;
+template<class T>
+const std::unordered_map<std::string, std::vector<T> >& CacheContent<T>::get_items() const {
+	return items;
 }
 
-NodeStats::NodeStats(const Capacity &capacity, const QueryStats &query_stats, std::vector<CacheStats> stats) :
-	Capacity(capacity), query_stats(query_stats), stats(stats) {
+///////////////////////////////////////////////////////////
+//
+// CACHE-STATS
+//
+///////////////////////////////////////////////////////////
+
+CacheStats::CacheStats(CacheType type, uint64_t capacity_total, uint64_t capacity_used) :
+	CacheContent(type,capacity_total,capacity_used) {
 }
 
-NodeStats::NodeStats(BinaryStream& stream) : Capacity(stream), query_stats(stream) {
-	uint64_t ssize;
-	stream.read(&ssize);
-	stats.reserve(ssize);
-	for ( uint64_t i = 0; i < ssize; i++ )
-		stats.push_back( CacheStats(stream) );
+CacheStats::CacheStats(BinaryReadBuffer& buffer) : CacheContent(buffer) {
 }
 
-void NodeStats::toStream(BinaryStream& stream) const {
-	Capacity::toStream(stream);
-	query_stats.toStream(stream);
-	stream.write(static_cast<uint64_t>(stats.size()));
-	for ( auto &e : stats ) {
-		e.toStream(stream);
-	}
+CacheHandshake::CacheHandshake(CacheType type, uint64_t capacity_total,
+		uint64_t capacity_used) : CacheContent(type,capacity_total,capacity_used) {
 }
+
+CacheHandshake::CacheHandshake(BinaryReadBuffer& buffer) : CacheContent(buffer) {
+}
+
+///////////////////////////////////////////////////////////
+//
+// QUERY STATS
+//
+///////////////////////////////////////////////////////////
 
 QueryStats::QueryStats() : single_local_hits(0), multi_local_hits(0), multi_local_partials(0),
 	single_remote_hits(0), multi_remote_hits(0), multi_remote_partials(0), misses(0) {
 }
 
-QueryStats::QueryStats(BinaryStream& stream) :
-	single_local_hits(stream.read<uint32_t>()),
-	multi_local_hits(stream.read<uint32_t>()),
-	multi_local_partials(stream.read<uint32_t>()),
-	single_remote_hits(stream.read<uint32_t>()),
-	multi_remote_hits(stream.read<uint32_t>()),
-	multi_remote_partials(stream.read<uint32_t>()),
-	misses(stream.read<uint32_t>()){
+QueryStats::QueryStats(BinaryReadBuffer& buffer) :
+	single_local_hits(buffer.read<uint32_t>()),
+	multi_local_hits(buffer.read<uint32_t>()),
+	multi_local_partials(buffer.read<uint32_t>()),
+	single_remote_hits(buffer.read<uint32_t>()),
+	multi_remote_hits(buffer.read<uint32_t>()),
+	multi_remote_partials(buffer.read<uint32_t>()),
+	misses(buffer.read<uint32_t>()){
 }
 
 QueryStats QueryStats::operator +(const QueryStats& stats) const {
@@ -218,14 +191,14 @@ QueryStats& QueryStats::operator +=(const QueryStats& stats) {
 	return *this;
 }
 
-void QueryStats::toStream(BinaryStream& stream) const {
-	stream.write( single_local_hits );
-	stream.write( multi_local_hits );
-	stream.write( multi_local_partials );
-	stream.write( single_remote_hits );
-	stream.write( multi_remote_hits );
-	stream.write( multi_remote_partials );
-	stream.write( misses );
+void QueryStats::toStream(BinaryWriteBuffer& buffer) const {
+	buffer.write( single_local_hits );
+	buffer.write( multi_local_hits );
+	buffer.write( multi_local_partials );
+	buffer.write( single_remote_hits );
+	buffer.write( multi_remote_hits );
+	buffer.write( multi_remote_partials );
+	buffer.write( misses );
 }
 
 void QueryStats::reset() {
@@ -251,49 +224,65 @@ std::string QueryStats::to_string() const {
 	return ss.str();
 }
 
-void ActiveQueryStats::add_single_local_hit() {
-	std::lock_guard<std::mutex> g(mtx);
-	single_local_hits++;
+///////////////////////////////////////////////////////////
+//
+// NODE-STATS
+//
+///////////////////////////////////////////////////////////
+
+NodeStats::NodeStats(const QueryStats &query_stats, std::vector<CacheStats> &&stats) :
+	query_stats(query_stats), stats(stats) {
 }
 
-void ActiveQueryStats::add_multi_local_hit() {
-	std::lock_guard<std::mutex> g(mtx);
-	multi_local_hits++;
+NodeStats::NodeStats(BinaryReadBuffer& buffer) : query_stats(buffer) {
+	uint64_t ssize = buffer.read<uint64_t>();
+	stats.reserve(ssize);
+	for ( uint64_t i = 0; i < ssize; i++ )
+		stats.push_back( CacheStats(buffer) );
 }
 
-void ActiveQueryStats::add_multi_local_partial() {
-	std::lock_guard<std::mutex> g(mtx);
-	multi_local_partials++;
+void NodeStats::toStream(BinaryWriteBuffer& buffer) const {
+	query_stats.toStream(buffer);
+	buffer.write(static_cast<uint64_t>(stats.size()));
+	for ( auto &e : stats ) {
+		e.toStream(buffer);
+	}
 }
 
-void ActiveQueryStats::add_single_remote_hit() {
-	std::lock_guard<std::mutex> g(mtx);
-	single_remote_hits++;
+///////////////////////////////////////////////////////////
+//
+// HANDSHAKE
+//
+///////////////////////////////////////////////////////////
+
+NodeHandshake::NodeHandshake( uint32_t port, std::vector<CacheHandshake> &&entries ) :
+	port(port), data(entries) {
 }
 
-void ActiveQueryStats::add_multi_remote_hit() {
-	std::lock_guard<std::mutex> g(mtx);
-	multi_remote_hits++;
+NodeHandshake::NodeHandshake(BinaryReadBuffer& buffer) {
+	buffer.read(&port);
+	uint64_t r_size = buffer.read<uint64_t>();
+
+	data.reserve(r_size);
+	for ( uint64_t i = 0; i < r_size; i++ )
+		data.push_back( CacheHandshake(buffer) );
 }
 
-void ActiveQueryStats::add_multi_remote_partial() {
-	std::lock_guard<std::mutex> g(mtx);
-	multi_remote_partials++;
+void NodeHandshake::toStream(BinaryWriteBuffer& buffer) const {
+	buffer.write(port);
+	buffer.write( static_cast<uint64_t>(data.size()) );
+	for ( auto &e : data )
+		e.toStream(buffer);
 }
 
-void ActiveQueryStats::add_miss() {
-	std::lock_guard<std::mutex> g(mtx);
-	misses++;
+const std::vector<CacheHandshake>& NodeHandshake::get_data() const {
+	return data;
 }
 
-QueryStats ActiveQueryStats::get() const {
-	std::lock_guard<std::mutex> g(mtx);
-	return QueryStats(*this);
+std::string NodeHandshake::to_string() const {
+	return concat("NodeHandshake[port: ", port, "]");
 }
 
-QueryStats ActiveQueryStats::get_and_reset() {
-	std::lock_guard<std::mutex> g(mtx);
-	auto res = QueryStats(*this);
-	reset();
-	return res;
-}
+template class CacheContent<NodeEntryStats>;
+template class CacheContent<HandshakeEntry> ;
+

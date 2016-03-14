@@ -35,14 +35,14 @@
 // Provides helper functions for common tasks.
 //
 
-enum class CacheType : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT, UNKNOWN };
-
 class CacheCube;
 class QueryRectangle;
 class SpatioTemporalReference;
 class GridSpatioTemporalResult;
 
-
+/**
+ * Helper class to track execution time
+ */
 class ExecTimer {
 public:
 	ExecTimer( std::string &&name );
@@ -60,6 +60,9 @@ private:
 };
 
 
+/**
+ * Simple multi-reader, single writer lock
+ */
 class RWLock {
 public:
 	RWLock() : read_count(0) {};
@@ -91,6 +94,9 @@ private:
 	std::mutex w_lock;
 };
 
+/**
+ * Guard for obtaining a read-lock
+ */
 class SharedLockGuard {
 public:
 	SharedLockGuard() = delete;
@@ -108,6 +114,9 @@ private:
 	RWLock &lock;
 };
 
+/**
+ * Guard for obtaining a write-lock
+ */
 class ExclusiveLockGuard {
 public:
 	ExclusiveLockGuard() = delete;
@@ -126,65 +135,65 @@ private:
 };
 
 
+/**
+ * Class holding utility function used by various cache components
+ */
 class CacheCommon {
 public:
 
+	/**
+	 * Method to be set as GDALs error handler. Swallaws all output.
+	 */
 	static void GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg);
 
+	/**
+	 * @return the time since epoch in ms.
+	 */
 	static time_t time_millis();
 
-	//
-	// Creates a listening socket on the given port.
-	//
-	static int get_listening_socket(int port, bool nonblock = true, int backlog = 10);
-
-	//
-	// Returns a string-representation for the given query-rectange
-	//
-	static std::string qr_to_string( const QueryRectangle &rect );
-
-	//
-	// Returns a string-representation for the given spatio-temporal reference
-	//
-	static std::string stref_to_string( const SpatioTemporalReference &ref );
-
+	/**
+	 * Installs a custom uncaught exception handler which
+	 * prints the stack-trace before terminating
+	 */
 	static void set_uncaught_exception_handler();
 
+	/**
+	 * @return the stacktrace of the last 20 calls
+	 */
 	static std::string get_stacktrace();
 
+	/**
+	 * Creates a listening socket on the given port
+	 * @param port the port to listen on
+	 * @paran nonblock whether the calls to accept are blocking
+	 * @param backlog the backlog
+	 */
+	static int get_listening_socket(int port, bool nonblock = true, int backlog = 10);
+
+	/**
+	 * @return a string-representation for the given query-rectange
+	 */
+	static std::string qr_to_string( const QueryRectangle &rect );
+
+	/**
+	 * @return a string-representation for the given spatio-temporal reference
+	 */
+	static std::string stref_to_string( const SpatioTemporalReference &ref );
+
+	/**
+	 * @return if the resolution of two grid-results match (e.g. for puzzling)
+	 */
 	static bool resolution_matches( const GridSpatioTemporalResult &r1, const GridSpatioTemporalResult &r2 );
 
+	/**
+	 * @return if the resolution of two cache-cubes match (e.g. for puzzling)
+	 */
 	static bool resolution_matches( const CacheCube &c1, const CacheCube &c2 );
 
+	/**
+	 * @return if the given resolutions match (e.g. for puzzling)
+	 */
 	static bool resolution_matches( double scalex1, double scaley1, double scalex2, double scaley2 );
-
-	//
-	// Helper to read from a stream with a given timeout. Basically wraps
-	// BinaryStream::read(T*,bool).
-	// If the timeout is reached, a TimeoutException is thrown. If select()
-	// gets interrupted an InterruptedException is thrown. Both are not
-	// harmful to the underlying connection.
-	// On a harmful error, a NetworkException is thrown.
-	//
-	template<typename T>
-	static size_t read(T *t, BinaryFDStream &sock, int timeout, bool allow_eof = false) {
-		struct timeval tv { timeout, 0 };
-		fd_set readfds;
-		FD_ZERO(&readfds);
-		FD_SET(sock.getReadFD(), &readfds);
-		BinaryStream &stream = sock;
-
-		int ret = select(sock.getReadFD()+1, &readfds, nullptr, nullptr, &tv);
-		if ( ret > 0 )
-			return stream.read(t,allow_eof);
-		else if ( ret == 0 )
-			throw TimeoutException("No data available");
-		else if ( errno == EINTR )
-			throw InterruptedException("Select interrupted");
-		else {
-			throw NetworkException(concat("UnixSocket: read() failed: ", strerror(errno)));
-		}
-	}
 
 private:
 	CacheCommon() {};

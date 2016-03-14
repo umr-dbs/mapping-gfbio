@@ -303,7 +303,7 @@ bool BinaryFDStream::readNB(BinaryReadBuffer &buffer, bool allow_eof) {
 	if (bytes_read == -1) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK)
 			return false;
-		throw NetworkException("BinaryFDStream: unexpected error while reading a BinaryReadBuffer");
+		throw NetworkException(concat("BinaryFDStream: unexpected error while reading a BinaryReadBuffer: ", strerror(errno)));
 	}
 	if (bytes_read == 0) {
 		is_eof = true;
@@ -456,7 +456,7 @@ size_t BinaryReadBuffer::read(char *buffer, size_t len, bool allow_eof) {
 	return len;
 }
 
-size_t BinaryReadBuffer::getPayloadSize() {
+size_t BinaryReadBuffer::getPayloadSize() const {
 	if (status != Status::FINISHED)
 		throw ArgumentException("cannot getPayloadSize() from a BinaryReadBuffer until it has been filled");
 	return size_total;

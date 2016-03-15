@@ -39,7 +39,7 @@ class DataDescription {
 
 		void verify() const;
 
-		void serialize(BinaryWriteBuffer &buffer) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 		int getBPP() const; // Bytes per Pixel
 		double getMinByDatatype() const;
@@ -108,7 +108,7 @@ class GenericRaster : public GridSpatioTemporalResult {
 		GenericRaster(const GenericRaster &) = delete;
 		GenericRaster &operator=(const GenericRaster &) = delete;
 
-		void serialize(BinaryWriteBuffer &buffer);
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory);
 		static std::unique_ptr<GenericRaster> deserialize(BinaryReadBuffer &buffer);
 
 		std::unique_ptr<GenericRaster> clone();

@@ -23,7 +23,7 @@ public:
 
 	virtual std::unique_ptr<GenericPlot> clone() const = 0;
 
-	virtual void serialize(BinaryWriteBuffer &buffer) const {
+	virtual void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
 		// TODO
 		throw MustNotHappenException("Implement me!");
 	}

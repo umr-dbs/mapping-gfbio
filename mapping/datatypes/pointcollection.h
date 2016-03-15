@@ -81,7 +81,7 @@ public:
 	 * Serialize collection to buffer
 	 * @param buffer the buffer to serialize to
 	 */
-	void serialize(BinaryWriteBuffer &buffer) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * Add (copy) feature from another collection into this collection

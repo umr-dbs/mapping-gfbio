@@ -63,7 +63,7 @@ class AttributeMaps {
 		 * Serialize the object state to a buffer
 		 * @param buffer a binary buffer
 		 */
-		void serialize(BinaryWriteBuffer &buffer) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 		/**
 		 * Set a numeric key/value pair. Throws an exception if the key is already set.
@@ -159,7 +159,7 @@ class AttributeArrays {
 
 				AttributeArray(BinaryReadBuffer &buffer);
 				void deserialize(BinaryReadBuffer &buffer);
-				void serialize(BinaryWriteBuffer &buffer) const;
+				void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 				/**
 				 * Sets an attribute value.
@@ -224,7 +224,7 @@ class AttributeArrays {
 		AttributeArrays clone() const;
 
 		void deserialize(BinaryReadBuffer &buffer);
-		void serialize(BinaryWriteBuffer &buffer) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 		/**
 		 * Returns a reference to a numeric attribute array

@@ -37,9 +37,9 @@ ResolutionInfo::ResolutionInfo(BinaryReadBuffer& buffer) :
 	actual_pixel_scale_x(buffer.read<double>()), actual_pixel_scale_y(buffer.read<double>()) {
 }
 
-void ResolutionInfo::serialize(BinaryWriteBuffer& buffer) const {
-	buffer.write(pixel_scale_x);
-	buffer.write(pixel_scale_y);
+void ResolutionInfo::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	buffer.write(pixel_scale_x, is_persistent_memory);
+	buffer.write(pixel_scale_y, is_persistent_memory);
 	buffer.write(restype);
 	buffer.write(actual_pixel_scale_x);
 	buffer.write(actual_pixel_scale_y);
@@ -75,8 +75,8 @@ QueryCube::QueryCube(BinaryReadBuffer& buffer) : Cube3(buffer),
 	epsg(buffer.read<epsg_t>()), timetype(buffer.read<timetype_t>()) {
 }
 
-void QueryCube::serialize(BinaryWriteBuffer& buffer) const {
-	Cube3::serialize(buffer);
+void QueryCube::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	Cube3::serialize(buffer, is_persistent_memory);
 	buffer.write(epsg);
 	buffer.write(timetype);
 }
@@ -109,9 +109,9 @@ CacheCube::CacheCube(const GenericPlot& result) :
 CacheCube::CacheCube(BinaryReadBuffer& buffer) : QueryCube(buffer), resolution_info(buffer) {
 }
 
-void CacheCube::serialize(BinaryWriteBuffer& buffer) const {
-	QueryCube::serialize(buffer);
-	buffer.write(resolution_info);
+void CacheCube::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	QueryCube::serialize(buffer, is_persistent_memory);
+	buffer.write(resolution_info, is_persistent_memory);
 }
 
 
@@ -134,9 +134,9 @@ FetchInfo::FetchInfo(BinaryReadBuffer& buffer) :
 	size(buffer.read<uint64_t>()), profile(buffer) {
 }
 
-void FetchInfo::serialize(BinaryWriteBuffer& buffer) const {
+void FetchInfo::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
 	buffer.write(size);
-	buffer.write(profile);
+	buffer.write(profile, is_persistent_memory);
 }
 
 ///////////////////////////////////////////////////////////
@@ -165,11 +165,11 @@ CacheEntry::CacheEntry(BinaryReadBuffer& buffer) :
 		access_count(buffer.read<uint32_t>()), bounds(buffer) {
 }
 
-void CacheEntry::serialize(BinaryWriteBuffer& buffer) const {
-	FetchInfo::serialize(buffer);
+void CacheEntry::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	FetchInfo::serialize(buffer, is_persistent_memory);
 	buffer.write(last_access);
 	buffer.write(access_count);
-	buffer.write(bounds);
+	buffer.write(bounds, is_persistent_memory);
 }
 
 std::string CacheEntry::to_string() const {
@@ -190,8 +190,8 @@ NodeCacheKey::NodeCacheKey(BinaryReadBuffer &buffer) :
 	semantic_id( buffer.read<std::string>() ), entry_id( buffer.read<uint64_t>() ){
 }
 
-void NodeCacheKey::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(semantic_id);
+void NodeCacheKey::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	buffer.write(semantic_id, is_persistent_memory);
 	buffer.write(entry_id);
 }
 
@@ -212,9 +212,9 @@ TypedNodeCacheKey::TypedNodeCacheKey(CacheType type, const std::string& semantic
 TypedNodeCacheKey::TypedNodeCacheKey(BinaryReadBuffer &buffer) : NodeCacheKey(buffer), type( buffer.read<CacheType>() ) {
 }
 
-void TypedNodeCacheKey::serialize(BinaryWriteBuffer &buffer) const {
-	NodeCacheKey::serialize(buffer);
-	buffer.write(type);
+void TypedNodeCacheKey::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	NodeCacheKey::serialize(buffer, is_persistent_memory);
+	buffer.write(type, is_persistent_memory);
 }
 
 std::string TypedNodeCacheKey::to_string() const {
@@ -243,9 +243,9 @@ MetaCacheEntry::MetaCacheEntry(BinaryReadBuffer &buffer) :
 	TypedNodeCacheKey(buffer), CacheEntry(buffer) {
 }
 
-void MetaCacheEntry::serialize(BinaryWriteBuffer &buffer) const {
-	TypedNodeCacheKey::serialize(buffer);
-	CacheEntry::serialize(buffer);
+void MetaCacheEntry::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	TypedNodeCacheKey::serialize(buffer, is_persistent_memory);
+	CacheEntry::serialize(buffer, is_persistent_memory);
 }
 
 std::string MetaCacheEntry::to_string() const {
@@ -266,8 +266,8 @@ ForeignRef::ForeignRef(BinaryReadBuffer& buffer) :
 	host( buffer.read<std::string>() ), port( buffer.read<uint32_t>() ) {
 }
 
-void ForeignRef::serialize(BinaryWriteBuffer& buffer) const {
-	buffer.write(host);
+void ForeignRef::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	buffer.write(host, is_persistent_memory);
 	buffer.write(port);
 }
 
@@ -285,8 +285,8 @@ DeliveryResponse::DeliveryResponse(BinaryReadBuffer& buffer) :
 	ForeignRef(buffer), delivery_id( buffer.read<uint64_t>()) {
 }
 
-void DeliveryResponse::serialize(BinaryWriteBuffer& buffer) const {
-	ForeignRef::serialize(buffer);
+void DeliveryResponse::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	ForeignRef::serialize(buffer, is_persistent_memory);
 	buffer.write(delivery_id);
 }
 
@@ -308,8 +308,8 @@ CacheRef::CacheRef(const std::string& host, uint32_t port, uint64_t entry_id) :
 CacheRef::CacheRef(BinaryReadBuffer& buffer) : ForeignRef(buffer), entry_id( buffer.read<uint64_t>() ) {
 }
 
-void CacheRef::serialize(BinaryWriteBuffer& buffer) const {
-	ForeignRef::serialize(buffer);
+void CacheRef::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	ForeignRef::serialize(buffer, is_persistent_memory);
 	buffer.write(entry_id);
 }
 

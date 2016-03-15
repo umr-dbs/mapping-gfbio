@@ -25,7 +25,7 @@ NodeEntryStats::NodeEntryStats(BinaryReadBuffer& buffer) :
 	access_count( buffer.read<uint32_t>() ) {
 }
 
-void NodeEntryStats::serialize(BinaryWriteBuffer& buffer) const {
+void NodeEntryStats::serialize(BinaryWriteBuffer& buffer, bool) const {
 	buffer.write(entry_id);
 	buffer.write(last_access);
 	buffer.write(access_count);
@@ -42,9 +42,9 @@ HandshakeEntry::HandshakeEntry(uint64_t entry_id, const CacheEntry& entry) : Cac
 HandshakeEntry::HandshakeEntry(BinaryReadBuffer& buffer) : CacheEntry(buffer), entry_id(buffer.read<uint64_t>()){
 }
 
-void HandshakeEntry::serialize(BinaryWriteBuffer& buffer) const {
-	CacheEntry::serialize(buffer);
-	buffer.write(entry_id);
+void HandshakeEntry::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	CacheEntry::serialize(buffer, is_persistent_memory);
+	buffer << entry_id;
 }
 
 
@@ -58,7 +58,7 @@ CacheUsage::CacheUsage(BinaryReadBuffer& buffer) :
 		capacity_used(buffer.read<uint64_t>()){
 }
 
-void CacheUsage::serialize(BinaryWriteBuffer& buffer) const {
+void CacheUsage::serialize(BinaryWriteBuffer& buffer, bool) const {
 	buffer.write(type);
 	buffer.write(capacity_total);
 	buffer.write(capacity_used);
@@ -102,8 +102,8 @@ CacheContent<T>::CacheContent(BinaryReadBuffer& buffer) : CacheUsage(buffer) {
 }
 
 template<class T>
-void CacheContent<T>::serialize(BinaryWriteBuffer& buffer) const {
-	CacheUsage::serialize(buffer);
+void CacheContent<T>::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	CacheUsage::serialize(buffer, is_persistent_memory);
 
 	buffer.write(static_cast<uint64_t>(items.size()));
 	for ( auto &e : items ) {
@@ -191,14 +191,10 @@ QueryStats& QueryStats::operator +=(const QueryStats& stats) {
 	return *this;
 }
 
-void QueryStats::serialize(BinaryWriteBuffer& buffer) const {
-	buffer.write( single_local_hits );
-	buffer.write( multi_local_hits );
-	buffer.write( multi_local_partials );
-	buffer.write( single_remote_hits );
-	buffer.write( multi_remote_hits );
-	buffer.write( multi_remote_partials );
-	buffer.write( misses );
+void QueryStats::serialize(BinaryWriteBuffer& buffer, bool) const {
+	buffer << single_local_hits << multi_local_hits << multi_local_partials;
+	buffer << single_remote_hits << multi_remote_hits << multi_remote_partials;
+	buffer << misses;
 }
 
 void QueryStats::reset() {
@@ -241,7 +237,7 @@ NodeStats::NodeStats(BinaryReadBuffer& buffer) : query_stats(buffer) {
 		stats.push_back( CacheStats(buffer) );
 }
 
-void NodeStats::serialize(BinaryWriteBuffer& buffer) const {
+void NodeStats::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
 	buffer.write(query_stats);
 	buffer.write(static_cast<uint64_t>(stats.size()));
 	for ( auto &e : stats ) {
@@ -268,7 +264,7 @@ NodeHandshake::NodeHandshake(BinaryReadBuffer& buffer) {
 		data.push_back( CacheHandshake(buffer) );
 }
 
-void NodeHandshake::serialize(BinaryWriteBuffer& buffer) const {
+void NodeHandshake::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
 	buffer.write(port);
 	buffer.write( static_cast<uint64_t>(data.size()) );
 	for ( auto &e : data )

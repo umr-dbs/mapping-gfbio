@@ -65,7 +65,7 @@ class SpatialReference {
 		/*
 		 * Write to a binary buffer
 		 */
-		void serialize(BinaryWriteBuffer &buffer) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 		/*
 		 * Validate if all invariants are met
 		 */
@@ -125,7 +125,7 @@ public:
 	/*
 	 * Write to a binary buffer
 	 */
-	void serialize(BinaryWriteBuffer &buffer) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/*
 	 * Validate if invariants are met
@@ -205,7 +205,7 @@ class TemporalReference : public TimeInterval {
 		/*
 		 * Write to a binary buffer
 		 */
-		void serialize(BinaryWriteBuffer &buffer) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 		/*
 		 * Validate if all invariants are met
 		 */
@@ -308,7 +308,7 @@ class SpatioTemporalReference : public SpatialReference, public TemporalReferenc
 		/*
 		 * Write to a binary buffer
 		 */
-		void serialize(BinaryWriteBuffer &buffer) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 		/*
 		 * Validate if all invariants are met
 		 */

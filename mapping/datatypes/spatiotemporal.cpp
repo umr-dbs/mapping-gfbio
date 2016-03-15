@@ -55,7 +55,7 @@ SpatialReference::SpatialReference(BinaryReadBuffer &buffer) {
 	validate();
 }
 
-void SpatialReference::serialize(BinaryWriteBuffer &buffer) const {
+void SpatialReference::serialize(BinaryWriteBuffer &buffer, bool) const {
 	buffer
 		<< (uint32_t) epsg
 		<< x1 << y1 << x2 << y2
@@ -107,7 +107,7 @@ TimeInterval::TimeInterval(BinaryReadBuffer &buffer) {
 	validate();
 }
 
-void TimeInterval::serialize(BinaryWriteBuffer &buffer) const {
+void TimeInterval::serialize(BinaryWriteBuffer &buffer, bool) const {
 	buffer << t1 << t2;
 }
 
@@ -198,8 +198,8 @@ TemporalReference::TemporalReference(BinaryReadBuffer &buffer) : TimeInterval(bu
 	validate();
 }
 
-void TemporalReference::serialize(BinaryWriteBuffer &buffer) const {
-	TimeInterval::serialize(buffer);
+void TemporalReference::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	TimeInterval::serialize(buffer, is_persistent_memory);
 	buffer << (uint32_t) timetype;
 }
 
@@ -288,9 +288,9 @@ size_t SpatialReference::get_byte_size() const {
 SpatioTemporalReference::SpatioTemporalReference(BinaryReadBuffer &buffer) : SpatialReference(buffer), TemporalReference(buffer) {
 }
 
-void SpatioTemporalReference::serialize(BinaryWriteBuffer &buffer) const {
-	SpatialReference::serialize(buffer);
-	TemporalReference::serialize(buffer);
+void SpatioTemporalReference::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	SpatialReference::serialize(buffer, is_persistent_memory);
+	TemporalReference::serialize(buffer, is_persistent_memory);
 }
 
 SpatioTemporalReference::SpatioTemporalReference(const QueryRectangle &rect) : SpatialReference(rect), TemporalReference(rect) {

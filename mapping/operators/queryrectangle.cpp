@@ -15,10 +15,9 @@ QueryResolution::QueryResolution(BinaryReadBuffer &buffer) {
 	buffer.read(&yres);
 }
 
-void QueryResolution::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(restype);
-	buffer.write(xres);
-	buffer.write(yres);
+void QueryResolution::serialize(BinaryWriteBuffer &buffer, bool) const {
+	buffer << restype;
+	buffer << xres << yres;
 }
 
 /*
@@ -32,10 +31,10 @@ QueryRectangle::QueryRectangle(const GridSpatioTemporalResult &grid)
 QueryRectangle::QueryRectangle(BinaryReadBuffer &buffer) : SpatialReference(buffer), TemporalReference(buffer), QueryResolution(buffer) {
 }
 
-void QueryRectangle::serialize(BinaryWriteBuffer &buffer) const {
-	SpatialReference::serialize(buffer);
-	TemporalReference::serialize(buffer);
-	QueryResolution::serialize(buffer);
+void QueryRectangle::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	SpatialReference::serialize(buffer, is_persistent_memory);
+	TemporalReference::serialize(buffer, is_persistent_memory);
+	QueryResolution::serialize(buffer, is_persistent_memory);
 }
 
 void QueryRectangle::enlarge(int pixels) {

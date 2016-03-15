@@ -17,9 +17,8 @@ Coordinate::Coordinate(BinaryReadBuffer &buffer) {
 	buffer.read(&x);
 	buffer.read(&y);
 }
-void Coordinate::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(x);
-	buffer.write(y);
+void Coordinate::serialize(BinaryWriteBuffer &buffer, bool) const {
+	buffer << x << y;
 }
 
 /**

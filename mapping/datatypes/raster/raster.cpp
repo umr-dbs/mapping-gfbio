@@ -132,7 +132,7 @@ void DataDescription::addNoData() {
 	has_no_data = true;
 }
 
-void DataDescription::serialize(BinaryWriteBuffer &buffer) const {
+void DataDescription::serialize(BinaryWriteBuffer &buffer, bool) const {
 	buffer
 		<< datatype
 		<< unit.toJson()
@@ -214,15 +214,14 @@ GenericRaster::GenericRaster(const DataDescription &datadescription, const Spati
 GenericRaster::~GenericRaster() {
 }
 
-void GenericRaster::serialize(BinaryWriteBuffer &buffer) {
+void GenericRaster::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) {
 	const char *data = (const char *) getData();
 	size_t len = getDataSize();
-	buffer.write(dd);
-	buffer.write(stref);
-	buffer.write((uint32_t) width);
-	buffer.write((uint32_t) height);
-	buffer.write(data, len, true);
-	buffer.write(global_attributes);
+	buffer.write(dd, is_persistent_memory);
+	buffer.write(stref, is_persistent_memory);
+	buffer << (uint32_t) width << (uint32_t) height;
+	buffer.write(data, len, is_persistent_memory);
+	buffer.write(global_attributes, is_persistent_memory);
 }
 
 std::unique_ptr<GenericRaster> GenericRaster::deserialize(BinaryReadBuffer &buffer) {

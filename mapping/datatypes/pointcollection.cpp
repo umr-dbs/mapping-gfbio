@@ -142,7 +142,7 @@ PointCollection::PointCollection(BinaryReadBuffer &buffer) : SimpleFeatureCollec
 	}
 }
 
-void PointCollection::serialize(BinaryWriteBuffer &buffer) const {
+void PointCollection::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
 	buffer << stref;
 	buffer << hasTime();
 
@@ -150,8 +150,8 @@ void PointCollection::serialize(BinaryWriteBuffer &buffer) const {
 	size_t coordinateCount = coordinates.size();
 	buffer << featureCount << coordinateCount;
 
-	buffer << global_attributes;
-	buffer << feature_attributes;
+	buffer.write(global_attributes, is_persistent_memory);
+	buffer.write(feature_attributes, is_persistent_memory);
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {

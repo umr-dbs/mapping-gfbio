@@ -11,7 +11,7 @@ class ProfilingData {
 public:
 	ProfilingData();
 	ProfilingData(BinaryReadBuffer &buffer);
-	void serialize(BinaryWriteBuffer &buffer) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 	std::string to_string() const;
 	double self_cpu;
 	double all_cpu;

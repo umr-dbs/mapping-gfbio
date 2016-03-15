@@ -18,19 +18,18 @@ RasterDBBackend::TileDescription::TileDescription(BinaryReadBuffer &buffer) {
 	buffer.read(&compression);
 }
 
-void RasterDBBackend::TileDescription::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(tileid);
-	buffer.write(channelid);
-	buffer.write(fileid);
-	buffer.write(offset);
-	buffer.write(size);
-	buffer.write(x1);
-	buffer.write(y1);
-	buffer.write(z1);
-	buffer.write(width);
-	buffer.write(height);
-	buffer.write(depth);
-	buffer.write(compression);
+void RasterDBBackend::TileDescription::serialize(BinaryWriteBuffer &buffer, bool) const {
+	buffer
+		<< tileid
+		<< channelid
+		<< fileid
+		<< offset
+		<< size
+		<< x1 << y1 << z1
+		<< width << height
+		<< depth
+		<< compression
+	;
 }
 
 RasterDBBackend::RasterDescription::RasterDescription(BinaryReadBuffer &buffer) {
@@ -39,10 +38,9 @@ RasterDBBackend::RasterDescription::RasterDescription(BinaryReadBuffer &buffer) 
 	buffer.read(&time_end);
 }
 
-void RasterDBBackend::RasterDescription::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(rasterid);
-	buffer.write(time_start);
-	buffer.write(time_end);
+void RasterDBBackend::RasterDescription::serialize(BinaryWriteBuffer &buffer, bool) const {
+	buffer << rasterid;
+	buffer << time_start << time_end;
 }
 
 

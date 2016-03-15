@@ -205,28 +205,28 @@ namespace detail {
 	// ints, floats and enums
 	template <typename T>
 	typename std::enable_if< std::is_arithmetic<remove_rcv_t<T>>::value || std::is_enum<remove_rcv_t<T>>::value >::type
-		buffer_write_helper(BinaryWriteBuffer &buffer, T&& t) {
-		buffer.write((const char *) &t, sizeof(T), false);
+		buffer_write_helper(BinaryWriteBuffer &buffer, T&& t, bool is_persistent_memory) {
+		buffer.write((const char *) &t, sizeof(T), is_persistent_memory);
 	}
 
 	// classes except std::string
 	template <typename T>
 	typename std::enable_if< std::is_class<remove_rcv_t<T>>::value && !std::is_same< remove_rcv_t<T>, std::string>::value >::type
-		buffer_write_helper(BinaryWriteBuffer &buffer, T&& t) {
-		t.serialize(buffer);
+		buffer_write_helper(BinaryWriteBuffer &buffer, T&& t, bool is_persistent_memory) {
+		t.serialize(buffer, is_persistent_memory);
 	}
 
 	// std::string
 	template <typename T>
 	typename std::enable_if< std::is_same< remove_rcv_t<T>, std::string>::value >::type
-		buffer_write_helper(BinaryWriteBuffer &buffer, T&& str) {
-		buffer.writeString(str);
+		buffer_write_helper(BinaryWriteBuffer &buffer, T&& str, bool is_persistent_memory) {
+		buffer.writeString(str, is_persistent_memory);
 	}
 }
 
 
 template<typename T> void BinaryWriteBuffer::write(T&& t, bool is_persistent_memory) {
-	detail::buffer_write_helper<T>(*this, std::forward<T>(t));
+	detail::buffer_write_helper<T>(*this, std::forward<T>(t), is_persistent_memory);
 }
 
 

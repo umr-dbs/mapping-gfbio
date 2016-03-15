@@ -32,7 +32,7 @@ void AttributeMaps::deserialize(BinaryReadBuffer &buffer) {
 	}
 }
 
-void AttributeMaps::serialize(BinaryWriteBuffer &buffer) const {
+void AttributeMaps::serialize(BinaryWriteBuffer &buffer, bool) const {
 	size_t count = _numeric.size();
 	buffer.write(count);
 	for (auto &e : _numeric) {
@@ -134,12 +134,11 @@ void AttributeArrays::AttributeArray<T>::deserialize(BinaryReadBuffer &buffer) {
 }
 
 template <typename T>
-void AttributeArrays::AttributeArray<T>::serialize(BinaryWriteBuffer &buffer) const {
-	std::string unit_json = unit.toJson();
-	buffer.write(unit_json);
-	buffer.write(array.size());
+void AttributeArrays::AttributeArray<T>::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	buffer << unit.toJson();
+	buffer << array.size();
 	for (const auto &v : array)
-		buffer.write(v);
+		buffer << v;
 }
 
 template<typename T> struct defaultvalue {
@@ -198,23 +197,17 @@ void AttributeArrays::deserialize(BinaryReadBuffer &buffer) {
 	}
 }
 
-void AttributeArrays::serialize(BinaryWriteBuffer &buffer) const {
+void AttributeArrays::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
 	size_t keycount = _numeric.size();
-	buffer.write(keycount);
+	buffer << keycount;
 	for (const auto &e : _numeric) {
-		const auto &key = e.first;
-		buffer.write(key);
-		const auto &vec = e.second;
-		buffer.write(vec);
+		buffer << e.first << e.second;
 	}
 
 	keycount = _textual.size();
-	buffer.write(keycount);
+	buffer << keycount;
 	for (const auto &e : _textual) {
-		const auto &key = e.first;
-		buffer.write(key);
-		const auto &vec = e.second;
-		buffer.write(vec);
+		buffer << e.first << e.second;
 	}
 }
 

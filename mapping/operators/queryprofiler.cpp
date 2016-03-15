@@ -23,16 +23,10 @@ ProfilingData::ProfilingData(BinaryReadBuffer& buffer) :
 	uncached_io(buffer.read<uint64_t>()) {
 }
 
-void ProfilingData::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(self_cpu);
-	buffer.write(all_cpu);
-	buffer.write(uncached_cpu);
-	buffer.write(self_gpu);
-	buffer.write(all_gpu);
-	buffer.write(uncached_gpu);
-	buffer.write(self_io);
-	buffer.write(all_io);
-	buffer.write(uncached_io);
+void ProfilingData::serialize(BinaryWriteBuffer &buffer, bool) const {
+	buffer << self_cpu << all_cpu << uncached_cpu;
+	buffer << self_gpu << all_gpu << uncached_gpu;
+	buffer << self_io << all_io << uncached_io;
 }
 
 std::string ProfilingData::to_string() const {

@@ -16,7 +16,7 @@ class QueryResolution {
 		QueryResolution(Type restype, uint32_t xres, uint32_t yres) : restype(restype), xres(xres), yres(yres) {
 		}
 		QueryResolution(BinaryReadBuffer &buffer);
-		void serialize(BinaryWriteBuffer &buffer) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 
 		static QueryResolution pixels(uint32_t xres, uint32_t yres) {
@@ -39,7 +39,7 @@ class QueryRectangle : public SpatialReference, public TemporalReference, public
 		QueryRectangle(const GridSpatioTemporalResult &grid);
 		QueryRectangle(BinaryReadBuffer &buffer);
 
-		void serialize(BinaryWriteBuffer &buffer) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 		void enlarge(int pixels);
 };

@@ -78,7 +78,7 @@ public:
 	 * Serialize collection to buffer
 	 * @param buffer the buffer to serialize to
 	 */
-	void serialize(BinaryWriteBuffer &buffer) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * add a new coordinate to the current line. After adding all coordinates, finishLine() has to be called

@@ -85,7 +85,7 @@ public:
 	 * Serialize collection to a buffer
 	 * @param buffer the buffer to serialize to
 	 */
-	void serialize(BinaryWriteBuffer &buffer) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * add a new coordinate to the current ring. After adding all coordinates, finishRing() has to be called

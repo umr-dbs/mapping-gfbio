@@ -31,6 +31,9 @@ std::unique_ptr<BinaryReadBuffer> getSerializedBuffer(T &&obj) {
 }
 
 static void compareBinaryReadBuffers(const BinaryReadBuffer &a, const BinaryReadBuffer &b) {
+	// Check if the first buffer was completely read on deserialization
+	EXPECT_EQ(a.size_read, a.size_total);
+	// Now check if the buffers are identical
 	EXPECT_EQ(a.getPayloadSize(), b.getPayloadSize());
 	EXPECT_EQ(a.buffer.size(), b.buffer.size());
 	for (size_t i = 0;i<a.buffer.size();i++)

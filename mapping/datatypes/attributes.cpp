@@ -139,7 +139,7 @@ void AttributeArrays::AttributeArray<T>::serialize(BinaryWriteBuffer &buffer) co
 	buffer.write(unit_json);
 	buffer.write(array.size());
 	for (const auto &v : array)
-		buffer.write(&v);
+		buffer.write(v);
 }
 
 template<typename T> struct defaultvalue {

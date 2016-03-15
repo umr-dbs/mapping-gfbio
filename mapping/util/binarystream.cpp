@@ -277,7 +277,7 @@ void BinaryWriteBuffer::write(const char *data, size_t len, bool is_persistent_m
 		throw MustNotHappenException("ERROR: BinaryWriteBuffer, buffer.insert() had a reallocation.");
 }
 
-void BinaryWriteBuffer::write(const std::string &string, bool is_persistent_memory) {
+void BinaryWriteBuffer::writeString(const std::string &string, bool is_persistent_memory) {
 	size_t len = string.size();
 	if (len > (size_t) (1<<31))
 		throw NetworkException("BinaryStream: String too large to transmit");

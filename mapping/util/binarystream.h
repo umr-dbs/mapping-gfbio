@@ -147,18 +147,19 @@ class BinaryWriteBuffer {
 		 *        the write() call. This information can be used to avoid copies.
 		 */
 		void write(const char *buffer, size_t len, bool is_persistent_memory = false);
-		void write(const std::string &string, bool is_persistent_memory = false);
-		void write(std::string &string, bool is_persistent_memory = false) {
-			write( (const std::string &) string, is_persistent_memory );
-		}
 
 		/*
-		 * This will serialize based on the type. Native types will be serialized by their binary represenation.
-		 * When writing an object, this will call object.serialize(buffer).
+		 * This will serialize based on the type. See stream_write_helper below.
+		 * - Native types will be serialized by their binary represenation.
+		 * - std::string has its own serialization function.
+		 * - On all other classes, this will call object.serialize(buffer).
 		 */
-		template<typename T> void write(const T& t);
-		template<typename T> void write(T& t);
-
+		template<typename T> void write(T&& t, bool is_persistent_memory = false);
+		/*
+		 * We cannot add a serialize() method to std:: classes, so we use these helper methods.
+		 * Don't call them directly; use buffer.write(obj)
+		 */
+		void writeString(const std::string &str, bool is_persistent_memory = false);
 
 		void enableLinking() { may_link = true; }
 		void disableLinking() { may_link = false; }
@@ -183,23 +184,39 @@ class BinaryWriteBuffer {
 		size_t areas_sent;
 };
 
-// We need to make sure that classes are never serialized by their binary representation; always call serialize() on them
-template <typename T>
-typename std::enable_if< !std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &buffer, T& t) {
-	buffer.write((const char *) &t, sizeof(T));
+/*
+ * buffer_write_helper is writing a type into a buffer.
+ */
+namespace detail {
+	// strip references, const and volatile from the type
+	template <typename T>
+	using remove_rcv_t = typename std::remove_cv< typename std::remove_reference<T>::type >::type;
+
+	// ints, floats and enums
+	template <typename T>
+	typename std::enable_if< std::is_arithmetic<remove_rcv_t<T>>::value || std::is_enum<remove_rcv_t<T>>::value >::type
+		buffer_write_helper(BinaryWriteBuffer &buffer, T&& t) {
+		buffer.write((const char *) &t, sizeof(T), false);
+	}
+
+	// classes except std::string
+	template <typename T>
+	typename std::enable_if< std::is_class<remove_rcv_t<T>>::value && !std::is_same< remove_rcv_t<T>, std::string>::value >::type
+		buffer_write_helper(BinaryWriteBuffer &buffer, T&& t) {
+		t.serialize(buffer);
+	}
+
+	// std::string
+	template <typename T>
+	typename std::enable_if< std::is_same< remove_rcv_t<T>, std::string>::value >::type
+		buffer_write_helper(BinaryWriteBuffer &buffer, T&& str) {
+		buffer.writeString(str);
+	}
 }
 
-template <typename T>
-typename std::enable_if< std::is_class<T>::value >::type stream_write_helper(BinaryWriteBuffer &buffer, T& t) {
-	t.serialize(buffer);
-}
 
-template<typename T> void BinaryWriteBuffer::write(const T& t) {
-	stream_write_helper<const T>(*this, t);
-}
-
-template<typename T> void BinaryWriteBuffer::write(T& t) {
-	stream_write_helper<T>(*this, t);
+template<typename T> void BinaryWriteBuffer::write(T&& t, bool is_persistent_memory) {
+	detail::buffer_write_helper<T>(*this, std::forward<T>(t));
 }
 
 

@@ -52,7 +52,7 @@ void EchoServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request
 		size_t remaining = bytes_total - bytes_read;
 		size_t next_batch_size = std::min(SERVER_BUFFER_SIZE, remaining);
 		request->read(buffer, next_batch_size);
-		response->write(buffer, next_batch_size);
+		response->write(buffer, next_batch_size, true);
 		bytes_read += next_batch_size;
 	}
 

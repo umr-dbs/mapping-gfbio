@@ -294,6 +294,9 @@ class BinaryReadBuffer {
 		std::vector<char> buffer;
 		Status status;
 		size_t size_total, size_read;
+
+		// This is required by the unit tests to compare to buffers for equality. Don't use it anywhere else.
+		friend void compareBinaryReadBuffers(const BinaryReadBuffer &a, const BinaryReadBuffer &b);
 };
 
 

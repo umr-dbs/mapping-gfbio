@@ -18,72 +18,26 @@ std::unique_ptr<LineCollection> LineCollection::clone() const {
 
 
 LineCollection::LineCollection(BinaryReadBuffer &buffer) : SimpleFeatureCollection(SpatioTemporalReference(buffer)) {
-	auto hasTime = buffer.read<bool>();
-
-	auto featureCount = buffer.read<size_t>();
-	start_feature.reserve(featureCount);
-
-	auto lineCount = buffer.read<size_t>();
-	start_line.reserve(lineCount);
-
-	auto coordinateCount = buffer.read<size_t>();
-	coordinates.reserve(coordinateCount);
-
 	global_attributes.deserialize(buffer);
 	feature_attributes.deserialize(buffer);
 
-	if (hasTime) {
-		time.reserve(featureCount);
-		for (size_t i = 0; i < featureCount; i++) {
-			time.push_back(TimeInterval(buffer));
-		}
-	}
-
-	uint32_t offset;
-	for (size_t i = 0; i < featureCount; i++) {
-		buffer.read(&offset);
-		start_feature.push_back(offset);
-	}
-
-	for (size_t i = 0; i < lineCount; i++) {
-		buffer.read(&offset);
-		start_line.push_back(offset);
-	}
-
-	for (size_t i = 0; i < coordinateCount; i++) {
-		coordinates.push_back(Coordinate(buffer));
-	}
+	buffer.read(&coordinates);
+	buffer.read(&time);
+	buffer.read(&start_feature);
+	buffer.read(&start_line);
 }
 
 void LineCollection::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
-	buffer << stref;
-	buffer << hasTime();
-
-	size_t featureCount = start_feature.size();
-	size_t lineCount = start_line.size();
-	size_t coordinateCount = coordinates.size();
-	buffer << featureCount << lineCount << coordinateCount;
+	buffer.write(stref, is_persistent_memory);
 
 	buffer.write(global_attributes, is_persistent_memory);
 	buffer.write(feature_attributes, is_persistent_memory);
 
-	if (hasTime()) {
-		for (size_t i = 0; i < featureCount; i++) {
-			buffer << time[i];
-		}
-	}
+	buffer.write(coordinates, is_persistent_memory);
+	buffer.write(time, is_persistent_memory);
 
-	for (size_t i = 0; i < featureCount; i++) {
-		buffer << start_feature[i];
-	}
-
-	for (size_t i = 0; i < lineCount; i++) {
-		buffer << start_line[i];
-	}
-
-	for (size_t i = 0; i < coordinateCount; i++) {
-		buffer << coordinates[i];
-	}
+	buffer.write(start_feature, is_persistent_memory);
+	buffer.write(start_line, is_persistent_memory);
 }
 
 template<typename T>

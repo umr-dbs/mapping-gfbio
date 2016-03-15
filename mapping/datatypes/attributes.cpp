@@ -124,21 +124,13 @@ template <typename T>
 void AttributeArrays::AttributeArray<T>::deserialize(BinaryReadBuffer &buffer) {
 	auto unit_json = buffer.read<std::string>();
 	unit = Unit(unit_json);
-	auto size = buffer.read<size_t>();
-	array.reserve(size);
-	for (size_t i=0;i<size;i++) {
-		auto value = buffer.read<T>();
-		array.push_back(value);
-	}
-
+	buffer.read(&array);
 }
 
 template <typename T>
 void AttributeArrays::AttributeArray<T>::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
 	buffer << unit.toJson();
-	buffer << array.size();
-	for (const auto &v : array)
-		buffer << v;
+	buffer.write(array, is_persistent_memory);
 }
 
 template<typename T> struct defaultvalue {

@@ -194,20 +194,47 @@ class BinaryWriteBuffer {
  * buffer_write_helper is writing a type into a buffer.
  */
 namespace detail {
+	/*
+	 * First, add some helper templates to modify and classify types.
+	 */
+
 	// strip references, const and volatile from the type
 	template <typename T>
 	using remove_rcv_t = typename std::remove_cv< typename std::remove_reference<T>::type >::type;
 
-	// ints, floats and enums
+	// is a primitive type: ints, floats and enums
 	template <typename T>
-	typename std::enable_if< std::is_arithmetic<remove_rcv_t<T>>::value || std::is_enum<remove_rcv_t<T>>::value >::type
+	using is_primitive = std::integral_constant<bool,
+			std::is_arithmetic<remove_rcv_t<T>>::value
+			|| std::is_enum<remove_rcv_t<T>>::value
+		>;
+
+	// is a vector
+	template <typename T> struct is_vector : std::false_type {};
+	template <typename T> struct is_vector< std::vector<T> > : std::true_type {};
+
+	// is a class with a .serialize() method
+	// TODO: this is a broken heuristic for now, meaning any class that's not a std::string or std::vector
+	template <typename T>
+	using is_serializable = std::integral_constant<bool,
+			std::is_class<remove_rcv_t<T>>::value
+			&& !std::is_same< remove_rcv_t<T>, std::string>::value
+			&& !is_vector< remove_rcv_t<T> >::value
+		>;
+
+	/*
+	 * Now define the buffer_write_helper() method, which writes the given argument to the buffer.
+	 */
+	// For primitive types
+	template <typename T>
+	typename std::enable_if< is_primitive<T>::value >::type
 		buffer_write_helper(BinaryWriteBuffer &buffer, T&& t, bool is_persistent_memory) {
 		buffer.write((const char *) &t, sizeof(T), is_persistent_memory);
 	}
 
-	// classes except std::string
+	// For serializable classes
 	template <typename T>
-	typename std::enable_if< std::is_class<remove_rcv_t<T>>::value && !std::is_same< remove_rcv_t<T>, std::string>::value >::type
+	typename std::enable_if< is_serializable<T>::value >::type
 		buffer_write_helper(BinaryWriteBuffer &buffer, T&& t, bool is_persistent_memory) {
 		t.serialize(buffer, is_persistent_memory);
 	}
@@ -218,11 +245,30 @@ namespace detail {
 		buffer_write_helper(BinaryWriteBuffer &buffer, T&& str, bool is_persistent_memory) {
 		buffer.writeString(str, is_persistent_memory);
 	}
+
+	// std::vector of a primitive type
+	// These are guaranteed to be continuous in memory, so we can just write the whole array at once
+	template <typename T>
+	typename std::enable_if< is_primitive<T>::value >::type
+		buffer_write_helper(BinaryWriteBuffer &buffer, const std::vector<T> &vec, bool is_persistent_memory) {
+		buffer.write(vec.size());
+		buffer.write((char *) vec.data(), vec.size()*sizeof(T), is_persistent_memory);
+	}
+
+	// std::vector of a serializable class or std::string
+	// We must serialize each element sequentially
+	template <typename T>
+	typename std::enable_if< is_serializable<T>::value || std::is_same< remove_rcv_t<T>, std::string>::value >::type
+		buffer_write_helper(BinaryWriteBuffer &buffer, const std::vector<T> &vec, bool is_persistent_memory) {
+		buffer.write(vec.size());
+		for (size_t i=0;i<vec.size();i++)
+			buffer.write(vec[i], is_persistent_memory);
+	}
 }
 
 
 template<typename T> void BinaryWriteBuffer::write(T&& t, bool is_persistent_memory) {
-	detail::buffer_write_helper<T>(*this, std::forward<T>(t), is_persistent_memory);
+	detail::buffer_write_helper(*this, std::forward<T>(t), is_persistent_memory);
 }
 
 
@@ -278,8 +324,43 @@ class BinaryReadBuffer {
 		 */
 		size_t read(char *buffer, size_t len, bool allow_eof = false);
 		size_t read(std::string *string, bool allow_eof = false);
-		template<typename T> typename std::enable_if< !std::is_class<T>::value, size_t>::type
+		template<typename T> typename std::enable_if< detail::is_primitive<T>::value, size_t>::type
 			read(T *t, bool allow_eof = false) { return read((char *) t, sizeof(T), allow_eof); }
+
+		// easier deserialization of std::vector
+		// std::vector of a primitive type
+		template<typename T> typename std::enable_if< detail::is_primitive<T>::value, size_t>::type
+			read(std::vector<T> *vec, bool allow_eof = false) {
+				size_t size;
+				if (read(&size, allow_eof) == 0)
+					return 0;
+				vec->resize(size);
+				return read((char *) vec->data(), size*sizeof(T)) + sizeof(size_t);
+			}
+		// std::vector of a serializable class
+		template<typename T> typename std::enable_if< detail::is_serializable<T>::value, size_t>::type
+			read(std::vector<T> *vec, bool allow_eof = false) {
+				size_t size;
+				if (read(&size, allow_eof) == 0)
+					return 0;
+				vec->clear();
+				vec->reserve(size);
+				for (size_t i=0;i<size;i++)
+					vec->emplace_back(*this);
+				return 1;
+			}
+		// std::vector of a std::string
+			size_t read(std::vector<std::string> *vec, bool allow_eof = false) {
+				size_t size;
+				if (read(&size, allow_eof) == 0)
+					return 0;
+				vec->resize(size);
+				for (size_t i=0;i<size;i++)
+					read(&((*vec)[i]));
+				return 1;
+			}
+
+
 		template<typename T>
 			T read() {
 				T t; read(&t); return t;

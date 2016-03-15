@@ -113,59 +113,24 @@ bool PointCollection::featureIntersectsRectangle(size_t featureIndex, double x1,
 
 
 PointCollection::PointCollection(BinaryReadBuffer &buffer) : SimpleFeatureCollection(SpatioTemporalReference(buffer)) {
-	auto hasTime = buffer.read<bool>();
-
-	auto featureCount = buffer.read<size_t>();
-	start_feature.reserve(featureCount);
-
-	auto coordinateCount = buffer.read<size_t>();
-	coordinates.reserve(coordinateCount);
-
 	global_attributes.deserialize(buffer);
 	feature_attributes.deserialize(buffer);
 
-	if (hasTime) {
-		time.reserve(featureCount);
-		for (size_t i = 0; i < featureCount; i++) {
-			time.push_back(TimeInterval(buffer));
-		}
-	}
-
-	uint32_t offset;
-	for (size_t i = 0; i < featureCount; i++) {
-		auto offset = buffer.read<uint32_t>();
-		start_feature.push_back(offset);
-	}
-
-	for (size_t i = 0; i < coordinateCount; i++) {
-		coordinates.push_back(Coordinate(buffer));
-	}
+	buffer.read(&coordinates);
+	buffer.read(&time);
+	buffer.read(&start_feature);
 }
 
 void PointCollection::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
-	buffer << stref;
-	buffer << hasTime();
-
-	size_t featureCount = start_feature.size();
-	size_t coordinateCount = coordinates.size();
-	buffer << featureCount << coordinateCount;
+	buffer.write(stref, is_persistent_memory);
 
 	buffer.write(global_attributes, is_persistent_memory);
 	buffer.write(feature_attributes, is_persistent_memory);
 
-	if (hasTime()) {
-		for (size_t i = 0; i < featureCount; i++) {
-			buffer << time[i];
-		}
-	}
+	buffer.write(coordinates, is_persistent_memory);
+	buffer.write(time, is_persistent_memory);
 
-	for (size_t i = 0; i < featureCount; i++) {
-		buffer << start_feature[i];
-	}
-
-	for (size_t i = 0; i < coordinateCount; i++) {
-		buffer << coordinates[i];
-	}
+	buffer.write(start_feature, is_persistent_memory);
 }
 
 void PointCollection::addFeatureFromCollection(const PointCollection &collection, size_t feature, const std::vector<std::string> &textualAttributes, const std::vector<std::string> &numericAttributes) {

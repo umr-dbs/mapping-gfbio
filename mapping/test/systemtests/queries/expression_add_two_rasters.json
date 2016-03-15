@@ -1,5 +1,5 @@
 {
-	"name": "Identity expression",
+	"name": "Expression add two rasters",
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",

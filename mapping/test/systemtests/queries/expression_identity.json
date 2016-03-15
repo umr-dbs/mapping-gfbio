@@ -23,8 +23,12 @@
         "params": {
             "datatype": "input",
             "expression": "A",
-            "max": 255,
-            "min": 71
+            "unit": {
+				"measurement": "unknown",
+				"unit": "unknown",
+				"min": 71,
+				"max": 255
+	        }
         },
         "sources": {
             "raster": [
@@ -39,5 +43,5 @@
         },
         "type": "expression"
     },
-    "query_expected_hash": "715612544ff0b8cd1933a5f5ed860f83"
+    "query_expected_hash": "4854d04d559df4f643cb73e8b352f348"
 }

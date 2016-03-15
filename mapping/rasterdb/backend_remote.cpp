@@ -39,7 +39,6 @@ std::vector<std::string> RemoteRasterDBBackend::enumerateSources() {
 	BinaryWriteBuffer request;
 	request.write(c);
 	stream->write(request);
-	stream->flush();
 
 	BinaryReadBuffer response;
 	stream->read(response);
@@ -59,7 +58,6 @@ std::string RemoteRasterDBBackend::readJSON(const std::string &sourcename) {
 	request.write(c);
 	request.write(sourcename);
 	stream->write(request);
-	stream->flush();
 
 	BinaryReadBuffer response;
 	stream->read(response);
@@ -83,7 +81,6 @@ void RemoteRasterDBBackend::open(const std::string &_sourcename, bool writeable)
 	request.write(c);
 	request.write(this->sourcename);
 	stream->write(request);
-	stream->flush();
 
 	BinaryReadBuffer response;
 	stream->read(response);
@@ -105,7 +102,6 @@ std::string RemoteRasterDBBackend::readJSON() {
 		BinaryWriteBuffer request;
 		request.write(c);
 		stream->write(request);
-		stream->flush();
 
 		BinaryReadBuffer response;
 		stream->read(response);
@@ -127,7 +123,6 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 	request.write(t1);
 	request.write(t2);
 	stream->write(request);
-	stream->flush();
 
 	BinaryReadBuffer response;
 	stream->read(response);
@@ -149,7 +144,6 @@ void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &a
 	request.write(c);
 	request.write(rasterid);
 	stream->write(request);
-	stream->flush();
 
 	BinaryReadBuffer response;
 	stream->read(response);
@@ -182,7 +176,6 @@ int RemoteRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 	request.write(rasterid);
 	request.write(desiredzoom);
 	stream->write(request);
-	stream->flush();
 
 	BinaryReadBuffer response;
 	stream->read(response);
@@ -207,7 +200,6 @@ const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enume
 	request.write(y2);
 	request.write(zoom);
 	stream->write(request);
-	stream->flush();
 
 	BinaryReadBuffer response;
 	stream->read(response);
@@ -270,7 +262,6 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 	request.write(c);
 	request.write(tiledesc);
 	stream->write(request);
-	stream->flush();
 
 	BinaryReadBuffer response;
 	stream->read(response);

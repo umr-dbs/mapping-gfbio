@@ -66,8 +66,6 @@ class BinaryStream {
 		 * Fill a BinaryReadBuffer with contents from the stream (blocking)
 		 */
 		virtual void read(BinaryReadBuffer &buffer);
-
-		void flush() {}; // TODO: remove
 };
 
 

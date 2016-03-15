@@ -1,0 +1,54 @@
+{
+	"name": "Identity expression",
+	"query_result": "raster",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 0
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "resolution": {
+    	"type": "pixels",
+        "x": 10800,
+        "y": 5400
+    },
+    "name": "Identity Expression",
+    "query": {
+        "params": {
+            "datatype": "UInt16",
+            "expression": "A + B",
+            "unit": {
+				"measurement": "unknown",
+				"unit": "unknown",
+				"min": 71,
+				"max": 510
+	        }
+        },
+        "sources": {
+            "raster": [
+                {
+                    "params": {
+                        "channel": 0,
+                        "sourcename": "world1"
+                    },
+                    "type": "source"
+                },
+                {
+                    "params": {
+                        "channel": 0,
+                        "sourcename": "world1"
+                    },
+                    "type": "source"
+                }
+            ]
+        },
+        "type": "expression"
+    },
+    "query_expected_hash": "c8d7c87824baeba031632d8d81dce4d9"
+}

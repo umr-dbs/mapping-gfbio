@@ -91,15 +91,13 @@ std::unique_ptr<BinaryReadBuffer> ROperator::runScript(BinaryStream &stream, con
 			if (type == RSERVER_TYPE_RASTER) {
 				auto raster = getRasterFromSource(childidx, qrect, profiler);
 				BinaryWriteBuffer requested_data;
-				requested_data.enableLinking();
-				requested_data.write(*raster);
+				requested_data.write(*raster, true);
 				stream.write(requested_data);
 			}
 			else if (type == RSERVER_TYPE_POINTS) {
 				auto points = getPointCollectionFromSource(childidx, qrect, profiler);
 				BinaryWriteBuffer requested_data;
-				requested_data.enableLinking();
-				requested_data.write(*points);
+				requested_data.write(*points, true);
 				stream.write(requested_data);
 			}
 			else {

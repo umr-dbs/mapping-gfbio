@@ -170,9 +170,6 @@ class BinaryWriteBuffer {
 		 */
 		void writeString(const std::string &str, bool is_persistent_memory = false);
 
-		void enableLinking() { may_link = true; }
-		void disableLinking() { may_link = false; }
-
 		bool isWriting() { return status == Status::WRITING; }
 		bool isFinished() { return status == Status::FINISHED; }
 		size_t getSize();
@@ -183,7 +180,6 @@ class BinaryWriteBuffer {
 
 		std::vector<char> buffer;
 		std::vector<Area> areas;
-		bool may_link;
 		Status status;
 
 		size_t next_area_start;

@@ -52,7 +52,7 @@ void EchoServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request
 		size_t remaining = bytes_total - bytes_read;
 		size_t next_batch_size = std::min(SERVER_BUFFER_SIZE, remaining);
 		request->read(buffer, next_batch_size);
-		response->write(buffer, next_batch_size, true);
+		response->write(buffer, next_batch_size, false);
 		bytes_read += next_batch_size;
 	}
 
@@ -131,7 +131,6 @@ static void run_client(int id) {
 		for (req=0;req<NUM_REQUESTS;req++) {
 			//printf("Client %d is at %d of %d\n", id, req, NUM_REQUESTS);
 			BinaryWriteBuffer request;
-			request.enableLinking();
 			request.write(request_bytes.c_str(), request_bytes.size(), true);
 			stream->write(request);
 

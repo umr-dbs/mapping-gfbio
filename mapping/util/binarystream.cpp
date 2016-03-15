@@ -237,7 +237,7 @@ bool BinaryFDStream::readNB(BinaryReadBuffer &buffer, bool allow_eof) {
 /*
  * BinaryWriteBuffer
  */
-BinaryWriteBuffer::BinaryWriteBuffer() : may_link(false), status(Status::CREATING), next_area_start(0), size_total(0), size_sent(0), areas_sent(0) {
+BinaryWriteBuffer::BinaryWriteBuffer() : status(Status::CREATING), next_area_start(0), size_total(0), size_sent(0), areas_sent(0) {
 	// always prefix with the size
 	areas.emplace_back((const char *) &size_total, sizeof(size_total));
 }
@@ -249,7 +249,7 @@ void BinaryWriteBuffer::write(const char *data, size_t len, bool is_persistent_m
 		throw ArgumentException("cannot write() to a BinaryWriteBuffer after it was prepared for sending");
 
 	// maybe we can just link to external memory, without touching our buffer
-	if (may_link && is_persistent_memory && len >= 64) {
+	if (is_persistent_memory && len >= 64) {
 		finishBufferedArea();
 		areas.emplace_back(data, len);
 		return;

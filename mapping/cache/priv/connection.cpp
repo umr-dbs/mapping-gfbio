@@ -634,7 +634,6 @@ void DeliveryConnection::send(std::shared_ptr<const T> item) {
 
 	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
 	buffer->write(RESP_OK);
-	buffer->enableLinking();
 	write_data(*buffer,item);
 	begin_write(std::move(buffer));
 }
@@ -648,7 +647,6 @@ void DeliveryConnection::send_cache_entry(const FetchInfo& info,
 	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
 	buffer->write(RESP_OK);
 	buffer->write(info);
-	buffer->enableLinking();
 	write_data(*buffer,item);
 	begin_write(std::move(buffer));
 }
@@ -662,7 +660,6 @@ void DeliveryConnection::send_move(const CacheEntry& info,
 	auto buffer = make_unique<BinaryWriteBufferWithSharedObject<const T>>(item);
 	buffer->write(RESP_OK);
 	buffer->write(info);
-	buffer->enableLinking();
 	write_data(*buffer,item);
 	begin_write(std::move(buffer));
 }

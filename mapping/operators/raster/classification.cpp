@@ -46,23 +46,23 @@ ClassificationOperator::ClassificationOperator(int sourcecounts[], GenericOperat
 	for (Json::Value::ArrayIndex i=0;i<classification_list.size();i++) {
 		Json::Value classification_case = classification_list[i];
 		if(!classification_case.isArray())
-			throw OperatorException("Classification: \"classification_case\" on position "+std::to_string(i)+" is no array! ->" + classification_case.asString());
+			throw OperatorException("Classification: \"classification_case\" on position "+std::to_string(i)+" is no array! ->" + classification_case.toStyledString());
 		if(classification_case.size() != 3)
-			throw OperatorException("Classification: \"classification_case\" on position "+std::to_string(i)+" is to short/long! Expected: size() == 3 ->" + classification_case.asString());
+			throw OperatorException("Classification: \"classification_case\" on position "+std::to_string(i)+" is to short/long! Expected: size() == 3 ->" + classification_case.toStyledString());
 		//now get the values and push them into the vectors
 		Json::Value value = classification_case[0];
 		if(!value.isConvertibleTo(Json::ValueType::realValue))
-			throw OperatorException("Classification: \"lower_border\" on position "+std::to_string(i)+" is not convertible to a real value ->" + classification_case.asString());
+			throw OperatorException("Classification: \"lower_border\" on position "+std::to_string(i)+" is not convertible to a real value ->" + classification_case.toStyledString());
 		classification_lower_border.push_back(static_cast<float>(value.asDouble()));
 
 		value = classification_case[1];
 		if(!value.isConvertibleTo(Json::ValueType::realValue))
-			throw OperatorException("Classification: \"upper_border\" on position "+std::to_string(i)+" is not convertible to a real value ->" + classification_case.asString());
+			throw OperatorException("Classification: \"upper_border\" on position "+std::to_string(i)+" is not convertible to a real value ->" + classification_case.toStyledString());
 		classification_upper_border.push_back(static_cast<float>(value.asDouble()));
 
 		value = classification_case[2];
 		if(!value.isConvertibleTo(Json::ValueType::intValue))
-			throw OperatorException("Classification: \"upper_border\" on position "+std::to_string(i)+" is not convertible to an int value ->" + classification_case.asString());
+			throw OperatorException("Classification: \"upper_border\" on position "+std::to_string(i)+" is not convertible to an int value ->" + classification_case.toStyledString());
 		classification_classes.push_back(value.asInt());
 	}
 }

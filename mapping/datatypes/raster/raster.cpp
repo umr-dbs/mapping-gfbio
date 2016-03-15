@@ -133,12 +133,15 @@ void DataDescription::addNoData() {
 }
 
 void DataDescription::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(datatype);
-	buffer.write(unit.toJson());
-	buffer.write(has_no_data);
+	buffer
+		<< datatype
+		<< unit.toJson()
+		<< has_no_data
+	;
 	if (has_no_data)
-		buffer.write(no_data);
+		buffer << no_data;
 }
+
 DataDescription::DataDescription(BinaryReadBuffer &buffer) : unit{Unit::UNINITIALIZED} {
 	buffer.read(&datatype);
 	auto unitstr = buffer.read<std::string>();

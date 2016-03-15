@@ -143,29 +143,28 @@ PointCollection::PointCollection(BinaryReadBuffer &buffer) : SimpleFeatureCollec
 }
 
 void PointCollection::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(stref);
-	buffer.write(hasTime());
+	buffer << stref;
+	buffer << hasTime();
 
 	size_t featureCount = start_feature.size();
-	buffer.write(featureCount);
 	size_t coordinateCount = coordinates.size();
-	buffer.write(coordinateCount);
+	buffer << featureCount << coordinateCount;
 
-	buffer.write(global_attributes);
-	buffer.write(feature_attributes);
+	buffer << global_attributes;
+	buffer << feature_attributes;
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {
-			buffer.write(time[i]);
+			buffer << time[i];
 		}
 	}
 
 	for (size_t i = 0; i < featureCount; i++) {
-		buffer.write(start_feature[i]);
+		buffer << start_feature[i];
 	}
 
 	for (size_t i = 0; i < coordinateCount; i++) {
-		buffer.write(coordinates[i]);
+		buffer << coordinates[i];
 	}
 }
 

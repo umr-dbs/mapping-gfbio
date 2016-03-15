@@ -56,11 +56,10 @@ SpatialReference::SpatialReference(BinaryReadBuffer &buffer) {
 }
 
 void SpatialReference::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write((uint32_t) epsg);
-	buffer.write(x1);
-	buffer.write(y1);
-	buffer.write(x2);
-	buffer.write(y2);
+	buffer
+		<< (uint32_t) epsg
+		<< x1 << y1 << x2 << y2
+	;
 }
 
 /*
@@ -109,8 +108,7 @@ TimeInterval::TimeInterval(BinaryReadBuffer &buffer) {
 }
 
 void TimeInterval::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(t1);
-	buffer.write(t2);
+	buffer << t1 << t2;
 }
 
 void TimeInterval::validate() const {
@@ -202,7 +200,7 @@ TemporalReference::TemporalReference(BinaryReadBuffer &buffer) : TimeInterval(bu
 
 void TemporalReference::serialize(BinaryWriteBuffer &buffer) const {
 	TimeInterval::serialize(buffer);
-	buffer.write((uint32_t) timetype);
+	buffer << (uint32_t) timetype;
 }
 
 

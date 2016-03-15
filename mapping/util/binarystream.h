@@ -156,6 +156,15 @@ class BinaryWriteBuffer {
 		 */
 		template<typename T> void write(T&& t, bool is_persistent_memory = false);
 		/*
+		 * operator<< overload for code brevity.
+		 */
+		template<typename T>
+		BinaryWriteBuffer &operator<<(T&& t) {
+			write(std::forward<T>(t), false);
+			return *this;
+		}
+
+		/*
 		 * We cannot add a serialize() method to std:: classes, so we use these helper methods.
 		 * Don't call them directly; use buffer.write(obj)
 		 */
@@ -183,6 +192,7 @@ class BinaryWriteBuffer {
 		size_t size_sent;
 		size_t areas_sent;
 };
+
 
 /*
  * buffer_write_helper is writing a type into a buffer.

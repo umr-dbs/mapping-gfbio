@@ -67,42 +67,38 @@ PolygonCollection::PolygonCollection(BinaryReadBuffer &buffer) : SimpleFeatureCo
 }
 
 void PolygonCollection::serialize(BinaryWriteBuffer &buffer) const {
-	buffer.write(stref);
-	buffer.write(hasTime());
+	buffer << stref;
+	buffer << hasTime();
 
 	size_t featureCount = start_feature.size();
-	buffer.write(featureCount);
 	size_t polygonCount = start_polygon.size();
-	buffer.write(polygonCount);
 	size_t ringCount = start_ring.size();
-	buffer.write(ringCount);
 	size_t coordinateCount = coordinates.size();
-	buffer.write(coordinateCount);
+	buffer << featureCount << polygonCount << ringCount << coordinateCount;
 
-
-	buffer.write(global_attributes);
-	buffer.write(feature_attributes);
+	buffer << global_attributes;
+	buffer << feature_attributes;
 
 	if (hasTime()) {
 		for (size_t i = 0; i < featureCount; i++) {
-			buffer.write(time[i]);
+			buffer << time[i];
 		}
 	}
 
 	for (size_t i = 0; i < featureCount; i++) {
-		buffer.write(start_feature[i]);
+		buffer << start_feature[i];
 	}
 
 	for (size_t i = 0; i < polygonCount; i++) {
-		buffer.write(start_polygon[i]);
+		buffer << start_polygon[i];
 	}
 
 	for (size_t i = 0; i < ringCount; i++) {
-		buffer.write(start_ring[i]);
+		buffer << start_ring[i];
 	}
 
 	for (size_t i = 0; i < coordinateCount; i++) {
-		buffer.write(coordinates[i]);
+		buffer << coordinates[i];
 	}
 }
 

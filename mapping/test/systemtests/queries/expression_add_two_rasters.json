@@ -1,5 +1,5 @@
 {
-	"name": "Identity expression",
+	"name": "Expression add two rasters",
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",
@@ -21,17 +21,24 @@
     "name": "Identity Expression",
     "query": {
         "params": {
-            "datatype": "input",
-            "expression": "A",
+            "datatype": "UInt16",
+            "expression": "A + B",
             "unit": {
 				"measurement": "unknown",
 				"unit": "unknown",
 				"min": 71,
-				"max": 255
+				"max": 510
 	        }
         },
         "sources": {
             "raster": [
+                {
+                    "params": {
+                        "channel": 0,
+                        "sourcename": "world1"
+                    },
+                    "type": "source"
+                },
                 {
                     "params": {
                         "channel": 0,
@@ -43,5 +50,5 @@
         },
         "type": "expression"
     },
-    "query_expected_hash": "4854d04d559df4f643cb73e8b352f348"
+    "query_expected_hash": "c8d7c87824baeba031632d8d81dce4d9"
 }

@@ -2,12 +2,12 @@
    "channels" : [
       {
          "datatype" : "Byte",
-         "nodata" : 0.0,
+         "nodata" : 255.0,
          "unit" : {
             "interpolation" : "unknown",
-            "max" : 255.0,
+            "max" : 254.0,
             "measurement" : "unknown",
-            "min" : 1.0,
+            "min" : 0.0,
             "unit" : "unknown"
          }
       }

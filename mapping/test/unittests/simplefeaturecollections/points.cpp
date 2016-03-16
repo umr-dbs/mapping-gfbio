@@ -247,8 +247,8 @@ TEST(PointCollection, SimpletoARFFWithTime) {
 			"@ATTRIBUTE test NUMERIC\n"
 			"\n"
 			"@DATA\n"
-			"1,2,\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"TEST123\",5.1\n"
-			"2,3,\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"TEST1234\",2.1\n";
+			"1,2,\"-infinity\",\"infinity\",\"TEST123\",5.1\n"
+			"2,3,\"-infinity\",\"infinity\",\"TEST1234\",2.1\n";
 	EXPECT_EQ(expected, points.toARFF());
 }
 

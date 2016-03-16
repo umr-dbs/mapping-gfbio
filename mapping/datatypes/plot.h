@@ -23,13 +23,14 @@ public:
 
 	virtual std::unique_ptr<GenericPlot> clone() const = 0;
 
-	virtual void toStream(BinaryStream &stream) const {
+	virtual void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
 		// TODO
+		throw MustNotHappenException("Implement me!");
 	}
 
-	static std::unique_ptr<GenericPlot> fromStream(BinaryStream &stream) {
+	static std::unique_ptr<GenericPlot> deserialize(BinaryReadBuffer &buffer) {
 		// TODO
-		throw OperatorException("Implement me!");
+		throw MustNotHappenException("Implement me!");
 	}
 
 	std::string hash() const {

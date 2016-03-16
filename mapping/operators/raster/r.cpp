@@ -91,15 +91,13 @@ std::unique_ptr<BinaryReadBuffer> ROperator::runScript(BinaryStream &stream, con
 			if (type == RSERVER_TYPE_RASTER) {
 				auto raster = getRasterFromSource(childidx, qrect, profiler);
 				BinaryWriteBuffer requested_data;
-				requested_data.enableLinking();
-				requested_data.write(*raster);
+				requested_data.write(*raster, true);
 				stream.write(requested_data);
 			}
 			else if (type == RSERVER_TYPE_POINTS) {
 				auto points = getPointCollectionFromSource(childidx, qrect, profiler);
 				BinaryWriteBuffer requested_data;
-				requested_data.enableLinking();
-				requested_data.write(*points);
+				requested_data.write(*points, true);
 				stream.write(requested_data);
 			}
 			else {
@@ -125,11 +123,11 @@ std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect, 
 	if (result_type != "raster")
 		throw OperatorException("This R script does not return rasters");
 
-	BinaryFDStream socket(socketpath.c_str());
+	auto socket = BinaryStream::connectUNIX(socketpath.c_str());
 	auto response = runScript(socket, rect, RSERVER_TYPE_RASTER, profiler);
 	socket.close();
 
-	auto raster = GenericRaster::fromStream(*(response.get()));
+	auto raster = GenericRaster::deserialize(*(response.get()));
 	return raster;
 }
 
@@ -137,7 +135,7 @@ std::unique_ptr<PointCollection> ROperator::getPointCollection(const QueryRectan
 	if (result_type != "points")
 		throw OperatorException("This R script does not return a point collection");
 
-	BinaryFDStream socket(socketpath.c_str());
+	auto socket = BinaryStream::connectUNIX(socketpath.c_str());
 	auto response = runScript(socket, rect, RSERVER_TYPE_POINTS, profiler);
 	socket.close();
 
@@ -151,7 +149,7 @@ std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect, Quer
 	if (!wants_text && !wants_plot)
 		throw OperatorException("This R script does not return a plot");
 
-	BinaryFDStream socket(socketpath.c_str());
+	auto socket = BinaryStream::connectUNIX(socketpath.c_str());
 	auto response = runScript(socket, rect, wants_text ? RSERVER_TYPE_STRING : RSERVER_TYPE_PLOT, profiler);
 	socket.close();
 

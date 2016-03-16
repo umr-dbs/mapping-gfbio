@@ -112,15 +112,15 @@ static std::atomic<bool> all_clients_successful;
 static void run_client(int id) {
 	int req=0;
 	try {
-		auto stream = make_unique<BinaryFDStream>("127.0.0.1", SERVER_PORT, true);
+		auto stream = BinaryStream::connectTCP("127.0.0.1", SERVER_PORT, true);
 
 		for (req=0;req<NUM_REQUESTS;req++) {
 			BinaryWriteBuffer request;
 			request.write((int) req);
-			stream->write(request);
+			stream.write(request);
 
 			BinaryReadBuffer response;
-			stream->read(response);
+			stream.read(response);
 
 			auto res = response.read<int>();
 			if (res != req) {

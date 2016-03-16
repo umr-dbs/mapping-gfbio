@@ -89,7 +89,7 @@ std::unique_ptr<GenericRaster> query_raster_source(BinaryStream &stream, int chi
 
 	BinaryReadBuffer new_request;
 	stream.read(new_request);
-	auto raster = GenericRaster::fromStream(new_request);
+	auto raster = GenericRaster::deserialize(new_request);
 	raster->setRepresentation(GenericRaster::Representation::CPU);
 	return raster;
 }
@@ -149,7 +149,7 @@ static std::string read_file_as_string(const std::string &filename) {
 
 
 void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
-	BinaryFDStream stream(sock_fd, sock_fd);
+	auto stream = BinaryStream::fromAcceptedSocket(sock_fd);
 
 	BinaryReadBuffer request;
 	stream.read(request);
@@ -206,18 +206,16 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			auto raster = ***REMOVED***::as<std::unique_ptr<GenericRaster>>(result);
 			is_sending = true;
 			BinaryWriteBuffer response;
-			response.enableLinking();
 			response.write((char) -RSERVER_TYPE_RASTER);
-			response.write(*raster);
+			response.write(*raster, true);
 			stream.write(response);
 		}
 		else if (type == RSERVER_TYPE_POINTS) {
 			auto points = ***REMOVED***::as<std::unique_ptr<PointCollection>>(result);
 			is_sending = true;
 			BinaryWriteBuffer response;
-			response.enableLinking();
 			response.write((char) -RSERVER_TYPE_POINTS);
-			response.write(*points);
+			response.write(*points, true);
 			stream.write(response);
 		}
 		else if (type == RSERVER_TYPE_STRING) {
@@ -225,7 +223,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			is_sending = true;
 			BinaryWriteBuffer response;
 			response.write((char) -RSERVER_TYPE_STRING);
-			response.write(output);
+			response.write(output, true);
 			stream.write(response);
 		}
 		else if (type == RSERVER_TYPE_PLOT) {
@@ -236,7 +234,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			is_sending = true;
 			BinaryWriteBuffer response;
 			response.write((char) -RSERVER_TYPE_PLOT);
-			response.write(output);
+			response.write(output, true);
 			stream.write(response);
 		}
 		else

@@ -20,9 +20,8 @@
  * Connection
  */
 NonblockingServer::Connection::Connection(NonblockingServer &server, int fd, int id)
-	: fd(fd), state(State::INITIALIZING), is_closed(false), server(server), id(id) {
-	stream.reset( new BinaryFDStream(fd,fd) );
-	stream->makeNonBlocking();
+	: fd(fd), stream(BinaryStream::fromAcceptedSocket(fd,true)), state(State::INITIALIZING), is_closed(false), server(server), id(id) {
+	stream.makeNonBlocking();
 	// the client is supposed to send the first data, so we'll start reading.
 	waitForData();
 }
@@ -55,7 +54,7 @@ void NonblockingServer::Connection::close() {
 		// we must not remove them while another thread may be using the connection.
 		readbuffer.reset(nullptr);
 		writebuffer.reset(nullptr);
-		stream->close();
+		stream.close();
 	}
 }
 
@@ -146,7 +145,7 @@ static int getListeningSocket(int port, int backlog = 10) {
  * Nonblocking Server
  */
 NonblockingServer::NonblockingServer()
-	: num_workers(0), next_id(1), listensocket(-1), running(false), wakeup_pipe(BinaryFDStream::PIPE) {
+	: num_workers(0), next_id(1), listensocket(-1), running(false), wakeup_pipe(BinaryStream::makePipe()) {
 }
 
 NonblockingServer::~NonblockingServer() {
@@ -159,7 +158,7 @@ NonblockingServer::~NonblockingServer() {
 
 void NonblockingServer::readNB(Connection &c) {
 	try {
-		auto is_eof = c.stream->readNB(*(c.readbuffer), true);
+		auto is_eof = c.stream.readNB(*(c.readbuffer), true);
 		if (is_eof) {
 			c.close();
 			return;
@@ -185,7 +184,7 @@ void NonblockingServer::readNB(Connection &c) {
 
 void NonblockingServer::writeNB(Connection &c) {
 	try {
-		c.stream->writeNB(*(c.writebuffer));
+		c.stream.writeNB(*(c.writebuffer));
 		if (c.writebuffer->isFinished()) {
 			Log::debug("%d: response sent", c.id);
 			c.waitForData();
@@ -382,8 +381,6 @@ void NonblockingServer::start() {
 				throw NetworkException(concat("accept() call failed: ", strerror(errno)));
 			}
 
-			int one = 1;
-			setsockopt(new_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 			connections_lock.lock();
 			connections.push_back( createConnection(new_fd, next_id++) );
 			connections_lock.unlock();
@@ -406,7 +403,7 @@ void NonblockingServer::stopAllWorkers() {
 void NonblockingServer::wake() {
 	// if the loop is currently in a select() phase, this write will wake it up.
 	char c = 0;
-	wakeup_pipe.write(c);
+	write(wakeup_pipe.getWriteFD(), &c, 1);
 }
 
 void NonblockingServer::stop() {

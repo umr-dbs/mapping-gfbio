@@ -177,9 +177,7 @@ void TileServerConnection::processDataAsync() {
 	response->object = backend->readTile(*tile);
 	tile.reset(nullptr);
 	response->write(response->object->size);
-	response->enableLinking();
 	response->write((const char *) response->object->data, response->object->size, true);
-	response->disableLinking();
 	Log::info("%d: data sent", id);
 	startWritingData(std::move(response));
 }

@@ -32,7 +32,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	uint64_t entry_id;
 	uint64_t last_access;
@@ -43,7 +43,7 @@ class HandshakeEntry : public CacheEntry {
 public:
 	HandshakeEntry(uint64_t entry_id, const CacheEntry &entry );
 	HandshakeEntry( BinaryReadBuffer &buffer );
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	uint64_t entry_id;
 };
@@ -60,7 +60,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	CacheType type;
 	uint64_t capacity_total;
@@ -87,7 +87,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * Add a specific item
@@ -148,7 +148,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation
@@ -188,7 +188,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 
 	QueryStats query_stats;
@@ -213,7 +213,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return The entries held by the cache

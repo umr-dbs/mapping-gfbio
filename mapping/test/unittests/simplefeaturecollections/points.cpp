@@ -7,8 +7,6 @@
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
 #include <json/json.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
@@ -599,16 +597,14 @@ TEST(PointCollection, StreamSerialization){
 
 	points.addSinglePointFeature(Coordinate(20,20));
 
-	//create binarystream using pipe
-	int fds[2];
-	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
-	EXPECT_EQ(0, status);
+	auto stream = BinaryStream::makePipe();
+	BinaryWriteBuffer wb;
+	wb.write(points);
+	stream.write(wb);
 
-	BinaryFDStream stream(fds[0], fds[1]);
-
-	points.toStream(stream);
-
-	PointCollection points2(stream);
+	BinaryReadBuffer rb;
+	stream.read(rb);
+	PointCollection points2(rb);
 
 	CollectionTestUtil::checkEquality(points, points2);
 }

@@ -15,8 +15,8 @@ class QueryResolution {
 		QueryResolution() = delete;
 		QueryResolution(Type restype, uint32_t xres, uint32_t yres) : restype(restype), xres(xres), yres(yres) {
 		}
-		QueryResolution(BinaryStream &stream);
-		void toStream(BinaryStream &stream) const;
+		QueryResolution(BinaryReadBuffer &buffer);
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 
 		static QueryResolution pixels(uint32_t xres, uint32_t yres) {
@@ -37,9 +37,9 @@ class QueryRectangle : public SpatialReference, public TemporalReference, public
 		QueryRectangle();
 		QueryRectangle(const SpatialReference &s, const TemporalReference &t, const QueryResolution &r) : SpatialReference(s), TemporalReference(t), QueryResolution(r) {}
 		QueryRectangle(const GridSpatioTemporalResult &grid);
-		QueryRectangle(BinaryStream &stream);
+		QueryRectangle(BinaryReadBuffer &buffer);
 
-		void toStream(BinaryStream &stream) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 		void enlarge(int pixels);
 };

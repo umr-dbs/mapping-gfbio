@@ -52,7 +52,7 @@ void EchoServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request
 		size_t remaining = bytes_total - bytes_read;
 		size_t next_batch_size = std::min(SERVER_BUFFER_SIZE, remaining);
 		request->read(buffer, next_batch_size);
-		response->write(buffer, next_batch_size);
+		response->write(buffer, next_batch_size, false);
 		bytes_read += next_batch_size;
 	}
 
@@ -124,19 +124,18 @@ std::string getRandomString() {
 static void run_client(int id) {
 	int req=0;
 	try {
-		auto stream = make_unique<BinaryFDStream>("127.0.0.1", SERVER_PORT, true);
+		auto stream = BinaryStream::connectTCP("127.0.0.1", SERVER_PORT, true);
 
 		const auto request_bytes = getRandomString();
 
 		for (req=0;req<NUM_REQUESTS;req++) {
 			//printf("Client %d is at %d of %d\n", id, req, NUM_REQUESTS);
 			BinaryWriteBuffer request;
-			request.enableLinking();
 			request.write(request_bytes.c_str(), request_bytes.size(), true);
-			stream->write(request);
+			stream.write(request);
 
 			BinaryReadBuffer response;
-			stream->read(response);
+			stream.read(response);
 
 			for (size_t pos=0;pos < request_bytes.size(); pos++) {
 				auto byte = response.read<char>();

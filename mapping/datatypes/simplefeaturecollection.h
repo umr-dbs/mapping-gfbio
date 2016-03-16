@@ -10,10 +10,10 @@
 
 
 class Coordinate {
-	private:
-		Coordinate(BinaryStream &stream);
-		void toStream(BinaryStream &stream) const;
 	public:
+		Coordinate(BinaryReadBuffer &buffer);
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
+
 		Coordinate(double x, double y) : x(x), y(y) {}
 
 		Coordinate() = delete;

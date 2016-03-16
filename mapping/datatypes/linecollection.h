@@ -19,7 +19,7 @@ public:
 		start_line.push_back(0); //start of first line
 	}
 
-	LineCollection(BinaryStream& stream);
+	LineCollection(BinaryReadBuffer &buffer);
 
 	// allow move construction and move assignment
 	LineCollection(LineCollection &&other) = default;
@@ -75,10 +75,10 @@ public:
 	std::vector<uint32_t> start_feature;
 
 	/**
-	 * Serialize collection to stream
-	 * @param stream the stream to serialize to
+	 * Serialize collection to buffer
+	 * @param buffer the buffer to serialize to
 	 */
-	void toStream(BinaryStream &stream) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * add a new coordinate to the current line. After adding all coordinates, finishLine() has to be called

@@ -11,44 +11,39 @@ AttributeMaps::AttributeMaps() {
 AttributeMaps::~AttributeMaps() {
 }
 
-AttributeMaps::AttributeMaps(BinaryStream &stream) {
-	fromStream(stream);
+AttributeMaps::AttributeMaps(BinaryReadBuffer &buffer) {
+	deserialize(buffer);
 }
 
-void AttributeMaps::fromStream(BinaryStream &stream) {
+void AttributeMaps::deserialize(BinaryReadBuffer &buffer) {
 	_numeric.empty();
 	_textual.empty();
-	size_t count;
-	stream.read(&count);
+	auto count = buffer.read<size_t>();
 	for (size_t i=0;i<count;i++) {
-		std::string key;
-		stream.read(&key);
-		double value;
-		stream.read(&value);
+		auto key = buffer.read<std::string>();
+		auto value = buffer.read<double>();
 		_numeric[key] = value;
 	}
-	stream.read(&count);
+	buffer.read(&count);
 	for (size_t i=0;i<count;i++) {
-		std::string key;
-		stream.read(&key);
-		std::string value;
-		stream.read(&value);
+		auto key = buffer.read<std::string>();
+		auto value = buffer.read<std::string>();
 		_textual[key] = value;
 	}
 }
 
-void AttributeMaps::toStream(BinaryStream &stream) const {
+void AttributeMaps::serialize(BinaryWriteBuffer &buffer, bool) const {
 	size_t count = _numeric.size();
-	stream.write(count);
+	buffer.write(count);
 	for (auto &e : _numeric) {
-		stream.write(e.first);
-		stream.write(e.second);
+		buffer.write(e.first);
+		buffer.write(e.second);
 	}
 	count = _textual.size();
-	stream.write(count);
+	buffer.write(count);
 	for (auto &e : _textual) {
-		stream.write(e.first);
-		stream.write(e.second);
+		buffer.write(e.first);
+		buffer.write(e.second);
 	}
 }
 
@@ -121,33 +116,21 @@ void AttributeArrays::AttributeArray<T>::set(size_t idx, const T &value) {
 }
 
 template <typename T>
-AttributeArrays::AttributeArray<T>::AttributeArray(BinaryStream &stream) : unit(Unit::UNINITIALIZED) {
-	fromStream(stream);
+AttributeArrays::AttributeArray<T>::AttributeArray(BinaryReadBuffer &buffer) : unit(Unit::UNINITIALIZED) {
+	deserialize(buffer);
 }
 
 template <typename T>
-void AttributeArrays::AttributeArray<T>::fromStream(BinaryStream &stream) {
-	std::string unit_json;
-	stream.read(&unit_json);
+void AttributeArrays::AttributeArray<T>::deserialize(BinaryReadBuffer &buffer) {
+	auto unit_json = buffer.read<std::string>();
 	unit = Unit(unit_json);
-	size_t size;
-	stream.read(&size);
-	array.reserve(size);
-	for (size_t i=0;i<size;i++) {
-		T value;
-		stream.read(&value);
-		array.push_back(value);
-	}
-
+	buffer.read(&array);
 }
 
 template <typename T>
-void AttributeArrays::AttributeArray<T>::toStream(BinaryStream &stream) const {
-	std::string unit_json = unit.toJson();
-	stream.write(unit_json);
-	stream.write(array.size());
-	for (const auto &v : array)
-		stream.write(&v);
+void AttributeArrays::AttributeArray<T>::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	buffer << unit.toJson();
+	buffer.write(array, is_persistent_memory);
 }
 
 template<typename T> struct defaultvalue {
@@ -181,51 +164,42 @@ AttributeArrays::AttributeArray<T> AttributeArrays::AttributeArray<T>::copy() co
 
 AttributeArrays::AttributeArrays() {
 }
-AttributeArrays::AttributeArrays(BinaryStream &stream) {
-	fromStream(stream);
+AttributeArrays::AttributeArrays(BinaryReadBuffer &buffer) {
+	deserialize(buffer);
 }
 
 AttributeArrays::~AttributeArrays() {
 }
 
-void AttributeArrays::fromStream(BinaryStream &stream) {
-	size_t keycount;
-	stream.read(&keycount);
+void AttributeArrays::deserialize(BinaryReadBuffer &buffer) {
+	auto keycount = buffer.read<size_t>();
 	for (size_t i=0;i<keycount;i++) {
-		std::string key;
-		stream.read(&key);
-		auto res = _numeric.emplace(key, stream);
+		auto key = buffer.read<std::string>();
+		auto res = _numeric.emplace(key, buffer);
 		if (res.second != true)
 			throw AttributeException("Cannot deserialize AttributeArrays");
 	}
 
-	stream.read(&keycount);
+	buffer.read(&keycount);
 	for (size_t i=0;i<keycount;i++) {
-		std::string key;
-		stream.read(&key);
-		auto res = _textual.emplace(key, stream);
+		auto key = buffer.read<std::string>();
+		auto res = _textual.emplace(key, buffer);
 		if (res.second != true)
 			throw AttributeException("Cannot deserialize AttributeArrays");
 	}
 }
 
-void AttributeArrays::toStream(BinaryStream &stream) const {
+void AttributeArrays::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
 	size_t keycount = _numeric.size();
-	stream.write(keycount);
+	buffer << keycount;
 	for (const auto &e : _numeric) {
-		const auto &key = e.first;
-		stream.write(key);
-		const auto &vec = e.second;
-		stream.write(vec);
+		buffer << e.first << e.second;
 	}
 
 	keycount = _textual.size();
-	stream.write(keycount);
+	buffer << keycount;
 	for (const auto &e : _textual) {
-		const auto &key = e.first;
-		stream.write(key);
-		const auto &vec = e.second;
-		stream.write(vec);
+		buffer << e.first << e.second;
 	}
 }
 

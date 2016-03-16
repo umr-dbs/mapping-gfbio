@@ -32,10 +32,10 @@ BaseRequest::BaseRequest(BinaryReadBuffer& buffer) : type(buffer.read<CacheType>
 		semantic_id(buffer.read<std::string>()), query(buffer)  {
 }
 
-void BaseRequest::toStream(BinaryWriteBuffer& buffer) const {
+void BaseRequest::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
 	buffer.write(type);
-	buffer.write(semantic_id);
-	query.toStream(buffer);
+	buffer.write(semantic_id, is_persistent_memory);
+	buffer.write(query, is_persistent_memory);
 }
 
 std::string BaseRequest::to_string() const {
@@ -60,8 +60,8 @@ DeliveryRequest::DeliveryRequest(BinaryReadBuffer& buffer) :
 	BaseRequest(buffer), entry_id(buffer.read<uint64_t>()) {
 }
 
-void DeliveryRequest::toStream(BinaryWriteBuffer& buffer) const {
-	BaseRequest::toStream(buffer);
+void DeliveryRequest::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	BaseRequest::serialize(buffer, is_persistent_memory);
 	buffer.write(entry_id);
 }
 
@@ -105,16 +105,16 @@ PuzzleRequest::PuzzleRequest(BinaryReadBuffer& buffer) :
 	}
 }
 
-void PuzzleRequest::toStream(BinaryWriteBuffer& buffer) const {
-	BaseRequest::toStream(buffer);
+void PuzzleRequest::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	BaseRequest::serialize(buffer, is_persistent_memory);
 
 	buffer.write( static_cast<uint64_t>(remainder.size()));
 	for ( auto &rem : remainder )
-		rem.toStream(buffer);
+		buffer.write(rem);
 
 	buffer.write( static_cast<uint64_t>(parts.size()));
 	for ( auto &cr : parts )
-		cr.toStream(buffer);
+		buffer.write(cr);
 }
 
 std::string PuzzleRequest::to_string() const {

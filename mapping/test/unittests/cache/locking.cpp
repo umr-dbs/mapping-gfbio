@@ -33,10 +33,9 @@ QueryRectangle create_query( const SpatialReference &sref ) {
 	);
 }
 
-std::shared_ptr<IndexCacheEntry> create_entry( uint32_t node_id, const std::string sem_id, uint64_t e_id, const SpatialReference &sref ) {
+CacheEntry create_entry( const SpatialReference &sref ) {
 	CacheCube cc( sref, TemporalReference(TIMETYPE_UNIX,0,1e10));
-	MetaCacheEntry ref( CacheType::POINT, sem_id, e_id, CacheEntry( cc, 10, ProfilingData() ) );
-	return std::shared_ptr<IndexCacheEntry>( new IndexCacheEntry( node_id, ref ) );
+	return CacheEntry( cc, 10, ProfilingData() );
 }
 
 TEST(Locking,MgrLocks) {
@@ -51,14 +50,10 @@ TEST(Locking,MgrLocks) {
 
 	auto &c = ic.get_cache(CacheType::POINT);
 
-	auto e1 = create_entry(n->id, sem_id, 1, SpatialReference(EPSG_LATLON, 0,0, 10, 10) );
-	auto e2 = create_entry(n->id, sem_id, 2, SpatialReference(EPSG_LATLON, 10,0, 20, 10) );
-	auto e3 = create_entry(n->id, sem_id, 1, SpatialReference(EPSG_LATLON, 0,10, 10, 20) );
-	auto e4 = create_entry(n->id, sem_id, 2, SpatialReference(EPSG_LATLON, 10,10, 20, 20) );
-	c.put(e1);
-	c.put(e2);
-	c.put(e3);
-	c.put(e4);
+	c.put(sem_id,n->id,1,create_entry(SpatialReference(EPSG_LATLON, 0,0, 10, 10)));
+	c.put(sem_id,n->id,2,create_entry(SpatialReference(EPSG_LATLON, 10,0, 20, 10)));
+	c.put(sem_id,n->id,3,create_entry(SpatialReference(EPSG_LATLON, 0,10, 10, 20)));
+	c.put(sem_id,n->id,4,create_entry(SpatialReference(EPSG_LATLON, 10,10, 20, 20)));
 
 
 	// Query full hit

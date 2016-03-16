@@ -35,7 +35,8 @@ enum timetype_t : uint16_t {
 };
 
 class QueryRectangle;
-class BinaryStream;
+class BinaryReadBuffer;
+class BinaryWriteBuffer;
 
 class SpatialReference {
 	public:
@@ -58,13 +59,13 @@ class SpatialReference {
 		 */
 		SpatialReference(epsg_t epsg, double x1, double y1, double x2, double y2, bool &flipx, bool &flipy);
 		/*
-		 * Read a SpatialReference from a stream
+		 * Read a SpatialReference from a buffer
 		 */
-		SpatialReference(BinaryStream &stream);
+		SpatialReference(BinaryReadBuffer &buffer);
 		/*
-		 * Write to a binary stream
+		 * Write to a binary buffer
 		 */
-		void toStream(BinaryStream &stream) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 		/*
 		 * Validate if all invariants are met
 		 */
@@ -117,14 +118,14 @@ public:
 	TimeInterval(): t1(0), t2(0) {};
 
 	/*
-	 * Read a TimeInterval from a stream
+	 * Read a TimeInterval from a buffer
 	 */
-	TimeInterval(BinaryStream &stream);
+	TimeInterval(BinaryReadBuffer &buffer);
 
 	/*
-	 * Write to a binary stream
+	 * Write to a binary buffer
 	 */
-	void toStream(BinaryStream &stream) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/*
 	 * Validate if invariants are met
@@ -198,13 +199,13 @@ class TemporalReference : public TimeInterval {
 		 */
 		TemporalReference(timetype_t time, double t1, double t2);
 		/*
-		 * Read a TemporalReference from a stream
+		 * Read a TemporalReference from a buffer
 		 */
-		TemporalReference(BinaryStream &stream);
+		TemporalReference(BinaryReadBuffer &buffer);
 		/*
-		 * Write to a binary stream
+		 * Write to a binary buffer
 		 */
-		void toStream(BinaryStream &stream) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 		/*
 		 * Validate if all invariants are met
 		 */
@@ -301,13 +302,13 @@ class SpatioTemporalReference : public SpatialReference, public TemporalReferenc
 		 */
 		SpatioTemporalReference(const QueryRectangle &rect);
 		/*
-		 * Read a SpatioTemporalReference from a stream
+		 * Read a SpatioTemporalReference from a buffer
 		 */
-		SpatioTemporalReference(BinaryStream &stream);
+		SpatioTemporalReference(BinaryReadBuffer &buffer);
 		/*
-		 * Write to a binary stream
+		 * Write to a binary buffer
 		 */
-		void toStream(BinaryStream &stream) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 		/*
 		 * Validate if all invariants are met
 		 */

@@ -99,7 +99,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &stream ) const;
+	void serialize(BinaryWriteBuffer &stream, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation
@@ -257,7 +257,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation

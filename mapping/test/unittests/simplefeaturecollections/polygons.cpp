@@ -6,8 +6,6 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
-#include <unistd.h>
-#include <fcntl.h>
 #include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
@@ -872,16 +870,14 @@ TEST(PolygonCollection, StreamSerialization){
 	polygons.finishPolygon();
 	polygons.finishFeature();
 
-	//create binarystream using pipe
-	int fds[2];
-	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
-	EXPECT_EQ(0, status);
+	auto stream = BinaryStream::makePipe();
+	BinaryWriteBuffer wb;
+	wb.write(polygons);
+	stream.write(wb);
 
-	BinaryFDStream stream(fds[0], fds[1]);
-
-	polygons.toStream(stream);
-
-	PolygonCollection polygons2(stream);
+	BinaryReadBuffer rb;
+	stream.read(rb);
+	PolygonCollection polygons2(rb);
 
 	CollectionTestUtil::checkEquality(polygons, polygons2);
 }

@@ -1,16 +1,17 @@
 #ifndef OPERATORS_QUERYPROFILER_H
 #define OPERATORS_QUERYPROFILER_H
 
-#include "util/binarystream.h"
-
 #include <stdlib.h>
 #include <string>
+
+class BinaryReadBuffer;
+class BinaryWriteBuffer;
 
 class ProfilingData {
 public:
 	ProfilingData();
-	ProfilingData( BinaryStream &stream );
-	void toStream(BinaryStream &stream) const;
+	ProfilingData(BinaryReadBuffer &buffer);
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 	std::string to_string() const;
 	double self_cpu;
 	double all_cpu;

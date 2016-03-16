@@ -1,25 +1,23 @@
 
 #include "operators/queryrectangle.h"
-#include "util/binarystream.h"
 #include "util/exceptions.h"
+#include "util/binarystream.h"
 
 #include <algorithm>
-
 
 /*
  * QueryResolution class
  */
 
-QueryResolution::QueryResolution(BinaryStream &stream) {
-	stream.read(&restype);
-	stream.read(&xres);
-	stream.read(&yres);
+QueryResolution::QueryResolution(BinaryReadBuffer &buffer) {
+	buffer.read(&restype);
+	buffer.read(&xres);
+	buffer.read(&yres);
 }
 
-void QueryResolution::toStream(BinaryStream &stream) const {
-	stream.write(restype);
-	stream.write(xres);
-	stream.write(yres);
+void QueryResolution::serialize(BinaryWriteBuffer &buffer, bool) const {
+	buffer << restype;
+	buffer << xres << yres;
 }
 
 /*
@@ -30,13 +28,13 @@ QueryRectangle::QueryRectangle(const GridSpatioTemporalResult &grid)
 }
 
 
-QueryRectangle::QueryRectangle(BinaryStream &stream) : SpatialReference(stream), TemporalReference(stream), QueryResolution(stream) {
+QueryRectangle::QueryRectangle(BinaryReadBuffer &buffer) : SpatialReference(buffer), TemporalReference(buffer), QueryResolution(buffer) {
 }
 
-void QueryRectangle::toStream(BinaryStream &stream) const {
-	SpatialReference::toStream(stream);
-	TemporalReference::toStream(stream);
-	QueryResolution::toStream(stream);
+void QueryRectangle::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	SpatialReference::serialize(buffer, is_persistent_memory);
+	TemporalReference::serialize(buffer, is_persistent_memory);
+	QueryResolution::serialize(buffer, is_persistent_memory);
 }
 
 void QueryRectangle::enlarge(int pixels) {

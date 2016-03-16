@@ -49,7 +49,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream(BinaryWriteBuffer &buffer) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * Checks if the resolution matches the given query
@@ -94,7 +94,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	epsg_t epsg;
 	timetype_t timetype;
@@ -140,7 +140,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return the time-interval this cube is valid for
@@ -172,7 +172,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	uint64_t size;
 	ProfilingData profile;
@@ -211,7 +211,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation
@@ -245,7 +245,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation
@@ -279,7 +279,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation
@@ -329,7 +329,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream(BinaryWriteBuffer &buffer) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation
@@ -362,7 +362,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	std::string host;
 	uint32_t port;
@@ -393,7 +393,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation
@@ -427,7 +427,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
 	 * @return a human readable respresentation

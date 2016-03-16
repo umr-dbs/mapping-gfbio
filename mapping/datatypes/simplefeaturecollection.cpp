@@ -13,13 +13,12 @@
 #include <limits>
 #include <json/json.h>
 
-Coordinate::Coordinate(BinaryStream &stream) {
-	stream.read(&x);
-	stream.read(&y);
+Coordinate::Coordinate(BinaryReadBuffer &buffer) {
+	buffer.read(&x);
+	buffer.read(&y);
 }
-void Coordinate::toStream(BinaryStream &stream) const {
-	stream.write(x);
-	stream.write(y);
+void Coordinate::serialize(BinaryWriteBuffer &buffer, bool) const {
+	buffer << x << y;
 }
 
 /**

@@ -4,6 +4,7 @@
 #include <string.h> // memset(), strerror()
 #include <errno.h>
 #include <memory>
+#include <algorithm>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -16,76 +17,52 @@
 #include <fcntl.h>
 
 
-BinaryStream::BinaryStream() : is_blocking(true) {
+/*
+ * BinaryStream
+ * Construction, Move and Cleanup
+ */
+BinaryStream::BinaryStream() : is_blocking(true), read_fd(-1), write_fd(-1) {
+}
+BinaryStream::BinaryStream(int read_fd, int write_fd) : is_blocking(true), read_fd(read_fd), write_fd(write_fd) {
 }
 
 BinaryStream::~BinaryStream() {
+	close();
 }
 
-void BinaryStream::makeNonBlocking() {
-	throw ArgumentException("This stream type does not support NonBlocking mode");
-}
-
-void BinaryStream::write(const std::string &string, bool is_persistent_memory) {
-	size_t len = string.size();
-	if (len > (size_t) (1<<31))
-		throw NetworkException("BinaryStream: String too large to transmit");
-	write(len);
-	write(string.data(), len, is_persistent_memory);
-}
-
-void BinaryStream::flush() {
-
-}
-
-size_t BinaryStream::read(std::string *string, bool allow_eof) {
-	size_t len;
-	if (read(&len, allow_eof) == 0)
-		return 0;
-
-	std::unique_ptr<char[]> buffer( new char[len] );
-	read(buffer.get(), len);
-	string->assign(buffer.get(), len);
-	return len + sizeof(len);
-}
-
-
-void BinaryStream::write(BinaryWriteBuffer &buffer) {
-	throw ArgumentException("Cannot write a BinaryWriteBuffer to a generic BinaryStream");
-	/*
-	if (!buffer.isWriting())
-		throw ArgumentException("cannot write() a BinaryWriteBuffer when not prepared for writing");
-	if (buffer.size_sent != 0)
-		throw ArgumentException("cannot partially write() a BinaryWriteBuffer");
-
-	for (size_t i=0;i<buffer.areas.size();i++)
-		write(buffer.areas[i].start, buffer.areas[i].len);
-	buffer.status = BinaryWriteBuffer::Status::FINISHED;
-	*/
-}
-
-void BinaryStream::read(BinaryReadBuffer &buffer) {
-	throw ArgumentException("Cannot read a BinaryWriteBuffer from a generic BinaryStream");
-	/*
-	if (buffer.isRead())
-		throw ArgumentException("cannot read() a BinaryReadBuffer that's already fully read");
-
-	while (!buffer.isRead()) {
-		read(buffer.buffer.data(), buffer.size_total);
-		buffer.markBytesAsRead(buffer.size_total);
+void BinaryStream::close() {
+	if (read_fd >= 0) {
+		::close(read_fd);
+		if (read_fd == write_fd)
+			write_fd = -1;
+		read_fd = -1;
 	}
-	*/
+	if (write_fd >= 0) {
+		::close(write_fd);
+		write_fd = -1;
+	}
 }
 
+BinaryStream::BinaryStream(BinaryStream &&other) : is_blocking(true), read_fd(-1), write_fd(-1) {
+	*this = std::move(other);
+}
+
+BinaryStream &BinaryStream::operator=(BinaryStream &&other) {
+	std::swap(is_blocking, other.is_blocking);
+	std::swap(read_fd, other.read_fd);
+	std::swap(write_fd, other.write_fd);
+	return *this;
+}
 
 
 /*
- * BinaryFDStream
+ * BinaryStream
+ * Static constructors
  */
-BinaryFDStream::BinaryFDStream(const char *server_path) : is_eof(false), read_fd(-1), write_fd(-1) {
+BinaryStream BinaryStream::connectUNIX(const char *server_path) {
 	int new_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (new_fd < 0)
-		throw NetworkException("BinaryFDStream: unable to create socket()");
+		throw NetworkException("BinaryStream: unable to create socket()");
 
 	struct sockaddr_un server_addr;
 	memset((void *) &server_addr, 0, sizeof(server_addr));
@@ -94,15 +71,13 @@ BinaryFDStream::BinaryFDStream(const char *server_path) : is_eof(false), read_fd
 	strcpy(server_addr.sun_path, server_path);
 	if (connect(new_fd, (sockaddr *) &server_addr, sizeof(server_addr)) == -1) {
 		::close(new_fd);
-		throw NetworkException("BinaryFDStream: unable to connect()");
+		throw NetworkException("BinaryStream: unable to connect()");
 	}
 
-	read_fd = new_fd;
-	write_fd = new_fd;
+	return BinaryStream(new_fd, new_fd);
 }
 
-
-BinaryFDStream::BinaryFDStream(const char *hostname, int port, bool no_delay) : is_eof(false), read_fd(-1), write_fd(-1) {
+BinaryStream BinaryStream::connectTCP(const char *hostname, int port, bool no_delay) {
 	struct addrinfo hints;
 	memset(&hints, 0, sizeof(hints));
 	struct addrinfo *servinfo;
@@ -119,25 +94,47 @@ BinaryFDStream::BinaryFDStream(const char *hostname, int port, bool no_delay) : 
 	int new_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
 	if (new_fd < 0) {
 		freeaddrinfo(servinfo);
-		throw NetworkException("BinaryFDStream: unable to create socket()");
+		throw NetworkException("BinaryStream: unable to create socket()");
 	}
 
 	if (connect(new_fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {
 		freeaddrinfo(servinfo);
 		::close(new_fd);
-		throw NetworkException(concat("BinaryFDStream: unable to connect(", hostname, ":", port, "/", portstr, "): ", strerror(errno)));
+		throw NetworkException(concat("BinaryStream: unable to connect(", hostname, ":", port, "/", portstr, "): ", strerror(errno)));
 	}
+	freeaddrinfo(servinfo);
 
-	if ( no_delay ) {
+	if (no_delay) {
 		int one = 1;
 		setsockopt(new_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
 	}
 
-	read_fd = new_fd;
-	write_fd = new_fd;
-	freeaddrinfo(servinfo);
+	return BinaryStream(new_fd, new_fd);
 }
 
+BinaryStream BinaryStream::fromAcceptedSocket(int socket, bool no_delay) {
+	if (no_delay) {
+		int one = 1;
+		setsockopt(socket, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+	}
+
+	return BinaryStream(socket, socket);
+}
+
+BinaryStream BinaryStream::makePipe() {
+	int fds[2];
+	auto res = pipe(fds);
+	if (res != 0)
+		throw NetworkException(concat("pipe() call failed: ", strerror(errno)));
+
+	return BinaryStream(fds[0], fds[1]);
+}
+
+
+/*
+ * BinaryStream
+ * Make nonblocking
+ */
 static void make_fd_nonblocking(int fd) {
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (flags == -1)
@@ -147,78 +144,21 @@ static void make_fd_nonblocking(int fd) {
 		throw NetworkException("Cannot make fd nonblocking, fcntl failed");
 }
 
-void BinaryFDStream::makeNonBlocking() {
+void BinaryStream::makeNonBlocking() {
 	if (!is_blocking)
-		throw ArgumentException("BinaryFDStream::makeNonBlocking(): is already nonblocking");
+		throw ArgumentException("BinaryStream::makeNonBlocking(): is already nonblocking");
 
 	make_fd_nonblocking(read_fd);
 	make_fd_nonblocking(write_fd);
 	is_blocking = false;
 }
 
-BinaryFDStream::BinaryFDStream(int read_fd, int write_fd, bool no_delay) : is_eof(false), read_fd(read_fd), write_fd(write_fd) {
-	if (write_fd == -2)
-		this->write_fd = read_fd;
 
-	if ( no_delay ) {
-		int one = 1;
-		setsockopt(this->write_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
-	}
-}
-
-BinaryFDStream::~BinaryFDStream() {
-	close();
-}
-
-BinaryFDStream::BinaryFDStream(PIPE_t p) {
-	int fds[2];
-	auto res = pipe(fds);
-	if (res != 0)
-		throw NetworkException(concat("pipe() call failed: ", strerror(errno)));
-	read_fd = fds[0];
-	write_fd = fds[1];
-	is_eof = false;
-}
-
-void BinaryFDStream::close() {
-	if (read_fd >= 0) {
-		::close(read_fd);
-		if (read_fd == write_fd)
-			write_fd = -1;
-		read_fd = -1;
-	}
-	if (write_fd >= 0) {
-		::close(write_fd);
-		write_fd = -1;
-	}
-}
-
-
-void BinaryFDStream::write(const char *buffer, size_t len, bool is_persistent_memory) {
-	if (!is_blocking)
-		throw NetworkException("Cannot write() to a a nonblocking stream");
-
-	if (write_fd < 0) {
-		throw NetworkException(concat("BinaryFDStream: cannot write to closed socket ", write_fd, " in pid ", getpid()));
-	}
-	//auto res = ::send(write_fd, buffer, len, MSG_NOSIGNAL);
-	size_t written = 0;
-	while (written < len) {
-		size_t remaining = len - written;
-		auto res = ::write(write_fd, &buffer[written], remaining);
-		if ((size_t) res == remaining)
-			return;
-		if (res <= 0)
-			throw NetworkException(concat("BinaryFDStream: write() failed: ", strerror(errno), "(", remaining, " requested, ", res, " written)"));
-
-		if ((size_t) res > remaining)
-			throw NetworkException(concat("BinaryFDStream: write() wrote too much bytes: ", remaining, " requested, ", res, " written"));
-		written += res;
-	}
-	//fprintf(stderr, "BinaryFDStream: written %lu bytes\n", len);
-}
-
-void BinaryFDStream::write(BinaryWriteBuffer &buffer) {
+/*
+ * BinaryStream
+ * Reading and Writing
+ */
+void BinaryStream::write(BinaryWriteBuffer &buffer) {
 	if (!is_blocking)
 		throw NetworkException("Cannot write() to a nonblocking stream");
 
@@ -230,7 +170,7 @@ void BinaryFDStream::write(BinaryWriteBuffer &buffer) {
 		writeNB(buffer);
 }
 
-void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
+void BinaryStream::writeNB(BinaryWriteBuffer &buffer) {
 	buffer.prepareForWriting();
 	if (!buffer.isWriting())
 		throw ArgumentException("cannot writeNB() a BinaryWriteBuffer when not prepared for writing");
@@ -239,11 +179,11 @@ void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
 	if (written < 0) {
 		if (!is_blocking && (errno == EAGAIN || errno == EWOULDBLOCK))
 			return;
-		throw NetworkException(concat("BinaryFDStream: writev() failed: ", strerror(errno)));
+		throw NetworkException(concat("BinaryStream: writev() failed: ", strerror(errno)));
 	}
 	if (written == 0) {
 		if (is_blocking)
-			throw NetworkException(concat("BinaryFDStream: writev() wrote 0 bytes in blocking call"));
+			throw NetworkException(concat("BinaryStream: writev() wrote 0 bytes in blocking call"));
 		return;
 	}
 	buffer.markBytesAsWritten(written);
@@ -251,49 +191,18 @@ void BinaryFDStream::writeNB(BinaryWriteBuffer &buffer) {
 }
 
 
-
-size_t BinaryFDStream::read(char *buffer, size_t len, bool allow_eof) {
+bool BinaryStream::read(BinaryReadBuffer &buffer, bool allow_eof) {
 	if (!is_blocking)
 		throw NetworkException("Cannot read() on a nonblocking stream");
-	if (read_fd < 0)
-		throw NetworkException(concat("BinaryFDStream: cannot read from closed socket ", read_fd, " in pid ", getpid()));
-	if (is_eof)
-		throw NetworkException("BinaryFDStream: tried to read from a socket which is eof'ed");
 
-	size_t remaining = len;
-	size_t bytes_read = 0;
-	while (remaining > 0) {
-		// Note: MSG_WAITALL does not guarantee that the whole buffer is filled; the loop is still required
-		//auto r = ::recv(read_fd, buffer, remaining, MSG_WAITALL);
-		auto r = ::read(read_fd, buffer, remaining);
-		if (r == 0) {
-			is_eof = true;
-			if (!allow_eof || bytes_read > 0)
-				throw NetworkException("BinaryFDStream: unexpected eof");
-			return bytes_read;
-		}
-		if (r < 0)
-			throw NetworkException(concat("BinaryFDStream: read() failed: ", strerror(errno)));
-		bytes_read += r;
-		buffer += r;
-		remaining -= r;
+	while (!buffer.isRead()) {
+		if (readNB(buffer, allow_eof) == true)
+			return true;
 	}
-	if (bytes_read != len)
-		throw NetworkException("BinaryFDStream: invalid read");
-
-	//fprintf(stderr, "BinaryFDStream: read %lu bytes\n", bytes_read);
-	return bytes_read;
+	return false;
 }
 
-void BinaryFDStream::read(BinaryReadBuffer &buffer) {
-	if (!is_blocking)
-		throw NetworkException("Cannot read() on a nonblocking stream");
-
-	while(!buffer.isRead())
-		readNB(buffer);
-}
-
-bool BinaryFDStream::readNB(BinaryReadBuffer &buffer, bool allow_eof) {
+bool BinaryStream::readNB(BinaryReadBuffer &buffer, bool allow_eof) {
 	if (buffer.isRead())
 		throw ArgumentException("cannot read() a BinaryReadBuffer that's already fully read");
 
@@ -303,12 +212,11 @@ bool BinaryFDStream::readNB(BinaryReadBuffer &buffer, bool allow_eof) {
 	if (bytes_read == -1) {
 		if (errno == EAGAIN || errno == EWOULDBLOCK)
 			return false;
-		throw NetworkException(concat("BinaryFDStream: unexpected error while reading a BinaryReadBuffer: ", strerror(errno)));
+		throw NetworkException(concat("BinaryStream: unexpected error while reading a BinaryReadBuffer: ", strerror(errno)));
 	}
 	if (bytes_read == 0) {
-		is_eof = true;
 		if (!allow_eof || !buffer.isEmpty())
-			throw NetworkException("BinaryFDStream: unexpected eof while reading a BinaryReadBuffer");
+			throw NetworkException("BinaryStream: unexpected eof while reading a BinaryReadBuffer");
 		return true;
 	}
 	buffer.markBytesAsRead(bytes_read);
@@ -319,7 +227,7 @@ bool BinaryFDStream::readNB(BinaryReadBuffer &buffer, bool allow_eof) {
 /*
  * BinaryWriteBuffer
  */
-BinaryWriteBuffer::BinaryWriteBuffer() : may_link(false), status(Status::CREATING), next_area_start(0), size_total(0), size_sent(0), areas_sent(0) {
+BinaryWriteBuffer::BinaryWriteBuffer() : status(Status::CREATING), next_area_start(0), size_total(0), size_sent(0), areas_sent(0) {
 	// always prefix with the size
 	areas.emplace_back((const char *) &size_total, sizeof(size_total));
 }
@@ -331,7 +239,7 @@ void BinaryWriteBuffer::write(const char *data, size_t len, bool is_persistent_m
 		throw ArgumentException("cannot write() to a BinaryWriteBuffer after it was prepared for sending");
 
 	// maybe we can just link to external memory, without touching our buffer
-	if (may_link && is_persistent_memory && len >= 64) {
+	if (is_persistent_memory && len >= 64) {
 		finishBufferedArea();
 		areas.emplace_back(data, len);
 		return;
@@ -359,9 +267,14 @@ void BinaryWriteBuffer::write(const char *data, size_t len, bool is_persistent_m
 		throw MustNotHappenException("ERROR: BinaryWriteBuffer, buffer.insert() had a reallocation.");
 }
 
-size_t BinaryWriteBuffer::read(char *buffer, size_t len, bool allow_eof) {
-	throw ArgumentException("A BinaryWriteBuffer cannot read()");
+void BinaryWriteBuffer::writeString(const std::string &string, bool is_persistent_memory) {
+	size_t len = string.size();
+	if (len > (size_t) (1<<31))
+		throw NetworkException("BinaryStream: String too large to transmit");
+	write(len);
+	write(string.data(), len, is_persistent_memory);
 }
+
 
 void BinaryWriteBuffer::finishBufferedArea() {
 	if (next_area_start < buffer.size()) {
@@ -434,27 +347,28 @@ BinaryReadBuffer::~BinaryReadBuffer() {
 
 }
 
-void BinaryReadBuffer::write(const char *data, size_t len, bool is_persistent_memory) {
-	throw ArgumentException("A BinaryReadBuffer cannot write()");
-}
-
-size_t BinaryReadBuffer::read(char *buffer, size_t len, bool allow_eof) {
+void BinaryReadBuffer::read(char *buffer, size_t len) {
 	if (status != Status::FINISHED)
 		throw ArgumentException("cannot read() from a BinaryReadBuffer until it has been filled");
 
 	size_t remaining = size_total - size_read;
-	if (remaining < len) {
-		if (allow_eof && remaining == 0)
-			return 0;
-		throw NetworkException(concat("BinaryReadBuffer: unexpected eof with ", remaining, " of ", size_total, " remaining, ", len, " requested"));
-	}
+	if (remaining < len)
+		throw NetworkException(concat("BinaryReadBuffer: not enough data to satisfy read, ", remaining, " of ", size_total, " remaining, ", len, " requested"));
 
 	// copy data where it should go.
 	const char *vec_start = this->buffer.data() + size_read;
 	memcpy(buffer, vec_start, len);
 	size_read += len;
-	return len;
 }
+
+void BinaryReadBuffer::read(std::string *string) {
+	auto len = read<size_t>();
+
+	std::unique_ptr<char[]> buffer( new char[len] );
+	read(buffer.get(), len);
+	string->assign(buffer.get(), len);
+}
+
 
 size_t BinaryReadBuffer::getPayloadSize() const {
 	if (status != Status::FINISHED)

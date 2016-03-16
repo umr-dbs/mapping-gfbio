@@ -20,95 +20,29 @@ std::unique_ptr<PolygonCollection> PolygonCollection::clone() const {
 }
 
 
-PolygonCollection::PolygonCollection(BinaryStream &stream) : SimpleFeatureCollection(stream) {
-	bool hasTime;
-	stream.read(&hasTime);
+PolygonCollection::PolygonCollection(BinaryReadBuffer &buffer) : SimpleFeatureCollection(SpatioTemporalReference(buffer)) {
+	global_attributes.deserialize(buffer);
+	feature_attributes.deserialize(buffer);
 
-	size_t featureCount;
-	stream.read(&featureCount);
-	start_feature.reserve(featureCount);
-
-	size_t polygonCount;
-	stream.read(&polygonCount);
-	start_polygon.reserve(polygonCount);
-
-	size_t ringCount;
-	stream.read(&ringCount);
-	start_ring.reserve(ringCount);
-
-	size_t coordinateCount;
-	stream.read(&coordinateCount);
-	coordinates.reserve(coordinateCount);
-
-	global_attributes.fromStream(stream);
-	feature_attributes.fromStream(stream);
-
-	if (hasTime) {
-		time.reserve(featureCount);
-		for (size_t i = 0; i < featureCount; i++) {
-			time.push_back(TimeInterval(stream));
-		}
-	}
-
-	uint32_t offset;
-	for (size_t i = 0; i < featureCount; i++) {
-		stream.read(&offset);
-		start_feature.push_back(offset);
-	}
-
-	for (size_t i = 0; i < polygonCount; i++) {
-		stream.read(&offset);
-		start_polygon.push_back(offset);
-	}
-
-	for (size_t i = 0; i < ringCount; i++) {
-		stream.read(&offset);
-		start_ring.push_back(offset);
-	}
-
-	for (size_t i = 0; i < coordinateCount; i++) {
-		coordinates.push_back(Coordinate(stream));
-	}
+	buffer.read(&coordinates);
+	buffer.read(&time);
+	buffer.read(&start_feature);
+	buffer.read(&start_polygon);
+	buffer.read(&start_ring);
 }
 
-void PolygonCollection::toStream(BinaryStream &stream) const {
-	stream.write(stref);
-	stream.write(hasTime());
+void PolygonCollection::serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const {
+	buffer.write(stref, is_persistent_memory);
 
-	size_t featureCount = start_feature.size();
-	stream.write(featureCount);
-	size_t polygonCount = start_polygon.size();
-	stream.write(polygonCount);
-	size_t ringCount = start_ring.size();
-	stream.write(ringCount);
-	size_t coordinateCount = coordinates.size();
-	stream.write(coordinateCount);
+	buffer.write(global_attributes, is_persistent_memory);
+	buffer.write(feature_attributes, is_persistent_memory);
 
+	buffer.write(coordinates, is_persistent_memory);
+	buffer.write(time, is_persistent_memory);
 
-	stream.write(global_attributes);
-	stream.write(feature_attributes);
-
-	if (hasTime()) {
-		for (size_t i = 0; i < featureCount; i++) {
-			time[i].toStream(stream);
-		}
-	}
-
-	for (size_t i = 0; i < featureCount; i++) {
-		stream.write(start_feature[i]);
-	}
-
-	for (size_t i = 0; i < polygonCount; i++) {
-		stream.write(start_polygon[i]);
-	}
-
-	for (size_t i = 0; i < ringCount; i++) {
-		stream.write(start_ring[i]);
-	}
-
-	for (size_t i = 0; i < coordinateCount; i++) {
-		coordinates[i].toStream(stream);
-	}
+	buffer.write(start_feature, is_persistent_memory);
+	buffer.write(start_polygon, is_persistent_memory);
+	buffer.write(start_ring, is_persistent_memory);
 }
 
 

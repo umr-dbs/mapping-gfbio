@@ -9,7 +9,8 @@
 #include <string>
 #include <sys/types.h>
 
-class BinaryStream;
+class BinaryReadBuffer;
+class BinaryWriteBuffer;
 
 namespace RasterOpenCL {
 	class CLProgram;
@@ -44,25 +45,25 @@ class AttributeMaps {
 		 */
 		AttributeMaps();
 		/**
-		 * Construct a new object from a stream by deserialization.
-		 * @param stream a binary stream
+		 * Construct a new object from a buffer by deserialization.
+		 * @param buffer a binary buffer
 		 */
-		AttributeMaps(BinaryStream &stream);
+		AttributeMaps(BinaryReadBuffer &buffer);
 		/**
 		 * Destructor.
 		 */
 		~AttributeMaps();
 
 		/**
-		 * Deserialize the object state from a stream
-		 * @param stream a binary stream
+		 * Deserialize the object state from a buffer
+		 * @param buffer a binary buffer
 		 */
-		void fromStream(BinaryStream &stream);
+		void deserialize(BinaryReadBuffer &buffer);
 		/**
-		 * Serialize the object state to a stream
-		 * @param stream a binary stream
+		 * Serialize the object state to a buffer
+		 * @param buffer a binary buffer
 		 */
-		void toStream(BinaryStream &stream) const;
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 		/**
 		 * Set a numeric key/value pair. Throws an exception if the key is already set.
@@ -156,9 +157,9 @@ class AttributeArrays {
 				AttributeArray(AttributeArray &&) = default;
 				AttributeArray& operator=(AttributeArray &&) = default;
 
-				AttributeArray(BinaryStream &stream);
-				void fromStream(BinaryStream &stream);
-				void toStream(BinaryStream &stream) const;
+				AttributeArray(BinaryReadBuffer &buffer);
+				void deserialize(BinaryReadBuffer &buffer);
+				void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 				/**
 				 * Sets an attribute value.
@@ -210,7 +211,7 @@ class AttributeArrays {
 		};
 	public:
 		AttributeArrays();
-		AttributeArrays(BinaryStream &stream);
+		AttributeArrays(BinaryReadBuffer &buffer);
 		~AttributeArrays();
 
 		// explicitely mark this class as movable, but not copyable.
@@ -222,8 +223,8 @@ class AttributeArrays {
 		// if you must have a copy, create one explicitely via clone
 		AttributeArrays clone() const;
 
-		void fromStream(BinaryStream &stream);
-		void toStream(BinaryStream &stream) const;
+		void deserialize(BinaryReadBuffer &buffer);
+		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 		/**
 		 * Returns a reference to a numeric attribute array

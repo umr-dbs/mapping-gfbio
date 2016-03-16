@@ -30,7 +30,7 @@ class NonblockingServer {
 				virtual void processDataAsync();
 
 				const int fd;
-				std::unique_ptr<BinaryFDStream> stream;
+				BinaryStream stream;
 				std::unique_ptr<BinaryWriteBuffer> writebuffer;
 				std::unique_ptr<BinaryReadBuffer> readbuffer;
 
@@ -123,7 +123,7 @@ class NonblockingServer {
 		std::recursive_mutex connections_mutex;
 
 		std::atomic<bool> running;
-		BinaryFDStream wakeup_pipe;
+		BinaryStream wakeup_pipe;
 };
 
 

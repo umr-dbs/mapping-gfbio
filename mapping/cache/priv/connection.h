@@ -41,7 +41,7 @@ public:
 	 * @param no_delay whether to disable nagle's algorithm
 	 *
 	 */
-	BlockingConnection( const std::string host, int port, bool no_delay = true ) : socket(make_unique<BinaryFDStream>(host.c_str(),port,no_delay)) {}
+	BlockingConnection( const std::string host, int port, bool no_delay = true ) : socket(BinaryStream::connectTCP(host.c_str(),port,no_delay)) {}
 
 	/**
 	 * Writes the given parameters to the underlying stream
@@ -56,7 +56,7 @@ public:
 	 */
 	std::unique_ptr<BinaryReadBuffer> read() {
 		auto result = make_unique<BinaryReadBuffer>();
-		socket->read(*result);
+		socket.read(*result);
 		return result;
 	}
 
@@ -70,9 +70,9 @@ public:
 		struct timeval tv { timeout, 0 };
 		fd_set readfds;
 		FD_ZERO(&readfds);
-		FD_SET(socket->getReadFD(), &readfds);
+		FD_SET(socket.getReadFD(), &readfds);
 
-		int ret = select(socket->getReadFD()+1, &readfds, nullptr, nullptr, &tv);
+		int ret = select(socket.getReadFD()+1, &readfds, nullptr, nullptr, &tv);
 		if ( ret > 0 ) {
 			return read();
 		}
@@ -103,7 +103,7 @@ private:
 	template<typename Head, typename... Tail>
 	void _internal_write(BinaryWriteBuffer &buffer, const Head &head, const Tail &... tail);
 
-	std::unique_ptr<BinaryFDStream> socket;
+	BinaryStream socket;
 };
 
 template<typename... Params>
@@ -117,7 +117,7 @@ template<typename... Params>
 void BlockingConnection::write(const Params &... params) {
 	BinaryWriteBuffer buffer;
 	_internal_write(buffer, params...);
-	socket->write(buffer);
+	socket.write(buffer);
 }
 
 template<typename Head>
@@ -165,11 +165,11 @@ public:
 	/**
 	 * Releases the underlying stream for usage in concrete connections
 	 */
-	std::unique_ptr<BinaryFDStream> release_stream();
+	BinaryStream release_stream();
 
 	std::string hostname;
 private:
-	std::unique_ptr<BinaryFDStream> stream;
+	BinaryStream stream;
 	std::unique_ptr<BinaryReadBuffer> buffer;
 };
 
@@ -186,7 +186,7 @@ public:
 	 * @param state the initial stats of the connection
 	 * @param socket the underlying socket
 	 */
-	BaseConnection(StateType state, std::unique_ptr<BinaryFDStream> socket);
+	BaseConnection(StateType state, BinaryStream &&socket);
 	virtual ~BaseConnection() = default;
 
 	/**
@@ -275,7 +275,7 @@ private:
 
 	StateType state;
 	bool faulty;
-	std::unique_ptr<BinaryFDStream> socket;
+	BinaryStream socket;
 	std::unique_ptr<BinaryReadBuffer> reader;
 	std::unique_ptr<BinaryWriteBuffer> writer;
 };
@@ -314,7 +314,7 @@ public:
 	// message:string -- a description of the error
 	static const uint8_t RESP_ERROR = 19;
 
-	ClientConnection(std::unique_ptr<BinaryFDStream> socket);
+	ClientConnection(BinaryStream &&socket);
 
 	/**
 	 * Sends the given response and resets the state to IDLE
@@ -440,7 +440,7 @@ public:
 	// message:string -- a description of the error
 	static const uint8_t RESP_ERROR = 39;
 
-	WorkerConnection(std::unique_ptr<BinaryFDStream> socket, uint32_t node_id);
+	WorkerConnection(BinaryStream &&socket, uint32_t node_id);
 
 	/**
 	 * Sends the given request to the connected worker-thread.
@@ -608,7 +608,7 @@ public:
 
 	static const uint8_t RESP_REORG_REMOVE_REQUEST = 54;
 
-	ControlConnection(std::unique_ptr<BinaryFDStream> socket, uint32_t node_id, const std::string &hostname);
+	ControlConnection(BinaryStream &&socket, uint32_t node_id, const std::string &hostname);
 
 	/**
 	 * Tells the node to reorganize.
@@ -735,7 +735,7 @@ public:
 	//
 	static const uint8_t RESP_ERROR = 80;
 
-	DeliveryConnection(std::unique_ptr<BinaryFDStream> socket);
+	DeliveryConnection(BinaryStream &&socket);
 
 	/**
 	 * Required states are CACHE_REQUEST_READ, MOVE_REQUEST_READ, AWAITING_MOVE_CONFIRM, MOVE_DONE

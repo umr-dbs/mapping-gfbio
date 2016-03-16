@@ -40,7 +40,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	uint32_t from_node_id;
 
@@ -76,7 +76,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	uint32_t from_node_id;
 	// The host to retrieve the item from
@@ -134,7 +134,7 @@ public:
 	 * Serializes this instance to the given buffer
 	 * @param buffer The buffer to write to
 	 */
-	void toStream( BinaryWriteBuffer &buffer ) const;
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 private:
 	std::vector<ReorgMoveItem> moves;
 	std::vector<TypedNodeCacheKey> removals;

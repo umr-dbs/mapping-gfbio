@@ -17,6 +17,7 @@
 #include <map>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <memory>
 #include <mutex>
@@ -63,10 +64,24 @@ public:
 /**
  * Entry in the index-cache
  */
-class IndexCacheEntry : public IndexCacheKey, public CacheEntry {
+class IndexCacheEntry : public CacheEntry {
+	friend class IndexCache;
+private:
+	IndexCacheEntry( const std::string &semantic_id, uint32_t node_id, uint64_t entry_id, const CacheEntry &ref  );
 public:
-	IndexCacheEntry( uint32_t node_id, const MetaCacheEntry &ref  );
-	IndexCacheEntry( const std::string semantic_id, uint32_t node_id, const HandshakeEntry &ref  );
+
+	/**
+	 * @return the id of the node hosting this entry
+	 */
+	uint32_t get_node_id() const;
+
+	/**
+	 * @return the id of the entry
+	 */
+	uint64_t get_entry_id() const;
+
+	const std::string &semantic_id;
+	std::pair<uint32_t,uint64_t> id;
 };
 
 /**
@@ -89,7 +104,7 @@ public:
 	 * Adds the given entry
 	 * @param entry the entry to add
 	 */
-	void put( const std::shared_ptr<IndexCacheEntry>& entry );
+	void put( const std::string semantic_id, uint32_t node_id, uint64_t entry_id, const CacheEntry& entry );
 
 
 	/**
@@ -148,6 +163,8 @@ private:
 	 * @param e the entry to remove
 	 */
 	void remove_from_node( const std::shared_ptr<IndexCacheEntry> &e );
+
+	std::unordered_set<std::string> semantic_ids;
 
 	// Holds a reference to all entries clustered by node
 	mutable std::map<uint32_t, std::set<std::shared_ptr<const IndexCacheEntry>>> entries_by_node;

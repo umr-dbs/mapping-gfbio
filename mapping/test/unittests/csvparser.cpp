@@ -107,14 +107,14 @@ TEST(CSVParser, simpleSemicolonCRLF) {
 	checkParseResult(parser, test.result);
 }
 
-TEST(CSVParser, DISABLED_simpleWrongDelim) {
+TEST(CSVParser, simpleWrongDelim) {
 	std::string delim = ";";
 	std::string endl = "\n";
 	auto& test = simple;
 	std::stringstream ss;
 	toCSV(ss, test.input, delim, endl);
 	CSVParser parser(ss, ',');
-	checkParseResult(parser, test.result);
+	EXPECT_THROW(parser.readTuple(), ArgumentException);
 }
 
 TEST(CSVParser, quotes) {

@@ -71,7 +71,7 @@ void IndexCacheManager::process_handshake(uint32_t node_id, const NodeHandshake&
 		auto &cache = get_info(content.type);
 		for ( auto &p : content.get_items() ) {
 			for ( auto &entry : p.second )
-				cache.cache->put( std::make_shared<IndexCacheEntry>(p.first, node_id, entry) );
+				cache.cache->put( p.first, node_id, entry.entry_id, entry );
 		}
 	}
 }

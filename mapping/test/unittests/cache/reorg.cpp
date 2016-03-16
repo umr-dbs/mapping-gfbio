@@ -29,24 +29,20 @@ TEST(ReorgTest,CapacityReorg) {
 	auto reorg = ReorgStrategy::by_name(cache,"capacity","lru");
 
 	// Entry 1
-	NodeCacheKey k1("key", 1);
 	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c1(b1, 10, ProfilingData());
-	MetaCacheEntry r1(CacheType::RASTER, k1, c1);
-	std::shared_ptr<IndexCacheEntry> e1( new IndexCacheEntry(1, r1) );
+	cache.put("key",1,1,c1);
 
 	// Entry 2
-	NodeCacheKey k2("key", 2);
 	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c2(b2, 10, ProfilingData());
-	MetaCacheEntry r2(CacheType::RASTER, k2, c2);
-	std::shared_ptr<IndexCacheEntry> e2( new IndexCacheEntry(1, r2) );
+	cache.put("key",1,2,c2);
+
+	CacheStats cs(CacheType::RASTER,40,20);
+	cs.add_item("key", NodeEntryStats(2,CacheCommon::time_millis(),2));
 
 	// Increase count
-	e2->access_count = 2;
-
-	cache.put(e1);
-	cache.put(e2);
+	cache.update_stats(1, cs );
 
 	std::map<uint32_t, NodeReorgDescription> res;
 	for ( auto &kv : nodes ) {
@@ -80,25 +76,25 @@ TEST(ReorgTest,GeographicReorg) {
 	auto reorg = ReorgStrategy::by_name(cache,"geo","lru");
 
 	// Entry 1
-	NodeCacheKey k1("key", 1);
 	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c1(b1, 10, ProfilingData());
-	MetaCacheEntry r1(CacheType::RASTER, k1, c1);
-	std::shared_ptr<IndexCacheEntry> e1( new IndexCacheEntry(1, r1) );
+
+	cache.put("key",1,1,c1);
 
 	// Entry 2
-	NodeCacheKey k2("key", 2);
 	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45),
 		TemporalReference(TIMETYPE_UNIX, 0, 10));
 	CacheEntry c2(b2, 10, ProfilingData());
-	MetaCacheEntry r2(CacheType::RASTER, k2, c2);
-	std::shared_ptr<IndexCacheEntry> e2( new IndexCacheEntry(1, r2) );
+
+	cache.put("key",1,2,c2);
+
+
+	CacheStats cs(CacheType::RASTER,40,20);
+	cs.add_item("key", NodeEntryStats(2,CacheCommon::time_millis(),2));
 
 	// Increase count
-	e2->access_count = 2;
+	cache.update_stats(1, cs );
 
-	cache.put(e1);
-	cache.put(e2);
 
 	std::map<uint32_t, NodeReorgDescription> res;
 	for ( auto &kv : nodes ) {
@@ -116,12 +112,9 @@ TEST(ReorgTest,GeographicReorg) {
 	EXPECT_TRUE(res.at(1).is_empty());
 }
 
-std::shared_ptr<IndexCacheEntry> createGraphEntry( uint32_t node_id, uint64_t entry_id, const std::string &workflow, size_t size) {
-	NodeCacheKey k1(workflow, entry_id);
+CacheEntry createGraphEntry( size_t size) {
 	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 180, 90), TemporalReference(TIMETYPE_UNIX, 0, 10));
-	CacheEntry c1(b1, size, ProfilingData());
-	MetaCacheEntry r1(CacheType::RASTER, k1, c1);
-	return std::shared_ptr<IndexCacheEntry>( new IndexCacheEntry(node_id, r1) );
+	return CacheEntry(b1, size, ProfilingData());
 }
 
 TEST(ReorgTest,GraphReorg) {
@@ -142,23 +135,14 @@ TEST(ReorgTest,GraphReorg) {
 		res.emplace(kv.first, NodeReorgDescription(kv.second));
 	}
 
-	auto e1 = createGraphEntry(1, 1, "SRC", 5 );
-	auto e2 = createGraphEntry(1, 2, "SRC", 5 );
-	auto e3 = createGraphEntry(1, 3, "SRC", 5 );
-	auto e4 = createGraphEntry(1, 4, "OP1 {SRC}", 3 );
-	auto e5 = createGraphEntry(1, 5, "OP1 {SRC}", 3 );
-	auto e6 = createGraphEntry(1, 6, "OP1 {SRC}", 3 );
-	auto e7 = createGraphEntry(1, 7, "OP1 {SRC}", 3 );
-	auto e8 = createGraphEntry(1, 8, "OP2 {SRC}", 2 );
-
-	cache.put(e1);
-	cache.put(e2);
-	cache.put(e3);
-	cache.put(e4);
-	cache.put(e5);
-	cache.put(e6);
-	cache.put(e7);
-	cache.put(e8);
+	cache.put("SRC", 1, 1, createGraphEntry(5) );
+	cache.put("SRC", 1, 2, createGraphEntry(5) );
+	cache.put("SRC", 1, 3, createGraphEntry(5) );
+	cache.put("OP1 {SRC}", 1, 4, createGraphEntry(3) );
+	cache.put("OP1 {SRC}", 1, 5, createGraphEntry(3) );
+	cache.put("OP1 {SRC}", 1, 6, createGraphEntry(3) );
+	cache.put("OP1 {SRC}", 1, 7, createGraphEntry(3) );
+	cache.put("OP2 {SRC}", 1, 8, createGraphEntry(2) );
 
 	reorg->reorganize(res);
 

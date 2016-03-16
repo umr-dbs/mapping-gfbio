@@ -39,13 +39,16 @@ std::string IndexCacheKey::to_string() const {
 //
 // Index entry
 //
-IndexCacheEntry::IndexCacheEntry(uint32_t node_id, const MetaCacheEntry &ref) :
-	IndexCacheKey(ref.semantic_id,node_id,ref.entry_id), CacheEntry(ref) {
+IndexCacheEntry::IndexCacheEntry(const std::string &semantic_id, uint32_t node_id, uint64_t entry_id, const CacheEntry &ref) :
+	CacheEntry(ref), semantic_id(semantic_id), id(node_id,entry_id) {
 }
 
-IndexCacheEntry::IndexCacheEntry(const std::string semantic_id,
-		uint32_t node_id, const HandshakeEntry& ref) :
-	IndexCacheKey(semantic_id, node_id, ref.entry_id), CacheEntry(ref) {
+uint32_t IndexCacheEntry::get_node_id() const {
+	return id.first;
+}
+
+uint64_t IndexCacheEntry::get_entry_id() const {
+	return id.second;
 }
 
 //////////////////////////////////////////////////////////////////
@@ -58,9 +61,13 @@ IndexCache::IndexCache( CacheType type ) : type(type) {
 }
 
 
-void IndexCache::put( const std::shared_ptr<IndexCacheEntry>& entry) {
-	this->put_int(entry->semantic_id,entry->id,entry);
-	get_node_entries(entry->get_node_id()).insert(entry);
+void IndexCache::put( const std::string semantic_id, uint32_t node_id, uint64_t entry_id, const CacheEntry& entry ) {
+	auto res = semantic_ids.emplace(semantic_id);
+
+	std::shared_ptr<IndexCacheEntry> item( new IndexCacheEntry(*res.first,node_id,entry_id,entry) );
+
+	this->put_int(semantic_id,item->id,item);
+	get_node_entries(item->get_node_id()).insert(item);
 }
 
 std::shared_ptr<const IndexCacheEntry> IndexCache::get(const IndexCacheKey& key) const {
@@ -134,4 +141,3 @@ void IndexCache::update_stats(uint32_t node_id, const CacheStats &stats) {
 		}
 	}
 }
-

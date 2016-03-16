@@ -1,0 +1,39 @@
+{
+	"name": "Classification ndvi",
+	"query_result": "raster",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 1443657600,
+        "end": 1443657601
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "resolution": {
+    	"type": "pixels",
+        "x": 3600,
+        "y": 1800
+    },
+    "query": {
+        "params": {
+           "RemapRange": [[0, 70, 1], [70, 254, 2]]
+        },
+        "sources": {
+            "raster": [
+                {
+                    "params": {
+                        "channel": 0,
+                        "sourcename": "ndvi"
+                    },
+                    "type": "source"
+                }
+            ]
+        },
+        "type": "reclass"
+    },
+    "query_expected_hash": "968835d8b3b5e695453bc98179ca0ac7"
+}

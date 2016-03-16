@@ -6,8 +6,6 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
-#include <unistd.h>
-#include <fcntl.h>
 #include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
@@ -591,12 +589,7 @@ TEST(LineCollection, StreamSerialization){
 	lines.finishLine();
 	lines.finishFeature();
 
-	//create binarystream using pipe
-	int fds[2];
-	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
-	EXPECT_EQ(0, status);
-
-	BinaryFDStream stream(fds[0], fds[1]);
+	auto stream = BinaryStream::makePipe();
 	BinaryWriteBuffer wb;
 	wb.write(lines);
 	stream.write(wb);

@@ -99,19 +99,19 @@ static std::atomic<int> clients_handshaked{0};
 
 static void run_client(int id, int start_number) {
 	try {
-		auto stream = make_unique<BinaryFDStream>("127.0.0.1", SERVER_PORT, true);
+		auto stream = BinaryStream::connectTCP("127.0.0.1", SERVER_PORT, true);
 
 		// send initial number
 		BinaryWriteBuffer request;
 		request.write(start_number);
-		stream->write(request);
+		stream.write(request);
 
 		clients_handshaked++;
 
 		while (true) {
 			// Receive number
 			BinaryReadBuffer response;
-			stream->read(response);
+			stream.read(response);
 			auto number = response.read<int>();
 
 			// Decrement
@@ -121,7 +121,7 @@ static void run_client(int id, int start_number) {
 			// Send back
 			BinaryWriteBuffer request;
 			request.write(number);
-			stream->write(request);
+			stream.write(request);
 
 			if (number <= 0)
 				break;

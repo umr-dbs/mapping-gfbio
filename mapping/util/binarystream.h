@@ -31,17 +31,33 @@ class BinaryReadBuffer;
  * performance improvement because it reduces syscalls to read() and write().
  *
  * Buffered IO is also required to implement nonblocking IO.
+ *
+ *
+ * The default implementation of BinaryStream is based on posix file descriptors,
+ * which are flexible enough for files, pipes, TCP etc. Unless there is a
+ * use case for a stream that cannot be backed by a posix fd, there's no need
+ * to turn BinaryStream into a virtual class hierarchy.
  */
 
 class BinaryStream {
-	protected:
+	public:
+		/*
+		 * The default constructor will create an unusable stream. Use the static constructors.
+		 */
 		BinaryStream();
+		~BinaryStream();
+
+		// BinaryStream is movable, but not copyable
 		BinaryStream(const BinaryStream &) = delete;
 		BinaryStream &operator=(const BinaryStream &) = delete;
+		BinaryStream(BinaryStream &&);
+		BinaryStream &operator=(BinaryStream &&);
 
-		bool is_blocking;
-	public:
-		virtual ~BinaryStream();
+		// Static constructors
+		static BinaryStream connectUNIX(const char *server_path);
+		static BinaryStream connectTCP(const char *hostname, int port, bool no_delay = false);
+		static BinaryStream fromAcceptedSocket(int socket, bool no_delay = false);
+		static BinaryStream makePipe();
 
 		/*
 		 * A stream can be either blocking or nonblocking.
@@ -56,53 +72,51 @@ class BinaryStream {
 		 * This method turns a stream into nonblocking mode. There is currently no way to turn them back;
 		 * this may be implemented when a need arises.
 		 */
-		virtual void makeNonBlocking();
+		void makeNonBlocking();
 
 		/*
 		 * Write the contents of a BinaryWriteBuffer to the stream (blocking)
 		 */
-		virtual void write(BinaryWriteBuffer &buffer);
+		void write(BinaryWriteBuffer &buffer);
+		/*
+		 * Write the contents of a BinaryWriteBuffer to the stream (non-blocking)
+		 */
+		void writeNB(BinaryWriteBuffer &buffer);
 		/*
 		 * Fill a BinaryReadBuffer with contents from the stream (blocking)
+		 * @return true if eof was encountered and allow_eof = true, otherwise false
 		 */
-		virtual void read(BinaryReadBuffer &buffer);
-};
-
-
-/**
- * An implementation using posix file descriptors
- *
- * Currently used for AF_UNIX and TCP socket connections.
- */
-class BinaryFDStream : public BinaryStream {
-	public:
-		BinaryFDStream(const char *server_path);
-		BinaryFDStream(const char *hostname, int port, bool no_delay = false);
-		BinaryFDStream(int read_fd, int write_fd = -2, bool no_delay = false);
-		struct PIPE_t {};
-		static constexpr PIPE_t PIPE = {};
-		BinaryFDStream(PIPE_t p);
-
-		virtual ~BinaryFDStream();
-
-		virtual void makeNonBlocking();
-
-		void close();
-
-		virtual void write(BinaryWriteBuffer &buffer);
-		void writeNB(BinaryWriteBuffer &buffer);
-		virtual void read(BinaryReadBuffer &buffer);
+		bool read(BinaryReadBuffer &buffer, bool allow_eof = false);
+		/*
+		 * Fill a BinaryReadBuffer with contents from the stream (non-blocking)
+		 * @return true if eof was encountered and allow_eof = true, otherwise false
+		 */
 		bool readNB(BinaryReadBuffer &buffer, bool allow_eof = false);
 
+		/*
+		 * Returns the file descriptor used for reading.
+		 * Don't manipulate the FD in any way; this shall only be used for select() etc
+		 */
 		int getReadFD() const { return read_fd; }
+		/*
+		 * Returns the file descriptor used for writing.
+		 * Don't manipulate the FD in any way; this shall only be used for select() etc
+		 */
 		int getWriteFD() const { return write_fd; }
 
-		bool eof() { return is_eof; }
+		/*
+		 * Closes all file descriptors
+		 */
+		void close();
 	private:
-		bool is_eof;
+		// This constructor is private. Use the static named constructors instead.
+		BinaryStream(int read_fd, int write_fd);
+
+		bool is_blocking;
 		int read_fd;
 		int write_fd;
 };
+
 
 
 /**
@@ -117,7 +131,6 @@ class BinaryFDStream : public BinaryStream {
  */
 class BinaryWriteBuffer {
 		friend class BinaryStream;
-		friend class BinaryFDStream;
 		struct Area {
 			Area(const char *start, size_t len) : start(start), len(len) {}
 			const char *start;
@@ -303,7 +316,6 @@ class BinaryWriteBufferWithSharedObject : public BinaryWriteBuffer {
  */
 class BinaryReadBuffer {
 		friend class BinaryStream;
-		friend class BinaryFDStream;
 		enum class Status {
 			READING_SIZE,
 			READING_DATA,

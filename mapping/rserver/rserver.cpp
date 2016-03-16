@@ -149,7 +149,7 @@ static std::string read_file_as_string(const std::string &filename) {
 
 
 void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
-	BinaryFDStream stream(sock_fd, sock_fd);
+	auto stream = BinaryStream::fromAcceptedSocket(sock_fd);
 
 	BinaryReadBuffer request;
 	stream.read(request);

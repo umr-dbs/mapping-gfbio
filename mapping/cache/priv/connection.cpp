@@ -24,7 +24,6 @@
 #include <fcntl.h>
 #include <netdb.h>
 
-
 ///////////////////////////////////////////////////////////
 //
 // NewNBConnection
@@ -32,7 +31,7 @@
 ///////////////////////////////////////////////////////////
 
 NewNBConnection::NewNBConnection( struct sockaddr_storage *remote_addr, int fd ) :
-	stream( make_unique<BinaryFDStream>(fd,fd,true)), buffer( make_unique<BinaryReadBuffer>()  ) {
+	stream( BinaryStream::fromAcceptedSocket(fd, true) ), buffer( make_unique<BinaryReadBuffer>() ) {
 
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
@@ -42,21 +41,19 @@ NewNBConnection::NewNBConnection( struct sockaddr_storage *remote_addr, int fd )
 				 NI_NUMERICHOST | NI_NUMERICSERV);
 
 	hostname.assign(hbuf);
-	stream->makeNonBlocking();
+	stream.makeNonBlocking();
 }
 
 int NewNBConnection::get_read_fd() const {
-	if ( stream )
-		return stream->getReadFD();
+	auto fd = stream.getReadFD();
+	if (fd >= 0)
+		return fd;
 	throw IllegalStateException("Stream released already");
 }
 
 bool NewNBConnection::input() {
-	if ( stream ) {
-		stream->readNB(*buffer);
-		return buffer->isRead();
-	}
-	throw IllegalStateException("Stream released already");
+	stream.readNB(*buffer);
+	return buffer->isRead();
 }
 
 BinaryReadBuffer& NewNBConnection::get_data() {
@@ -66,10 +63,8 @@ BinaryReadBuffer& NewNBConnection::get_data() {
 		throw IllegalStateException("Buffer not fully read");
 }
 
-std::unique_ptr<BinaryFDStream> NewNBConnection::release_stream() {
-	auto res = std::move(stream);
-	stream.reset();
-	return res;
+BinaryStream NewNBConnection::release_stream() {
+	return std::move(stream);
 }
 
 ///////////////////////////////////////////////////////////
@@ -79,7 +74,7 @@ std::unique_ptr<BinaryFDStream> NewNBConnection::release_stream() {
 ///////////////////////////////////////////////////////////
 
 template<typename StateType>
-BaseConnection<StateType>::BaseConnection(StateType state, std::unique_ptr<BinaryFDStream> socket) :
+BaseConnection<StateType>::BaseConnection(StateType state, BinaryStream &&socket) :
 	id(next_id++), state(state), faulty(false), socket(std::move(socket)), reader(new BinaryReadBuffer() ) {
 }
 
@@ -87,7 +82,7 @@ template<typename StateType>
 bool BaseConnection<StateType>::input() {
 
 	try {
-		bool eof = socket->readNB(*reader, true );
+		bool eof = socket.readNB(*reader, true );
 		if ( eof ) {
 			Log::debug("Connection closed %d", id);
 			faulty = true;
@@ -109,7 +104,7 @@ template<typename StateType>
 void BaseConnection<StateType>::output() {
 	if ( writer ) {
 		try {
-			socket->writeNB(*writer);
+			socket.writeNB(*writer);
 			if ( writer->isFinished() ) {
 				write_finished();
 				writer.reset();
@@ -135,12 +130,12 @@ void BaseConnection<StateType>::begin_write(std::unique_ptr<BinaryWriteBuffer> b
 
 template<typename StateType>
 int BaseConnection<StateType>::get_read_fd() const {
-	return socket->getReadFD();
+	return socket.getReadFD();
 }
 
 template<typename StateType>
 int BaseConnection<StateType>::get_write_fd() const {
-	return socket->getWriteFD();
+	return socket.getWriteFD();
 }
 
 template<typename StateType>
@@ -191,7 +186,7 @@ uint64_t BaseConnection<StateType>::next_id = 1;
 //
 /////////////////////////////////////////////////
 
-ClientConnection::ClientConnection(std::unique_ptr<BinaryFDStream> socket) :
+ClientConnection::ClientConnection(BinaryStream &&socket) :
 	BaseConnection(ClientState::IDLE, std::move(socket)) {
 }
 
@@ -252,7 +247,7 @@ const uint8_t ClientConnection::RESP_ERROR;
 //
 /////////////////////////////////////////////////
 
-WorkerConnection::WorkerConnection(std::unique_ptr<BinaryFDStream> socket, uint32_t node_id) :
+WorkerConnection::WorkerConnection(BinaryStream &&socket, uint32_t node_id) :
 	BaseConnection(WorkerState::IDLE, std::move(socket)), node_id(node_id), delivery_id(0) {
 }
 
@@ -415,7 +410,7 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 //
 /////////////////////////////////////////////////
 
-ControlConnection::ControlConnection(std::unique_ptr<BinaryFDStream> socket, uint32_t node_id, const std::string &hostname) :
+ControlConnection::ControlConnection(BinaryStream &&socket, uint32_t node_id, const std::string &hostname) :
 	BaseConnection(ControlState::SENDING_HELLO, std::move(socket)), node_id(node_id) {
 	auto buffer = make_unique<BinaryWriteBuffer>();
 	buffer->write(CMD_HELLO);
@@ -561,7 +556,7 @@ const uint8_t ControlConnection::RESP_STATS;
 //
 /////////////////////////////////////////////////
 
-DeliveryConnection::DeliveryConnection(std::unique_ptr<BinaryFDStream> socket) :
+DeliveryConnection::DeliveryConnection(BinaryStream &&socket) :
 	BaseConnection(DeliveryState::IDLE, std::move(socket)), delivery_id(0), cache_key(CacheType::UNKNOWN,"", 0) {
 }
 

@@ -123,7 +123,7 @@ std::unique_ptr<GenericRaster> ROperator::getRaster(const QueryRectangle &rect, 
 	if (result_type != "raster")
 		throw OperatorException("This R script does not return rasters");
 
-	BinaryFDStream socket(socketpath.c_str());
+	auto socket = BinaryStream::connectUNIX(socketpath.c_str());
 	auto response = runScript(socket, rect, RSERVER_TYPE_RASTER, profiler);
 	socket.close();
 
@@ -135,7 +135,7 @@ std::unique_ptr<PointCollection> ROperator::getPointCollection(const QueryRectan
 	if (result_type != "points")
 		throw OperatorException("This R script does not return a point collection");
 
-	BinaryFDStream socket(socketpath.c_str());
+	auto socket = BinaryStream::connectUNIX(socketpath.c_str());
 	auto response = runScript(socket, rect, RSERVER_TYPE_POINTS, profiler);
 	socket.close();
 
@@ -149,7 +149,7 @@ std::unique_ptr<GenericPlot> ROperator::getPlot(const QueryRectangle &rect, Quer
 	if (!wants_text && !wants_plot)
 		throw OperatorException("This R script does not return a plot");
 
-	BinaryFDStream socket(socketpath.c_str());
+	auto socket = BinaryStream::connectUNIX(socketpath.c_str());
 	auto response = runScript(socket, rect, wants_text ? RSERVER_TYPE_STRING : RSERVER_TYPE_PLOT, profiler);
 	socket.close();
 

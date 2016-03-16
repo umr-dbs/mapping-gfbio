@@ -3,11 +3,10 @@
 
 #include "rasterdb/backend.h"
 #include "util/sqlite.h"
+#include "util/binarystream.h"
 
 #include <string>
 #include <memory>
-
-class BinaryStream;
 
 class RemoteRasterDBBackend : public RasterDBBackend {
 	public:
@@ -48,7 +47,7 @@ class RemoteRasterDBBackend : public RasterDBBackend {
 	private:
 		void init();
 
-		std::unique_ptr<BinaryStream> stream;
+		BinaryStream stream;
 		std::string sourcename;
 		std::string cache_directory;
 		std::string remote_host;

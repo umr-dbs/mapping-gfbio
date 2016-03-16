@@ -15,11 +15,7 @@ static void compareBinaryReadBuffers(const BinaryReadBuffer &a, const BinaryRead
 
 template<typename T>
 std::unique_ptr<BinaryReadBuffer> getSerializedBuffer(T &&obj) {
-	int fds[2];
-	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
-	EXPECT_EQ(0, status);
-
-	BinaryFDStream stream(fds[0], fds[1]);
+	auto stream = BinaryStream::makePipe();
 	BinaryWriteBuffer wb;
 	wb.write(obj, true);
 	stream.write(wb);

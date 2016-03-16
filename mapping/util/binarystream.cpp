@@ -347,33 +347,26 @@ BinaryReadBuffer::~BinaryReadBuffer() {
 
 }
 
-size_t BinaryReadBuffer::read(char *buffer, size_t len, bool allow_eof) {
+void BinaryReadBuffer::read(char *buffer, size_t len) {
 	if (status != Status::FINISHED)
 		throw ArgumentException("cannot read() from a BinaryReadBuffer until it has been filled");
 
 	size_t remaining = size_total - size_read;
-	if (remaining < len) {
-		if (allow_eof && remaining == 0)
-			return 0;
-		throw NetworkException(concat("BinaryReadBuffer: unexpected eof with ", remaining, " of ", size_total, " remaining, ", len, " requested"));
-	}
+	if (remaining < len)
+		throw NetworkException(concat("BinaryReadBuffer: not enough data to satisfy read, ", remaining, " of ", size_total, " remaining, ", len, " requested"));
 
 	// copy data where it should go.
 	const char *vec_start = this->buffer.data() + size_read;
 	memcpy(buffer, vec_start, len);
 	size_read += len;
-	return len;
 }
 
-size_t BinaryReadBuffer::read(std::string *string, bool allow_eof) {
-	size_t len;
-	if (read(&len, allow_eof) == 0)
-		return 0;
+void BinaryReadBuffer::read(std::string *string) {
+	auto len = read<size_t>();
 
 	std::unique_ptr<char[]> buffer( new char[len] );
 	read(buffer.get(), len);
 	string->assign(buffer.get(), len);
-	return len + sizeof(len);
 }
 
 

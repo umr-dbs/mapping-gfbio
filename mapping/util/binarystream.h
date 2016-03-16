@@ -332,42 +332,34 @@ class BinaryReadBuffer {
 		 * QueryRectangle rect(buffer)
 		 * auto raster = GenericRaster::deserialize(buffer)
 		 */
-		size_t read(char *buffer, size_t len, bool allow_eof = false);
-		size_t read(std::string *string, bool allow_eof = false);
-		template<typename T> typename std::enable_if< detail::is_primitive<T>::value, size_t>::type
-			read(T *t, bool allow_eof = false) { return read((char *) t, sizeof(T), allow_eof); }
+		void read(char *buffer, size_t len);
+		void read(std::string *string);
+		template<typename T> typename std::enable_if< detail::is_primitive<T>::value>::type
+			read(T *t) { read((char *) t, sizeof(T)); }
 
 		// easier deserialization of std::vector
 		// std::vector of a primitive type
-		template<typename T> typename std::enable_if< detail::is_primitive<T>::value, size_t>::type
-			read(std::vector<T> *vec, bool allow_eof = false) {
-				size_t size;
-				if (read(&size, allow_eof) == 0)
-					return 0;
+		template<typename T> typename std::enable_if< detail::is_primitive<T>::value>::type
+			read(std::vector<T> *vec) {
+				auto size = read<size_t>();
 				vec->resize(size);
-				return read((char *) vec->data(), size*sizeof(T)) + sizeof(size_t);
+				read((char *) vec->data(), size*sizeof(T));
 			}
 		// std::vector of a serializable class
-		template<typename T> typename std::enable_if< detail::is_serializable<T>::value, size_t>::type
-			read(std::vector<T> *vec, bool allow_eof = false) {
-				size_t size;
-				if (read(&size, allow_eof) == 0)
-					return 0;
+		template<typename T> typename std::enable_if< detail::is_serializable<T>::value>::type
+			read(std::vector<T> *vec) {
+				auto size = read<size_t>();
 				vec->clear();
 				vec->reserve(size);
 				for (size_t i=0;i<size;i++)
 					vec->emplace_back(*this);
-				return 1;
 			}
 		// std::vector of a std::string
-			size_t read(std::vector<std::string> *vec, bool allow_eof = false) {
-				size_t size;
-				if (read(&size, allow_eof) == 0)
-					return 0;
+			void read(std::vector<std::string> *vec) {
+				auto size = read<size_t>();
 				vec->resize(size);
 				for (size_t i=0;i<size;i++)
 					read(&((*vec)[i]));
-				return 1;
 			}
 
 

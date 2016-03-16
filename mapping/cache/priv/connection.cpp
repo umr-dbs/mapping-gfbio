@@ -686,7 +686,7 @@ void DeliveryConnection::finish_move() {
 template<typename T>
 void DeliveryConnection::write_data(BinaryWriteBuffer& buffer,
 		std::shared_ptr<const T> &item) {
-	buffer.write( *item );
+	buffer.write( *item, true );
 }
 
 // Hack for GenericRaster since serialize is not const
@@ -694,7 +694,7 @@ template<>
 void DeliveryConnection::write_data(BinaryWriteBuffer& buffer,
 		std::shared_ptr<const GenericRaster> &item) {
 	auto p = const_cast<GenericRaster*>(item.get());
-	buffer.write( *p );
+	buffer.write( *p, true );
 }
 
 

@@ -122,7 +122,12 @@ TEST(Serialization, ProfilingData) {
 }
 
 TEST(Serialization, ResolutionInfo) {
-	ResolutionInfo ri;
+	DataDescription dd(GDT_Byte, Unit::unknown());
+	SpatioTemporalReference stref(SpatialReference::unreferenced(), TemporalReference::unreferenced());
+	auto raster = GenericRaster::create(dd, stref, 200, 20, 1, GenericRaster::Representation::CPU);
+	raster->clear(0);
+
+	ResolutionInfo ri( *raster );
 	checkSerializationConstructor(ri);
 }
 

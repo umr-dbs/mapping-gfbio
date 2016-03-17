@@ -263,7 +263,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 		}
 		else if ( cc.get_state() == ControlState::REMOVE_REQUEST_READ ) {
 			auto &node_key = cc.get_remove_request();
-			IndexCacheKey key(key.semantic_id, cc.node_id, node_key.entry_id );
+			IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
 			if ( !query_manager.is_locked( node_key.type, key ) )
 				cc.confirm_remove();
 		}

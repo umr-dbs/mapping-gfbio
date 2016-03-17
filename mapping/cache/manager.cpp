@@ -110,21 +110,27 @@ bool ClientCacheWrapper<T>::put(const std::string& semantic_id,
 template<typename T>
 std::unique_ptr<T> ClientCacheWrapper<T>::query(
 		const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
-
 	(void) profiler;
+
+
+	std::unique_ptr<BinaryReadBuffer> idx_resp;
 
 	try {
 		auto idx_con = BlockingConnection::create(idx_host, idx_port, true, ClientConnection::MAGIC_NUMBER);
-
 		BaseRequest req(type,op.getSemanticId(),rect);
-		auto resp = idx_con->write_and_read(ClientConnection::CMD_GET, req);
+		idx_resp = idx_con->write_and_read(ClientConnection::CMD_GET, req);
+	} catch ( const NetworkException &ne ) {
+		Log::error("Could not talk to index-server (%s:%d): %s", idx_host.c_str(), idx_port, ne.what());
+		throw OperatorException(ne.what());
+	}
 
-		uint8_t idx_rc = resp->template read<uint8_t>();
-		switch (idx_rc) {
-			case ClientConnection::RESP_OK: {
-				DeliveryResponse dr(*resp);
-				Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
+	uint8_t idx_rc = idx_resp->template read<uint8_t>();
+	switch (idx_rc) {
+		case ClientConnection::RESP_OK: {
+			DeliveryResponse dr(*idx_resp);
+			Log::debug("Contacting delivery-server: %s:%d, delivery_id: %d", dr.host.c_str(), dr.port, dr.delivery_id);
 
+			try {
 				auto del_con = BlockingConnection::create(dr.host, dr.port, true, DeliveryConnection::MAGIC_NUMBER);
 				auto del_resp = del_con->write_and_read(DeliveryConnection::CMD_GET, dr.delivery_id);
 
@@ -144,21 +150,21 @@ std::unique_ptr<T> ClientCacheWrapper<T>::query(
 						throw DeliveryException("Delivery returned unknown code");
 					}
 				}
-				break;
+			} catch ( const NetworkException &ne ) {
+					Log::error("Could not retrieve result from delivery: %s", dr.to_string().c_str());
+					throw OperatorException(ne.what());
 			}
-			case ClientConnection::RESP_ERROR: {
-				std::string err_msg = resp->template read<std::string>();
-				Log::error("Cache returned error: %s", err_msg.c_str());
-				throw OperatorException(err_msg);
-			}
-			default: {
-				Log::error("Cache returned unknown code: %d", idx_rc);
-				throw OperatorException("Cache returned unknown code");
-			}
+			break;
 		}
-	} catch ( const NetworkException &ne ) {
-		Log::error("Could not connect to index-server: %s", ne.what());
-		throw OperatorException(ne.what());
+		case ClientConnection::RESP_ERROR: {
+			std::string err_msg = idx_resp->template read<std::string>();
+			Log::error("Cache returned error: %s", err_msg.c_str());
+			throw OperatorException(err_msg);
+		}
+		default: {
+			Log::error("Cache returned unknown code: %d", idx_rc);
+			throw OperatorException("Cache returned unknown code");
+		}
 	}
 }
 

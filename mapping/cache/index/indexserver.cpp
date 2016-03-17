@@ -39,10 +39,10 @@ void IndexServer::stop() {
 }
 
 void IndexServer::run() {
-	int listen_socket = CacheCommon::get_listening_socket(port);
+	int listen_socket = CacheCommon::get_listening_socket(port,true,SOMAXCONN);
 	Log::info("index-server: listening on node-port: %d", port);
 
-	std::vector<NewNBConnection> new_cons;
+	std::vector<std::unique_ptr<NewNBConnection>> new_cons;
 
 	while (!shutdown) {
 		struct timeval tv { 2, 0 };
@@ -57,8 +57,8 @@ void IndexServer::run() {
 
 		// Add newly accepted sockets
 		for (auto &nc : new_cons) {
-			FD_SET(nc.get_read_fd(), &readfds);
-			maxfd = std::max(maxfd, nc.get_read_fd());
+			FD_SET(nc->get_read_fd(), &readfds);
+			maxfd = std::max(maxfd, nc->get_read_fd());
 		}
 
 		// Setup existing connections
@@ -85,7 +85,7 @@ void IndexServer::run() {
 				}
 				else if (new_fd > 0) {
 					Log::debug("New connection established, fd: %d", new_fd);
-					new_cons.push_back( NewNBConnection(&remote_addr,new_fd) );
+					new_cons.push_back( make_unique<NewNBConnection>(&remote_addr,new_fd) );
 				}
 			}
 		}
@@ -201,36 +201,40 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	return maxfd;
 }
 
-void IndexServer::process_handshake(std::vector<NewNBConnection> &new_fds, fd_set* readfds) {
+void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>> &new_fds, fd_set* readfds) {
 	auto it = new_fds.begin();
 	while (it != new_fds.end()) {
+		auto &nc = **it;
 		try {
-			if (FD_ISSET(it->get_read_fd(), readfds) && it->input() ) {
-				auto &data = it->get_data();
+			if (FD_ISSET(nc.get_read_fd(), readfds) && nc.input() ) {
+				auto &data = nc.get_data();
 				uint32_t magic = data.read<uint32_t>();
 				switch (magic) {
 					case ClientConnection::MAGIC_NUMBER: {
-						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(it->release_stream());
+						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(nc.release_stream());
 						Log::trace("New client connections established");
-						client_connections.emplace(cc->id, std::move(cc));
+						if ( !client_connections.emplace(cc->id, std::move(cc)).second )
+							throw MustNotHappenException("Emplaced same connection-id twice!");
 						break;
 					}
 					case WorkerConnection::MAGIC_NUMBER: {
 						uint32_t node_id = data.read<uint32_t>();
-						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(it->release_stream(),node_id);
+						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(nc.release_stream(),node_id);
 						Log::info("New worker registered for node: %d, id: %d", node_id, wc->id);
-						worker_connections.emplace(wc->id, std::move(wc));
+						if ( !worker_connections.emplace(wc->id, std::move(wc)).second )
+							throw MustNotHappenException("Emplaced same connection-id twice!");
 						break;
 					}
 					case ControlConnection::MAGIC_NUMBER: {
 						NodeHandshake hs(data);
-						auto node = std::make_shared<Node>(next_node_id++, it->hostname, hs);
-						auto con  = make_unique<ControlConnection>(it->release_stream(), node->id, node->host);
+						auto node = std::make_shared<Node>(next_node_id++, nc.hostname, hs);
+						auto con  = make_unique<ControlConnection>(nc.release_stream(), node->id, node->host);
 						node->control_connection = con->id;
 						nodes.emplace(node->id, node);
 						caches.process_handshake(node->id,hs);
-						Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, it->hostname.c_str(), con->id);
-						control_connections.emplace(con->id, std::move(con));
+						Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, nc.hostname.c_str(), con->id);
+						if ( !control_connections.emplace(con->id, std::move(con)).second )
+							throw MustNotHappenException("Emplaced same connection-id twice!");
 						break;
 					}
 					default:

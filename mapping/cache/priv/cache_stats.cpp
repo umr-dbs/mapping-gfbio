@@ -86,7 +86,6 @@ CacheContent<T>::CacheContent(BinaryReadBuffer& buffer) : CacheUsage(buffer) {
 	std::string semantic_id;
 
 	buffer.read(&size);
-	items.reserve(size);
 
 	for ( size_t i = 0; i < size; i++ ) {
 		buffer.read(&semantic_id);
@@ -124,7 +123,7 @@ void CacheContent<T>::add_item(const std::string& semantic_id, T item) {
 }
 
 template<class T>
-const std::unordered_map<std::string, std::vector<T> >& CacheContent<T>::get_items() const {
+const std::map<std::string, std::vector<T> >& CacheContent<T>::get_items() const {
 	return items;
 }
 

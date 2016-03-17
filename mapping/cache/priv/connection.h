@@ -24,6 +24,13 @@
  */
 class BlockingConnection {
 public:
+	BlockingConnection() = delete;
+	BlockingConnection( const BlockingConnection& ) = delete;
+	BlockingConnection( BlockingConnection&& ) = delete;
+	BlockingConnection& operator=( const BlockingConnection& ) = delete;
+	BlockingConnection& operator=( BlockingConnection&& ) = delete;
+
+
 	/**
 	 * Creates a new blocking connection and immediately sends the given data (e.g. handshake).
 	 * @param host the hostname to connect to
@@ -136,6 +143,12 @@ void BlockingConnection::_internal_write(BinaryWriteBuffer &buffer, const Head &
  */
 class NewNBConnection {
 public:
+	NewNBConnection() = delete;
+	NewNBConnection( const NewNBConnection& ) = delete;
+	NewNBConnection( NewNBConnection&& ) = delete;
+	NewNBConnection& operator=( const NewNBConnection& ) = delete;
+	NewNBConnection& operator=( NewNBConnection&& ) = delete;
+
 	/**
 	 * Constructs a new instance.
 	 * The socket is set to non-blocking,
@@ -170,7 +183,7 @@ public:
 	std::string hostname;
 private:
 	BinaryStream stream;
-	std::unique_ptr<BinaryReadBuffer> buffer;
+	BinaryReadBuffer buffer;
 };
 
 /**
@@ -181,6 +194,12 @@ class BaseConnection {
 private:
 	static uint64_t next_id;
 public:
+	BaseConnection() = delete;
+	BaseConnection( const BaseConnection& ) = delete;
+	BaseConnection( BaseConnection&& ) = delete;
+	BaseConnection& operator=( const BaseConnection& ) = delete;
+	BaseConnection& operator=( BaseConnection&& ) = delete;
+
 	/**
 	 * Creates a new instance.
 	 * @param state the initial stats of the connection

@@ -22,8 +22,12 @@
 #include <iostream>
 #include <mutex>
 
+//#define ENABLE_TIMING
+
+#ifndef ENABLE_TIMING
 #define TIME_EXEC(name) ((void)0)
 #define TIME_EXEC2(name) ((void)0)
+#endif
 
 #ifdef ENABLE_TIMING
 #define TIME_EXEC(name) ExecTimer t(name)

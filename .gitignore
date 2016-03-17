@@ -9,8 +9,8 @@ datasources
 
 # compiled binaries
 mapping/mapping_manager
+mapping/mapping_manager.san
 mapping/r_server
-mapping/geometrytestbed
 mapping/gtest
 mapping/tileserver
 mapping/cache_index

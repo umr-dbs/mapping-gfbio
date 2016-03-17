@@ -248,10 +248,10 @@ worldclim_datasource:	${EXE}
 systemtest:
 	${MAKE} systemtest_testenvironment
 	${MAKE} systemtest_testcases
-	php test/systemtests/parse_logs.php >test/systemtests/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log
-	rm -f ${TEST_LOGS}
+	php test/systemtests/parse_logs.php test/systemtests/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log test/systemtest_latest.xml
+	#rm -f ${TEST_LOGS}
 	echo "Testcases done";
-	
+
 systemtest_testcases: ${EXE} ${TEST_LOGS}
 	echo "All logs written"
 
@@ -262,11 +262,13 @@ systemtest_testenvironment: ${EXE}
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXE} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; bash test/systemtests/data/ndvi/import.sh 
 
+# note: use /usr/bin/time instead of time, because the latter may be a shell's builtin without the required POSIX options
+# The || true at the end is to prevent make from aborting after the first failed test. The actual return code is in the log. 
 test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_SANITIZED}
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; if EXELOG=$$(./${EXE_SANITIZED} testquery $< 2>&1) ; then echo "$$EXELOG" >$@ ; else echo "FAILED: returncode\n$$EXELOG" >$@ ; fi
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${EXE_SANITIZED} testquery $< >$@ 2>&1 || true
 
 unittest: ${EXEGTEST}
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml"
 
 webinstall:
 	php htdocs/get_css.php > htdocs/compiled/compiled.release.css

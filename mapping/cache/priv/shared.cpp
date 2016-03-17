@@ -38,9 +38,9 @@ ResolutionInfo::ResolutionInfo(BinaryReadBuffer& buffer) :
 }
 
 void ResolutionInfo::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	buffer.write(restype);
 	buffer.write(pixel_scale_x, is_persistent_memory);
 	buffer.write(pixel_scale_y, is_persistent_memory);
-	buffer.write(restype);
 	buffer.write(actual_pixel_scale_x);
 	buffer.write(actual_pixel_scale_y);
 }

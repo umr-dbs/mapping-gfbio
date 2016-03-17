@@ -61,10 +61,11 @@ IndexCache::IndexCache( CacheType type ) : type(type) {
 }
 
 
-void IndexCache::put( const std::string semantic_id, uint32_t node_id, uint64_t entry_id, const CacheEntry& entry ) {
+void IndexCache::put( const std::string &semantic_id, uint32_t node_id, uint64_t entry_id, const CacheEntry& entry ) {
 	auto res = semantic_ids.emplace(semantic_id);
 
 	std::shared_ptr<IndexCacheEntry> item( new IndexCacheEntry(*res.first,node_id,entry_id,entry) );
+//	std::shared_ptr<IndexCacheEntry> item( new IndexCacheEntry(semantic_id,node_id,entry_id,entry) );
 
 	this->put_int(semantic_id,item->id,item);
 	get_node_entries(item->get_node_id()).insert(item);

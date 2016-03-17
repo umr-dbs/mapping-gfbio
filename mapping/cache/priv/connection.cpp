@@ -87,7 +87,7 @@ template<typename StateType>
 bool BaseConnection<StateType>::input() {
 
 	try {
-		bool eof = socket->readNB(*reader, true );
+		bool eof = socket->readNB(*reader, reader->isEmpty() );
 		if ( eof ) {
 			Log::debug("Connection closed %d", id);
 			faulty = true;

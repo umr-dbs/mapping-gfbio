@@ -77,7 +77,7 @@ private:
 	 * @param new_fds the accepted but not initialized connections
 	 * @param readfds the set of fds
 	 */
-	void process_handshake( std::vector<NewNBConnection> &new_fds, fd_set *readfds);
+	void process_handshake( std::vector<std::unique_ptr<NewNBConnection>> &new_fds, fd_set *readfds);
 
 	/**
 	 * Processes actions on control-connections

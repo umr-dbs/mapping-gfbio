@@ -6,8 +6,6 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
-#include <unistd.h>
-#include <fcntl.h>
 #include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
@@ -455,9 +453,9 @@ TEST(PolygonCollection, toARFF) {
 			"@ATTRIBUTE test2 NUMERIC\n"
 			"\n"
 			"@DATA\n"
-			"\"POLYGON((1 2,1 3,2 3,1 2))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test\",5.1\n"
-			"\"MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8)))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test2\",4.1\n"
-			"\"POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test3\",3.1\n";
+			"\"POLYGON((1 2,1 3,2 3,1 2))\",\"-infinity\",\"infinity\",\"test\",5.1\n"
+			"\"MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8)))\",\"-infinity\",\"infinity\",\"test2\",4.1\n"
+			"\"POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81))\",\"-infinity\",\"infinity\",\"test3\",3.1\n";
 
 	EXPECT_EQ(expected, polygons.toARFF());
 }
@@ -872,12 +870,7 @@ TEST(PolygonCollection, StreamSerialization){
 	polygons.finishPolygon();
 	polygons.finishFeature();
 
-	//create binarystream using pipe
-	int fds[2];
-	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
-	EXPECT_EQ(0, status);
-
-	BinaryFDStream stream(fds[0], fds[1]);
+	auto stream = BinaryStream::makePipe();
 	BinaryWriteBuffer wb;
 	wb.write(polygons);
 	stream.write(wb);

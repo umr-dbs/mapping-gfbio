@@ -1,10 +1,10 @@
 {
-	"name": "Identity expression",
+	"name": "Classification ndvi",
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",
-        "start": 0,
-        "end": 0
+        "start": 1443657600,
+        "end": 1443657601
     },
     "spatial_reference": {
         "projection": "EPSG:4326",
@@ -15,32 +15,25 @@
     },
     "resolution": {
     	"type": "pixels",
-        "x": 10800,
-        "y": 5400
+        "x": 3600,
+        "y": 1800
     },
     "query": {
         "params": {
-            "datatype": "input",
-            "expression": "A",
-            "unit": {
-				"measurement": "unknown",
-				"unit": "unknown",
-				"min": 71,
-				"max": 255
-	        }
+           "RemapRange": [[0, 70, 1], [70, 254, 2]]
         },
         "sources": {
             "raster": [
                 {
                     "params": {
                         "channel": 0,
-                        "sourcename": "world1"
+                        "sourcename": "ndvi"
                     },
                     "type": "source"
                 }
             ]
         },
-        "type": "expression"
+        "type": "reclass"
     },
-    "query_expected_hash": "4854d04d559df4f643cb73e8b352f348"
+    "query_expected_hash": "968835d8b3b5e695453bc98179ca0ac7"
 }

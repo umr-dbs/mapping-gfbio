@@ -7,8 +7,6 @@
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
 #include <json/json.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
@@ -247,8 +245,8 @@ TEST(PointCollection, SimpletoARFFWithTime) {
 			"@ATTRIBUTE test NUMERIC\n"
 			"\n"
 			"@DATA\n"
-			"1,2,\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"TEST123\",5.1\n"
-			"2,3,\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"TEST1234\",2.1\n";
+			"1,2,\"-infinity\",\"infinity\",\"TEST123\",5.1\n"
+			"2,3,\"-infinity\",\"infinity\",\"TEST1234\",2.1\n";
 	EXPECT_EQ(expected, points.toARFF());
 }
 
@@ -599,12 +597,7 @@ TEST(PointCollection, StreamSerialization){
 
 	points.addSinglePointFeature(Coordinate(20,20));
 
-	//create binarystream using pipe
-	int fds[2];
-	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
-	EXPECT_EQ(0, status);
-
-	BinaryFDStream stream(fds[0], fds[1]);
+	auto stream = BinaryStream::makePipe();
 	BinaryWriteBuffer wb;
 	wb.write(points);
 	stream.write(wb);

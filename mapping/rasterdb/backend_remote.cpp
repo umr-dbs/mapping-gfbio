@@ -27,7 +27,7 @@ RemoteRasterDBBackend::RemoteRasterDBBackend() {
 
 	//printf("Connecting to %s port %d\n", servername.c_str(), portnr);
 
-	stream.reset( new BinaryFDStream(servername.c_str(), portnr, true) );
+	stream = BinaryStream::connectTCP(servername.c_str(), portnr, true);
 }
 
 RemoteRasterDBBackend::~RemoteRasterDBBackend() {
@@ -38,10 +38,10 @@ std::vector<std::string> RemoteRasterDBBackend::enumerateSources() {
 	auto c = COMMAND_ENUMERATESOURCES;
 	BinaryWriteBuffer request;
 	request.write(c);
-	stream->write(request);
+	stream.write(request);
 
 	BinaryReadBuffer response;
-	stream->read(response);
+	stream.read(response);
 
 	std::vector<std::string> sourcenames;
 	auto count = response.read<size_t>();
@@ -57,10 +57,10 @@ std::string RemoteRasterDBBackend::readJSON(const std::string &sourcename) {
 	BinaryWriteBuffer request;
 	request.write(c);
 	request.write(sourcename);
-	stream->write(request);
+	stream.write(request);
 
 	BinaryReadBuffer response;
-	stream->read(response);
+	stream.read(response);
 
 	auto json = response.read<std::string>();
 	return json;
@@ -80,10 +80,10 @@ void RemoteRasterDBBackend::open(const std::string &_sourcename, bool writeable)
 	BinaryWriteBuffer request;
 	request.write(c);
 	request.write(this->sourcename);
-	stream->write(request);
+	stream.write(request);
 
 	BinaryReadBuffer response;
-	stream->read(response);
+	stream.read(response);
 
 	auto responsecode = response.read<uint8_t>();
 	if (responsecode != 48)
@@ -101,10 +101,10 @@ std::string RemoteRasterDBBackend::readJSON() {
 		auto c = COMMAND_READJSON;
 		BinaryWriteBuffer request;
 		request.write(c);
-		stream->write(request);
+		stream.write(request);
 
 		BinaryReadBuffer response;
-		stream->read(response);
+		stream.read(response);
 
 		response.read(&json);
 	}
@@ -122,10 +122,10 @@ RasterDBBackend::RasterDescription RemoteRasterDBBackend::getClosestRaster(int c
 	request.write(channelid);
 	request.write(t1);
 	request.write(t2);
-	stream->write(request);
+	stream.write(request);
 
 	BinaryReadBuffer response;
-	stream->read(response);
+	stream.read(response);
 
 	RasterDescription res(response);
 	if (res.rasterid < 0) {
@@ -143,10 +143,10 @@ void RemoteRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &a
 	BinaryWriteBuffer request;
 	request.write(c);
 	request.write(rasterid);
-	stream->write(request);
+	stream.write(request);
 
 	BinaryReadBuffer response;
-	stream->read(response);
+	stream.read(response);
 
 	// read strings
 	while (true) {
@@ -175,10 +175,10 @@ int RemoteRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 	request.write(c);
 	request.write(rasterid);
 	request.write(desiredzoom);
-	stream->write(request);
+	stream.write(request);
 
 	BinaryReadBuffer response;
-	stream->read(response);
+	stream.read(response);
 
 	int bestzoom;
 	response.read(&bestzoom);
@@ -199,10 +199,10 @@ const std::vector<RasterDBBackend::TileDescription> RemoteRasterDBBackend::enume
 	request.write(x2);
 	request.write(y2);
 	request.write(zoom);
-	stream->write(request);
+	stream.write(request);
 
 	BinaryReadBuffer response;
-	stream->read(response);
+	stream.read(response);
 
 	std::vector<TileDescription> result;
 	size_t count;
@@ -261,10 +261,10 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 	BinaryWriteBuffer request;
 	request.write(c);
 	request.write(tiledesc);
-	stream->write(request);
+	stream.write(request);
 
 	BinaryReadBuffer response;
-	stream->read(response);
+	stream.read(response);
 
 	auto size = response.read<size_t>();
 	auto bb = make_unique<ByteBuffer>(size);

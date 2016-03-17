@@ -6,8 +6,6 @@
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 #include "datatypes/simplefeaturecollections/geosgeomutil.h"
 #include <vector>
-#include <unistd.h>
-#include <fcntl.h>
 #include "util/binarystream.h"
 
 #include "datatypes/pointcollection.h"
@@ -319,8 +317,8 @@ TEST(LineCollection, toARFF){
 			"@ATTRIBUTE test2 NUMERIC\n"
 			"\n"
 			"@DATA\n"
-			"\"LINESTRING(1 2,1 3)\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test\",5.1\n"
-			"\"MULTILINESTRING((1 2,2 3),(2 4,5 6))\",\"1970-01-01T00:00:00\",\"1970-01-01T00:00:00\",\"test2\",4.1\n";
+			"\"LINESTRING(1 2,1 3)\",\"-infinity\",\"infinity\",\"test\",5.1\n"
+			"\"MULTILINESTRING((1 2,2 3),(2 4,5 6))\",\"-infinity\",\"infinity\",\"test2\",4.1\n";
 
 	EXPECT_EQ(expected, lines.toARFF());
 }
@@ -591,12 +589,7 @@ TEST(LineCollection, StreamSerialization){
 	lines.finishLine();
 	lines.finishFeature();
 
-	//create binarystream using pipe
-	int fds[2];
-	int status = pipe2(fds, O_NONBLOCK | O_CLOEXEC);
-	EXPECT_EQ(0, status);
-
-	BinaryFDStream stream(fds[0], fds[1]);
+	auto stream = BinaryStream::makePipe();
 	BinaryWriteBuffer wb;
 	wb.write(lines);
 	stream.write(wb);

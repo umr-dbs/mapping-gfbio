@@ -124,7 +124,7 @@ std::string getRandomString() {
 static void run_client(int id) {
 	int req=0;
 	try {
-		auto stream = make_unique<BinaryFDStream>("127.0.0.1", SERVER_PORT, true);
+		auto stream = BinaryStream::connectTCP("127.0.0.1", SERVER_PORT, true);
 
 		const auto request_bytes = getRandomString();
 
@@ -132,10 +132,10 @@ static void run_client(int id) {
 			//printf("Client %d is at %d of %d\n", id, req, NUM_REQUESTS);
 			BinaryWriteBuffer request;
 			request.write(request_bytes.c_str(), request_bytes.size(), true);
-			stream->write(request);
+			stream.write(request);
 
 			BinaryReadBuffer response;
-			stream->read(response);
+			stream.read(response);
 
 			for (size_t pos=0;pos < request_bytes.size(); pos++) {
 				auto byte = response.read<char>();

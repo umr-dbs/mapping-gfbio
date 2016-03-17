@@ -96,7 +96,7 @@ void NonblockingServer::Connection::processDataAsync() {
 /*
  * Helper Function
  */
-static int getListeningSocket(int port, int backlog = 10) {
+static int getListeningSocket(int port) {
 	int sock;
 	struct addrinfo hints, *servinfo, *p;
 
@@ -135,7 +135,7 @@ static int getListeningSocket(int port, int backlog = 10) {
 	if (p == nullptr)
 		throw NetworkException("failed to bind");
 
-	if (listen(sock, backlog) == -1)
+	if (listen(sock, SOMAXCONN) == -1)
 		throw NetworkException("listen() failed");
 
 	return sock;

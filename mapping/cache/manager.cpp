@@ -124,7 +124,7 @@ std::unique_ptr<T> ClientCacheWrapper<T>::query(
 		throw OperatorException(ne.what());
 	}
 
-	uint8_t idx_rc = idx_resp->template read<uint8_t>();
+	uint8_t idx_rc = idx_resp->read<uint8_t>();
 	switch (idx_rc) {
 		case ClientConnection::RESP_OK: {
 			DeliveryResponse dr(*idx_resp);
@@ -157,7 +157,7 @@ std::unique_ptr<T> ClientCacheWrapper<T>::query(
 			break;
 		}
 		case ClientConnection::RESP_ERROR: {
-			std::string err_msg = idx_resp->template read<std::string>();
+			std::string err_msg = idx_resp->read<std::string>();
 			Log::error("Cache returned error: %s", err_msg.c_str());
 			throw OperatorException(err_msg);
 		}

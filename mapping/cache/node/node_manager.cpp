@@ -208,8 +208,8 @@ std::unique_ptr<T> NodeCacheWrapper<T>::query(const GenericOperator& op, const Q
 	Log::debug("Local MISS for query: %s on %s. Querying index.", CacheCommon::qr_to_string(rect).c_str(), op.getSemanticId().c_str());
 	BaseRequest cr(CacheType::RASTER, op.getSemanticId(), rect);
 
-	auto resp = mgr.get_worker_context().get_index_connection().write_and_read(WorkerConnection::CMD_QUERY_CACHE,cr);
-	uint8_t rc = resp->template read<uint8_t>();
+	std::unique_ptr<BinaryReadBuffer> resp = mgr.get_worker_context().get_index_connection().write_and_read(WorkerConnection::CMD_QUERY_CACHE,cr);
+	uint8_t rc = resp->read<uint8_t>();
 
 	switch (rc) {
 		// Full hit on different client

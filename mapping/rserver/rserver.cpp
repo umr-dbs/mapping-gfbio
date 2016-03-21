@@ -353,7 +353,7 @@ int main()
 
 	Log::info("Socket started, listening..");
 	// Start listening and fork()
-	listen(listen_fd, 5);
+	listen(listen_fd, SOMAXCONN);
 	while (true) {
 		// try to reap our children
 		int status;

@@ -62,12 +62,20 @@ bool ResolutionInfo::matches(const QueryCube& query) const {
 ///////////////////////////////////////////////////////////
 
 BaseCube::BaseCube(const SpatioTemporalReference& stref) :
-	Cube3(stref.x1,stref.x2,stref.y1,stref.y2,stref.t1,stref.t2), epsg(stref.epsg), timetype(stref.timetype) {
+	Cube3(stref.x1,stref.x2,stref.y1,stref.y2,stref.t1,
+		// Always make timespan an interval -- otherwise the volume function of cube returns 0
+		// Currently only works for unix timestamps
+		std::max( stref.t2, stref.t1 + 0.25 ) ),
+		epsg(stref.epsg), timetype(stref.timetype) {
 }
 
 BaseCube::BaseCube(const SpatialReference& sref,
 		const TemporalReference& tref) :
-	Cube3(sref.x1,sref.x2,sref.y1,sref.y2,tref.t1,tref.t2), epsg(sref.epsg), timetype(tref.timetype) {
+	Cube3(sref.x1,sref.x2,sref.y1,sref.y2,tref.t1,
+			// Always make timespan an interval -- otherwise the volume function of cube returns 0
+			// Currently only works for unix timestamps
+			std::max( tref.t2, tref.t1 + 0.25 )),
+			epsg(sref.epsg), timetype(tref.timetype) {
 }
 
 BaseCube::BaseCube(BinaryReadBuffer& buffer) : Cube3(buffer),
@@ -87,14 +95,10 @@ void BaseCube::serialize(BinaryWriteBuffer& buffer,
 //
 ///////////////////////////////////////////////////////////
 
-QueryCube::QueryCube(const QueryRectangle& rect) : BaseCube( rect,
-		TemporalReference(rect.timetype, rect.t1,
-		// Always make timespan an interval -- otherwise the volume function of cube returns 0
-		// Currently only works for unix timestamps
-		std::max( rect.t2, rect.t1 + 0.25 )) ),
+QueryCube::QueryCube(const QueryRectangle& rect) : BaseCube( rect ),
 		restype(rect.restype),
 		pixel_scale_x( rect.restype == QueryResolution::Type::NONE ? 0 :  (rect.x2-rect.x1) / rect.xres ),
-		pixel_scale_y( rect.restype == QueryResolution::Type::NONE ? 0 :  (rect.y2-rect.y1) / rect.yres ){
+		pixel_scale_y( rect.restype == QueryResolution::Type::NONE ? 0 :  (rect.y2-rect.y1) / rect.yres ) {
 }
 
 QueryCube::QueryCube(BinaryReadBuffer& buffer) : BaseCube(buffer),

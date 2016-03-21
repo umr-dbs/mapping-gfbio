@@ -29,12 +29,12 @@ TEST(ReorgTest,CapacityReorg) {
 	auto reorg = ReorgStrategy::by_name(cache,"capacity","lru");
 
 	// Entry 1
-	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheCube b1(SpatioTemporalReference(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10)));
 	CacheEntry c1(b1, 10, ProfilingData());
 	cache.put("key",1,1,c1);
 
 	// Entry 2
-	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheCube b2(SpatioTemporalReference(SpatialReference(EPSG_LATLON, 45, 0, 90, 45), TemporalReference(TIMETYPE_UNIX, 0, 10)));
 	CacheEntry c2(b2, 10, ProfilingData());
 	cache.put("key",1,2,c2);
 
@@ -76,14 +76,13 @@ TEST(ReorgTest,GeographicReorg) {
 	auto reorg = ReorgStrategy::by_name(cache,"geo","lru");
 
 	// Entry 1
-	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheCube b1(SpatioTemporalReference(SpatialReference(EPSG_LATLON, 0, 0, 45, 45), TemporalReference(TIMETYPE_UNIX, 0, 10)));
 	CacheEntry c1(b1, 10, ProfilingData());
 
 	cache.put("key",1,1,c1);
 
 	// Entry 2
-	CacheCube b2(SpatialReference(EPSG_LATLON, 45, 0, 90, 45),
-		TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheCube b2(SpatioTemporalReference(SpatialReference(EPSG_LATLON, 45, 0, 90, 45), TemporalReference(TIMETYPE_UNIX, 0, 10)));
 	CacheEntry c2(b2, 10, ProfilingData());
 
 	cache.put("key",1,2,c2);
@@ -113,7 +112,7 @@ TEST(ReorgTest,GeographicReorg) {
 }
 
 CacheEntry createGraphEntry( size_t size) {
-	CacheCube b1(SpatialReference(EPSG_LATLON, 0, 0, 180, 90), TemporalReference(TIMETYPE_UNIX, 0, 10));
+	CacheCube b1(SpatioTemporalReference(SpatialReference(EPSG_LATLON, 0, 0, 180, 90), TemporalReference(TIMETYPE_UNIX, 0, 10)));
 	return CacheEntry(b1, size, ProfilingData());
 }
 

@@ -132,17 +132,20 @@ TEST(Serialization, ResolutionInfo) {
 }
 
 TEST(Serialization, QueryCube) {
-	QueryCube qc(
-			SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
-			TemporalReference( TIMETYPE_UNIX, 0, 1e5 )
+	QueryRectangle qr(
+		SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
+		TemporalReference( TIMETYPE_UNIX, 0, 1e5 ),
+		QueryResolution::none()
 	);
+
+	QueryCube qc(qr);
 	checkSerializationConstructor(qc);
 }
 
 TEST(Serialization, CacheCube) {
-	CacheCube cc(
+	CacheCube cc(SpatioTemporalReference(
 			SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
-			TemporalReference( TIMETYPE_UNIX, 0, 1e5 )
+			TemporalReference( TIMETYPE_UNIX, 0, 1e5 ))
 	);
 	checkSerializationConstructor(cc);
 }
@@ -153,8 +156,12 @@ TEST(Serialization, FetchInfo) {
 }
 
 TEST(Serialization, CacheEntry) {
-	CacheCube cc(SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
-			TemporalReference( TIMETYPE_UNIX, 0, 1e5 ));
+
+
+	CacheCube cc(SpatioTemporalReference(
+			SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
+			TemporalReference( TIMETYPE_UNIX, 0, 1e5 ) )
+	);
 
 	CacheEntry ce( cc, 1024, ProfilingData(), 10024373, 5 );
 	checkSerializationConstructor(ce);
@@ -171,8 +178,9 @@ TEST(Serialization, TypedNodeCacheKey) {
 }
 
 TEST(Serialization, MetaCacheEntry) {
-	CacheCube cc(SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
-				TemporalReference( TIMETYPE_UNIX, 0, 1e5 ));
+	CacheCube cc(SpatioTemporalReference(
+				SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
+				TemporalReference( TIMETYPE_UNIX, 0, 1e5 ) ));
 
 	CacheEntry ce( cc, 1024, ProfilingData(), 10024373, 5 );
 	TypedNodeCacheKey k(CacheType::RASTER,"key",1);
@@ -268,8 +276,9 @@ TEST(Serialization, NodeEntryStats) {
 }
 
 TEST(Serialization, HandshakeEntry) {
-	CacheCube cc(SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
-				TemporalReference( TIMETYPE_UNIX, 0, 1e5 ));
+	CacheCube cc(SpatioTemporalReference(
+				SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
+				TemporalReference( TIMETYPE_UNIX, 0, 1e5 )));
 
 	CacheEntry ce( cc, 1024, ProfilingData(), 10024373, 5 );
 	HandshakeEntry hse( 1, ce );
@@ -291,8 +300,9 @@ TEST(Serialization, CacheStats) {
 }
 
 TEST(Serialization, CacheHandshake) {
-	CacheCube cc(SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
-				 TemporalReference( TIMETYPE_UNIX, 0, 1e5 ));
+	CacheCube cc(SpatioTemporalReference(
+				 SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
+				 TemporalReference( TIMETYPE_UNIX, 0, 1e5 )));
 
 	CacheHandshake ch(CacheType::RASTER,4096,2048);
 	ch.add_item("key1", HandshakeEntry(1, CacheEntry(cc, 1024, ProfilingData(), 10024373,5 ) ) );
@@ -337,8 +347,9 @@ TEST(Serialization, NodeStats) {
 
 TEST(Serialization, NodeHandshake) {
 
-	CacheCube cc(SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
-					 TemporalReference( TIMETYPE_UNIX, 0, 1e5 ));
+	CacheCube cc( SpatioTemporalReference(
+				  SpatialReference(EPSG_LATLON, -180, -90, 180, 90),
+				  TemporalReference( TIMETYPE_UNIX, 0, 1e5 )));
 
 	CacheHandshake ch(CacheType::RASTER,4096,2048);
 	ch.add_item("key1", HandshakeEntry(1, CacheEntry(cc, 1024, ProfilingData(), 10024373,5 ) ) );

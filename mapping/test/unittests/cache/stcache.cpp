@@ -44,7 +44,7 @@ TEST(STCacheTest,SimpleTest) {
 		QueryProfiler qp;
 		auto qres = cache.query(sem_id,qr);
 		EXPECT_TRUE( qres.has_remainder() );
-		auto res = GenericRaster::create(dd,qr,width,height);
+		auto res = GenericRaster::create(dd,SpatioTemporalReference(qr, TemporalReference(qr.timetype,qr.t1-100,qr.t2+100)),width,height);
 		CacheEntry meta( CacheCube(*res), 10, ProfilingData() );
 		cache.put(sem_id, res, meta);
 		qres = cache.query(sem_id,qr);

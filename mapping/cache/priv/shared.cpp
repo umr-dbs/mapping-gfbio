@@ -45,14 +45,40 @@ void ResolutionInfo::serialize(BinaryWriteBuffer& buffer, bool is_persistent_mem
 	buffer.write(actual_pixel_scale_y);
 }
 
-bool ResolutionInfo::matches(const QueryRectangle& query) const {
+bool ResolutionInfo::matches(const QueryCube& query) const {
 	return query.restype == restype &&
 	// No resolution --> matches
     (restype == QueryResolution::Type::NONE ||
     	// Check res
-	    (pixel_scale_x.contains((query.x2-query.x1) / query.xres) &&
-		 pixel_scale_y.contains((query.y2-query.y1) / query.yres))
+	    (pixel_scale_x.contains(query.pixel_scale_x) &&
+		 pixel_scale_y.contains(query.pixel_scale_y))
     );
+}
+
+///////////////////////////////////////////////////////////
+//
+// BASE CUBE
+//
+///////////////////////////////////////////////////////////
+
+BaseCube::BaseCube(const SpatioTemporalReference& stref) :
+	Cube3(stref.x1,stref.x2,stref.y1,stref.y2,stref.t1,stref.t2), epsg(stref.epsg), timetype(stref.timetype) {
+}
+
+BaseCube::BaseCube(const SpatialReference& sref,
+		const TemporalReference& tref) :
+	Cube3(sref.x1,sref.x2,sref.y1,sref.y2,tref.t1,tref.t2), epsg(sref.epsg), timetype(tref.timetype) {
+}
+
+BaseCube::BaseCube(BinaryReadBuffer& buffer) : Cube3(buffer),
+		epsg(buffer.read<epsg_t>()), timetype(buffer.read<timetype_t>()) {
+}
+
+void BaseCube::serialize(BinaryWriteBuffer& buffer,
+		bool is_persistent_memory) const {
+	Cube3::serialize(buffer, is_persistent_memory);
+	buffer.write(epsg);
+	buffer.write(timetype);
 }
 
 ///////////////////////////////////////////////////////////
@@ -61,24 +87,25 @@ bool ResolutionInfo::matches(const QueryRectangle& query) const {
 //
 ///////////////////////////////////////////////////////////
 
-QueryCube::QueryCube(const QueryRectangle& rect) : QueryCube(rect,rect) {
+QueryCube::QueryCube(const QueryRectangle& rect) : BaseCube( rect,
+		TemporalReference(rect.timetype, rect.t1,
+		// Always make timespan an interval -- otherwise the volume function of cube returns 0
+		// Currently only works for unix timestamps
+		std::max( rect.t2, rect.t1 + 0.25 )) ),
+		restype(rect.restype),
+		pixel_scale_x( rect.restype == QueryResolution::Type::NONE ? 0 :  (rect.x2-rect.x1) / rect.xres ),
+		pixel_scale_y( rect.restype == QueryResolution::Type::NONE ? 0 :  (rect.y2-rect.y1) / rect.yres ){
 }
 
-QueryCube::QueryCube(const SpatialReference& sref, const TemporalReference& tref) :
-	Cube3( sref.x1, sref.x2, sref.y1, sref.y2, tref.t1,
-	// Always make timespan an interval -- otherwise the volume function of cube returns 0
-	// Currently only works for unix timestamps
-	std::max( tref.t2, tref.t1 + 0.25 ) ), epsg(sref.epsg), timetype(tref.timetype) {
-}
-
-QueryCube::QueryCube(BinaryReadBuffer& buffer) : Cube3(buffer),
-	epsg(buffer.read<epsg_t>()), timetype(buffer.read<timetype_t>()) {
+QueryCube::QueryCube(BinaryReadBuffer& buffer) : BaseCube(buffer),
+	restype(buffer.read<QueryResolution::Type>()), pixel_scale_x(buffer.read<double>()), pixel_scale_y(buffer.read<double>())  {
 }
 
 void QueryCube::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
-	Cube3::serialize(buffer, is_persistent_memory);
-	buffer.write(epsg);
-	buffer.write(timetype);
+	BaseCube::serialize(buffer,is_persistent_memory);
+	buffer.write(restype);
+	buffer.write(pixel_scale_x);
+	buffer.write(pixel_scale_y);
 }
 
 ///////////////////////////////////////////////////////////
@@ -87,33 +114,29 @@ void QueryCube::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) 
 //
 ///////////////////////////////////////////////////////////
 
-CacheCube::CacheCube(const SpatialReference& sref, const TemporalReference& tref) :
-	QueryCube( sref, tref ) {
+CacheCube::CacheCube(const SpatioTemporalReference& stref) : BaseCube( stref ) {
 }
 
-CacheCube::CacheCube(const SpatioTemporalResult& result) : CacheCube( result.stref, result.stref ) {
+CacheCube::CacheCube(const SpatioTemporalResult& result) : BaseCube( result.stref ) {
 }
 
 CacheCube::CacheCube(const GridSpatioTemporalResult& result) :
-	QueryCube(result.stref,result.stref), resolution_info(result) {
+		BaseCube(result.stref), resolution_info(result) {
 }
 
 CacheCube::CacheCube(const GenericPlot& result) :
-	QueryCube( SpatialReference(EPSG_UNREFERENCED, -std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(),
-			std::numeric_limits<double>::infinity(),std::numeric_limits<double>::infinity()),
-		       TemporalReference(TIMETYPE_UNREFERENCED, -std::numeric_limits<double>::infinity(),std::numeric_limits<double>::infinity()) ) {
+	BaseCube( SpatioTemporalReference::unreferenced() ) {
 	(void) result;
 }
 
 
-CacheCube::CacheCube(BinaryReadBuffer& buffer) : QueryCube(buffer), resolution_info(buffer) {
+CacheCube::CacheCube(BinaryReadBuffer& buffer) : BaseCube(buffer), resolution_info(buffer) {
 }
 
 void CacheCube::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
-	QueryCube::serialize(buffer, is_persistent_memory);
+	BaseCube::serialize(buffer, is_persistent_memory);
 	buffer.write(resolution_info, is_persistent_memory);
 }
-
 
 const Interval& CacheCube::get_timespan() const {
 	return get_dimension(2);

@@ -6,8 +6,6 @@
 
 # this is the default path when installing libgtest-dev on ubuntu
 GTEST_DIR=/usr/src/gtest/
-GDAL_INCLUDE_DIR=/usr/include/gdal/
-JSONCPP_INCLUDE_DIR=/usr/include/jsoncpp/
 
 #CPP=g++
 CPP=clang++-3.5
@@ -22,9 +20,6 @@ USE_R=true
 USE_OPENCL=true
 USE_ABCD=true
 
-LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
-CPATH := /usr/local/include/:$(CPATH)
-
 DBG_FLAGS=-g
 OPT_FLAGS=-O2
 
@@ -38,9 +33,9 @@ SANITIZE_FLAGS:=-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer
 # -fno-sanitize-recover=undefined would exit on undefined behaviour, but needs a more recent version of clang
 # -fsanitize=integer for warnings on (defined) unsigned overflows
 
-CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. -I${JSONCPP_INCLUDE_DIR} -I${GDAL_INCLUDE_DIR}
+CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. $(shell pkg-config --cflags jsoncpp gdal)
 CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
-LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time 
+LDFLAGS:=$(shell pkg-config --libs gdal jsoncpp) -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time 
 LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-lfcgi++ -lfcgi

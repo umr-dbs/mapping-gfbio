@@ -26,6 +26,20 @@ OPT_FLAGS=-O2
 # to override any of these options, create Makefile.local and set them there
 -include Makefile.local
 
+# now let's see if all our libraries are present
+EXTERNAL_LIBS := jsoncpp gdal libpng zlib libpqxx libcurl sqlite3
+ifeq (${USE_ABCD},true)
+	EXTERNAL_LIBS+= xerces-c
+endif
+
+EXTERNAL_LIBS_EXIST := $(shell pkg-config --exists $(EXTERNAL_LIBS) >/dev/null 2>&1 ; echo $$?)
+ifneq ($(EXTERNAL_LIBS_EXIST),0)
+$(shell pkg-config --print-errors $(EXTERNAL_LIBS))
+$(error Could not find required library, we need $(EXTERNAL_LIBS))
+endif
+
+
+
 # The testcases are run with full error checking. Currently, the following two tools are used:
 # AddressSanitizer, see http://clang.llvm.org/docs/AddressSanitizer.html
 # UndefinedBehaviorSanitizer, see http://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
@@ -33,9 +47,9 @@ SANITIZE_FLAGS:=-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer
 # -fno-sanitize-recover=undefined would exit on undefined behaviour, but needs a more recent version of clang
 # -fsanitize=integer for warnings on (defined) unsigned overflows
 
-CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. $(shell pkg-config --cflags jsoncpp gdal)
+CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. $(shell pkg-config --cflags $(EXTERNAL_LIBS))
 CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
-LDFLAGS:=$(shell pkg-config --libs gdal jsoncpp) -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time 
+LDFLAGS:=$(shell pkg-config --libs $(EXTERNAL_LIBS)) -lpthread -pthread -lbz2 -lturbojpeg -lgeos -lboost_date_time
 LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-lfcgi++ -lfcgi
@@ -76,7 +90,6 @@ OBJ_OPERATORS_TEMPORAL=o/operators/temporal/timeshiftoperator.o
 OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o 
 ifeq (${USE_ABCD},true)
 	OBJ_OPERATORS_GFBIO += o/operators/gfbio/abcdsource.o
-	LDFLAGS += -lxerces-c
 endif
 OBJ_OPERATORS_ALL=$(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) $(OBJ_OPERATORS_GFBIO) ${OBJ_OPERATORS_TEMPORAL}
 

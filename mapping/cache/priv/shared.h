@@ -21,6 +21,7 @@
  */
 enum class CacheType : uint8_t { RASTER, POINT, LINE, POLYGON, PLOT, UNKNOWN };
 
+class QueryCube;
 
 /**
  * Stores information about the pixel-resolution of raster-data.
@@ -56,7 +57,7 @@ public:
 	 * @param query The query to check the resolution for
 	 * @return whether the resolution matches the query or not
 	 */
-	bool matches( const QueryRectangle &query ) const;
+	bool matches( const QueryCube &query ) const;
 
 	QueryResolution::Type restype;
 	Interval pixel_scale_x;
@@ -67,22 +68,50 @@ public:
 
 
 /**
- * Wraps a query-rectangle into a cube for searching the cache.
+ * Basic cube for cache-related tasks.
  */
-class QueryCube : public Cube3 {
+class BaseCube : public Cube3 {
 public:
+
 	/**
-	 * Constructs an instance from the given query
-	 * @param query the query to wrap
+	 * Constructs an instance from the given spatial and temporal references
+	 * @param stref the spatial-temporal reference to use
 	 */
-	QueryCube( const QueryRectangle &rect );
+	BaseCube( const SpatioTemporalReference &stref );
 
 	/**
 	 * Constructs an instance from the given spatial and temporal references
 	 * @param sref the spatial reference to use
 	 * @param tref the temporal reference to use
 	 */
-	QueryCube( const SpatialReference &sref, const TemporalReference &tref );
+	BaseCube( const SpatialReference &sref, const TemporalReference &tref );
+
+	/**
+	 * Constructs an instance from the given buffer
+	 * @param buffer The buffer holding the instance data
+	 */
+	BaseCube( BinaryReadBuffer &buffer );
+
+	/**
+	 * Serializes this instance to the given buffer
+	 * @param buffer The buffer to write to
+	 */
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
+
+	epsg_t epsg;
+	timetype_t timetype;
+};
+
+/**
+ * Wraps a query-rectangle into a cube for searching the cache.
+ */
+class QueryCube : public BaseCube {
+public:
+	/**
+	 * Constructs an instance from the given query
+	 * @param query the query to wrap
+	 */
+	QueryCube( const QueryRectangle &rect );
 
 	/**
 	 * Constructs an instance from the given buffer
@@ -96,21 +125,22 @@ public:
 	 */
 	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
-	epsg_t epsg;
-	timetype_t timetype;
+	QueryResolution::Type restype;
+	double pixel_scale_x;
+	double pixel_scale_y;
 };
 
 /**
  * Describes the spatial, temporal and resolution bounds of a cache entry
  */
-class CacheCube : public QueryCube {
+class CacheCube : public BaseCube {
 public:
+
 	/**
-	 * Constructs an instance from the given spatial and temporal extension
-	 * @param sref the spatial extension to use
-	 * @param tref the temporal extension to use
+	 * Constructs an instance from the given result
+	 * @param stref
 	 */
-	CacheCube( const SpatialReference &sref, const TemporalReference &tref );
+	CacheCube( const SpatioTemporalReference &stref );
 
 	/**
 	 * Constructs an instance from the given result
@@ -143,7 +173,7 @@ public:
 	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**
-	 * @return the time-interval this cube is valid for
+	 * @return the timespan, this entry is valid for
 	 */
 	const Interval& get_timespan() const;
 

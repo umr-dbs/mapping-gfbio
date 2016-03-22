@@ -34,7 +34,7 @@ QueryRectangle create_query( const SpatialReference &sref ) {
 }
 
 CacheEntry create_entry( const SpatialReference &sref ) {
-	CacheCube cc( sref, TemporalReference(TIMETYPE_UNIX,0,1e10));
+	CacheCube cc( SpatioTemporalReference(sref, TemporalReference(TIMETYPE_UNIX,0,1e10)));
 	return CacheEntry( cc, 10, ProfilingData() );
 }
 

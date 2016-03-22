@@ -271,7 +271,7 @@ private:
  */
 class GeographicReorgStrategy : public ReorgStrategy {
 public:
-	static uint32_t get_z_value( const QueryCube &c );
+	static uint32_t get_z_value( const BaseCube &c );
 	static bool z_comp( const std::shared_ptr<const IndexCacheEntry> &e1, const std::shared_ptr<const IndexCacheEntry> &e2 );
 
 	GeographicReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);

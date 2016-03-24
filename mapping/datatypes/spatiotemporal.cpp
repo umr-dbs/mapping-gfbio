@@ -112,8 +112,8 @@ void TimeInterval::serialize(BinaryWriteBuffer &buffer, bool) const {
 }
 
 void TimeInterval::validate() const {
-	if (t1 > t2)
-		throw ArgumentException(concat("TimeInterval invalid, requires t1:", t1, " <= t2:", t2, "\n", CacheCommon::get_stacktrace()));
+	if (t1 >= t2)
+		throw ArgumentException(concat("TimeInterval invalid, requires t1:", t1, " < t2:", t2, "\n", CacheCommon::get_stacktrace()));
 }
 
 
@@ -132,14 +132,14 @@ bool TimeInterval::intersects(double t_start, double t_end) const {
 void TimeInterval::intersect(const TimeInterval &other) {
 	t1 = std::max(t1, other.t1);
 	t2 = std::min(t2, other.t2);
-	if (t1 > t2)
+	if (t1 >= t2)
 		throw ArgumentException("intersect(): both TimeIntervals do not intersect");
 }
 
 TimeInterval TimeInterval::intersection(const TimeInterval &other) {
 	double intersectiont1 = std::max(t1, other.t1);
 	double intersectiont2 = std::min(t2, other.t2);
-	if (intersectiont1 > intersectiont2)
+	if (intersectiont1 >= intersectiont2)
 		throw ArgumentException("intersect(): both TimeIntervals do not intersect");
 	return TimeInterval(intersectiont1, intersectiont2);
 }
@@ -178,13 +178,21 @@ SpatialReference SpatialReference::extent(epsg_t epsg) {
 const std::string TemporalReference::ISO_BEGIN_OF_TIME = "-infinity";
 const std::string TemporalReference::ISO_END_OF_TIME = "infinity";
 
-TemporalReference::TemporalReference(timetype_t timetype) : TimeInterval(0, 0), timetype(timetype) {
+TemporalReference::TemporalReference(timetype_t timetype) : TimeInterval(), timetype(timetype) {
 	t1 = beginning_of_time();
 	t2 = end_of_time();
 
 	validate();
 }
 
+TemporalReference::TemporalReference(timetype_t timetype, double t1) : TimeInterval(), timetype(timetype) {
+	this->t1 = t1;
+	this->t2 = t1+epsilon();
+	if (this->t1 >= this->t2)
+		throw MustNotHappenException(concat("TemporalReference::epsilon() too small for this magnitude, ", this->t1, " == ", this->t2));
+
+	validate();
+}
 
 TemporalReference::TemporalReference(timetype_t timetype, double t1, double t2)
 	: TimeInterval(t1, t2), timetype(timetype) {
@@ -230,6 +238,12 @@ double TemporalReference::end_of_time() const {
 	return std::numeric_limits<double>::infinity();
 }
 
+double TemporalReference::epsilon() const {
+	if (timetype == TIMETYPE_UNIX) {
+		return 1.0/1000.0; // 1 millisecond should be small enough.
+	}
+	throw ArgumentException(concat("TemporalReference::epsilon() on unknown timetype ", (int) timetype, "\n"));
+}
 
 
 bool TemporalReference::contains(const TemporalReference &other) const {

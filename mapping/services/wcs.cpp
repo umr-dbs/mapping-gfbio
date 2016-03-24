@@ -125,7 +125,7 @@ void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		bool flipx, flipy;
 		QueryRectangle query_rect(
 			SpatialReference(query_crsId, crsRangeX.first, crsRangeY.first, crsRangeX.second, crsRangeY.second, flipx, flipy),
-			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+			TemporalReference(TIMETYPE_UNIX, timestamp),
 			QueryResolution::pixels(sizeX, sizeY)
 		);
 		QueryProfiler profiler;

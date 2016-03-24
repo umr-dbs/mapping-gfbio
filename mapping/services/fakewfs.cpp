@@ -28,7 +28,7 @@ void FakeWFSService::run(const Params &params, HTTPResponseStream& result, std::
 
 		QueryRectangle rect(
 			SpatialReference::extent(query_epsg),
-			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+			TemporalReference(TIMETYPE_UNIX, timestamp),
 			QueryResolution::none()
 		);
 		QueryProfiler profiler;
@@ -53,7 +53,7 @@ void FakeWFSService::run(const Params &params, HTTPResponseStream& result, std::
 
 		QueryRectangle rect(
 			SpatialReference::extent(query_epsg),
-			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+			TemporalReference(TIMETYPE_UNIX, timestamp),
 			QueryResolution::none()
 		);
 
@@ -78,7 +78,7 @@ void FakeWFSService::run(const Params &params, HTTPResponseStream& result, std::
 
 		QueryRectangle rect(
 			SpatialReference::extent(query_epsg),
-			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+			TemporalReference(TIMETYPE_UNIX, timestamp),
 			QueryResolution::none()
 		);
 		QueryProfiler profiler;

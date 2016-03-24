@@ -38,7 +38,7 @@ TEST(STCacheTest,SimpleTest) {
 		parseBBOX(bbox, bboxes[i], epsg, false);
 		QueryRectangle qr(
 			SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
-			TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+			TemporalReference(TIMETYPE_UNIX, timestamp),
 			QueryResolution::pixels(width, height)
 		);
 		QueryProfiler qp;
@@ -82,7 +82,7 @@ TEST(STCacheTest,TestQuery) {
 
 	QueryRectangle qrect(
 		SpatialReference(EPSG_LATLON, 0, 0, 2, 2),
-		TemporalReference(TIMETYPE_UNIX, 10, 10),
+		TemporalReference(TIMETYPE_UNIX, 10),
 		QueryResolution::pixels(2, 2)
 	);
 	auto qr = cache.query(sem_id, qrect);

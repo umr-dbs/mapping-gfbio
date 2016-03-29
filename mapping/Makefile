@@ -257,7 +257,7 @@ systemtest:
 	${MAKE} systemtest_testenvironment
 	${MAKE} systemtest_testcases
 	php test/systemtests/parse_logs.php test/systemtests/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log test/systemtest_latest.xml
-	#rm -f ${TEST_LOGS}
+	rm -f ${TEST_LOGS}
 	echo "Testcases done";
 
 systemtest_testcases: ${EXE} ${TEST_LOGS}

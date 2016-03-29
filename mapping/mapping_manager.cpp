@@ -212,9 +212,12 @@ static TemporalReference tref_from_json(Json::Value &root){
 			time_type = TIMETYPE_UNKNOWN;
 
 		double start = json.get("start", 0).asDouble();
-		double end = json.get("end", 0).asDouble();
+		if (json.isMember("end")) {
+			double end = json.get("end", 0).asDouble();
+			return TemporalReference(time_type, start, end);
+		}
 
-		return TemporalReference(time_type, start, end);
+		return TemporalReference(time_type, start);
 	}
 
 	return TemporalReference::unreferenced();

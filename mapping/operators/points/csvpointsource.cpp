@@ -410,7 +410,7 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 			} catch (const std::exception& e) {
 				switch(errorHandling) {
 					case ErrorHandling::ABORT:
-						throw OperatorException("CSVSource: error parsing double value from string");
+						throw OperatorException(concat("CSVSource: error parsing double value from string '", tuple[pos_numeric[k]], "' on feature #", current_idx));
 					case ErrorHandling::SKIP:
 						collection->removeLastFeature();
 						added = false;

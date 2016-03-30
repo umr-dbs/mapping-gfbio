@@ -34,7 +34,6 @@ class QueryResolution {
 
 class QueryRectangle : public SpatialReference, public TemporalReference, public QueryResolution {
 	public:
-		QueryRectangle();
 		QueryRectangle(const SpatialReference &s, const TemporalReference &t, const QueryResolution &r) : SpatialReference(s), TemporalReference(t), QueryResolution(r) {}
 		QueryRectangle(const GridSpatioTemporalResult &grid);
 		QueryRectangle(BinaryReadBuffer &buffer);

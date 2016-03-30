@@ -67,12 +67,15 @@ class BinaryStream {
 		 * e.g. while waiting for new data to arrive over the network.
 		 *
 		 * Non-blocking means that partial reads and writes are possible. Always check the buffer's state
-		 * to know whether a read or write was completed.
+		 * to know whether the buffer was fully read or written.
 		 *
-		 * This method turns a stream into nonblocking mode. There is currently no way to turn them back;
-		 * this may be implemented when a need arises.
+		 * These methods switch between the two modes.
 		 */
 		void makeNonBlocking();
+		/*
+		 * @see makeNonBlocking()
+		 */
+		void makeBlocking();
 
 		/*
 		 * Write the contents of a BinaryWriteBuffer to the stream (blocking)

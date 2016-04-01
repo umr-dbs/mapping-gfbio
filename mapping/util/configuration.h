@@ -14,6 +14,9 @@ class Configuration {
 	public:
 		static const std::string &get(const std::string &name);
 		static const std::string &get(const std::string &name, const std::string &defaultValue);
+		static int getInt(const std::string &name);
+		static int getInt(const std::string &name, const int defaultValue);
+		static bool getBool(const std::string &name);
 		static bool getBool(const std::string &name, const bool defaultValue);
 };
 

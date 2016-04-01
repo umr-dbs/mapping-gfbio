@@ -2,6 +2,8 @@
 #include "util/binarystream.h"
 #include "rserver/rserver.h"
 
+#include "util/server_nonblocking.h"
+
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/plots/text.h"
@@ -22,15 +24,10 @@
 
 #include <time.h>
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <sys/wait.h>
-#include <poll.h>
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h> // waitpid()
 
-
-const int TIMEOUT_SECONDS = 600;
 
 #ifdef __clang__ // Prevent GCC from complaining about unknown pragmas.
 #pragma clang diagnostic push
@@ -57,19 +54,6 @@ const int TIMEOUT_SECONDS = 600;
 
 
 #include "rserver/***REMOVED***_callbacks.h"
-
-
-int cmpTimespec(const struct timespec &t1, const struct timespec &t2) {
-	if (t1.tv_sec < t2.tv_sec)
-		return -1;
-	if (t1.tv_sec > t2.tv_sec)
-		return 1;
-	if (t1.tv_nsec < t2.tv_nsec)
-		return -1;
-	if (t1.tv_nsec > t2.tv_nsec)
-		return 1;
-	return 0;
-}
 
 
 // Set to true while you're sending. If an exception happens when not sending, an error message can be returned
@@ -148,25 +132,73 @@ static std::string read_file_as_string(const std::string &filename) {
 }
 
 
-void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
-	auto stream = BinaryStream::fromAcceptedSocket(sock_fd);
+void signal_handler(int signum) {
+	Log::error("Caught signal %d, exiting", signum);
+	exit(signum);
+}
 
-	BinaryReadBuffer request;
-	stream.read(request);
-	int magic = request.read<int>();;
+
+class RServerConnection : public NonblockingServer::Connection {
+	public:
+		RServerConnection(NonblockingServer &server, int fd, int id);
+		~RServerConnection();
+	private:
+		virtual void processData(std::unique_ptr<BinaryReadBuffer> request);
+		virtual void processDataForked(BinaryStream stream);
+		std::string source;
+		char expected_result;
+		int rastersourcecount;
+		int pointssourcecount;
+		QueryRectangle qrect;
+};
+
+class RServer : public NonblockingServer {
+	public:
+		RServer(***REMOVED*** *R, ***REMOVED***Callbacks *callbacks) : NonblockingServer(),
+			R(R), callbacks(callbacks) {
+		}
+		virtual ~RServer() {};
+	private:
+		virtual std::unique_ptr<Connection> createConnection(int fd, int id);
+
+		***REMOVED*** *R;
+		***REMOVED***Callbacks *callbacks;
+		friend class RServerConnection;
+};
+
+
+RServerConnection::RServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id),
+	source(""), expected_result(-1), rastersourcecount(-1), pointssourcecount(-1), qrect(SpatialReference::unreferenced(), TemporalReference::unreferenced(), QueryResolution::none()) {
+	Log::info("%d: connected", id);
+}
+
+RServerConnection::~RServerConnection() {
+}
+
+void RServerConnection::processData(std::unique_ptr<BinaryReadBuffer> request) {
+	int magic = request->read<int>();
 	if (magic != RSERVER_MAGIC_NUMBER)
 		throw PlatformException("Client sent the wrong magic number");
-	auto type = request.read<char>();
-	Log::info("Requested type: %d", type);
-	std::string source;
-	request.read(&source);
-	auto rastersourcecount = request.read<int>();
-	auto pointssourcecount = request.read<int>();
+	expected_result = request->read<char>();
+	Log::info("Requested type: %d", expected_result);
+	request->read(&source);
+	rastersourcecount = request->read<int>();
+	pointssourcecount = request->read<int>();
 	Log::info("Requested counts: %d %d", rastersourcecount, pointssourcecount);
-	QueryRectangle qrect(request);
+	qrect = QueryRectangle(*request);
 	Log::info("rectangle is rect (%f,%f -> %f,%f)", qrect.x1,qrect.y1, qrect.x2,qrect.y2);
 
-	if (type == RSERVER_TYPE_PLOT) {
+	auto timeout = request->read<int>();
+	forkAndProcess(timeout);
+}
+
+void RServerConnection::processDataForked(BinaryStream stream) {
+	RServer &rserver = (RServer &) server;
+	***REMOVED*** &R = *(rserver.R);
+
+	Log::info("Here's our client!");
+
+	if (expected_result == RSERVER_TYPE_PLOT) {
 		R.parseEval("rserver_plot_tempfile = tempfile(\"rs_plot\", fileext=\".png\")");
 		R.parseEval("png(rserver_plot_tempfile, width=1000, height=1000, bg=\"transparent\")");
 	}
@@ -202,7 +234,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 		auto result = R.parseEval(lastline);
 		Profiler::stop("running R script");
 
-		if (type == RSERVER_TYPE_RASTER) {
+		if (expected_result == RSERVER_TYPE_RASTER) {
 			auto raster = ***REMOVED***::as<std::unique_ptr<GenericRaster>>(result);
 			is_sending = true;
 			BinaryWriteBuffer response;
@@ -210,7 +242,7 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			response.write(*raster, true);
 			stream.write(response);
 		}
-		else if (type == RSERVER_TYPE_POINTS) {
+		else if (expected_result == RSERVER_TYPE_POINTS) {
 			auto points = ***REMOVED***::as<std::unique_ptr<PointCollection>>(result);
 			is_sending = true;
 			BinaryWriteBuffer response;
@@ -218,15 +250,15 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 			response.write(*points, true);
 			stream.write(response);
 		}
-		else if (type == RSERVER_TYPE_STRING) {
-			std::string output = Rcallbacks.getConsoleOutput();
+		else if (expected_result == RSERVER_TYPE_STRING) {
+			std::string output = rserver.callbacks->getConsoleOutput();
 			is_sending = true;
 			BinaryWriteBuffer response;
 			response.write((char) -RSERVER_TYPE_STRING);
 			response.write(output, true);
 			stream.write(response);
 		}
-		else if (type == RSERVER_TYPE_PLOT) {
+		else if (expected_result == RSERVER_TYPE_PLOT) {
 			R.parseEval("dev.off()");
 			std::string filename = ***REMOVED***::as<std::string>(R["rserver_plot_tempfile"]);
 			std::string output = read_file_as_string(filename);
@@ -258,13 +290,11 @@ void client(int sock_fd, ***REMOVED*** &R, ***REMOVED***Callbacks &Rcallbacks) {
 		stream.write(response);
 		return;
 	}
-
 }
 
 
-void signal_handler(int signum) {
-	Log::error("Caught signal %d, exiting", signum);
-	exit(signum);
+std::unique_ptr<NonblockingServer::Connection> RServer::createConnection(int fd, int id) {
+	return make_unique<RServerConnection>(*this, fd, id);
 }
 
 
@@ -272,7 +302,7 @@ int main()
 {
 	Configuration::loadFromDefaultPaths();
 
-	auto rserver_socket = Configuration::get("rserver.socket");
+	auto portnr = Configuration::getInt("rserver.port");
 
 	Log::setLogFd(stdout);
 	Log::setLevel(Configuration::get("rserver.loglevel", "info"));
@@ -322,136 +352,14 @@ int main()
 	***REMOVED***::Function _attributes("attributes");
 	attributes = &_attributes;
 
-	Log::info("R is ready");
+	Log::info("R is ready, starting server..");
 
-	// get rid of leftover sockets
-	unlink(rserver_socket.c_str());
+	RServer server(&R, Rcallbacks);
+	//server.listen(rserver_socket, 0777);
+	server.listen(portnr);
+	server.setWorkerThreads(0);
+	server.allowForking();
+	server.start();
 
-	int listen_fd;
-
-	// create a socket
-	listen_fd = socket(AF_UNIX, SOCK_STREAM, 0);
-	if (listen_fd < 0) {
-		Log::error("socket() failed: %s", strerror(errno));
-		exit(1);
-	}
-
-	/* bind socket */
-	struct sockaddr_un server_addr;
-	memset((void *) &server_addr, 0, sizeof(server_addr));
-	server_addr.sun_family = AF_UNIX;
-	strcpy(server_addr.sun_path, rserver_socket.c_str());
-	if (bind(listen_fd, (sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
-		Log::error("bind() failed: %s", strerror(errno));
-		exit(1);
-	}
-
-	chmod(rserver_socket.c_str(), 0777);
-
-
-	std::map<pid_t, timespec> running_clients;
-
-	Log::info("Socket started, listening..");
-	// Start listening and fork()
-	listen(listen_fd, SOMAXCONN);
-	while (true) {
-		// try to reap our children
-		int status;
-		pid_t exited_pid;
-		while ((exited_pid = waitpid(-1, &status, WNOHANG)) > 0) {
-			Log::info("Client %d no longer exists", (int) exited_pid);
-			running_clients.erase(exited_pid);
-		}
-		// Kill all overdue children
-		struct timespec current_t;
-		clock_gettime(CLOCK_MONOTONIC, &current_t);
-
-		for (auto it = running_clients.begin(); it != running_clients.end(); ) {
-			auto timeout_t = it->second;
-			if (cmpTimespec(timeout_t, current_t) < 0) {
-				auto timeouted_pid = it->first;
-				Log::info("Client %d gets killed due to timeout", (int) timeouted_pid);
-
-				if (kill(timeouted_pid, SIGHUP) < 0) { // TODO: SIGKILL?
-					Log::error("kill() failed: %s", strerror(errno));
-				}
-				// the postincrement of the iterator is important to avoid using an invalid iterator
-				running_clients.erase(it++);
-			}
-			else {
-				++it;
-			}
-
-		}
-
-		// Wait for new connections. Do not wait longer than 5 seconds.
-		struct pollfd pollfds[1];
-		pollfds[0].fd = listen_fd;
-		pollfds[0].events = POLLIN;
-
-		int poll_res = poll(pollfds, /* count = */ 1, /* timeout in ms = */ 5000);
-		if (poll_res < 0) {
-			Log::error("poll() failed: %s", strerror(errno));
-			exit(1);
-		}
-		if (poll_res == 0)
-			continue;
-		if ((pollfds[0].revents & POLLIN) == 0)
-			continue;
-
-		struct sockaddr_un client_addr;
-		socklen_t client_addr_len = sizeof(client_addr);
-		int client_fd = accept(listen_fd, (struct sockaddr *) &client_addr, &client_addr_len);
-		if (client_fd < 0) {
-			if (errno == EAGAIN || errno == EWOULDBLOCK)
-				continue;
-			Log::error("accept() failed: %s", strerror(errno));
-			exit(1);
-		}
-		// fork
-		pid_t pid = fork();
-		if (pid < 0) {
-			Log::error("fork() failed: %s", strerror(errno));
-			exit(1);
-		}
-
-		if (pid == 0) {
-			// This is the client
-			// TODO: drop privileges!
-			close(listen_fd);
-			Log::info("New client starting");
-			auto start_c = clock();
-			struct timespec start_t;
-			clock_gettime(CLOCK_MONOTONIC, &start_t);
-			try {
-				client(client_fd, R, *Rcallbacks);
-			}
-			catch (const std::exception &e) {
-				Log::warn("Exception: %s", e.what());
-			}
-			auto end_c = clock();
-			struct timespec end_t;
-			clock_gettime(CLOCK_MONOTONIC, &end_t);
-
-			double c = (double) (end_c - start_c) / CLOCKS_PER_SEC;
-			double t = (double) (end_t.tv_sec - start_t.tv_sec) + (double) (end_t.tv_nsec - start_t.tv_nsec) / 1000000000;
-
-			Log::info("Client finished, %.3fs real, %.3fs CPU", t, c);
-			auto p = Profiler::get();
-			for (auto &s : p) {
-				Log::info("%s", s.c_str());
-			}
-
-			exit(0);
-		}
-		else {
-			// This is the server
-			close(client_fd);
-
-			struct timespec timeout_t;
-			clock_gettime(CLOCK_MONOTONIC, &timeout_t);
-			timeout_t.tv_sec += TIMEOUT_SECONDS;
-			running_clients[pid] = timeout_t;
-		}
-	}
+	return 0;
 }

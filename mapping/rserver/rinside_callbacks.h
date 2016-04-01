@@ -10,7 +10,7 @@ class ***REMOVED***Callbacks : public Callbacks {
 			output_buffer << line;
 			std::string trimmed = line;
 			trimmed.erase(trimmed.find_last_not_of(" \n\r\t")+1);
-			Log::info("R output, type %d: '%s'", type, trimmed.c_str());
+			//Log::debug("R output, type %d: '%s'", type, trimmed.c_str());
 		};
 
 		virtual void FlushConsole() {

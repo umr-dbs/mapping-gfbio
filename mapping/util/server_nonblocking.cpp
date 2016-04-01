@@ -3,17 +3,23 @@
 #include "util/server_nonblocking.h"
 #include "util/log.h"
 
-// socket() etc
 #include <sys/types.h>
+
+// socket() etc
 #include <sys/socket.h>
 #include <netdb.h>
 
 #include <string.h>
+#include <errno.h>
 
+// tcp
 #include <netinet/in.h>
 #include <netinet/tcp.h>
-
-#include <errno.h>
+// af_unix
+#include <sys/un.h>
+#include <sys/stat.h>
+// waitpid
+#include <sys/wait.h>
 
 
 /*
@@ -37,7 +43,7 @@ void NonblockingServer::Connection::startProcessing() {
 	processData(std::move(readbuffer));
 	// processData() can either send a reply (WRITING_DATA), process async or go idle
 	if (state == Connection::State::PROCESSING_DATA)
-		throw MustNotHappenException("processData() did not change the state, expected PROCESS_ASYNC, IDLE or a reply");
+		throw MustNotHappenException("processData() did not change the state, expected PROCESS_ASYNC, PROCESS_FORKED, IDLE or a reply");
 }
 
 void NonblockingServer::Connection::waitForData() {
@@ -86,9 +92,80 @@ void NonblockingServer::Connection::goIdle() {
 	state = State::IDLE;
 }
 
+void NonblockingServer::Connection::forkAndProcess(int timeout_seconds) {
+	// Do not allow forking from anything but the main thread, and only while the Connection object owns the handle
+	if (state != State::PROCESSING_DATA)
+		throw MustNotHappenException("Connection::forkAndProcess() cannot be called in current state");
+	if (!server.running || !server.allow_forking)
+		throw MustNotHappenException("Connection::forkAndProcess(): server is not running or not configured for forking");
+
+	// Do the actual forking
+	pid_t pid = fork();
+	if (pid < 0)
+		throw PlatformException(concat("fork() failed: ", strerror(errno)));
+
+	if (pid > 0) {
+		// This is still the parent process.
+
+		// Notify the server that a connection has fork'ed.
+		server.registerForkedProcess(pid, timeout_seconds);
+		// Make sure the fd is closed and the connection gets cleaned up in the main loop
+		close();
+		state = Connection::State::PROCESSING_DATA_FORKED;
+		return;
+	}
+	else if (pid == 0) {
+		// This is the child process
+		try {
+			server.cleanupAfterFork();
+
+			// Without the coordination of the NonblockingServer, the connection and its connection API will no longer work.
+			// Neither the stream nor the buffers may remain accessible.
+			state = State::PROCESSING_DATA_FORKED;
+
+			// We "steal" the stream from the connection before closing it. The child process can access the stream directly.
+			BinaryStream new_stream = std::move(stream);
+			new_stream.makeBlocking();
+			close();
+
+			Log::info("New child process starting");
+			auto start_c = clock();
+			struct timespec start_t;
+			clock_gettime(CLOCK_MONOTONIC, &start_t);
+			try {
+				processDataForked(std::move(new_stream));
+			}
+			catch (const std::exception &e) {
+				Log::warn("Exception in child process: %s", e.what());
+			}
+			auto end_c = clock();
+			struct timespec end_t;
+			clock_gettime(CLOCK_MONOTONIC, &end_t);
+
+			double c = (double) (end_c - start_c) / CLOCKS_PER_SEC;
+			double t = (double) (end_t.tv_sec - start_t.tv_sec) + (double) (end_t.tv_nsec - start_t.tv_nsec) / 1000000000;
+
+			Log::info("Child process finished, %.3fs real, %.3fs CPU", t, c);
+			/*
+			auto p = Profiler::get();
+			for (auto &s : p) {
+				Log::info("%s", s.c_str());
+			}
+			*/
+		} catch (const std::exception &e) {
+			Log::error("Child process terminated with an exception: %s\n", e.what());
+		} catch (...) {
+			Log::error("Child process terminated with an exception\n");
+		}
+		exit(0); // make sure control never returns to the Server on our child process
+	}
+}
 
 void NonblockingServer::Connection::processDataAsync() {
 	throw MustNotHappenException("processDataAsync not implemented on this connection!");
+}
+void NonblockingServer::Connection::processDataForked(BinaryStream stream) {
+	throw MustNotHappenException("processDataForked not implemented on this connection!");
 }
 
 
@@ -133,7 +210,7 @@ static int getListeningSocket(int port) {
 	freeaddrinfo(servinfo); // all done with this structure
 
 	if (p == nullptr)
-		throw NetworkException("failed to bind");
+		throw NetworkException(concat("failed to bind to any interface on port ", port));
 
 	if (listen(sock, SOMAXCONN) == -1)
 		throw NetworkException("listen() failed");
@@ -141,11 +218,36 @@ static int getListeningSocket(int port) {
 	return sock;
 }
 
+static int getListeningSocket(const std::string &socket_path, int umode) {
+	// get rid of leftover sockets
+	unlink(socket_path.c_str());
+
+	int sock;
+
+	// create a socket
+	sock = socket(AF_UNIX, SOCK_STREAM, 0);
+	if (sock < 0)
+		throw NetworkException(concat("socket() failed: ", strerror(errno)));
+
+	// bind socket
+	struct sockaddr_un server_addr;
+	memset((void *) &server_addr, 0, sizeof(server_addr));
+	server_addr.sun_family = AF_UNIX;
+	strcpy(server_addr.sun_path, socket_path.c_str());
+	if (bind(sock, (sockaddr *) &server_addr, sizeof(server_addr)) < 0)
+		throw NetworkException(concat("bind() failed: ", strerror(errno)));
+
+	chmod(socket_path.c_str(), umode);
+
+	return sock;
+}
+
+
 /*
  * Nonblocking Server
  */
 NonblockingServer::NonblockingServer()
-	: num_workers(0), next_id(1), listensocket(-1), running(false), wakeup_pipe(BinaryStream::makePipe()) {
+	: num_workers(0), allow_forking(false), next_id(1), listensocket(-1), running(false), wakeup_pipe(BinaryStream::makePipe()) {
 }
 
 NonblockingServer::~NonblockingServer() {
@@ -243,12 +345,11 @@ NonblockingServer::Connection *NonblockingServer::popTask() {
 NonblockingServer::Connection *NonblockingServer::getIdleConnectionById(int id) {
 	std::lock_guard<std::recursive_mutex> connections_lock(connections_mutex);
 	for (auto &c : connections) {
-		if (c->id == id && c->state == Connection::State::IDLE)
+		if (c->id == id && c->state == Connection::State::IDLE && !c->is_closed)
 			return c.get();
 	}
 	throw ArgumentException("No idle connection with the given ID found");
 }
-
 
 void NonblockingServer::setWorkerThreads(int num_workers) {
 	if (running)
@@ -257,11 +358,29 @@ void NonblockingServer::setWorkerThreads(int num_workers) {
 	this->num_workers = num_workers;
 }
 
+void NonblockingServer::allowForking() {
+	if (running)
+		throw MustNotHappenException("NonblockingServer: do not call allowForking() after start()");
+
+	allow_forking = true;
+}
+
 void NonblockingServer::listen(int portnr) {
 	if (running)
 		throw MustNotHappenException("NonblockingServer: do not call listen() after start()");
+	if (listensocket >= 0)
+		throw MustNotHappenException("NonblockingServer: can only listen on one port or socket at the moment");
 
 	listensocket = getListeningSocket(portnr);
+}
+
+void NonblockingServer::listen(const std::string &socket_path, int umode) {
+	if (running)
+		throw MustNotHappenException("NonblockingServer: do not call listen() after start()");
+	if (listensocket >= 0)
+		throw MustNotHappenException("NonblockingServer: can only listen on one port or socket at the moment");
+
+	listensocket = getListeningSocket(socket_path, umode);
 }
 
 void NonblockingServer::worker_thread() {
@@ -283,6 +402,65 @@ void NonblockingServer::worker_thread() {
 	Log::info("worker thread stopping..");
 }
 
+void NonblockingServer::registerForkedProcess(pid_t pid, int timeout_seconds) {
+	struct timespec timeout;
+	if (timeout_seconds <= 0) {
+		timeout.tv_sec = std::numeric_limits<time_t>::max();
+		timeout.tv_nsec = 0;
+	}
+	else {
+		clock_gettime(CLOCK_MONOTONIC, &timeout);
+		timeout.tv_sec += timeout_seconds;
+	}
+	running_child_processes[pid] = timeout;
+}
+
+
+static int cmpTimespec(const struct timespec &t1, const struct timespec &t2) {
+	if (t1.tv_sec < t2.tv_sec)
+		return -1;
+	if (t1.tv_sec > t2.tv_sec)
+		return 1;
+	if (t1.tv_nsec < t2.tv_nsec)
+		return -1;
+	if (t1.tv_nsec > t2.tv_nsec)
+		return 1;
+	return 0;
+}
+
+void NonblockingServer::reapAllChildProcesses(bool force_timeout) {
+	if (!allow_forking)
+		return;
+	// try to reap our children
+	int status;
+	pid_t exited_pid;
+	while ((exited_pid = waitpid(-1, &status, WNOHANG)) > 0) {
+		Log::info("Child process %d no longer exists", (int) exited_pid);
+		running_child_processes.erase(exited_pid);
+	}
+	// Kill all overdue children
+	struct timespec current_t;
+	clock_gettime(CLOCK_MONOTONIC, &current_t);
+
+	for (auto it = running_child_processes.begin(); it != running_child_processes.end(); ) {
+		auto timeout_t = it->second;
+		if (force_timeout || cmpTimespec(timeout_t, current_t) < 0) {
+			auto timeouted_pid = it->first;
+			Log::warn("Child process %d gets killed due to timeout", (int) timeouted_pid);
+
+			if (kill(timeouted_pid, SIGHUP) < 0) { // TODO: SIGKILL?
+				Log::error("kill() failed: %s", strerror(errno));
+			}
+			// the postincrement of the iterator is important to avoid using an invalid iterator
+			running_child_processes.erase(it++);
+		}
+		else {
+			++it;
+		}
+	}
+}
+
+
 void NonblockingServer::start() {
 	if (!listensocket)
 		throw ArgumentException("NonblockingServer: call listen() before start()");
@@ -294,6 +472,8 @@ void NonblockingServer::start() {
 		workers.emplace_back(&NonblockingServer::worker_thread, this);
 
 	while (true) {
+		reapAllChildProcesses();
+
 		struct timeval tv{60,0};
 		fd_set readfds;
 		fd_set writefds;
@@ -369,6 +549,7 @@ void NonblockingServer::start() {
 		connections_lock.unlock();
 
 		if (FD_ISSET(listensocket, &readfds)) {
+    		//struct sockaddr_un remote_addr; // for AF_UNIX
 			struct sockaddr_storage remote_addr;
 			socklen_t sin_size = sizeof(remote_addr);
 			int new_fd = accept(listensocket, (struct sockaddr *) &remote_addr, &sin_size);
@@ -388,7 +569,9 @@ void NonblockingServer::start() {
 	}
 
 	stopAllWorkers();
+	reapAllChildProcesses(true);
 }
+
 
 void NonblockingServer::stopAllWorkers() {
 	if (!workers.empty()) {
@@ -410,4 +593,9 @@ void NonblockingServer::stop() {
 	Log::info("Sending signal to stop server");
 	running = false;
 	wake();
+}
+
+void NonblockingServer::cleanupAfterFork() {
+	// TODO: implement.
+	// open fds don't hurt, but they really shouldn't stick around.
 }

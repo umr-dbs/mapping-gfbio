@@ -7,9 +7,12 @@
 #include <queue>
 #include <thread>
 #include <mutex>
+#include <map>
 #include <memory>
 #include <atomic>
 #include <condition_variable>
+
+#include <sys/types.h> // pid_t, timespec_t
 
 
 /*
@@ -28,6 +31,7 @@ class NonblockingServer {
 			private:
 				virtual void processData(std::unique_ptr<BinaryReadBuffer> request) = 0;
 				virtual void processDataAsync();
+				virtual void processDataForked(BinaryStream stream);
 
 				const int fd;
 				BinaryStream stream;
@@ -49,6 +53,7 @@ class NonblockingServer {
 					READING_DATA,
 					PROCESSING_DATA,
 					PROCESSING_DATA_ASYNC,
+					PROCESSING_DATA_FORKED,
 					WRITING_DATA,
 					IDLE
 				};
@@ -61,6 +66,7 @@ class NonblockingServer {
 			protected:
 				void startWritingData(std::unique_ptr<BinaryWriteBuffer> writebuffer);
 				void enqueueForAsyncProcessing();
+				void forkAndProcess(int timeout_seconds=0);
 				void goIdle();
 
 				void close();
@@ -72,14 +78,23 @@ class NonblockingServer {
 		NonblockingServer();
 		virtual ~NonblockingServer();
 		/*
-		 * Sets up the listening socket, but does not accept any connections yet.
+		 * Sets up a TCP listening socket, but does not accept any connections yet.
 		 */
 		void listen(int portnr);
+		/*
+		 * Sets up an AF_UNIX listening socket, but does not accept any connections yet.
+		 */
+		void listen(const std::string &socket_path, int umode = 0777);
 		/*
 		 * Sets the number of worker threads to use. Defaults to 0, which forbids asynchronous processing.
 		 * Set this before calling start();
 		 */
 		void setWorkerThreads(int num_workers);
+		/*
+		 * Configures that the connections are allowed to call forkAndProcess().
+		 * Set this before calling start();
+		 */
+		void allowForking();
 		/*
 		 * After listen() succeeded, start the main loop
 		 */
@@ -88,6 +103,11 @@ class NonblockingServer {
 		 * Stop the server. As start() does not terminate, this must be called from a separate thread.
 		 */
 		void stop();
+		/*
+		 * This stops the server without any cleanups. All open fds are closed.
+		 * If a connection fork()s, this is for cleanup on the child process.
+		 */
+		void cleanupAfterFork();
 		/*
 		 * Gets a reference to a connection by id. Only IDLE connections are returned.
 		 */
@@ -101,6 +121,10 @@ class NonblockingServer {
 		void readNB(Connection &connection);
 		void writeNB(Connection &connection);
 
+		/*
+		 * A Server must overload this method. All it does is instantiate a new Connection
+		 * of the correct class.
+		 */
 		virtual std::unique_ptr<Connection> createConnection(int fd, int id) = 0;
 
 		// Workers
@@ -108,6 +132,12 @@ class NonblockingServer {
 		std::vector<std::thread> workers;
 		void worker_thread();
 		void stopAllWorkers();
+
+		// Forked processes
+		bool allow_forking;
+		std::map<pid_t, timespec> running_child_processes; // pid, timeout
+		void registerForkedProcess(pid_t pid, int timeout_seconds);
+		void reapAllChildProcesses(bool force_timeout = false);
 
 		// job-queue
 		std::queue<Connection *> job_queue;

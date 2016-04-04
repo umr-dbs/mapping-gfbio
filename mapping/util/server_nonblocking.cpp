@@ -117,8 +117,6 @@ void NonblockingServer::Connection::forkAndProcess(int timeout_seconds) {
 	else if (pid == 0) {
 		// This is the child process
 		try {
-			server.cleanupAfterFork();
-
 			// Without the coordination of the NonblockingServer, the connection and its connection API will no longer work.
 			// Neither the stream nor the buffers may remain accessible.
 			state = State::PROCESSING_DATA_FORKED;
@@ -127,6 +125,9 @@ void NonblockingServer::Connection::forkAndProcess(int timeout_seconds) {
 			BinaryStream new_stream = std::move(stream);
 			new_stream.makeBlocking();
 			close();
+
+			// now that we have the only stream we're interested in, let the server close all the connections.
+			server.cleanupAfterFork();
 
 			Log::info("New child process starting");
 			auto start_c = clock();
@@ -596,6 +597,17 @@ void NonblockingServer::stop() {
 }
 
 void NonblockingServer::cleanupAfterFork() {
-	// TODO: implement.
-	// open fds don't hurt, but they really shouldn't stick around.
+	// this is run on the client process. The main loop doesn't run any more.
+	running = false;
+
+	// Worker threads don't persist after fork(), so we don't need to clean up any.
+
+	// It closes all fds that aren't required by the client any more.
+	for (auto &connection : connections) {
+		connection->close();
+	}
+	if (listensocket) {
+		close(listensocket);
+		listensocket = -1;
+	}
 }

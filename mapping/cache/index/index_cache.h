@@ -81,6 +81,7 @@ public:
 	uint64_t get_entry_id() const;
 
 	const std::string &semantic_id;
+//	std::string semantic_id;
 	std::pair<uint32_t,uint64_t> id;
 };
 
@@ -104,7 +105,7 @@ public:
 	 * Adds the given entry
 	 * @param entry the entry to add
 	 */
-	void put( const std::string semantic_id, uint32_t node_id, uint64_t entry_id, const CacheEntry& entry );
+	void put( const std::string &semantic_id, uint32_t node_id, uint64_t entry_id, const CacheEntry& entry );
 
 
 	/**

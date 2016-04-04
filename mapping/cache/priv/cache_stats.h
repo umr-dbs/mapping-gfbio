@@ -12,7 +12,7 @@
 #include "util/binarystream.h"
 
 #include <vector>
-#include <unordered_map>
+#include <map>
 
 /**
  * This class holds access information about a cache entry
@@ -99,9 +99,9 @@ public:
 	/**
 	 * Retrieves all statistic-updates
 	 */
-	const std::unordered_map<std::string,std::vector<T>>& get_items() const;
+	const std::map<std::string,std::vector<T>>& get_items() const;
 private:
-	std::unordered_map<std::string,std::vector<T>> items;
+	std::map<std::string,std::vector<T>> items;
 };
 
 class CacheStats : public CacheContent<NodeEntryStats> {

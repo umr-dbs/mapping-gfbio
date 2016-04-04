@@ -181,11 +181,7 @@ CSVPointSource::CSVPointSource(int sourcecounts[], GenericOperator *sources[], J
 
     // TODO: make sure no column names are reused multiple times?
 
-    try {
-    	errorHandling = ErrorHandlingConverter.from_json(params, "on_error");
-    } catch (const ArgumentException& e){
-    	errorHandling = ErrorHandling::ABORT;
-    }
+    errorHandling = ErrorHandlingConverter.from_json(params, "on_error");
 }
 
 
@@ -414,16 +410,19 @@ void CSVPointSource::readAnyCollection(SimpleFeatureCollection *collection, cons
 			} catch (const std::exception& e) {
 				switch(errorHandling) {
 					case ErrorHandling::ABORT:
-						throw OperatorException("CSVSource: error parsing double value from string");
+						throw OperatorException(concat("CSVSource: error parsing double value from string '", tuple[pos_numeric[k]], "' on feature #", current_idx));
 					case ErrorHandling::SKIP:
 						collection->removeLastFeature();
-						continue;
-					case ErrorHandling::KEEP:
+						added = false;
 						break;
+					case ErrorHandling::KEEP:
+						value = NAN;
 				}
 			}
 			collection->feature_attributes.numeric(columns_numeric[k]).set(current_idx, value);
 		}
+		if (!added)
+			continue;
 		for (size_t k=0;k<columns_textual.size();k++) {
 			collection->feature_attributes.textual(columns_textual[k]).set(current_idx, tuple[pos_textual[k]]);
 		}

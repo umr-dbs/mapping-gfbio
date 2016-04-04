@@ -88,9 +88,9 @@ void DeliveryManager::remove_expired_deliveries() {
 
 void DeliveryManager::run() {
 	Log::info("Starting Delivery-Manager");
-	int delivery_fd = CacheCommon::get_listening_socket(listen_port);
+	int delivery_fd = CacheCommon::get_listening_socket(listen_port,true,SOMAXCONN);
 
-	std::vector<NewNBConnection> new_cons;
+	std::vector<std::unique_ptr<NewNBConnection>> new_cons;
 
 	// Read on delivery-socket
 	while (!shutdown) {
@@ -105,8 +105,8 @@ void DeliveryManager::run() {
 
 		// Add newly accepted sockets
 		for (auto &nc : new_cons) {
-			FD_SET(nc.get_read_fd(), &readfds);
-			maxfd = std::max(maxfd, nc.get_read_fd());
+			FD_SET(nc->get_read_fd(), &readfds);
+			maxfd = std::max(maxfd, nc->get_read_fd());
 		}
 
 		maxfd = std::max(maxfd, setup_fdset(&readfds,&writefds));
@@ -122,12 +122,13 @@ void DeliveryManager::run() {
 		// Handshake
 		auto it = new_cons.begin();
 		while (it != new_cons.end()) {
+			auto &nc = **it;
 			try {
-				if (FD_ISSET(it->get_read_fd(), &readfds) && it->input() ) {
-					auto &data = it->get_data();
+				if (FD_ISSET(nc.get_read_fd(), &readfds) && nc.input() ) {
+					auto &data = nc.get_data();
 					uint32_t magic = data.read<uint32_t>();
 					if (magic == DeliveryConnection::MAGIC_NUMBER) {
-						std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(it->release_stream());
+						std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(nc.release_stream());
 						Log::debug("New delivery-connection createdm, id: %d", dc->id);
 						connections.push_back(std::move(dc));
 					}
@@ -152,7 +153,7 @@ void DeliveryManager::run() {
 				Log::error("Accept failed: %d", strerror(errno));
 			else if (new_fd > 0) {
 				Log::debug("New connection established, fd: %d", new_fd);
-				new_cons.push_back( NewNBConnection(&remote_addr,new_fd) );
+				new_cons.push_back( make_unique<NewNBConnection>(&remote_addr,new_fd) );
 			}
 		}
 		remove_expired_deliveries();

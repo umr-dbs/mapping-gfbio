@@ -59,7 +59,7 @@ void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 			bool flipx, flipy;
 			QueryRectangle qrect(
 				SpatialReference(query_epsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy),
-				TemporalReference(TIMETYPE_UNIX, timestamp, timestamp),
+				TemporalReference(TIMETYPE_UNIX, timestamp),
 				QueryResolution::pixels(output_width, output_height)
 			);
 

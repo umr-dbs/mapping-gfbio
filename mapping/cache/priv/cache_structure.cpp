@@ -148,8 +148,10 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 
 	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
 
+	const QueryCube qc(spec);
+
 	// Get intersecting entries
-	auto candidates = get_query_candidates( spec );
+	auto candidates = get_query_candidates( qc );
 
 	// No candidates found
 	if ( candidates.empty() ) {
@@ -159,7 +161,10 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 
 	std::vector<CacheQueryInfo<KType>> used_entries;
 	std::vector<KType> ids;
-	std::vector<Cube<3>> remainders{QueryCube(spec)}, tmp_remainders;
+	std::vector<Cube<3>> remainders{qc}, tmp_remainders;
+
+	ids.reserve(candidates.size());
+	used_entries.reserve(candidates.size());
 
 	while ( !candidates.empty() && !remainders.empty() ) {
 		bool used = false;
@@ -177,16 +182,14 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 
 		// Dissect remainders
 		tmp_remainders.clear();
-		tmp_remainders.reserve(remainders.size());
 
 		for ( auto &r : remainders ) {
 			if ( info.entry->bounds.intersects(r) ) {
 				used = true;
 				auto split = r.dissect_by(info.entry->bounds);
 				// Insert new remainders
-				if ( !split.empty() ) {
+				if ( !split.empty() )
 					tmp_remainders.insert(tmp_remainders.end(),split.begin(),split.end());
-				}
 			}
 			else
 				tmp_remainders.push_back(r);
@@ -195,9 +198,8 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 
 		if ( used ) {
 			ids.push_back(info.key);
-			used_entries.push_back(info);
+			used_entries.push_back( std::move(info) );
 		}
-
 		candidates.pop();
 	}
 
@@ -209,12 +211,12 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 		rem_volume += rem.volume();
 	}
 	// Return miss if we have a low coverage (<10%)
-	if ( rem_volume/ QueryCube(spec).volume() > 0.9 )
+	if ( rem_volume/ qc.volume() > 0.9 )
 		return CacheQueryResult<KType>( spec );
 
 
 	// Entend expected result
-	auto new_query = enlarge_expected_result(spec, used_entries, u_rems);
+	auto new_query = enlarge_expected_result(qc, used_entries, u_rems);
 
 	// Stretch timespan of raster-data
 	if ( spec.restype == QueryResolution::Type::PIXELS ) {
@@ -227,23 +229,22 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 
 template<typename KType, typename EType>
 std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_query_candidates(
-	const QueryRectangle& spec) const {
+	const QueryCube& qc) const {
 
-	Log::trace("Fetching candidates for query: %s", CacheCommon::qr_to_string(spec).c_str() );
+//	Log::trace("Fetching candidates for query: %s", CacheCommon::qr_to_string(spec).c_str() );
 	std::priority_queue<CacheQueryInfo<KType>> partials;
 
-	QueryCube qc( spec );
 	for (auto &e : entries) {
 		CacheCube &bounds = e.second->bounds;
 
-		if ( spec.epsg == bounds.epsg &&
-			 spec.timetype == bounds.timetype &&
-			 bounds.resolution_info.matches(spec) &&
+		if ( qc.epsg == bounds.epsg &&
+			 qc.timetype == bounds.timetype &&
+			 bounds.resolution_info.matches(qc) &&
 			 bounds.intersects(qc) ) {
 
 			// Raster
-			if ( spec.restype == QueryResolution::Type::PIXELS &&
-				!bounds.get_timespan().contains( Interval( spec.t1, spec.t2) ) )
+			if ( qc.restype == QueryResolution::Type::PIXELS &&
+				!bounds.get_timespan().contains( qc.get_dimension(2) ) )
 				continue;
 
 			// Coverage = score for now
@@ -258,8 +259,8 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 
 		}
 	}
-	Log::trace("Found %d candidates for query: %s", partials.size(), CacheCommon::qr_to_string(spec).c_str() );
-	return partials;
+//	Log::trace("Found %d candidates for query: %s", partials.size(), CacheCommon::qr_to_string(spec).c_str() );
+	return std::move(partials);
 }
 
 template<typename KType, typename EType>
@@ -292,7 +293,7 @@ std::vector<Cube<3> > CacheStructure<KType, EType>::union_remainders(
 }
 
 template<typename KType, typename EType>
-QueryRectangle CacheStructure<KType, EType>::enlarge_expected_result( const QueryRectangle &orig,
+QueryRectangle CacheStructure<KType, EType>::enlarge_expected_result( const QueryCube &qc,
 	const std::vector<CacheQueryInfo<KType>> &hits, const std::vector<Cube<3>> &remainders) const {
 
 	// Calculated maximum covered cube
@@ -304,11 +305,10 @@ QueryRectangle CacheStructure<KType, EType>::enlarge_expected_result( const Quer
 						  std::numeric_limits<double>::infinity() };
 
 
-	const QueryCube qc(orig);
 	// If we have a raster, we extend it in spatial dimensions and
 	// enlarge time-interval to t1 = max(hits.t1) and t2 = min(hits.t2)
 	// since there MUST NOT be two results with different time-intervals
-	int check_dims = (orig.restype == QueryResolution::Type::PIXELS) ? 2 : 3;
+	int check_dims = (qc.restype == QueryResolution::Type::PIXELS) ? 2 : 3;
 
 	// Calculate coverage and check which edges may be extended
 	// Only extend edges untouched by a remainder
@@ -355,15 +355,15 @@ QueryRectangle CacheStructure<KType, EType>::enlarge_expected_result( const Quer
 
 	// RASTER ONLY
 	// calculate resolution
-	if ( orig.restype == QueryResolution::Type::PIXELS ) {
-		int w = std::ceil(orig.xres / (orig.x2-orig.x1) * (values[1]-values[0]));
-		int h = std::ceil(orig.yres / (orig.y2-orig.y1) * (values[3]-values[2]));
+	if ( qc.restype == QueryResolution::Type::PIXELS ) {
+		int w = std::ceil( qc.pixel_scale_x / (values[1]-values[0]));
+		int h = std::ceil( qc.pixel_scale_y / (values[3]-values[2]));
 		qr = QueryResolution::pixels(w,h);
 	}
 
 	return QueryRectangle(
-		SpatialReference( orig.epsg, values[0], values[2], values[1], values[3] ),
-		TemporalReference( orig.timetype, values[4], values[5] ),
+		SpatialReference( qc.epsg, values[0], values[2], values[1], values[3] ),
+		TemporalReference( qc.timetype, values[4], values[5] ),
 		qr
 	);
 }

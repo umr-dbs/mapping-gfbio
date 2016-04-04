@@ -150,7 +150,7 @@ std::unique_ptr<PointCollection> RasterMetaDataToPoints::getPointCollection(cons
 			while (current_idx < featurecount) {
 				// TODO: inprecise, the timestamps may not be [t1,t1).
 				QueryRectangle rect2(rect,
-						TemporalReference(rect.timetype, temporal_index[current_idx].second, temporal_index[current_idx].second),
+						TemporalReference(rect.timetype, temporal_index[current_idx].second),
 						QueryResolution::pixels(xResolution, yResolution));
 				try {
 					auto raster = getRasterFromSource(r, rect2, profiler);

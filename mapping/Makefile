@@ -6,8 +6,6 @@
 
 # this is the default path when installing libgtest-dev on ubuntu
 GTEST_DIR=/usr/src/gtest/
-GDAL_INCLUDE_DIR=/usr/include/gdal/
-JSONCPP_INCLUDE_DIR=/usr/include/jsoncpp/
 
 #CPP=g++
 CPP=clang++-3.5
@@ -22,14 +20,25 @@ USE_R=true
 USE_OPENCL=true
 USE_ABCD=true
 
-LD_LIBRARY_PATH := /usr/local/lib/:$(LD_LIBRARY_PATH)
-CPATH := /usr/local/include/:$(CPATH)
-
 DBG_FLAGS=-g
 OPT_FLAGS=-O2
 
 # to override any of these options, create Makefile.local and set them there
 -include Makefile.local
+
+# now let's see if all our libraries are present
+EXTERNAL_LIBS := jsoncpp gdal libpng zlib libpqxx libcurl sqlite3
+ifeq (${USE_ABCD},true)
+	EXTERNAL_LIBS+= xerces-c
+endif
+
+EXTERNAL_LIBS_EXIST := $(shell pkg-config --exists $(EXTERNAL_LIBS) >/dev/null 2>&1 ; echo $$?)
+ifneq ($(EXTERNAL_LIBS_EXIST),0)
+$(shell pkg-config --print-errors $(EXTERNAL_LIBS))
+$(error Could not find required library, we need $(EXTERNAL_LIBS))
+endif
+
+
 
 # The testcases are run with full error checking. Currently, the following two tools are used:
 # AddressSanitizer, see http://clang.llvm.org/docs/AddressSanitizer.html
@@ -38,9 +47,9 @@ SANITIZE_FLAGS:=-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer
 # -fno-sanitize-recover=undefined would exit on undefined behaviour, but needs a more recent version of clang
 # -fsanitize=integer for warnings on (defined) unsigned overflows
 
-CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. -I${JSONCPP_INCLUDE_DIR} -I${GDAL_INCLUDE_DIR}
+CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. $(shell pkg-config --cflags $(EXTERNAL_LIBS))
 CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
-LDFLAGS=-lgdal -ljsoncpp -lsqlite3 -lz -lbz2 -lpthread -pthread -lpng -lturbojpeg -lpqxx -lgeos -lcurl -lboost_date_time 
+LDFLAGS:=$(shell pkg-config --libs $(EXTERNAL_LIBS)) -lpthread -pthread -lbz2 -lturbojpeg -lgeos -lboost_date_time
 LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-lfcgi++ -lfcgi
@@ -81,7 +90,6 @@ OBJ_OPERATORS_TEMPORAL=o/operators/temporal/timeshiftoperator.o
 OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o 
 ifeq (${USE_ABCD},true)
 	OBJ_OPERATORS_GFBIO += o/operators/gfbio/abcdsource.o
-	LDFLAGS += -lxerces-c
 endif
 OBJ_OPERATORS_ALL=$(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) $(OBJ_OPERATORS_GFBIO) ${OBJ_OPERATORS_TEMPORAL}
 
@@ -140,7 +148,7 @@ ${EXE_SANITIZED}:	$(patsubst %.o,%.san.o,o/mapping_manager.o ${OBJ_COMMON})
 ${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES}
 	${CPP} $+ -o $@  ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_CGI}
 
-${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o o/cache/common.o
+${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o o/cache/common.o o/util/server_nonblocking.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 
 ${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/util/server_nonblocking.o ${OBJ_UNITTEST} o/libgtest.a
@@ -248,10 +256,10 @@ worldclim_datasource:	${EXE}
 systemtest:
 	${MAKE} systemtest_testenvironment
 	${MAKE} systemtest_testcases
-	php test/systemtests/parse_logs.php >test/systemtests/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log
+	php test/systemtests/parse_logs.php test/systemtests/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log test/systemtest_latest.xml
 	rm -f ${TEST_LOGS}
 	echo "Testcases done";
-	
+
 systemtest_testcases: ${EXE} ${TEST_LOGS}
 	echo "All logs written"
 
@@ -262,11 +270,13 @@ systemtest_testenvironment: ${EXE}
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXE} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; bash test/systemtests/data/ndvi/import.sh 
 
+# note: use /usr/bin/time instead of time, because the latter may be a shell's builtin without the required POSIX options
+# The || true at the end is to prevent make from aborting after the first failed test. The actual return code is in the log. 
 test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_SANITIZED}
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; if EXELOG=$$(./${EXE_SANITIZED} testquery $< 2>&1) ; then echo "$$EXELOG" >$@ ; else echo "FAILED: returncode\n$$EXELOG" >$@ ; fi
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${EXE_SANITIZED} testquery $< >$@ 2>&1 || true
 
 unittest: ${EXEGTEST}
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml"
 
 webinstall:
 	php htdocs/get_css.php > htdocs/compiled/compiled.release.css

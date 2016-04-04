@@ -142,13 +142,40 @@ const std::string &Configuration::get(const std::string &name, const std::string
 	return it->second;
 }
 
+static int intFromString(const std::string &str) {
+	return std::stoi(str); // stoi throws if no conversion could be performed
+}
+
+int Configuration::getInt(const std::string &name) {
+	auto it = values.find(name);
+	if (it == values.end())
+		throw ArgumentException(concat("No configuration found for key ", name));
+	return intFromString(it->second);
+}
+
+int Configuration::getInt(const std::string &name, const int defaultValue) {
+	auto it = values.find(name);
+	if (it == values.end())
+		return defaultValue;
+	return intFromString(it->second);
+}
+
+static bool boolFromString(const std::string &str) {
+	if (str == "1" || str == "true" || str == "TRUE" || str == "yes" || str == "YES")
+		return true;
+	return false;
+}
+
+bool Configuration::getBool(const std::string &name) {
+	auto it = values.find(name);
+	if (it == values.end())
+		throw ArgumentException(concat("No configuration found for key ", name));
+	return boolFromString(it->second);
+}
 
 bool Configuration::getBool(const std::string &name, const bool defaultValue) {
 	auto it = values.find(name);
 	if (it == values.end())
 		return defaultValue;
-	auto &str = it->second;
-	if (str == "1" || str == "true" || str == "TRUE" || str == "yes" || str == "YES")
-		return true;
-	return false;
+	return boolFromString(it->second);
 }

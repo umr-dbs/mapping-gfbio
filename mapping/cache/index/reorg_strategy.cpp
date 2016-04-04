@@ -532,7 +532,7 @@ const uint32_t GeographicReorgStrategy::SHIFTS[] = {1, 2, 4, 8};
 const uint16_t GeographicReorgStrategy::SCALE_X = 0xFFFF / 360;
 const uint16_t GeographicReorgStrategy::SCALE_Y = 0xFFFF / 180;
 
-uint32_t GeographicReorgStrategy::get_z_value(const QueryCube& c) {
+uint32_t GeographicReorgStrategy::get_z_value(const BaseCube& c) {
 	Point<3> com = c.get_centre_of_mass();
 	double ex = com.get_value(0);
 	double ey = com.get_value(1);

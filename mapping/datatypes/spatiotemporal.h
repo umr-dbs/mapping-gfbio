@@ -115,7 +115,7 @@ class TimeInterval {
 public:
 	TimeInterval(double t1, double t2);
 
-	TimeInterval(): t1(0), t2(0) {};
+	TimeInterval(): t1(0), t2(1) {};
 
 	/*
 	 * Read a TimeInterval from a buffer
@@ -195,6 +195,10 @@ class TemporalReference : public TimeInterval {
 		 */
 		TemporalReference(timetype_t timetype);
 		/*
+		 * Constructs a reference around a point in time, using a very small interval (see epsilon())
+		 */
+		TemporalReference(timetype_t time, double t1);
+		/*
 		 * Constructs a reference with all values
 		 */
 		TemporalReference(timetype_t time, double t1, double t2);
@@ -219,6 +223,11 @@ class TemporalReference : public TimeInterval {
 		 * Returns the highest valid timestamp based on the timetype
 		 */
 		double end_of_time() const;
+		/*
+		 * Returns a reasonably small duration that is expected to be smaller than any
+		 * duration of data. Used for constructing an interval from a point in time.
+		 */
+		double epsilon() const;
 
 		/*
 		 * Returns whether the other TemporalReference is contained (smaller or equal) within this.

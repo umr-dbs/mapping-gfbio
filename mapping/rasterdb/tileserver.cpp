@@ -202,8 +202,7 @@ int main(void) {
 	Log::setLogFd(stdout);
 	Log::setLevel(Configuration::get("rasterdb.tileserver.loglevel", "info"));
 
-	auto portstr = Configuration::get("rasterdb.tileserver.port");
-	auto portnr = atoi(portstr.c_str());
+	auto portnr = Configuration::getInt("rasterdb.tileserver.port");
 
 	auto threadsstr = Configuration::get("rasterdb.tileserver.threads", "1");
 	auto threads = std::max(1, atoi(threadsstr.c_str()));

@@ -164,7 +164,7 @@ private:
 	 * @param spec the extend of the desired result
 	 * @return a list of candidates ordered by their coverage
 	 */
-	std::priority_queue<CacheQueryInfo<KType>> get_query_candidates( const QueryRectangle &spec ) const;
+	std::priority_queue<CacheQueryInfo<KType>> get_query_candidates( const QueryCube &qc ) const;
 
 	/**
 	 * Tries to minimize the remainder-queries by unioning them. The uinion of two remainders
@@ -182,7 +182,7 @@ private:
 	 * @param remainders the remainders
 	 * @return A query-rectangle describing the expected extend of the query-result
 	 */
-	QueryRectangle enlarge_expected_result( const QueryRectangle &orig, const std::vector<CacheQueryInfo<KType>> &hits, const std::vector<Cube<3>> &remainders ) const;
+	QueryRectangle enlarge_expected_result( const QueryCube &orig, const std::vector<CacheQueryInfo<KType>> &hits, const std::vector<Cube<3>> &remainders ) const;
 
 public:
 	const std::string semantic_id;

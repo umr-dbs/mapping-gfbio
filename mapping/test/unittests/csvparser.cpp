@@ -48,9 +48,9 @@ static CSVTest delimInQuotes(const std::string& delim){
 	return result;
 }
 
-static const std::vector<std::vector<std::string>> missingFields({{"a", "b", "c"}, {"d"}, {"e", "f", "g"}});
+static const std::vector<std::vector<std::string>> missingFields{{"a", "b", "c"}, {"d"}, {"e", "f", "g"}};
 
-static const std::vector<std::vector<std::string>> tooManyFields({{"a", "b", "c"}, {"d", "e", "f", "g"}, {"h", "i", "j"}});
+static const std::vector<std::vector<std::string>> tooManyFields{{"a", "b", "c"}, {"d", "e", "f", "g"}, {"h", "i", "j"}};
 
 static void checkParseResult(CSVParser& parser, const std::vector<std::vector<std::string>> expected) {
 	for(std::vector<std::string> fields : expected) {

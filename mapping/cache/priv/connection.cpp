@@ -31,7 +31,7 @@
 ///////////////////////////////////////////////////////////
 
 NewNBConnection::NewNBConnection( struct sockaddr_storage *remote_addr, int fd ) :
-	stream( BinaryStream::fromAcceptedSocket(fd, true) ), buffer( make_unique<BinaryReadBuffer>() ) {
+	stream( BinaryStream::fromAcceptedSocket(fd, true) ) {
 
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
@@ -52,13 +52,13 @@ int NewNBConnection::get_read_fd() const {
 }
 
 bool NewNBConnection::input() {
-	stream.readNB(*buffer);
-	return buffer->isRead();
+	stream.readNB(buffer);
+	return buffer.isRead();
 }
 
 BinaryReadBuffer& NewNBConnection::get_data() {
-	if ( buffer->isRead() )
-		return *buffer;
+	if ( buffer.isRead() )
+		return buffer;
 	else
 		throw IllegalStateException("Buffer not fully read");
 }
@@ -82,7 +82,7 @@ template<typename StateType>
 bool BaseConnection<StateType>::input() {
 
 	try {
-		bool eof = socket.readNB(*reader, true );
+		bool eof = socket.readNB(*reader, reader->isEmpty() );
 		if ( eof ) {
 			Log::debug("Connection closed %d", id);
 			faulty = true;

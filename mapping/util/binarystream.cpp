@@ -135,23 +135,38 @@ BinaryStream BinaryStream::makePipe() {
  * BinaryStream
  * Make nonblocking
  */
-static void make_fd_nonblocking(int fd) {
+static void set_fd_nonblocking(int fd, bool nonblock) {
 	int flags = fcntl(fd, F_GETFL, 0);
 	if (flags == -1)
-		throw NetworkException("Cannot make fd nonblocking, fcntl failed");
-	int res = fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+		throw NetworkException("Cannot change blocking mode on fd, fcntl failed");
+	int new_flags = flags;
+	if (nonblock)
+		new_flags |= O_NONBLOCK;
+	else
+		new_flags &= ~O_NONBLOCK;
+	int res = fcntl(fd, F_SETFL, new_flags);
 	if (res == -1)
-		throw NetworkException("Cannot make fd nonblocking, fcntl failed");
+		throw NetworkException("Cannot change blocking mode on fd, fcntl failed");
 }
 
 void BinaryStream::makeNonBlocking() {
 	if (!is_blocking)
 		throw ArgumentException("BinaryStream::makeNonBlocking(): is already nonblocking");
 
-	make_fd_nonblocking(read_fd);
-	make_fd_nonblocking(write_fd);
+	set_fd_nonblocking(read_fd, true);
+	set_fd_nonblocking(write_fd, true);
 	is_blocking = false;
 }
+
+void BinaryStream::makeBlocking() {
+	if (is_blocking)
+		throw ArgumentException("BinaryStream::makeBlocking(): is already blocking");
+
+	set_fd_nonblocking(read_fd, false);
+	set_fd_nonblocking(write_fd, false);
+	is_blocking = true;
+}
+
 
 
 /*

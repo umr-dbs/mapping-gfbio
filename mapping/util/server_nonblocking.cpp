@@ -174,7 +174,9 @@ void NonblockingServer::Connection::processDataForked(BinaryStream stream) {
 /*
  * Helper Function
  */
-static int getListeningSocket(int port) {
+static void addListeningSockets(int port, std::vector<int> &listensockets) {
+	int sockets_added = 0;
+
 	int sock;
 	struct addrinfo hints, *servinfo, *p;
 
@@ -196,7 +198,8 @@ static int getListeningSocket(int port) {
 
 		int yes = 1;
 		if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-			freeaddrinfo(servinfo); // all done with this structure
+			close(sock);
+			freeaddrinfo(servinfo);
 			throw NetworkException("setsockopt() failed");
 		}
 
@@ -205,18 +208,20 @@ static int getListeningSocket(int port) {
 			continue;
 		}
 
-		break;
+		if (listen(sock, SOMAXCONN) == -1) {
+			close(sock);
+			freeaddrinfo(servinfo);
+			throw NetworkException("listen() failed");
+		}
+
+		listensockets.push_back(sock);
+		sockets_added++;
 	}
 
-	freeaddrinfo(servinfo); // all done with this structure
+	freeaddrinfo(servinfo);
 
-	if (p == nullptr)
+	if (sockets_added == 0)
 		throw NetworkException(concat("failed to bind to any interface on port ", port));
-
-	if (listen(sock, SOMAXCONN) == -1)
-		throw NetworkException("listen() failed");
-
-	return sock;
 }
 
 static int getListeningSocket(const std::string &socket_path, int umode) {
@@ -240,6 +245,11 @@ static int getListeningSocket(const std::string &socket_path, int umode) {
 
 	chmod(socket_path.c_str(), umode);
 
+	if (listen(sock, SOMAXCONN) == -1) {
+		close(sock);
+		throw NetworkException("listen() failed");
+	}
+
 	return sock;
 }
 
@@ -248,14 +258,11 @@ static int getListeningSocket(const std::string &socket_path, int umode) {
  * Nonblocking Server
  */
 NonblockingServer::NonblockingServer()
-	: num_workers(0), allow_forking(false), next_id(1), listensocket(-1), running(false), wakeup_pipe(BinaryStream::makePipe()) {
+	: num_workers(0), allow_forking(false), next_connection_id(1), running(false), wakeup_pipe(BinaryStream::makePipe()) {
 }
 
 NonblockingServer::~NonblockingServer() {
-	if (listensocket) {
-		close(listensocket);
-		listensocket = -1;
-	}
+	closeAllListenSockets();
 	stopAllWorkers();
 }
 
@@ -369,20 +376,27 @@ void NonblockingServer::allowForking() {
 void NonblockingServer::listen(int portnr) {
 	if (running)
 		throw MustNotHappenException("NonblockingServer: do not call listen() after start()");
-	if (listensocket >= 0)
-		throw MustNotHappenException("NonblockingServer: can only listen on one port or socket at the moment");
 
-	listensocket = getListeningSocket(portnr);
+	addListeningSockets(portnr, listensockets_inet);
 }
 
 void NonblockingServer::listen(const std::string &socket_path, int umode) {
 	if (running)
 		throw MustNotHappenException("NonblockingServer: do not call listen() after start()");
-	if (listensocket >= 0)
-		throw MustNotHappenException("NonblockingServer: can only listen on one port or socket at the moment");
 
-	listensocket = getListeningSocket(socket_path, umode);
+	auto sock = getListeningSocket(socket_path, umode);
+	listensockets_unix.push_back(sock);
 }
+
+void NonblockingServer::closeAllListenSockets() {
+	for (auto sock : listensockets_inet)
+		close(sock);
+	listensockets_inet.clear();
+	for (auto sock : listensockets_unix)
+		close(sock);
+	listensockets_unix.clear();
+}
+
 
 void NonblockingServer::worker_thread() {
 	try {
@@ -462,8 +476,26 @@ void NonblockingServer::reapAllChildProcesses(bool force_timeout) {
 }
 
 
+class FDSet {
+	public:
+		FDSet() {
+			FD_ZERO(&fds);
+			maxfd = 0;
+		}
+		void set(int fd) {
+			FD_SET(fd, &fds);
+			maxfd = std::max(maxfd, fd);
+		}
+		bool isset(int fd) {
+			return FD_ISSET(fd, &fds);
+		}
+		int maxfd;
+		fd_set fds;
+};
+
+
 void NonblockingServer::start() {
-	if (!listensocket)
+	if (listensockets_inet.empty() && listensockets_unix.empty())
 		throw ArgumentException("NonblockingServer: call listen() before start()");
 	bool expected = false;
 	if (!running.compare_exchange_strong(expected, true))
@@ -476,12 +508,9 @@ void NonblockingServer::start() {
 		reapAllChildProcesses();
 
 		struct timeval tv{60,0};
-		fd_set readfds;
-		fd_set writefds;
-		int maxfd = 0;
+		FDSet readfds;
+		FDSet writefds;
 
-		FD_ZERO(&readfds);
-		FD_ZERO(&writefds);
 		std::unique_lock<std::recursive_mutex> connections_lock(connections_mutex);
 		auto it = connections.begin();
 		while (it != connections.end()) {
@@ -498,26 +527,23 @@ void NonblockingServer::start() {
 			}
 			else {
 				if (state == Connection::State::WRITING_DATA)
-					FD_SET(fd, &writefds);
+					writefds.set(fd);
 				else if (state == Connection::State::READING_DATA)
-					FD_SET(fd, &readfds);
-				else {
-					++it;
-					continue;
-				}
+					readfds.set(fd);
 			}
-			maxfd = std::max(fd, maxfd);
 			++it;
 		}
 		connections_lock.unlock();
 
-		maxfd = std::max(wakeup_pipe.getReadFD(), maxfd);
-		FD_SET(wakeup_pipe.getReadFD(), &readfds);
+		readfds.set(wakeup_pipe.getReadFD());
 
-		maxfd = std::max(listensocket, maxfd);
-		FD_SET(listensocket, &readfds);
+		for (auto sock : listensockets_inet)
+			readfds.set(sock);
 
-		auto res = select(maxfd+1, &readfds, &writefds, nullptr, &tv);
+		for (auto sock : listensockets_unix)
+			readfds.set(sock);
+
+		auto res = select(std::max(readfds.maxfd, writefds.maxfd)+1, &readfds.fds, &writefds.fds, nullptr, &tv);
 		if (res == 0) // timeout
 			continue;
 		if (res < 0) {
@@ -531,7 +557,7 @@ void NonblockingServer::start() {
 			break;
 		}
 
-		if (FD_ISSET(wakeup_pipe.getReadFD(), &readfds)) {
+		if (readfds.isset(wakeup_pipe.getReadFD())) {
 			// we have been woken, now we need to read any outstanding data or the pipe will remain readable
 			char buf[1024];
 			read(wakeup_pipe.getReadFD(), buf, 1024);
@@ -540,37 +566,52 @@ void NonblockingServer::start() {
 		connections_lock.lock();
 		for (auto &c : connections) {
 			Connection::State state = c->state;
-			if (state == Connection::State::WRITING_DATA && FD_ISSET(c->fd, &writefds)) {
+			if (state == Connection::State::WRITING_DATA && writefds.isset(c->fd)) {
 				writeNB(*c);
 			}
-			else if (state == Connection::State::READING_DATA && FD_ISSET(c->fd, &readfds)) {
+			else if (state == Connection::State::READING_DATA && readfds.isset(c->fd)) {
 				readNB(*c);
 			}
 		}
 		connections_lock.unlock();
 
-		if (FD_ISSET(listensocket, &readfds)) {
-    		//struct sockaddr_un remote_addr; // for AF_UNIX
-			struct sockaddr_storage remote_addr;
-			socklen_t sin_size = sizeof(remote_addr);
-			int new_fd = accept(listensocket, (struct sockaddr *) &remote_addr, &sin_size);
-			if (new_fd == -1) {
-				if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
-					continue;
-				if (errno == ECONNABORTED)
-					continue;
-
-				throw NetworkException(concat("accept() call failed: ", strerror(errno)));
+		for (int sock : listensockets_inet) {
+			if (readfds.isset(sock)) {
+				struct sockaddr_storage remote_addr; // for AF_INET
+				socklen_t sin_size = sizeof(remote_addr);
+				int new_fd = accept(sock, (struct sockaddr *) &remote_addr, &sin_size);
+				addNewConnectionFromAcceptedFD(new_fd);
 			}
-
-			connections_lock.lock();
-			connections.push_back( createConnection(new_fd, next_id++) );
-			connections_lock.unlock();
+		}
+		for (int sock : listensockets_unix) {
+			if (readfds.isset(sock)) {
+				struct sockaddr_un remote_addr; // for AF_UNIX
+				socklen_t sin_size = sizeof(remote_addr);
+				int new_fd = accept(sock, (struct sockaddr *) &remote_addr, &sin_size);
+				addNewConnectionFromAcceptedFD(new_fd);
+			}
 		}
 	}
 
 	stopAllWorkers();
 	reapAllChildProcesses(true);
+}
+
+
+void NonblockingServer::addNewConnectionFromAcceptedFD(int fd) {
+	// this method is called with the return value from accept().
+	// do the error handling here to avoid code duplication.
+	if (fd < 0) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+			return;
+		if (errno == ECONNABORTED)
+			return;
+
+		throw NetworkException(concat("accept() call failed: ", strerror(errno)));
+	}
+
+	std::unique_lock<std::recursive_mutex> connections_lock(connections_mutex);
+	connections.push_back( createConnection(fd, next_connection_id++) );
 }
 
 
@@ -603,11 +644,8 @@ void NonblockingServer::cleanupAfterFork() {
 	// Worker threads don't persist after fork(), so we don't need to clean up any.
 
 	// It closes all fds that aren't required by the client any more.
+	closeAllListenSockets();
 	for (auto &connection : connections) {
 		connection->close();
-	}
-	if (listensocket) {
-		close(listensocket);
-		listensocket = -1;
 	}
 }

@@ -34,17 +34,13 @@ class WKTSource : public GenericOperator {
 
 						auto entry = timeParam[i];
 						auto start = entry[0];
-						if(start.isString() && start.asString() == rect.ISO_BEGIN_OF_TIME)
-							t1 = rect.beginning_of_time();
-						else if(start.isNumeric())
+						if(start.isNumeric())
 							t1 = start.asDouble();
 						else
 							throw ArgumentException("WKTSource: end time is invalid");
 
 						auto end = entry[1];
-						if(end.isString() && end.asString() == rect.ISO_END_OF_TIME)
-							t2 = rect.end_of_time();
-						else if(end.isNumeric())
+						if(end.isNumeric())
 							t2 = end.asDouble();
 						else
 							throw ArgumentException("WKTSource: end time is invalid");

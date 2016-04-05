@@ -3,15 +3,20 @@
 
 #include <string>
 #include <gtest/gtest.h>
+#include <ctime>
 
-TEST(STRef, toISOBeginEndOfTime) {
+TEST(STRef, toISOBeginOfTime) {
 	TemporalReference tref(timetype_t::TIMETYPE_UNIX);
 
 	std::string iso = tref.toIsoString(tref.beginning_of_time());
-	EXPECT_EQ("-infinity", iso);
+	EXPECT_EQ("0001-01-01T00:00:00", iso);
+}
 
-	iso = tref.toIsoString(tref.end_of_time());
-	EXPECT_EQ("infinity", iso);
+TEST(STRef, toISOnEndOfTime) {
+	TemporalReference tref(timetype_t::TIMETYPE_UNIX);
+
+	std::string iso = tref.toIsoString(tref.end_of_time());
+	EXPECT_EQ("9999-12-31T23:59:59", iso);
 }
 
 TEST(STRef, temporalIntersectionWithIntervalsToEndOfTime) {

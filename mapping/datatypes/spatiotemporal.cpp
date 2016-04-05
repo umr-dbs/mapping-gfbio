@@ -4,11 +4,13 @@
 #include "util/binarystream.h"
 #include "util/debug.h"
 #include "cache/common.h"
+#include "util/timeparser.h"
 
-#include "boost/date_time/posix_time/posix_time.hpp"
 #include <math.h>
 #include <limits>
 #include <sstream>
+#include <ctime>
+#include <iomanip>
 
 
 /**
@@ -175,8 +177,22 @@ SpatialReference SpatialReference::extent(epsg_t epsg) {
 	throw ArgumentException("Cannot return extent of an unknown CRS");
 }
 
-const std::string TemporalReference::ISO_BEGIN_OF_TIME = "-infinity";
-const std::string TemporalReference::ISO_END_OF_TIME = "infinity";
+
+double calculateBOT() {
+	auto timeParser = TimeParser::create(TimeParser::Format::ISO);
+	return timeParser->parse("0001-01-01T00:00:00");
+}
+
+double calculateEOT() {
+	auto timeParser = TimeParser::create(TimeParser::Format::ISO);
+	return timeParser->parse("9999-12-31T23:59:59");
+}
+
+const double TemporalReference::begin_of_time_value = calculateBOT();
+const double TemporalReference::end_of_time_value = calculateEOT();
+
+
+
 
 TemporalReference::TemporalReference(timetype_t timetype) : TimeInterval(), timetype(timetype) {
 	t1 = beginning_of_time();
@@ -222,8 +238,8 @@ void TemporalReference::validate() const {
 
 double TemporalReference::beginning_of_time() const {
 	if (timetype == TIMETYPE_UNIX) {
-		// TODO: find a sensible value. Big Bang? Creation of earth?
-		return -std::numeric_limits<double>::infinity();
+		//ISO 8601: 0001-01-01T00:00:00
+		return begin_of_time_value;
 	}
 	// The default for other timetypes is -infinity
 	return -std::numeric_limits<double>::infinity();
@@ -231,8 +247,8 @@ double TemporalReference::beginning_of_time() const {
 
 double TemporalReference::end_of_time() const {
 	if (timetype == TIMETYPE_UNIX) {
-		// TODO: find a sensible value. When the sun turns supernova in a couple billion years, that'd probably mark the end of earth-based geography.
-		return std::numeric_limits<double>::infinity();
+		//ISO 8601: 9999-12-31T23:59:59
+		return end_of_time_value;
 	}
 	// The default for other timetypes is infinity
 	return std::numeric_limits<double>::infinity();
@@ -276,13 +292,38 @@ void TemporalReference::intersect(const TemporalReference &other) {
 std::string TemporalReference::toIsoString(double time) const {
 	std::ostringstream result;
 
-	if(time == beginning_of_time())
-		return TemporalReference::ISO_BEGIN_OF_TIME;
-	else if(time == end_of_time())
-		return ISO_END_OF_TIME;
-
 	if(timetype == TIMETYPE_UNIX){
-		result << boost::posix_time::to_iso_extended_string(boost::posix_time::from_time_t(time));
+		long t = time;
+		std::tm *tm = std::gmtime(&t);
+
+		if(tm == NULL)
+			throw ArgumentException("Could not convert time to IsoString");
+
+		int year = 1900 + tm->tm_year;
+		int month = tm->tm_mon + 1;
+		int day = tm->tm_mday;
+		int hour = tm->tm_hour;
+		int minute = tm->tm_min;
+		int second = tm->tm_sec;
+
+		double frac = time - t;
+
+		result.fill('0');
+
+		result << std::setw(4) << year << "-" << std::setw(2) << month << "-" <<std::setw(2) << day << "T" <<
+				std::setw(2) << hour << ":" <<std::setw(2) << minute << ":" <<std::setw(2) << second;
+
+		if(frac > 0.0) {
+			//remove leading zero
+			std::stringstream ss;
+			ss << frac;
+			std::string frac_string = ss.str();
+
+			frac_string.erase(0, frac_string.find_first_not_of('0'));
+
+			result << frac_string;
+		}
+
 		//TODO: incorporate fractions of seconds
 	} else {
 		throw ConverterException("can only convert UNIX timestamps");

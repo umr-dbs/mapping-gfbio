@@ -277,8 +277,9 @@ class TemporalReference : public TimeInterval {
 		}
 		timetype_t timetype;
 
-		static const std::string ISO_BEGIN_OF_TIME;
-		static const std::string ISO_END_OF_TIME;
+	private:
+		static const double begin_of_time_value;
+		static const double end_of_time_value;
 };
 
 /**

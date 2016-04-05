@@ -74,12 +74,7 @@ public:
 	TimeParserISO() : TimeParser(timetype_t::TIMETYPE_UNIX, Format::ISO) {}
 
 	virtual double parse(const std::string& timeString) const{
-		//TODO: support entirety of ISO8601 compatible formats https://en.wikipedia.org/wiki/ISO_8601
-		if(timeString == TemporalReference::ISO_BEGIN_OF_TIME)
-			return tref.beginning_of_time();
-		else if(timeString == TemporalReference::ISO_END_OF_TIME)
-			return tref.end_of_time();
-
+		//TODO: support entirety of ISO8601 compatible formats https://en.wikipedia.org/wiki/ISO_8601 and fractions of seconds
 		std::tm tm = {};
 		if (strptime(timeString.c_str(), "%Y-%m-%dT%H:%M:%S", &tm))
 			return timegm(&tm);

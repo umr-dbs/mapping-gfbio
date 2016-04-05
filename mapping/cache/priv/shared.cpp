@@ -62,19 +62,13 @@ bool ResolutionInfo::matches(const QueryCube& query) const {
 ///////////////////////////////////////////////////////////
 
 BaseCube::BaseCube(const SpatioTemporalReference& stref) :
-	Cube3(stref.x1,stref.x2,stref.y1,stref.y2,stref.t1,
-		// Always make timespan an interval -- otherwise the volume function of cube returns 0
-		// Currently only works for unix timestamps
-		std::max( stref.t2, stref.t1 + 0.25 ) ),
+	Cube3(stref.x1,stref.x2,stref.y1,stref.y2,stref.t1,stref.t2),
 		epsg(stref.epsg), timetype(stref.timetype) {
 }
 
 BaseCube::BaseCube(const SpatialReference& sref,
 		const TemporalReference& tref) :
-	Cube3(sref.x1,sref.x2,sref.y1,sref.y2,tref.t1,
-			// Always make timespan an interval -- otherwise the volume function of cube returns 0
-			// Currently only works for unix timestamps
-			std::max( tref.t2, tref.t1 + 0.25 )),
+	Cube3(sref.x1,sref.x2,sref.y1,sref.y2,tref.t1,tref.t2),
 			epsg(sref.epsg), timetype(tref.timetype) {
 }
 

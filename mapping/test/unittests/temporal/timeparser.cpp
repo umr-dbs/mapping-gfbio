@@ -45,3 +45,19 @@ TEST(TimeParser, testISOBefore1970){
 
 	EXPECT_FLOAT_EQ(-7783735800, parser->parse("1723-05-06T11:11:11"));
 }
+
+TEST(TimeParser, bot) {
+	auto timeParser = TimeParser::create(TimeParser::Format::ISO);
+	auto bot = timeParser->parse("0001-01-01T00:00:00");
+
+	TemporalReference t(TIMETYPE_UNIX);
+	EXPECT_FLOAT_EQ(bot, t.beginning_of_time());
+}
+
+TEST(TimeParser, eot) {
+	auto timeParser = TimeParser::create(TimeParser::Format::ISO);
+	auto eot = timeParser->parse("9999-12-31T23:59:59");
+
+	TemporalReference t(TIMETYPE_UNIX);
+	EXPECT_FLOAT_EQ(eot, t.end_of_time());
+}

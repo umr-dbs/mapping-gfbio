@@ -276,10 +276,6 @@ class TemporalReference : public TimeInterval {
 			return TemporalReference(TIMETYPE_UNREFERENCED, 0.0, 1.0);
 		}
 		timetype_t timetype;
-
-	private:
-		static const double begin_of_time_value;
-		static const double end_of_time_value;
 };
 
 /**

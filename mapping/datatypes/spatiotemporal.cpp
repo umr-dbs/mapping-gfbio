@@ -4,7 +4,6 @@
 #include "util/binarystream.h"
 #include "util/debug.h"
 #include "cache/common.h"
-#include "util/timeparser.h"
 
 #include <math.h>
 #include <limits>
@@ -178,21 +177,6 @@ SpatialReference SpatialReference::extent(epsg_t epsg) {
 }
 
 
-double calculateBOT() {
-	auto timeParser = TimeParser::create(TimeParser::Format::ISO);
-	return timeParser->parse("0001-01-01T00:00:00");
-}
-
-double calculateEOT() {
-	auto timeParser = TimeParser::create(TimeParser::Format::ISO);
-	return timeParser->parse("9999-12-31T23:59:59");
-}
-
-const double TemporalReference::begin_of_time_value = calculateBOT();
-const double TemporalReference::end_of_time_value = calculateEOT();
-
-
-
 
 TemporalReference::TemporalReference(timetype_t timetype) : TimeInterval(), timetype(timetype) {
 	t1 = beginning_of_time();
@@ -236,10 +220,12 @@ void TemporalReference::validate() const {
 		throw ArgumentException(concat("TemporalReference invalid, requires t2:", t2, " <= eot:", end_of_time()));
 }
 
+
 double TemporalReference::beginning_of_time() const {
 	if (timetype == TIMETYPE_UNIX) {
+		// A test in unittests/temporal/timeparser.cpp verifies that the constant matches the given date
 		//ISO 8601: 0001-01-01T00:00:00
-		return begin_of_time_value;
+		return -62135596800;
 	}
 	// The default for other timetypes is -infinity
 	return -std::numeric_limits<double>::infinity();
@@ -247,8 +233,9 @@ double TemporalReference::beginning_of_time() const {
 
 double TemporalReference::end_of_time() const {
 	if (timetype == TIMETYPE_UNIX) {
+		// A test in unittests/temporal/timeparser.cpp verifies that the constant matches the given date
 		//ISO 8601: 9999-12-31T23:59:59
-		return end_of_time_value;
+		return 253402300799;
 	}
 	// The default for other timetypes is infinity
 	return std::numeric_limits<double>::infinity();

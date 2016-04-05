@@ -63,6 +63,10 @@ void SimpleFeatureCollection::validate() const {
 
 		for(auto& interval : time) {
 			interval.validate();
+			if (interval.t1 < stref.beginning_of_time())
+				throw ArgumentException(concat("Feature time interval invalid, requires t1:", interval.t1, " >= bot:", stref.beginning_of_time()));
+			if (interval.t2 > stref.end_of_time())
+				throw ArgumentException(concat("Feature time interval invalid, requires t2:", interval.t2, " <= eot:", stref.end_of_time()));
 		}
 	}
 

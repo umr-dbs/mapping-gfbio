@@ -146,12 +146,18 @@ class NonblockingServer {
 		void enqueueTask(Connection *connection);
 		Connection *popTask();
 
-		// other things
-		int next_id;
-		int listensocket;
-		std::vector<std::unique_ptr<Connection>> connections;
-		std::recursive_mutex connections_mutex;
+		// Listen sockets
+		std::vector<int> listensockets_inet;
+		std::vector<int> listensockets_unix;
+		void closeAllListenSockets();
 
+		// Connections
+		std::recursive_mutex connections_mutex;
+		int next_connection_id;
+		std::vector<std::unique_ptr<Connection>> connections;
+		void addNewConnectionFromAcceptedFD(int fd);
+
+		// Status
 		std::atomic<bool> running;
 		BinaryStream wakeup_pipe;
 };

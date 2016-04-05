@@ -1,6 +1,7 @@
 #include "util/server_nonblocking.h"
 #include "util/make_unique.h"
 #include "util/log.h"
+#include "util/concat.h"
 
 #include <gtest/gtest.h>
 #include <thread>
@@ -8,6 +9,10 @@
 #include <chrono>
 #include <algorithm> // std::min
 #include <atomic>
+
+#include <sys/types.h>
+#include <unistd.h> // getpid
+
 
 
 // Unit tests are supposed to be quick. If you want to really stress-test the server,
@@ -17,6 +22,8 @@ static const int NUM_REQUESTS = 3;
 
 static const int SERVER_PORT = 51234;
 static const size_t SERVER_BUFFER_SIZE = 1064960;
+
+static std::string unix_socket_path;
 
 // to see minimum/default/maximum buffer sizes, do:
 // cat /proc/sys/net/ipv4/tcp_{r,w}mem
@@ -87,6 +94,7 @@ static void run_server() {
 
 		server = make_unique<EchoServer>();
 		server->listen(portnr);
+		server->listen(unix_socket_path, 0700);
 
 		server_initialization_mutex.unlock();
 		server->start();
@@ -124,7 +132,11 @@ std::string getRandomString() {
 static void run_client(int id) {
 	int req=0;
 	try {
-		auto stream = BinaryStream::connectTCP("127.0.0.1", SERVER_PORT, true);
+		BinaryStream stream;
+		if (id % 3 == 1)
+			stream = BinaryStream::connectUNIX(unix_socket_path.c_str());
+		else
+			stream = BinaryStream::connectTCP("127.0.0.1", SERVER_PORT, true);
 
 		const auto request_bytes = getRandomString();
 
@@ -160,6 +172,8 @@ TEST(NonblockingServer, EchoServer) {
 	all_clients_successful = true;
 	server_thread_failed = false;
 
+	unix_socket_path = concat("/tmp/gtest_nonblocking_echoserver.", getpid(), ".socket");
+
 	std::thread server_thread(run_server);
 
 	// wait for the listening socket to exist
@@ -190,6 +204,8 @@ TEST(NonblockingServer, EchoServer) {
 	// stop the server
 	server->stop();
 	server_thread.join();
+
+	unlink(unix_socket_path.c_str());
 
 	EXPECT_EQ(true, all_clients_successful);
 }

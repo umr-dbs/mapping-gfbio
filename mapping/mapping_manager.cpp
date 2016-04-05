@@ -1,4 +1,7 @@
 #include "datatypes/raster.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/linecollection.h"
+#include "datatypes/polygoncollection.h"
 #include "datatypes/plot.h"
 #include "datatypes/colorizer.h"
 #include "rasterdb/rasterdb.h"
@@ -8,6 +11,7 @@
 #include "operators/operator.h"
 #include "converters/converter.h"
 #include "raster/profiler.h"
+#include "util/binarystream.h"
 #include "util/configuration.h"
 #include "util/gdal.h"
 #include "util/debug.h"
@@ -22,9 +26,7 @@
 #include <memory>
 
 #include <json/json.h>
-#include "datatypes/pointcollection.h"
-#include "datatypes/linecollection.h"
-#include "datatypes/polygoncollection.h"
+
 
 static char *program_name;
 static void usage() {
@@ -424,6 +426,13 @@ static void testsemantic(GenericOperator *graph) {
 	return;
 }
 
+template<typename T>
+std::string getIPCHash(T &t) {
+	BinaryWriteBuffer buf;
+	buf << t;
+	return buf.hash().asHex();
+}
+
 // The return code is 0 for both success and failure, nonzero for any actual error (e.g. exception or crash)
 static int testquery(int argc, char *argv[]) {
 	if (argc < 3) {
@@ -462,7 +471,7 @@ static int testquery(int argc, char *argv[]) {
 		 * Step #3: run the query and see if the results match
 		 */
 		std::string result = root.get("query_result", "raster").asString();
-		std::string real_hash, real_hash2;
+		std::string real_hash, real_hash2, real_hash_ipc;
 
 		bool flipx, flipy;
 		auto qrect = qrect_from_json(root, flipx, flipy);
@@ -486,30 +495,35 @@ static int testquery(int argc, char *argv[]) {
 				raster = raster->flip(flipx, flipy);
 			real_hash = raster->hash();
 			real_hash2 = raster->clone()->hash();
+			real_hash_ipc = getIPCHash(*raster);
 		}
 		else if (result == "points") {
 			QueryProfiler profiler;
 			auto points = graph->getCachedPointCollection(qrect, profiler);
 			real_hash = points->hash();
 			real_hash2 = points->clone()->hash();
+			real_hash_ipc = getIPCHash(*points);
 		}
 		else if (result == "lines") {
 			QueryProfiler profiler;
 			auto lines = graph->getCachedLineCollection(qrect, profiler);
 			real_hash = lines->hash();
 			real_hash2 = lines->clone()->hash();
+			real_hash_ipc = getIPCHash(*lines);
 		}
 		else if (result == "polygons") {
 			QueryProfiler profiler;
 			auto polygons = graph->getCachedPolygonCollection(qrect, profiler);
 			real_hash = polygons->hash();
 			real_hash2 = polygons->clone()->hash();
+			real_hash_ipc = getIPCHash(*polygons);
 		}
 		else if (result == "plot") {
 			QueryProfiler profiler;
 			auto plot = graph->getCachedPlot(qrect, profiler);
 			real_hash = plot->hash();
 			real_hash2 = plot->clone()->hash();
+			real_hash_ipc = real_hash; // We cannot serialize plots, so keep using its JSON string.
 		}
 		else {
 			printf("Unknown result type: %s\n", result.c_str());
@@ -517,18 +531,24 @@ static int testquery(int argc, char *argv[]) {
 		}
 
 		if (real_hash != real_hash2) {
-			printf("Hashes of result and its clone differ, probably a bug in clone():original: %s\ncopy:      %s\n", real_hash.c_str(), real_hash2.c_str());
+			printf("FAILED: hash\nHashes of result and its clone differ, probably a bug in clone():original: %s\ncopy:      %s\n", real_hash.c_str(), real_hash2.c_str());
 			return 5;
 		}
 
 		if (root.isMember("query_expected_hash")) {
 			std::string expected_hash = root.get("query_expected_hash", "#").asString();
-			if (expected_hash == real_hash) {
+			if (expected_hash == real_hash_ipc) {
+				// This is the new hash, everything is fine
 				printf("\nPASSED: hash\n");
 				return 0;
 			}
+			else if (expected_hash == real_hash) {
+				// This is still the old hash, mark as failed and output instructions
+				printf("\nFAILED: hash\nTestcase still contains the old hash, update the testcase to use\n  \"query_expected_hash\" : \"%s\"\n", real_hash_ipc.c_str());
+				return 0;
+			}
 			else {
-				printf("\nFAILED: hash\nExpected: %s\nResult  : %s\n", expected_hash.c_str(), real_hash.c_str());
+				printf("\nFAILED: hash\nExpected     : %s\nResult (IPC) : %s\nResult (Old) : %s\n", expected_hash.c_str(), real_hash_ipc.c_str(), real_hash.c_str());
 				return 0;
 			}
 		}

@@ -158,6 +158,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 			TIME_EXEC("Operator.getRaster");
 			result = getRaster(rect,exec_profiler);
 		}
+		d_profile(depth, type, "raster", exec_profiler);
 		if ( cache.put(semantic_id,result,rect,exec_profiler) ) {
 			parent_profiler.cached(exec_profiler);
 		}
@@ -185,6 +186,7 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 			TIME_EXEC("Operator.getPointCollection");
 			result = getPointCollection(rect,exec_profiler);
 		}
+		d_profile(depth, type, "points", exec_profiler);
 		if ( cache.put(semantic_id,result,rect,exec_profiler) )
 			parent_profiler.cached(exec_profiler);
 	}
@@ -213,6 +215,7 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 			TIME_EXEC("Operator.getLineCollection");
 			result = getLineCollection(rect,exec_profiler);
 		}
+		d_profile(depth, type, "lines", exec_profiler);
 		if ( cache.put(semantic_id,result,rect,exec_profiler) )
 				parent_profiler.cached(exec_profiler);
 	}
@@ -241,6 +244,7 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 			TIME_EXEC("Operator.getPolygonCollection");
 			result = getPolygonCollection(rect,exec_profiler);
 		}
+		d_profile(depth, type, "polygon", exec_profiler);
 		if ( cache.put(semantic_id,result,rect,exec_profiler) )
 			parent_profiler.cached(exec_profiler);
 	}

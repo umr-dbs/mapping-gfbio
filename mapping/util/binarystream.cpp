@@ -243,6 +243,7 @@ bool BinaryStream::readNB(BinaryReadBuffer &buffer, bool allow_eof) {
  * BinaryWriteBuffer
  */
 BinaryWriteBuffer::BinaryWriteBuffer() : status(Status::CREATING), next_area_start(0), size_total(0), size_sent(0), areas_sent(0) {
+	buffer.reserve(512);
 	// always prefix with the size
 	areas.emplace_back((const char *) &size_total, sizeof(size_total));
 }
@@ -264,18 +265,17 @@ void BinaryWriteBuffer::write(const char *data, size_t len, bool is_persistent_m
 	const char *vec_start = buffer.data();
 	const char *vec_end = vec_start + buffer.size();
 
-	buffer.reserve(buffer.size() + len);
+	// Copy the data
+	buffer.insert(buffer.end(), data, data+len);
 
+	// Check if buffer was reallocated and adjust areas
 	const char *new_vec_start = buffer.data();
 	if (new_vec_start != vec_start) {
-		for (int i=0;i<areas.size();i++) {
+		for (size_t i=0;i<areas.size();i++) {
 			if (areas[i].start >= vec_start && areas[i].start < vec_end)
 				areas[i].start = areas[i].start - vec_start + new_vec_start;
 		}
 	}
-
-	// the areas have been adjusted, now we can copy the data into our buffer
-	buffer.insert(buffer.end(), data, data+len);
 
 	// This must not happen (according to the C++ spec), but if it does, we want to know.
 	if (buffer.data() != new_vec_start)
@@ -317,11 +317,6 @@ void BinaryWriteBuffer::prepareForWriting() {
 	}
 }
 
-size_t BinaryWriteBuffer::getSize() {
-	if (!isWriting())
-		throw ArgumentException("BinaryWriteBuffer: cannot getSize() before prepareForWriting()");
-	return size_total;
-}
 
 void BinaryWriteBuffer::markBytesAsWritten(size_t sent_bytes) {
 	if (!isWriting())
@@ -348,6 +343,16 @@ void BinaryWriteBuffer::markBytesAsWritten(size_t sent_bytes) {
 			sent_bytes = 0;
 		}
 	}
+}
+
+SHA1::SHA1Value BinaryWriteBuffer::hash() {
+	prepareForWriting();
+
+	SHA1 sha1;
+	for (auto &area : areas) {
+		sha1.addBytes(area.start, area.len);
+	}
+	return sha1.digest();
 }
 
 

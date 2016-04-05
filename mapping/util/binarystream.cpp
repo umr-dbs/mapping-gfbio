@@ -317,11 +317,6 @@ void BinaryWriteBuffer::prepareForWriting() {
 	}
 }
 
-size_t BinaryWriteBuffer::getSize() {
-	if (!isWriting())
-		throw ArgumentException("BinaryWriteBuffer: cannot getSize() before prepareForWriting()");
-	return size_total;
-}
 
 void BinaryWriteBuffer::markBytesAsWritten(size_t sent_bytes) {
 	if (!isWriting())
@@ -348,6 +343,16 @@ void BinaryWriteBuffer::markBytesAsWritten(size_t sent_bytes) {
 			sent_bytes = 0;
 		}
 	}
+}
+
+SHA1::SHA1Value BinaryWriteBuffer::hash() {
+	prepareForWriting();
+
+	SHA1 sha1;
+	for (auto &area : areas) {
+		sha1.addBytes(area.start, area.len);
+	}
+	return sha1.digest();
 }
 
 

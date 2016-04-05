@@ -1,13 +1,15 @@
 #ifndef UTIL_SOCKET_H
 #define UTIL_SOCKET_H
 
+#include "util/make_unique.h"
+#include "util/sha1.h"
+
 #include <unistd.h>
 #include <string>
 #include <type_traits>
 #include <vector>
 #include <memory>
 
-#include "util/make_unique.h"
 
 class BinaryWriteBuffer;
 class BinaryReadBuffer;
@@ -184,9 +186,13 @@ class BinaryWriteBuffer {
 		 */
 		void writeString(const std::string &str, bool is_persistent_memory = false);
 
+		/*
+		 * Get a SHA1 hash of this buffer's contents
+		 */
+		SHA1::SHA1Value hash();
+
 		bool isWriting() { return status == Status::WRITING; }
 		bool isFinished() { return status == Status::FINISHED; }
-		size_t getSize();
 		void markBytesAsWritten(size_t written);
 	private:
 		void finishBufferedArea();

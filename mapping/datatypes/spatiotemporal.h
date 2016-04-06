@@ -132,6 +132,12 @@ public:
 	 */
 	void validate() const;
 
+	/*
+	 * Validate if invariants are met.
+	 * Additionally validate if the interval is contained in [beginning_of_time, end_of_time)
+	 */
+	void validate(double beginning_of_time, double end_of_time) const;
+
 	/**
 	 * Returns whether the other TimeInterval is contained (smaller or equal) within this.
 	 * @param other the other TimeInterval

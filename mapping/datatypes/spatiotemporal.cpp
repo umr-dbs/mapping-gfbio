@@ -117,6 +117,14 @@ void TimeInterval::validate() const {
 		throw ArgumentException(concat("TimeInterval invalid, requires t1:", t1, " < t2:", t2, "\n", CacheCommon::get_stacktrace()));
 }
 
+void TimeInterval::validate(double beginning_of_time, double end_of_time) const {
+	validate();
+	if (t1 < beginning_of_time)
+		throw ArgumentException(concat("TimeInterval invalid, requires t1:", t1, " >= bot:", beginning_of_time));
+	if (t2 > end_of_time)
+		throw ArgumentException(concat("TimeInterval invalid, requires t2:", t2, " <= eot:", end_of_time));
+}
+
 
 bool TimeInterval::contains(const TimeInterval &other) const {
 	return t1 <= other.t1 && t2 >= other.t2;
@@ -213,11 +221,7 @@ void TemporalReference::serialize(BinaryWriteBuffer &buffer, bool is_persistent_
 
 
 void TemporalReference::validate() const {
-	TimeInterval::validate();
-	if (t1 < beginning_of_time())
-		throw ArgumentException(concat("TemporalReference invalid, requires t1:", t1, " >= bot:", beginning_of_time()));
-	if (t2 > end_of_time())
-		throw ArgumentException(concat("TemporalReference invalid, requires t2:", t2, " <= eot:", end_of_time()));
+	TimeInterval::validate(beginning_of_time(), end_of_time());
 }
 
 

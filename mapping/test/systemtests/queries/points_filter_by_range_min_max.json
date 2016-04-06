@@ -48,5 +48,5 @@
 		},
 		"type" : "points_filter_by_range"
 	},
-	"query_expected_hash" : "7e40b122778895a4968fed05ed0495ba"
+	"query_expected_hash" : "bf4ba69af29dc008e6343f0305c5989a3372bace"
 }

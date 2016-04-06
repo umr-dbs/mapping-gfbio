@@ -263,17 +263,20 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const Qu
 	bool has_filter = false;
 
 	for(auto feature : *points_in){
+		//project points in feature
 		for(auto& coordinate : feature){
-			double x = coordinate.x, y = coordinate.y;
-			if (!transformer.transform(x, y) || !rect.SpatialReference::contains(x, y)) {
+			if (!transformer.transform(coordinate.x, coordinate.y)) {
+				//projection failed
 				keep[feature] = false;
 				has_filter = true;
 				break;
 			}
-			else {
-				coordinate.x = x;
-				coordinate.y = y;
-			}
+		}
+
+		//check if feature is still in query rectangle
+		if(keep[feature] && !points_in->featureIntersectsRectangle(feature, rect.x1, rect.y1, rect.x2, rect.y2)) {
+			keep[feature] = false;
+			has_filter = true;
 		}
 	}
 
@@ -309,21 +312,25 @@ std::unique_ptr<LineCollection> ProjectionOperator::getLineCollection(const Quer
 	bool has_filter = false;
 
 	for(auto feature : *lines_in){
+		//project lines in feature
 		for(auto line : feature){
+			//project points in line
 			for(auto& coordinate : line){
-				double x = coordinate.x, y = coordinate.y;
-				if (!transformer.transform(x, y) || !rect.SpatialReference::contains(x, y)) {
+				if (!transformer.transform(coordinate.x, coordinate.y)) {
+					//projection failed
 					keep[feature] = false;
 					has_filter = true;
 					break;
 				}
-				else {
-					coordinate.x = x;
-					coordinate.y = y;
-				}
 			}
 			if(!keep[feature])
 				break;
+		}
+
+		//check if feature is still in query rectangle
+		if(keep[feature] && !lines_in->featureIntersectsRectangle(feature, rect.x1, rect.y1, rect.x2, rect.y2)){
+			keep[feature] = false;
+			has_filter = true;
 		}
 	}
 
@@ -358,18 +365,17 @@ std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(cons
 	bool has_filter = false;
 
 	for(auto feature : *polygons_in){
+		//project polygons in feature
 		for(auto polygon : feature){
+			//project rings in polygon
 			for(auto ring : polygon){
+				//project points in ring
 				for(auto& coordinate : ring){
-					double x = coordinate.x, y = coordinate.y;
-					if (!transformer.transform(x, y) || !rect.SpatialReference::contains(x, y)) {
+					if (!transformer.transform(coordinate.x, coordinate.y)) {
+						//projection failed
 						keep[feature] = false;
 						has_filter = true;
 						break;
-					}
-					else {
-						coordinate.x = x;
-						coordinate.y = y;
 					}
 				}
 				if(!keep[feature])
@@ -377,6 +383,12 @@ std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(cons
 			}
 			if(!keep[feature])
 				break;
+		}
+
+		//check if feature is still in query rectangle
+		if(keep[feature] && !polygons_in->featureIntersectsRectangle(feature, rect.x1, rect.y1, rect.x2, rect.y2)){
+			keep[feature] = false;
+			has_filter = true;
 		}
 	}
 

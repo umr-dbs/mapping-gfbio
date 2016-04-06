@@ -362,7 +362,7 @@ static void parseMultipartSubBoundary(HTTPService::Params &params, std::istream&
 			}
 
 			std::string name = cdparams["name"];
-
+/*
 			if(!cdparams["filename"].empty()) {
 
 				// Extend HTTPService::Params with information about where to save (/tmp by default?)
@@ -379,7 +379,7 @@ static void parseMultipartSubBoundary(HTTPService::Params &params, std::istream&
 
 				params[name] = filename;
 			}
-			else {
+			else */{
 				// Store file in memory (string encoded into HTTPService::Params? What about binary data?)
 				params[name] = body;
 

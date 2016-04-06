@@ -52,5 +52,5 @@
         },
         "type": "histogram_from_features"
     },
-    "query_expected_hash": "d704e210d713e870a38334643ee6664a"
+    "query_expected_hash": "3a7f3ea9314a36be97b57d30d5c2365e18197c59"
 }

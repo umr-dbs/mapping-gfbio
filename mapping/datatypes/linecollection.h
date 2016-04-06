@@ -166,12 +166,6 @@ public:
 
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
-	/**
-	 * compute the hash of the collection
-	 * @return the hash of the collection
-	 */
-	std::string hash() const;
-
 	virtual bool isSimple() const;
 
 	virtual size_t getFeatureCount() const {

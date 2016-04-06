@@ -5,7 +5,6 @@
 #include "raster/opencl.h"
 #endif
 #include "raster/profiler.h"
-#include "util/hash.h"
 #include "util/binarystream.h"
 #include "operators/operator.h" // for QueryRectangle
 
@@ -638,15 +637,6 @@ double Raster2D<T>::getAsDouble(int x, int y, int) const {
 	return (double) get(x, y);
 }
 
-
-
-std::string GenericRaster::hash() {
-	setRepresentation(GenericRaster::Representation::CPU);
-	const int len = getDataSize();
-	const uint8_t * data = (const uint8_t*) getData();
-
-	return calculateHash(data, len).asHex();
-}
 
 
 #include "raster_font.h"

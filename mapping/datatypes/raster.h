@@ -140,8 +140,6 @@ class GenericRaster : public GridSpatioTemporalResult {
 
 		virtual size_t get_byte_size() const;
 
-		std::string hash();
-
 		const DataDescription dd;
 
 	protected:

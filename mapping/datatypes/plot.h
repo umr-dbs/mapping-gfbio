@@ -3,7 +3,6 @@
 
 #include "util/exceptions.h"
 #include "util/binarystream.h"
-#include "util/hash.h"
 
 #include <string>
 #include <memory>
@@ -31,12 +30,6 @@ public:
 	static std::unique_ptr<GenericPlot> deserialize(BinaryReadBuffer &buffer) {
 		// TODO
 		throw MustNotHappenException("Implement me!");
-	}
-
-	std::string hash() const {
-		std::string serialized = toJSON();
-
-		return calculateHash((const unsigned char *) serialized.c_str(), (int) serialized.length()).asHex();
 	}
 };
 

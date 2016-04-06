@@ -433,6 +433,12 @@ std::string getIPCHash(T &t) {
 	return buf.hash().asHex();
 }
 
+std::string getStringHash(const std::string &str) {
+	SHA1 sha1;
+	sha1.addBytes(str.data(), str.length());
+	return sha1.digest().asHex();
+}
+
 // The return code is 0 for both success and failure, nonzero for any actual error (e.g. exception or crash)
 static int testquery(int argc, char *argv[]) {
 	if (argc < 3) {
@@ -471,7 +477,7 @@ static int testquery(int argc, char *argv[]) {
 		 * Step #3: run the query and see if the results match
 		 */
 		std::string result = root.get("query_result", "raster").asString();
-		std::string real_hash, real_hash2, real_hash_ipc;
+		std::string real_hash, real_hash2;
 
 		bool flipx, flipy;
 		auto qrect = qrect_from_json(root, flipx, flipy);
@@ -493,37 +499,32 @@ static int testquery(int argc, char *argv[]) {
 			auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
 			if (flipx || flipy)
 				raster = raster->flip(flipx, flipy);
-			real_hash = raster->hash();
-			real_hash2 = raster->clone()->hash();
-			real_hash_ipc = getIPCHash(*raster);
+			real_hash = getIPCHash(*raster);
+			real_hash2 = getIPCHash(*raster->clone());
 		}
 		else if (result == "points") {
 			QueryProfiler profiler;
 			auto points = graph->getCachedPointCollection(qrect, profiler);
-			real_hash = points->hash();
-			real_hash2 = points->clone()->hash();
-			real_hash_ipc = getIPCHash(*points);
+			real_hash = getIPCHash(*points);
+			real_hash2 = getIPCHash(*points->clone());
 		}
 		else if (result == "lines") {
 			QueryProfiler profiler;
 			auto lines = graph->getCachedLineCollection(qrect, profiler);
-			real_hash = lines->hash();
-			real_hash2 = lines->clone()->hash();
-			real_hash_ipc = getIPCHash(*lines);
+			real_hash = getIPCHash(*lines);
+			real_hash2 = getIPCHash(*lines->clone());
 		}
 		else if (result == "polygons") {
 			QueryProfiler profiler;
 			auto polygons = graph->getCachedPolygonCollection(qrect, profiler);
-			real_hash = polygons->hash();
-			real_hash2 = polygons->clone()->hash();
-			real_hash_ipc = getIPCHash(*polygons);
+			real_hash = getIPCHash(*polygons);
+			real_hash2 = getIPCHash(*polygons->clone());
 		}
 		else if (result == "plot") {
 			QueryProfiler profiler;
 			auto plot = graph->getCachedPlot(qrect, profiler);
-			real_hash = plot->hash();
-			real_hash2 = plot->clone()->hash();
-			real_hash_ipc = real_hash; // We cannot serialize plots, so keep using its JSON string.
+			real_hash = getStringHash(plot->toJSON());
+			real_hash2 = getStringHash(plot->clone()->toJSON());
 		}
 		else {
 			printf("Unknown result type: %s\n", result.c_str());
@@ -537,18 +538,12 @@ static int testquery(int argc, char *argv[]) {
 
 		if (root.isMember("query_expected_hash")) {
 			std::string expected_hash = root.get("query_expected_hash", "#").asString();
-			if (expected_hash == real_hash_ipc) {
-				// This is the new hash, everything is fine
+			if (expected_hash == real_hash) {
 				printf("\nPASSED: hash\n");
 				return 0;
 			}
-			else if (expected_hash == real_hash) {
-				// This is still the old hash, mark as failed and output instructions
-				printf("\nFAILED: hash\nTestcase still contains the old hash, update the testcase to use\n  \"query_expected_hash\" : \"%s\"\n", real_hash_ipc.c_str());
-				return 0;
-			}
 			else {
-				printf("\nFAILED: hash\nExpected     : %s\nResult (IPC) : %s\nResult (Old) : %s\n", expected_hash.c_str(), real_hash_ipc.c_str(), real_hash.c_str());
+				printf("\nFAILED: hash\nExpected : %s\nResult   : %s\n", expected_hash.c_str(), real_hash.c_str());
 				return 0;
 			}
 		}

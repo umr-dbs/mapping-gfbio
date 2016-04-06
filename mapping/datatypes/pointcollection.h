@@ -178,12 +178,6 @@ public:
 
 	virtual bool featureIntersectsRectangle(size_t featureIndex, double x1, double y1, double x2, double y2) const;
 
-	/**
-	 * compute the hash of the collection
-	 * @return the hash of the collection
-	 */
-	std::string hash() const;
-
 	virtual SpatialReference getFeatureMBR(size_t featureIndex) const;
 
 	virtual std::string toCSV() const;

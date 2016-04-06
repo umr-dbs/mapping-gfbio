@@ -196,12 +196,6 @@ public:
 	 */
 	bool pointInCollection(Coordinate& coordinate) const;
 
-	/**
-	 * compute the hash of the collection
-	 * @return the hash of the collection
-	 */
-	std::string hash() const;
-
 	virtual bool isSimple() const final;
 
 	virtual size_t getFeatureCount() const final {

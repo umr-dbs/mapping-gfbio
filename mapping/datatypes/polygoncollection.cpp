@@ -1,7 +1,6 @@
 
 #include "datatypes/polygoncollection.h"
 #include "util/make_unique.h"
-#include "util/hash.h"
 #include "util/binarystream.h"
 
 #include <sstream>
@@ -228,13 +227,6 @@ void PolygonCollection::featureToWKT(size_t featureIndex, std::ostringstream& wk
 		wkt.seekp(((long)wkt.tellp()) - 1);
 		wkt << ")";
 	}
-}
-
-std::string PolygonCollection::hash() const {
-	// certainly not the most stable solution, but it has few lines of code..
-	std::string serialized = toGeoJSON(true);
-
-	return calculateHash((const unsigned char *) serialized.c_str(), (int) serialized.length()).asHex();
 }
 
 bool PolygonCollection::isSimple() const {

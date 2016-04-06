@@ -1,7 +1,6 @@
 #include "datatypes/pointcollection.h"
 
 #include "util/binarystream.h"
-#include "util/hash.h"
 #include "util/make_unique.h"
 
 #include <sstream>
@@ -365,13 +364,6 @@ std::string PointCollection::toARFF(std::string layerName) const {
 	}
 
 	return arff.str();
-}
-
-std::string PointCollection::hash()const {
-	// certainly not the most stable solution, but it has few lines of code..
-	std::string csv = toCSV();
-
-	return calculateHash((const unsigned char *) csv.c_str(), (int) csv.length()).asHex();
 }
 
 bool PointCollection::isSimple() const {

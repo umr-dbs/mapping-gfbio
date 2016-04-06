@@ -276,7 +276,7 @@ test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_SAN
 	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${EXE_SANITIZED} testquery $< >$@ 2>&1 || true
 
 unittest: ${EXEGTEST}
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml"
+	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml" || true
 
 webinstall:
 	php htdocs/get_css.php > htdocs/compiled/compiled.release.css

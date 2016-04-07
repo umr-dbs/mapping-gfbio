@@ -113,6 +113,7 @@ EXE_SANITIZED=mapping_manager.san
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
 EXEGTEST=gtest
+EXEPARSETESTLOGS=test/systemtests/parse_logs
 EXETILESERVER=tileserver
 EXECACHEINDEX=cache_index
 EXECACHENODE=cache_node
@@ -153,6 +154,9 @@ ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/quer
 
 ${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/util/server_nonblocking.o ${OBJ_UNITTEST} o/libgtest.a
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
+
+${EXEPARSETESTLOGS}:	o/test/systemtests/parse_logs.o
+	${CPP} $+ -o $@
 
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/util/server_nonblocking.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/datatypes/unit.o o/util/binarystream.o o/util/sha1.o o/util/sqlite.o o/util/configuration.o o/util/sizeutil.o o/util/log.o
 	${CPP} $+ -o $@  ${LDFLAGS}
@@ -253,10 +257,10 @@ worldclim_datasource:	${EXE}
 #
 # All the remaining phony targets
 #
-systemtest:
+systemtest: ${EXEPARSETESTLOGS}
 	${MAKE} systemtest_testenvironment
 	${MAKE} systemtest_testcases
-	php test/systemtests/parse_logs.php test/systemtests/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log test/systemtest_latest.xml
+	${EXEPARSETESTLOGS} >test/systemtest_latest.xml
 	rm -f ${TEST_LOGS}
 	echo "Testcases done";
 
@@ -287,7 +291,7 @@ doc:
 	./../docs/makeDoc
 
 clean:
-	rm -f ${EXE} ${EXE_SANITIZED} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXECACHEEXP} ${EXECLUSEXP}
+	rm -f ${EXE} ${EXE_SANITIZED} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEPARSETESTLOGS} ${EXECACHEEXP} ${EXECLUSEXP}
 	rm -f $(CL_HEADERS)
 	find o/ -type f -name '*.o' -delete
 	find o/ -type f -name '*.d' -delete

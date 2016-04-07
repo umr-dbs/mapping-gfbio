@@ -17,6 +17,7 @@ mapping/cache_index
 mapping/cache_node
 mapping/cache_experiments
 mapping/cluster_experiment
+mapping/test/systemtests/parse_logs
 
 # machine specific configuration
 mapping/Makefile.local

@@ -2,6 +2,7 @@
 #include "datatypes/raster/typejuggling.h"
 #include "raster/opencl.h"
 #include "operators/operator.h"
+#include "util/formula.h"
 
 
 #include <limits>
@@ -96,6 +97,18 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	}
 
 	/*
+	 * See if the formula is valid and safe
+	 */
+
+	Formula f(expression);
+	f.addCLFunctions();
+	for (int i=0;i<rastercount;i++) {
+		char code = 'A' + (char) i;
+		f.addVariable(std::string(1, code));
+	}
+	auto safe_expression = f.parse();
+
+	/*
 	 * Let's assemble our code
 	 */
 	std::stringstream ss_sourcecode;
@@ -117,7 +130,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 			"}";
 	}
 	ss_sourcecode <<
-		"OUT_TYPE0 result = " << expression << ";"
+		"OUT_TYPE0 result = " << safe_expression << ";"
 		"out_data[gid] = result;"
 		"}";
 

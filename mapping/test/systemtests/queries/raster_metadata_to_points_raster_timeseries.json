@@ -57,7 +57,7 @@
 						"duration": 1,
 						"time1_format": {
 							"format" : "custom",
-							"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
+							"custom_format" : "%Y-%m-%d %H:%M:%S%z"
 						},
 						"columns": {
 							"x": "wkt",
@@ -72,5 +72,5 @@
             ]
         }
     },
-	"query_expected_hash" : "6a2f04861e4cc9f9b710f54cac892b0e2d3f4f0c"
+	"query_expected_hash" : "dacc74cd352f86f3eaae38704661740ca3e0b8e3"
 }

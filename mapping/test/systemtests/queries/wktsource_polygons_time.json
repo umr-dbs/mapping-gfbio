@@ -19,7 +19,7 @@
 			{
 				"type": "polygons",
 				"wkt": "GEOMETRYCOLLECTION(POLYGON((0 0, 180 0, 180 90, 0 90, 0 0)))",
-				"time": [[1451606400, "infinity"]]
+				"time": [[1451606400, 253402300799]]
 			},
 		"type" : "wktsource"
 	},

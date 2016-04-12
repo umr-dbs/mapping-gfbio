@@ -1,8 +1,9 @@
 {
 	/**
-		select osm_id, st_astext(geom), time_intersect(time_start, timestamp 'infinity', timestamp '2015-01-01 00:00', timestamp '2015-02-01 00:00'), name from osm_large_cities
+		set timezone  = 'UTC';
+		select osm_id, st_astext(geom), time_intersect(time_start, timestamp '9999-12-31 23:59:59', timestamp '2015-01-01 00:00', timestamp '2015-02-01 00:00'), name from osm_large_cities
 	  	where ST_CONTAINS(ST_GeomFromText('POLYGON((0 0, 0 90, 180 90, 180 0, 0 0))', 4326), geom)
-	  	and (time_start, timestamp 'infinity') overlaps (timestamp '2015-01-01 00:00', timestamp '2015-02-01 00:00')
+	  	and (time_start, timestamp '9999-12-31 23:59:59') overlaps (timestamp '2015-01-01 00:00', timestamp '2015-02-01 00:00')
 	  	order by osm_id asc 
 	*/
 
@@ -35,7 +36,7 @@
 							"duration": "inf",
 							"time1_format": {
 								"format" : "custom",
-								"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
+								"custom_format" : "%Y-%m-%d %H:%M:%S%z"
 							},
 							"columns": {
 								"x": "wkt",
@@ -61,5 +62,5 @@
 			]
 		}		
 	},
-	"query_expected_hash" : "33b6d91ab927d87af835b75793bfcd26865ad89f"
+	"query_expected_hash" : "6babd92c7757fe9e725ce052e491da4e9edbbbd6"
 }

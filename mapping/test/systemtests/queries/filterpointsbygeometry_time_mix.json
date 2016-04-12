@@ -1,9 +1,9 @@
 {
 	/**
-		select c.osm_id, st_astext(c.geom), time_intersect(un.time_start, timestamp 'infinity', c.time_start, timestamp 'infinity'), c.name 
+		select c.osm_id, st_astext(c.geom), time_intersect(un.time_start, timestamp '9999-12-31 23:59:59', c.time_start, timestamp '9999-12-31 23:59:59'), c.name 
 		from osm_large_cities c, un_countries un
 		  where ST_CONTAINS(un.geom, c.geom)
-		  and (un.time_start, timestamp 'infinity') overlaps (c.time_start, timestamp 'infinity')
+		  and (un.time_start, timestamp '9999-12-31 23:59:59') overlaps (c.time_start, timestamp '9999-12-31 23:59:59')
 		order by c.osm_id
 	*/
 
@@ -36,7 +36,7 @@
 							"duration": "inf",
 							"time1_format": {
 								"format" : "custom",
-								"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
+								"custom_format" : "%Y-%m-%d %H:%M:%S%z"
 							},
 							"columns": {
 								"x": "wkt",
@@ -74,5 +74,5 @@
 			]
 		}		
 	},
-	"query_expected_hash" : "a33674a330c9c7fa56055b5aa4ddb936"
+	"query_expected_hash" : "d19b6904abebeae69b3e87963255b20adaee94c8"
 }

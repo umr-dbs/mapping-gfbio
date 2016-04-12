@@ -1,7 +1,7 @@
 {
-	/*select osm_id, st_astext(geom), time_start, name from osm_large_cities
+	/*select osm_id, st_astext(geom), time_start, name, population from osm_large_cities
 	  where ST_INTERSECTS(geom, ST_GeomFromText('POLYGON((0 0, 0 90, 180 90, 180 0, 0 0))', 4326))
-	  and (time_start, timestamp 'infinity') overlaps (timestamp '2015-01-01 00:00', timestamp 'infinity')
+	  and (time_start, timestamp '9999-12-31 23:59:59') overlaps (timestamp '2015-01-01 00:00', timestamp '9999-12-31 23:59:59')
 	  order by osm_id asc*/
 	
 	"name" : "Load points",	
@@ -29,7 +29,7 @@
 			"duration": "inf",
 			"time1_format": {
 				"format" : "custom",
-				"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
+				"custom_format" : "%Y-%m-%d %H:%M:%S%z"
 			},
 			"columns": {
 				"x": "wkt",
@@ -41,5 +41,5 @@
 		"sources" : null,
 		"type" : "csvpointsource"
 	},
-	"query_expected_hash" : "fbdff8b649fd571c58162693ab1ec5db"
+	"query_expected_hash" : "6607b848d2655326e6583198421c657234a9d336"
 }

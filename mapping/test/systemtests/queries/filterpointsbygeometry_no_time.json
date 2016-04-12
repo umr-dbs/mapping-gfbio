@@ -1,6 +1,6 @@
 {
 	/**
-		select osm_id, st_astext(geom), time_start, 'infinity' as time_end, name from osm_large_cities
+		select osm_id, st_astext(geom), time_start, '9999-12-31 23:59:59' as time_end, name from osm_large_cities
   		where ST_CONTAINS(ST_GeomFromText('POLYGON((0 0, 0 90, 180 90, 180 0, 0 0))', 4326), geom)
   		order by osm_id asc
   	*/

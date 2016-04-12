@@ -24,7 +24,7 @@
 			"duration": "inf",
 			"time1_format": {
 				"format" : "custom",
-				"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
+				"custom_format" : "%Y-%m-%d %H:%M:%S%z"
 			},
 			"columns": {
 				"x": "wkt",
@@ -36,5 +36,5 @@
 		"sources" : null,
 		"type" : "csvpointsource"
 	},
-	"query_expected_hash" : "2ad68be48102e0097cecbbaa5b12198c"
+	"query_expected_hash" : "ecb7257fe6bf9b860ae713b406d8aa7527682be3"
 }

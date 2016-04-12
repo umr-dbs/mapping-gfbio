@@ -1,13 +1,13 @@
 {
 	/**
-		(select osm_id, st_astext(geom), time_intersect(time_start, timestamp 'infinity', to_timestamp(1420070400), to_timestamp(1430438400)) as time, name from osm_large_cities
+		(select osm_id, st_astext(geom), time_intersect(time_start, timestamp '9999-12-31 23:59:59', to_timestamp(1420070400), to_timestamp(1430438400)) as time, name from osm_large_cities
 		  where ST_CONTAINS(ST_GeomFromText('POLYGON((15.04205 55.05814, 5.86624 55.05814, 5.86624 47.27021, 15.04205 47.27021, 15.04205 55.05814))', 4326), geom)
-		  and (time_start, timestamp 'infinity') overlaps (to_timestamp(1420070400), to_timestamp(1430438400))
+		  and (time_start, timestamp '9999-12-31 23:59:59') overlaps (to_timestamp(1420070400), to_timestamp(1430438400))
 		  order by osm_id asc)
 		 UNION
-		(select osm_id, st_astext(geom), time_intersect(time_start, timestamp 'infinity', to_timestamp(1433116800), to_timestamp(1451606400)) as time, name from osm_large_cities
+		(select osm_id, st_astext(geom), time_intersect(time_start, timestamp '9999-12-31 23:59:59', to_timestamp(1433116800), to_timestamp(1451606400)) as time, name from osm_large_cities
 		  where ST_CONTAINS(ST_GeomFromText('POLYGON((15.04205 55.05814, 5.86624 55.05814, 5.86624 47.27021, 15.04205 47.27021, 15.04205 55.05814))', 4326), geom)
-		  and (time_start, timestamp 'infinity') overlaps (to_timestamp(1433116800), to_timestamp(1451606400))
+		  and (time_start, timestamp '9999-12-31 23:59:59') overlaps (to_timestamp(1433116800), to_timestamp(1451606400))
 		  order by osm_id asc)
 	*/
 
@@ -40,7 +40,7 @@
 							"duration": "inf",
 							"time1_format": {
 								"format" : "custom",
-								"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
+								"custom_format" : "%Y-%m-%d %H:%M:%S%z"
 							},
 							"columns": {
 								"x": "wkt",
@@ -66,5 +66,5 @@
 			]
 		}		
 	},
-	"query_expected_hash" : "8fc3f0cf13536074633aa9ba73c7d5d72280d05e"
+	"query_expected_hash" : "b13aa3df18bb85c54494f45ea9cd7a4d07778fe6"
 }

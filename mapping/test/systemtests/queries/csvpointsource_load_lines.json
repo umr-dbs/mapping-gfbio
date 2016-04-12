@@ -25,7 +25,7 @@
 			"duration": "inf",
 			"time1_format": {
 				"format" : "custom",
-				"custom_format" : "%Y-%m-%d"
+				"custom_format" : "%Y-%m-%d %H:%M:%S%z"
 			},
 			"columns": {
 				"x": "wkt",
@@ -35,5 +35,5 @@
 			}
 		}
 	},
-	"query_expected_hash" : "ab9bf2baa0113c0751a81e5cf7ede4b3"
+	"query_expected_hash" : "f18863cd45b936be894263543fccc964ce362a97"
 }

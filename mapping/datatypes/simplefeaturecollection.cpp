@@ -109,14 +109,9 @@ std::string SimpleFeatureCollection::toGeoJSON(bool displayMetadata) const {
 				json << ",";
 			}
 
-			/*
-			 * TODO: this produces invalid JSON if a timestamp is +-infinity
-			 *       find a better solution. ISO date or something?
-
 			if (hasTime()) {
-				json << "\"time_start\":" << time[feature].t1 << ",\"time_end\":" << time[feature].t2 << ",";
+				json << "\"time_start\":\"" << stref.toIsoString(time[feature].t1) << "\",\"time_end\":\"" << stref.toIsoString(time[feature].t2) << "\",";
 			}
-			*/
 
 			json.seekp(((long) json.tellp()) - 1); // delete last ,
 			json << "}";

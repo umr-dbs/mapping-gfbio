@@ -228,7 +228,7 @@ TEST(LineCollection, toGeoJSONEmptyCollection){
 }
 
 TEST(LineCollection, toGeoJSONMetadata){
-	LineCollection lines(SpatioTemporalReference::unreferenced());
+	LineCollection lines(SpatioTemporalReference(SpatialReference::unreferenced(), TemporalReference(TIMETYPE_UNIX)));
 	auto &test = lines.feature_attributes.addTextualAttribute("test", Unit::unknown());
 	auto &test2 = lines.feature_attributes.addNumericAttribute("test2", Unit::unknown());
 
@@ -249,9 +249,9 @@ TEST(LineCollection, toGeoJSONMetadata){
 	test.set(1, "test123");
 	test2.set(1, 4.1);
 
-	lines.addDefaultTimestamps(0,1);
+	lines.addDefaultTimestamps();
 
-	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"LineString","coordinates":[[1.000000,2.000000],[1.000000,3.000000]]},"properties":{"test":"test","test2":5.100000,"time_start":0.000000,"time_end":1.000000}},{"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[[[1.000000,2.000000],[2.000000,3.000000]],[[2.000000,4.000000],[5.000000,6.000000]]]},"properties":{"test":"test123","test2":4.100000,"time_start":0.000000,"time_end":1.000000}}]})";
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"LineString","coordinates":[[1.000000,2.000000],[1.000000,3.000000]]},"properties":{"test":"test","test2":5.100000,"time_start":"0001-01-01T00:00:00","time_end":"9999-12-31T23:59:59"}},{"type":"Feature","geometry":{"type":"MultiLineString","coordinates":[[[1.000000,2.000000],[2.000000,3.000000]],[[2.000000,4.000000],[5.000000,6.000000]]]},"properties":{"test":"test123","test2":4.100000,"time_start":"0001-01-01T00:00:00","time_end":"9999-12-31T23:59:59"}}]})";
 
 	EXPECT_EQ(expected, lines.toGeoJSON(true));
 }
@@ -317,8 +317,8 @@ TEST(LineCollection, toARFF){
 			"@ATTRIBUTE test2 NUMERIC\n"
 			"\n"
 			"@DATA\n"
-			"\"LINESTRING(1 2,1 3)\",\"-infinity\",\"infinity\",\"test\",5.1\n"
-			"\"MULTILINESTRING((1 2,2 3),(2 4,5 6))\",\"-infinity\",\"infinity\",\"test2\",4.1\n";
+			"\"LINESTRING(1 2,1 3)\",\"0001-01-01T00:00:00\",\"9999-12-31T23:59:59\",\"test\",5.1\n"
+			"\"MULTILINESTRING((1 2,2 3),(2 4,5 6))\",\"0001-01-01T00:00:00\",\"9999-12-31T23:59:59\",\"test2\",4.1\n";
 
 	EXPECT_EQ(expected, lines.toARFF());
 }

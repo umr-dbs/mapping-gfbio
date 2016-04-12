@@ -337,7 +337,7 @@ TEST(PolygonCollection, toGeoJSONEmptyCollection) {
 
 TEST(PolygonCollection, toGeoJSONMetadata) {
 	//TODO: test missing metadata value
-	PolygonCollection polygons(SpatioTemporalReference::unreferenced());
+	PolygonCollection polygons(SpatioTemporalReference(SpatialReference::unreferenced(), TemporalReference(TIMETYPE_UNIX)));
 
 	auto &test = polygons.feature_attributes.addTextualAttribute("test", Unit::unknown());
 	auto &test2 = polygons.feature_attributes.addNumericAttribute("test2", Unit::unknown());
@@ -383,9 +383,9 @@ TEST(PolygonCollection, toGeoJSONMetadata) {
 	test.set(2, "test3");
 	test2.set(2, 3.1);
 
-	polygons.addDefaultTimestamps(0,1);
+	polygons.addDefaultTimestamps();
 
-	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[1.000000,2.000000],[1.000000,3.000000],[2.000000,3.000000],[1.000000,2.000000]]]},"properties":{"test":"test","test2":5.100000,"time_start":0.000000,"time_end":1.000000}},{"type":"Feature","geometry":{"type":"MultiPolygon","coordinates":[[[[1.000000,2.000000],[1.000000,3.000000],[2.000000,3.000000],[1.000000,2.000000]]],[[[5.000000,8.000000],[2.000000,3.000000],[7.000000,6.000000],[5.000000,8.000000]]]]},"properties":{"test":"test2","test2":4.100000,"time_start":0.000000,"time_end":1.000000}},{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[11.000000,21.000000],[11.000000,31.000000],[21.000000,31.000000],[11.000000,21.000000]],[[51.000000,81.000000],[21.000000,31.000000],[71.000000,61.000000],[51.000000,81.000000]]]},"properties":{"test":"test3","test2":3.100000,"time_start":0.000000,"time_end":1.000000}}]})";
+	std::string expected = R"({"type":"FeatureCollection","crs":{"type":"name","properties":{"name":"EPSG:1"}},"features":[{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[1.000000,2.000000],[1.000000,3.000000],[2.000000,3.000000],[1.000000,2.000000]]]},"properties":{"test":"test","test2":5.100000,"time_start":"0001-01-01T00:00:00","time_end":"9999-12-31T23:59:59"}},{"type":"Feature","geometry":{"type":"MultiPolygon","coordinates":[[[[1.000000,2.000000],[1.000000,3.000000],[2.000000,3.000000],[1.000000,2.000000]]],[[[5.000000,8.000000],[2.000000,3.000000],[7.000000,6.000000],[5.000000,8.000000]]]]},"properties":{"test":"test2","test2":4.100000,"time_start":"0001-01-01T00:00:00","time_end":"9999-12-31T23:59:59"}},{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[11.000000,21.000000],[11.000000,31.000000],[21.000000,31.000000],[11.000000,21.000000]],[[51.000000,81.000000],[21.000000,31.000000],[71.000000,61.000000],[51.000000,81.000000]]]},"properties":{"test":"test3","test2":3.100000,"time_start":"0001-01-01T00:00:00","time_end":"9999-12-31T23:59:59"}}]})";
 
 	EXPECT_EQ(expected, polygons.toGeoJSON(true));
 }
@@ -453,9 +453,9 @@ TEST(PolygonCollection, toARFF) {
 			"@ATTRIBUTE test2 NUMERIC\n"
 			"\n"
 			"@DATA\n"
-			"\"POLYGON((1 2,1 3,2 3,1 2))\",\"-infinity\",\"infinity\",\"test\",5.1\n"
-			"\"MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8)))\",\"-infinity\",\"infinity\",\"test2\",4.1\n"
-			"\"POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81))\",\"-infinity\",\"infinity\",\"test3\",3.1\n";
+			"\"POLYGON((1 2,1 3,2 3,1 2))\",\"0001-01-01T00:00:00\",\"9999-12-31T23:59:59\",\"test\",5.1\n"
+			"\"MULTIPOLYGON(((1 2,1 3,2 3,1 2)),((5 8,2 3,7 6,5 8)))\",\"0001-01-01T00:00:00\",\"9999-12-31T23:59:59\",\"test2\",4.1\n"
+			"\"POLYGON((11 21,11 31,21 31,11 21),(51 81,21 31,71 61,51 81))\",\"0001-01-01T00:00:00\",\"9999-12-31T23:59:59\",\"test3\",3.1\n";
 
 	EXPECT_EQ(expected, polygons.toARFF());
 }

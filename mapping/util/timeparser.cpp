@@ -97,8 +97,10 @@ public:
 
 	virtual double parse(const std::string& timeString) const{
 		std::tm tm = {};
-		if (strptime(timeString.c_str(), custom_format.c_str(), &tm))
-			return timegm(&tm);
+		if (strptime(timeString.c_str(), custom_format.c_str(), &tm)) {
+			double time = -tm.tm_gmtoff + timegm(&tm);
+			return time;
+		}
 		throw TimeParseException(concat("Could not parse time string: ", timeString, " for format: ", custom_format));
 	}
 

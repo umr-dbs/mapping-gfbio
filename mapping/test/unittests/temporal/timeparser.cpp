@@ -3,7 +3,6 @@
 #include "util/timeparser.h"
 #include "util/exceptions.h"
 
-
 TEST(TimeParser, testSeconds){
 	auto parser = TimeParser::create(TimeParser::Format::SECONDS);
 
@@ -60,4 +59,17 @@ TEST(TimeParser, eot) {
 
 	TemporalReference t(TIMETYPE_UNIX);
 	EXPECT_FLOAT_EQ(eot, t.end_of_time());
+}
+
+TEST(TimeParser, timeZone) {
+	auto parser= TimeParser::createCustom("%Y-%m-%d %H:%M:%S");
+	auto parserZone = TimeParser::createCustom("%Y-%m-%d %H:%M:%S%z");
+
+	EXPECT_FLOAT_EQ(0, parser->parse("1970-01-01 00:00:00"));
+	EXPECT_FLOAT_EQ(0, parserZone->parse("1970-01-01 00:00:00+00"));
+	EXPECT_FLOAT_EQ(-3600, parserZone->parse("1970-01-01 00:00:00+01"));
+	EXPECT_FLOAT_EQ(3600, parserZone->parse("1970-01-01 00:00:00-01"));
+
+	TemporalReference t(TIMETYPE_UNIX);
+	EXPECT_EQ("2013-02-18T03:26:50", t.toIsoString(parserZone->parse("2013-02-18 04:26:50+01")));
 }

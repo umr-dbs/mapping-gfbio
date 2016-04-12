@@ -1,4 +1,9 @@
 {
+	/**
+		select * from places_dump_100k p where plz between 10000 and 11000 and not exists (
+			select * from places_dump_100k q where plz between 10000 and 10500 and p.x = q.x and p.y = q.y)
+		order by plz, name
+	*/
     "name": "Point difference",
     "query_result": "points",
     "temporal_reference": {
@@ -28,7 +33,7 @@
                         "points": [
                             {
                                 "params": {
-                                    "filename": "test/systemtests/data/places_dump/places_dump_DE.csv",
+                                    "filename": "test/systemtests/data/places_dump/places_dump_DE_100k.csv",
                                     "geometry": "xy",
 									"time": "none",
 									"columns": {
@@ -54,7 +59,7 @@
                         "points": [
                             {
                                 "params": {
-                                    "filename": "test/systemtests/data/places_dump/places_dump_DE.csv",
+                                    "filename": "test/systemtests/data/places_dump/places_dump_DE_100k.csv",
                                     "geometry": "xy",
 									"time": "none",
 									"columns": {
@@ -74,5 +79,5 @@
         },
         "type": "points_difference"
     },
-    "query_expected_hash": "db633cc5489f5761b068edbe9a475ea582d8e2b3"
+    "query_expected_hash": "8e06037c38dfcc15cfb52c197c1b3f216e17e0ca"
 }

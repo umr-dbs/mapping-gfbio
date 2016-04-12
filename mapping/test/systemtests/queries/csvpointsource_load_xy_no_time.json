@@ -16,7 +16,7 @@
 	{
 		"params" : 
 		{
-			"filename" : "test/systemtests/data/places_dump/places_dump_DE.csv",
+			"filename" : "test/systemtests/data/places_dump/places_dump_DE_100k.csv",
 			"geometry": "xy",
 			"time": "none",
 			"columns": {
@@ -29,5 +29,5 @@
 		"sources" : null,
 		"type" : "csvpointsource"
 	},
-	"query_expected_hash" : "09df934e2ceef0ce7b4531528c9e0b955c0099cf"
+	"query_expected_hash" : "e846d330ac28ef0214533b70f0ef7be9747fe59b"
 }

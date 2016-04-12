@@ -19,7 +19,7 @@
 		"params" : 
 		{
 			"filename": "test/systemtests/data/un_countries/countries.csv",
-			"on_error": "skip",
+			"on_error": "keep",
 			"separator": ";",
 			"geometry": "wkt",
 			"time": "start",
@@ -35,5 +35,5 @@
 			}
 		}
 	},
-	"query_expected_hash" : "d5f55da10ae7729ee8edb5a92c697d4d"
+	"query_expected_hash" : "368d96c14c75eb3acf473fa2019421fb3a389799"
 }

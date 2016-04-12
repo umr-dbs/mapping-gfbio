@@ -1,6 +1,6 @@
 {
 	/**
-		select ST_ASTEXT(ST_TRANSFORM(geom, 3857)), osm_id from osm_highways_3lanes
+		select ST_ASTEXT(ST_TRANSFORM(geom, 3857)), osm_id from un_countries
 		order by osm_id
 	*/
 	"name" : "Projection 4326 to 3857 polygons",
@@ -47,5 +47,5 @@
 		},
 		"type" : "projection"
 	},
-	"query_expected_hash" : ""
+	"query_expected_hash" : "48f07e7c82046aebafed2dd36683c4d6e4afc5bd"
 }

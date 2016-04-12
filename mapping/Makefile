@@ -77,7 +77,7 @@ OBJ_DATATYPES_COMMON=o/datatypes/attributes.o o/datatypes/spatiotemporal.o o/dat
 OBJ_DATATYPES=${OBJ_DATATYPES_COMMON} o/datatypes/raster/raster.o
 OBJ_DATATYPES_NOCL=${OBJ_DATATYPES_COMMON} o/datatypes/raster/raster_nocl.o
 OBJ_PLOT=o/datatypes/plots/histogram.o o/datatypes/plots/text.o o/datatypes/plots/png.o
-OBJ_UTIL=o/util/gdal.o o/util/sha1.o o/util/curl.o o/util/sqlite.o o/util/sunpos.o o/util/binarystream.o o/util/csvparser.o o/util/base64.o o/util/configuration.o o/util/debug.o o/util/timemodification.o o/util/log.o o/util/timeparser.o o/util/sizeutil.o
+OBJ_UTIL=o/util/gdal.o o/util/sha1.o o/util/curl.o o/util/sqlite.o o/util/sunpos.o o/util/binarystream.o o/util/csvparser.o o/util/base64.o o/util/configuration.o o/util/formula.o o/util/debug.o o/util/timemodification.o o/util/log.o o/util/timeparser.o o/util/sizeutil.o
 OBJ_POINTVISUALIZATION=o/pointvisualization/BoundingBox.o o/pointvisualization/Circle.o o/pointvisualization/Coordinate.o o/pointvisualization/Dimension.o o/pointvisualization/FindResult.o o/pointvisualization/QuadTreeNode.o o/pointvisualization/CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters/converter.o o/converters/raw.o
 OBJ_OPERATORS_RASTER=o/operators/raster/matrixkernel.o o/operators/raster/expression.o o/operators/raster/projections.o o/operators/raster/rastersource.o o/operators/raster/r.o o/operators/raster/classification.o
@@ -113,6 +113,7 @@ EXE_SANITIZED=mapping_manager.san
 EXECGI=../htdocs/cgi-bin/mapping
 EXERSERVER=r_server
 EXEGTEST=gtest
+EXEPARSETESTLOGS=test/systemtests/parse_logs
 EXETILESERVER=tileserver
 EXECACHEINDEX=cache_index
 EXECACHENODE=cache_node
@@ -153,6 +154,9 @@ ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/quer
 
 ${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/util/server_nonblocking.o ${OBJ_UNITTEST} o/libgtest.a
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
+
+${EXEPARSETESTLOGS}:	o/test/systemtests/parse_logs.o
+	${CPP} $+ -o $@
 
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/util/server_nonblocking.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/datatypes/unit.o o/util/binarystream.o o/util/sha1.o o/util/sqlite.o o/util/configuration.o o/util/sizeutil.o o/util/log.o
 	${CPP} $+ -o $@  ${LDFLAGS}
@@ -253,10 +257,10 @@ worldclim_datasource:	${EXE}
 #
 # All the remaining phony targets
 #
-systemtest:
+systemtest: ${EXEPARSETESTLOGS}
 	${MAKE} systemtest_testenvironment
 	${MAKE} systemtest_testcases
-	php test/systemtests/parse_logs.php test/systemtests/logs/tests_$$(date '+%Y-%m-%d_%H-%M').log test/systemtest_latest.xml
+	${EXEPARSETESTLOGS} >test/systemtest_latest.xml
 	rm -f ${TEST_LOGS}
 	echo "Testcases done";
 
@@ -287,7 +291,7 @@ doc:
 	./../docs/makeDoc
 
 clean:
-	rm -f ${EXE} ${EXE_SANITIZED} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXECACHEEXP} ${EXECLUSEXP}
+	rm -f ${EXE} ${EXE_SANITIZED} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEPARSETESTLOGS} ${EXECACHEEXP} ${EXECLUSEXP}
 	rm -f $(CL_HEADERS)
 	find o/ -type f -name '*.o' -delete
 	find o/ -type f -name '*.d' -delete

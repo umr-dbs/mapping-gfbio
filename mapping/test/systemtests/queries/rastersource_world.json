@@ -3,7 +3,7 @@
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",
-        "start": 0
+        "start": 1388534400
     },
     "spatial_reference": {
         "projection": "EPSG:4326",
@@ -14,16 +14,16 @@
     },
     "resolution": {
     	"type": "pixels",
-        "x": 10800,
-        "y": 5400
+        "x": 3600,
+        "y": 1800
     },
     "query_mode": "exact",
     "query": {        
         "params": {
        		"channel": 0,
-            "sourcename": "world1"
+            "sourcename": "ndvi"
         },
         "type": "source"
     },
-    "query_expected_hash": "a8ed327c49f79b5bebca6456d3d0bca197679214"
+    "query_expected_hash": "c65f09a46739944514f9f79ed30df76211ddfdc0"
 }

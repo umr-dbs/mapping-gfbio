@@ -1,9 +1,9 @@
 {
-	"name" : "Projection 4326 tp 3857 raster",
+	"name" : "Projection 4326 to 3857 raster",
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",
-        "start": 0
+        "start": 1388534400
     },
     "spatial_reference": {
         "projection": "EPSG:3857",
@@ -14,8 +14,8 @@
     },
     "resolution": {
     	"type": "pixels",
-        "x": 7284, 
-        "y": 9630
+        "x": 3600, 
+        "y": 3600
     },
     "query_mode": "exact",
 	"query" : 
@@ -34,7 +34,7 @@
 					"params" : 
 					{
 						"channel" : 0,
-						"sourcename" : "world1"
+						"sourcename" : "ndvi"
 					},
 					"type" : "source"
 				}

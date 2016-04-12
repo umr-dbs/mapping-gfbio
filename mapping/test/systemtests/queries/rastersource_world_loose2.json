@@ -14,14 +14,14 @@
     },
     "resolution": {
     	"type": "pixels",
-        "x": 10799,
-        "y": 5399
+        "x": 3599,
+        "y": 1799
     },
     "query_mode": "loose",
     "query": {        
         "params": {
         	"channel": 0,
-            "sourcename": "world1"
+            "sourcename": "ndvi"
         },
         "type": "source"
     },

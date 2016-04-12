@@ -3,7 +3,7 @@
     "query_result": "plot",
     "temporal_reference": {
         "type": "UNIX",
-        "start": 0
+        "start": 1388534400
     },
     "spatial_reference": {
         "projection": "EPSG:4326",
@@ -14,8 +14,8 @@
     },
     "resolution": {
     	"type": "pixels",
-        "x": 10800,
-        "y": 5400
+        "x": 3600,
+        "y": 1800
     },
     "query_mode": "exact",
     "query": {
@@ -26,7 +26,7 @@
               {        
 		        "params": {
 		       		"channel": 0,
-		            "sourcename": "world1"
+		            "sourcename": "ndvi"
 		        },
 		        "type": "source"
 		       }
@@ -34,5 +34,5 @@
         },
         "type": "histogram"
     },
-    "query_expected_hash": "e46ddec66c2c625ff03c37e361cc76342b4f039b"
+    "query_expected_hash": "10022e9e7d7ae5e462e132e2b9c56a148132190e"
 }

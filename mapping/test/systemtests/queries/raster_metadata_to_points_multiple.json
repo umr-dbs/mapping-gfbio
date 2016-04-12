@@ -3,7 +3,7 @@
 			select 
 			     ST_Value(rast, geom) 
 			from 
-			     world1 
+			     ndvi 
 			where
 			     ST_Intersects(rast,geom)
 			)
@@ -33,22 +33,22 @@
                 "raster_value",
                 "raster_value2"
             ],
-            "xResolution" : 10800,
-            "yResolution": 5400
+            "xResolution" : 3600,
+            "yResolution": 1800
         },
         "sources": {
             "raster": [
                 {
                     "type": "source",
                     "params": {
-                        "sourcename": "world1",
+                        "sourcename": "ndvi",
                         "channel": 0
                     }
                 },
                 {
                     "type": "source",
                     "params": {
-                        "sourcename": "world1",
+                        "sourcename": "ndvi",
                         "channel": 0
                     }
                 }
@@ -64,7 +64,7 @@
 						"duration": 1,
 						"time1_format": {
 							"format" : "custom",
-							"custom_format" : "%Y-%m-%d %H:%M:%S+%Z"
+							"custom_format" : "%Y-%m-%d %H:%M:%S%z"
 						},
 						"columns": {
 							"x": "wkt",
@@ -79,5 +79,5 @@
             ]
         }
     },
-	"query_expected_hash" : "6cf7ceeebe348c762d66f1e8e9f4c7f19b349e9a"
+	"query_expected_hash" : "4489b4c636c313f274f8f7bf206dec32d6cccf70"
 }

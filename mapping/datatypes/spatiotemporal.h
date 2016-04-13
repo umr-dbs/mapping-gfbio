@@ -47,7 +47,8 @@ class SpatialReference {
 		/**
 		 * Construct a reference that spans the known universe.
 		 * The actual endpoints are taken from the epsg_t t when known;
-		 * if in doubt they're set to +- Infinity.
+		 * if in doubt they're set to extent(epsg)
+		 * @see extent
 		 */
 		SpatialReference(epsg_t epsg);
 		/*
@@ -100,6 +101,7 @@ class SpatialReference {
 		}
 		/*
 		 * Named constructor for returning a reference that spans the whole earth in the given CRS
+		 * Defaults to -/+infinity.
 		 */
 		static SpatialReference extent(epsg_t epsg);
 

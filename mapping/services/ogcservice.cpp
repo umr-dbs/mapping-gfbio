@@ -78,31 +78,20 @@ void OGCService::parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg
 		std::swap(bbox[2], bbox[3]);
 	}
 
-	// If no extent is known, just trust the client.
+	// If no extent is known, just trust the client and assume the bbox is within the extent.
 	if (std::isfinite(extent.x1)) {
-		double bbox_normalized[4];
-		for (int i=0;i<4;i+=2) {
-			bbox_normalized[i  ] = (bbox[i  ] - extent.x1) / (extent.x2-extent.x1);
-			bbox_normalized[i+1] = (bbox[i+1] - extent.y1) / (extent.y2-extent.y1);
-		}
+		double allowed_error_x = (extent.x2-extent.x1) / 1000;
+		double allowed_error_y = (extent.y2-extent.y1) / 1000;
 
 		// Koordinaten können leicht ausserhalb liegen, z.B.
 		// 20037508.342789, 20037508.342789
-		for (int i=0;i<4;i++) {
-			if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
-				bbox_normalized[i] = 0.0;
-			else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
-				bbox_normalized[i] = 1.0;
-		}
-
-		for (int i=0;i<4;i++) {
-			if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0)
-				throw ArgumentException("BBOX exceeds extent");
+		if ( (bbox[0] < extent.x1 - allowed_error_x)
+		  || (bbox[1] < extent.y1 - allowed_error_y)
+		  || (bbox[2] > extent.x2 + allowed_error_x)
+		  || (bbox[3] > extent.y2 + allowed_error_y) ) {
+			throw ArgumentException("BBOX exceeds extent");
 		}
 	}
-
-	//bbox_normalized[1] = 1.0 - bbox_normalized[1];
-	//bbox_normalized[3] = 1.0 - bbox_normalized[3];
 }
 
 

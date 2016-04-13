@@ -283,7 +283,10 @@ void TemporalReference::intersect(const TemporalReference &other) {
 std::string TemporalReference::toIsoString(double time) const {
 	std::ostringstream result;
 
-	if(timetype == TIMETYPE_UNIX){
+	if(timetype == TIMETYPE_UNIX) {
+		if (time < beginning_of_time() || time > end_of_time())
+			throw ArgumentException("toIsoString: given timestamp is outside the valid range");
+
 		long t = time;
 		std::tm *tm = std::gmtime(&t);
 

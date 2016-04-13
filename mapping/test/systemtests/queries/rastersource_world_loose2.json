@@ -3,7 +3,7 @@
 	"query_result": "raster",
     "temporal_reference": {
         "type": "UNIX",
-        "start": 0
+        "start": 1388534400
     },
     "spatial_reference": {
         "projection": "EPSG:4326",
@@ -25,5 +25,5 @@
         },
         "type": "source"
     },
-    "query_expected_hash": ""
+    "query_expected_hash": "df6d5c55d7c1b0970b9d89ab55195ea490d574ad"
 }

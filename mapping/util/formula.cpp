@@ -61,4 +61,4 @@ std::string Formula::parse() {
 	}
 
 	return formula;
-};
+}

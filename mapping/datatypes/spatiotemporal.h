@@ -47,7 +47,8 @@ class SpatialReference {
 		/**
 		 * Construct a reference that spans the known universe.
 		 * The actual endpoints are taken from the epsg_t t when known;
-		 * if in doubt they're set to +- Infinity.
+		 * if in doubt they're set to extent(epsg)
+		 * @see extent
 		 */
 		SpatialReference(epsg_t epsg);
 		/*
@@ -100,6 +101,7 @@ class SpatialReference {
 		}
 		/*
 		 * Named constructor for returning a reference that spans the whole earth in the given CRS
+		 * Defaults to -/+infinity.
 		 */
 		static SpatialReference extent(epsg_t epsg);
 
@@ -135,6 +137,8 @@ public:
 	/*
 	 * Validate if invariants are met.
 	 * Additionally validate if the interval is contained in [beginning_of_time, end_of_time)
+	 * @param beginning_of_time smallest allowed time
+	 * @param end_of_time largest allowed time
 	 */
 	void validate(double beginning_of_time, double end_of_time) const;
 
@@ -196,8 +200,7 @@ class TemporalReference : public TimeInterval {
 		TemporalReference() = delete;
 		/**
 		 * Construct a reference that spans the known universe in time.
-		 * The actual endpoints are taken from the timetype_t when known;
-		 * if in doubt they're set to +- Infinity.
+		 * The actual endpoints are beginning_of_time() and end_of_time() respectively.
 		 */
 		TemporalReference(timetype_t timetype);
 		/*
@@ -263,9 +266,10 @@ class TemporalReference : public TimeInterval {
 		void intersect(const TemporalReference &other);
 
 		/**
-		 * serializes given time as ISO String with respect to timetype
+		 * serializes given time as ISO String
+		 * throws an exception if the timetype is incompatible to the gregorian calendar.
 		 */
-		std::string toIsoString(double time) const ;
+		std::string toIsoString(double time) const;
 
 		/**
 		 * the size of this object in memory (in bytes)

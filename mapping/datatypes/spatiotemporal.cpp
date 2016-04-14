@@ -16,10 +16,11 @@
  * SpatialReference
  */
 SpatialReference::SpatialReference(epsg_t epsg) : epsg(epsg) {
-	x1 = -std::numeric_limits<double>::infinity();
-	y1 = -std::numeric_limits<double>::infinity();
-	x2 = std::numeric_limits<double>::infinity();
-	y2 = std::numeric_limits<double>::infinity();
+	auto e = extent(epsg);
+	x1 = e.x1;
+	x2 = e.x2;
+	y1 = e.y1;
+	y2 = e.y2;
 
 	validate();
 }
@@ -92,6 +93,19 @@ void SpatialReference::validate() const {
 		throw ArgumentException(msg.str());
 	}
 }
+
+SpatialReference SpatialReference::extent(epsg_t epsg) {
+	// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
+	if (epsg == EPSG_WEBMERCATOR)
+		return SpatialReference(EPSG_WEBMERCATOR, -20037508.34,-20037508.34,20037508.34,20037508.34);
+	if (epsg == EPSG_LATLON)
+		return SpatialReference(EPSG_LATLON, -180, -90, 180, 90);
+	if (epsg == EPSG_GEOSMSG)
+		return SpatialReference(EPSG_GEOSMSG, -5568748.276, -5568748.276, 5568748.276, 5568748.276);
+
+	return SpatialReference(epsg, -std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity(), -std::numeric_limits<double>::infinity(), std::numeric_limits<double>::infinity());
+}
+
 
 /**
  * TimeInterval
@@ -172,19 +186,6 @@ size_t TimeInterval::get_byte_size() const {
 size_t TemporalReference::get_byte_size() const {
 	return sizeof(TemporalReference);
 }
-
-SpatialReference SpatialReference::extent(epsg_t epsg) {
-	if (epsg == EPSG_WEBMERCATOR)
-		return SpatialReference(EPSG_WEBMERCATOR, -20037508.34,-20037508.34,20037508.34,20037508.34);
-	if (epsg == EPSG_LATLON)
-		return SpatialReference(EPSG_LATLON, -180, -90, 180, 90);
-	if (epsg == EPSG_GEOSMSG)
-		return SpatialReference(EPSG_GEOSMSG, -5568748.276, -5568748.276, 5568748.276, 5568748.276);
-
-	throw ArgumentException("Cannot return extent of an unknown CRS");
-}
-
-
 
 TemporalReference::TemporalReference(timetype_t timetype) : TimeInterval(), timetype(timetype) {
 	t1 = beginning_of_time();
@@ -283,7 +284,10 @@ void TemporalReference::intersect(const TemporalReference &other) {
 std::string TemporalReference::toIsoString(double time) const {
 	std::ostringstream result;
 
-	if(timetype == TIMETYPE_UNIX){
+	if(timetype == TIMETYPE_UNIX) {
+		if (time < beginning_of_time() || time > end_of_time())
+			throw ArgumentException("toIsoString: given timestamp is outside the valid range");
+
 		long t = time;
 		std::tm *tm = std::gmtime(&t);
 

@@ -27,21 +27,7 @@ void OGCService::parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg
 	for(int i=0;i<4;i++)
 		bbox[i] = NAN;
 
-	// Figure out if we know the extent of the CRS
-	// WebMercator, http://www.easywms.com/easywms/?q=en/node/3592
-	//                               minx          miny         maxx         maxy
-	double extent_webmercator[4] {-20037508.34 , -20037508.34 , 20037508.34 , 20037508.34};
-	double extent_latlon[4]      {     -180    ,       -90    ,      180    ,       90   };
-	double extent_msg[4]         { -5568748.276,  -5568748.276, 5568748.276,  5568748.276};
-
-	double *extent = nullptr;
-	if (epsg == EPSG_WEBMERCATOR)
-		extent = extent_webmercator;
-	else if (epsg == EPSG_LATLON)
-		extent = extent_latlon;
-	else if (epsg == EPSG_GEOSMSG)
-		extent = extent_msg;
-
+	auto extent = SpatialReference::extent(epsg);
 
 	std::string delimiters = " ,";
 	size_t current, next = -1;
@@ -55,22 +41,25 @@ void OGCService::parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg
 		if (stringValue == "Infinity") {
 			if (!allow_infinite)
 				throw ArgumentException("cannot process BBOX with Infinity");
-			if (!extent)
-				throw ArgumentException("cannot process BBOX with Infinity and unknown CRS");
-			value = std::max(extent[element], extent[(element+2)%4]);
+			if (element == 0 || element == 2)
+				value = std::max(extent.x1, extent.x2);
+			else
+				value = std::max(extent.y1, extent.y2);
 		}
 		else if (stringValue == "-Infinity") {
 			if (!allow_infinite)
 				throw ArgumentException("cannot process BBOX with Infinity");
-			if (!extent)
-				throw ArgumentException("cannot process BBOX with Infinity and unknown CRS");
-			value = std::min(extent[element], extent[(element+2)%4]);
+			if (element == 0 || element == 2)
+				value = std::min(extent.x1, extent.x2);
+			else
+				value = std::min(extent.y1, extent.y2);
 		}
 		else {
 			value = std::stod(stringValue);
-			if (!std::isfinite(value))
-				throw ArgumentException("BBOX contains entry that is not a finite number");
 		}
+
+		if (!std::isfinite(value))
+			throw ArgumentException("BBOX contains entry that is not a finite number");
 
 		bbox[element++] = value;
 	} while (element < 4 && next != std::string::npos);
@@ -89,31 +78,20 @@ void OGCService::parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg
 		std::swap(bbox[2], bbox[3]);
 	}
 
-	// If no extent is known, just trust the client.
-	if (extent) {
-		double bbox_normalized[4];
-		for (int i=0;i<4;i+=2) {
-			bbox_normalized[i  ] = (bbox[i  ] - extent[0]) / (extent[2]-extent[0]);
-			bbox_normalized[i+1] = (bbox[i+1] - extent[1]) / (extent[3]-extent[1]);
-		}
+	// If no extent is known, just trust the client and assume the bbox is within the extent.
+	if (std::isfinite(extent.x1)) {
+		double allowed_error_x = (extent.x2-extent.x1) / 1000;
+		double allowed_error_y = (extent.y2-extent.y1) / 1000;
 
 		// Koordinaten können leicht ausserhalb liegen, z.B.
 		// 20037508.342789, 20037508.342789
-		for (int i=0;i<4;i++) {
-			if (bbox_normalized[i] < 0.0 && bbox_normalized[i] > -0.001)
-				bbox_normalized[i] = 0.0;
-			else if (bbox_normalized[i] > 1.0 && bbox_normalized[i] < 1.001)
-				bbox_normalized[i] = 1.0;
-		}
-
-		for (int i=0;i<4;i++) {
-			if (bbox_normalized[i] < 0.0 || bbox_normalized[i] > 1.0)
-				throw ArgumentException("BBOX exceeds extent");
+		if ( (bbox[0] < extent.x1 - allowed_error_x)
+		  || (bbox[1] < extent.y1 - allowed_error_y)
+		  || (bbox[2] > extent.x2 + allowed_error_x)
+		  || (bbox[3] > extent.y2 + allowed_error_y) ) {
+			throw ArgumentException("BBOX exceeds extent");
 		}
 	}
-
-	//bbox_normalized[1] = 1.0 - bbox_normalized[1];
-	//bbox_normalized[3] = 1.0 - bbox_normalized[3];
 }
 
 

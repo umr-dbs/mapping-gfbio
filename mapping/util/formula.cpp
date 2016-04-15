@@ -50,7 +50,7 @@ std::string Formula::parse() {
 	// TODO: this catches some strings that are dangerous to include in an opencl kernel,
 	// but does not actually parse, verify and pretty-print the formula.
 
-	if (formula.find_first_of(";[]{}!#%&\"\'\\") != std::string::npos)
+	if (formula.find_first_of(";[]{}!#%\"\'\\") != std::string::npos)
 		throw parse_error("Formula contains disallowed characters");
 
 	if ((formula.find("/*") != std::string::npos)

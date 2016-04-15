@@ -558,8 +558,8 @@ void ParallelExecutor::thread_exec() {
 //
 
 QTriple::QTriple() : type(CacheType::UNKNOWN), query(
-		SpatialReference(EPSG_UNKNOWN,0,0,0,0),
-		TemporalReference(TIMETYPE_UNKNOWN,0,0),
+		SpatialReference::unreferenced(),
+		TemporalReference::unreferenced(),
 		QueryResolution::none() ) {
 }
 

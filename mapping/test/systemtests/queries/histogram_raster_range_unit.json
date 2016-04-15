@@ -20,6 +20,8 @@
     "query_mode": "exact",
     "query": {
         "params": {
+        	"range" : "unit",
+        	"buckets" : 255
         },
         "sources": {
             "raster": [

@@ -83,9 +83,9 @@ OBJ_CONVERTERS=o/converters/converter.o o/converters/raw.o
 OBJ_OPERATORS_RASTER=o/operators/raster/matrixkernel.o o/operators/raster/expression.o o/operators/raster/projections.o o/operators/raster/rastersource.o o/operators/raster/r.o o/operators/raster/classification.o
 OBJ_OPERATORS_POINTS=o/operators/points/pgpointsource.o o/operators/points/gfbiopointsource.o o/operators/points/points_filter_by_range.o o/operators/points/points_difference.o o/operators/points/points_cluster.o o/operators/points/csvpointsource.o
 OBJ_OPERATORS_GEOMETRY=o/operators/geometry/wktsource.o
-OBJ_OPERATORS_COMBINED=o/operators/combined/points2raster.o o/operators/combined/raster_metadata_to_points.o o/operators/combined/points2cluster_raster.o o/operators/combined/filterpointsbygeometry.o
+OBJ_OPERATORS_COMBINED=o/operators/combined/points2raster.o o/operators/combined/raster_metadata_to_points.o o/operators/combined/filterpointsbygeometry.o
 OBJ_OPERATORS_MSAT=o/operators/msat/temperature.o o/operators/msat/reflectance.o o/operators/msat/solarangle.o o/operators/msat/radiance.o o/operators/msat/pansharpening.o o/operators/msat/gccthermthresholddetection.o o/operators/msat/co2correction.o
-OBJ_OPERATORS_PLOTS=o/operators/plots/histogram.o o/operators/plots/points2histogram.o o/operators/plots/points_metadata_tograph.o
+OBJ_OPERATORS_PLOTS=o/operators/plots/histogram.o o/operators/plots/points_metadata_tograph.o
 OBJ_OPERATORS_TEMPORAL=o/operators/temporal/timeshiftoperator.o
 OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o 
 ifeq (${USE_ABCD},true)

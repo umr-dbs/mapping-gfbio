@@ -302,7 +302,7 @@ enum Orientation {
  * @return the orientation of c
  */
 Orientation orientation(const Coordinate& p1, const Coordinate& p2, const Coordinate& c) {
-    int val = (p2.y - p1.y) * (c.x - p2.x) -
+    double val = (p2.y - p1.y) * (c.x - p2.x) -
               (p2.x - p1.x) * (c.y - p2.y);
 
     if (val == 0) return ON;  // colinear

@@ -7,6 +7,7 @@
 
 #include <cmath>
 #include <vector>
+#include <iomanip>
 
 color_t color_from_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 	return (uint32_t) a << 24 | (uint32_t) b << 16 | (uint32_t) g << 8 | (uint32_t) r;
@@ -142,6 +143,40 @@ void Colorizer::fillPalette(color_t *colors, int num_colors, double min, double 
 	}
 }
 
+static void color_as_html(std::ostream &s, color_t color) {
+	if (a_from_color(color) == 255) {
+		s << "#";
+		s << std::setfill('0') << std::hex;
+		s << std::setw(2) << (int) r_from_color(color)
+		  << std::setw(2) << (int) g_from_color(color)
+		  << std::setw(2) << (int) b_from_color(color);
+		s << std::setw(0) << std::dec;
+	}
+	else {
+		s << "rgba(" << (int) r_from_color(color) << "," << (int) g_from_color(color) << "," << (int) b_from_color(color) << "," << (a_from_color(color)/255.0) << ")";
+	}
+}
+
+std::string Colorizer::toJson() const {
+	std::ostringstream ss;
+
+	ss << "{ \"interpolation\": \"";
+	if (interpolation == Interpolation::LINEAR)
+		ss << "linear";
+	else if (interpolation == Interpolation::NEAREST)
+		ss << "nearest";
+	ss << "\", \"breakpoints\": [\n";
+	for (size_t i=0;i<table.size();i++) {
+		if (i != 0)
+			ss << ",\n";
+		ss << "[" << table[i].value << ",\"";
+		color_as_html(ss, table[i].color);
+		ss << "\"]";
+	}
+	ss << "]}";
+
+	return ss.str();
+}
 
 
 static const Colorizer::ColorTable heatmap_breakpoints = {
@@ -230,7 +265,7 @@ std::unique_ptr<Colorizer> Colorizer::fromUnit(const Unit &unit) {
 		return make_unique<Colorizer>(error_breakpoints, Interpolation::NEAREST);
 	// TODO: we need a better default colorizer, optimized for contrast
 	if (unit.getUnit() == "classification")
-		return make_unique<Colorizer>(glc2000_breakpoints);
+		return make_unique<Colorizer>(glc2000_breakpoints, Interpolation::NEAREST);
 
 	// TODO: if we have a min/max, we can do a proper scaling. If we don't, what do we do?
 	if (!unit.hasMinMax())

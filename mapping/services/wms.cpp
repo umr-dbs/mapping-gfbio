@@ -4,6 +4,7 @@
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
 #include "datatypes/plot.h"
+#include "datatypes/colorizer.h"
 #include "util/configuration.h"
 #include "util/debug.h"
 
@@ -170,6 +171,25 @@ void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 			title : "SRTM"
 		});
 		 */
+	}
+	else if (request == "GetColorizer") {
+		bool flipx, flipy;
+		QueryRectangle qrect(
+			SpatialReference::extent(query_epsg),
+			TemporalReference(TIMETYPE_UNIX, timestamp),
+			QueryResolution::pixels(1, 1)
+		);
+
+		auto graph = GenericOperator::fromJSON(params.get("layers"));
+		QueryProfiler profiler;
+		auto result_raster = graph->getCachedRaster(qrect,profiler,GenericOperator::RasterQM::LOOSE);
+
+		auto unit = result_raster->dd.unit;
+		auto colorizer = Colorizer::fromUnit(unit);
+
+		result.sendContentType("application/json");
+		result.finishHeaders();
+		result << colorizer->toJson();
 	}
 	// GetFeatureInfo (optional)
 	else if (request == "GetFeatureInfo") {

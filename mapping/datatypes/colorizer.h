@@ -36,6 +36,7 @@ class Colorizer {
 		virtual ~Colorizer();
 
 		void fillPalette(color_t *colors, int num_colors, double min, double max) const;
+		std::string toJson() const;
 
 		static std::unique_ptr<Colorizer> fromUnit(const Unit &unit);
 	private:

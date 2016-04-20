@@ -62,7 +62,7 @@ std::unique_ptr<GenericRaster> PointsToRasterOperator::getRaster(const QueryRect
 	RasterOpenCL::init();
 
 	QueryRectangle rect_larger = rect;
-	rect_larger.enlarge(radius);
+	rect_larger.enlargePixels(radius);
 
 	QueryRectangle rect_points(rect_larger, rect_larger, QueryResolution::none());
 	auto points = getPointCollectionFromSource(0, rect_points, profiler);

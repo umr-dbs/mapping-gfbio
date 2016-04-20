@@ -40,7 +40,8 @@ class QueryRectangle : public SpatialReference, public TemporalReference, public
 
 		void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
-		void enlarge(int pixels);
+		void enlargePixels(int pixels);
+		void enlargeFraction(double fraction);
 };
 
 #endif

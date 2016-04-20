@@ -210,7 +210,9 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 		rect.restype == QueryResolution::Type::PIXELS ? QueryResolution::pixels(src_xres, src_yres) : QueryResolution(rect)
 	);
 	if (result.restype == QueryResolution::Type::PIXELS)
-		result.enlarge(2);
+		result.enlargePixels(2);
+	else
+		result.enlargeFraction(0.01);
 	return result;
 }
 

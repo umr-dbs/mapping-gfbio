@@ -12,7 +12,7 @@
 
 namespace cache_exp {
 	const time_t timestamp = parseIso8601DateTime("2010-06-06T18:00:00.000Z");
-	const TemporalReference tref(TIMETYPE_UNIX,timestamp,timestamp);
+	const TemporalReference tref(TIMETYPE_UNIX,timestamp);
 
 	const std::string srtm_wf = R"WF_ESCAPE(
 {
@@ -27,7 +27,7 @@ namespace cache_exp {
 
 const std::string srtm_ts_wf = R"WF_ESCAPE(
 { "type": "timeShiftOperator",
-  "params": { "shift": { "from": { "unit": "absolute", "value": "1995-06-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-06-15 12:00:00" } }  },
+  "params": { "shift": { "from": { "unit": "absolute", "value": "1995-06-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-06-15 12:00:01" } }  },
   "sources": { "raster": [
 {
   "type": "source",
@@ -93,40 +93,40 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 	"sources" : {
 		"raster": [
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-01-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-01-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-01-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-01-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-02-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-02-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-02-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-02-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-03-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-03-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-03-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-03-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-04-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-04-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-04-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-04-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-05-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-05-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-05-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-05-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-06-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-06-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-06-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-06-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-07-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-07-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-07-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-07-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-08-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-08-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-08-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-08-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-09-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-09-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-09-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-09-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-10-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-10-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-10-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-10-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-11-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-11-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-11-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-11-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
 		  { "type": "timeShiftOperator",
-			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-12-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-12-15 12:00:00" } }  },
+			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-12-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-12-15 12:00:01" } }  },
 			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } }
 	   ]
 	}
@@ -460,7 +460,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 	const QuerySpec srtm_ts(srtm_ts_wf,EPSG_LATLON,CacheType::RASTER,tref, "SRTM Timeshifted");
 	const QuerySpec srtm_ex(srtm_ex_wf,EPSG_LATLON,CacheType::RASTER,tref, "SRTM Expression");
 
-	static QuerySpec projected_shifted_temp( const std::string &timestamp ) {
+	static QuerySpec projected_shifted_temp( const std::string &timestamp, const std::string &time_to ) {
 		std::string p1 = R"WF_ESCAPE(
 		{
 		  "type": "projection",
@@ -484,12 +484,12 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		}
 		)WF_ESCAPE";
 
-		std::string wf = p1 + timestamp + p2 + timestamp + p3;
+		std::string wf = p1 + timestamp + p2 + time_to + p3;
 
 		return QuerySpec( wf, EPSG_WEBMERCATOR, CacheType::RASTER,tref,"Monthly Temperature (Projected, Shifted to " + timestamp + ")" );
 	}
 
-	static QuerySpec shifted_temp( const std::string &timestamp ) {
+	static QuerySpec shifted_temp( const std::string &timestamp, const std::string &time_to ) {
 		std::string p1 = R"WF_ESCAPE(
 		{
 			  "type": "timeShiftOperator",
@@ -504,7 +504,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		}
 		)WF_ESCAPE";
 
-		std::string wf = p1 + timestamp + p2 + timestamp + p3;
+		std::string wf = p1 + timestamp + p2 + time_to + p3;
 
 		return QuerySpec( wf, EPSG_LATLON, CacheType::RASTER,tref,"Monthly Temperature (Shifted to " + timestamp + ")" );
 	}

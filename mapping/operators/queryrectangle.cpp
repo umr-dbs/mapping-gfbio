@@ -37,12 +37,12 @@ void QueryRectangle::serialize(BinaryWriteBuffer &buffer, bool is_persistent_mem
 	QueryResolution::serialize(buffer, is_persistent_memory);
 }
 
-void QueryRectangle::enlarge(int pixels) {
+void QueryRectangle::enlargePixels(int pixels) {
 	if (restype != QueryResolution::Type::PIXELS)
 		throw ArgumentException("Cannot enlarge QueryRectangle without a proper pixel size");
 
-	double pixel_size_in_world_coordinates_x = (double) std::abs(x2 - x1) / xres;
-	double pixel_size_in_world_coordinates_y = (double) std::abs(y2 - y1) / yres;
+	double pixel_size_in_world_coordinates_x = (double) (x2 - x1) / xres;
+	double pixel_size_in_world_coordinates_y = (double) (y2 - y1) / yres;
 
 	x1 -= pixels * pixel_size_in_world_coordinates_x;
 	x2 += pixels * pixel_size_in_world_coordinates_x;
@@ -51,4 +51,20 @@ void QueryRectangle::enlarge(int pixels) {
 
 	xres += 2*pixels;
 	yres += 2*pixels;
+}
+
+void QueryRectangle::enlargeFraction(double fraction) {
+	// If the desired resolution is specified in pixels, we would need to adjust the amount of requested pixels as well.
+	// Until there's a use case for this, I'd rather not bother figuring out the best way to handle rounding.
+	if (restype == QueryResolution::Type::PIXELS)
+		throw ArgumentException("Cannot (yet) enlarge QueryRectangle by a fraction when a pixel size is present");
+
+	double enlarge_x = (x2 - x1) * fraction;
+	double enlarge_y = (y2 - y1) * fraction;
+
+	x1 -= enlarge_x;
+	x2 += enlarge_x;
+
+	y1 -= enlarge_y;
+	y2 += enlarge_y;
 }

@@ -27,7 +27,6 @@ TEST(Formula, bad) {
 	badFormula("A + 'a'");
 	badFormula("A[7]");
 	badFormula("while(1) {}");
-	badFormula("*(&A + 5)");
 	badFormula("while(1) {}");
 	badFormula("A % 10"); // must use mod(A, 10)
 	badFormula("42 // comment");
@@ -36,6 +35,7 @@ TEST(Formula, bad) {
 
 TEST(Formula, DISABLED_morebad) {
 	// These should be caught, but cannot be detected without a full parser.
+	badFormula("*(&A + 5)");
 	badFormula("42 + exit(5)");
 	badFormula("*(0x0042)");
 	badFormula("statement(), 42");

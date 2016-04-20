@@ -37,7 +37,7 @@ static void usage() {
 		printf("%s import <sourcename> <filename> <filechannel> <sourcechannel> <time_start> <duration> <compression>\n", program_name);
 		printf("%s link <sourcename> <sourcechannel> <time_reference> <time_start> <duration>\n", program_name);
 		printf("%s query <queryname> <png_filename>\n", program_name);
-		printf("%s testquery <queryname>\n", program_name);
+		printf("%s testquery <queryname> [S|F]\n", program_name);
 		printf("%s enumeratesources [verbose]\n", program_name);
 		exit(5);
 }
@@ -439,6 +439,7 @@ std::string getStringHash(const std::string &str) {
 	return sha1.digest().asHex();
 }
 
+
 // The return code is 0 for both success and failure, nonzero for any actual error (e.g. exception or crash)
 static int testquery(int argc, char *argv[]) {
 	if (argc < 3) {
@@ -446,8 +447,14 @@ static int testquery(int argc, char *argv[]) {
 	}
 	char *in_filename = argv[2];
 	bool set_hash = false;
-	if (argc >= 4 && argv[3][0] == 'S')
-		set_hash = true;
+	bool full_test = false;
+	if (argc >= 4) {
+		if(argv[3][0] == 'S')
+			set_hash = true;
+		else if(argv[3][0] == 'F')
+			full_test = true;
+	}
+
 
 	try {
 		/*
@@ -504,21 +511,78 @@ static int testquery(int argc, char *argv[]) {
 		}
 		else if (result == "points") {
 			QueryProfiler profiler;
-			auto points = graph->getCachedPointCollection(qrect, profiler);
-			real_hash = getIPCHash(*points);
-			real_hash2 = getIPCHash(*points->clone());
+			auto features = graph->getCachedPointCollection(qrect, profiler);
+			auto clone = features->clone();
+
+			real_hash = getIPCHash(*features);
+			real_hash2 = getIPCHash(*clone);
+
+			if(full_test) {
+				//run query again with upper half of MBR to check if operator correctly filters according to space
+				auto mbr = features->getCollectionMBR();
+				mbr.y2 -= (mbr.y2 - mbr.y1) / 2;
+				auto qrect_cut = QueryRectangle(mbr, qrect, qrect);
+				auto cut = graph->getCachedPointCollection(qrect_cut, profiler);
+				auto features_filtered = features->filterBySpatioTemporalReferenceIntersection(qrect_cut);
+
+				std::string hash_cut = getIPCHash(*cut);
+				std::string hash_filtered = getIPCHash(*features_filtered);
+
+				if (hash_cut != hash_filtered) {
+					printf("FAILED: hash\nHashes of result of query on subregion and filter on subregion of features differ. modified qrect: %s\nfilter on features:      %s\n", hash_cut.c_str(), hash_filtered.c_str());
+					return 5;
+				}
+			}
 		}
 		else if (result == "lines") {
 			QueryProfiler profiler;
-			auto lines = graph->getCachedLineCollection(qrect, profiler);
-			real_hash = getIPCHash(*lines);
-			real_hash2 = getIPCHash(*lines->clone());
+			auto features = graph->getCachedLineCollection(qrect, profiler);
+			auto clone = features->clone();
+
+			real_hash = getIPCHash(*features);
+			real_hash2 = getIPCHash(*clone);
+
+			if(full_test) {
+				//run query again with upper half of MBR to check if operator correctly filters according to space
+				auto mbr = features->getCollectionMBR();
+				mbr.y2 -= (mbr.y2 - mbr.y1) / 2;
+				auto qrect_cut = QueryRectangle(mbr, qrect, qrect);
+				auto cut = graph->getCachedLineCollection(qrect_cut, profiler);
+				auto features_filtered = features->filterBySpatioTemporalReferenceIntersection(qrect_cut);
+
+				std::string hash_cut = getIPCHash(*cut);
+				std::string hash_filtered = getIPCHash(*features_filtered);
+
+				if (hash_cut != hash_filtered) {
+					printf("FAILED: hash\nHashes of result of query on subregion and filter on subregion of features differ. modified qrect: %s\nfilter on features:      %s\n", hash_cut.c_str(), hash_filtered.c_str());
+					return 5;
+				}
+			}
 		}
 		else if (result == "polygons") {
 			QueryProfiler profiler;
-			auto polygons = graph->getCachedPolygonCollection(qrect, profiler);
-			real_hash = getIPCHash(*polygons);
-			real_hash2 = getIPCHash(*polygons->clone());
+			auto features = graph->getCachedPolygonCollection(qrect, profiler);
+			auto clone = features->clone();
+
+			real_hash = getIPCHash(*features);
+			real_hash2 = getIPCHash(*clone);
+
+			if(full_test) {
+				//run query again with upper half of MBR to check if operator correctly filters according to space
+				auto mbr = features->getCollectionMBR();
+				mbr.y2 -= (mbr.y2 - mbr.y1) / 2;
+				auto qrect_cut = QueryRectangle(mbr, qrect, qrect);
+				auto cut = graph->getCachedPolygonCollection(qrect_cut, profiler);
+				auto features_filtered = features->filterBySpatioTemporalReferenceIntersection(qrect_cut);
+
+				std::string hash_cut = getIPCHash(*cut);
+				std::string hash_filtered = getIPCHash(*features_filtered);
+
+				if (hash_cut != hash_filtered) {
+					printf("FAILED: hash\nHashes of result of query on subregion and filter on subregion of features differ. modified qrect: %s\nfilter on features:      %s\n", hash_cut.c_str(), hash_filtered.c_str());
+					return 5;
+				}
+			}
 		}
 		else if (result == "plot") {
 			QueryProfiler profiler;
@@ -530,6 +594,7 @@ static int testquery(int argc, char *argv[]) {
 			printf("Unknown result type: %s\n", result.c_str());
 			return 5;
 		}
+
 
 		if (real_hash != real_hash2) {
 			printf("FAILED: hash\nHashes of result and its clone differ, probably a bug in clone():original: %s\ncopy:      %s\n", real_hash.c_str(), real_hash2.c_str());

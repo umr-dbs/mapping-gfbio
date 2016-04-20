@@ -24,8 +24,33 @@
 #include <fstream>
 #include <exception>
 #include <memory>
+#include <utility>
 
 #include <json/json.h>
+
+
+// This is a helper template, allowing much of the following functionality to be templated for all feature types
+template<typename T> struct queryFeature {};
+
+template<> struct queryFeature<PointCollection> {
+	static std::unique_ptr<PointCollection> query(GenericOperator *graph, const QueryRectangle &rect) {
+		QueryProfiler profiler;
+		return graph->getCachedPointCollection(rect, profiler);
+	}
+};
+template<> struct queryFeature<LineCollection> {
+	static std::unique_ptr<LineCollection> query(GenericOperator *graph, const QueryRectangle &rect) {
+		QueryProfiler profiler;
+		return graph->getCachedLineCollection(rect, profiler);
+	}
+};
+template<> struct queryFeature<PolygonCollection> {
+	static std::unique_ptr<PolygonCollection> query(GenericOperator *graph, const QueryRectangle &rect) {
+		QueryProfiler profiler;
+		return graph->getCachedPolygonCollection(rect, profiler);
+	}
+};
+
 
 
 static char *program_name;
@@ -257,11 +282,20 @@ static QueryRectangle qrect_from_json(Json::Value &root, bool &flipx, bool &flip
 	);
 }
 
-static QueryRectangle qrect_from_json(Json::Value &root) {
-	bool flipx, flipy;
-	return qrect_from_json(root, flipx, flipy);
-}
 
+template<typename T> void runfeaturequery(GenericOperator *graph, const QueryRectangle &qrect, const char *out_filename) {
+	auto features = queryFeature<T>::query(graph, qrect);
+	auto csv = features->toCSV();
+	if (out_filename) {
+		FILE *f = fopen(out_filename, "w");
+		if (f) {
+			fwrite(csv.c_str(), csv.length(), 1, f);
+			fclose(f);
+		}
+	}
+	else
+		printf("No output filename given, discarding result\n");
+}
 
 static void runquery(int argc, char *argv[]) {
 	if (argc < 3) {
@@ -331,46 +365,13 @@ static void runquery(int argc, char *argv[]) {
 			printf("No output filename given, discarding result of size %d x %d\n", raster->width, raster->height);
 	}
 	else if (result == "points") {
-		QueryProfiler profiler;
-		auto points = graph->getCachedPointCollection(qrect, profiler);
-		auto csv = points->toCSV();
-		if (out_filename) {
-			FILE *f = fopen(out_filename, "w");
-			if (f) {
-				fwrite(csv.c_str(), csv.length(), 1, f);
-				fclose(f);
-			}
-		}
-		else
-			printf("No output filename given, discarding result\n");
+		runfeaturequery<PointCollection>(graph.get(), qrect, out_filename);
 	}
 	else if (result == "lines") {
-		QueryProfiler profiler;
-		auto lines = graph->getCachedLineCollection(qrect, profiler);
-		auto csv = lines->toCSV();
-		if (out_filename) {
-			FILE *f = fopen(out_filename, "w");
-			if (f) {
-				fwrite(csv.c_str(), csv.length(), 1, f);
-				fclose(f);
-			}
-		}
-		else
-			printf("No output filename given, discarding result\n");
+		runfeaturequery<LineCollection>(graph.get(), qrect, out_filename);
 	}
 	else if (result == "polygons") {
-		QueryProfiler profiler;
-		auto polygons = graph->getCachedPolygonCollection(qrect, profiler);
-		auto csv = polygons->toCSV();
-		if (out_filename) {
-			FILE *f = fopen(out_filename, "w");
-			if (f) {
-				fwrite(csv.c_str(), csv.length(), 1, f);
-				fclose(f);
-			}
-		}
-		else
-			printf("No output filename given, discarding result\n");
+		runfeaturequery<PolygonCollection>(graph.get(), qrect, out_filename);
 	}
 	else if (result == "plot") {
 			QueryProfiler profiler;
@@ -426,6 +427,7 @@ static void testsemantic(GenericOperator *graph) {
 	return;
 }
 
+
 template<typename T>
 std::string getIPCHash(T &t) {
 	BinaryWriteBuffer buf;
@@ -439,6 +441,32 @@ std::string getStringHash(const std::string &str) {
 	return sha1.digest().asHex();
 }
 
+template<typename T> std::pair<std::string, std::string> testfeaturequery(GenericOperator *graph, const QueryRectangle &qrect, bool full_test) {
+	auto features = queryFeature<T>::query(graph, qrect);
+	auto clone = features->clone();
+
+	std::string real_hash = getIPCHash(*features);
+	std::string real_hash2 = getIPCHash(*clone);
+
+	if(full_test) {
+		//run query again with upper half of MBR to check if operator correctly filters according to space
+		auto mbr = features->getCollectionMBR();
+		mbr.y2 -= (mbr.y2 - mbr.y1) / 2;
+		auto qrect_cut = QueryRectangle(mbr, qrect, qrect);
+		auto cut = queryFeature<T>::query(graph, qrect_cut);
+		auto features_filtered = features->filterBySpatioTemporalReferenceIntersection(qrect_cut);
+
+		std::string hash_cut = getIPCHash(*cut);
+		std::string hash_filtered = getIPCHash(*features_filtered);
+
+		if (hash_cut != hash_filtered) {
+			printf("FAILED: hash\nHashes of result of query on subregion and filter on subregion of features differ. modified qrect: %s\nfilter on features:      %s\n", hash_cut.c_str(), hash_filtered.c_str());
+			throw 1;
+		}
+	}
+
+	return std::make_pair(real_hash, real_hash2);
+}
 
 // The return code is 0 for both success and failure, nonzero for any actual error (e.g. exception or crash)
 static int testquery(int argc, char *argv[]) {
@@ -510,79 +538,19 @@ static int testquery(int argc, char *argv[]) {
 			real_hash2 = getIPCHash(*raster->clone());
 		}
 		else if (result == "points") {
-			QueryProfiler profiler;
-			auto features = graph->getCachedPointCollection(qrect, profiler);
-			auto clone = features->clone();
-
-			real_hash = getIPCHash(*features);
-			real_hash2 = getIPCHash(*clone);
-
-			if(full_test) {
-				//run query again with upper half of MBR to check if operator correctly filters according to space
-				auto mbr = features->getCollectionMBR();
-				mbr.y2 -= (mbr.y2 - mbr.y1) / 2;
-				auto qrect_cut = QueryRectangle(mbr, qrect, qrect);
-				auto cut = graph->getCachedPointCollection(qrect_cut, profiler);
-				auto features_filtered = features->filterBySpatioTemporalReferenceIntersection(qrect_cut);
-
-				std::string hash_cut = getIPCHash(*cut);
-				std::string hash_filtered = getIPCHash(*features_filtered);
-
-				if (hash_cut != hash_filtered) {
-					printf("FAILED: hash\nHashes of result of query on subregion and filter on subregion of features differ. modified qrect: %s\nfilter on features:      %s\n", hash_cut.c_str(), hash_filtered.c_str());
-					return 5;
-				}
-			}
+			auto res = testfeaturequery<PointCollection>(graph.get(), qrect, full_test);
+			real_hash = res.first;
+			real_hash2 = res.second;
 		}
 		else if (result == "lines") {
-			QueryProfiler profiler;
-			auto features = graph->getCachedLineCollection(qrect, profiler);
-			auto clone = features->clone();
-
-			real_hash = getIPCHash(*features);
-			real_hash2 = getIPCHash(*clone);
-
-			if(full_test) {
-				//run query again with upper half of MBR to check if operator correctly filters according to space
-				auto mbr = features->getCollectionMBR();
-				mbr.y2 -= (mbr.y2 - mbr.y1) / 2;
-				auto qrect_cut = QueryRectangle(mbr, qrect, qrect);
-				auto cut = graph->getCachedLineCollection(qrect_cut, profiler);
-				auto features_filtered = features->filterBySpatioTemporalReferenceIntersection(qrect_cut);
-
-				std::string hash_cut = getIPCHash(*cut);
-				std::string hash_filtered = getIPCHash(*features_filtered);
-
-				if (hash_cut != hash_filtered) {
-					printf("FAILED: hash\nHashes of result of query on subregion and filter on subregion of features differ. modified qrect: %s\nfilter on features:      %s\n", hash_cut.c_str(), hash_filtered.c_str());
-					return 5;
-				}
-			}
+			auto res = testfeaturequery<LineCollection>(graph.get(), qrect, full_test);
+			real_hash = res.first;
+			real_hash2 = res.second;
 		}
 		else if (result == "polygons") {
-			QueryProfiler profiler;
-			auto features = graph->getCachedPolygonCollection(qrect, profiler);
-			auto clone = features->clone();
-
-			real_hash = getIPCHash(*features);
-			real_hash2 = getIPCHash(*clone);
-
-			if(full_test) {
-				//run query again with upper half of MBR to check if operator correctly filters according to space
-				auto mbr = features->getCollectionMBR();
-				mbr.y2 -= (mbr.y2 - mbr.y1) / 2;
-				auto qrect_cut = QueryRectangle(mbr, qrect, qrect);
-				auto cut = graph->getCachedPolygonCollection(qrect_cut, profiler);
-				auto features_filtered = features->filterBySpatioTemporalReferenceIntersection(qrect_cut);
-
-				std::string hash_cut = getIPCHash(*cut);
-				std::string hash_filtered = getIPCHash(*features_filtered);
-
-				if (hash_cut != hash_filtered) {
-					printf("FAILED: hash\nHashes of result of query on subregion and filter on subregion of features differ. modified qrect: %s\nfilter on features:      %s\n", hash_cut.c_str(), hash_filtered.c_str());
-					return 5;
-				}
-			}
+			auto res = testfeaturequery<PolygonCollection>(graph.get(), qrect, full_test);
+			real_hash = res.first;
+			real_hash2 = res.second;
 		}
 		else if (result == "plot") {
 			QueryProfiler profiler;
@@ -598,7 +566,7 @@ static int testquery(int argc, char *argv[]) {
 
 		if (real_hash != real_hash2) {
 			printf("FAILED: hash\nHashes of result and its clone differ, probably a bug in clone():original: %s\ncopy:      %s\n", real_hash.c_str(), real_hash2.c_str());
-			return 5;
+			return 0;
 		}
 
 		if (root.isMember("query_expected_hash")) {
@@ -627,6 +595,9 @@ static int testquery(int argc, char *argv[]) {
 	}
 	catch (const std::exception &e) {
 		printf("Exception: %s\n", e.what());
+		return 5;
+	}
+	catch (...) {
 		return 5;
 	}
 	return 10;

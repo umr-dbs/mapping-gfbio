@@ -36,33 +36,29 @@ template<typename T> void Raster2D<T>::toPNG(std::ostream &output, const Coloriz
 		overlay->print(4, 36, 1, msg_unit.str().c_str());
 	}
 
-	T max = dd.unit.getMax();
-	T min = dd.unit.getMin();
-
-	T actual_min = min;
-	T actual_max = max;
-	if (colorizer.is_absolute) {
-		// calculate the actual min/max so we can include only the range we require
-		actual_min = (T) dd.getMaxByDatatype();
-		actual_max = (T) dd.getMinByDatatype();
-		bool found_pixel = false;
-		auto size = getPixelCount();
-		for (size_t i=0;i<size;i++) {
-			T v = data[i];
-			if (dd.is_no_data(v))
-				continue;
-			actual_min = std::min(actual_min, v);
-			actual_max = std::max(actual_max, v);
-			found_pixel = true;
-		}
-		if (!found_pixel) {
-			actual_min = 0;
-			actual_max = 1;
-		}
+	// calculate the actual min/max so we can include only the range we require in the palette
+	T actual_min = dd.getMaxByDatatype();
+	T actual_max = dd.getMinByDatatype();
+	bool found_pixel = false;
+	auto size = getPixelCount();
+	for (size_t i=0;i<size;i++) {
+		T v = data[i];
+		if (dd.is_no_data(v))
+			continue;
+		actual_min = std::min(actual_min, v);
+		actual_max = std::max(actual_max, v);
+		found_pixel = true;
+	}
+	if (!found_pixel) {
+		actual_min = 0;
+		actual_max = 1;
+	}
+	if (actual_max <= actual_min) {
+		actual_max = actual_min + 1;
 	}
 
 	if (!std::isfinite(actual_min) || !std::isfinite(actual_max))
-		throw ExporterException("Cannot export PNG without either a known min/max or an absolute colorizer");
+		throw ExporterException("Cannot export PNG with infinite raster values");
 
 	//auto actual_range = RasterTypeInfo<T>::getRange(actual_min, actual_max);
 

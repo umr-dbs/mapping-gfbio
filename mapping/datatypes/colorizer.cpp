@@ -7,25 +7,24 @@
 
 #include <cmath>
 #include <vector>
-#include <utility>
 
-uint32_t color_from_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+color_t color_from_rgba(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 	return (uint32_t) a << 24 | (uint32_t) b << 16 | (uint32_t) g << 8 | (uint32_t) r;
 }
 
-static uint8_t r_from_color(uint32_t color) {
+static uint8_t r_from_color(color_t color) {
 	return color & 0xff;
 }
 
-static uint8_t g_from_color(uint32_t color) {
+static uint8_t g_from_color(color_t color) {
 	return (color & 0xff00) >> 8;
 }
 
-static uint8_t b_from_color(uint32_t color) {
+static uint8_t b_from_color(color_t color) {
 	return (color & 0xff0000) >> 16;
 }
 
-static uint8_t a_from_color(uint32_t color) {
+static uint8_t a_from_color(color_t color) {
 	return (color & 0xff000000) >> 24;
 }
 
@@ -40,7 +39,7 @@ static uint8_t channel_from_double(double c) {
 // h: 0..359, s: 0..255, v: 0..255
 
 // ungenau, evtl. http://www.cs.rit.edu/~ncs/color/t_convert.html nehmen
-uint32_t color_from_hsva(uint16_t h, uint8_t s, uint8_t v, uint8_t a) {
+color_t color_from_hsva(uint16_t h, uint8_t s, uint8_t v, uint8_t a) {
     if (s == 0) {
     	return color_from_rgba(v, v, v, a);
     }
@@ -82,39 +81,38 @@ uint32_t color_from_hsva(uint16_t h, uint8_t s, uint8_t v, uint8_t a) {
     }
 }
 
-Colorizer::Colorizer(bool is_absolute) : is_absolute(is_absolute) {
+
+
+Colorizer::Colorizer(const ColorTable &table, Interpolation interpolation) : table(table), interpolation(interpolation) {
 }
 
 Colorizer::~Colorizer() {
 }
 
+OwningColorizer::OwningColorizer() : Colorizer(table) {
+}
 
-class InterpolatingAbsoluteColorizer : public Colorizer {
-	public:
-		InterpolatingAbsoluteColorizer(const std::vector< std::pair<double,uint32_t> > &breakpoints) : Colorizer(true), breakpoints(breakpoints) {}
-		~InterpolatingAbsoluteColorizer() {}
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const;
-	private:
-		const std::vector< std::pair<double, uint32_t> > &breakpoints;
-};
+OwningColorizer::~OwningColorizer() {
+}
 
-void InterpolatingAbsoluteColorizer::fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
+
+void Colorizer::fillPalette(color_t *colors, int num_colors, double min, double max) const {
 	double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
 	for (int c = 0; c < num_colors; c++) {
 		double value = min + c*step;
-		uint32_t color;
-		if (value <= breakpoints[0].first) {
-			color = breakpoints[0].second;
+		color_t color;
+		if (value <= table[0].value) {
+			color = table[0].color;
 		}
-		else if (value >= breakpoints[breakpoints.size()-1].first) {
-			color = breakpoints[breakpoints.size()-1].second;
+		else if (value >= table[table.size()-1].value) {
+			color = table[table.size()-1].color;
 		}
 		else {
-			for (int i=1;i<breakpoints.size();i++) {
-				if (value <= breakpoints[i].first) {
-					auto last_color = breakpoints[i-1].second;
-					auto next_color = breakpoints[i].second;
-					double fraction = (value-breakpoints[i-1].first) / (breakpoints[i].first - breakpoints[i-1].first);
+			for (size_t i=1;i<table.size();i++) {
+				if (value <= table[i].value) {
+					auto last_color = table[i-1].color;
+					auto next_color = table[i].color;
+					double fraction = (value-table[i-1].value) / (table[i].value - table[i-1].value);
 
 					uint8_t r = channel_from_double(r_from_color(last_color) * (1-fraction) + r_from_color(next_color) * fraction);
 					uint8_t g = channel_from_double(g_from_color(last_color) * (1-fraction) + g_from_color(next_color) * fraction);
@@ -133,176 +131,100 @@ void InterpolatingAbsoluteColorizer::fillPalette(uint32_t *colors, int num_color
 
 
 
-
-class GreyscaleColorizer : public Colorizer {
-	public:
-		GreyscaleColorizer() : Colorizer(false) {}
-		virtual ~GreyscaleColorizer() {};
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-			for (int c = 0; c < num_colors; c++) {
-				uint8_t color = (uint8_t) (255.0*c/num_colors);
-				colors[c] = color_from_rgba(color, color, color, 255);
-			}
-		}
+static const Colorizer::ColorTable heatmap_breakpoints = {
+	Colorizer::Breakpoint(  0, color_from_rgba(  0,   0, 255,  50)),
+	Colorizer::Breakpoint(100, color_from_rgba(  0,   0, 255, 150)),
+	Colorizer::Breakpoint(150, color_from_rgba(  0, 255, 255, 255)),
+	Colorizer::Breakpoint(200, color_from_rgba(  0, 255,   0, 255)),
+	Colorizer::Breakpoint(235, color_from_rgba(255, 255,   0, 255)),
+	Colorizer::Breakpoint(255, color_from_rgba(255,   0,   0, 255))
 };
 
 
-
-class HSVColorizer : public Colorizer {
-	public:
-		HSVColorizer() : Colorizer(false) {}
-		virtual ~HSVColorizer() {};
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-			for (int c = 0; c < num_colors; c++) {
-				double frac = (double) c / num_colors;
-				colors[c] = color_from_hsva((uint16_t) (120.0-(120.0*frac)), 150, 255);
-			}
-		}
+static const Colorizer::ColorTable temperature_breakpoints = {
+	Colorizer::Breakpoint(-50, color_from_rgba(  0,   0,   0)),
+	Colorizer::Breakpoint(-30, color_from_rgba(255,   0, 255)),
+	Colorizer::Breakpoint(-10, color_from_rgba(  0,   0, 255)),
+	Colorizer::Breakpoint(  0, color_from_rgba(  0, 255, 255)),
+	Colorizer::Breakpoint( 10, color_from_rgba(255, 255,   0)),
+	Colorizer::Breakpoint( 30, color_from_rgba(255,   0,   0)),
+	Colorizer::Breakpoint( 50, color_from_rgba(255, 255, 255))
 };
 
 
-static const std::vector< std::pair<double, uint32_t> > heatmap_breakpoints = {
-	std::make_pair(  0, color_from_rgba(  0,   0, 255,  50)),
-	std::make_pair(100, color_from_rgba(  0,   0, 255, 150)),
-	std::make_pair(150, color_from_rgba(  0, 255, 255, 255)),
-	std::make_pair(200, color_from_rgba(  0, 255,   0, 255)),
-	std::make_pair(235, color_from_rgba(255, 255,   0, 255)),
-	std::make_pair(255, color_from_rgba(255,   0,   0, 255))
+static const Colorizer::ColorTable height_breakpoints = {
+	Colorizer::Breakpoint(   0, color_from_rgba(170, 255, 170)), // #AAFFAA
+	Colorizer::Breakpoint(1000, color_from_rgba(  0, 255,   0)), // #00FF00
+	Colorizer::Breakpoint(1200, color_from_rgba(255, 255,   0)), // #FFFF00
+	Colorizer::Breakpoint(1400, color_from_rgba(255, 127,   0)), // #FF7F00
+	Colorizer::Breakpoint(1600, color_from_rgba(191, 127,  63)), // #BF7F3F
+	Colorizer::Breakpoint(2000, color_from_rgba(  0,   0,   0)), // #000000
+	Colorizer::Breakpoint(4000, color_from_rgba(255, 255, 255)), // #ffffff
+	Colorizer::Breakpoint(8000, color_from_rgba(  0,   0, 255))  // #0000ff
 };
 
 
-static const std::vector< std::pair<double, uint32_t> > temperature_breakpoints = {
-	std::make_pair(-50, color_from_rgba(  0,   0,   0)),
-	std::make_pair(-30, color_from_rgba(255,   0, 255)),
-	std::make_pair(-10, color_from_rgba(  0,   0, 255)),
-	std::make_pair(  0, color_from_rgba(  0, 255, 255)),
-	std::make_pair( 10, color_from_rgba(255, 255,   0)),
-	std::make_pair( 30, color_from_rgba(255,   0,   0)),
-	std::make_pair( 50, color_from_rgba(255, 255, 255))
+static const Colorizer::ColorTable cpm_breakpoints = {
+	Colorizer::Breakpoint(    0, color_from_rgba(  0, 255,   0)),
+	Colorizer::Breakpoint(  100, color_from_rgba(200, 255,   0)),
+	Colorizer::Breakpoint( 1000, color_from_rgba(255,   0,   0)),
+	Colorizer::Breakpoint(10000, color_from_rgba(  0,   0,   0))
 };
 
-
-static const std::vector< std::pair<double, uint32_t> > height_breakpoints = {
-	std::make_pair(   0, color_from_rgba(170, 255, 170)), // #AAFFAA
-	std::make_pair(1000, color_from_rgba(  0, 255,   0)), // #00FF00
-	std::make_pair(1200, color_from_rgba(255, 255,   0)), // #FFFF00
-	std::make_pair(1400, color_from_rgba(255, 127,   0)), // #FF7F00
-	std::make_pair(1600, color_from_rgba(191, 127,  63)), // #BF7F3F
-	std::make_pair(2000, color_from_rgba(  0,   0,   0)), // #000000
-	std::make_pair(4000, color_from_rgba(255, 255, 255)), // #ffffff
-	std::make_pair(8000, color_from_rgba(  0,   0, 255))  // #0000ff
+static const Colorizer::ColorTable error_breakpoints = {
+	Colorizer::Breakpoint(1, color_from_rgba(255, 0, 0))
 };
 
-
-static const std::vector< std::pair<double, uint32_t> > cpm_breakpoints = {
-	std::make_pair(    0, color_from_rgba(  0, 255,   0)),
-	std::make_pair(  100, color_from_rgba(200, 255,   0)),
-	std::make_pair( 1000, color_from_rgba(255,   0,   0)),
-	std::make_pair(10000, color_from_rgba(  0,   0,   0))
-};
-
-static const std::vector< std::pair<double, uint32_t> > error_breakpoints = {
-	std::make_pair(1, color_from_rgba(255, 0, 0))
-};
-
-
-class GlobalLandCoverColorizer : public Colorizer {
-	public:
-		GlobalLandCoverColorizer() : Colorizer(true) {}
-		virtual ~GlobalLandCoverColorizer() {}
-		virtual void fillPalette(uint32_t *colors, int num_colors, double min, double max) const {
-			double step = (num_colors > 1) ? ((max - min) / (num_colors-1)) : 0;
-			for (int c = 0; c < num_colors; c++) {
-				int value = std::round(min + c*step);
-				uint32_t color;
-				if (value == 1)
-					color = color_from_rgba(0, 100, 0);
-				else if (value == 2)
-					color = color_from_rgba(0, 150, 0);
-				else if (value == 3)
-					color = color_from_rgba(175, 255, 98);
-				else if (value == 4)
-					color = color_from_rgba(139, 68, 18);
-				else if (value == 5)
-					color = color_from_rgba(205, 126, 95);
-				else if (value == 6)
-					color = color_from_rgba(140, 190, 0);
-				else if (value == 7)
-					color = color_from_rgba(119, 150, 255);
-				else if (value == 8)
-					color = color_from_rgba(0, 70, 200);
-				else if (value == 9)
-					color = color_from_rgba(0, 230, 0);
-				else if (value == 10)
-					color = color_from_rgba(0, 0, 0);
-				else if (value == 11)
-					color = color_from_rgba(255, 118, 0);
-				else if (value == 12)
-					color = color_from_rgba(255, 179, 0);
-				else if (value == 13)
-					color = color_from_rgba(255, 234, 158);
-				else if (value == 14)
-					color = color_from_rgba(222, 202, 161);
-				else if (value == 15)
-					color = color_from_rgba(0, 150, 150);
-				else if (value == 16)
-					color = color_from_rgba(255, 224, 229);
-				else if (value == 17)
-					color = color_from_rgba(255, 116, 232);
-				else if (value == 18)
-					color = color_from_rgba(202, 138, 255);
-				else if (value == 19)
-					color = color_from_rgba(180, 180, 180);
-				else if (value == 20)
-					color = color_from_rgba(138, 227, 255);
-				else if (value == 21)
-					color = color_from_rgba(240, 240, 240);
-				else if (value == 22)
-					color = color_from_rgba(255, 0, 0);
-				else if (value == 23)
-					color = color_from_rgba(255, 255, 255);
-				else
-					color = color_from_rgba(0, 0, 255);
-
-				colors[c] = color;
-			}
-		};
+// See http://forobs.jrc.ec.europa.eu/products/glc2000/legend.php
+static const Colorizer::ColorTable glc2000_breakpoints = {
+	Colorizer::Breakpoint( 0, color_from_rgba(0, 0, 0, 0)), // invalid value
+	Colorizer::Breakpoint( 1, color_from_rgba(0, 100, 0)),
+	Colorizer::Breakpoint( 2, color_from_rgba(0, 150, 0)),
+	Colorizer::Breakpoint( 3, color_from_rgba(175, 255, 98)),
+	Colorizer::Breakpoint( 4, color_from_rgba(139, 68, 18)),
+	Colorizer::Breakpoint( 5, color_from_rgba(205, 126, 95)),
+	Colorizer::Breakpoint( 6, color_from_rgba(140, 190, 0)),
+	Colorizer::Breakpoint( 7, color_from_rgba(119, 150, 255)),
+	Colorizer::Breakpoint( 8, color_from_rgba(0, 70, 200)),
+	Colorizer::Breakpoint( 9, color_from_rgba(0, 230, 0)),
+	Colorizer::Breakpoint(10, color_from_rgba(0, 0, 0)),
+	Colorizer::Breakpoint(11, color_from_rgba(255, 118, 0)),
+	Colorizer::Breakpoint(12, color_from_rgba(255, 179, 0)),
+	Colorizer::Breakpoint(13, color_from_rgba(255, 234, 158)),
+	Colorizer::Breakpoint(14, color_from_rgba(222, 202, 161)),
+	Colorizer::Breakpoint(15, color_from_rgba(0, 150, 150)),
+	Colorizer::Breakpoint(16, color_from_rgba(255, 224, 229)),
+	Colorizer::Breakpoint(17, color_from_rgba(255, 116, 232)),
+	Colorizer::Breakpoint(18, color_from_rgba(202, 138, 255)),
+	Colorizer::Breakpoint(19, color_from_rgba(180, 180, 180)),
+	Colorizer::Breakpoint(20, color_from_rgba(138, 227, 255)),
+	Colorizer::Breakpoint(21, color_from_rgba(240, 240, 240)),
+	Colorizer::Breakpoint(22, color_from_rgba(255, 0, 0)),
+	Colorizer::Breakpoint(23, color_from_rgba(0, 0, 0, 0)) // invalid value
 };
 
 
 std::unique_ptr<Colorizer> Colorizer::fromUnit(const Unit &unit) {
 	if (unit.getMeasurement() == "temperature" && unit.getUnit() == "c")
-		return create("temperature");
+		return make_unique<Colorizer>(temperature_breakpoints);
 	if (unit.getMeasurement() == "elevation" && unit.getUnit() == "m")
-		return create("height");
+		return make_unique<Colorizer>(height_breakpoints);
 	if (unit.getMeasurement() == "frequency" && unit.getUnit() == "heatmap")
-		return create("heatmap");
+		return make_unique<Colorizer>(heatmap_breakpoints);
 	if (unit.getMeasurement() == "radiation" && unit.getUnit() == "cpm")
-		return create("cpm");
+		return make_unique<Colorizer>(cpm_breakpoints);
 	if (unit.getUnit() == "errormessage")
-		return create("error");
+		return make_unique<Colorizer>(error_breakpoints, Interpolation::NEAREST);
+	// TODO: we need a better default colorizer, optimized for contrast
 	if (unit.getUnit() == "classification")
-		return create("glc"); // TODO: we need a better default colorizer, optimized for contrast
+		return make_unique<Colorizer>(glc2000_breakpoints);
 
 	// TODO: if we have a min/max, we can do a proper scaling. If we don't, what do we do?
-	return create("grey");
-}
+	if (!unit.hasMinMax())
+		throw ArgumentException("Cannot create a suitable Colorizer for the given Unit.");
 
-
-std::unique_ptr<Colorizer> Colorizer::create(const std::string &name) {
-	if (name == "hsv")
-		return make_unique<HSVColorizer>();
-	if (name == "heatmap")
-		return make_unique<InterpolatingAbsoluteColorizer>(heatmap_breakpoints);
-	if (name == "temperature")
-		return make_unique<InterpolatingAbsoluteColorizer>(temperature_breakpoints);
-	if (name == "height")
-		return make_unique<InterpolatingAbsoluteColorizer>(height_breakpoints);
-	if (name == "cpm")
-		return make_unique<InterpolatingAbsoluteColorizer>(cpm_breakpoints);
-	if (name == "error")
-		return make_unique<InterpolatingAbsoluteColorizer>(error_breakpoints);
-	if (name == "glc")
-		return make_unique<GlobalLandCoverColorizer>();
-	return make_unique<GreyscaleColorizer>();
+	auto c = make_unique<OwningColorizer>();
+	c->table.emplace_back(unit.getMin(), color_from_rgba(0,0,0,255));
+	c->table.emplace_back(unit.getMax(), color_from_rgba(255,255,255,255));
+	return std::unique_ptr<Colorizer>(c.release());
 }

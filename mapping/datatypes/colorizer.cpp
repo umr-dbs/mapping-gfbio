@@ -108,18 +108,31 @@ void Colorizer::fillPalette(color_t *colors, int num_colors, double min, double 
 			color = table[table.size()-1].color;
 		}
 		else {
+			color = color_from_rgba(0, 0, 0, 0);
 			for (size_t i=1;i<table.size();i++) {
 				if (value <= table[i].value) {
 					auto last_color = table[i-1].color;
 					auto next_color = table[i].color;
-					double fraction = (value-table[i-1].value) / (table[i].value - table[i-1].value);
 
-					uint8_t r = channel_from_double(r_from_color(last_color) * (1-fraction) + r_from_color(next_color) * fraction);
-					uint8_t g = channel_from_double(g_from_color(last_color) * (1-fraction) + g_from_color(next_color) * fraction);
-					uint8_t b = channel_from_double(b_from_color(last_color) * (1-fraction) + b_from_color(next_color) * fraction);
-					uint8_t a = channel_from_double(a_from_color(last_color) * (1-fraction) + a_from_color(next_color) * fraction);
+					if (interpolation == Interpolation::LINEAR) {
+						double fraction = (value-table[i-1].value) / (table[i].value - table[i-1].value);
 
-					color = color_from_rgba(r, g, b, a);
+						uint8_t r = channel_from_double(r_from_color(last_color) * (1-fraction) + r_from_color(next_color) * fraction);
+						uint8_t g = channel_from_double(g_from_color(last_color) * (1-fraction) + g_from_color(next_color) * fraction);
+						uint8_t b = channel_from_double(b_from_color(last_color) * (1-fraction) + b_from_color(next_color) * fraction);
+						uint8_t a = channel_from_double(a_from_color(last_color) * (1-fraction) + a_from_color(next_color) * fraction);
+
+						color = color_from_rgba(r, g, b, a);
+					}
+					else if (interpolation == Interpolation::NEAREST) {
+						if (value-table[i-1].value > table[i].value-value)
+							color = table[i-1].color;
+						else
+							color = table[i].color;
+					}
+					else {
+						throw MustNotHappenException("Unknown interpolation mode in colorizer");
+					}
 					break;
 				}
 			}

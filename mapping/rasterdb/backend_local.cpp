@@ -169,8 +169,7 @@ RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, doub
 	if (!this->is_opened)
 		throw ArgumentException("Cannot call createRaster() before open() on a RasterDBBackend");
 
-	SQLiteStatement stmt(db);
-	stmt.prepare("SELECT id FROM rasters WHERE channel = ? AND ABS(time_start - ?) < 0.001 AND ABS(time_end - ?) < 0.001");
+	auto stmt = db.prepare("SELECT id FROM rasters WHERE channel = ? AND ABS(time_start - ?) < 0.001 AND ABS(time_end - ?) < 0.001");
 	stmt.bind(1, channel);
 	stmt.bind(2, time_start);
 	stmt.bind(3, time_end);
@@ -180,7 +179,7 @@ RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, doub
 	}
 	stmt.finalize();
 
-	stmt.prepare("INSERT INTO rasters (channel, time_start, time_end) VALUES (?,?,?)");
+	stmt = db.prepare("INSERT INTO rasters (channel, time_start, time_end) VALUES (?,?,?)");
 	stmt.bind(1, channel);
 	stmt.bind(2, time_start);
 	stmt.bind(3, time_end);
@@ -188,32 +187,31 @@ RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, doub
 	auto rasterid = db.getLastInsertId();
 	stmt.finalize();
 
-	SQLiteStatement stmt_attr(db);
-	stmt_attr.prepare("INSERT INTO attributes (rasterid, isstring, key, value) VALUES (?,?,?,?)");
-	stmt_attr.bind(1, rasterid);
-	stmt_attr.bind(2, 1); // isstring
+	stmt = db.prepare("INSERT INTO attributes (rasterid, isstring, key, value) VALUES (?,?,?,?)");
+	stmt.bind(1, rasterid);
+	stmt.bind(2, 1); // isstring
 
 	// import metadata
 	for (auto attr : attributes.textual()) {
 		auto key = attr.first;
 		auto value = attr.second;
 
-		stmt_attr.bind(3, key);
-		stmt_attr.bind(4, value);
+		stmt.bind(3, key);
+		stmt.bind(4, value);
 
-		stmt_attr.exec();
+		stmt.exec();
 		printf("inserting textual attribute: %s = %s\n", key.c_str(), value.c_str());
 	}
-	stmt_attr.bind(2, 0); // isstring
+	stmt.bind(2, 0); // isstring
 
 	for (auto attr : attributes.numeric()) {
 		auto key = attr.first;
 		auto value = attr.second;
 
-		stmt_attr.bind(3, key);
-		stmt_attr.bind(4, value);
+		stmt.bind(3, key);
+		stmt.bind(4, value);
 
-		stmt_attr.exec();
+		stmt.exec();
 		printf("inserting numeric attribute: %s = %f\n", key.c_str(), value);
 	}
 
@@ -251,8 +249,7 @@ void LocalRasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, ui
 		throw SourceException("writing failed, disk full?");
 
 	// Step 2: insert into DB
-	SQLiteStatement stmt(db);
-	stmt.prepare("INSERT INTO tiles (rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression)"
+	auto stmt = db.prepare("INSERT INTO tiles (rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression)"
 		" VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
 
 	stmt.bind(1, rasterid);
@@ -281,8 +278,7 @@ void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, d
 		throw SourceException("Cannot link rasters with overlapping time intervals");
 
 	// Create the new raster
-	SQLiteStatement stmt(db);
-	stmt.prepare("INSERT INTO rasters (channel, time_start, time_end) VALUES (?,?,?)");
+	auto stmt = db.prepare("INSERT INTO rasters (channel, time_start, time_end) VALUES (?,?,?)");
 	stmt.bind(1, channelid);
 	stmt.bind(2, time_start);
 	stmt.bind(3, time_end);
@@ -291,16 +287,14 @@ void LocalRasterDBBackend::linkRaster(int channelid, double time_of_reference, d
 	stmt.finalize();
 
 	// Copy all attributes
-	SQLiteStatement stmt_attr(db);
-	stmt_attr.prepare("INSERT INTO attributes (rasterid, isstring, key, value) SELECT ? AS rasterid, isstring, key, value FROM attributes WHERE rasterid = ?");
+	auto stmt_attr = db.prepare("INSERT INTO attributes (rasterid, isstring, key, value) SELECT ? AS rasterid, isstring, key, value FROM attributes WHERE rasterid = ?");
 	stmt_attr.bind(1, rasterid);
 	stmt_attr.bind(2, rd.rasterid);
 	stmt_attr.exec();
 
 	// Copy all tiles
 	// Note: this will assign new IDs to the copies, so they will be stored twice in the tileserver cache
-	SQLiteStatement stmt_tiles(db);
-	stmt_tiles.prepare("INSERT INTO tiles (rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression)"
+	auto stmt_tiles = db.prepare("INSERT INTO tiles (rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression)"
 		" SELECT ? AS rasterid, x1, y1, z1, x2, y2, z2, zoom, filenr, fileoffset, filebytes, compression FROM tiles WHERE rasterid = ?");
 	stmt_tiles.bind(1, rasterid);
 	stmt_tiles.bind(2, rd.rasterid);
@@ -313,8 +307,7 @@ RasterDBBackend::RasterDescription LocalRasterDBBackend::getClosestRaster(int ch
 		throw ArgumentException("Cannot call getClosestRaster() before open() on a RasterDBBackend");
 
 	// find a raster that's valid during the given timestamp
-	SQLiteStatement stmt(db);
-	stmt.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end >= ? ORDER BY time_start DESC limit 1");
+	auto stmt = db.prepare("SELECT id, time_start, time_end FROM rasters WHERE channel = ? AND time_start <= ? AND time_end >= ? ORDER BY time_start DESC limit 1");
 	stmt.bind(1, channelid);
 	stmt.bind(2, t1);
 	stmt.bind(3, t2);
@@ -332,8 +325,7 @@ void LocalRasterDBBackend::readAttributes(rasterid_t rasterid, AttributeMaps &at
 	if (!this->is_opened)
 		throw ArgumentException("Cannot call readAttributes() before open() on a RasterDBBackend");
 
-	SQLiteStatement stmt_md(db);
-	stmt_md.prepare("SELECT isstring, key, value FROM attributes WHERE rasterid = ?");
+	auto stmt_md = db.prepare("SELECT isstring, key, value FROM attributes WHERE rasterid = ?");
 	stmt_md.bind(1, rasterid);
 	while (stmt_md.next()) {
 		int isstring = stmt_md.getInt(0);
@@ -352,8 +344,7 @@ int LocalRasterDBBackend::getBestZoom(rasterid_t rasterid, int desiredzoom) {
 	if (!this->is_opened)
 		throw ArgumentException("Cannot call getBestZoom() before open() on a RasterDBBackend");
 
-	SQLiteStatement stmt_z(db);
-	stmt_z.prepare("SELECT MAX(zoom) FROM tiles WHERE rasterid = ? AND zoom <= ?");
+	auto stmt_z = db.prepare("SELECT MAX(zoom) FROM tiles WHERE rasterid = ? AND zoom <= ?");
 	stmt_z.bind(1, rasterid);
 	stmt_z.bind(2, desiredzoom);
 
@@ -375,8 +366,7 @@ const std::vector<RasterDBBackend::TileDescription> LocalRasterDBBackend::enumer
 	std::vector<TileDescription> result;
 
 	// find all overlapping rasters in DB
-	SQLiteStatement stmt(db);
-	stmt.prepare("SELECT id,x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM tiles"
+	auto stmt = db.prepare("SELECT id,x1,y1,z1,x2,y2,z2,filenr,fileoffset,filebytes,compression FROM tiles"
 		" WHERE rasterid = ? AND zoom = ? AND x1 < ? AND y1 < ? AND x2 > ? AND y2 > ? ORDER BY filenr ASC, fileoffset ASC");
 
 	stmt.bind(1, rasterid);
@@ -417,9 +407,7 @@ bool LocalRasterDBBackend::hasTile(rasterid_t rasterid, uint32_t width, uint32_t
 
 	int zoomfactor = 1 << zoom;
 
-	SQLiteStatement stmt(db);
-
-	stmt.prepare("SELECT 1 FROM tiles WHERE rasterid = ? AND x1 = ? AND y1 = ? AND z1 = ? AND x2 = ? AND y2 = ? AND z2 = ? AND zoom = ?");
+	auto stmt = db.prepare("SELECT 1 FROM tiles WHERE rasterid = ? AND x1 = ? AND y1 = ? AND z1 = ? AND x2 = ? AND y2 = ? AND z2 = ? AND zoom = ?");
 
 	stmt.bind(1, rasterid);
 	stmt.bind(2, offx); // x1

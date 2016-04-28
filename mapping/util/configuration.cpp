@@ -88,13 +88,26 @@ void Configuration::load(const std::string &filename) {
 void Configuration::loadFromEnvironment() {
 	if (environ == nullptr)
 		return;
+
+	std::string configuration_file;
+	std::vector<std::string> relevant_vars;
+
 	for(int i=0;environ[i] != nullptr;i++) {
 		auto line = environ[i];
 		if (strncmp(line, "MAPPING_", 8) == 0 || strncmp(line, "mapping_", 8) == 0) {
 			std::string linestr(&line[8]);
-			parseLine(linestr);
+			if (strncmp(linestr.c_str(), "CONFIGURATION=", 14) || strncmp(linestr.c_str(), "configuration=", 14))
+				configuration_file = linestr.substr(14);
+			else
+				relevant_vars.push_back(linestr);
 		}
 	}
+
+	// The file must be loaded before we parse the variables, to guarantee a repeatable priority when multiple settings overlap
+	if (configuration_file != "")
+		load(configuration_file);
+	for (auto &linestr : relevant_vars)
+		parseLine(linestr);
 }
 
 
@@ -163,7 +176,9 @@ int Configuration::getInt(const std::string &name, const int defaultValue) {
 static bool boolFromString(const std::string &str) {
 	if (str == "1" || str == "true" || str == "TRUE" || str == "yes" || str == "YES")
 		return true;
-	return false;
+	if (str == "0" || str == "false" || str == "FALSE" || str == "no" || str == "NO")
+		return false;
+	throw ArgumentException(concat("Configuration value '", str, "' is not a boolean value (try setting 0/1, yes/no or true/false)"));
 }
 
 bool Configuration::getBool(const std::string &name) {

@@ -271,16 +271,16 @@ systemtest_testenvironment: ${EXE}
 	rm -f test/systemtests/data/world1.dat test/systemtests/data/world1.db
 	rm -f test/systemtests/data/ndvi.dat test/systemtests/data/ndvi.db
 	#./${EXE} createsource 4326 test/systemtests/data/world1.tif  >test/systemtests/data/test_world1.json
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXE} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; bash test/systemtests/data/ndvi/import.sh 
+	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ; ./${EXE} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
+	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ; bash test/systemtests/data/ndvi/import.sh 
 
 # note: use /usr/bin/time instead of time, because the latter may be a shell's builtin without the required POSIX options
 # The || true at the end is to prevent make from aborting after the first failed test. The actual return code is in the log. 
 test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_SANITIZED}
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${EXE_SANITIZED} testquery $< >$@ 2>&1 || true
+	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${EXE_SANITIZED} testquery $< >$@ 2>&1 || true
 
 unittest: ${EXEGTEST}
-	export MAPPING_RASTERDB_BACKEND=local MAPPING_RASTERDB_LOCAL_PATH=test/systemtests/data/ ; ./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml" || true
+	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ; ./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml" || true
 
 webinstall:
 	php htdocs/get_css.php > htdocs/compiled/compiled.release.css

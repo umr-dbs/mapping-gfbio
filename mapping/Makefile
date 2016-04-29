@@ -73,6 +73,7 @@ endif
 OBJ_SERVICES=o/services/httpservice.o o/services/httpparsing.o o/services/ogcservice.o o/services/wms.o o/services/wcs.o o/services/fakewfs.o o/services/wfs.o
 OBJ_RASTER=o/raster/opencl.o o/raster/profiler.o
 OBJ_RASTERDB=o/rasterdb/rasterdb.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/rasterdb/backend_remote.o
+OBJ_USERDB=o/userdb/userdb.o o/userdb/backend_sqlite.o
 OBJ_DATATYPES_COMMON=o/datatypes/attributes.o o/datatypes/spatiotemporal.o o/datatypes/raster/import_gdal.o o/datatypes/raster/export_pgm.o o/datatypes/raster/export_yuv.o o/datatypes/raster/export_png.o o/datatypes/raster/export_jpeg.o o/datatypes/simplefeaturecollection.o o/datatypes/pointcollection.o o/datatypes/linecollection.o o/datatypes/polygoncollection.o o/datatypes/simplefeaturecollections/geosgeomutil.o o/datatypes/simplefeaturecollections/wkbutil.o o/datatypes/unit.o o/datatypes/colorizer.o
 OBJ_DATATYPES=${OBJ_DATATYPES_COMMON} o/datatypes/raster/raster.o
 OBJ_DATATYPES_NOCL=${OBJ_DATATYPES_COMMON} o/datatypes/raster/raster_nocl.o
@@ -140,7 +141,7 @@ all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXEC
 # Dependencies and compiler flags of all executables
 #
 
-${EXE}:	o/mapping_manager.o ${OBJ_COMMON}
+${EXE}:	o/mapping_manager.o ${OBJ_COMMON} ${OBJ_USERDB}
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 	
 ${EXE_SANITIZED}:	$(patsubst %.o,%.san.o,o/mapping_manager.o ${OBJ_COMMON})
@@ -152,7 +153,7 @@ ${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES}
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o o/cache/common.o o/util/server_nonblocking.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 
-${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/util/server_nonblocking.o ${OBJ_UNITTEST} o/libgtest.a
+${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} ${OBJ_USERDB} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/util/server_nonblocking.o ${OBJ_UNITTEST} o/libgtest.a
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 
 ${EXEPARSETESTLOGS}:	o/test/systemtests/parse_logs.o
@@ -280,7 +281,7 @@ test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_SAN
 	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${EXE_SANITIZED} testquery $< >$@ 2>&1 || true
 
 unittest: ${EXEGTEST}
-	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ; ./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml" || true
+	./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml" || true
 
 webinstall:
 	php htdocs/get_css.php > htdocs/compiled/compiled.release.css

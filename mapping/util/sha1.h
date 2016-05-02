@@ -31,6 +31,7 @@ class SHA1 {
 		SHA1();
 		~SHA1();
 		void addBytes(const char *data, size_t size);
+		void addBytes(const std::string &str) { addBytes(str.c_str(), str.length()); }
 		SHA1Value digest();
 	private:
 		std::unique_ptr<boost::uuids::detail::sha1> s;

@@ -38,6 +38,10 @@ void SQLite::exec(const char *query) {
 	}
 }
 
+SQLite::SQLiteStatement SQLite::prepare(const char *query) {
+	return SQLiteStatement(db, query);
+}
+
 int64_t SQLite::getLastInsertId() {
 	return sqlite3_last_insert_rowid(db);
 }
@@ -45,53 +49,53 @@ int64_t SQLite::getLastInsertId() {
 
 
 
-SQLiteStatement::SQLiteStatement(const SQLite &sqlite) : db(&sqlite), stmt(nullptr) {
-}
-
-SQLiteStatement::~SQLiteStatement() {
-	finalize();
-	db = nullptr;
-}
-
-
-void SQLiteStatement::prepare(const char *query) {
-	if (stmt)
-		throw SQLiteException("Statement already prepared");
-
+SQLite::SQLiteStatement::SQLiteStatement(sqlite3 *db, const char *query) : stmt(nullptr) {
 	auto result = sqlite3_prepare_v2(
-		db->db,
+		db,
 		query,
 		-1, // read until '\0'
 		&stmt,
 		NULL
 	);
 	if (result != SQLITE_OK)
-		throw SourceException(concat("Cannot prepare statement: ", result, ", error='", sqlite3_errmsg(db->db), "', query='", query, "'"));
+		throw SQLiteException(concat("Cannot prepare statement: ", result, ", error='", sqlite3_errmsg(db), "', query='", query, "'"));
 }
 
+SQLite::SQLiteStatement::~SQLiteStatement() {
+	finalize();
+}
 
-void SQLiteStatement::bind(int idx, int32_t value) {
+SQLite::SQLiteStatement::SQLiteStatement(SQLiteStatement &&other) : stmt(nullptr) {
+	std::swap(stmt, other.stmt);
+}
+
+SQLite::SQLiteStatement &SQLite::SQLiteStatement::operator=(SQLiteStatement &&other) {
+	std::swap(stmt, other.stmt);
+	return *this;
+}
+
+void SQLite::SQLiteStatement::bind(int idx, int32_t value) {
 	if (!stmt)
 		throw SQLiteException("Prepare before binding");
 
 	if (SQLITE_OK != sqlite3_bind_int(stmt, idx, value) )
 		throw SQLiteException("error binding int");
 }
-void SQLiteStatement::bind(int idx, int64_t value) {
+void SQLite::SQLiteStatement::bind(int idx, int64_t value) {
 	if (!stmt)
 		throw SQLiteException("Prepare before binding");
 
 	if (SQLITE_OK != sqlite3_bind_int64(stmt, idx, value) )
 		throw SQLiteException("error binding int");
 }
-void SQLiteStatement::bind(int idx, double value) {
+void SQLite::SQLiteStatement::bind(int idx, double value) {
 	if (!stmt)
 		throw SQLiteException("Prepare before binding");
 
 	if (SQLITE_OK != sqlite3_bind_double(stmt, idx, value) )
 		throw SQLiteException("error binding double");
 }
-void SQLiteStatement::bind(int idx, const char *value) {
+void SQLite::SQLiteStatement::bind(int idx, const char *value) {
 	if (!stmt)
 		throw SQLiteException("Prepare before binding");
 
@@ -100,7 +104,7 @@ void SQLiteStatement::bind(int idx, const char *value) {
 }
 
 
-void SQLiteStatement::exec() {
+void SQLite::SQLiteStatement::exec() {
 	if (!stmt)
 		throw SQLiteException("Prepare before exec");
 
@@ -110,7 +114,7 @@ void SQLiteStatement::exec() {
 		throw SQLiteException("SQLiteStatement::reset failed");
 }
 
-bool SQLiteStatement::next() {
+bool SQLite::SQLiteStatement::next() {
 	if (!stmt)
 		throw SQLiteException("Prepare before next");
 
@@ -127,24 +131,24 @@ bool SQLiteStatement::next() {
 }
 
 
-int32_t SQLiteStatement::getInt(int column) {
+int32_t SQLite::SQLiteStatement::getInt(int column) {
 	return sqlite3_column_int(stmt, column);
 }
 
-int64_t SQLiteStatement::getInt64(int column) {
+int64_t SQLite::SQLiteStatement::getInt64(int column) {
 	return sqlite3_column_int64(stmt, column);
 }
 
-double SQLiteStatement::getDouble(int column) {
+double SQLite::SQLiteStatement::getDouble(int column) {
 	return sqlite3_column_double(stmt, column);
 }
 
-const char *SQLiteStatement::getString(int column) {
+const char *SQLite::SQLiteStatement::getString(int column) {
 	return (const char *) sqlite3_column_text(stmt, column);
 }
 
 
-void SQLiteStatement::finalize() {
+void SQLite::SQLiteStatement::finalize() {
 	if (stmt) {
 		sqlite3_finalize(stmt);
 		stmt = nullptr;

@@ -118,7 +118,6 @@ static void parseKeyValuePair(const std::string& q, std::map<std::string, std::s
 	}
 
 	kvp[key] = val;
-	fprintf(stderr, "%s : %s\n", key.c_str(), val.c_str());
 }
 
 /**

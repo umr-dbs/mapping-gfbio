@@ -26,12 +26,11 @@ void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 	std::string request = params.get("request");
 	// GetCapabilities
 	if (request == "GetCapabilities") {
-
+		// TODO!
 	}
 	// GetMap
 	else if (request == "GetMap") {
-		std::string version = params.get("version");
-		if (version != "1.3.0")
+		if (params.get("version") != "1.3.0")
 			result.send500("Invalid version");
 
 		int output_width = params.getInt("width");
@@ -173,6 +172,9 @@ void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		 */
 	}
 	else if (request == "GetColorizer") {
+		if (params.get("version") != "1.3.0")
+			result.send500("Invalid version");
+
 		bool flipx, flipy;
 		QueryRectangle qrect(
 			SpatialReference::extent(query_epsg),

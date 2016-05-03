@@ -11,6 +11,13 @@
 #include <unordered_map>
 #include <random>
 
+// all of these just to open /dev/urandom ..
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+
 /*
  * Permissions
  */
@@ -93,6 +100,44 @@ UserDBBackend::~UserDBBackend() {
  */
 std::mt19937 rng;
 
+static uint64_t createSeed() {
+	uint64_t seed = 0;
+
+	// try the realtime clock first
+	struct timespec ts;
+	if (clock_gettime(CLOCK_REALTIME, &ts) == 0) {
+		seed ^= (uint64_t) ts.tv_sec;
+		seed ^= (uint64_t) ts.tv_nsec;
+	}
+	else {
+		// if clock_gettime() is not available, fall back to time()
+		auto t = time(nullptr);
+		if (t != (time_t) -1)
+			seed ^= (uint64_t) t;
+	}
+	// also try the monotonic clock
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0) {
+		seed ^= (uint64_t) ts.tv_sec;
+		seed ^= (uint64_t) ts.tv_nsec;
+	}
+
+	// All POSIX sources are exhausted, but many systems have /dev/urandom, so try using that.
+	auto f = open("/dev/urandom", O_RDONLY);
+	if (f >= 0) {
+		uint64_t random = 0;
+		if (read(f, &random, sizeof(random)) == sizeof(random)) {
+			seed ^= random;
+		}
+		close(f);
+	}
+
+	if (seed == 0)
+		throw PlatformException("No usable source of entropy found, cannot seed RNG");
+
+	return seed;
+}
+
+
 
 /*
  * UserDB
@@ -106,7 +151,7 @@ void UserDB::init(const std::string &backend, const std::string &location) {
 		throw ArgumentException(concat("Unknown userdb backend: ", backend));
 
 	// seed the rng
-	rng.seed(time(nullptr));
+	rng.seed(createSeed());
 
 	auto constructor = map->at(backend);
 	userdb_backend = constructor(location);

@@ -21,7 +21,7 @@ REGISTER_HTTP_SERVICE(WMSService, "WMS");
 void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostream &error) {
 	bool debug = params.getBool("debug", Configuration::getBool("global.debug", false));
 	auto query_epsg = parseEPSG(params, "crs");
-	auto timestamp = parseTimestamp(params, 1295266500); // 2011-1-17 12:15);
+	TemporalReference tref = parseTime(params);
 
 	std::string request = params.get("request");
 	// GetCapabilities
@@ -51,16 +51,15 @@ void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 			//if (params["tiled"] != "true")
 			//	send403("only tiled for now");
 
-			double bbox[4];
-			parseBBOX(bbox, params.get("bbox"), query_epsg, false);
+			SpatialReference sref = parseBBOX(params.get("bbox"), query_epsg, false);
 			auto colorizer = params.get("colors", "");
 			auto format = params.get("format", "image/png");
 
 
 			bool flipx, flipy;
 			QueryRectangle qrect(
-				SpatialReference(query_epsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy),
-				TemporalReference(TIMETYPE_UNIX, timestamp),
+				sref,
+				tref,
 				QueryResolution::pixels(output_width, output_height)
 			);
 
@@ -75,6 +74,7 @@ void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 				return;
 			}
 			else {
+				double bbox[4] = {sref.x1, sref.y1, sref.x2, sref.y2};
 				auto graph = GenericOperator::fromJSON(params.get("layers"));
 				QueryProfiler profiler;
 				auto result_raster = graph->getCachedRaster(qrect,profiler,GenericOperator::RasterQM::EXACT);
@@ -176,7 +176,7 @@ void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostr
 		bool flipx, flipy;
 		QueryRectangle qrect(
 			SpatialReference::extent(query_epsg),
-			TemporalReference(TIMETYPE_UNIX, timestamp),
+			tref,
 			QueryResolution::pixels(1, 1)
 		);
 

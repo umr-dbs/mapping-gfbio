@@ -48,8 +48,7 @@ void HTTPService::run(std::streambuf *in, std::streambuf *out, std::streambuf *e
 		parseGetData(params);
 		parsePostData(params, input);
 
-		// TODO: port the client to WFS, remove FAKEWFS
-		auto servicename = params.get("service", "FAKEWFS");
+		auto servicename = params.get("service");
 		auto service = HTTPService::getRegisteredService(servicename);
 
 		service->run(params, response, error);

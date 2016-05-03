@@ -18,6 +18,13 @@ class Configuration {
 		static int getInt(const std::string &name, const int defaultValue);
 		static bool getBool(const std::string &name);
 		static bool getBool(const std::string &name, const bool defaultValue);
+
+		// These parsers are helper methods.
+		// They're only exported publicly because HTTPService::Params wants to use them.
+		// They do throw exceptions when the string cannot be parsed.
+		static int parseInt(const std::string &str);
+		static bool parseBool(const std::string &str);
+
 };
 
 #endif

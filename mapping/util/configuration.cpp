@@ -110,7 +110,6 @@ void Configuration::loadFromEnvironment() {
 		parseLine(linestr);
 }
 
-
 static const char* getHomeDirectory() {
 	// Note that $HOME is not set for the cgi-bin executed by apache
 	auto homedir = getenv("HOME");
@@ -123,8 +122,12 @@ static const char* getHomeDirectory() {
 	return nullptr;
 }
 
-
+static bool loaded_from_default_paths = false;
 void Configuration::loadFromDefaultPaths() {
+	if (loaded_from_default_paths)
+		return;
+	loaded_from_default_paths = true;
+
 	load("/etc/mapping.conf");
 
 	auto homedir = getHomeDirectory();
@@ -155,42 +158,50 @@ const std::string &Configuration::get(const std::string &name, const std::string
 	return it->second;
 }
 
-static int intFromString(const std::string &str) {
-	return std::stoi(str); // stoi throws if no conversion could be performed
-}
-
 int Configuration::getInt(const std::string &name) {
 	auto it = values.find(name);
 	if (it == values.end())
 		throw ArgumentException(concat("No configuration found for key ", name));
-	return intFromString(it->second);
+	return parseInt(it->second);
 }
 
 int Configuration::getInt(const std::string &name, const int defaultValue) {
 	auto it = values.find(name);
 	if (it == values.end())
 		return defaultValue;
-	return intFromString(it->second);
-}
-
-static bool boolFromString(const std::string &str) {
-	if (str == "1" || str == "true" || str == "TRUE" || str == "yes" || str == "YES")
-		return true;
-	if (str == "0" || str == "false" || str == "FALSE" || str == "no" || str == "NO")
-		return false;
-	throw ArgumentException(concat("Configuration value '", str, "' is not a boolean value (try setting 0/1, yes/no or true/false)"));
+	return parseInt(it->second);
 }
 
 bool Configuration::getBool(const std::string &name) {
 	auto it = values.find(name);
 	if (it == values.end())
 		throw ArgumentException(concat("No configuration found for key ", name));
-	return boolFromString(it->second);
+	return parseBool(it->second);
 }
 
 bool Configuration::getBool(const std::string &name, const bool defaultValue) {
 	auto it = values.find(name);
 	if (it == values.end())
 		return defaultValue;
-	return boolFromString(it->second);
+	return parseBool(it->second);
+}
+
+
+int Configuration::parseInt(const std::string &str) {
+	return std::stoi(str); // stoi throws if no conversion could be performed
+}
+
+bool Configuration::parseBool(const std::string &str) {
+	if (str == "1")
+		return true;
+	if (str == "0")
+		return false;
+	std::string strtl;
+	std::transform(str.cbegin(), str.cend(), strtl.begin(), ::tolower);
+	if (strtl == "true" || strtl == "yes")
+		return true;
+	if (strtl == "false" || strtl == "no")
+		return false;
+
+	throw ArgumentException(concat("'", str, "' is not a boolean value (try setting 0/1, yes/no or true/false)"));
 }

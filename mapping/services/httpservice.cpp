@@ -3,6 +3,7 @@
 #include "services/httpparsing.h"
 #include "util/exceptions.h"
 #include "util/debug.h"
+#include "util/configuration.h"
 
 #include <map>
 #include <unordered_map>
@@ -79,31 +80,25 @@ std::string HTTPService::Params::get(const std::string &key, const std::string &
 }
 
 int HTTPService::Params::getInt(const std::string &key) const {
-	auto it = find(key);
-	if (it == end())
-		throw ArgumentException(concat("No parameter with key ", key));
-
-	// TODO: throw exception on invalid values like "42abc"
-	return std::stoi(it->second);
+	return Configuration::parseInt(get(key));
 }
 
 int HTTPService::Params::getInt(const std::string &key, int defaultvalue) const {
 	auto it = find(key);
 	if (it == end())
 		return defaultvalue;
-
-	return std::stoi(it->second);
+	return Configuration::parseInt(it->second);
 }
 
 bool HTTPService::Params::getBool(const std::string &key) const {
-	return get(key) == "1";
+	return Configuration::parseBool(get(key));
 }
 
 bool HTTPService::Params::getBool(const std::string &key, bool defaultvalue) const {
 	auto it = find(key);
 	if (it == end())
 		return defaultvalue;
-	return it->second == "1";
+	return Configuration::parseBool(it->second);
 }
 
 

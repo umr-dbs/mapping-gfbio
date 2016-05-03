@@ -11,23 +11,50 @@ epsg_t OGCService::parseEPSG(const Params &params, const std::string &key, epsg_
 	return epsgCodeFromSrsString(params.get(key));
 }
 
-double OGCService::parseTimestamp(const Params &params, double defaultValue) {
-	double timestamp = defaultValue;
-	if (params.hasParam("timestamp")) {
-		timestamp = TimeParser::create(TimeParser::Format::SECONDS)->parse(params.get("timestamp"));
+TemporalReference OGCService::parseTime(const Params &parameters) const {
+	TemporalReference tref(TIMETYPE_UNIX);
+	if(parameters.hasParam("time")){
+		//time is specified in ISO8601, it can either be an instant (single datetime) or an interval
+		//An interval is separated by "/". "Either the start value or the end value can be omitted to
+		//indicate no restriction on time in that direction."
+		//sources: - http://docs.geoserver.org/2.8.x/en/user/services/wms/time.html#wms-time
+		//         - http://www.ogcnetwork.net/node/178
+
+		//TODO: relative intervals
+
+		const std::string &timeString = parameters.get("time");
+		auto timeParser = TimeParser::create(TimeParser::Format::ISO);
+		size_t sep = timeString.find("/");
+
+		if(sep == std::string::npos){
+			//time is an instant
+			tref.t1 = timeParser->parse(timeString);
+			tref.t2 = tref.t1 + tref.epsilon();
+		} else if (sep == 0){
+			//time interval begins at begin of time
+			tref.t2 = timeParser->parse(timeString.substr(1));
+		}
+		else {
+			tref.t1 = timeParser->parse(timeString.substr(0, sep));
+			if(sep < timeString.length() - 1) {
+				tref.t2 = timeParser->parse(timeString.substr(sep + 1));
+			}
+			//else time interval ends at end of time
+		}
+
+		tref.validate();
 	}
-	if (params.hasParam("time")) { //TODO: prefer time over timestamp?
-		timestamp = TimeParser::create(TimeParser::Format::ISO)->parse(params.get("time"));
-	}
-	return timestamp;
+	return tref;
 }
 
-void OGCService::parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow_infinite) {
-	// &BBOX=0,0,10018754.171394622,10018754.171394622
-	for(int i=0;i<4;i++)
-		bbox[i] = NAN;
+SpatialReference OGCService::parseBBOX(const std::string bbox_str, epsg_t epsg, bool allow_infinite) {
+	SpatialReference sref(epsg);
 
 	auto extent = SpatialReference::extent(epsg);
+
+	double bbox[4];
+	for(int i=0;i<4;i++)
+		bbox[i] = NAN;
 
 	std::string delimiters = " ,";
 	size_t current, next = -1;
@@ -92,6 +119,12 @@ void OGCService::parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg
 			throw ArgumentException("BBOX exceeds extent");
 		}
 	}
+
+	sref.x1 = bbox[0];
+	sref.y1 = bbox[1];
+	sref.x2 = bbox[2];
+	sref.y2 = bbox[3];
+	return sref;
 }
 
 

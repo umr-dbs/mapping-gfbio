@@ -178,6 +178,15 @@ std::string WFSService::getFeature(const Params& parameters) {
 
 	// outputFormat
 	// default is "application/gml+xml; version=3.2"
+
+	//TODO: respect default output format of WFS and support more datatypes
+	if(parameters.hasParam("outputformat")) {
+		std::string format = parameters.get("outputformat");
+		if(format == "application/json")
+			return features->toGeoJSON(true);
+		else if (format == "csv")
+			return features->toCSV();
+	}
 	return features->toGeoJSON(true);
 
 	// VSPs

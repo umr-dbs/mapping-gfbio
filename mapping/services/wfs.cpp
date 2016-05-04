@@ -180,15 +180,13 @@ std::string WFSService::getFeature(const Params& parameters) {
 	// default is "application/gml+xml; version=3.2"
 
 	//TODO: respect default output format of WFS and support more datatypes
-	if(parameters.hasParam("outputformat")) {
-		std::string format = parameters.get("outputformat");
-		if(format == "application/json")
-			return features->toGeoJSON(true);
-		else if (format == "csv")
-			return features->toCSV();
-	}
-	return features->toGeoJSON(true);
-
+	auto format = parameters.get("outputformat", "application/json");
+	if (format == "application/json")
+		return features->toGeoJSON(true);
+	else if (format == "csv")
+		return features->toCSV();
+	else
+		throw ArgumentException("WFSService: unknown output format");
 	// VSPs
 	// O
 	// A server may implement additional KVP parameters that are not part of this International Standard. These are known as vendor-specific parameters. VSPs allow vendors to specify additional parameters that will enhance the results of requests. A server shall produce valid results even if the VSPs are missing, malformed or if VSPs are supplied that are not known to the server. Unknown VSPs shall be ignored.

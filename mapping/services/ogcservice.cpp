@@ -48,8 +48,6 @@ TemporalReference OGCService::parseTime(const Params &parameters) const {
 }
 
 SpatialReference OGCService::parseBBOX(const std::string bbox_str, epsg_t epsg, bool allow_infinite) {
-	SpatialReference sref(epsg);
-
 	auto extent = SpatialReference::extent(epsg);
 
 	double bbox[4];
@@ -120,10 +118,8 @@ SpatialReference OGCService::parseBBOX(const std::string bbox_str, epsg_t epsg, 
 		}
 	}
 
-	sref.x1 = bbox[0];
-	sref.y1 = bbox[1];
-	sref.x2 = bbox[2];
-	sref.y2 = bbox[3];
+	bool flipx, flipy;
+	SpatialReference sref(epsg, bbox[0], bbox[1], bbox[2], bbox[3], flipx, flipy);
 	return sref;
 }
 

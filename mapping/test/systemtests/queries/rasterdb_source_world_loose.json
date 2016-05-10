@@ -1,0 +1,29 @@
+{
+    "name": "Load world raster (loose)",
+	"query_result": "raster",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 1388534400
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "resolution": {
+    	"type": "pixels",
+        "x": 3600,
+        "y": 1800
+    },
+    "query_mode": "loose",
+    "query": {
+        "params": {
+        	"channel": 0,
+            "sourcename": "ndvi"
+        },
+        "type": "rasterdb_source"
+    },
+    "query_expected_hash": "6920b9d175e73beda8d39321594b01c84bbd0e3b"
+}

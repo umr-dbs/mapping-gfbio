@@ -41,7 +41,7 @@
 						}
 					},
 					"sources" : null,
-					"type" : "csvpointsource"
+					"type" : "csv_source"
 				}
 			]
 		},

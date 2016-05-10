@@ -1,0 +1,73 @@
+{
+	/**
+		set timezone  = 'UTC';
+		(select osm_id, st_astext(geom), time_intersect(time_start, timestamp '9999-12-31 23:59:59', to_timestamp(1420070400), to_timestamp(1430438400)) as time, name from osm_large_cities
+		  where ST_CONTAINS(ST_GeomFromText('POLYGON((15.04205 55.05814, 5.86624 55.05814, 5.86624 47.27021, 15.04205 47.27021, 15.04205 55.05814))', 4326), geom)
+		  and (time_start, timestamp '9999-12-31 23:59:59') overlaps (to_timestamp(1420070400), to_timestamp(1430438400))
+		  order by osm_id asc)
+		 UNION
+		(select osm_id, st_astext(geom), time_intersect(time_start, timestamp '9999-12-31 23:59:59', to_timestamp(1425168000), to_timestamp(1451606400)) as time, name from osm_large_cities
+		  where ST_CONTAINS(ST_GeomFromText('POLYGON((15.04205 55.05814, 5.86624 55.05814, 5.86624 47.27021, 15.04205 47.27021, 15.04205 55.05814))', 4326), geom)
+		  and (time_start, timestamp '9999-12-31 23:59:59') overlaps (to_timestamp(1425168000), to_timestamp(1451606400))
+		  order by osm_id asc) 
+		  
+		--merge step is omitted here
+	*/
+
+	"name" : "Filter Points by Geometry (time, splits)",	
+	"query_result": "points",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+	"query" : 
+	{
+		"type" : "point_in_polygon_filter",
+		"sources" : {
+			"points": [
+				{
+					"params" : 
+						{
+							"filename" : "test/systemtests/data/osm_large_cities/osm_large_cities.csv",
+							"separator" : ";",
+							"geometry": "wkt",
+							"time": "start",
+							"duration": "inf",
+							"time1_format": {
+								"format" : "custom",
+								"custom_format" : "%Y-%m-%d %H:%M:%S%z"
+							},
+							"columns": {
+								"x": "wkt",
+								"numeric": ["osm_id"],
+								"textual": ["name", "is_in"],
+								"time1": "time_start"
+							}
+						},
+						"sources" : null,
+						"type" : "csv_source"
+				}
+			],
+			"polygons": [
+				{					
+					"params" : 
+						{
+							"type": "polygons",
+							"wkt": "GEOMETRYCOLLECTION(POLYGON((15.04205 55.05814, 5.86624 55.05814, 5.86624 47.27021, 15.04205 47.27021, 15.04205 55.05814)), POLYGON((15.04205 55.05814, 5.86624 55.05814, 5.86624 47.27021, 15.04205 47.27021, 15.04205 55.05814)))",
+							"time": [[1420070400, 1430438400], [1425168000, 1451606400]]
+						},
+					"type" : "wkt_source"							
+				}				
+			]
+		}		
+	},
+	"query_expected_hash" : "5fd8268440505fd38b90d72ea36dccb3fef579f9"
+}

@@ -30,7 +30,7 @@
 		       		"channel": 0,
 		            "sourcename": "ndvi"
 		        },
-		        "type": "source"
+		        "type": "rasterdb_source"
 		       }
             ]
         },

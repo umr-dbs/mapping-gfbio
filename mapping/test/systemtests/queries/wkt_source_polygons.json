@@ -1,0 +1,26 @@
+{
+	"name" : "WKTSource polygons",	
+	"query_result": "polygons",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+	"query" : 
+	{
+		"params" : 
+			{
+				"type": "polygons",
+				"wkt": "GEOMETRYCOLLECTION(POLYGON((0 0, 180 0, 180 90, 0 90, 0 0)))"
+			},
+		"type" : "wkt_source"
+	},
+	"query_expected_hash" : "af74b3b3fdb974f431959eb7c4f268f21ebb0102"
+}

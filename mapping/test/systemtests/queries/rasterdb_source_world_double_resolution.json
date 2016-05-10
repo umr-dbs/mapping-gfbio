@@ -1,0 +1,29 @@
+{
+    "name": "Load world raster (double resolution)",
+	"query_result": "raster",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 1388534400
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "resolution": {
+    	"type": "pixels",
+        "x": 7200,
+        "y": 3600
+    },
+    "query_mode": "exact",
+    "query": {
+		"params": {
+        	"channel": 0,
+            "sourcename": "ndvi"
+        },
+        "type": "rasterdb_source"
+    },
+    "query_expected_hash": "df6c64d874de74cc96de06a8d3a303b7bca4904a"
+}

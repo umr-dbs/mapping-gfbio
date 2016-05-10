@@ -117,7 +117,7 @@ std::unique_ptr<GenericRaster> MatrixOperator::getRaster(const QueryRectangle &r
 		prog.setProfiler(profiler);
 		prog.addInRaster(raster_in.get());
 		prog.addOutRaster(raster_out.get());
-		prog.compile(operators_raster_matrixkernel, "matrixkernel");
+		prog.compile(operators_processing_raster_matrixkernel, "matrixkernel");
 		prog.addArg((cl_int) matrixsize);
 
 		cl::Buffer matrixbuffer(

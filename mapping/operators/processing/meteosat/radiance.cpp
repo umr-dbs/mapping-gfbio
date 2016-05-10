@@ -92,7 +92,7 @@ std::unique_ptr<GenericRaster> MeteosatRadianceOperator::getRaster(const QueryRe
 	prog.setProfiler(profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
-	prog.compile(operators_msat_radiance, "radianceConvertedKernel");
+	prog.compile(operators_processing_meteosat_radiance, "radianceConvertedKernel");
 	prog.addArg(offset);
 	prog.addArg(slope);
 	prog.addArg(conversionFactor);

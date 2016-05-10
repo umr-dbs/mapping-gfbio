@@ -316,7 +316,7 @@ std::unique_ptr<GenericRaster> MeteosatGccThermThresholdDetectionOperator::getRa
 	prog.setProfiler(profiler);
 	prog.addOutRaster(raster_out.get());
 	prog.addInRaster(solar_zenith_angle_raster.get());
-	prog.compile(operators_raster_classification_kernels, "replacementByRangeKernel");
+	prog.compile(operators_processing_raster_classification_kernels, "replacementByRangeKernel");
 	prog.addArg(classification_bounds_lower);
 	prog.addArg(classification_bounds_upper);
 	prog.addArg(classification_classes);

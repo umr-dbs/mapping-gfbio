@@ -162,14 +162,14 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	if(solarCorrection){
-		prog.compile(operators_msat_reflectance, "reflectanceWithSolarCorrectionKernel");
+		prog.compile(operators_processing_meteosat_reflectance, "reflectanceWithSolarCorrectionKernel");
 		prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
 		prog.addArg(psaIntermediateValues.dRightAscension);
 		prog.addArg(psaIntermediateValues.dDeclination);
 		prog.addArg(projectionCooridnateToViewAngleFactor);
 	}
 	else{
-		prog.compile(operators_msat_reflectance, "reflectanceWithoutSolarCorrectionKernel");
+		prog.compile(operators_processing_meteosat_reflectance, "reflectanceWithoutSolarCorrectionKernel");
 	}
 	prog.addArg(etsr);
 	prog.addArg(esd);

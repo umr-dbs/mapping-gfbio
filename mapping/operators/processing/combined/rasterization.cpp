@@ -99,7 +99,7 @@ std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRecta
 		prog.setProfiler(profiler);
 		prog.addInRaster(accumulator.get());
 		prog.addOutRaster(blurred.get());
-		prog.compile(operators_combined_points2raster_frequency, "blur_frequency");
+		prog.compile(operators_processing_combined_points2raster_frequency, "blur_frequency");
 		prog.addArg(radius);
 		prog.run();
 
@@ -152,7 +152,7 @@ std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRecta
 		prog.addInRaster(r_count.get());
 		prog.addInRaster(r_sum.get());
 		prog.addOutRaster(blurred.get());
-		prog.compile(operators_combined_points2raster_value, "blur_value");
+		prog.compile(operators_processing_combined_points2raster_value, "blur_value");
 		prog.addArg(radius);
 		prog.run();
 

@@ -130,7 +130,7 @@ std::unique_ptr<GenericRaster> MeteosatTemperatureOperator::getRaster(const Quer
 	prog.setProfiler(profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
-	prog.compile(operators_msat_temperature, "temperaturekernel");
+	prog.compile(operators_processing_meteosat_temperature, "temperaturekernel");
 	prog.addArg(lut);
 	prog.run();
 

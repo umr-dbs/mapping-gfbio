@@ -69,7 +69,7 @@ std::unique_ptr<GenericRaster> MeteosatCo2CorrectionOperator::getRaster(const Qu
 	prog.addInRaster(raster_bt108.get());
 	prog.addInRaster(raster_bt134.get());
 	prog.addOutRaster(raster_out.get());
-	prog.compile(operators_msat_co2correction, "co2correctionkernel");
+	prog.compile(operators_processing_meteosat_co2correction, "co2correctionkernel");
 	prog.run();
 
 	return raster_out;

@@ -88,7 +88,7 @@ std::unique_ptr<PointCollection> DifferenceOperator::getPointCollection(const Qu
 		prog.setProfiler(profiler);
 		prog.addPointCollection(pointsMinuend.get());
 		prog.addPointCollection(pointsSubtrahend.get());
-		prog.compile(operators_points_points_difference, "difference");
+		prog.compile(operators_processing_features_difference, "difference");
 		prog.addPointCollectionPositions(0, true);
 		prog.addPointCollectionPositions(1, true);
 		prog.addArg(keep);

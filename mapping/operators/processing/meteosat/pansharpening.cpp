@@ -117,10 +117,10 @@ std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const Qu
 	prog_degenerate.addInRaster(raster_hrv.get());
 	prog_degenerate.addOutRaster(low_high_matrix.get());
 	if (!spatial) {
-		prog_degenerate.compile(operators_msat_pansharpening_degenerate, "pan_downsample");
+		prog_degenerate.compile(operators_processing_meteosat_pansharpening_degenerate, "pan_downsample");
 		prog_degenerate.addArg(ratio);
 	} else {
-		prog_degenerate.compile(operators_msat_pansharpening_degenerate, "pan_downsample_spatial");
+		prog_degenerate.compile(operators_processing_meteosat_pansharpening_degenerate, "pan_downsample_spatial");
 		prog_degenerate.addArg(ratio);
 		prog_degenerate.addArg(9);
 		prog_degenerate.addArg(spatialMatrix);
@@ -138,7 +138,7 @@ std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const Qu
 	prog_regression.addInRaster(low_high_matrix.get());
 	prog_regression.addOutRaster(reg_low_a.get());
 	prog_regression.addOutRaster(reg_low_b.get());
-	prog_regression.compile(operators_msat_pansharpening_regression, "pan_regression");
+	prog_regression.compile(operators_processing_meteosat_pansharpening_regression, "pan_regression");
 	prog_regression.addArg(local_regression);
 	prog_regression.addArg(distance);
 	prog_regression.run();
@@ -160,7 +160,7 @@ std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const Qu
 	prog_interpolate.addInRaster(raster_hrv.get());
 	prog_interpolate.addInRaster(raster_lowres.get());
 	prog_interpolate.addOutRaster(raster_out.get());
-	prog_interpolate.compile(operators_msat_pansharpening_interpolate, "pan_interpolate");
+	prog_interpolate.compile(operators_processing_meteosat_pansharpening_interpolate, "pan_interpolate");
 	prog_interpolate.addArg(ratio);
 	prog_interpolate.run();
 

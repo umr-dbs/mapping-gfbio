@@ -54,7 +54,7 @@ LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-lfcgi++ -lfcgi
 LDFLAGS_GTEST=-lpthread
-CL_SOURCES:=$(wildcard operators/*/*.cl)
+CL_SOURCES:=$(wildcard operators/*/*.cl) $(wildcard operators/*/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 
 TEST_QUERIES:=$(wildcard test/systemtests/queries/*.json)

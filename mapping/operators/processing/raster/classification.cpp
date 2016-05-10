@@ -117,7 +117,7 @@ std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRect
 	prog.setProfiler(profiler);
 	prog.addOutRaster(raster_out.get());
 	prog.addInRaster(raster_in.get());
-	prog.compile(operators_raster_classification_kernels, "classificationByRangeKernel");
+	prog.compile(operators_processing_raster_classification_kernels, "classificationByRangeKernel");
 	prog.addArg(classification_lower_border);
 	prog.addArg(classification_upper_border);
 	prog.addArg(classification_classes);

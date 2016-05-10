@@ -144,7 +144,7 @@ std::unique_ptr<GenericRaster> MeteosatSolarAngleOperator::getRaster(const Query
 	prog.setProfiler(profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
-	prog.compile(operators_msat_solarangle, kernelName.c_str());
+	prog.compile(operators_processing_meteosat_solarangle, kernelName.c_str());
 	prog.addArg(projectionCooridnateToViewAngleFactor);
 	prog.addArg(psaIntermediateValues.dGreenwichMeanSiderealTime);
 	prog.addArg(psaIntermediateValues.dRightAscension);

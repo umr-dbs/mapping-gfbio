@@ -1,4 +1,5 @@
 
 # AMDs OpenCL implementation always leaks
-leak:/usr/lib/libamdocl64.so
-leak:/usr/lib/libOpenCL.so
+leak:libamdocl64.so
+leak:libOpenCL.so
+

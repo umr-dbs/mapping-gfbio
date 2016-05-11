@@ -4,10 +4,8 @@
 
 #include "util/exceptions.h"
 #include "util/configuration.h"
-#include "util/sha1.h"
 
 #include <time.h>
-#include <memory>
 #include <unordered_map>
 #include <random>
 
@@ -21,25 +19,17 @@
 /*
  * Permissions
  */
-void UserDB::Permissions::addUserPermissions(UserDB::userid_t userid, const std::string &permissions) {
-	// Every user will by default have the permission user.<userid>
-	set.insert(concat("user.", userid));
-}
-void UserDB::Permissions::addGroupPermissions(UserDB::groupid_t groupid, const std::string &permissions) {
-	// all members of a group will by default have the permission group.<groupid>
-	set.insert(concat("group.", groupid));
-	addPermissionSet(permissions);
+void UserDB::Permissions::addPermission(const std::string &permission) {
+	set.insert(permission);
 }
 
-void UserDB::Permissions::addPermissionSet(const std::string &permissions) {
-	std::string::size_type pos = 0;
-	while (pos != std::string::npos) {
-		auto endpos = permissions.find(' ', pos);
-		auto p = permissions.substr(pos, endpos);
-		if (p.length() > 0)
-			set.insert(p);
-		pos = endpos;
-	}
+void UserDB::Permissions::removePermission(const std::string &permission) {
+	set.erase(permission);
+}
+
+void UserDB::Permissions::addPermissions(const Permissions &other) {
+	for (auto &p : other.set)
+		set.insert(p);
 }
 
 bool UserDB::Permissions::hasPermission(const std::string &permission) {
@@ -47,10 +37,53 @@ bool UserDB::Permissions::hasPermission(const std::string &permission) {
 }
 
 
+
 /*
  * User
  */
-UserDB::User::User(userid_t userid, const std::string &username, Permissions &&permissions) : userid(userid), username(username), permissions(permissions) {
+UserDB::User::User(userid_t userid, const std::string &username, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups)
+	: userid(userid), username(username), groups(groups), user_permissions(user_permissions) {
+	all_permissions.addPermissions(user_permissions);
+	for (auto &group : groups)
+		all_permissions.addPermissions(group->group_permissions);
+}
+
+std::shared_ptr<UserDB::User> UserDB::User::joinGroup(const UserDB::Group &group) {
+	UserDB::addUserToGroup(userid, group.groupid);
+	return UserDB::loadUser(userid);
+}
+std::shared_ptr<UserDB::User> UserDB::User::leaveGroup(const UserDB::Group &group) {
+	UserDB::removeUserFromGroup(userid, group.groupid);
+	return UserDB::loadUser(userid);
+}
+
+std::shared_ptr<UserDB::User> UserDB::User::addPermission(const std::string &permission) {
+	UserDB::addUserPermission(userid, permission);
+	return UserDB::loadUser(userid);
+}
+std::shared_ptr<UserDB::User> UserDB::User::removePermission(const std::string &permission) {
+	UserDB::removeUserPermission(userid, permission);
+	return UserDB::loadUser(userid);
+}
+
+void UserDB::User::changePassword(const std::string &password) {
+	UserDB::changeUserPassword(userid, password);
+}
+
+/*
+ * Group
+ */
+UserDB::Group::Group(groupid_t groupid, const std::string &groupname, Permissions &&group_permissions)
+	: groupid(groupid), groupname(groupname), group_permissions(group_permissions) {
+}
+
+std::shared_ptr<UserDB::Group> UserDB::Group::addPermission(const std::string &permission) {
+	UserDB::addGroupPermission(groupid, permission);
+	return UserDB::loadGroup(groupid);
+}
+std::shared_ptr<UserDB::Group> UserDB::Group::removePermission(const std::string &permission) {
+	UserDB::removeGroupPermission(groupid, permission);
+	return UserDB::loadGroup(groupid);
 }
 
 /*
@@ -137,6 +170,20 @@ static uint64_t createSeed() {
 	return seed;
 }
 
+std::string UserDB::createRandomToken(size_t length) {
+	static std::string letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+	std::uniform_int_distribution<int> distribution(0, letters.length()-1);
+
+	std::string result;
+	result.reserve(length);
+	for (size_t i = 0; i < length; i++) {
+		result += letters[distribution(rng)];
+	}
+	return result;
+}
+
+
 
 
 /*
@@ -167,66 +214,83 @@ void UserDB::shutdown() {
 	userdb_backend = nullptr;
 }
 
+std::shared_ptr<UserDB::User> UserDB::loadUser(UserDB::userid_t userid) {
+	auto userdata = userdb_backend->loadUser(userid);
+	std::vector<std::shared_ptr<Group>> groups;
+	for (auto groupid : userdata.groupids)
+		groups.push_back(loadGroup(groupid));
+	auto user = std::make_shared<User>(userid, userdata.username, std::move(userdata.permissions), std::move(groups));
+	return user;
+}
+
 std::shared_ptr<UserDB::User> UserDB::createUser(const std::string &username, const std::string &password) {
 	auto userid = userdb_backend->createUser(username, password);
-	return userdb_backend->loadUser(userid);
+	return loadUser(userid);
 }
+
+void UserDB::addUserPermission(userid_t userid, const std::string &permission) {
+	userdb_backend->addUserPermission(userid, permission);
+	// TODO: invalidate user cache
+}
+void UserDB::removeUserPermission(userid_t userid, const std::string &permission) {
+	userdb_backend->removeUserPermission(userid, permission);
+	// TODO: invalidate user cache
+}
+
+void UserDB::changeUserPassword(userid_t userid, const std::string &password) {
+	userdb_backend->changeUserPassword(userid, password);
+	// TODO: invalidate user cache
+}
+
+
+std::shared_ptr<UserDB::Group> UserDB::loadGroup(UserDB::groupid_t groupid) {
+	auto groupdata = userdb_backend->loadGroup(groupid);
+	return std::make_shared<Group>(groupid, groupdata.groupname, std::move(groupdata.permissions));
+}
+
+std::shared_ptr<UserDB::Group> UserDB::createGroup(const std::string &groupname) {
+	auto groupid = userdb_backend->createGroup(groupname);
+	return loadGroup(groupid);
+}
+
+void UserDB::addGroupPermission(groupid_t groupid, const std::string &permission) {
+	userdb_backend->addGroupPermission(groupid, permission);
+	// TODO: invalidate group cache
+}
+void UserDB::removeGroupPermission(groupid_t groupid, const std::string &permission) {
+	userdb_backend->removeGroupPermission(groupid, permission);
+	// TODO: invalidate group cache
+}
+
+void UserDB::addUserToGroup(UserDB::userid_t userid, UserDB::groupid_t groupid) {
+	userdb_backend->addUserToGroup(userid, groupid);
+	// TODO: invalidate user cache
+}
+void UserDB::removeUserFromGroup(UserDB::userid_t userid, UserDB::groupid_t groupid) {
+	userdb_backend->removeUserFromGroup(userid, groupid);
+	// TODO: invalidate user cache
+}
+
 
 std::shared_ptr<UserDB::Session> UserDB::createSession(const std::string &username, const std::string &password, time_t duration_in_seconds) {
 	// API keys are normal sessions without an expiration date, modeled by expires = 0.
 	time_t expires = 0;
 	if (duration_in_seconds > 0)
 		expires = time(nullptr) + duration_in_seconds;
-	// create the session
-	auto sessiontoken = userdb_backend->createSession(username, password, expires);
-	return userdb_backend->loadSession(sessiontoken);
+	auto userid = userdb_backend->authenticateUser(username, password);
+	auto sessiontoken = userdb_backend->createSession(userid, expires);
+	return loadSession(sessiontoken);
 }
 
 std::shared_ptr<UserDB::Session> UserDB::loadSession(const std::string &sessiontoken) {
-	return userdb_backend->loadSession(sessiontoken);
+	auto sessiondata = userdb_backend->loadSession(sessiontoken);
+	auto user = loadUser(sessiondata.userid);
+	auto session = std::make_shared<UserDB::Session>(sessiontoken, user, sessiondata.expires);
+	if (session->isExpired())
+		throw UserDB::session_expired_error();
+	return session;
 }
 
 void UserDB::destroySession(const std::string &sessiontoken) {
 	userdb_backend->destroySession(sessiontoken);
-}
-
-/*
- * Helper methods for token generation and hashing
- */
-std::string UserDB::createRandomToken(size_t length) {
-	static std::string letters = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-
-	std::uniform_int_distribution<int> distribution(0, letters.length()-1);
-
-	std::string result;
-	result.reserve(length);
-	for (size_t i = 0; i < length; i++) {
-		result += letters[distribution(rng)];
-	}
-	return result;
-}
-
-std::string UserDB::createPwdHash(const std::string &password) {
-	/*
-	 * Hashes are stored in the backend as
-	 * salt:hash
-	 * where salt is randomly generated, and hash is the concatenation of password and salt.
-	 */
-	auto salt = createRandomToken(8);
-	SHA1 sha1;
-	sha1.addBytes(password);
-	sha1.addBytes(salt);
-	return salt + ":" + sha1.digest().asHex();
-}
-
-bool UserDB::verifyPwdHash(const std::string &password, const std::string &pwhash) {
-	auto colon = pwhash.find(':');
-	if (colon == std::string::npos)
-		return false;
-	auto salt = pwhash.substr(0, colon);
-	auto hash = pwhash.substr(colon+1, std::string::npos);
-	SHA1 sha1;
-	sha1.addBytes(password);
-	sha1.addBytes(salt);
-	return sha1.digest().asHex() == hash;
 }

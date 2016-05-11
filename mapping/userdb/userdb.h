@@ -5,36 +5,75 @@
 #include <unordered_set>
 #include <memory>
 #include <exception>
+#include <vector>
 
+
+/*
+ * This is a module for handling users and associated data. A user can belong to several groups. Both users and groups have permissions.
+ * A user can create a session for authentification.
+ * TODO: artifact-handling
+ *
+ * The UserDB will always return shared_ptr's to immutable objects. Returning shared mutable objects would not be thread-safe; returning
+ * copies everywhere is slow.
+ * As a consequence, every method call that would change an object will return a shared_ptr to a new, immutable object.
+ *
+ * TODO: cache objects
+ */
 class UserDB {
-	public:
-		// typedefs
+	protected:
+		// these are for internal use only, they should never be leaked outside of the userdb
 		using userid_t = int64_t;
 		using groupid_t = int64_t;
+		friend class UserDBBackend;
+
+	public:
+		class Permissions;
+		class User;
+		class Group;
+		class Session;
 
 		// helper classes
 		class Permissions {
 			public:
-				void addUserPermissions(userid_t userid, const std::string &permissions);
-				void addGroupPermissions(groupid_t groupid, const std::string &permissions);
+				Permissions() = default;
+				void addPermission(const std::string &permission);
+				void removePermission(const std::string &permission);
+				void addPermissions(const Permissions &other);
 				bool hasPermission(const std::string &permission);
 			private:
-				void addPermissionSet(const std::string &permissions);
 				std::unordered_set<std::string> set;
 		};
 		class User {
 			public:
-				User(userid_t userid, const std::string &username, Permissions &&permissions);
+				User(userid_t userid, const std::string &username, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups);
 
-				userid_t getUserID() { return userid; }
 				const std::string &getUsername() { return username; }
-				bool hasPermission(const std::string &permission) { return permissions.hasPermission(permission); }
-				// changePassword() ?
+				bool hasPermission(const std::string &permission) { return all_permissions.hasPermission(permission); }
+				std::shared_ptr<User> joinGroup(const UserDB::Group &group);
+				std::shared_ptr<User> leaveGroup(const UserDB::Group &group);
+				void changePassword(const std::string &password);
+				std::shared_ptr<User> addPermission(const std::string &permission);
+				std::shared_ptr<User> removePermission(const std::string &permission);
 			private:
 				userid_t userid;
 				std::string username;
-				// store groups here?
-				Permissions permissions;
+				std::vector<std::shared_ptr<Group>> groups;
+				Permissions user_permissions;
+				Permissions all_permissions;
+		};
+		class Group {
+			public:
+				Group(groupid_t groupid, const std::string &groupname, Permissions &&group_permissions);
+
+				const std::string &getGroupname() { return groupname; }
+				bool hasPermission(const std::string &permission) { return group_permissions.hasPermission(permission); }
+				std::shared_ptr<Group> addPermission(const std::string &permission);
+				std::shared_ptr<Group> removePermission(const std::string &permission);
+			private:
+				groupid_t groupid;
+				std::string groupname;
+				Permissions group_permissions;
+				friend class User;
 		};
 		class Session {
 			public:
@@ -55,8 +94,8 @@ class UserDB {
 			: public std::runtime_error { using std::runtime_error::runtime_error; };
 		struct database_error
 			: public userdb_error { using userdb_error::userdb_error; };
-		struct credentials_error
-			: public userdb_error { credentials_error() : userdb_error("UserDB: username or password is wrong.") {}; };
+		struct authentication_error
+			: public userdb_error { using userdb_error::userdb_error; };
 		struct session_expired_error
 			: public userdb_error { session_expired_error() : userdb_error("UserDB: your session has expired, you need to login again.") {}; };
 
@@ -69,12 +108,22 @@ class UserDB {
 		static std::shared_ptr<Session> createSession(const std::string &username, const std::string &password, time_t duration_in_seconds = 0);
 		static std::shared_ptr<Session> loadSession(const std::string &token);
 
+		static std::shared_ptr<Group> createGroup(const std::string &groupname);
+
 		// these should only be called by backend implementations
 		static std::string createRandomToken(size_t length);
-		static std::string createPwdHash(const std::string &password);
-		static bool verifyPwdHash(const std::string &password, const std::string &pwhash);
-
 	private:
+		static std::shared_ptr<User> loadUser(userid_t userid);
+		static void addUserPermission(userid_t userid, const std::string &permission);
+		static void removeUserPermission(userid_t userid, const std::string &permission);
+		static void changeUserPassword(userid_t userid, const std::string &password);
+
+		static std::shared_ptr<Group> loadGroup(groupid_t groupid);
+		static void addGroupPermission(groupid_t groupid, const std::string &permission);
+		static void removeGroupPermission(groupid_t groupid, const std::string &permission);
+		static void addUserToGroup(userid_t userid, groupid_t groupid);
+		static void removeUserFromGroup(userid_t userid, groupid_t groupid);
+
 		static void destroySession(const std::string &sessiontoken);
 
 		// TODO: sessioncache?

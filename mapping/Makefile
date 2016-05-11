@@ -276,7 +276,7 @@ systemtest_testenvironment: ${EXE}
 # note: use /usr/bin/time instead of time, because the latter may be a shell's builtin without the required POSIX options
 # The || true at the end is to prevent make from aborting after the first failed test. The actual return code is in the log. 
 test/systemtests/queries/%.log: test/systemtests/queries/%.json ${EXE} ${EXE_SANITIZED}
-	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${EXE_SANITIZED} testquery $< >$@ 2>&1 || true
+	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" LSAN_OPTIONS="suppressions=test/systemtests/lsan.suppressions" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${EXE_SANITIZED} testquery $< >$@ 2>&1 || true
 
 unittest: ${EXEGTEST}
 	./${EXEGTEST} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml" || true

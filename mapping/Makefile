@@ -54,7 +54,7 @@ LDFLAGS_CL=-lOpenCL
 LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 LDFLAGS_CGI=-lfcgi++ -lfcgi
 LDFLAGS_GTEST=-lpthread
-CL_SOURCES:=$(wildcard operators/*/*.cl)
+CL_SOURCES:=$(wildcard operators/*/*.cl) $(wildcard operators/*/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 
 TEST_QUERIES:=$(wildcard test/systemtests/queries/*.json)
@@ -70,7 +70,7 @@ endif
 #
 # All object files, grouped by subsystem
 #
-OBJ_SERVICES=o/services/httpservice.o o/services/httpparsing.o o/services/ogcservice.o o/services/wms.o o/services/wcs.o o/services/wfs.o
+OBJ_SERVICES=o/services/httpservice.o o/services/httpparsing.o o/services/ogcservice.o o/services/wms.o o/services/wcs.o o/services/wfs.o o/services/plot.o
 OBJ_RASTER=o/raster/opencl.o o/raster/profiler.o
 OBJ_RASTERDB=o/rasterdb/rasterdb.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/rasterdb/backend_remote.o
 OBJ_USERDB=o/userdb/userdb.o o/userdb/backend_sqlite.o
@@ -81,18 +81,16 @@ OBJ_PLOT=o/datatypes/plots/histogram.o o/datatypes/plots/text.o o/datatypes/plot
 OBJ_UTIL=o/util/gdal.o o/util/sha1.o o/util/curl.o o/util/sqlite.o o/util/sunpos.o o/util/binarystream.o o/util/csvparser.o o/util/base64.o o/util/configuration.o o/util/formula.o o/util/debug.o o/util/timemodification.o o/util/log.o o/util/timeparser.o o/util/sizeutil.o
 OBJ_POINTVISUALIZATION=o/pointvisualization/BoundingBox.o o/pointvisualization/Circle.o o/pointvisualization/Coordinate.o o/pointvisualization/Dimension.o o/pointvisualization/FindResult.o o/pointvisualization/QuadTreeNode.o o/pointvisualization/CircleClusteringQuadTree.o
 OBJ_CONVERTERS=o/converters/converter.o o/converters/raw.o
-OBJ_OPERATORS_RASTER=o/operators/raster/matrixkernel.o o/operators/raster/expression.o o/operators/raster/projections.o o/operators/raster/rastersource.o o/operators/raster/r.o o/operators/raster/classification.o
-OBJ_OPERATORS_POINTS=o/operators/points/pgpointsource.o o/operators/points/gfbiopointsource.o o/operators/points/points_filter_by_range.o o/operators/points/points_difference.o o/operators/points/points_cluster.o o/operators/points/csvpointsource.o
-OBJ_OPERATORS_GEOMETRY=o/operators/geometry/wktsource.o
-OBJ_OPERATORS_COMBINED=o/operators/combined/points2raster.o o/operators/combined/raster_metadata_to_points.o o/operators/combined/filterpointsbygeometry.o
-OBJ_OPERATORS_MSAT=o/operators/msat/temperature.o o/operators/msat/reflectance.o o/operators/msat/solarangle.o o/operators/msat/radiance.o o/operators/msat/pansharpening.o o/operators/msat/gccthermthresholddetection.o o/operators/msat/co2correction.o
-OBJ_OPERATORS_PLOTS=o/operators/plots/histogram.o o/operators/plots/points_metadata_tograph.o
-OBJ_OPERATORS_TEMPORAL=o/operators/temporal/timeshiftoperator.o
-OBJ_OPERATORS_GFBIO=o/operators/gfbio/pangaeasource.o 
+OBJ_OPERATORS_SOURCE = o/operators/source/csv_source.o o/operators/source/gfbio_source.o o/operators/source/pangaea_source.o o/operators/source/postgres_source.o o/operators/source/rasterdb_source.o o/operators/source/wkt_source.o
+OBJ_OPERATORS_PROCESSING_RASTER=o/operators/processing/raster/matrixkernel.o o/operators/processing/raster/expression.o o/operators/processing/raster/classification.o
+OBJ_OPERATORS_PROCESSING_FEATURES=o/operators/processing/features/cluster.o o/operators/processing/features/difference.o o/operators/processing/features/numeric_attribute_filter.o o/operators/processing/features/point_in_polygon_filter.o
+OBJ_OPERATORS_PROCESSING_COMBINED=o/operators/processing/combined/projection.o o/operators/processing/combined/r_script.o o/operators/processing/combined/raster_value_extraction.o o/operators/processing/combined/rasterization.o o/operators/processing/combined/timeshift.o
+OBJ_OPERATORS_PROCESSING_METEOSAT=o/operators/processing/meteosat/temperature.o o/operators/processing/meteosat/reflectance.o o/operators/processing/meteosat/solarangle.o o/operators/processing/meteosat/radiance.o o/operators/processing/meteosat/pansharpening.o o/operators/processing/meteosat/gccthermthresholddetection.o o/operators/processing/meteosat/co2correction.o
+OBJ_OPERATORS_PLOTS=o/operators/plots/histogram.o o/operators/plots/feature_attributes_plot.o
 ifeq (${USE_ABCD},true)
-	OBJ_OPERATORS_GFBIO += o/operators/gfbio/abcdsource.o
+	OBJ_OPERATORS_SOURCE += o/operators/source/abcd_source.o
 endif
-OBJ_OPERATORS_ALL=$(OBJ_OPERATORS_RASTER) $(OBJ_OPERATORS_POINTS) $(OBJ_OPERATORS_GEOMETRY) $(OBJ_OPERATORS_COMBINED) $(OBJ_OPERATORS_MSAT) $(OBJ_OPERATORS_PLOTS) $(OBJ_OPERATORS_GFBIO) ${OBJ_OPERATORS_TEMPORAL}
+OBJ_OPERATORS_ALL=$(OBJ_OPERATORS_SOURCE) $(OBJ_OPERATORS_PROCESSING_RASTER) $(OBJ_OPERATORS_PROCESSING_FEATURES) $(OBJ_OPERATORS_PROCESSING_COMBINED) $(OBJ_OPERATORS_PROCESSING_METEOSAT) $(OBJ_OPERATORS_PLOTS)
 
 OBJ_OPERATORS_ALLSTUBS=${OBJ_OPERATORS_ALL:o/operators/%=o/operators_stub/%}
 

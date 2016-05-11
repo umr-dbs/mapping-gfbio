@@ -1,0 +1,30 @@
+{
+    "name": "Load ndvi raster Okt 2015",
+	"query_result": "raster",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 1443657600,
+        "end": 1443657601
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+    "resolution": {
+    	"type": "pixels",
+        "x": 3600,
+        "y": 1800
+    },
+    "query_mode": "exact",
+    "query": {        
+        "params": {
+        	"channel": 0,
+            "sourcename": "ndvi"
+        },
+        "type": "rasterdb_source"
+    },
+    "query_expected_hash": "b9cb96770204c3d78167c697c7f626649528bb66"
+}

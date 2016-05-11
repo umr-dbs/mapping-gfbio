@@ -1,0 +1,26 @@
+{
+	"name" : "WKTSource points",	
+	"query_result": "points",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0,
+        "end": 2147483647
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },
+	"query" : 
+	{
+		"params" : 
+			{
+				"type": "points",
+				"wkt": "GEOMETRYCOLLECTION(POINT(0 0), POINT(12 12), MULTIPOINT((3 4), (5 5)))"
+			},
+		"type" : "wkt_source"
+	},
+	"query_expected_hash" : "330ef2ebe8a91be96c95bcc13cb588083faeffd1"
+}

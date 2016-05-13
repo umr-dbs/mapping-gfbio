@@ -109,9 +109,9 @@ void SQLite::SQLiteStatement::exec() {
 		throw SQLiteException("Prepare before exec");
 
 	if (SQLITE_DONE != sqlite3_step(stmt))
-		throw SQLiteException("SQLiteStatement::exec() failed");
+		throw SQLiteException(concat("SQLiteStatement::exec() failed: ", sqlite3_errmsg(sqlite3_db_handle(stmt))));
 	if (SQLITE_OK != sqlite3_reset(stmt))
-		throw SQLiteException("SQLiteStatement::reset failed");
+		throw SQLiteException(concat("SQLiteStatement::reset() failed: ", sqlite3_errmsg(sqlite3_db_handle(stmt))));
 }
 
 bool SQLite::SQLiteStatement::next() {

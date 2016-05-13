@@ -10,7 +10,9 @@
 
 #include "operators/operator.h"
 #include "converters/converter.h"
-#include "raster/profiler.h"
+
+#include "userdb/userdb.h"
+
 #include "util/binarystream.h"
 #include "util/configuration.h"
 #include "util/gdal.h"
@@ -53,7 +55,7 @@ template<> struct queryFeature<PolygonCollection> {
 
 
 
-static char *program_name;
+static const char *program_name;
 static void usage() {
 		printf("Usage:\n");
 		printf("%s convert <input_filename> <png_filename>\n", program_name);
@@ -64,6 +66,7 @@ static void usage() {
 		printf("%s query <queryname> <png_filename>\n", program_name);
 		printf("%s testquery <queryname> [S|F]\n", program_name);
 		printf("%s enumeratesources [verbose]\n", program_name);
+		printf("%s userdb ...", program_name);
 		exit(5);
 }
 
@@ -351,11 +354,11 @@ static void runquery(int argc, char *argv[]) {
 
 		if (out_filename) {
 			{
-				Profiler::Profiler p("TO_GTIFF");
+				//Profiler::Profiler p("TO_GTIFF");
 				raster->toGDAL((std::string(out_filename) + ".tif").c_str(), "GTiff", flipx, flipy);
 			}
 			{
-				Profiler::Profiler p("TO_PNG");
+				//Profiler::Profiler p("TO_PNG");
 				auto colors = Colorizer::fromUnit(raster->dd.unit);
 				std::ofstream output(std::string(out_filename) + ".png");
 				raster->toPNG(output, *colors);
@@ -603,6 +606,33 @@ static int testquery(int argc, char *argv[]) {
 	return 10;
 }
 
+static int userdb_usage() {
+	printf("Commands for userdb:\n");
+	printf("%s userdb adduser <username> <password>\n", program_name);
+	return 5;
+}
+
+static int userdb(int argc, char *argv[]) {
+	if (argc < 3)
+		return userdb_usage();
+
+	try {
+		UserDB::initFromConfiguration();
+
+		std::string command = argv[2];
+		if (command == "adduser" && argc == 5) {
+			auto user = UserDB::createUser(argv[3], argv[4]);
+			printf("ok\n");
+			return 0;
+		}
+
+		return userdb_usage();
+	}
+	catch (const std::exception &e) {
+		printf("ERROR: %s\n", e.what());
+		return 5;
+	}
+}
 
 int main(int argc, char *argv[]) {
 
@@ -655,6 +685,9 @@ int main(int argc, char *argv[]) {
 				printf("----------------------------------------------------------------------\n");
 			}
 		}
+	}
+	else if (strcmp(command, "userdb") == 0) {
+		returncode = userdb(argc, argv);
 	}
 	else if (strcmp(command, "msgcoord") == 0) {
 		GDAL::CRSTransformer t(EPSG_LATLON, EPSG_GEOSMSG);

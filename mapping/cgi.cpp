@@ -4,7 +4,7 @@
 #include "util/timeparser.h"
 
 #include "services/httpservice.h"
-
+#include "userdb/userdb.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -40,6 +40,10 @@ JPEG32: 120703 (90%)
 
 int main() {
 	Configuration::loadFromDefaultPaths();
+
+	/*
+	 * Initialize Cache
+	 */
 	bool cache_enabled = Configuration::getBool("cache.enabled",false);
 
 	std::unique_ptr<CacheManager> cm;
@@ -54,6 +58,11 @@ int main() {
 		cm = make_unique<ClientCacheManager>(host,port);
 	}
 	CacheManager::init( cm.get() );
+
+	/*
+	 * Initialize UserDB
+	 */
+	UserDB::initFromConfiguration();
 
 
 	if (getenv("FCGI_WEB_SERVER_ADDRS") == nullptr) {

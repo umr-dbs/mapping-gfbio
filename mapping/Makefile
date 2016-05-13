@@ -141,8 +141,8 @@ all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXEC
 
 ${EXE}:	o/mapping_manager.o ${OBJ_COMMON} ${OBJ_USERDB}
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
-	
-${EXE_SANITIZED}:	$(patsubst %.o,%.san.o,o/mapping_manager.o ${OBJ_COMMON})
+
+${EXE_SANITIZED}:	$(patsubst %.o,%.san.o,o/mapping_manager.o ${OBJ_COMMON} ${OBJ_USERDB})
 	${CPP} $+ -o $@ $(SANITIZE_FLAGS) ${LDFLAGS} ${LDFLAGS_CL}
 
 ${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES} ${OBJ_USERDB}
@@ -165,7 +165,7 @@ ${EXECACHEINDEX}:	${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NO
 
 ${EXECACHENODE}:	${OBJ_COMMON} o/cache/node/nodeserver_main.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
-	
+
 ${EXECACHEEXP}:	${OBJ_COMMON} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/cache_experiments_main.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 

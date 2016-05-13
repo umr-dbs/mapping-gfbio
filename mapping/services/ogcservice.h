@@ -12,6 +12,8 @@
  */
 class OGCService : public HTTPService {
 	protected:
+		using HTTPService::HTTPService;
+
 		epsg_t parseEPSG(const Params &params, const std::string &key, epsg_t def = EPSG_WEBMERCATOR);
 		TemporalReference parseTime(const Params &params) const;
 		SpatialReference parseBBOX(const std::string bbox_str, epsg_t epsg = EPSG_WEBMERCATOR, bool allow_infinite = false);

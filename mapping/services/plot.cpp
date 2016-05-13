@@ -13,15 +13,15 @@
  */
 class PlotService : public OGCService {
 public:
-	PlotService() = default;
+	using OGCService::OGCService;
 	virtual ~PlotService() = default;
 
-	virtual void run(const Params& params, HTTPResponseStream& result, std::ostream &error);
+	virtual void run();
 };
 
 REGISTER_HTTP_SERVICE(PlotService, "plot");
 
-void PlotService::run(const Params& params, HTTPResponseStream& result, std::ostream &error) {
+void PlotService::run() {
 	std::string query = params.get("query", "");
 	if(query == "")
 		throw ArgumentException("PlotService: no query specified");

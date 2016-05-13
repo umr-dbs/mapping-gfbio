@@ -11,14 +11,14 @@
 
 class WMSService : public OGCService {
 	public:
-		WMSService() = default;
+		using OGCService::OGCService;
 		virtual ~WMSService() = default;
-		virtual void run(const Params& params, HTTPResponseStream& result, std::ostream &error);
+		virtual void run();
 };
 REGISTER_HTTP_SERVICE(WMSService, "WMS");
 
 
-void WMSService::run(const Params& params, HTTPResponseStream& result, std::ostream &error) {
+void WMSService::run() {
 	bool debug = params.getBool("debug", Configuration::getBool("global.debug", false));
 	auto query_epsg = parseEPSG(params, "crs");
 	TemporalReference tref = parseTime(params);

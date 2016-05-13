@@ -36,12 +36,12 @@ EnumConverter<FeatureType> featureTypeConverter(featureTypeMap);
  */
 class WFSService : public OGCService {
 	public:
-		WFSService() = default;
+		using OGCService::OGCService;
 		virtual ~WFSService() = default;
 
 		std::string getResponse(const Params &params);
 
-		virtual void run(const Params& params, HTTPResponseStream& result, std::ostream &error) {
+		virtual void run() {
 			result.sendContentType("application/json");
 			result.finishHeaders();
 			result << getResponse(params);

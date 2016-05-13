@@ -6,9 +6,9 @@
 
 class WCSService : public OGCService {
 	public:
-		WCSService() = default;
+		using OGCService::OGCService;
 		virtual ~WCSService() = default;
-		virtual void run(const Params& params, HTTPResponseStream& result, std::ostream &error);
+		virtual void run();
 };
 REGISTER_HTTP_SERVICE(WCSService, "WCS");
 
@@ -74,7 +74,7 @@ static int getWcsParameterInteger(const std::string &wcsParameterString){
 }
 
 
-void WCSService::run(const Params& params, HTTPResponseStream& result, std::ostream &error) {
+void WCSService::run() {
 
 	/*http://www.myserver.org:port/path?
 	 * service=WCS &version=2.0

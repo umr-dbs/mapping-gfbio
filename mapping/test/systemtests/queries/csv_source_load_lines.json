@@ -32,7 +32,12 @@
 				"textual": ["name"],
 				"numeric": ["osm_id"],
 				"time1": "time_start"
-			}
+			},
+   			"provenance": {
+	     		"citation": "© OpenStreetMap contributors",
+	     		"license": "Open Data Commons Open Database License (ODbL)",
+	    		"uri": "http://www.openstreetmap.org/"
+  			 }
 		}
 	},
 	"query_expected_hash" : "f18863cd45b936be894263543fccc964ce362a97"

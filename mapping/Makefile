@@ -94,7 +94,7 @@ OBJ_OPERATORS_ALL=$(OBJ_OPERATORS_SOURCE) $(OBJ_OPERATORS_PROCESSING_RASTER) $(O
 
 OBJ_OPERATORS_ALLSTUBS=${OBJ_OPERATORS_ALL:o/operators/%=o/operators_stub/%}
 
-OBJ_OPERATORS_COMMON=o/operators/operator.o o/operators/queryrectangle.o o/operators/queryprofiler.o
+OBJ_OPERATORS_COMMON=o/operators/operator.o o/operators/provenance.o o/operators/queryrectangle.o o/operators/queryprofiler.o
 OBJ_OPERATORS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALL}
 OBJ_OPERATORS_STUBS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALLSTUBS}
 

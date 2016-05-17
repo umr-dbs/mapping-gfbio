@@ -121,6 +121,10 @@ std::unique_ptr<GenericPlot> GenericOperator::getPlot(const QueryRectangle &, Qu
 	throw OperatorException("getPlot() called on an operator that doesn't return data vectors");
 }
 
+void GenericOperator::getProvenance(ProvenanceCollection &pc) {
+
+}
+
 static void d_profile(int depth, const std::string &type, const char *result, QueryProfiler &profiler, size_t bytes = 0) {
 	std::ostringstream msg;
 	msg.precision(4);
@@ -271,6 +275,20 @@ std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle
 	}
 	d_profile(depth, type, "plot", profiler);
 	return result;
+}
+
+void GenericOperator::getRecursiveProvenance(ProvenanceCollection &pc) {
+	for (int i=0;i<MAX_SOURCES;i++) {
+		if (sources[i])
+			sources[i]->getRecursiveProvenance(pc);
+	}
+	getProvenance(pc);
+}
+
+std::unique_ptr<ProvenanceCollection> GenericOperator::getFullProvenance() {
+	auto provenance = make_unique<ProvenanceCollection>();
+	getRecursiveProvenance(*provenance);
+	return provenance;
 }
 
 

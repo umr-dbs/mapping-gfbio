@@ -2,6 +2,7 @@
 #define OPERATORS_OPERATOR_H
 
 #include "datatypes/spatiotemporal.h"
+#include "operators/provenance.h"
 #include "operators/queryrectangle.h"
 #include "operators/queryprofiler.h"
 
@@ -65,12 +66,16 @@ class GenericOperator {
 		std::unique_ptr<PolygonCollection> getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
 		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
 
+		std::unique_ptr<ProvenanceCollection> getFullProvenance();
+
+		const std::string &getType() const { return type; }
 		const std::string &getSemanticId() const { return semantic_id; }
 		int getDepth() const { return depth; }
 
 	protected:
 		GenericOperator(int sourcecounts[], GenericOperator *sources[]);
 		virtual void writeSemanticParameters(std::ostringstream &stream);
+		virtual void getProvenance(ProvenanceCollection &pc);
 		void assumeSources(int rasters, int pointcollections=0, int linecollections=0, int polygoncollections=0);
 
 		int getRasterSourceCount() { return sourcecounts[0]; }
@@ -98,6 +103,7 @@ class GenericOperator {
 		};
 		void validateQRect(const QueryRectangle &rect, ResolutionRequirement res = ResolutionRequirement::OPTIONAL);
 		void validateResult(const QueryRectangle &rect, SpatioTemporalResult *result);
+		void getRecursiveProvenance(ProvenanceCollection &pc);
 
 		int sourcecounts[MAX_INPUT_TYPES];
 		GenericOperator *sources[MAX_SOURCES];

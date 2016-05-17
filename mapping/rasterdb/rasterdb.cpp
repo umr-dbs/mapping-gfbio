@@ -267,6 +267,16 @@ void RasterDB::init() {
 		}
 		channels[i]->dd.verify();
 	}
+
+	Json::Value provenanceinfo = root["provenance"];
+	if (provenanceinfo.isObject()) {
+		provenance = make_unique<Provenance>(
+			provenanceinfo.get("citation", "").asString(),
+			provenanceinfo.get("license", "").asString(),
+			provenanceinfo.get("uri", "").asString(),
+			"" // no identifier, that's the operator's job.
+		);
+	}
 }
 
 
@@ -569,8 +579,6 @@ std::unique_ptr<GenericRaster> RasterDB::query(const QueryRectangle &rect, Query
 	profiler.addIOCost(io_costs);
 	return result;
 }
-
-
 
 
 static std::unordered_map<std::string, std::weak_ptr<RasterDB> > RasterDB_map;

@@ -17,5 +17,10 @@
       "origin" : [ -180.0, -90 ],
       "scale" : [ 0.10, 0.10 ],
       "size" : [ 3600, 1800 ]
+   },
+   "provenance": {
+   	"citation": "NVDI, Images by Reto Stockli, NASA's Earth Observatory Group, using data provided by the MODIS Land Science Team.",
+   	"license": "public domain",
+   	"uri": "http://neo.sci.gsfc.nasa.gov/view.php?datasetId=MOD13A2_E_NDVI"
    }
 }

@@ -19,6 +19,7 @@ class RasterDBSourceOperator : public GenericOperator {
 		virtual ~RasterDBSourceOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
+		virtual void getProvenance(ProvenanceCollection &pc);
 		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
 #endif
 	protected:
@@ -52,14 +53,18 @@ RasterDBSourceOperator::~RasterDBSourceOperator() {
 
 REGISTER_OPERATOR(RasterDBSourceOperator, "rasterdb_source");
 
-// obsolete, keep for backwards compatibility for a while
-class SourceOperator2 : public RasterDBSourceOperator {
-	public:
-		SourceOperator2(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : RasterDBSourceOperator(sourcecounts, sources, params) {}
-};
-
 
 #ifndef MAPPING_OPERATOR_STUBS
+void RasterDBSourceOperator::getProvenance(ProvenanceCollection &pc) {
+	std::string local_identifier = "data." + getType() + "." + sourcename;
+
+	auto sp = rasterdb->getProvenance();
+	if (sp == nullptr)
+		pc.add(Provenance("", "", "", local_identifier));
+	else
+		pc.add(Provenance(sp->citation, sp->license, sp->uri, local_identifier));
+}
+
 std::unique_ptr<GenericRaster> RasterDBSourceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
 	return rasterdb->query(rect, profiler, channel, transform);
 }

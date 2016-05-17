@@ -13,7 +13,7 @@ class RasterDBBackend;
 class RasterDBChannel;
 class QueryRectangle;
 class QueryProfiler;
-
+class Provenance;
 
 /*
  * A coordinate reference system as modeled by GDAL.
@@ -100,6 +100,7 @@ class RasterDB {
 		void linkRaster(int channelid, double time_of_reference, double time_start, double time_end);
 		std::unique_ptr<GenericRaster> query(const QueryRectangle &rect, QueryProfiler &profiler, int channelid, bool transform = true);
 
+		const Provenance *getProvenance() const { return provenance.get(); }
 		bool isWriteable() const { return writeable; }
 
 		static std::vector<std::string> getSourceNames();
@@ -117,6 +118,7 @@ class RasterDB {
 		GDALCRS *crs;
 		int channelcount;
 		RasterDBChannel **channels;
+		std::unique_ptr<Provenance> provenance;
 		std::mutex mutex;
 };
 

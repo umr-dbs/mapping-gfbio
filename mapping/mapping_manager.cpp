@@ -65,6 +65,7 @@ static void usage() {
 		printf("%s link <sourcename> <sourcechannel> <time_reference> <time_start> <duration>\n", program_name);
 		printf("%s query <queryname> <png_filename>\n", program_name);
 		printf("%s testquery <queryname> [S|F]\n", program_name);
+		printf("%s showprovenance <queryname>\n", program_name);
 		printf("%s enumeratesources [verbose]\n", program_name);
 		printf("%s userdb ...", program_name);
 		exit(5);
@@ -606,6 +607,43 @@ static int testquery(int argc, char *argv[]) {
 	return 10;
 }
 
+static int showprovenance(int argc, char *argv[]) {
+	if (argc != 3) {
+		usage();
+	}
+	char *in_filename = argv[2];
+
+	try {
+		/*
+		 * Step #1: open the query.json file and parse it
+		 */
+		std::ifstream file(in_filename);
+		if (!file.is_open()) {
+			printf("unable to open query file %s\n", in_filename);
+			return 5;
+		}
+
+		Json::Reader reader(Json::Features::strictMode());
+		Json::Value root;
+		if (!reader.parse(file, root)) {
+			printf("unable to read json\n%s\n", reader.getFormattedErrorMessages().c_str());
+			return 5;
+		}
+
+		auto graph = GenericOperator::fromJSON(root["query"]);
+		auto p = graph->getFullProvenance();
+		printf("Provenance: %s\n", p->toJson().c_str());
+		return 0;
+	}
+	catch (const std::exception &e) {
+		printf("Exception: %s\n", e.what());
+		return 5;
+	}
+	catch (...) {
+		return 5;
+	}
+}
+
 static int userdb_usage() {
 	printf("Commands for userdb:\n");
 	printf("%s userdb adduser <username> <password>\n", program_name);
@@ -670,6 +708,9 @@ int main(int argc, char *argv[]) {
 	}
 	else if (strcmp(command, "testquery") == 0) {
 		returncode = testquery(argc, argv);
+	}
+	else if (strcmp(command, "showprovenance") == 0) {
+		returncode = showprovenance(argc, argv);
 	}
 	else if (strcmp(command, "enumeratesources") == 0) {
 		bool verbose = false;

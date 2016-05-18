@@ -48,6 +48,14 @@ static const XMLCh tagNameCoordinatesLatLong[] = {chLatin_a,chLatin_b,chLatin_c,
 static const XMLCh tagNameLongitudeDecimal[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_L,chLatin_o,chLatin_n,chLatin_g,chLatin_i,chLatin_t,chLatin_u,chLatin_d,chLatin_e,chLatin_D,chLatin_e,chLatin_c,chLatin_i,chLatin_m,chLatin_a,chLatin_l,chNull};
 static const XMLCh tagNameLatitudeDecimal[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_L,chLatin_a,chLatin_t,chLatin_i,chLatin_t,chLatin_u,chLatin_d,chLatin_e,chLatin_D,chLatin_e,chLatin_c,chLatin_i,chLatin_m,chLatin_a,chLatin_l,chNull};
 //static const XMLCh tagNameUnitGUID[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_U,chLatin_n,chLatin_i,chLatin_t,chLatin_G,chLatin_U,chLatin_I,chLatin_D,chNull};
+static const XMLCh tagNameIPRStatements[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_I,chLatin_P,chLatin_R,chLatin_S,chLatin_t,chLatin_a,chLatin_t,chLatin_e,chLatin_m,chLatin_e,chLatin_n,chLatin_t,chLatin_s,chNull};
+static const XMLCh tagNameCopyrights[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_C,chLatin_o,chLatin_p,chLatin_y,chLatin_r,chLatin_i,chLatin_g,chLatin_h,chLatin_t,chLatin_s,chNull};
+static const XMLCh tagNameCopyright[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_C,chLatin_o,chLatin_p,chLatin_y,chLatin_r,chLatin_i,chLatin_g,chLatin_h,chLatin_t,chNull};
+static const XMLCh tagNameLicenses[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_L,chLatin_i,chLatin_c,chLatin_e,chLatin_n,chLatin_s,chLatin_e,chLatin_s,chNull};
+static const XMLCh tagNameLicense[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_L,chLatin_i,chLatin_c,chLatin_e,chLatin_n,chLatin_s,chLatin_e,chNull};
+static const XMLCh tagNameURI[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_U,chLatin_R,chLatin_I,chNull};
+static const XMLCh tagNameTitle[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_T,chLatin_i,chLatin_t,chLatin_l,chLatin_e,chNull};
+static const XMLCh tagNameDetails[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_D,chLatin_e,chLatin_t,chLatin_a,chLatin_i,chLatin_l,chLatin_s,chNull};
 
 /**
  * Operator that gets points from pangaea
@@ -61,6 +69,7 @@ class ABCDSourceOperator : public GenericOperator {
 
 #ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual void getProvenance(ProvenanceCollection &pc);
 #endif
 		void writeSemanticParameters(std::ostringstream& stream) {
 			stream << "{\"path\":\"" << inputFile << "\"}";
@@ -81,6 +90,8 @@ class ABCDSourceOperator : public GenericOperator {
 				std::function<void(const std::string&, double)> setDoubleAttribute,
 				std::function<void(const std::string&, const std::string&)> setStringAttribute);
 
+		void handleIPRStatements(DOMElement& element, ProvenanceCollection &pc);
+
 
 		double parseDouble(const XMLCh* text) const;
 
@@ -89,6 +100,8 @@ class ABCDSourceOperator : public GenericOperator {
 
 		void setGlobalStringAttribute(const std::string& attribute, const std::string& value);
 		void setGlobalDoubleAttribute(const std::string& attribute, double value);
+
+		std::unique_ptr<DOMLSParserImpl> createParser();
 
 #endif
 
@@ -335,6 +348,22 @@ void ABCDSourceOperator::handleUnits(DOMDocument& doc) {
 	}
 }
 
+std::unique_ptr<DOMLSParserImpl> ABCDSourceOperator::createParser() {
+	//create parser
+	static const XMLCh gLS[] = { chLatin_L, chLatin_S, chNull };
+	DOMImplementation*  impl = DOMImplementationRegistry::getDOMImplementation(gLS); //deleted by XMLPlatform::Terminate
+	std::unique_ptr<DOMLSParserImpl> parser(dynamic_cast<DOMLSParserImpl*>(impl->createLSParser(DOMImplementationLS::MODE_SYNCHRONOUS, 0)));
+
+	//configure
+	parser->setParameter(XMLUni::fgXercesDOMHasPSVIInfo, true);  //collect schema info
+	parser->setParameter(XMLUni::fgDOMComments, false); //discard comments
+	parser->setExternalNoNamespaceSchemaLocation("ABCD_2.06.XSD");
+	parser->setDoSchema(true);
+	parser->setValidationScheme(xercesc::XercesDOMParser::Val_Always);
+
+	return parser;
+}
+
 std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 	points = make_unique<PointCollection>(rect);
 
@@ -342,17 +371,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 
 	XMLPlatformUtils::Initialize(); //TODO: only do this once for long running process
 	{
-		//create parser
-		static const XMLCh gLS[] = { chLatin_L, chLatin_S, chNull };
-		DOMImplementation*  impl = DOMImplementationRegistry::getDOMImplementation(gLS); //deleted by XMLPlatform::Terminate
-		std::unique_ptr<DOMLSParserImpl> parser(dynamic_cast<DOMLSParserImpl*>(impl->createLSParser(DOMImplementationLS::MODE_SYNCHRONOUS, 0)));
-
-		//configure
-		parser->setParameter(XMLUni::fgXercesDOMHasPSVIInfo, true);  //collect schema info
-		parser->setParameter(XMLUni::fgDOMComments, false); //discard comments
-		parser->setExternalNoNamespaceSchemaLocation("ABCD_2.06.XSD");
-		parser->setDoSchema(true);
-		parser->setValidationScheme(xercesc::XercesDOMParser::Val_Always);
+		auto parser = createParser();
 
 		parser->parseURI(inputFile.c_str());
 
@@ -376,6 +395,69 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 
 	points->validate();
 	return points->filterBySpatioTemporalReferenceIntersection(rect);
+}
+
+void ABCDSourceOperator::handleIPRStatements(DOMElement& element, ProvenanceCollection &pc) {
+	Provenance provenance;
+	provenance.local_identifier = "data." + getType() + "." + inputFile;
+
+	//the IPR statements itself
+	DOMElement* child = element.getFirstElementChild();
+	while(child != nullptr) {
+		if(XMLString::compareString(child->getNodeName(), tagNameCopyrights) == 0) {
+			provenance.citation = transcode(child->getTextContent());
+		} else if(XMLString::compareString(child->getNodeName(), tagNameLicenses) == 0) {
+			provenance.license = transcode(child->getTextContent());
+		} else if(XMLString::compareString(child->getNodeName(), tagNameURI) == 0) {
+			provenance.uri = transcode(child->getTextContent());
+		} else {
+			//TODO terms of use?
+		}
+		child = child->getNextElementSibling();
+	}
+
+	//parent metadata the IPR statement belongs to
+	DOMElement &metaData = dynamic_cast<DOMElement&>(*element.getParentNode());
+	DOMNodeList* uriList = metaData.getElementsByTagName(tagNameURI);
+	if(uriList->getLength() > 0) {
+		DOMElement &uri = dynamic_cast<DOMElement&>(*uriList->item(0));
+		provenance.uri = transcode(uri.getTextContent());
+	}
+
+	DOMNodeList* titleList = metaData.getElementsByTagName(tagNameTitle);
+	if(titleList->getLength() > 0) {
+		DOMElement &title = dynamic_cast<DOMElement&>(*titleList->item(0));
+		provenance.citation += transcode(title.getTextContent()) + " ";
+	}
+
+	DOMNodeList* detailsList = metaData.getElementsByTagName(tagNameDetails);
+	if(detailsList->getLength() > 0) {
+		DOMElement &detail = dynamic_cast<DOMElement&>(*detailsList->item(0));
+		provenance.citation += transcode(detail.getTextContent());
+	}
+
+	pc.add(provenance);
+}
+
+void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
+	XMLPlatformUtils::Initialize(); //TODO: only do this once for long running process
+	{
+		auto parser = createParser();
+
+		parser->parseURI(inputFile.c_str());
+
+		DOMDocument* doc = parser->getDocument(); //deleted by parser when done
+		if(doc == nullptr)
+			throw OperatorException(concat("ABCDSource: could not parse document:", inputFile));
+
+		DOMNodeList* iprStatementsList = doc->getElementsByTagName(tagNameIPRStatements);
+		for(size_t i = 0; i < iprStatementsList->getLength(); ++i) {
+			DOMElement& element = dynamic_cast<DOMElement&>(*iprStatementsList->item(i));
+			handleIPRStatements(element, pc);
+		}
+	}
+
+	XMLPlatformUtils::Terminate(); //TODO: only do this once for long running process
 }
 
 #endif

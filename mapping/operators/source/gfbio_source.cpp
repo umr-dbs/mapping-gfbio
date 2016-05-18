@@ -15,6 +15,7 @@
 #include <json/json.h>
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
+#include <json/json.h>
 
 
 class GFBioSourceOperator : public GenericOperator {
@@ -25,13 +26,15 @@ class GFBioSourceOperator : public GenericOperator {
 #ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
 		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual void getProvenance(ProvenanceCollection &pc);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
 #ifndef MAPPING_OPERATOR_STUBS
-		void getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format);
+		void getStringFromServer(const std::string url, std::stringstream& data);
+		void performQuery(const QueryRectangle& rect, std::stringstream& data, std::string format);
 #endif
 		std::string datasource;
 		std::string query;
@@ -61,11 +64,39 @@ void GFBioSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
+
+void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
+	std::ostringstream url;
+		url
+			<< Configuration::get("operators.gfbiosource.webserviceurl")
+			<< "provenance"  << "?datasource="
+			<< curl.escape(datasource) << "&query=" << curl.escape(query);
+
+	std::stringstream data;
+	getStringFromServer(url.str(), data);
+
+	Json::Reader reader(Json::Features::strictMode());
+	Json::Value root;
+	if (!reader.parse(data, root))
+		throw OperatorException("GFBioSourceOperator: Provenance information could not be parsed");
+
+	for(unsigned int i = 0; i < root.size(); ++i) {
+		Json::Value entry = root.get(i, "");
+		Provenance provenance;
+		provenance.citation = entry["citation"].asString();
+		provenance.uri = entry["uri"].asString();
+		provenance.license = entry["license"].asString();
+
+		pc.add(provenance);
+	}
+}
+
+
 std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	auto points_out = make_unique<PointCollection>(rect);
 
 	std::stringstream data;
-	getStringFromServer(rect, data, "CSV");
+	performQuery(rect, data, "CSV");
 	profiler.addIOCost( data.tellp() );
 
 	try {
@@ -109,7 +140,7 @@ std::unique_ptr<PolygonCollection> GFBioSourceOperator::getPolygonCollection(con
 	}
 
 	std::stringstream data;
-	getStringFromServer(rect, data, "WKB");
+	performQuery(rect, data, "WKB");
 	profiler.addIOCost( data.tellp() );
 
 	auto polygonCollection = WKBUtil::readPolygonCollection(data, rect);
@@ -117,17 +148,21 @@ std::unique_ptr<PolygonCollection> GFBioSourceOperator::getPolygonCollection(con
 	return polygonCollection;
 }
 
-void GFBioSourceOperator::getStringFromServer(const QueryRectangle& rect, std::stringstream& data, std::string format) {
+void GFBioSourceOperator::performQuery(const QueryRectangle& rect, std::stringstream& data, std::string format) {
 	std::ostringstream url;
 	url
 		<< Configuration::get("operators.gfbiosource.webserviceurl")
-		<< format << "?datasource="
+		<< "fetchDataSource/" << format << "?datasource="
 		<< curl.escape(datasource) << "&query=" << curl.escape(query)
 		<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
 		<< rect.x2 << "," << rect.y2 << "&includeMetadata=" << includeMetadata;
+	fprintf(stderr, url.str().c_str());
+	getStringFromServer(url.str(), data);
+}
 
+void GFBioSourceOperator::getStringFromServer(const std::string url, std::stringstream& data) {
 	curl.setOpt(CURLOPT_PROXY, Configuration::get("operators.gfbiosource.proxy", "").c_str());
-	curl.setOpt(CURLOPT_URL, url.str().c_str());
+	curl.setOpt(CURLOPT_URL, url.c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
 

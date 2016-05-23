@@ -86,6 +86,7 @@ class CSVSourceOperator : public GenericOperator {
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
+		virtual void getProvenance(ProvenanceCollection &pc);
 
 	private:
 		void readAnyCollection(SimpleFeatureCollection *collection, const QueryRectangle &rect, QueryProfiler &profiler,
@@ -106,6 +107,7 @@ class CSVSourceOperator : public GenericOperator {
 		std::vector<std::string> columns_textual;
 		char field_separator;
 		ErrorHandling errorHandling;
+		Provenance provenance;
 };
 
 
@@ -182,6 +184,16 @@ CSVSourceOperator::CSVSourceOperator(int sourcecounts[], GenericOperator *source
     // TODO: make sure no column names are reused multiple times?
 
     errorHandling = ErrorHandlingConverter.from_json(params, "on_error");
+
+	Json::Value provenanceInfo = params["provenance"];
+	if (provenanceInfo.isObject()) {
+		provenance = Provenance(
+				provenanceInfo.get("citation", "").asString(),
+				provenanceInfo.get("license", "").asString(),
+				provenanceInfo.get("uri", "").asString(),
+				""
+				);
+	}
 }
 
 
@@ -228,11 +240,24 @@ void CSVSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 	columns["numeric"] = numeric;
 	params["columns"] = columns;
 
+	Json::Value provenanceInfo;
+	provenanceInfo["citation"] = provenance.citation;
+	provenanceInfo["license"] = provenance.license;
+	provenanceInfo["uri"] = provenance.uri;
+	params["provenance"] = provenanceInfo;
+
 	Json::FastWriter writer;
 	stream << writer.write(params);
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
+
+void CSVSourceOperator::getProvenance(ProvenanceCollection &pc) {
+	provenance.local_identifier = "data." + getType() + "." + filename;
+
+	pc.add(provenance);
+}
+
 static uint64_t getFilesize(const char *filename) {
     struct stat st;
     if (stat(filename, &st) == 0)

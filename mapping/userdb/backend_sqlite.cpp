@@ -12,10 +12,12 @@ class SQLiteUserDBBackend : public UserDBBackend {
 		virtual ~SQLiteUserDBBackend();
 
 	protected:
-		virtual userid_t createUser(const std::string &username, const std::string &password);
+		virtual userid_t createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password, const std::string &externalid);
 		virtual UserData loadUser(userid_t userid);
 		virtual userid_t authenticateUser(const std::string &username, const std::string &password);
-		virtual void changeUserPassword(userid_t userid, const std::string &password);
+		virtual userid_t findExternalUser(const std::string &externalid);
+		virtual void setUserExternalid(userid_t userid, const std::string &externalid);
+		virtual void setUserPassword(userid_t userid, const std::string &password);
 		virtual void addUserPermission(userid_t userid, const std::string &permission);
 		virtual void removeUserPermission(userid_t userid, const std::string &permission);
 
@@ -45,10 +47,15 @@ SQLiteUserDBBackend::SQLiteUserDBBackend(const std::string &filename) {
 	db.exec("CREATE TABLE IF NOT EXISTS users ("
 		" userid INTEGER PRIMARY KEY,"
 		" username STRING NOT NULL,"
-		" pwhash STRING NOT NULL"
+		" realname STRING NOT NULL,"
+		" email STRING NOT NULL,"
+		" pwhash STRING NOT NULL,"
+		" externalid STRING"
 		")"
 	);
 	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS unique_username ON users(username)");
+	// NULL values do not count for the unique index in sqlite
+	db.exec("CREATE UNIQUE INDEX IF NOT EXISTS unique_externalid ON users(externalid)");
 
 	db.exec("CREATE TABLE IF NOT EXISTS user_permissions ("
 		" userid INTEGER NOT NULL,"
@@ -57,7 +64,6 @@ SQLiteUserDBBackend::SQLiteUserDBBackend(const std::string &filename) {
 		")"
 	);
 
-	// TODO: hat eine Gruppe einen "owner" zur Administration?
 	db.exec("CREATE TABLE IF NOT EXISTS groups ("
 		" groupid INTEGER PRIMARY KEY,"
 		" groupname STRING NOT NULL"
@@ -97,10 +103,19 @@ SQLiteUserDBBackend::~SQLiteUserDBBackend() {
 /*
  * Users
  */
-UserDBBackend::userid_t SQLiteUserDBBackend::createUser(const std::string &username, const std::string &password) {
-	auto stmt = db.prepare("INSERT INTO users (username, pwhash) VALUES (?, ?)");
+UserDBBackend::userid_t SQLiteUserDBBackend::createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password, const std::string &externalid) {
+	auto stmt = db.prepare("INSERT INTO users (username, realname, email, pwhash, externalid) VALUES (?, ?, ?, ?, ?)");
 	stmt.bind(1, username);
-	stmt.bind(2, createPwdHash(password));
+	stmt.bind(2, realname);
+	stmt.bind(3, email);
+	if (externalid != "") {
+		stmt.bind(4, "external");
+		stmt.bind(5, externalid);
+	}
+	else {
+		stmt.bind(4, createPwdHash(password));
+		stmt.bind(5, nullptr);
+	}
 	stmt.exec();
 	return db.getLastInsertId();
 }
@@ -137,13 +152,29 @@ UserDBBackend::userid_t SQLiteUserDBBackend::authenticateUser(const std::string 
 	std::string pwhash = stmt.getString(1);
 	if (!verifyPwdHash(password, pwhash))
 		throw UserDB::authentication_error("UserDB: username or password wrong");
-	stmt.finalize();
 
 	return userid;
 }
 
-void SQLiteUserDBBackend::changeUserPassword(userid_t userid, const std::string &password) {
-	auto stmt = db.prepare("UPDATE users SET pwhash = ? WHERE userid = ? LIMIT 1");
+UserDBBackend::userid_t SQLiteUserDBBackend::findExternalUser(const std::string &externalid) {
+	auto stmt = db.prepare("SELECT userid FROM users WHERE externalid = ?");
+	stmt.bind(1, externalid);
+	if (!stmt.next())
+		throw UserDB::authentication_error("UserDB: username or password wrong");
+	auto userid = stmt.getInt64(0);
+
+	return userid;
+}
+
+void SQLiteUserDBBackend::setUserExternalid(userid_t userid, const std::string &externalid) {
+	auto stmt = db.prepare("UPDATE users SET pwhash = 'external', externalid = ? WHERE userid = ? LIMIT 1");
+	stmt.bind(1, externalid);
+	stmt.bind(2, userid);
+	stmt.exec();
+}
+
+void SQLiteUserDBBackend::setUserPassword(userid_t userid, const std::string &password) {
+	auto stmt = db.prepare("UPDATE users SET pwhash = ?, externalid = NULL WHERE userid = ? LIMIT 1");
 	stmt.bind(1, createPwdHash(password));
 	stmt.bind(2, userid);
 	stmt.exec();

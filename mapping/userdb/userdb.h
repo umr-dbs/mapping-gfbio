@@ -51,7 +51,8 @@ class UserDB {
 				bool hasPermission(const std::string &permission) { return all_permissions.hasPermission(permission); }
 				std::shared_ptr<User> joinGroup(const UserDB::Group &group);
 				std::shared_ptr<User> leaveGroup(const UserDB::Group &group);
-				void changePassword(const std::string &password);
+				void setPassword(const std::string &password);
+				void setExternalid(const std::string &externalid);
 				std::shared_ptr<User> addPermission(const std::string &permission);
 				std::shared_ptr<User> removePermission(const std::string &permission);
 			private:
@@ -104,8 +105,10 @@ class UserDB {
 		static void init(const std::string &backend, const std::string &location);
 		static void shutdown();
 
-		static std::shared_ptr<User> createUser(const std::string &username, const std::string &password);
+		static std::shared_ptr<User> createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password);
+		static std::shared_ptr<User> createExternalUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &externalid);
 		static std::shared_ptr<Session> createSession(const std::string &username, const std::string &password, time_t duration_in_seconds = 0);
+		static std::shared_ptr<Session> createSessionForExternalUser(const std::string &externalid, time_t duration_in_seconds = 0);
 		static std::shared_ptr<Session> loadSession(const std::string &token);
 
 		static std::shared_ptr<Group> createGroup(const std::string &groupname);
@@ -116,7 +119,8 @@ class UserDB {
 		static std::shared_ptr<User> loadUser(userid_t userid);
 		static void addUserPermission(userid_t userid, const std::string &permission);
 		static void removeUserPermission(userid_t userid, const std::string &permission);
-		static void changeUserPassword(userid_t userid, const std::string &password);
+		static void setUserPassword(userid_t userid, const std::string &password);
+		static void setUserExternalid(userid_t userid, const std::string &externalid);
 
 		static std::shared_ptr<Group> loadGroup(groupid_t groupid);
 		static void addGroupPermission(groupid_t groupid, const std::string &permission);

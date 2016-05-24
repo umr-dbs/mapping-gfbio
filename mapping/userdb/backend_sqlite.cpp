@@ -6,7 +6,6 @@
 
 
 class SQLiteUserDBBackend : public UserDBBackend {
-	friend class UserDB;
 	public:
 		SQLiteUserDBBackend(const std::string &filename);
 		virtual ~SQLiteUserDBBackend();
@@ -121,11 +120,15 @@ UserDBBackend::userid_t SQLiteUserDBBackend::createUser(const std::string &usern
 }
 
 UserDBBackend::UserData SQLiteUserDBBackend::loadUser(userid_t userid) {
-	auto stmt = db.prepare("SELECT username FROM users WHERE userid = ?");
+	auto stmt = db.prepare("SELECT username, externalid FROM users WHERE userid = ?");
 	stmt.bind(1, userid);
 	if (!stmt.next())
 		throw UserDB::database_error("UserDB: user not found");
 	std::string username = stmt.getString(0);
+	auto externalid_ptr = stmt.getString(1);
+	std::string externalid;
+	if (externalid_ptr != nullptr)
+		externalid = std::string(externalid_ptr);
 	stmt.finalize();
 
 	stmt = db.prepare("SELECT permission FROM user_permissions WHERE userid = ?");
@@ -140,7 +143,7 @@ UserDBBackend::UserData SQLiteUserDBBackend::loadUser(userid_t userid) {
 	while (stmt.next())
 		groups.push_back(stmt.getInt64(0));
 
-	return UserData{userid, username, std::move(permissions), std::move(groups)};
+	return UserData{userid, username, externalid, std::move(permissions), std::move(groups)};
 }
 
 UserDBBackend::userid_t SQLiteUserDBBackend::authenticateUser(const std::string &username, const std::string &password) {

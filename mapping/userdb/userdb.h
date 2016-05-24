@@ -45,9 +45,10 @@ class UserDB {
 		};
 		class User {
 			public:
-				User(userid_t userid, const std::string &username, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups);
+				User(userid_t userid, const std::string &username, const std::string &externalid, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups);
 
 				const std::string &getUsername() { return username; }
+				const std::string &getExternalid() { return externalid; }
 				bool hasPermission(const std::string &permission) { return all_permissions.hasPermission(permission); }
 				std::shared_ptr<User> joinGroup(const UserDB::Group &group);
 				std::shared_ptr<User> leaveGroup(const UserDB::Group &group);
@@ -58,6 +59,7 @@ class UserDB {
 			private:
 				userid_t userid;
 				std::string username;
+				std::string externalid;
 				std::vector<std::shared_ptr<Group>> groups;
 				Permissions user_permissions;
 				Permissions all_permissions;

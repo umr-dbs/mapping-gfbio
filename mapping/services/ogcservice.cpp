@@ -4,6 +4,11 @@
 #include "util/timeparser.h"
 #include "util/exceptions.h"
 
+#include <archive.h>
+#include <archive_entry.h>
+#include <cstring>
+#include <vector>
+
 
 epsg_t OGCService::parseEPSG(const Params &params, const std::string &key, epsg_t defaultValue) {
 	if (!params.hasParam(key))
@@ -162,4 +167,62 @@ void OGCService::outputSimpleFeatureCollectionARFF(HTTPResponseStream &stream, S
 	stream.sendHeader("Content-Disposition", "attachment; filename=\"export.arff\"");
 	stream.finishHeaders();
 	stream << collection->toARFF();
+}
+
+void OGCService::exportZip(const char* data, size_t dataLength, const std::string &format, ProvenanceCollection &provenance) {
+	//data file name
+	std::string fileExtension;
+	if (format == "application/json")
+		fileExtension = "json";
+	else if (format == "csv")
+		fileExtension = "csv";
+	else
+		throw ArgumentException("WFSService: unknown output format");
+	std::string fileName = "data." + fileExtension;
+
+	//archive creation
+	struct archive *archive;
+	struct archive_entry *entry;
+
+	size_t bufferSize = dataLength * 2; //TODO determine reasonable size?
+	std::vector<char> buffer(bufferSize);
+
+	archive = archive_write_new();
+
+	archive_write_set_format_zip(archive);
+	size_t used;
+	archive_write_open_memory(archive, buffer.data(), bufferSize, &used);
+
+	//data
+	entry = archive_entry_new();
+	archive_entry_set_pathname(entry, fileName.c_str());
+	archive_entry_set_size(entry, dataLength);
+	archive_entry_set_filetype(entry, AE_IFREG);
+	archive_entry_set_perm(entry, 0644);
+	archive_write_header(archive, entry);
+
+	archive_write_data(archive, data, dataLength);
+	archive_entry_free(entry);
+
+	//provenance info
+	//TODO: format provenance info
+	std::string json = provenance.toJson();
+	entry = archive_entry_new();
+	archive_entry_set_pathname(entry, "provenance.txt");
+	archive_entry_set_size(entry, json.length());
+	archive_entry_set_filetype(entry, AE_IFREG);
+	archive_entry_set_perm(entry, 0644);
+	archive_write_header(archive, entry);
+
+	archive_write_data(archive, json.c_str(), json.length());
+	archive_entry_free(entry);
+
+	archive_write_close(archive);
+	archive_write_free(archive);
+
+	result.sendContentType(EXPORT_MIME_PREFIX + format);
+	result.sendHeader("Content-Disposition", "attachment; filename=export.zip");
+	result.sendHeader("Content-Length", concat(used));
+	result.finishHeaders();
+	result.write(reinterpret_cast<const char*>(buffer.data()), used);
 }

@@ -5,6 +5,7 @@
 #include "datatypes/spatiotemporal.h"
 #include "datatypes/simplefeaturecollection.h"
 #include "datatypes/raster/raster_priv.h"
+#include "operators/provenance.h"
 
 /*
  * This is an abstract helper class to implement services of the OGC.
@@ -22,6 +23,10 @@ class OGCService : public HTTPService {
 		void outputSimpleFeatureCollectionGeoJSON(HTTPResponseStream &stream, SimpleFeatureCollection *collection, bool displayMetadata = false);
 		void outputSimpleFeatureCollectionCSV(HTTPResponseStream &stream, SimpleFeatureCollection *collection);
 		void outputSimpleFeatureCollectionARFF(HTTPResponseStream &stream, SimpleFeatureCollection* collection);
+
+		void exportZip(const char* data, size_t dataLength, const std::string &format, ProvenanceCollection &provenance);
+
+		static constexpr const char* EXPORT_MIME_PREFIX = "application/x-export;";
 };
 
 

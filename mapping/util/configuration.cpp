@@ -8,6 +8,7 @@
 #include <string>
 #include <algorithm>
 #include <cstdlib>
+#include <vector>
 
 #include <unistd.h>
 #include <sys/types.h>
@@ -197,7 +198,9 @@ bool Configuration::parseBool(const std::string &str) {
 	if (str == "0")
 		return false;
 	std::string strtl;
+	strtl.resize( str.length() );
 	std::transform(str.cbegin(), str.cend(), strtl.begin(), ::tolower);
+
 	if (strtl == "true" || strtl == "yes")
 		return true;
 	if (strtl == "false" || strtl == "no")

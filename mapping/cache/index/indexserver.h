@@ -49,7 +49,7 @@ public:
 	 * @param reorg_strategy the name of the reorg-strategy to use
 	 * @param relevance_function the name of the relevance-function to use
 	 */
-	IndexServer( int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function );
+	IndexServer( int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function, const std::string &scheduler = "default" );
 	virtual ~IndexServer() = default;
 
 	/* Fires up the index-server and will return after
@@ -119,6 +119,8 @@ private:
 	 */
 	void reorganize(bool force = false);
 
+	void wakeup();
+
 	// The currently known nodes
 	std::map<uint32_t,std::shared_ptr<Node>> nodes;
 	// Connections
@@ -138,13 +140,15 @@ private:
 	uint32_t next_node_id;
 
 	// The query-manager handling request-scheduling
-	QueryManager query_manager;
+	std::unique_ptr<QueryManager> query_manager;
 
 	// timestamp of the last reorganization
 	time_t last_reorg;
 
 	// Interval for stats-updates and reorg (in ms)
 	time_t update_interval;
+
+	BinaryStream wakeup_pipe;
 };
 
 #endif /* INDEX_INDEXSERVER_H_ */

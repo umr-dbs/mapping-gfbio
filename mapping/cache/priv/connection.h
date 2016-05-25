@@ -11,6 +11,7 @@
 #include "cache/priv/requests.h"
 #include "cache/priv/cache_stats.h"
 #include "cache/priv/redistribution.h"
+#include "util/binarystream.h"
 
 #include "util/concat.h"
 #include "util/exceptions.h"
@@ -39,7 +40,7 @@ public:
 	 * @param params the data to send
 	 */
 	template<typename... Params>
-	static std::unique_ptr<BlockingConnection> create(const std::string host, int port, bool no_delay, const Params &... params );
+	static std::unique_ptr<BlockingConnection> create(const std::string &host, int port, bool no_delay, const Params &... params );
 
 	/**
 	 * Constructs a new instance by opening a socket to the given host and port
@@ -48,7 +49,8 @@ public:
 	 * @param no_delay whether to disable nagle's algorithm
 	 *
 	 */
-	BlockingConnection( const std::string host, int port, bool no_delay = true ) : socket(BinaryStream::connectTCP(host.c_str(),port,no_delay)) {}
+	BlockingConnection( const std::string host, int port, bool no_delay = true ) :
+		socket(BinaryStream::connectTCP(host.c_str(),port,no_delay)) {}
 
 	/**
 	 * Writes the given parameters to the underlying stream
@@ -61,36 +63,7 @@ public:
 	 * Reads data from the underlying stream
 	 * @return a buffer containing the data read
 	 */
-	std::unique_ptr<BinaryReadBuffer> read() {
-		auto result = make_unique<BinaryReadBuffer>();
-		socket.read(*result);
-		return result;
-	}
-
-	/**
-	 * Reads data from the underlying stream, if any.
-	 * Blocks until either data is available or the given timeout is reached.
-	 * @param timeout the timeout in seconds
-	 * @return a buffer containing the data read
-	 */
-	std::unique_ptr<BinaryReadBuffer> read_timeout(int timeout) {
-		struct timeval tv { timeout, 0 };
-		fd_set readfds;
-		FD_ZERO(&readfds);
-		FD_SET(socket.getReadFD(), &readfds);
-
-		int ret = select(socket.getReadFD()+1, &readfds, nullptr, nullptr, &tv);
-		if ( ret > 0 ) {
-			return read();
-		}
-		else if ( ret == 0 )
-			throw TimeoutException("No data available");
-		else if ( errno == EINTR )
-			throw InterruptedException("Select interrupted");
-		else {
-			throw NetworkException(concat("UnixSocket: read() failed: ", strerror(errno)));
-		}
-	}
+	std::unique_ptr<BinaryReadBuffer> read();
 
 	/**
 	 * Issues a write followed by a read
@@ -109,12 +82,12 @@ private:
 
 	template<typename Head, typename... Tail>
 	void _internal_write(BinaryWriteBuffer &buffer, const Head &head, const Tail &... tail);
-
+protected:
 	BinaryStream socket;
 };
 
 template<typename... Params>
-std::unique_ptr<BlockingConnection> BlockingConnection::create(const std::string host, int port, bool no_delay, const Params &... params ) {
+std::unique_ptr<BlockingConnection> BlockingConnection::create(const std::string &host, int port, bool no_delay, const Params &... params ) {
 	auto result = make_unique<BlockingConnection>(host,port,no_delay);
 	result->write(params...);
 	return result;
@@ -137,6 +110,45 @@ void BlockingConnection::_internal_write(BinaryWriteBuffer &buffer, const Head &
 	buffer.write(head);
 	_internal_write(buffer, tail...);
 }
+
+
+class WakeableBlockingConnection : public BlockingConnection {
+public:
+	/**
+	 * Creates a new blocking connection and immediately sends the given data (e.g. handshake).
+	 * @param host the hostname to connect to
+	 * @param port the port to connect to
+	 * @param no_delay whether to disable nagle's algorithm
+	 * @param params the data to send
+	 */
+	template<typename... Params>
+	static std::unique_ptr<WakeableBlockingConnection> create(const std::string host, int port, BinaryStream &wakeup_pipe, bool consume_wakeup, bool no_delay, const Params &... params ) {
+		auto result = make_unique<WakeableBlockingConnection>(host,port,wakeup_pipe,consume_wakeup,no_delay);
+		result->write(params...);
+		return result;
+	}
+
+	/**
+	 * Constructs a new instance by opening a socket to the given host and port
+	 * @param host the hostname to connect to
+	 * @param port the port to connect to
+	 * @param no_delay whether to disable nagle's algorithm
+	 *
+	 */
+	WakeableBlockingConnection( const std::string host, int port, BinaryStream &wakeup_pipe, bool consume_wakeup = false, bool no_delay = true ) :
+		BlockingConnection(host,port,no_delay), wakeup_pipe(wakeup_pipe), consume_wakeup(consume_wakeup) {}
+
+	/**
+	 * Reads data from the underlying stream, if any.
+	 * Blocks until either data is available or the given timeout is reached.
+	 * @param timeout the timeout in seconds
+	 * @return a buffer containing the data read
+	 */
+	std::unique_ptr<BinaryReadBuffer> read_timeout(int timeout);
+private:
+	BinaryStream &wakeup_pipe;
+	bool consume_wakeup;
+};
 
 /**
  * Models a newly established non-blocking connection

@@ -52,7 +52,7 @@ bool NopCacheWrapper<T>::put(const std::string& semantic_id,
 }
 
 template<typename T>
-std::unique_ptr<T> NopCacheWrapper<T>::query(const GenericOperator& op,
+std::unique_ptr<T> NopCacheWrapper<T>::query(GenericOperator& op,
 		const QueryRectangle& rect, QueryProfiler &profiler) {
 	(void) op;
 	(void) rect;
@@ -109,7 +109,7 @@ bool ClientCacheWrapper<T>::put(const std::string& semantic_id,
 
 template<typename T>
 std::unique_ptr<T> ClientCacheWrapper<T>::query(
-		const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
+		GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
 	(void) profiler;
 
 

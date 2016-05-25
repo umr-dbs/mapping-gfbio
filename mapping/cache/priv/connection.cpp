@@ -24,6 +24,43 @@
 #include <fcntl.h>
 #include <netdb.h>
 
+
+std::unique_ptr<BinaryReadBuffer> BlockingConnection::read()  {
+	auto result = make_unique<BinaryReadBuffer>();
+	socket.read(*result);
+	return result;
+}
+
+
+std::unique_ptr<BinaryReadBuffer> WakeableBlockingConnection::read_timeout(
+		int timeout) {
+	struct timeval tv { timeout, 0 };
+			fd_set readfds;
+			FD_ZERO(&readfds);
+			FD_SET(socket.getReadFD(), &readfds);
+			FD_SET(wakeup_pipe.getReadFD(), &readfds);
+			int max_fd = std::max(socket.getReadFD(),wakeup_pipe.getReadFD());
+
+			int ret = select(max_fd+1, &readfds, nullptr, nullptr, &tv);
+			if ( ret > 0 ) {
+				if ( FD_ISSET(wakeup_pipe.getReadFD(),&readfds) && consume_wakeup ) {
+					// we have been woken, now we need to read any outstanding data or the pipe will remain readable
+					char buf[1024];
+					::read(wakeup_pipe.getReadFD(), buf, 1024);
+				}
+				if ( FD_ISSET(socket.getReadFD(),&readfds))
+					return read();
+				throw TimeoutException("No data available");
+			}
+			else if ( ret == 0 )
+				throw TimeoutException("No data available");
+			else if ( errno == EINTR )
+				throw InterruptedException("Select interrupted");
+			else {
+				throw NetworkException(concat("UnixSocket: read() failed: ", strerror(errno)));
+			}
+}
+
 ///////////////////////////////////////////////////////////
 //
 // NewNBConnection
@@ -728,5 +765,5 @@ template void DeliveryConnection::send_move( const CacheEntry&, std::shared_ptr<
 template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const PointCollection>& );
 template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const LineCollection>& );
 template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const PolygonCollection>& );
-template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const GenericPlot>& );
-
+template void DeliveryConnection::write_data(BinaryWriteBuffer&,
+		std::shared_ptr<const GenericPlot>&);

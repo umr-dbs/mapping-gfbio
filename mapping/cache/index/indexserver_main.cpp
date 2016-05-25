@@ -61,7 +61,14 @@ int main(void) {
 
 	std::string rs = Configuration::get("indexserver.reorg.strategy");
 	std::string rel = Configuration::get("indexserver.reorg.relevance","lru");
-	instance = new IndexServer(portnr, 10000, rs, rel);
+	std::string scheduler = Configuration::get("indexserver.scheduler","default");
+
+//	scheduler = "default";
+	size_t update_interval = 2000;
+	if ( scheduler == "dema" )
+		update_interval = 0;
+
+	instance = new IndexServer(portnr, update_interval, rs, rel, scheduler);
 	instance->run();
 	return 0;
 }

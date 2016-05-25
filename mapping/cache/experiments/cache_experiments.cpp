@@ -70,7 +70,7 @@ void LocalCacheExperiment::run_once() {
 	NopCacheManager ncm;
 	execute(&ncm, uncached_accum);
 	// Cached
-	LocalCacheManager lcm(CachingStrategy::by_name("always"),capacity, capacity, capacity, capacity, capacity);
+	LocalCacheManager lcm("always","lru",capacity, capacity, capacity, capacity, capacity);
 	execute(&lcm, cached_accum);
 }
 
@@ -130,7 +130,7 @@ void PuzzleExperiment::run_once() {
 	QueryProfiler qp;
 	double d = (query.x2-query.x1) / 4;
 
-	LocalCacheManager lcm(CachingStrategy::by_name("always"),capacity, capacity, capacity, capacity, capacity);
+	LocalCacheManager lcm("always", "lru",capacity, capacity, capacity, capacity, capacity);
 	CacheManager::init(&lcm);
 
 	QueryProfiler timer;
@@ -140,7 +140,7 @@ void PuzzleExperiment::run_once() {
 	accum[0] += timer.self_cpu;
 
 	for ( size_t i = 1; i < 4; i++ ) {
-		LocalCacheManager lcm(CachingStrategy::by_name("always"),capacity, capacity, capacity, capacity, capacity);
+		LocalCacheManager lcm("always", "lru",capacity, capacity, capacity, capacity, capacity);
 		CacheManager::init(&lcm);
 		execute_query(QTriple(CacheType::RASTER,query,query_spec.workflow),qp);
 
@@ -322,8 +322,7 @@ void QueryBatchingExperiment::print_results() {
 }
 
 void QueryBatchingExperiment::run_once() {
-	auto s = CachingStrategy::by_name("never");
-	LocalCacheManager lcm(std::move(s),capacity,capacity,capacity,capacity,capacity);
+	LocalCacheManager lcm("never", "lru",capacity,capacity,capacity,capacity,capacity);
 	CacheManager::init(&lcm);
 	execute_queries(queries,accum_unbatched);
 	exec(1,1);
@@ -474,14 +473,14 @@ void StrategyExperiment::print_results() {
 }
 
 void StrategyExperiment::run_once() {
-	exec(make_unique<CacheAll>(), get_accum("Always"));
-	exec(make_unique<SimpleThresholdStrategy>(CachingStrategy::Type::UNCACHED), get_accum(concat("Simple, Uncached")));
-	exec(make_unique<SimpleThresholdStrategy>(CachingStrategy::Type::SELF), get_accum(concat("Simple, Self")));
+	exec("always", get_accum("Always"));
+	exec("uncached", get_accum(concat("Simple, Uncached")));
+	exec("self", get_accum(concat("Simple, Self")));
 }
 
-void StrategyExperiment::exec(std::unique_ptr<CachingStrategy> strategy, std::pair<uint64_t,uint64_t> &accum ) {
+void StrategyExperiment::exec(const std::string &strategy, std::pair<uint64_t,uint64_t> &accum ) {
 	QueryProfiler qp;
-	LocalCacheManager lcm( std::move(strategy), capacity, capacity, capacity, capacity, capacity );
+	LocalCacheManager lcm( strategy, "lru", capacity, capacity, capacity, capacity, capacity );
 	CacheManager::init(&lcm);
 
 	TimePoint start, end;
@@ -493,8 +492,9 @@ void StrategyExperiment::exec(std::unique_ptr<CachingStrategy> strategy, std::pa
 
 	std::vector<CacheType> types{ CacheType::RASTER,CacheType::POINT,CacheType::LINE,CacheType::POLYGON,CacheType::PLOT};
 	size_t bytes_used = 0;
-	for ( auto &t : types )
-		bytes_used += lcm.get_usage(t).capacity_used;
+	//FIXME: Port to new manager hierarchy
+//	for ( auto &t : types )
+//		bytes_used += lcm.get_usage(t).capacity_used;
 
 	accum.first  += duration(start,end);
 	accum.second += bytes_used;

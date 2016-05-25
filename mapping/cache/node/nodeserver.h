@@ -137,6 +137,8 @@ private:
 	 */
 	void confirm_move( BlockingConnection &del_stream, const ReorgMoveItem& item, uint64_t new_id );
 
+	void wakeup();
+
 	/** Indicator telling if the server should shutdown */
 	bool shutdown;
 
@@ -149,6 +151,9 @@ private:
 	/** This node's listen-port (for delivery-connections) */
 	uint32_t my_port;
 
+	/** This node's hostname */
+	std::string my_host;
+
 	/** The hostname of the index-server */
 	std::string index_host;
 
@@ -159,7 +164,7 @@ private:
 	int num_treads;
 
 	/** The control-connection */
-	std::unique_ptr<BlockingConnection> control_connection;
+	std::unique_ptr<WakeableBlockingConnection> control_connection;
 
 	/** The delivery-manager */
 	DeliveryManager delivery_manager;
@@ -172,6 +177,8 @@ private:
 
 	/** The currently running worker-threads */
 	std::vector<std::unique_ptr<std::thread>> workers;
+
+	BinaryStream wakeup_pipe;
 };
 
 #endif /* NODE_NODESERVER_H_ */

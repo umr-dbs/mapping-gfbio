@@ -6,6 +6,8 @@
  */
 
 #include "cache/node/nodeserver.h"
+#include "cache/node/manager/remote_manager.h"
+#include "cache/node/manager/local_manager.h"
 #include "cache/manager.h"
 #include "cache/common.h"
 #include "util/configuration.h"
@@ -66,6 +68,8 @@ int main(void) {
 	auto numThreadsstr = Configuration::get("nodeserver.threads", "4");
 	auto num_threads = atoi(numThreadsstr.c_str());
 
+	std::string mgr  = Configuration::get("nodeserver.cache.manager","remote");
+	std::string repl = Configuration::get("nodeserver.cache.local.replacement","lru");
 	std::string cs = Configuration::get("nodeserver.cache.strategy");
 	size_t raster_size = atoi(Configuration::get("nodeserver.cache.raster.size").c_str());
 	size_t point_size = atoi(Configuration::get("nodeserver.cache.points.size").c_str());
@@ -79,8 +83,21 @@ int main(void) {
 	CachingStrategy::init();
 
 	// Inititalize cache
-	std::unique_ptr<NodeCacheManager> cache_impl = make_unique<NodeCacheManager>(
-			CachingStrategy::by_name(cs), raster_size, point_size, line_size, polygon_size, plot_size);
+	std::unique_ptr<NodeCacheManager> cache_impl;
+
+	std::string mgrlc;
+	mgrlc.resize(mgr.size());
+	std::transform(mgr.cbegin(),mgr.cend(),mgrlc.begin(),::tolower);
+
+//	mgrlc = "remote";
+//	repl = "lru";
+
+	if ( mgrlc == "remote" )
+		cache_impl = make_unique<RemoteCacheManager>(cs, raster_size, point_size, line_size, polygon_size, plot_size);
+	else if ( mgrlc == "local" )
+		cache_impl = make_unique<LocalCacheManager>(cs, repl, raster_size, point_size, line_size, polygon_size, plot_size);
+	else
+		throw ArgumentException(concat("Unknown manager impl: ", mgr));
 
 
 	CacheManager::init( cache_impl.get() );

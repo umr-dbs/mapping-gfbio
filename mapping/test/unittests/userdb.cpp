@@ -14,12 +14,13 @@ TEST(UserDB, testALL) {
 	const std::string username = "dummy";
 	const std::string password = "12345";
 	const std::string password2 = "luggage";
+	const std::string externalid = "externalsystem:42";
 	const std::string groupname = "mygroup";
 	const std::string userpermission = "user_can_do_stuff";
 	const std::string grouppermission = "group_members_can_do_stuff";
 
 	// Create a user
-	auto user = UserDB::createUser(username, password);
+	auto user = UserDB::createUser(username, "realname", "email", password);
 	EXPECT_EQ(user->getUsername(), username);
 
 	// Test user permissions
@@ -52,9 +53,14 @@ TEST(UserDB, testALL) {
 	EXPECT_THROW(UserDB::loadSession(sessiontoken), UserDB::session_expired_error);
 
 	// change password, try logging in again
-	user->changePassword(password2);
+	user->setPassword(password2);
 	EXPECT_THROW(UserDB::createSession(username, password), UserDB::authentication_error);
 	EXPECT_NO_THROW(UserDB::createSession(username, password2));
+
+	// mark user as an external user, having no own password
+	user->setExternalid(externalid);
+	EXPECT_THROW(UserDB::createSession(username, password2), UserDB::authentication_error);
+	EXPECT_NO_THROW(UserDB::createSessionForExternalUser(externalid));
 
 	// create a group
 	auto group = UserDB::createGroup(groupname);

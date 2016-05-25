@@ -646,7 +646,7 @@ static int showprovenance(int argc, char *argv[]) {
 
 static int userdb_usage() {
 	printf("Commands for userdb:\n");
-	printf("%s userdb adduser <username> <password>\n", program_name);
+	printf("%s userdb adduser <username> <realname> <email> <password>\n", program_name);
 	return 5;
 }
 
@@ -658,8 +658,8 @@ static int userdb(int argc, char *argv[]) {
 		UserDB::initFromConfiguration();
 
 		std::string command = argv[2];
-		if (command == "adduser" && argc == 5) {
-			auto user = UserDB::createUser(argv[3], argv[4]);
+		if (command == "adduser" && argc == 7) {
+			auto user = UserDB::createUser(argv[3], argv[4], argv[5], argv[6]);
 			printf("ok\n");
 			return 0;
 		}

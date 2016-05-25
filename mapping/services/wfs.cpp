@@ -41,15 +41,11 @@ class WFSService : public OGCService {
 
 		std::string getResponse(const Params &params);
 
-		virtual void run() {
-			result.sendContentType("application/json");
-			result.finishHeaders();
-			result << getResponse(params);
-		}
+		virtual void run();
 
 	private:
 		std::string getCapabilities();
-		std::string getFeature(const Params &params);
+		void getFeature();
 
 		// TODO: implement
 		std::string describeFeatureType();
@@ -71,51 +67,51 @@ class WFSService : public OGCService {
 REGISTER_HTTP_SERVICE(WFSService, "WFS");
 
 
-std::string WFSService::getResponse(const Params &parameters) {
-	if (!parameters.hasParam("version") || parameters.get("version") != "2.0.0") {
-		return "wrong version"; // TODO: Error message
+void WFSService::run() {
+	if (!params.hasParam("version") || params.get("version") != "2.0.0") {
+		result.send500("wrong version");
 	}
 
-	switch (stringToRequest.at(parameters.get("request"))) {
+	switch (stringToRequest.at(params.get("request"))) {
 	case WFSServiceType::GetCapabilities:
-		return getCapabilities();
+		getCapabilities();
 
 		break;
 	case WFSServiceType::GetFeature:
-		return getFeature(parameters);
+		getFeature();
 
 		break;
 	default:
-
-		return "wrong request"; // TODO exception
+		result.send500("wrong request");
 		break;
 	}
 }
 
 std::string WFSService::getCapabilities() {
-	return "";
+	result.sendContentType("text/html");
+	result.finishHeaders();
 }
 
-std::string WFSService::getFeature(const Params& parameters) {
-	if(!parameters.hasParam("typenames"))
+void WFSService::getFeature() {
+	if(!params.hasParam("typenames"))
 		throw ArgumentException("WFSService: typeNames parameter not specified");
 
-	std::pair<FeatureType, Json::Value> typeNames = parseTypeNames(parameters.get("typenames"));
+	std::pair<FeatureType, Json::Value> typeNames = parseTypeNames(params.get("typenames"));
 	FeatureType featureType = typeNames.first;
 	Json::Value query = typeNames.second;
 
-	TemporalReference tref = parseTime(parameters);
+	TemporalReference tref = parseTime(params);
 
 	// srsName=CRS
 	// this parameter is optional in WFS, but we use it here to create the Spatial Reference.
-	if(!parameters.hasParam("srsname"))
+	if(!params.hasParam("srsname"))
 		throw new ArgumentException("WFSService: Parameter srsname is missing");
-	epsg_t queryEpsg = this->parseEPSG(parameters, "srsname");
+	epsg_t queryEpsg = this->parseEPSG(params, "srsname");
 
 
 	SpatialReference sref(queryEpsg);
-	if(parameters.hasParam("bbox")) {
-		sref = parseBBOX(parameters.get("bbox"), queryEpsg);
+	if(params.hasParam("bbox")) {
+		sref = parseBBOX(params.get("bbox"), queryEpsg);
 	}
 
 	auto graph = GenericOperator::fromJSON(query);
@@ -144,10 +140,10 @@ std::string WFSService::getFeature(const Params& parameters) {
 
 	//clustered is ignored for non-point collections
 	//TODO: implement this as VSP or other operation?
-	if (parameters.hasParam("clustered") && parameters.getBool("clustered", false) && featureType == FeatureType::POINTS) {
+	if (params.hasParam("clustered") && params.getBool("clustered", false) && featureType == FeatureType::POINTS) {
 		PointCollection& points = dynamic_cast<PointCollection&>(*features);
 
-		features = clusterPoints(points, parameters);
+		features = clusterPoints(points, params);
 	}
 
 
@@ -180,18 +176,36 @@ std::string WFSService::getFeature(const Params& parameters) {
 	// default is "application/gml+xml; version=3.2"
 
 	//TODO: respect default output format of WFS and support more datatypes
-	auto format = parameters.get("outputformat", "application/json");
+	auto format = params.get("outputformat", "application/json");
+	fprintf(stderr, "aaaaaaaaaaa %s %d\n", format.c_str(), format.find(EXPORT_MIME_PREFIX));
+	bool exportMode = false;
+	if(format.find(EXPORT_MIME_PREFIX) == 0) {
+		exportMode = true;
+		format = format.substr(strlen(EXPORT_MIME_PREFIX));
+	}
+
+	std::string output;
 	if (format == "application/json")
-		return features->toGeoJSON(true);
+		output = features->toGeoJSON(true);
 	else if (format == "csv")
-		return features->toCSV();
+		output = features->toCSV();
 	else
 		throw ArgumentException("WFSService: unknown output format");
+
+	if(exportMode) {
+		exportZip(output.c_str(), output.length(), format, *graph->getFullProvenance());
+	} else {
+		result.sendContentType(format);
+		result.finishHeaders();
+		result << output;
+	}
 	// VSPs
 	// O
 	// A server may implement additional KVP parameters that are not part of this International Standard. These are known as vendor-specific parameters. VSPs allow vendors to specify additional parameters that will enhance the results of requests. A server shall produce valid results even if the VSPs are missing, malformed or if VSPs are supplied that are not known to the server. Unknown VSPs shall be ignored.
 	// A server may choose not to advertise some or all of its VSPs. If VSPs are included in the Capabilities XML (see 8.3), the ows:ExtendedCapabilities element (see OGC 06-121r3:2009, 7.4.6) shall be extended accordingly. Additional schema documents may be imported containing the extension(s) of the ows:ExtendedCapabilities element. Any advertised VSP shall include or reference additional metadata describing its meaning (see 8.4). WFS implementers should choose VSP names with care to avoid clashes with WFS parameters defined in this International Standard.
 }
+
+
 
 std::unique_ptr<PointCollection> WFSService::clusterPoints(const PointCollection &points, const Params &params) const {
 

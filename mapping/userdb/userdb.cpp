@@ -41,8 +41,8 @@ bool UserDB::Permissions::hasPermission(const std::string &permission) {
 /*
  * User
  */
-UserDB::User::User(userid_t userid, const std::string &username, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups)
-	: userid(userid), username(username), groups(groups), user_permissions(user_permissions) {
+UserDB::User::User(userid_t userid, const std::string &username, const std::string &externalid, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups)
+	: userid(userid), username(username), externalid(externalid), groups(groups), user_permissions(user_permissions) {
 	all_permissions.addPermissions(user_permissions);
 	for (auto &group : groups)
 		all_permissions.addPermissions(group->group_permissions);
@@ -66,8 +66,13 @@ std::shared_ptr<UserDB::User> UserDB::User::removePermission(const std::string &
 	return UserDB::loadUser(userid);
 }
 
-void UserDB::User::changePassword(const std::string &password) {
-	UserDB::changeUserPassword(userid, password);
+void UserDB::User::setExternalid(const std::string &externalid) {
+	UserDB::setUserExternalid(userid, externalid);
+	this->externalid = externalid;
+}
+void UserDB::User::setPassword(const std::string &password) {
+	UserDB::setUserPassword(userid, password);
+	externalid = "";
 }
 
 /*
@@ -219,12 +224,16 @@ std::shared_ptr<UserDB::User> UserDB::loadUser(UserDB::userid_t userid) {
 	std::vector<std::shared_ptr<Group>> groups;
 	for (auto groupid : userdata.groupids)
 		groups.push_back(loadGroup(groupid));
-	auto user = std::make_shared<User>(userid, userdata.username, std::move(userdata.permissions), std::move(groups));
+	auto user = std::make_shared<User>(userid, userdata.username, userdata.externalid, std::move(userdata.permissions), std::move(groups));
 	return user;
 }
 
-std::shared_ptr<UserDB::User> UserDB::createUser(const std::string &username, const std::string &password) {
-	auto userid = userdb_backend->createUser(username, password);
+std::shared_ptr<UserDB::User> UserDB::createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password) {
+	auto userid = userdb_backend->createUser(username, realname, email, password, "");
+	return loadUser(userid);
+}
+std::shared_ptr<UserDB::User> UserDB::createExternalUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &externalid) {
+	auto userid = userdb_backend->createUser(username, realname, email, "", externalid);
 	return loadUser(userid);
 }
 
@@ -237,8 +246,12 @@ void UserDB::removeUserPermission(userid_t userid, const std::string &permission
 	// TODO: invalidate user cache
 }
 
-void UserDB::changeUserPassword(userid_t userid, const std::string &password) {
-	userdb_backend->changeUserPassword(userid, password);
+void UserDB::setUserPassword(userid_t userid, const std::string &password) {
+	userdb_backend->setUserPassword(userid, password);
+	// TODO: invalidate user cache
+}
+void UserDB::setUserExternalid(userid_t userid, const std::string &externalid) {
+	userdb_backend->setUserExternalid(userid, externalid);
 	// TODO: invalidate user cache
 }
 
@@ -278,6 +291,16 @@ std::shared_ptr<UserDB::Session> UserDB::createSession(const std::string &userna
 	if (duration_in_seconds > 0)
 		expires = time(nullptr) + duration_in_seconds;
 	auto userid = userdb_backend->authenticateUser(username, password);
+	auto sessiontoken = userdb_backend->createSession(userid, expires);
+	return loadSession(sessiontoken);
+}
+
+std::shared_ptr<UserDB::Session> UserDB::createSessionForExternalUser(const std::string &externalid, time_t duration_in_seconds) {
+	// API keys are normal sessions without an expiration date, modeled by expires = 0.
+	time_t expires = 0;
+	if (duration_in_seconds > 0)
+		expires = time(nullptr) + duration_in_seconds;
+	auto userid = userdb_backend->findExternalUser(externalid);
 	auto sessiontoken = userdb_backend->createSession(userid, expires);
 	return loadSession(sessiontoken);
 }

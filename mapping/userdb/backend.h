@@ -18,6 +18,7 @@ class UserDBBackend {
 		struct UserData {
 			userid_t userid;
 			std::string username;
+			std::string externalid;
 			UserDB::Permissions permissions;
 			std::vector<groupid_t> groupids;
 		};
@@ -35,10 +36,12 @@ class UserDBBackend {
 		};
 
 		// Users
-		virtual UserDB::userid_t createUser(const std::string &username, const std::string &password) = 0;
+		virtual userid_t createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password, const std::string &externalid) = 0;
 		virtual UserData loadUser(userid_t userid) = 0;
-		virtual UserDB::userid_t authenticateUser(const std::string &username, const std::string &password) = 0;
-		virtual void changeUserPassword(userid_t userid, const std::string &password) = 0;
+		virtual userid_t authenticateUser(const std::string &username, const std::string &password) = 0;
+		virtual userid_t findExternalUser(const std::string &externalid) = 0;
+		virtual void setUserExternalid(userid_t userid, const std::string &externalid) = 0;
+		virtual void setUserPassword(userid_t userid, const std::string &password) = 0;
 		virtual void addUserPermission(userid_t userid, const std::string &permission) = 0;
 		virtual void removeUserPermission(userid_t userid, const std::string &permission) = 0;
 

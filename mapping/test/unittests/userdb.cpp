@@ -115,7 +115,6 @@ TEST(UserDB, testALL) {
 	EXPECT_EQ("Test Project 2", artifacts[0].getName());
 	EXPECT_EQ("Test Project", artifacts[1].getName());
 
-
 	// share
 	// user2 has no access
 	user2 = UserDB::createUser(username + "2", "realname", "email", password);
@@ -126,7 +125,10 @@ TEST(UserDB, testALL) {
 	// user2 now has access
 	EXPECT_NO_THROW(UserDB::loadArtifact(*user2, user->getUsername(), "project", "Test Project"));
 
-	// check that shared artifacts are listed
+	artifact = UserDB::loadArtifact(*user, user->getUsername(), "rscript", "My R script");
+	user2 = artifact->shareWithUser(user2->getUsername());
+
+	// check that shared artifacts of type are listed
 	artifacts = UserDB::loadArtifactsOfType(*user2, "project");
 	EXPECT_EQ(1, artifacts.size());
 	EXPECT_EQ("Test Project", artifacts[0].getName());

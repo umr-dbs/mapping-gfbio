@@ -387,7 +387,8 @@ std::vector<UserDB::Artifact> UserDB::loadArtifactsOfType(const User &user, cons
 		if(permission.find("userdb.artifact.") == 0){
 			size_t artifactid = std::stoi(permission.substr(strlen("userdb.artifact.")));
 			auto artifactData = userdb_backend->loadArtifact(artifactid);
-			artifacts.push_back(UserDB::Artifact(artifactData.artifactid, loadUser(artifactData.userid), artifactData.type, artifactData.name, artifactData.lastChanged));
+			if(artifactData.type == type)
+				artifacts.push_back(UserDB::Artifact(artifactData.artifactid, loadUser(artifactData.userid), artifactData.type, artifactData.name, artifactData.lastChanged));
 		}
 	}
 

@@ -5,6 +5,8 @@
  *      Author: mika
  */
 
+#include "cache/node/manager/remote_manager.h"
+#include "cache/node/manager/local_manager.h"
 #include "cache/experiments/exp_util.h"
 #include "cache/experiments/cheat.h"
 
@@ -132,173 +134,22 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 
 
 //
-// Local cache manager
-//
-
-template<class T>
-LocalCacheWrapper<T>::LocalCacheWrapper(NodeCache<T>& cache, std::unique_ptr<Puzzler<T> > puzzler, LocalCacheManager &mgr) :
-	cache(cache), retriever(cache), puzzle_util(this->retriever, std::move(puzzler)), mgr(mgr) {
-}
-
-template<class T>
-bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
-		const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
-
-	mgr.costs.all_cpu += profiler.uncached_cpu;
-	mgr.costs.all_gpu += profiler.uncached_gpu;
-	mgr.costs.all_io  += profiler.uncached_io;
-
-	if ( mgr.worker_context.is_puzzling() )
-		return false;
-
-	size_t size = SizeUtil::get_byte_size(*item);
-
-	if ( mgr.strategy->do_cache(profiler,size) ) {
-		CacheCube cube(*item);
-		// Min/Max resolution hack
-		if ( query.restype == QueryResolution::Type::PIXELS ) {
-			double scale_x = (query.x2-query.x1) / query.xres;
-			double scale_y = (query.y2-query.y1) / query.yres;
-
-			// Result was max
-			if ( scale_x < cube.resolution_info.pixel_scale_x.a )
-				cube.resolution_info.pixel_scale_x.a = 0;
-			// Result was minimal
-			else if ( scale_x > cube.resolution_info.pixel_scale_x.b )
-				cube.resolution_info.pixel_scale_x.b = std::numeric_limits<double>::infinity();
-
-
-			// Result was max
-			if ( scale_y < cube.resolution_info.pixel_scale_y.a )
-				cube.resolution_info.pixel_scale_y.a = 0;
-			// Result was minimal
-			else if ( scale_y > cube.resolution_info.pixel_scale_y.b )
-				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
-		}
-		cache.put(semantic_id, item, CacheEntry( cube, size, profiler));
-		return true;
-	}
-	return false;
-}
-
-template<class T>
-std::unique_ptr<T> LocalCacheWrapper<T>::query(const GenericOperator& op,
-		const QueryRectangle& rect, QueryProfiler &profiler) {
-
-	CacheQueryResult<uint64_t> qres = cache.query(op.getSemanticId(), rect);
-
-	// Full single local hit
-	if ( !qres.has_remainder() && qres.keys.size() == 1 ) {
-		NodeCacheKey key(op.getSemanticId(), qres.keys.at(0));
-		auto e = cache.get(key);
-		profiler.addTotalCosts(e->profile);
-		return e->copy_data();
-	}
-	// Partial or Full puzzle
-	else if ( qres.has_hit() ) {
-		std::vector<CacheRef> refs;
-		refs.reserve(qres.keys.size());
-		for ( auto &id : qres.keys )
-			refs.push_back( CacheRef("testhost",12345,id) );
-
-		PuzzleRequest pr( cache.type, op.getSemanticId(), rect, qres.remainder, refs );
-		QueryProfilerStoppingGuard sg(profiler);
-		return process_puzzle(pr, profiler);
-	}
-	else {
-		throw NoSuchElementException("MISS");
-	}
-}
-
-template<class T>
-std::unique_ptr<T> LocalCacheWrapper<T>::process_puzzle(const PuzzleRequest& request, QueryProfiler &parent_profiler) {
-	std::unique_ptr<T> result;
-	QueryProfiler profiler;
-	{
-		QueryProfilerRunningGuard guard(parent_profiler,profiler);
-		PuzzleGuard pg(mgr.worker_context);
-		result = puzzle_util.process_puzzle(request,profiler);
-	}
-	if ( put( request.semantic_id, result, request.query, profiler ) )
-		parent_profiler.cached(profiler);
-	return result;
-}
-
-LocalCacheManager::LocalCacheManager(std::unique_ptr<CachingStrategy> strategy,
-		size_t raster_cache_size, size_t point_cache_size,
-		size_t line_cache_size, size_t polygon_cache_size,
-		size_t plot_cache_size ) :
-	rc(CacheType::RASTER,raster_cache_size),
-	pc(CacheType::POINT,point_cache_size),
-	lc(CacheType::LINE,line_cache_size),
-	poc(CacheType::POLYGON,polygon_cache_size),
-	plc(CacheType::PLOT,plot_cache_size),
-	rw(rc, make_unique<RasterPuzzler>(), *this),
-	pw(pc, make_unique<PointCollectionPuzzler>(), *this),
-	lw(lc, make_unique<LineCollectionPuzzler>(), *this),
-	pow(poc, make_unique<PolygonCollectionPuzzler>(), *this),
-	plw(plc, make_unique<PlotPuzzler>(), *this),
-	strategy(std::move(strategy)) {
-}
-
-CacheWrapper<GenericRaster>& LocalCacheManager::get_raster_cache() {
-	return rw;
-}
-
-CacheWrapper<PointCollection>& LocalCacheManager::get_point_cache() {
-	return pw;
-}
-
-CacheWrapper<LineCollection>& LocalCacheManager::get_line_cache() {
-	return lw;
-}
-
-CacheWrapper<PolygonCollection>& LocalCacheManager::get_polygon_cache() {
-	return pow;
-}
-
-CacheWrapper<GenericPlot>& LocalCacheManager::get_plot_cache() {
-	return plw;
-}
-
-ProfilingData& LocalCacheManager::get_costs() {
-	return costs;
-}
-
-void LocalCacheManager::reset_costs() {
-	costs.all_cpu = 0;
-	costs.all_gpu = 0;
-	costs.all_io = 0;
-	costs.self_cpu = 0;
-	costs.self_gpu = 0;
-	costs.self_io = 0;
-	costs.uncached_cpu = 0;
-	costs.uncached_gpu = 0;
-	costs.uncached_io  = 0;
-}
-
-CacheUsage LocalCacheManager::get_usage(CacheType type) const {
-	switch(type) {
-	case CacheType::RASTER: return CacheUsage(type,rc.get_max_size(),rc.get_current_size());
-	case CacheType::POINT: return CacheUsage(type,pc.get_max_size(),pc.get_current_size());
-	case CacheType::LINE: return CacheUsage(type,lc.get_max_size(),lc.get_current_size());
-	case CacheType::POLYGON: return CacheUsage(type,poc.get_max_size(),poc.get_current_size());
-	case CacheType::PLOT: return CacheUsage(type,plc.get_max_size(),plc.get_current_size());
-	default: throw ArgumentException("Illegal type");
-	}
-}
-
-void LocalCacheManager::set_strategy(
-		std::unique_ptr<CachingStrategy> strategy) {
-	this->strategy.reset( strategy.release() );
-}
-
-//
 // Test extensions
 //
 
-TestNodeServer::TestNodeServer(int num_threads, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity)  :
-	NodeServer( make_unique<NodeCacheManager>( CachingStrategy::by_name(strategy), capacity,capacity,capacity,capacity,capacity ), my_port,index_host,index_port,num_threads) {
+std::unique_ptr<NodeCacheManager> TestNodeServer::get_mgr(
+		const std::string& cache_mgr, const std::string& strategy,
+		const std::string& local_repl, size_t capacity) {
+	if ( cache_mgr == "remote" )
+		return make_unique<RemoteCacheManager>( strategy, capacity,capacity,capacity,capacity,capacity );
+	else if ( cache_mgr == "local" )
+		return make_unique<LocalCacheManager>( strategy, local_repl, capacity,capacity,capacity,capacity,capacity);
+	throw ArgumentException("Unknown cache mode");
+}
+
+TestNodeServer::TestNodeServer(int num_threads, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, const std::string &cache_mgr, const std::string &local_repl, size_t capacity)  :
+	NodeServer( get_mgr(cache_mgr,strategy,local_repl,capacity), my_port,index_host,index_port,num_threads) {
+
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -307,11 +158,11 @@ bool TestNodeServer::owns_current_thread() {
 			return true;
 	}
 	return (delivery_thread != nullptr && std::this_thread::get_id() == delivery_thread->get_id()) ||
-		    std::this_thread::get_id() == my_id;
+		    std::this_thread::get_id() == my_thread_id;
 }
 
 void TestNodeServer::run_node_thread(TestNodeServer* ns) {
-	ns->my_id = std::this_thread::get_id();
+	ns->my_thread_id = std::this_thread::get_id();
 	ns->run();
 }
 
@@ -321,14 +172,16 @@ NodeCacheManager& TestNodeServer::get_cache_manager() {
 
 // Test index
 
-TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function)
-	: IndexServer(port,update_interval,reorg_strategy,relevance_function) {
+TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function,const std::string &scheduler)
+	: IndexServer(port,update_interval,reorg_strategy,relevance_function,scheduler) {
 }
 
 void TestIdxServer::trigger_reorg(uint32_t node_id, const ReorgDescription& desc)  {
+	Log::info("Triggering reorg");
 	for ( auto &cc : control_connections ) {
 		if ( cc.second->node_id == node_id ) {
 			cc.second->send_reorg(desc);
+			wakeup();
 			return;
 		}
 	}
@@ -354,24 +207,25 @@ void TestIdxServer::force_stat_update() {
 	for ( auto &kv : control_connections ) {
 		kv.second->send_get_stats();
 	}
-
+	wakeup();
 	wait_for_idle_control_connections();
 }
 
 void TestIdxServer::force_reorg() {
 	force_stat_update();
 	reorganize(true);
+	wakeup();
 	wait_for_idle_control_connections();
 }
 
 void TestIdxServer::reset_stats() {
 	for ( auto &p : nodes )
 		p.second->reset_query_stats();
-	query_manager.reset_stats();
+	query_manager->reset_stats();
 }
 
 IndexQueryStats TestIdxServer::get_stats() {
-	return query_manager.get_stats();
+	return query_manager->get_stats();
 }
 
 //
@@ -432,14 +286,18 @@ void TestCacheMan::reset_costs() {
 
 
 LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers, time_t update_interval, size_t capacity, std::string reorg_strat,
-	std::string relevance_function, std::string c_strat ) :
-		index_port(atoi(Configuration::get("indexserver.port").c_str())),
+	std::string relevance_function, std::string c_strat, std::string scheduler,
+	std::string node_cache,
+	std::string node_repl,
+	int index_port  ) :
+
+		index_port(index_port),
 		ccm("127.0.0.1", index_port),
 		idx_server(make_unique<TestIdxServer>(index_port,
-		update_interval,reorg_strat,relevance_function) ) {
+		update_interval,reorg_strat,relevance_function,scheduler) ) {
 
 	for ( int i = 1; i <= num_nodes; i++)
-		nodes.push_back( make_unique<TestNodeServer>(num_workers, index_port+i,"127.0.0.1",index_port,c_strat,capacity) );
+		nodes.push_back( make_unique<TestNodeServer>(num_workers, index_port+i,"127.0.0.1",index_port,c_strat,node_cache,node_repl,capacity) );
 
 	for ( auto &n : nodes )
 		mgr.add_instance(n.get());
@@ -473,6 +331,13 @@ TestIdxServer& LocalTestSetup::get_index() {
 	return *idx_server;
 }
 
+TestNodeServer& LocalTestSetup::get_node(uint32_t id) {
+	for ( auto &n : nodes )
+		if ( n->get_id() == id )
+			return *n;
+	throw ArgumentException(concat("No node with id: ",id));
+}
+
 std::vector<std::unique_ptr<TestNodeServer> >& LocalTestSetup::get_nodes() {
 	return nodes;
 }
@@ -504,7 +369,7 @@ bool TracingCacheWrapper<T,TYPE>::put(const std::string& semantic_id,
 
 template<class T, CacheType TYPE>
 std::unique_ptr<T> TracingCacheWrapper<T,TYPE>::query(
-		const GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
+		GenericOperator& op, const QueryRectangle& rect, QueryProfiler &profiler) {
 	(void) op;
 	(void) rect;
 	(void) profiler;
@@ -809,3 +674,4 @@ CacheExperimentMultiQuery::CacheExperimentMultiQuery(const std::string& name,
 		const std::vector<QuerySpec>& specs, uint32_t num_runs) :
 	CacheExperiment( concat(name, " - ", specs.size(), " queries"), num_runs), query_specs(specs) {
 }
+

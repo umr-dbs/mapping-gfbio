@@ -26,16 +26,20 @@
 
 time_t parseIso8601DateTime(std::string dateTimeString);
 
-void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg = EPSG_WEBMERCATOR, bool allow_infinite = false);
+void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg =
+		EPSG_WEBMERCATOR, bool allow_infinite = false);
 
 //
 // Test classes
 //
 
-class TestIdxServer : public IndexServer {
+class TestIdxServer: public IndexServer {
 public:
-	TestIdxServer( uint32_t port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function);
-	void trigger_reorg( uint32_t node_id, const ReorgDescription &desc );
+	TestIdxServer(uint32_t port, time_t update_interval,
+			const std::string &reorg_strategy,
+			const std::string &relevance_function,
+			const std::string &scheduler);
+	void trigger_reorg(uint32_t node_id, const ReorgDescription &desc);
 	void force_stat_update();
 	void force_reorg();
 	void reset_stats();
@@ -44,39 +48,56 @@ private:
 	void wait_for_idle_control_connections();
 };
 
-class TestNodeServer : public NodeServer {
+class TestNodeServer: public NodeServer {
+	static std::unique_ptr<NodeCacheManager> get_mgr( const std::string &cache_mgr, const std::string &strategy, const std::string &local_repl, size_t capacity );
 public:
 	static void run_node_thread(TestNodeServer *ns);
 
-	TestNodeServer(int num_threads, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity = 5 * 1024 * 1024 );
+
+	TestNodeServer(int num_threads, uint32_t my_port,
+			const std::string &index_host, uint32_t index_port,
+			const std::string &strategy, const std::string &cache_mgr, const std::string &local_repl, size_t capacity = 5 * 1024 * 1024);
 	NodeCacheManager &get_cache_manager();
+	uint32_t get_id() const {return NodeServer::my_id;};
+	uint32_t get_port() const {return NodeServer::my_port;};
+	const std::string& get_host() const {return NodeServer::my_host;};
+
 	bool owns_current_thread();
-	std::thread::id my_id;
+private:
+	std::thread::id my_thread_id;
 };
 
 template<typename T>
-class TestCacheWrapper : public CacheWrapper<T> {
+class TestCacheWrapper: public CacheWrapper<T> {
 public:
-	TestCacheWrapper( NodeCacheWrapper<T> &w, ProfilingData &costs) : w(w), costs(costs) {};
+	TestCacheWrapper(NodeCacheWrapper<T> &w, ProfilingData &costs) :
+			w(w), costs(costs) {
+	}
+	;
 
-	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item,
+			const QueryRectangle &query, const QueryProfiler &profiler) {
 		costs.all_cpu += profiler.self_cpu;
 		costs.all_gpu += profiler.self_gpu;
 		costs.all_io += profiler.self_io;
-		return w.put(semantic_id,item,query,profiler);
+		return w.put(semantic_id, item, query, profiler);
 	}
 
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler) { return w.query(op,rect,profiler); };
+	std::unique_ptr<T> query(GenericOperator &op,
+			const QueryRectangle &rect, QueryProfiler &profiler) {
+		return w.query(op, rect, profiler);
+	}
+	;
 
 private:
 	NodeCacheWrapper<T> &w;
 	ProfilingData &costs;
 };
 
-class TestCacheMan : public CacheManager {
+class TestCacheMan: public CacheManager {
 public:
-	void add_instance( TestNodeServer *inst );
-	NodeCacheManager& get_instance_mgr( int i );
+	void add_instance(TestNodeServer *inst);
+	NodeCacheManager& get_instance_mgr(int i);
 	CacheWrapper<GenericRaster>& get_raster_cache();
 	CacheWrapper<PointCollection>& get_point_cache();
 	CacheWrapper<LineCollection>& get_line_cache();
@@ -93,69 +114,23 @@ private:
 
 class LocalCacheManager;
 
-/**
- * Local implementation of cache manager
- */
-template<class T>
-class LocalCacheWrapper : public CacheWrapper<T> {
-	friend class LocalCacheManager;
-public:
-	LocalCacheWrapper( NodeCache<T> &cache, std::unique_ptr<Puzzler<T>> puzzler, LocalCacheManager &mgr );
-	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
-private:
-	std::unique_ptr<T> process_puzzle(const PuzzleRequest& request, QueryProfiler &parent_profiler);
-	NodeCache<T> &cache;
-	LocalRetriever<T> retriever;
-	PuzzleUtil<T> puzzle_util;
-	LocalCacheManager &mgr;
-};
-
-
-class LocalCacheManager : public CacheManager {
-	template <class T> friend class LocalCacheWrapper;
-public:
-	LocalCacheManager( std::unique_ptr<CachingStrategy> strategy,
-			size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
-			size_t polygon_cache_size, size_t plot_cache_size );
-	CacheWrapper<GenericRaster>& get_raster_cache();
-	CacheWrapper<PointCollection>& get_point_cache();
-	CacheWrapper<LineCollection>& get_line_cache();
-	CacheWrapper<PolygonCollection>& get_polygon_cache();
-	CacheWrapper<GenericPlot>& get_plot_cache();
-
-	ProfilingData &get_costs();
-	void reset_costs();
-
-	CacheUsage get_usage(CacheType type) const;
-
-	void set_strategy(std::unique_ptr<CachingStrategy> strategy);
-private:
-	ProfilingData costs;
-	WorkerContext worker_context;
-	NodeCache<GenericRaster> rc;
-	NodeCache<PointCollection> pc;
-	NodeCache<LineCollection> lc;
-	NodeCache<PolygonCollection> poc;
-	NodeCache<GenericPlot> plc;
-
-	LocalCacheWrapper<GenericRaster> rw;
-	LocalCacheWrapper<PointCollection> pw;
-	LocalCacheWrapper<LineCollection> lw;
-	LocalCacheWrapper<PolygonCollection> pow;
-	LocalCacheWrapper<GenericPlot> plw;
-
-	std::unique_ptr<CachingStrategy> strategy;
-};
-
-
 class LocalTestSetup {
 public:
-	LocalTestSetup(int num_nodes, int num_workers, time_t update_interval, size_t capacity, std::string reorg_strat, std::string relevance_function, std::string c_strat );
+	LocalTestSetup(int num_nodes, int num_workers, time_t update_interval,
+			size_t capacity, std::string reorg_strat,
+			std::string relevance_function,
+			std::string c_strat,
+			std::string scheduler = "default",
+			std::string node_cache = "remote",
+			std::string node_repl = "lru",
+			int index_port = atoi(
+					Configuration::get("indexserver.port").c_str()));
 	~LocalTestSetup();
 	ClientCacheManager &get_client();
 	TestIdxServer &get_index();
 	TestCacheMan &get_manager();
+	TestNodeServer& get_node(uint32_t id);
+
 	std::vector<std::unique_ptr<TestNodeServer>>& get_nodes();
 private:
 	int index_port;
@@ -172,9 +147,10 @@ private:
 
 class QTriple {
 public:
-	QTriple( CacheType type, const QueryRectangle &query, const std::string &semantic_id );
+	QTriple(CacheType type, const QueryRectangle &query,
+			const std::string &semantic_id);
 	QTriple();
-	QTriple& operator=( const QTriple &t );
+	QTriple& operator=(const QTriple &t);
 	CacheType type;
 	QueryRectangle query;
 	std::string semantic_id;
@@ -185,29 +161,37 @@ private:
 	static std::default_random_engine generator;
 	static std::uniform_real_distribution<double> distrib;
 public:
-	QuerySpec( const std::string &workflow, epsg_t epsg, CacheType type, const TemporalReference &tref, std::string name = "" );
+	QuerySpec(const std::string &workflow, epsg_t epsg, CacheType type,
+			const TemporalReference &tref, std::string name = "");
 	std::string workflow;
 	epsg_t epsg;
 	CacheType type;
 	TemporalReference tref;
 	std::string name;
 	SpatialReference bounds;
-	QueryRectangle random_rectangle( double extend, uint32_t resolution = 0 ) const;
-	QueryRectangle random_rectangle_percent( double percent, uint32_t resolution = 0 ) const;
-	std::vector<QueryRectangle> disjunct_rectangles( size_t num, double extend, uint32_t resolution ) const;
-	std::vector<QueryRectangle> disjunct_rectangles_percent( size_t num, double percent, uint32_t resolution ) const;
-	QueryRectangle rectangle( double x1, double y1, double extend, uint32_t resolution = 0 ) const;
+	QueryRectangle random_rectangle(double extend,
+			uint32_t resolution = 0) const;
+	QueryRectangle random_rectangle_percent(double percent,
+			uint32_t resolution = 0) const;
+	std::vector<QueryRectangle> disjunct_rectangles(size_t num, double extend,
+			uint32_t resolution) const;
+	std::vector<QueryRectangle> disjunct_rectangles_percent(size_t num,
+			double percent, uint32_t resolution) const;
+	QueryRectangle rectangle(double x1, double y1, double extend,
+			uint32_t resolution = 0) const;
 	size_t get_num_operators() const;
-	std::vector<QTriple> guess_query_steps( const QueryRectangle &rect ) const;
+	std::vector<QTriple> guess_query_steps(const QueryRectangle &rect) const;
 private:
 	size_t get_num_operators(GenericOperator *op) const;
-	void get_op_spec( GenericOperator* op, QueryRectangle rect, std::vector<QTriple> &result ) const;
+	void get_op_spec(GenericOperator* op, QueryRectangle rect,
+			std::vector<QTriple> &result) const;
 };
 
 class ParallelExecutor {
 	friend class std::thread;
 public:
-	ParallelExecutor( const std::deque<QTriple> &queries, ClientCacheManager &mgr, int num_threads );
+	ParallelExecutor(const std::deque<QTriple> &queries,
+			ClientCacheManager &mgr, int num_threads);
 	void execute();
 private:
 	void thread_exec();
@@ -219,11 +203,13 @@ private:
 };
 
 template<class T, CacheType TYPE>
-class TracingCacheWrapper : public CacheWrapper<T> {
+class TracingCacheWrapper: public CacheWrapper<T> {
 public:
-	TracingCacheWrapper( std::vector<QTriple> &query_log, size_t &size );
-	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
+	TracingCacheWrapper(std::vector<QTriple> &query_log, size_t &size);
+	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item,
+			const QueryRectangle &query, const QueryProfiler &profiler);
+	std::unique_ptr<T> query(GenericOperator &op,
+			const QueryRectangle &rect, QueryProfiler &profiler);
 private:
 	size_t &size;
 	std::vector<QTriple> &query_log;
@@ -240,11 +226,11 @@ public:
 	size_t size;
 	std::vector<QTriple> query_log;
 private:
-	TracingCacheWrapper<GenericRaster,CacheType::RASTER> rw;
-	TracingCacheWrapper<PointCollection,CacheType::POINT> pw;
-	TracingCacheWrapper<LineCollection,CacheType::LINE> lw;
-	TracingCacheWrapper<PolygonCollection,CacheType::POLYGON> pow;
-	TracingCacheWrapper<GenericPlot,CacheType::PLOT> plw;
+	TracingCacheWrapper<GenericRaster, CacheType::RASTER> rw;
+	TracingCacheWrapper<PointCollection, CacheType::POINT> pw;
+	TracingCacheWrapper<LineCollection, CacheType::LINE> lw;
+	TracingCacheWrapper<PolygonCollection, CacheType::POLYGON> pow;
+	TracingCacheWrapper<GenericPlot, CacheType::PLOT> plw;
 };
 
 //////////////////////////////////////////////////
@@ -253,18 +239,19 @@ private:
 //
 //////////////////////////////////////////////////
 
-
 class CacheExperiment {
 public:
 	typedef std::chrono::time_point<std::chrono::system_clock> TimePoint;
 	typedef std::chrono::system_clock SysClock;
-	static size_t duration( const TimePoint &start, const TimePoint &end );
-	static void execute_query( GenericOperator &op, const QueryRectangle &query, CacheType type, QueryProfiler &qp );
-	static void execute_query( const QTriple &query, QueryProfiler &qp );
-	static void execute_queries( const std::vector<QTriple> &queries, QueryProfiler &qp );
-	static void execute_query( ClientCacheManager &mgr, const QTriple &t );
+	static size_t duration(const TimePoint &start, const TimePoint &end);
+	static void execute_query(GenericOperator &op, const QueryRectangle &query,
+			CacheType type, QueryProfiler &qp);
+	static void execute_query(const QTriple &query, QueryProfiler &qp);
+	static void execute_queries(const std::vector<QTriple> &queries,
+			QueryProfiler &qp);
+	static void execute_query(ClientCacheManager &mgr, const QTriple &t);
 public:
-	CacheExperiment( const std::string &name, uint32_t num_runs );
+	CacheExperiment(const std::string &name, uint32_t num_runs);
 	virtual ~CacheExperiment() = default;
 	void run();
 protected:
@@ -279,18 +266,19 @@ public:
 	const uint32_t num_runs;
 };
 
-class CacheExperimentSingleQuery : public CacheExperiment {
+class CacheExperimentSingleQuery: public CacheExperiment {
 public:
-	CacheExperimentSingleQuery( const std::string &name, const QuerySpec &spec, uint32_t num_runs );
+	CacheExperimentSingleQuery(const std::string &name, const QuerySpec &spec,
+			uint32_t num_runs);
 	virtual ~CacheExperimentSingleQuery() = default;
 public:
 	const QuerySpec query_spec;
 };
 
-
-class CacheExperimentMultiQuery : public CacheExperiment {
+class CacheExperimentMultiQuery: public CacheExperiment {
 public:
-	CacheExperimentMultiQuery( const std::string &name, const std::vector<QuerySpec> &specs, uint32_t num_runs );
+	CacheExperimentMultiQuery(const std::string &name,
+			const std::vector<QuerySpec> &specs, uint32_t num_runs);
 	virtual ~CacheExperimentMultiQuery() = default;
 public:
 	const std::vector<QuerySpec> query_specs;

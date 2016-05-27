@@ -9,6 +9,7 @@
 #define EXPERIMENTS_CACHE_EXPERIMENTS_H_
 
 #include "cache/experiments/exp_util.h"
+#include "cache/node/manager/local_manager.h"
 
 #include <iostream>
 #include <chrono>
@@ -57,7 +58,7 @@ protected:
 	void print_results();
 	void run_once();
 private:
-	void exec( std::unique_ptr<CachingStrategy> strategy, std::pair<uint64_t,uint64_t> &accum );
+	void exec( const std::string &strategy, std::pair<uint64_t,uint64_t> &accum );
 	std::pair<uint64_t,uint64_t>& get_accum( const std::string &key );
 	double percentage; // used area
 	uint32_t query_resolution;

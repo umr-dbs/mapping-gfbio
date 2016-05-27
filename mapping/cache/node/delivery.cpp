@@ -56,7 +56,7 @@ void Delivery::send(DeliveryConnection& connection) {
 ////////////////////////////////////////////////////////////
 
 DeliveryManager::DeliveryManager(uint32_t listen_port, NodeCacheManager &manager) :
-	shutdown(false), listen_port(listen_port), delivery_id(1), manager(manager) {
+	shutdown(false), listen_port(listen_port), delivery_id(1), manager(manager), wakeup_pipe(BinaryStream::makePipe()) {
 }
 
 template <typename T>
@@ -86,6 +86,27 @@ void DeliveryManager::remove_expired_deliveries() {
 	}
 }
 
+std::unique_ptr<std::thread> DeliveryManager::run_async() {
+	return make_unique<std::thread>(&DeliveryManager::run, this);
+}
+
+void DeliveryManager::stop() {
+	Log::info("Delivery-manager shutting down.");
+	shutdown = true;
+	wakeup();
+}
+
+DeliveryManager::~DeliveryManager() {
+	stop();
+}
+
+void DeliveryManager::wakeup() {
+	BinaryWriteBuffer buffer;
+	buffer.write('w');
+	wakeup_pipe.write(buffer);
+}
+
+
 void DeliveryManager::run() {
 	Log::info("Starting Delivery-Manager");
 	int delivery_fd = CacheCommon::get_listening_socket(listen_port,true,SOMAXCONN);
@@ -99,9 +120,11 @@ void DeliveryManager::run() {
 		fd_set writefds;
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
+		// Add listen socket
+		FD_SET(wakeup_pipe.getReadFD(), &readfds);
 		FD_SET(delivery_fd, &readfds);
 
-		int maxfd = delivery_fd;
+		int maxfd = std::max(delivery_fd,wakeup_pipe.getReadFD());
 
 		// Add newly accepted sockets
 		for (auto &nc : new_cons) {
@@ -114,6 +137,12 @@ void DeliveryManager::run() {
 		int ret = select(maxfd + 1, &readfds, &writefds, nullptr, &tv);
 		if (ret <= 0)
 			continue;
+
+		if (FD_ISSET(wakeup_pipe.getReadFD(), &readfds) ) {
+			// we have been woken, now we need to read any outstanding data or the pipe will remain readable
+			char buf[1024];
+			read(wakeup_pipe.getReadFD(), buf, 1024);
+		}
 
 		// Current connections
 		// Action on delivery connections
@@ -313,19 +342,6 @@ void DeliveryManager::handle_move_done(DeliveryConnection& dc) {
 		default: throw ArgumentException(concat("Handling of type: ",(int)key.type," not supported"));
 	}
 	dc.finish_move();
-}
-
-std::unique_ptr<std::thread> DeliveryManager::run_async() {
-	return make_unique<std::thread>(&DeliveryManager::run, this);
-}
-
-void DeliveryManager::stop() {
-	Log::info("Delivery-manager shutting down.");
-	shutdown = true;
-}
-
-DeliveryManager::~DeliveryManager() {
-	stop();
 }
 
 template uint64_t DeliveryManager::add_delivery(std::shared_ptr<const GenericRaster>, uint32_t);

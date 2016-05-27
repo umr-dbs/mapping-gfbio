@@ -34,7 +34,7 @@
 NodeServer::NodeServer(std::unique_ptr<NodeCacheManager> manager, uint32_t my_port, std::string index_host, uint32_t index_port,
 	int num_threads) :
 	shutdown(false), workers_up(false), my_id(-1), my_port(my_port), index_host(index_host), index_port(index_port),
-	num_treads(num_threads), delivery_manager(my_port,*manager), manager(std::move(manager) ) {
+	num_treads(num_threads), delivery_manager(my_port,*manager), manager(std::move(manager)), wakeup_pipe(BinaryStream::makePipe()) {
 	this->manager->set_self_port(my_port);
 }
 
@@ -42,7 +42,7 @@ void NodeServer::worker_loop() {
 	while (workers_up && !shutdown) {
 		try {
 			// Setup index connection
-			auto idx_con = BlockingConnection::create(index_host,index_port,true,WorkerConnection::MAGIC_NUMBER,my_id);
+			auto idx_con = WakeableBlockingConnection::create(index_host,index_port, wakeup_pipe, false ,true,WorkerConnection::MAGIC_NUMBER,my_id);
 			manager->get_worker_context().set_index_connection(idx_con.get());
 
 			Log::debug("Worker connected to index-server");
@@ -67,7 +67,8 @@ void NodeServer::worker_loop() {
 		} catch (const NetworkException &ne) {
 			Log::info("Worker lost connection to index... Reconnecting. Reason: %s", ne.what());
 		}
-		std::this_thread::sleep_for(std::chrono::seconds(2));
+		if ( workers_up && !shutdown)
+			std::this_thread::sleep_for(std::chrono::seconds(2));
 	}
 	Log::info("Worker done.");
 }
@@ -419,7 +420,7 @@ void NodeServer::setup_control_connection() {
 
 	// Establish connection
 	NodeHandshake hs = manager->create_handshake();
-	this->control_connection = BlockingConnection::create(index_host,index_port,true,ControlConnection::MAGIC_NUMBER,hs);
+	this->control_connection = WakeableBlockingConnection::create(index_host,index_port, wakeup_pipe, true, true, ControlConnection::MAGIC_NUMBER,hs);
 
 
 	Log::debug("Waiting for response from index-server");
@@ -429,7 +430,8 @@ void NodeServer::setup_control_connection() {
 	uint8_t rc = resp->read<uint8_t>();
 	if (rc == ControlConnection::CMD_HELLO) {
 		resp->read(&my_id);
-		manager->set_self_host(resp->read<std::string>());
+		resp->read(&my_host);
+		manager->set_self_host(my_host);
 		Log::info("Successfuly connected to index-server. My Id is: %d", my_id);
 	}
 	else
@@ -440,11 +442,19 @@ std::unique_ptr<std::thread> NodeServer::run_async() {
 	return make_unique<std::thread>(&NodeServer::run, this);
 }
 
+void NodeServer::wakeup() {
+	BinaryWriteBuffer buffer;
+	buffer.write('w');
+	wakeup_pipe.write(buffer);
+}
+
 void NodeServer::stop() {
 	Log::info("Node-server shutting down.");
 	shutdown = true;
+	wakeup();
 }
 
 NodeServer::~NodeServer() {
 	stop();
 }
+

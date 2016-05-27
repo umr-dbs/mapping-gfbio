@@ -8,10 +8,87 @@
 #ifndef NODE_PUZZLE_UTIL_H_
 #define NODE_PUZZLE_UTIL_H_
 
-#include "cache/node/node_cache.h"
+#include "cache/node/node_manager.h"
 #include "cache/priv/requests.h"
 #include "operators/operator.h"
 
+class PuzzleJob {
+public:
+	template<class T>
+	static std::unique_ptr<T> process(GenericOperator &op,
+			const QueryRectangle &query, const std::vector<Cube<3>> &remainder,
+			const std::vector<std::shared_ptr<const T>> &parts,
+			QueryProfiler &profiler);
+private:
+
+	/**
+	 * Enlarges the result of the puzzle-request to the maximum bounding cube.
+	 * @param query the query-rectangle of the request
+	 * @param items the puzzle-pieces
+	 * @return the maximum bounding box of the result
+	 */
+	template<class T>
+	static SpatioTemporalReference enlarge_puzzle(const QueryRectangle &query,
+			const std::vector<std::shared_ptr<const T>>& items);
+
+	/**
+	 * Conmputes the remainder-queries
+	 * @param semantic_id the semantic id
+	 * @param ref_result a result used as reference for resolution computation
+	 * @param request the puzzle-request
+	 * @param qp the profiler to use
+	 * @return the results of the remainder queries
+	 */
+	template<class T>
+	static std::vector<std::unique_ptr<T>> compute_remainders(
+			const QueryRectangle& query, GenericOperator &op, const T& ref_result,
+			const std::vector<Cube<3> >& remainder, QueryProfiler& profiler);
+
+	template<class T>
+	static std::vector<QueryRectangle> get_remainder_queries(
+			const QueryRectangle& query, const std::vector<Cube<3> >& remainder, const T& ref_result);
+
+	/**
+	 * Snaps the bounds of a cube to the pixel grid
+	 * @param v1 the first value of the interval
+	 * @param v2 the second value of the interval
+	 * @param ref the reference point (value where a full pixel starts)
+	 * @param scale the pixel-scale
+	 *
+	 */
+	static void snap_to_pixel_grid(double &v1, double &v2, double ref,
+			double scale);
+
+	template<class T>
+	static std::unique_ptr<T> compute(GenericOperator &op,
+			const QueryRectangle &query, QueryProfiler &qp);
+
+	/**
+	 * Puzzles the given items into a result with the dimensions of bbox.
+	 * @param bbox the bounding box of the result
+	 * @param items the puzzle-pieces
+	 * @return the combined result
+	 */
+	template<class T>
+	static std::unique_ptr<T> puzzle(const SpatioTemporalReference &bbox,
+			const std::vector<std::shared_ptr<const T>> &items);
+
+	template<class T>
+	static std::unique_ptr<T> puzzle_feature_collection(
+			const SpatioTemporalReference &bbox,
+			const std::vector<std::shared_ptr<const T>> &items);
+
+	template<class T>
+	static void append_idxs(T &dest, const T &src);
+
+	/**
+	 * Helper for child-classes to append a vector of indices
+	 * @param dest the target vector
+	 * @param src the source vector
+	 */
+	static void append_idx_vec(std::vector<uint32_t> &dest,
+			const std::vector<uint32_t> &src);
+};
 
 /**
  * Interface to determine whether a CacheRef points to the local cache
@@ -46,29 +123,22 @@ public:
 	 * @param qp the profiler to use
 	 * @return the item fetched
 	 */
-	virtual std::shared_ptr<const T> fetch( const std::string &semantic_id, const CacheRef &ref, QueryProfiler &qp ) const = 0;
+	virtual std::shared_ptr<const T> fetch(const std::string &semantic_id,
+			const CacheRef &ref, QueryProfiler &qp) const = 0;
 
-	/**
-	 * Computes the item described by the given operator tree and query rectangle
-	 * @param op the operator tree
-	 * @param query the query's bounds
-	 * @param qp the profiler to use
-	 * @return the computed result
-	 */
-	virtual std::unique_ptr<T> compute( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) const = 0;
 };
 
 /**
  * Retriever implementation for local usage.
  */
 template<class T>
-class LocalRetriever : public PieceRetriever<T> {
+class LocalRetriever: public PieceRetriever<T> {
 public:
 	/**
 	 * Constructs a new instance for the given cache
 	 * @param cache the underlying cache
 	 */
-	LocalRetriever( const NodeCache<T> &cache );
+	LocalRetriever(const NodeCacheWrapper<T> &cache);
 	virtual ~LocalRetriever() = default;
 
 	/**
@@ -78,32 +148,26 @@ public:
 	 * @param qp the profiler to use
 	 * @return the item fetched
 	 */
-	virtual std::shared_ptr<const T> fetch( const std::string &semantic_id, const CacheRef &ref, QueryProfiler &qp ) const;
+	virtual std::shared_ptr<const T> fetch(const std::string &semantic_id,
+			const CacheRef &ref, QueryProfiler &qp) const;
 
-	/**
-	 * Computes the item described by the given operator tree and query rectangle
-	 * @param op the operator tree
-	 * @param query the query's bounds
-	 * @param qp the profiler to use
-	 * @return the computed result
-	 */
-	std::unique_ptr<T> compute( GenericOperator &op, const QueryRectangle &query, QueryProfiler &qp ) const;
 protected:
-	const NodeCache<T> &cache;
+	const NodeCacheWrapper<T> &cache;
 };
 
 /**
  * Retriever implementation combining the local and global cache
  */
 template<class T>
-class RemoteRetriever : public LocalRetriever<T> {
+class RemoteRetriever: public LocalRetriever<T> {
 public:
 	/**
 	 * Constructs a new instance for the given cache and handler
 	 * @param cache the underlying cache
 	 * @param handler the CacheRef handler
 	 */
-	RemoteRetriever( const NodeCache<T> &cache, const CacheRefHandler &handler );
+	RemoteRetriever(const NodeCacheWrapper<T> &cache,
+			const CacheRefHandler &handler);
 
 	/**
 	 * Fetches the cache entry pointed to by the given semantic id and CacheRef.
@@ -112,7 +176,8 @@ public:
 	 * @param qp the profiler to use
 	 * @return the item fetched
 	 */
-	std::shared_ptr<const T> fetch( const std::string &semantic_id, const CacheRef &ref, QueryProfiler &qp ) const;
+	std::shared_ptr<const T> fetch(const std::string &semantic_id,
+			const CacheRef &ref, QueryProfiler &qp) const;
 
 	/**
 	 * Loads the desired item from a foreign node
@@ -121,152 +186,15 @@ public:
 	 * @param qp the profiler to use
 	 * @return the item retrieved
 	 */
-	std::unique_ptr<T> load( const std::string &sematic_id, const CacheRef &ref, QueryProfiler &qp ) const;
+	std::unique_ptr<T> load(const std::string &sematic_id, const CacheRef &ref,
+			QueryProfiler &qp) const;
 private:
 	/**
 	 * Reads an data-item from the given buffer
 	 * @param buffer the buffer to read the item from
 	 */
-	std::unique_ptr<T> read_item( BinaryReadBuffer &buffer ) const;
+	std::unique_ptr<T> read_item(BinaryReadBuffer &buffer) const;
 	const CacheRefHandler &ref_handler;
-};
-
-/////////////////////////////////////
-//
-// PUZZLER
-//
-/////////////////////////////////////
-
-
-/**
- * Interface for puzzling a result from several parts
- */
-template<class T>
-class Puzzler {
-public:
-	virtual ~Puzzler() = default;
-	/**
-	 * Puzzles the given items into a result with the dimensions of bbox.
-	 * @param bbox the bounding box of the result
-	 * @param items the puzzle-pieces
-	 * @return the combined result
-	 */
-	virtual std::unique_ptr<T> puzzle( const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>> &items) const = 0;
-};
-
-/**
- * Raster implementation of the Puzzler-interface
- */
-class RasterPuzzler : public Puzzler<GenericRaster> {
-public:
-	std::unique_ptr<GenericRaster> puzzle( const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericRaster>> &items) const;
-};
-
-/**
- * Plot implementation of the Puzzler-interface
- */
-class PlotPuzzler : public Puzzler<GenericPlot> {
-public:
-	std::unique_ptr<GenericPlot> puzzle( const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const GenericPlot>> &items) const;
-};
-
-/**
- * Puzzler implementation for SimpleFeatureCollections
- */
-template<class T>
-class SimpleFeaturePuzzler : public Puzzler<T> {
-public:
-	virtual ~SimpleFeaturePuzzler() = default;
-	std::unique_ptr<T> puzzle( const SpatioTemporalReference &bbox, const std::vector<std::shared_ptr<const T>> &items) const;
-protected:
-	/**
-	 * Helper for child-classes to append a vector of indices
-	 * @param dest the target vector
-	 * @param src the source vector
-	 */
-	void append_idx_vec( std::vector<uint32_t> &dest, const std::vector<uint32_t> &src ) const;
-
-	/**
-	 * To be implemented by child classes. Appends required indexes.
-	 * May use append_idx_vec.
-	 * @param dest the result collection
-	 * @param src the source collection
-	 */
-	virtual void append_idxs( T &dest, const T &src ) const = 0;
-};
-
-/**
- * Point implementation of the SimpleFeatureCollection puzzler.
- */
-class PointCollectionPuzzler : public SimpleFeaturePuzzler<PointCollection> {
-protected:
-	void append_idxs( PointCollection &dest, const PointCollection &src ) const;
-};
-
-/**
- * Line implementation of the SimpleFeatureCollection puzzler.
- */
-class LineCollectionPuzzler : public SimpleFeaturePuzzler<LineCollection> {
-protected:
-	void append_idxs( LineCollection &dest, const LineCollection &src ) const;
-};
-
-/**
- * Polygon implementation of the SimpleFeatureCollection puzzler.
- */
-class PolygonCollectionPuzzler : public SimpleFeaturePuzzler<PolygonCollection> {
-protected:
-	void append_idxs( PolygonCollection &dest, const PolygonCollection &src ) const;
-};
-
-
-/////////////////////////////////////
-//
-// PUZZLE UTIL
-//
-/////////////////////////////////////
-
-/**
- * Utility to process puzzle-requests
- */
-template<class T>
-class PuzzleUtil {
-public:
-	/**
-	 * Constructs a new instance
-	 * @param retriever the retriever to use
-	 * @param puzzler the puzzler instance
-	 */
-	PuzzleUtil( const PieceRetriever<T> &retriever, std::unique_ptr<Puzzler<T>> puzzler );
-
-	/**
-	 * Processes the given puzzle requests by fetching all parts, computing the remainders
-	 * and combining the results.
-	 * @param request the puzzle-request
-	 * @param qp the profiler to use
-	 * @return the result of the puzzle-request
-	 */
-	std::unique_ptr<T> process_puzzle( const PuzzleRequest &request, QueryProfiler &qp ) const;
-private:
-	/**
-	 * Conmputes the remainder-queries
-	 * @param semantic_id the semantic id
-	 * @param ref_result a result used as reference for resolution computation
-	 * @param request the puzzle-request
-	 * @param qp the profiler to use
-	 * @return the results of the remainder queries
-	 */
-	std::vector<std::unique_ptr<T>> compute_remainders( const std::string &semantic_id, const T& ref_result, const PuzzleRequest &request, QueryProfiler &profiler ) const;
-
-	/**
-	 * Enlarges the result of the puzzle-request to the maximum bounding cube.
-	 * @param query the query-rectangle of the request
-	 * @param items the puzzle-pieces
-	 * @return the maximum bounding box of the result
-	 */
-	SpatioTemporalReference enlarge_puzzle( const QueryRectangle &query, const std::vector<std::shared_ptr<const T>>& items) const;
-	const PieceRetriever<T> &retriever;
-	std::unique_ptr<Puzzler<T>> puzzler;
 };
 
 #endif /* NODE_PUZZLE_UTIL_H_ */

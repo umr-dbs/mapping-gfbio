@@ -8,7 +8,6 @@
 #ifndef CACHE_NODE_MANAGER_H_
 #define CACHE_NODE_MANAGER_H_
 
-#include "cache/node/puzzle_util.h"
 #include "cache/priv/cache_stats.h"
 #include "cache/priv/caching_strategy.h"
 #include "cache/priv/connection.h"
@@ -19,6 +18,7 @@
 
 
 class NodeCacheManager;
+template<typename T> class PuzzleUtil;
 
 /**
  * This class holds the current query-statistics.
@@ -65,7 +65,6 @@ private:
  * This class holds all information sensitive for a worker-thread
  */
 class WorkerContext {
-	friend class PuzzleGuard;
 public:
 	/** Constructs a new instance */
 	WorkerContext();
@@ -81,30 +80,11 @@ public:
 	void set_index_connection( BlockingConnection *con );
 
 	/**
-	 * This function is used to omit caching of puzzle-pieces
-	 * @return whether this worker is currently puzzling a result
-	 */
-	bool is_puzzling() const;
-
-	/**
 	 * @return this worker's connection to the index-server
 	 */
 	BlockingConnection& get_index_connection() const;
 private:
-	bool puzzling;
 	BlockingConnection* index_connection;
-};
-
-/**
- * Simple guard to ensure the puzzling flag in this worker's context
- * is released, even if an exception is thrown.
- */
-class PuzzleGuard {
-public:
-	PuzzleGuard( WorkerContext& ctx ) : ctx(ctx) { ctx.puzzling = true; };
-	~PuzzleGuard() { ctx.puzzling = false; };
-private:
-	WorkerContext& ctx;
 };
 
 
@@ -120,8 +100,7 @@ private:
  */
 template<typename T>
 class NodeCacheWrapper : public CacheWrapper<T> {
-	friend class NodeServer;
-	friend class DeliveryManager;
+	friend class NodeCacheManager;
 public:
 	/**
 	 * Constructs a new instance
@@ -129,8 +108,7 @@ public:
 	 * @param cache the cache to wrap
 	 * @param puzzler the puzzler-instance
 	 */
-	NodeCacheWrapper( NodeCacheManager &mgr, NodeCache<T> &cache,
-			std::unique_ptr<Puzzler<T>> puzzler );
+	NodeCacheWrapper( NodeCacheManager &mgr, size_t size, CacheType type );
 	virtual ~NodeCacheWrapper() = default;
 
 	/**
@@ -142,7 +120,7 @@ public:
 	 * @param profiler the profiler which recorded the costs of the query-execution
 	 * @return whether the entry was stored in the cache or not
 	 */
-	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
+	virtual bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) = 0;
 
 	/**
 	 * Queries the cache with the given operator and query rectangle. If no local results can be found,
@@ -153,55 +131,49 @@ public:
 	 * @param profiler the profiler recording costs of query-execution
 	 * @return the result satisfying the given query parameters
 	 */
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
+	virtual std::unique_ptr<T> query(GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler) = 0;
 
-	/**
-	 * Retrieves the item for the given key.
-	 * @param key the key of the item to retrieve
-	 * @return the entry for the given key
-	 */
-	std::shared_ptr<const NodeCacheEntry<T>> get(const NodeCacheKey &key);
-
-	/**
-	 * Processes the given puzzle-request
-	 * @param request the puzzle-request
-	 * @param parent_profiler the profiler of the running query
-	 * @return the result satisfying the given puzzle-request
-	 */
-	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &parent_profiler );
-
-	QueryStats get_and_reset_query_stats();
-
-private:
 	/**
 	 * Inserts the given item into the local cache. This operation does not confirm insertion
 	 * with the caching-strategy and also does not inform the index about the new entry.
 	 * This method is provided for migrating entries from other nodes.
 	 * @return the meta-information about the stored entry
 	 */
-	MetaCacheEntry put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, CacheEntry &&info );
+	virtual MetaCacheEntry put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, CacheEntry &&info ) = 0;
 
 	/**
 	 * Removes the element with the given key from the cache, not notifying the index-server about it.
 	 * This method sould only be called during reorganization of the system.
 	 */
-	void remove_local(const NodeCacheKey &key);
+	virtual void remove_local(const NodeCacheKey &key) = 0;
 
-private:
+	/**
+	 * Processes the given puzzle-request
+	 * @param request the puzzle-request
+	 * @return the result satisfying the given puzzle-request
+	 */
+	virtual std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &parent_profiler ) = 0;
+
+	/**
+	 * Retrieves the item for the given key.
+	 * @param key the key of the item to retrieve
+	 * @return the entry for the given key
+	 */
+	std::shared_ptr<const NodeCacheEntry<T>> get(const NodeCacheKey &key) const;
+
+	QueryStats get_and_reset_query_stats();
+
+	CacheType get_type() const;
+
+protected:
 	NodeCacheManager &mgr;
-	NodeCache<T> &cache;
-	std::unique_ptr<RemoteRetriever<T>> retriever;
-	std::unique_ptr<PuzzleUtil<T>> puzzle_util;
-	RWLock local_lock;
+	NodeCache<T> cache;
 	ActiveQueryStats stats;
 };
 
-class NodeCacheManager : public CacheManager, public CacheRefHandler {
-	template<class T> friend class NodeCacheWrapper;
+class NodeCacheManager : public CacheManager {
 	static thread_local WorkerContext context;
-
 public:
-
 	/**
 	 * Constructs a new instance
 	 * @param strategy the caching strategy to use
@@ -211,14 +183,19 @@ public:
 	 * @param polygon_cache_size the maximum size of the polygon cache (in bytes)
 	 * @param plot_cache_size the maximum size of the plot cache (in bytes)
 	 */
-	NodeCacheManager( std::unique_ptr<CachingStrategy> strategy,
-			size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
-			size_t polygon_cache_size, size_t plot_cache_size );
+	NodeCacheManager( const std::string &strategy,
+			std::unique_ptr<NodeCacheWrapper<GenericRaster>> raster_wrapper,
+			std::unique_ptr<NodeCacheWrapper<PointCollection>> point_wrapper,
+			std::unique_ptr<NodeCacheWrapper<LineCollection>> line_wrapper,
+			std::unique_ptr<NodeCacheWrapper<PolygonCollection>> polygon_wrapper,
+			std::unique_ptr<NodeCacheWrapper<GenericPlot>> plot_wrapper );
 
 	/**
 	 * @return the thread-sensitve worker-context
 	 */
 	WorkerContext &get_worker_context();
+
+	const CachingStrategy &get_strategy() const;
 
 	/**
 	 * Sets the port of this node's delivery-proccess
@@ -231,20 +208,6 @@ public:
 	 * @param host the hostname to set
 	 */
 	void set_self_host( const std::string &host );
-
-	/**
-	 * Creates a self-reference to the cache-entry with the given id
-	 * @param id the id of the cache-entry to reference
-	 * @return a reference to the cache-entry with the given id
-	 */
-	CacheRef create_local_ref(uint64_t id) const;
-
-	/**
-	 * Checks whether the given reference points to this node
-	 * @param ref the reference to check
-	 * @return whether the given reference points to this node
-	 */
-	bool is_local_ref(const CacheRef& ref) const;
 
 	/**
 	 * Creates the handshake to be sent to the index-server
@@ -291,25 +254,22 @@ public:
 	 */
 	NodeCacheWrapper<GenericPlot>& get_plot_cache();
 private:
-	NodeCache<GenericRaster> raster_cache;
-	NodeCache<PointCollection> point_cache;
-	NodeCache<LineCollection> line_cache;
-	NodeCache<PolygonCollection> polygon_cache;
-	NodeCache<GenericPlot> plot_cache;
-
-	mutable NodeCacheWrapper<GenericRaster> raster_wrapper;
-	mutable NodeCacheWrapper<PointCollection> point_wrapper;
-	mutable NodeCacheWrapper<LineCollection> line_wrapper;
-	mutable NodeCacheWrapper<PolygonCollection> polygon_wrapper;
-	mutable NodeCacheWrapper<GenericPlot> plot_wrapper;
+	mutable std::unique_ptr<NodeCacheWrapper<GenericRaster>> raster_wrapper;
+	mutable std::unique_ptr<NodeCacheWrapper<PointCollection>> point_wrapper;
+	mutable std::unique_ptr<NodeCacheWrapper<LineCollection>> line_wrapper;
+	mutable std::unique_ptr<NodeCacheWrapper<PolygonCollection>> polygon_wrapper;
+	mutable std::unique_ptr<NodeCacheWrapper<GenericPlot>> plot_wrapper;
 
 	// Holds the actual caching-strategy to use
 	std::unique_ptr<CachingStrategy> strategy;
 
+	mutable QueryStats cumulated_stats;
+
+protected:
 	std::string my_host;
 	uint32_t my_port;
 
-	mutable QueryStats cumulated_stats;
+
 };
 
 #endif /* CACHE_NODE_MANAGER_H_ */

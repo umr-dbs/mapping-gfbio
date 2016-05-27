@@ -28,14 +28,21 @@
 //
 ////////////////////////////////////////////////////////////
 
-IndexServer::IndexServer(int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function) :
+IndexServer::IndexServer(int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function, const std::string &scheduler) :
 	caches(reorg_strategy,relevance_function), port(port), shutdown(false), next_node_id(1),
-	query_manager(caches,nodes), last_reorg(CacheCommon::time_millis()), update_interval(update_interval) {
+	query_manager(QueryManager::by_name(this->caches,this->nodes,scheduler)), last_reorg(CacheCommon::time_millis()), update_interval(update_interval), wakeup_pipe(BinaryStream::makePipe()) {
 }
 
 void IndexServer::stop() {
 	Log::info("Shutting down.");
 	shutdown = true;
+	wakeup();
+}
+
+void IndexServer::wakeup() {
+	BinaryWriteBuffer buffer;
+	buffer.write('w');
+	wakeup_pipe.write(buffer);
 }
 
 void IndexServer::run() {
@@ -45,15 +52,16 @@ void IndexServer::run() {
 	std::vector<std::unique_ptr<NewNBConnection>> new_cons;
 
 	while (!shutdown) {
-		struct timeval tv { 2, 0 };
+		struct timeval tv { 1, 0 };
 		fd_set readfds, writefds;
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
 
 		// Add listen socket
+		FD_SET(wakeup_pipe.getReadFD(), &readfds);
 		FD_SET(listen_socket, &readfds);
 
-		int maxfd = listen_socket;
+		int maxfd = std::max(listen_socket,wakeup_pipe.getReadFD());
 
 		// Add newly accepted sockets
 		for (auto &nc : new_cons) {
@@ -69,6 +77,12 @@ void IndexServer::run() {
 			Log::error("Select returned error: %s", strerror(errno));
 		}
 		else if (sel_ret > 0) {
+			if (FD_ISSET(wakeup_pipe.getReadFD(), &readfds) ) {
+				// we have been woken, now we need to read any outstanding data or the pipe will remain readable
+				char buf[1024];
+				read(wakeup_pipe.getReadFD(), buf, 1024);
+			}
+
 			process_worker_connections(&readfds,&writefds);
 			process_control_connections(&readfds, &writefds);
 			process_client_connections(&readfds, &writefds);
@@ -90,7 +104,7 @@ void IndexServer::run() {
 			}
 		}
 		// Schedule Jobs
-		query_manager.schedule_pending_jobs(worker_connections);
+		query_manager->schedule_pending_jobs(worker_connections);
 
 		if ( update_interval == 0 )
 			continue;
@@ -141,7 +155,7 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 	while (wit != worker_connections.end()) {
 		WorkerConnection &wc = *wit->second;
 		if (wc.is_faulty()) {
-			query_manager.worker_failed(wc.id);
+			query_manager->worker_failed(wc.id);
 			worker_connections.erase(wit++);
 		}
 		else if (wc.is_writing()) {
@@ -162,7 +176,7 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 		if (cc.is_faulty()) {
 			caches.remove_all_by_node(cc.node_id);
 			nodes.erase(cc.node_id);
-			query_manager.node_failed(cc.node_id);
+			query_manager->node_failed(cc.node_id);
 			control_connections.erase(ccit++);
 		}
 		else if (cc.is_writing()) {
@@ -182,8 +196,8 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 		ClientConnection &cc = *clit->second;
 		if (cc.is_faulty()) {
 			if ( cc.get_state() != ClientState::IDLE ) {
-				Log::info("Client connection cancelled: %ld", cc.id);
-				query_manager.handle_client_abort(cc.id);
+				Log::debug("Client connection cancelled: %ld", cc.id);
+				query_manager->handle_client_abort(cc.id);
 			}
 			client_connections.erase(clit++);
 		}
@@ -258,13 +272,13 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 		if ( cc.get_state() == ControlState::MOVE_RESULT_READ ) {
 			auto res = cc.get_move_result();
 			IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
-			if ( !query_manager.is_locked(res.type, old) )
+			if ( !query_manager->is_locked(res.type, old) )
 				cc.confirm_move();
 		}
 		else if ( cc.get_state() == ControlState::REMOVE_REQUEST_READ ) {
 			auto &node_key = cc.get_remove_request();
 			IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
-			if ( !query_manager.is_locked( node_key.type, key ) )
+			if ( !query_manager->is_locked( node_key.type, key ) )
 				cc.confirm_remove();
 		}
 		// Normal handling
@@ -282,7 +296,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					auto res = cc.get_move_result();
 					handle_reorg_result(res);
 					IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
-					if ( !query_manager.is_locked(res.type, old) )
+					if ( !query_manager->is_locked(res.type, old) )
 						cc.confirm_move();
 					break;
 				}
@@ -290,7 +304,7 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					Log::trace("Node %d requested removal of entry: %s", cc.node_id, cc.get_remove_request().to_string().c_str() );
 					auto &node_key = cc.get_remove_request();
 					IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
-					if ( !query_manager.is_locked( node_key.type, key ) )
+					if ( !query_manager->is_locked( node_key.type, key ) )
 						cc.confirm_remove();
 					break;
 				}
@@ -336,9 +350,9 @@ void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) 
 			// Handle state-changes
 			switch (cc.get_state()) {
 				case ClientState::AWAIT_RESPONSE:
-					Log::info("Client-request read: %s", cc.get_request().to_string().c_str() );
+					Log::debug("Client-request read: %s", cc.get_request().to_string().c_str() );
 
-					query_manager.add_request(cc.id, cc.get_request());
+					query_manager->add_request(cc.id, cc.get_request());
 					break;
 				default:
 					throw IllegalStateException(
@@ -364,8 +378,8 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				case WorkerState::ERROR: {
 					Log::warn("Worker returned error: %s. Forwarding to client.",
 						wc.get_error_message().c_str());
-					query_manager.close_worker(wc.id);
-					auto clients = query_manager.release_worker(wc.id);
+					query_manager->close_worker(wc.id);
+					auto clients = query_manager->release_worker(wc.id);
 					for (auto &cid : clients) {
 						try {
 							client_connections.at(cid)->send_error(wc.get_error_message());
@@ -378,7 +392,7 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				}
 				case WorkerState::DONE: {
 					Log::debug("Worker returned result. Determinig delivery qty.");
-					size_t qty = query_manager.close_worker(wc.id);
+					size_t qty = query_manager->close_worker(wc.id);
 					wc.send_delivery_qty(qty);
 					break;
 				}
@@ -386,7 +400,7 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 					auto &node = nodes.at(wc.node_id);
 					DeliveryResponse response(node->host,node->port, wc.get_delivery_id());
 					Log::debug("Worker returned delivery: %s", response.to_string().c_str());
-					auto clients = query_manager.release_worker(wc.id);
+					auto clients = query_manager->release_worker(wc.id);
 					for (auto &cid : clients) {
 						try {
 							client_connections.at(cid)->send_response(response);
@@ -406,7 +420,7 @@ void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) 
 				}
 				case WorkerState::QUERY_REQUESTED: {
 					Log::debug("Worker issued cache-query: %s", wc.get_query().to_string().c_str());
-					query_manager.process_worker_query(wc);
+					query_manager->process_worker_query(wc);
 					break;
 				}
 				default: {
@@ -436,10 +450,9 @@ void IndexServer::reorganize(bool force) {
 std::string IndexServer::stats_string() const {
 	std::ostringstream out;
 	out << "============ STATISTICS ============" << std::endl;
-	out << query_manager.get_stats().to_string() << std::endl;
+	out << query_manager->get_stats().to_string() << std::endl;
 	for ( auto &p : nodes )
 		out << p.second->to_string() << std::endl;
 	out << "====================================" << std::endl;
 	return out.str();
 }
-

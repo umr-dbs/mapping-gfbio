@@ -198,6 +198,8 @@ private:
 	 */
 	void remove_expired_deliveries();
 
+	void wakeup();
+
 	/** Indicator telling if the manager should shutdown */
 	bool shutdown;
 
@@ -218,6 +220,8 @@ private:
 
 	/** Reference to the cache-manager */
 	NodeCacheManager &manager;
+
+	BinaryStream wakeup_pipe;
 };
 
 #endif /* DELIVERY_H_ */

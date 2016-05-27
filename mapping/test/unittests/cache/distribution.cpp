@@ -21,38 +21,24 @@ typedef std::unique_ptr<std::thread> TP;
 
 TEST(DistributionTest,TestRedistibution) {
 	Log::setLevel(Log::LogLevel::WARN);
-	TestCacheMan cm;
-	TestIdxServer is(12346, 0, "capacity", "lru");
-	TestNodeServer ns1(1, 12347, "localhost", 12346, "always");
-	TestNodeServer ns2(1, 12348, "localhost", 12346, "always");
+	Configuration::loadFromDefaultPaths();
 
-	cm.add_instance(&ns1);
-	cm.add_instance(&ns2);
-
-	CacheManager::init(&cm);
-
-	std::vector<TP> ts;
-	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	ts.push_back(make_unique<std::thread>(TestNodeServer::run_node_thread, &ns1));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	ts.push_back(make_unique<std::thread>(TestNodeServer::run_node_thread, &ns2));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	LocalTestSetup stp(2,1,0,50*1024*1024,"capacity","lru","always", 12346);
 
 	std::string bbox_str("1252344.2712499984,5009377.085000001,2504688.5424999986,6261721.356250001");
 	std::string json =
-		"{\"type\":\"projection\",\"params\":{\"src_projection\":\"EPSG:4326\",\"dest_projection\":\"EPSG:3857\"},\"sources\":{\"raster\":[{\"type\":\"source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}]}}";
+		"{\"type\":\"projection\",\"params\":{\"src_projection\":\"EPSG:4326\",\"dest_projection\":\"EPSG:3857\"},\"sources\":{\"raster\":[{\"type\":\"rasterdb_source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}]}}";
 	std::string timestr("2010-06-06T18:00:00.000Z");
 	epsg_t epsg = EPSG_WEBMERCATOR;
 	uint32_t width = 256, height = 256;
 	time_t timestamp = parseIso8601DateTime(timestr);
 	double bbox[4];
 
-	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER,"localhost", 12346);
+	auto &cc = stp.get_client().get_raster_cache();
 
 	parseBBOX(bbox, bbox_str, epsg, false);
 	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
-		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), QueryResolution::pixels(width, height));
+		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp+1), QueryResolution::pixels(width, height));
 
 	std::string sem_id = GenericOperator::fromJSON(json)->getSemanticId();
 
@@ -63,64 +49,53 @@ TEST(DistributionTest,TestRedistibution) {
 
 	NodeCacheKey key1(sem_id, 2);
 
-	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get(key1));
+	int s_id = 1;
+	int d_id = 2;
+
+	try {
+		stp.get_node(s_id).get_cache_manager().get_raster_cache().get(key1);
+	} catch ( const NoSuchElementException &nse ) {
+		EXPECT_NO_THROW(stp.get_node(d_id).get_cache_manager().get_raster_cache().get(key1));
+		std::swap(s_id,d_id);
+	}
+
+	auto &s_node = stp.get_node(s_id);
+	auto &d_node = stp.get_node(d_id);
+
 
 	ReorgDescription rod;
-	ReorgMoveItem ri(CacheType::RASTER, key1.semantic_id, 1, key1.entry_id, "localhost", 12347);
+	ReorgMoveItem ri(CacheType::RASTER, key1.semantic_id, s_node.get_id(), key1.entry_id, s_node.get_host(), s_node.get_port());
 	rod.add_move(ri);
 
-	is.trigger_reorg(2, rod);
-
-	std::this_thread::sleep_for(std::chrono::milliseconds(2500));
+	stp.get_index().trigger_reorg(d_node.get_id(),rod);
+	stp.get_index().force_stat_update();
 
 	// Assert moved
-	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get(key1), NoSuchElementException);
+	EXPECT_THROW(s_node.get_cache_manager().get_raster_cache().get(key1), NoSuchElementException);
 
 	NodeCacheKey key_new(sem_id, 1);
-	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get(key_new));
-
-	ns2.stop();
-	ns1.stop();
-	is.stop();
-
-	for (TP &t : ts)
-		t->join();
+	EXPECT_NO_THROW(d_node.get_cache_manager().get_raster_cache().get(key_new));
 }
 
 TEST(DistributionTest,TestRemoteNodeFetch) {
 	// Reset testnodeutil
-	TestCacheMan cm;
-	TestIdxServer is(12346, 0, "capacity", "lru");
-	TestNodeServer ns1(1, 12347, "localhost", 12346, "always");
-	TestNodeServer ns2(1, 12348, "localhost", 12346, "always");
-
-	cm.add_instance(&ns1);
-	cm.add_instance(&ns2);
-
-	CacheManager::init(&cm);
-
-	std::vector<TP> ts;
-	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	ts.push_back(make_unique<std::thread>(TestNodeServer::run_node_thread, &ns1));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	ts.push_back(make_unique<std::thread>(TestNodeServer::run_node_thread, &ns2));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	Configuration::loadFromDefaultPaths();
+	LocalTestSetup stp(2,1,0,50*1024*1024,"capacity","lru","always", 12346);
 
 	std::string bbox_str("1252344.2712499984,5009377.085000001,2504688.5424999986,6261721.356250001");
 	std::string json =
-		"{\"type\":\"projection\",\"params\":{\"src_projection\":\"EPSG:4326\",\"dest_projection\":\"EPSG:3857\"},\"sources\":{\"raster\":[{\"type\":\"source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}]}}";
+		"{\"type\":\"projection\",\"params\":{\"src_projection\":\"EPSG:4326\",\"dest_projection\":\"EPSG:3857\"},\"sources\":{\"raster\":[{\"type\":\"rasterdb_source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}]}}";
 	std::string timestr("2010-06-06T18:00:00.000Z");
 	epsg_t epsg = EPSG_WEBMERCATOR;
 	uint32_t width = 256, height = 256;
 	time_t timestamp = parseIso8601DateTime(timestr);
 	double bbox[4];
 
-	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER, "localhost", 12346);
+	auto &cc = stp.get_client().get_raster_cache();
 
 	parseBBOX(bbox, bbox_str, epsg, false);
 	QueryRectangle qr(SpatialReference(epsg, bbox[0], bbox[1], bbox[2], bbox[3]),
-		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp), QueryResolution::pixels(width, height));
+		TemporalReference(TIMETYPE_UNIX, timestamp, timestamp+1), QueryResolution::pixels(width, height));
 
 
 	auto op = GenericOperator::fromJSON(json);
@@ -128,40 +103,20 @@ TEST(DistributionTest,TestRemoteNodeFetch) {
 	//Should hit 1st node
 	cc.query(*op, qr, qp1);
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
+	stp.get_index().force_stat_update();
 
 	//Should hit 2nd node
 	cc.query(*op, qr, qp2);
-
-	ns2.stop();
-	ns1.stop();
-	is.stop();
-
-	for (TP &t : ts)
-		t->join();
 }
 
 TEST(DistributionTest,TestStatsAndReorg) {
 	// Reset testnodeutil
-	TestCacheMan cm;
-	TestIdxServer is(12346, 500, "capacity", "lru");
-	TestNodeServer ns1(1, 12347, "localhost", 12346, "always", 204800 );
-	TestNodeServer ns2(1, 12348, "localhost", 12346, "always", 204800 );
+//	Log::setLevel(Log::LogLevel::DEBUG);
 
-	cm.add_instance(&ns1);
-	cm.add_instance(&ns2);
+	Configuration::loadFromDefaultPaths();
+	LocalTestSetup stp(2,1,500,204800,"capacity","lru","always", 12346);
 
-	CacheManager::init(&cm);
-
-	std::vector<TP> ts;
-	ts.push_back(make_unique<std::thread>(&IndexServer::run, &is));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	ts.push_back(make_unique<std::thread>(TestNodeServer::run_node_thread, &ns1));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-	ts.push_back(make_unique<std::thread>(TestNodeServer::run_node_thread, &ns2));
-	std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-	std::string json = "{\"type\":\"source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}";
+	std::string json = "{\"type\":\"rasterdb_source\",\"params\":{\"sourcename\":\"world1\",\"channel\":0}}";
 	std::string timestr("2010-06-06T18:00:00.000Z");
 	epsg_t epsg = EPSG_LATLON;
 
@@ -169,9 +124,9 @@ TEST(DistributionTest,TestStatsAndReorg) {
 
 	auto op = GenericOperator::fromJSON(json);
 
-	ClientCacheWrapper<GenericRaster> cc(CacheType::RASTER,"localhost", 12346);
+	auto &cc = stp.get_client().get_raster_cache();
 
-	TemporalReference tr(TIMETYPE_UNIX, timestamp, timestamp);
+	TemporalReference tr(TIMETYPE_UNIX, timestamp, timestamp+1);
 	QueryResolution   qres = QueryResolution::pixels(256, 256);
 
 
@@ -184,24 +139,17 @@ TEST(DistributionTest,TestStatsAndReorg) {
 	cc.query(*op, qr2, qp2);
 	cc.query(*op, qr2, qp3);
 
-	is.force_stat_update();
 
-	std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-	// Reorg should be finished at this point
+	stp.get_index().force_reorg();
 
-	// Assert moved
-	EXPECT_THROW(cm.get_instance_mgr(0).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1)),
-			NoSuchElementException );
+	try {
+		stp.get_node(1).get_cache_manager().get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1));
+		stp.get_node(2).get_cache_manager().get_raster_cache().get(NodeCacheKey(op->getSemanticId(),2));
+	} catch ( const NoSuchElementException &nse ) {
+		EXPECT_NO_THROW(stp.get_node(1).get_cache_manager().get_raster_cache().get(NodeCacheKey(op->getSemanticId(),2)));
+		EXPECT_NO_THROW(stp.get_node(2).get_cache_manager().get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1)));
+	}
 
-	EXPECT_NO_THROW(cm.get_instance_mgr(0).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),2)));
-	EXPECT_NO_THROW(cm.get_instance_mgr(1).get_raster_cache().get(NodeCacheKey(op->getSemanticId(),1)));
-
-	ns2.stop();
-	ns1.stop();
-	is.stop();
-
-	for (TP &t : ts)
-		t->join();
 }
 
 #endif

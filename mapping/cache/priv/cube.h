@@ -147,6 +147,14 @@ public:
 	 */
 	bool operator!=( const Point<DIM> &o ) const;
 
+	double distance_to( const Point<DIM> & o ) const;
+
+	Point<DIM> operator+( const Point<DIM> &o ) const;
+
+	Point<DIM> operator-( const Point<DIM> &o ) const;
+
+	Point<DIM> operator*( double s ) const;
+
 	/**
 	 * @return a human readable respresentation
 	 */
@@ -278,6 +286,7 @@ private:
  * Models a 2-dimensional point
  */
 class Point2 : public Point<2> {
+public:
 	Point2() {};
 	Point2( double x, double y ) {
 		set_value(0,x);
@@ -289,6 +298,7 @@ class Point2 : public Point<2> {
  * Models a 3-dimensional point
  */
 class Point3: public Point<3> {
+public:
 	Point3() {};
 	Point3( double x, double y, double z ) {
 		set_value(0,x);

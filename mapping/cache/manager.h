@@ -45,7 +45,7 @@ public:
 	 * @param profiler the profiler recording costs of query-execution
 	 * @return the result satisfying the given query parameters
 	 */
-	virtual std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler) = 0;
+	virtual std::unique_ptr<T> query(GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler) = 0;
 };
 
 /**
@@ -106,7 +106,7 @@ public:
 	NopCacheWrapper();
 
 	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
+	std::unique_ptr<T> query(GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 };
 
 /**
@@ -141,7 +141,7 @@ class ClientCacheWrapper : public CacheWrapper<T> {
 public:
 	ClientCacheWrapper( CacheType type, const std::string &idx_host, int idx_port );
 	bool put(const std::string &semantic_id, const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler);
-	std::unique_ptr<T> query(const GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
+	std::unique_ptr<T> query(GenericOperator &op, const QueryRectangle &rect, QueryProfiler &profiler);
 protected:
 	std::unique_ptr<T> read_result( BinaryReadBuffer &buffer );
 private:

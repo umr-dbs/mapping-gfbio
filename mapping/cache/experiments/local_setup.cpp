@@ -1,26 +1,13 @@
-/*
- * indexserver_main.cpp
- *
- *  Created on: 26.05.2015
- *      Author: mika
- */
-
-#include "cache/index/indexserver.h"
-#include "cache/index/reorg_strategy.h"
-#include "cache/common.h"
+#include "cache/experiments/exp_util.h"
 #include "util/configuration.h"
 #include "util/log.h"
+#include "raster/opencl.h"
 #include <signal.h>
 
-IndexServer *instance = nullptr;
-
 void termination_handler(int signum) {
-	if (signum == SIGSEGV) {
+	if ( signum == SIGSEGV ) {
 		printf("Segmentation fault. Stacktrace:\n%s", CacheCommon::get_stacktrace().c_str());
 		exit(1);
-	}
-	else {
-		instance->stop();
 	}
 }
 
@@ -53,23 +40,35 @@ int main(void) {
 	// Disable GDAL Error Messages
 	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
 
-	auto portstr = Configuration::get("indexserver.port");
+#ifndef MAPPING_NO_OPENCL
+	RasterOpenCL::init();
+#endif
+	CachingStrategy::init();
 
-	Log::setLevel(Configuration::get("log.level","info"));
+	Log::setLevel(Log::LogLevel::INFO);
 
-	auto portnr = atoi(portstr.c_str());
+	time_t update_interval = 0;
+	size_t cache_capacity = 50 * 1024 * 1024;
 
-	std::string rs = Configuration::get("indexserver.reorg.strategy");
-	std::string rel = Configuration::get("indexserver.reorg.relevance","lru");
-	std::string scheduler = Configuration::get("indexserver.scheduler","default");
+	std::string reorg_strategy = "geo";
+	std::string relevance = "costlru";
+	std::string caching_strat = "uncached";
 
-//	scheduler = "default";
-	size_t update_interval = 2000;
-	if ( scheduler != "default" )
-		update_interval = 0;
+	std::string scheduler = "emkde";
+	std::string node_cache_mode = "local";
+	std::string node_cache_repl = "lru";
+	int num_nodes = 4;
+	int workers_per_node = 1;
+	int index_port = 12346;
 
-	instance = new IndexServer(portnr, update_interval, rs, rel, scheduler);
-	instance->run();
+
+	LocalTestSetup lts(
+			num_nodes, workers_per_node, update_interval, cache_capacity, reorg_strategy, relevance, caching_strat, scheduler, node_cache_mode, node_cache_repl, index_port
+	);
+
+	std::this_thread::sleep_for( std::chrono::seconds(3600));
 	return 0;
 }
+
+
 

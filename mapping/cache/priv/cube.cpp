@@ -116,6 +116,39 @@ bool Point<DIM>::operator !=(const Point<DIM>& o) const {
 }
 
 template<int DIM>
+double Point<DIM>::distance_to(const Point<DIM>& o) const {
+	Point<DIM> dif = this->operator -(o);
+	double sqsum = 0;
+	for ( int i = 0; i < DIM; i++ )
+		sqsum += dif.values[i] * dif.values[i];
+	return std::sqrt(sqsum);
+}
+
+template<int DIM>
+Point<DIM> Point<DIM>::operator *(double s) const {
+	Point<DIM> res;
+	for ( int i = 0; i < DIM; i++ )
+		res.values[i] = s*values[i];
+	return res;
+}
+
+template<int DIM>
+Point<DIM> Point<DIM>::operator -(const Point<DIM>& o) const {
+	Point<DIM> res;
+	for ( int i = 0; i < DIM; i++ )
+		res.values[i] = values[i] - o.values[i];
+	return res;
+}
+
+template<int DIM>
+Point<DIM> Point<DIM>::operator +(const Point<DIM>& o) const {
+	Point<DIM> res;
+	for ( int i = 0; i < DIM; i++ )
+		res.values[i] = values[i] + o.values[i];
+	return res;
+}
+
+template<int DIM>
 std::string Point<DIM>::to_string() const {
 	std::ostringstream ss;
 	ss << "Point: (";
@@ -289,6 +322,14 @@ void Cube<DIM>::serialize(BinaryWriteBuffer& buffer, bool) const {
 	}
 }
 
+template<int DIM>
+bool Cube<DIM>::contains(const Point<DIM>& p) const {
+	for ( int i = 0; i < DIM; i++ ) {
+		if ( !dims[i].contains(p.get_value(i)) )
+			return false;
+	}
+	return true;
+}
 
 template<int DIM>
 std::string Cube<DIM>::to_string() const {

@@ -136,62 +136,6 @@ std::string PuzzleRequest::to_string() const {
 	return ss.str();
 }
 
-template<class T>
-std::vector<QueryRectangle> PuzzleRequest::get_remainder_queries(
-		const T& ref_result) const {
-	(void) ref_result;
-	std::vector<QueryRectangle> result;
-	result.reserve(remainder.size());
-
-	for ( auto &rem : remainder ) {
-		result.push_back( QueryRectangle( SpatialReference(query.epsg, rem.get_dimension(0).a, rem.get_dimension(1).
-												a, rem.get_dimension(0).b, rem.get_dimension(1).b),
-											TemporalReference(query.timetype, rem.get_dimension(2).a,rem.get_dimension(2).b),
-											QueryResolution::none() ) );
-	}
-	return result;
-}
-
-template<>
-std::vector<QueryRectangle> PuzzleRequest::get_remainder_queries(
-		const GenericRaster& ref_result) const {
-
-	std::vector<QueryRectangle> result;
-	result.reserve(remainder.size());
-
-	for ( auto &rem : remainder ) {
-		double x1 = rem.get_dimension(0).a;
-		double x2 = rem.get_dimension(0).b;
-		double y1 = rem.get_dimension(1).a;
-		double y2 = rem.get_dimension(1).b;
-
-
-		// Skip useless remainders
-		if ( rem.get_dimension(0).distance() < ref_result.pixel_scale_x / 2 ||
-			 rem.get_dimension(1).distance() < ref_result.pixel_scale_y / 2)
-			continue;
-		// Make sure we have at least one pixel
-		snap_to_pixel_grid(x1,x2,ref_result.stref.x1,ref_result.pixel_scale_x);
-		snap_to_pixel_grid(y1,y2,ref_result.stref.y1,ref_result.pixel_scale_y);
-
-
-		result.push_back( QueryRectangle( SpatialReference(query.epsg, x1,y1,x2,y2),
-										  TemporalReference(query.timetype, rem.get_dimension(2).a,rem.get_dimension(2).b),
-										  QueryResolution::pixels( std::round((x2-x1) / ref_result.pixel_scale_x),
-																   std::round((y2-y1) / ref_result.pixel_scale_y) ) ) );
-	}
-	return result;
-}
-
-
-void PuzzleRequest::snap_to_pixel_grid( double &v1, double &v2, double ref, double scale ) const {
-	if ( ref < v1 )
-		v1 = ref + std::floor( (v1-ref) / scale)*scale;
-	else
-		v1 = ref - std::ceil( (ref-v1) / scale)*scale;
-	v2 = v1 + std::ceil( (v2-v1) / scale)*scale;
-}
-
 size_t PuzzleRequest::get_num_remainders() const {
 	return remainder.size();
 }
@@ -199,10 +143,3 @@ size_t PuzzleRequest::get_num_remainders() const {
 bool PuzzleRequest::has_remainders() const {
 	return !remainder.empty();
 }
-
-template std::vector<QueryRectangle> PuzzleRequest::get_remainder_queries<PointCollection>(const PointCollection&) const;
-template std::vector<QueryRectangle> PuzzleRequest::get_remainder_queries<LineCollection>(const LineCollection&) const;
-template std::vector<QueryRectangle> PuzzleRequest::get_remainder_queries<PolygonCollection>(const PolygonCollection&) const;
-template std::vector<QueryRectangle> PuzzleRequest::get_remainder_queries<GenericPlot>(const GenericPlot&) const;
-
-

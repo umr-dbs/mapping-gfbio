@@ -2,6 +2,7 @@
 #include "cache/index/indexserver.h"
 #include "cache/index/index_cache.h"
 #include "cache/index/querymanager.h"
+#include "cache/index/query_manager/default_query_manager.h"
 #include "cache/index/reorg_strategy.h"
 
 TEST(Locking,CacheLocksTest) {
@@ -46,7 +47,7 @@ TEST(Locking,MgrLocks) {
 	node_map.emplace(n->id,n);
 	IndexCacheManager ic( "capacity","lru" );
 
-	QueryManager mgr(ic,node_map);
+	DefaultQueryManager mgr(ic,node_map);
 
 	auto &c = ic.get_cache(CacheType::POINT);
 

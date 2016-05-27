@@ -137,24 +137,8 @@ public:
 	 */
 	bool has_remainders() const;
 
-	/**
-	 * Transforms the remainder-cubes into queries understood by mapping
-	 * @param ref_result a reference-result
-	 */
-	template<class T>
-	std::vector<QueryRectangle> get_remainder_queries(const T& ref_result) const;
 	std::vector<CacheRef> parts;
-private:
 	std::vector<Cube<3>>  remainder;
-	/**
-	 * Snaps the bounds of a cube to the pixel grid
-	 * @param v1 the first value of the interval
-	 * @param v2 the second value of the interval
-	 * @param ref the reference point (value where a full pixel starts)
-	 * @param scale the pixel-scale
-	 *
-	 */
-	void snap_to_pixel_grid( double &v1, double &v2, double ref, double scale ) const;
 };
 
 #endif /* PRIV_REQUESTS_H_ */

@@ -152,7 +152,8 @@ ${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES} ${OBJ_USERDB}
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o o/cache/common.o o/util/server_nonblocking.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 
-${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} ${OBJ_USERDB} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/remote_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o
+${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} ${OBJ_USERDB} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/remote_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/util/server_nonblocking.o ${OBJ_UNITTEST} o/libgtest.a
+	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 
 ${EXEPARSETESTLOGS}:	o/test/systemtests/parse_logs.o
 	${CPP} $+ -o $@

@@ -176,8 +176,10 @@ void OGCService::exportZip(const char* data, size_t dataLength, const std::strin
 		fileExtension = "json";
 	else if (format == "csv")
 		fileExtension = "csv";
+	else if (format == "image/tiff")
+		fileExtension = "tiff";
 	else
-		throw ArgumentException("WFSService: unknown output format");
+		throw ArgumentException("OGCService: unknown output format");
 	std::string fileName = "data." + fileExtension;
 
 	//archive creation

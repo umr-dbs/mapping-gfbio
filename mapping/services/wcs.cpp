@@ -131,27 +131,45 @@ void WCSService::run() {
 		QueryProfiler profiler;
 		auto result_raster = graph->getCachedRaster(query_rect,profiler);
 
-		//setup the output parameters
-		std::string gdalDriver = "GTiff";
-		std::string gdalPrefix = "/vsimem/";
-		std::string gdalFileName = "test.tif";
-		std::string gdalOutFileName = gdalPrefix+gdalFileName;
+		auto format = params.get("format", "image/tiff");
+		fprintf(stderr,format.c_str());
+		bool exportMode = false;
+		if(format.find(EXPORT_MIME_PREFIX) == 0) {
+			exportMode = true;
+			format = format.substr(strlen(EXPORT_MIME_PREFIX));
+		}
 
-		//write the raster into a GDAL file
-		result_raster->toGDAL(gdalOutFileName.c_str(), gdalDriver.c_str());
-
-		//get the bytearray (buffer) and its size
+		GByte* outDataBuffer;
 		vsi_l_offset length;
-		GByte* outDataBuffer = VSIGetMemFileBuffer(gdalOutFileName.c_str(), &length, true);
+		std::string gdalFileName;
+		if(format == "image/tiff") {
+			//setup the output parameters
+			std::string gdalDriver = "GTiff";
+			std::string gdalPrefix = "/vsimem/";
+			gdalFileName = "test.tif";
+			std::string gdalOutFileName = gdalPrefix+gdalFileName;
 
-		//put the HTML headers for download
-		//result.sendContentType("???"); // TODO
-		result.sendHeader("Content-Disposition", concat("attachment; filename=\"",gdalFileName,"\""));
-		result.sendHeader("Content-Length", concat(static_cast<size_t>(length)));
-		result.finishHeaders();
+			//write the raster into a GDAL file
+			result_raster->toGDAL(gdalOutFileName.c_str(), gdalDriver.c_str());
 
-		//write the data into the output stream
-		result.write(reinterpret_cast<char*>(outDataBuffer), static_cast<size_t>(length));
+			//get the bytearray (buffer) and its size
+
+			outDataBuffer = VSIGetMemFileBuffer(gdalOutFileName.c_str(), &length, true);
+		} else
+			throw ArgumentException("WCSService: unknown format");
+
+		if(exportMode) {
+			exportZip(reinterpret_cast<char*>(outDataBuffer), static_cast<size_t>(length), format, *graph->getFullProvenance());
+		} else {
+			//put the HTML headers for download
+			//result.sendContentType("???"); // TODO
+			result.sendHeader("Content-Disposition", concat("attachment; filename=\"",gdalFileName,"\""));
+			result.sendHeader("Content-Length", concat(static_cast<size_t>(length)));
+			result.finishHeaders();
+
+			//write the data into the output stream
+			result.write(reinterpret_cast<char*>(outDataBuffer), static_cast<size_t>(length));
+		}
 
 		//clean the GDAL resources
 		VSIFree(outDataBuffer);

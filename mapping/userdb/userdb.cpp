@@ -4,10 +4,12 @@
 
 #include "util/exceptions.h"
 #include "util/configuration.h"
+#include "util/concat.h"
 
 #include <time.h>
 #include <unordered_map>
 #include <random>
+#include <cstring>
 
 // all of these just to open /dev/urandom ..
 #include <sys/types.h>
@@ -110,6 +112,42 @@ bool UserDB::Session::isExpired() {
 	return false;
 }
 
+/**
+ * Artifact
+ */
+UserDB::ArtifactVersion::ArtifactVersion(time_t timestamp, const std::string &value)
+	: timestamp(timestamp), value(value) {
+}
+
+UserDB::Artifact::Artifact(artifactid_t artifactid, std::shared_ptr<User> user, const std::string &type, const std::string &name, time_t lastChanged, std::vector<time_t> versions)
+	: artifactid(artifactid), user(user), type(type), name(name), lastChanged(lastChanged), versions(versions) {
+}
+
+UserDB::Artifact::Artifact(artifactid_t artifactid, std::shared_ptr<User> user, const std::string &type, const std::string &name, time_t lastChanged)
+	: artifactid(artifactid), user(user), type(type), name(name), lastChanged(lastChanged) {
+}
+
+std::shared_ptr<UserDB::ArtifactVersion> UserDB::Artifact::getLatestArtifactVersion() {
+	return UserDB::loadArtifactVersion(*user, artifactid, time(0));
+}
+
+std::shared_ptr<UserDB::ArtifactVersion> UserDB::Artifact::getArtifactVersion(time_t timestamp) {
+	return UserDB::loadArtifactVersion(*user, artifactid, timestamp);
+}
+
+time_t UserDB::Artifact::updateValue(const std::string &value) {
+	auto version = UserDB::updateArtifactValue(*user, type, name, value);
+	versions.push_back(version);
+	return version;
+}
+
+std::shared_ptr<UserDB::User> UserDB::Artifact::shareWithUser(const std::string &username) {
+	return UserDB::shareArtifactWithUser(artifactid, username);
+}
+
+std::shared_ptr<UserDB::Group> UserDB::Artifact::shareWithGroup(const std::string &groupname) {
+	return UserDB::shareArtifactWithGroup(artifactid, groupname);
+}
 
 /*
  * UserDB backend registration
@@ -316,4 +354,61 @@ std::shared_ptr<UserDB::Session> UserDB::loadSession(const std::string &sessiont
 
 void UserDB::destroySession(const std::string &sessiontoken) {
 	userdb_backend->destroySession(sessiontoken);
+}
+
+std::shared_ptr<UserDB::Artifact> UserDB::createArtifact(const UserDB::User &user, const std::string &type, const std::string &name, const std::string &value) {
+	artifactid_t artifactid = userdb_backend->createArtifact(user.userid, type, name, value);
+	auto artifactData =  userdb_backend->loadArtifact(artifactid);
+	return std::make_shared<Artifact>(artifactid, loadUser(artifactData.userid), artifactData.type, artifactData.name, artifactData.lastChanged, artifactData.versions);
+}
+
+std::shared_ptr<UserDB::Artifact> UserDB::loadArtifact(UserDB::User &user, const std::string &username, const std::string &type, const std::string &name) {
+	auto artifactData = userdb_backend->loadArtifact(username, type, name);
+	if(user.getUsername() == username || user.hasPermission(concat("userdb.artifact.", artifactData.artifactid)))
+		return std::make_shared<Artifact>(artifactData.artifactid, loadUser(artifactData.userid), artifactData.type, artifactData.name, artifactData.lastChanged, artifactData.versions);
+	throw UserDB::authorization_error("UserDB: Access denied on artifact");
+}
+
+std::shared_ptr<UserDB::ArtifactVersion> UserDB::loadArtifactVersion(const User &user, artifactid_t artifactid, time_t timestamp) {
+	auto artifactVersionData = userdb_backend->loadArtifactVersionData(user.userid, artifactid, timestamp);
+	return std::make_shared<ArtifactVersion>(artifactVersionData.timestamp, artifactVersionData.value);
+}
+
+time_t UserDB::updateArtifactValue(const User &user, const std::string &type, const std::string &name, const std::string &value) {
+	return userdb_backend->updateArtifactValue(user.userid, type, name, value);
+}
+
+
+std::vector<UserDB::Artifact> UserDB::loadArtifactsOfType(const User &user, const std::string &type) {
+	std::vector<UserDB::Artifact> artifacts;
+
+	// resolve accessible artifacts of other users
+	for(const std::string &permission : user.all_permissions.set) {
+		if(permission.find("userdb.artifact.") == 0){
+			size_t artifactid = std::stoi(permission.substr(strlen("userdb.artifact.")));
+			auto artifactData = userdb_backend->loadArtifact(artifactid);
+			artifacts.push_back(UserDB::Artifact(artifactData.artifactid, loadUser(artifactData.userid), artifactData.type, artifactData.name, artifactData.lastChanged));
+		}
+	}
+
+	// load user's own artifacts
+	auto artifactsData = userdb_backend->loadArtifactsOfType(user.userid, type);
+
+	for(auto& artifactData : artifactsData) {
+		artifacts.push_back(UserDB::Artifact(artifactData.artifactid, loadUser(artifactData.userid), artifactData.type, artifactData.name, artifactData.lastChanged));
+	}
+
+	return artifacts;
+}
+
+std::shared_ptr<UserDB::User> UserDB::shareArtifactWithUser(artifactid_t artifactid, const std::string &username) {
+	auto userid = userdb_backend->loadUserId(username);
+	auto user = loadUser(userid);
+	return user->addPermission(concat("userdb.artifact.", artifactid));
+}
+
+std::shared_ptr<UserDB::Group> UserDB::shareArtifactWithGroup(artifactid_t artifactid, const std::string &groupname) {
+	auto groupid = userdb_backend->loadGroupId(groupname);
+	auto group = loadGroup(groupid);
+	return group->addPermission(concat("userdb.artifact.", artifactid));
 }

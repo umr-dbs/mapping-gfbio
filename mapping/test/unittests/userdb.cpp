@@ -83,4 +83,51 @@ TEST(UserDB, testALL) {
 	EXPECT_EQ(true, user2->hasPermission(grouppermission));
 
 
+
+	// artifacts
+	// create artifact
+	auto artifact = UserDB::createArtifact(*user, "project", "Test Project", "test_project");
+	EXPECT_EQ("project", artifact->getType());
+	EXPECT_EQ("Test Project", artifact->getName());
+	EXPECT_EQ("test_project", artifact->getLatestArtifactVersion()->getValue());
+
+	// update
+	sleep(1); // wait for one second, because user + time has to be unique for an artifact version
+	artifact->updateValue("new value");
+
+	// load artifact
+	artifact = UserDB::loadArtifact(*user, user->getUsername(), "project", "Test Project");
+	EXPECT_EQ(2, artifact->getVersions().size());
+
+	auto version0 = artifact->getArtifactVersion(artifact->getVersions().at(0));
+	auto version1 = artifact->getArtifactVersion(artifact->getVersions().at(1));
+	EXPECT_EQ(true, version0->getTimestamp() > version1->getTimestamp());
+	EXPECT_EQ("new value", version0->getValue());
+	EXPECT_EQ("test_project", version1->getValue());
+
+	// load artifacts of type
+	sleep(1); // wait to fix order of projects in result
+	artifact = UserDB::createArtifact(*user, "project", "Test Project 2", "test_project 2");
+	artifact = UserDB::createArtifact(*user, "rscript", "My R script", "1 + 2");
+
+	auto artifacts = UserDB::loadArtifactsOfType(*user, "project");
+	EXPECT_EQ(2, artifacts.size());
+	EXPECT_EQ("Test Project 2", artifacts[0].getName());
+	EXPECT_EQ("Test Project", artifacts[1].getName());
+
+
+	// share
+	// user2 has no access
+	user2 = UserDB::createUser(username + "2", "realname", "email", password);
+	EXPECT_THROW(UserDB::loadArtifact(*user2, user->getUsername(), "project", "Test Project"), UserDB::authorization_error);
+	artifact = UserDB::loadArtifact(*user, user->getUsername(), "project", "Test Project");
+	user2 = artifact->shareWithUser(user2->getUsername());
+
+	// user2 now has access
+	EXPECT_NO_THROW(UserDB::loadArtifact(*user2, user->getUsername(), "project", "Test Project"));
+
+	// check that shared artifacts are listed
+	artifacts = UserDB::loadArtifactsOfType(*user2, "project");
+	EXPECT_EQ(1, artifacts.size());
+	EXPECT_EQ("Test Project", artifacts[0].getName());
 }

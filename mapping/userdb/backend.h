@@ -14,6 +14,7 @@ class UserDBBackend {
 	protected:
 		using userid_t = UserDB::userid_t;
 		using groupid_t = UserDB::groupid_t;
+		using artifactid_t = UserDB::artifactid_t;
 
 		struct UserData {
 			userid_t userid;
@@ -35,9 +36,25 @@ class UserDBBackend {
 			time_t expires;
 		};
 
+		struct ArtifactData {
+			artifactid_t artifactid;
+			userid_t userid;
+			std::string type;
+			std::string name;
+			time_t lastChanged;
+			std::vector<time_t> versions;
+		};
+		struct ArtifactVersionData {
+			time_t timestamp;
+			std::string value;
+		};
+
+
+
 		// Users
 		virtual userid_t createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password, const std::string &externalid) = 0;
 		virtual UserData loadUser(userid_t userid) = 0;
+		virtual userid_t loadUserId(const std::string &username) = 0;
 		virtual userid_t authenticateUser(const std::string &username, const std::string &password) = 0;
 		virtual userid_t findExternalUser(const std::string &externalid) = 0;
 		virtual void setUserExternalid(userid_t userid, const std::string &externalid) = 0;
@@ -48,6 +65,7 @@ class UserDBBackend {
 		// Groups
 		virtual UserDB::groupid_t createGroup(const std::string &groupname) = 0;
 		virtual GroupData loadGroup(groupid_t groupid) = 0;
+		virtual groupid_t loadGroupId(const std::string &groupname) = 0;
 		virtual void addUserToGroup(userid_t userid, groupid_t groupid) = 0;
 		virtual void removeUserFromGroup(userid_t userid, groupid_t groupid) = 0;
 		// destroyGroup ? this needs AUTO_INCREMENT to keep groupids unique forever.
@@ -58,6 +76,14 @@ class UserDBBackend {
 		virtual std::string createSession(userid_t, time_t expires) = 0;
 		virtual SessionData loadSession(const std::string &sessiontoken) = 0;
 		virtual void destroySession(const std::string &sessiontoken) = 0;
+
+		// Artifacts
+		virtual artifactid_t createArtifact(userid_t userid, const std::string &type, const std::string &name, const std::string &value) = 0;
+		virtual time_t updateArtifactValue(userid_t userid, const std::string &type, const std::string &name, const std::string &value) = 0;
+		virtual ArtifactData loadArtifact(artifactid_t artifactid) = 0;
+		virtual ArtifactData loadArtifact(const std::string& username, const std::string &type, const std::string &name) = 0;
+		virtual ArtifactVersionData loadArtifactVersionData(userid_t userid, artifactid_t artifactid, time_t timestamp) = 0;
+		virtual std::vector<ArtifactData> loadArtifactsOfType(userid_t userid, const std::string &type) = 0;
 };
 
 

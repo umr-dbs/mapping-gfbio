@@ -137,8 +137,19 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 // Test extensions
 //
 
-TestNodeServer::TestNodeServer(int num_threads, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, size_t capacity)  :
-	NodeServer( make_unique<RemoteCacheManager>( strategy, capacity,capacity,capacity,capacity,capacity ), my_port,index_host,index_port,num_threads) {
+std::unique_ptr<NodeCacheManager> TestNodeServer::get_mgr(
+		const std::string& cache_mgr, const std::string& strategy,
+		const std::string& local_repl, size_t capacity) {
+	if ( cache_mgr == "remote" )
+		return make_unique<RemoteCacheManager>( strategy, capacity,capacity,capacity,capacity,capacity );
+	else if ( cache_mgr == "local" )
+		return make_unique<LocalCacheManager>( strategy, local_repl, capacity,capacity,capacity,capacity,capacity);
+	throw ArgumentException("Unknown cache mode");
+}
+
+TestNodeServer::TestNodeServer(int num_threads, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, const std::string &cache_mgr, const std::string &local_repl, size_t capacity)  :
+	NodeServer( get_mgr(cache_mgr,strategy,local_repl,capacity), my_port,index_host,index_port,num_threads) {
+
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -161,8 +172,8 @@ NodeCacheManager& TestNodeServer::get_cache_manager() {
 
 // Test index
 
-TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function)
-	: IndexServer(port,update_interval,reorg_strategy,relevance_function) {
+TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function,const std::string &scheduler)
+	: IndexServer(port,update_interval,reorg_strategy,relevance_function,scheduler) {
 }
 
 void TestIdxServer::trigger_reorg(uint32_t node_id, const ReorgDescription& desc)  {
@@ -275,14 +286,18 @@ void TestCacheMan::reset_costs() {
 
 
 LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers, time_t update_interval, size_t capacity, std::string reorg_strat,
-	std::string relevance_function, std::string c_strat, int index_port  ) :
+	std::string relevance_function, std::string c_strat, std::string scheduler,
+	std::string node_cache,
+	std::string node_repl,
+	int index_port  ) :
+
 		index_port(index_port),
 		ccm("127.0.0.1", index_port),
 		idx_server(make_unique<TestIdxServer>(index_port,
-		update_interval,reorg_strat,relevance_function) ) {
+		update_interval,reorg_strat,relevance_function,scheduler) ) {
 
 	for ( int i = 1; i <= num_nodes; i++)
-		nodes.push_back( make_unique<TestNodeServer>(num_workers, index_port+i,"127.0.0.1",index_port,c_strat,capacity) );
+		nodes.push_back( make_unique<TestNodeServer>(num_workers, index_port+i,"127.0.0.1",index_port,c_strat,node_cache,node_repl,capacity) );
 
 	for ( auto &n : nodes )
 		mgr.add_instance(n.get());
@@ -659,3 +674,4 @@ CacheExperimentMultiQuery::CacheExperimentMultiQuery(const std::string& name,
 		const std::vector<QuerySpec>& specs, uint32_t num_runs) :
 	CacheExperiment( concat(name, " - ", specs.size(), " queries"), num_runs), query_specs(specs) {
 }
+

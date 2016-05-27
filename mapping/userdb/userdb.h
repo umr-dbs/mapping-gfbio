@@ -24,6 +24,7 @@ class UserDB {
 		// these are for internal use only, they should never be leaked outside of the userdb
 		using userid_t = int64_t;
 		using groupid_t = int64_t;
+		using artifactid_t = int64_t;
 		friend class UserDBBackend;
 
 	public:
@@ -34,6 +35,7 @@ class UserDB {
 
 		// helper classes
 		class Permissions {
+			friend class UserDB;
 			public:
 				Permissions() = default;
 				void addPermission(const std::string &permission);
@@ -44,6 +46,7 @@ class UserDB {
 				std::unordered_set<std::string> set;
 		};
 		class User {
+			friend class UserDB;
 			public:
 				User(userid_t userid, const std::string &username, const std::string &externalid, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups);
 
@@ -91,6 +94,38 @@ class UserDB {
 				std::shared_ptr<User> user;
 				time_t expires;
 		};
+		class ArtifactVersion {
+		public:
+			ArtifactVersion(time_t timestamp, const std::string &value);
+			time_t getTimestamp() { return timestamp; };
+			std::string &getValue() { return value; };
+		private:
+			time_t timestamp;
+			std::string value;
+		};
+		class Artifact {
+		public:
+			Artifact(artifactid_t artifactid, std::shared_ptr<User> user, const std::string &type, const std::string &name, time_t lastChanged, std::vector<time_t> versions);
+			Artifact(artifactid_t artifactid, std::shared_ptr<User> user, const std::string &type, const std::string &name, time_t lastChanged);
+			std::string &getType() { return type; };
+			std::string &getName() { return name; };
+			User &getUser() { return *user; };
+			time_t getLastChanged() { return lastChanged; };
+			std::shared_ptr<ArtifactVersion> getLatestArtifactVersion();
+			std::shared_ptr<ArtifactVersion> getArtifactVersion(time_t timestamp);
+			std::vector<time_t> &getVersions() { return versions; }
+			time_t updateValue(const std::string &value);
+			std::shared_ptr<UserDB::User> shareWithUser(const std::string& username);
+			std::shared_ptr<UserDB::Group> shareWithGroup(const std::string& groupname);
+		private:
+			artifactid_t artifactid;
+			std::shared_ptr<User> user;
+			std::vector<time_t> versions;
+			std::string username;
+			std::string type;
+			std::string name;
+			time_t lastChanged;
+		};
 
 		// exceptions
 		struct userdb_error
@@ -99,8 +134,12 @@ class UserDB {
 			: public userdb_error { using userdb_error::userdb_error; };
 		struct authentication_error
 			: public userdb_error { using userdb_error::userdb_error; };
+		struct authorization_error
+			: public userdb_error { using userdb_error::userdb_error; };
 		struct session_expired_error
 			: public userdb_error { session_expired_error() : userdb_error("UserDB: your session has expired, you need to login again.") {}; };
+		struct artifact_error
+			: public userdb_error { using userdb_error::userdb_error; };
 
 		// static methods
 		static void initFromConfiguration();
@@ -114,6 +153,36 @@ class UserDB {
 		static std::shared_ptr<Session> loadSession(const std::string &token);
 
 		static std::shared_ptr<Group> createGroup(const std::string &groupname);
+
+		/**
+		 * Create an artifact
+		 * @param user the user who creates this artifact
+		 * @param type the type of the artifact
+		 * @param name the name of the artifact
+		 * @param value the value of the artifact
+		 * @return the new artifact
+		 */
+		static std::shared_ptr<Artifact> createArtifact(const User &user, const std::string &type, const std::string &name, const std::string &value);
+
+		/**
+		 * Load latest version of an artifact.
+		 * If no artifact satisfying the parameters exists, an exception is thrown.
+		 * If the user has no permission to load the artifact an exception is thrown (TODO)
+		 * @param user the user who wants to load the artifact
+		 * @param username name of the user who owns the artifact
+		 * @param type the type of the artifact
+		 * @param name the name of the artifact
+		 * @return the artifact
+		 */
+		static std::shared_ptr<Artifact> loadArtifact(User &user, const std::string &username, const std::string &type, const std::string &name);
+
+		/**
+		 * Load a list of the names of all artifacts a given user has permission to on of a given type
+		 * @param user the user who wants to load the artifacts
+		 * @param type the type of the artifacts
+		 * @return the artifact
+		 */
+		static std::vector<Artifact> loadArtifactsOfType(const User &user, const std::string &type);
 
 		// these should only be called by backend implementations
 		static std::string createRandomToken(size_t length);
@@ -131,6 +200,11 @@ class UserDB {
 		static void removeUserFromGroup(userid_t userid, groupid_t groupid);
 
 		static void destroySession(const std::string &sessiontoken);
+
+		static std::shared_ptr<ArtifactVersion> loadArtifactVersion(const User &user, artifactid_t artifactid, time_t timestamp);
+		static time_t updateArtifactValue(const User &user, const std::string &type, const std::string &name, const std::string &value);
+		static std::shared_ptr<UserDB::User> shareArtifactWithUser(artifactid_t artifactid, const std::string &username);
+		static std::shared_ptr<UserDB::Group> shareArtifactWithGroup(artifactid_t artifactid, const std::string &username);
 
 		// TODO: sessioncache?
 };

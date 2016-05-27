@@ -13,6 +13,7 @@ class SQLiteUserDBBackend : public UserDBBackend {
 	protected:
 		virtual userid_t createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password, const std::string &externalid);
 		virtual UserData loadUser(userid_t userid);
+		virtual userid_t loadUserId(const std::string& username);
 		virtual userid_t authenticateUser(const std::string &username, const std::string &password);
 		virtual userid_t findExternalUser(const std::string &externalid);
 		virtual void setUserExternalid(userid_t userid, const std::string &externalid);
@@ -22,6 +23,7 @@ class SQLiteUserDBBackend : public UserDBBackend {
 
 		virtual groupid_t createGroup(const std::string &groupname);
 		virtual GroupData loadGroup(groupid_t groupid);
+		virtual groupid_t loadGroupId(const std::string &groupname);
 		virtual void addUserToGroup(userid_t userid, groupid_t groupid);
 		virtual void removeUserFromGroup(userid_t userid, groupid_t groupid);
 		virtual void addGroupPermission(groupid_t groupid, const std::string &permission);
@@ -30,9 +32,18 @@ class SQLiteUserDBBackend : public UserDBBackend {
 		virtual std::string createSession(userid_t, time_t expires);
 		virtual SessionData loadSession(const std::string &sessiontoken);
 		virtual void destroySession(const std::string &sessiontoken);
+
+		virtual artifactid_t createArtifact(userid_t userid, const std::string &type, const std::string &name, const std::string &value);
+		virtual time_t updateArtifactValue(userid_t userid, const std::string &type, const std::string &name, const std::string &value);
+		virtual ArtifactData loadArtifact(artifactid_t artifactid);
+		virtual ArtifactData loadArtifact(const std::string &username, const std::string &type, const std::string &name);
+		virtual ArtifactVersionData loadArtifactVersionData(userid_t userid, artifactid_t artifactid, time_t timestamp);
+		virtual std::vector<ArtifactData> loadArtifactsOfType(userid_t userid, const std::string &type);
 	private:
 		static std::string createPwdHash(const std::string &password);
 		static bool verifyPwdHash(const std::string &password, const std::string &pwhash);
+
+		artifactid_t loadArtifactId(userid_t userid, const std::string &type, const std::string name);
 
 		SQLite db;
 };
@@ -91,8 +102,23 @@ SQLiteUserDBBackend::SQLiteUserDBBackend(const std::string &filename) {
 		")"
 	);
 
-	// artifacts: artifactid, userid, type, name
-	// artifact_versions: artifactid, data, value
+	db.exec("CREATE TABLE IF NOT EXISTS artifacts ("
+		" artifactid INTEGER PRIMARY KEY,"
+		" userid INTEGER NOT NULL,"
+		" type STRING NOT NULL,"
+		" name STRING NOT NULL,"
+		" UNIQUE (userid, type, name) "
+		")"
+	);
+
+	db.exec("CREATE TABLE IF NOT EXISTS artifact_versions ("
+		" artifactid INTEGER,"
+		" timestamp DATETIME NOT NULL,"
+		" value STRING NOT NULL,"
+		" PRIMARY KEY(artifactid, timestamp),"
+		" FOREIGN KEY(artifactid) REFERENCES artifacts(artifactid) ON DELETE CASCADE"
+		")"
+	);
 }
 
 SQLiteUserDBBackend::~SQLiteUserDBBackend() {
@@ -144,6 +170,15 @@ UserDBBackend::UserData SQLiteUserDBBackend::loadUser(userid_t userid) {
 		groups.push_back(stmt.getInt64(0));
 
 	return UserData{userid, username, externalid, std::move(permissions), std::move(groups)};
+}
+
+
+UserDBBackend::userid_t SQLiteUserDBBackend::loadUserId(const std::string &username) {
+	auto stmt = db.prepare("SELECT userid FROM users WHERE username = ?");
+	stmt.bind(1, username);
+	if (!stmt.next())
+		throw UserDB::database_error("UserDB: user not found");
+	return stmt.getInt64(0);
 }
 
 UserDBBackend::userid_t SQLiteUserDBBackend::authenticateUser(const std::string &username, const std::string &password) {
@@ -220,6 +255,14 @@ UserDBBackend::GroupData SQLiteUserDBBackend::loadGroup(groupid_t groupid) {
 		permissions.addPermission(stmt.getString(0));
 
 	return GroupData{groupid, groupname, std::move(permissions)};
+}
+
+UserDBBackend::groupid_t SQLiteUserDBBackend::loadGroupId(const std::string &groupname) {
+	auto stmt = db.prepare("SELECT groupid FROM groups WHERE username = ?");
+	stmt.bind(1, groupname);
+	if (!stmt.next())
+		throw UserDB::database_error("UserDB: group not found");
+	return stmt.getInt64(0);
 }
 
 void SQLiteUserDBBackend::addUserToGroup(userid_t userid, groupid_t groupid) {
@@ -306,4 +349,113 @@ bool SQLiteUserDBBackend::verifyPwdHash(const std::string &password, const std::
 	sha1.addBytes(password);
 	sha1.addBytes(salt);
 	return sha1.digest().asHex() == hash;
+}
+
+
+
+UserDBBackend::artifactid_t SQLiteUserDBBackend::loadArtifactId(userid_t userid, const std::string &type, const std::string name) {
+	auto stmt = db.prepare("SELECT artifactid from artifacts where userid = ? and type = ? and name = ?");
+	stmt.bind(1, userid);
+	stmt.bind(2, type); //TODO check
+	stmt.bind(3, name);
+
+	if (!stmt.next())
+		throw UserDB::artifact_error("UserDB: artifact not found.");
+
+	return stmt.getInt64(0);
+}
+
+UserDBBackend::artifactid_t SQLiteUserDBBackend::createArtifact(userid_t userid, const std::string &type, const std::string &name, const std::string &value) {
+	// TODO begin transaction
+	// insert artifact
+	auto stmt = db.prepare("INSERT INTO artifacts (userid, type, name) VALUES (?, ?, ?)");
+	stmt.bind(1, userid);
+	stmt.bind(2, type);
+	stmt.bind(3, name);
+	stmt.exec();
+
+	// create initial version
+	auto artifactid = db.getLastInsertId();
+	stmt = db.prepare("INSERT INTO artifact_versions (artifactid, timestamp, value) VALUES (?, ?, ?)");
+	stmt.bind(1, artifactid);
+	stmt.bind(2, (int64_t)time(0)); //TODO check
+	stmt.bind(3, value);
+	stmt.exec();
+
+	//TODO end transaction
+
+	return artifactid;
+}
+
+time_t SQLiteUserDBBackend::updateArtifactValue(UserDBBackend::userid_t userid, const std::string &type, const std::string &name, const std::string &value) {
+	artifactid_t artifactid = loadArtifactId(userid, type, name);
+	time_t timestamp = time(0);
+	auto stmt = db.prepare("INSERT INTO artifact_versions (artifactid, timestamp, value) VALUES (?, ?, ?)");
+	stmt.bind(1, artifactid);
+	stmt.bind(2, (int64_t)timestamp); //TODO check
+	stmt.bind(3, value);
+	stmt.exec();
+
+	return timestamp;
+}
+
+UserDBBackend::ArtifactData SQLiteUserDBBackend::loadArtifact(UserDBBackend::artifactid_t artifactid) {
+	auto stmt = db.prepare("SELECT userid, type, name from artifacts WHERE artifactid = ?");
+	stmt.bind(1, artifactid);
+
+	if (!stmt.next())
+			throw UserDB::artifact_error("UserDB: artifact not found");
+
+	artifactid_t userid = stmt.getInt64(0);
+	std::string type = stmt.getString(1);
+	std::string name = stmt.getString(2);
+
+	stmt = db.prepare("SELECT timestamp FROM artifact_versions WHERE artifactid = ? ORDER BY timestamp desc");
+	stmt.bind(1, artifactid);
+
+	std::vector<time_t> versions;
+
+	while (stmt.next())
+		versions.push_back(stmt.getInt64(0));
+
+	return ArtifactData{artifactid, userid, type, name, versions.front(), versions};
+}
+
+UserDBBackend::ArtifactData SQLiteUserDBBackend::loadArtifact(const std::string &username, const std::string &type, const std::string &name) {
+	userid_t userid = loadUserId(username);
+	artifactid_t artifactid = loadArtifactId(userid, type, name);
+	return loadArtifact(artifactid);
+}
+
+UserDBBackend::ArtifactVersionData SQLiteUserDBBackend::loadArtifactVersionData(userid_t userid, artifactid_t artifactid, time_t timestamp) {
+	auto stmt = db.prepare("SELECT timestamp, value  FROM artifact_versions WHERE artifactid = ? AND timestamp <= ? ORDER BY timestamp DESC LIMIT 1");
+	stmt.bind(1, artifactid);
+	stmt.bind(2, (int64_t)timestamp);
+
+	if (!stmt.next())
+		throw UserDB::artifact_error("UserDB: artifact version not found");
+
+	time_t t = stmt.getInt64(0);
+	std::string value = stmt.getString(1);
+	return ArtifactVersionData{timestamp, value};
+}
+
+std::vector<UserDBBackend::ArtifactData> SQLiteUserDBBackend::loadArtifactsOfType(UserDBBackend::userid_t userid, const std::string &type) {
+	//TODO: find all artifacts that user has permission on
+
+	auto stmt = db.prepare("SELECT artifactid, name, max(timestamp) t from artifacts JOIN artifact_versions USING (artifactid) WHERE userid = ? and type = ? GROUP BY artifactid, name ORDER BY t DESC");
+	stmt.bind(1, userid);
+	stmt.bind(2, type);
+
+	std::vector<ArtifactData> artifacts;
+
+	while(stmt.next()) {
+		artifactid_t artifactid = stmt.getInt64(0);
+		std::string name = stmt.getString(1);
+		time_t timestamp = stmt.getInt64(2);
+
+		artifacts.push_back(ArtifactData{artifactid, userid, type, name, timestamp});
+	}
+
+	return artifacts;
 }

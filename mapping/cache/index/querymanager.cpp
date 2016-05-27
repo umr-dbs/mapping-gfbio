@@ -7,7 +7,8 @@
 
 #include "cache/index/querymanager.h"
 #include "cache/index/query_manager/default_query_manager.h"
-#include "cache/index/query_manager/dema_query_manager.h"
+#include "cache/index/query_manager/simple_query_manager.h"
+#include "cache/index/query_manager/emkde_query_manager.h"
 #include "cache/index/indexserver.h"
 #include "cache/common.h"
 #include "util/make_unique.h"
@@ -124,6 +125,10 @@ std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, cons
 		return make_unique<DefaultQueryManager>(mgr,nodes);
 	else if ( name == "dema" )
 		return make_unique<DemaQueryManager>(nodes);
+	else if ( name == "bema" )
+			return make_unique<BemaQueryManager>(nodes);
+	else if ( name == "emkde" )
+				return make_unique<EMKDEQueryManager>(nodes);
 	else throw ArgumentException(concat("Illegal scheduler name: ", name));
 }
 
@@ -138,7 +143,7 @@ void QueryManager::schedule_pending_jobs(
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
 			stats.queries_scheduled++;
-			Log::info("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
+			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
 			queries.emplace(con_id, std::move(*it));
 			it = pending_jobs.erase(it);
 		}

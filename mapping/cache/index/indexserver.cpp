@@ -196,7 +196,7 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 		ClientConnection &cc = *clit->second;
 		if (cc.is_faulty()) {
 			if ( cc.get_state() != ClientState::IDLE ) {
-				Log::info("Client connection cancelled: %ld", cc.id);
+				Log::debug("Client connection cancelled: %ld", cc.id);
 				query_manager->handle_client_abort(cc.id);
 			}
 			client_connections.erase(clit++);
@@ -350,7 +350,7 @@ void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) 
 			// Handle state-changes
 			switch (cc.get_state()) {
 				case ClientState::AWAIT_RESPONSE:
-					Log::info("Client-request read: %s", cc.get_request().to_string().c_str() );
+					Log::debug("Client-request read: %s", cc.get_request().to_string().c_str() );
 
 					query_manager->add_request(cc.id, cc.get_request());
 					break;

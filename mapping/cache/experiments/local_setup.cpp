@@ -45,7 +45,7 @@ int main(void) {
 #endif
 	CachingStrategy::init();
 
-	Log::setLevel(Log::LogLevel::DEBUG);
+	Log::setLevel(Log::LogLevel::INFO);
 
 	time_t update_interval = 0;
 	size_t cache_capacity = 50 * 1024 * 1024;
@@ -54,10 +54,10 @@ int main(void) {
 	std::string relevance = "costlru";
 	std::string caching_strat = "uncached";
 
-	std::string scheduler = "default";
-	std::string node_cache_mode = "remote";
+	std::string scheduler = "emkde";
+	std::string node_cache_mode = "local";
 	std::string node_cache_repl = "lru";
-	int num_nodes = 10;
+	int num_nodes = 4;
 	int workers_per_node = 1;
 	int index_port = 12346;
 
@@ -67,7 +67,6 @@ int main(void) {
 	);
 
 	std::this_thread::sleep_for( std::chrono::seconds(3600));
-
 	return 0;
 }
 

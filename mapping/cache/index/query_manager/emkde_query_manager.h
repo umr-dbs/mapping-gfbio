@@ -26,6 +26,7 @@ protected:
 	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req);
 
 private:
+	std::string bounds_to_string() const;
 
 	uint32_t get_hilbert_value( const QueryRectangle &rect );
 

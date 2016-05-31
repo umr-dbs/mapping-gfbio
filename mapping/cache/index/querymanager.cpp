@@ -23,7 +23,7 @@ IndexQueryStats::IndexQueryStats() :
 	partial_multi_node(0),
 	misses(0),
 	queries_issued(0),
-	queries_scheduled(0) {
+	queries_scheduled(0), num_queries(0), avg_wait_time(0), avg_exec_time(0), avg_time(0) {
 }
 
 void IndexQueryStats::reset() {
@@ -35,21 +35,39 @@ void IndexQueryStats::reset() {
 	misses = 0;
 	queries_issued = 0;
 	queries_scheduled = 0;
+	num_queries = 0;
+	avg_exec_time = 0;
+	avg_wait_time = 0;
+	avg_time = 0;
 }
 
 std::string IndexQueryStats::to_string() const {
 	std::ostringstream ss;
 	ss << "Index-Stats:" << std::endl;
-	ss << "  single hits           : " << single_hits << std::endl;
-	ss << "  puzzle single node    : " << multi_hits_single_node << std::endl;
-	ss << "  puzzle multiple nodes : " << multi_hits_multi_node << std::endl;
-	ss << "  partial single node   : " << partial_single_node << std::endl;
-	ss << "  partial multiple nodes: " << partial_multi_node << std::endl;
-	ss << "  misses                : " << misses << std::endl;
-	ss << "  client queries        : " << queries_issued << std::endl;
-	ss << "  queries scheduled     : " << queries_scheduled;
+	ss << "  single hits            : " << single_hits << std::endl;
+	ss << "  puzzle single node     : " << multi_hits_single_node << std::endl;
+	ss << "  puzzle multiple nodes  : " << multi_hits_multi_node << std::endl;
+	ss << "  partial single node    : " << partial_single_node << std::endl;
+	ss << "  partial multiple nodes : " << partial_multi_node << std::endl;
+	ss << "  misses                 : " << misses << std::endl;
+	ss << "  client queries         : " << queries_issued << std::endl;
+	ss << "  queries scheduled      : " << queries_scheduled << std::endl;
+	ss << "  Average Query Time     : " << avg_time << std::endl;
+	ss << "  Average Query Wait-Time: " << avg_wait_time << std::endl;
+	ss << "  Average Query Exec-Time: " << avg_exec_time;
 	return ss.str();
 }
+
+
+
+void IndexQueryStats::query_finished(const RunningQuery& q) {
+	avg_exec_time = ((avg_exec_time*num_queries) + (q.time_finished - q.time_scheduled)) / (num_queries+1);
+	avg_wait_time = ((avg_wait_time*num_queries) + (q.time_scheduled - q.time_created)) / (num_queries+1);
+	avg_time = avg_exec_time + avg_wait_time;
+	num_queries++;
+}
+
+
 
 CacheLocks::Lock::Lock(CacheType type, const IndexCacheKey& key) :
 	IndexCacheKey(key), type(type) {
@@ -142,6 +160,7 @@ void QueryManager::schedule_pending_jobs(
 	while (it != pending_jobs.end()) {
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
+			(*it)->time_scheduled = CacheCommon::time_millis();
 			stats.queries_scheduled++;
 			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
 			queries.emplace(con_id, std::move(*it));
@@ -168,6 +187,8 @@ std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
 		throw IllegalStateException(concat("No finished query found for worker: ",worker_id));
 
 	std::set<uint64_t> clients = it->second->get_clients();
+	it->second->time_finished = CacheCommon::time_millis();
+	stats.query_finished(*(it->second));
 	finished_queries.erase(it);
 	return clients;
 }
@@ -231,7 +252,7 @@ bool QueryManager::is_locked( CacheType type, const IndexCacheKey& key) const {
 //
 
 RunningQuery::RunningQuery( std::vector<CacheLocks::Lock> &&locks ) :
-	locks(std::move(locks)) {
+	locks(std::move(locks)), time_created(CacheCommon::time_millis()), time_scheduled(0), time_finished(0) {
 	QueryManager::locks.add_locks(this->locks);
 }
 

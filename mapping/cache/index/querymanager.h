@@ -21,32 +21,7 @@
 
 class QueryManager;
 
-/**
- * Statistics about cache-queries on the index-server
- */
-class IndexQueryStats {
-public:
-	IndexQueryStats();
 
-	/**
-	 * @return a human readable respresentation
-	 */
-	std::string to_string() const;
-
-	/**
-	 * Resets this stats (setting all counts to 0)
-	 */
-	void reset();
-
-	uint32_t single_hits;
-	uint32_t multi_hits_single_node;
-	uint32_t multi_hits_multi_node;
-	uint32_t partial_single_node;
-	uint32_t partial_multi_node;
-	uint32_t misses;
-	uint32_t queries_issued;
-	uint32_t queries_scheduled;
-};
 
 /**
  * Manages locks on cache-entries
@@ -112,6 +87,8 @@ private:
  * Models a query currently executed by a worker
  */
 class RunningQuery {
+	friend class QueryManager;
+	friend class IndexQueryStats;
 public:
 	/**
 	 * Creates a new instance and sets the given locks
@@ -175,9 +152,13 @@ public:
 	 * @return the request used to schedule this query
 	 */
 	virtual const BaseRequest& get_request() const = 0;
+
 private:
 	std::vector<CacheLocks::Lock> locks;
 	std::set<uint64_t> clients;
+	uint64_t time_created;
+	uint64_t time_scheduled;
+	uint64_t time_finished;
 };
 
 /**
@@ -214,6 +195,41 @@ public:
 	 * @return whether this query depends on the node with the given id (e.g. references a cache-entry)
 	 */
 	virtual bool is_affected_by_node( uint32_t node_id ) = 0;
+};
+
+/**
+ * Statistics about cache-queries on the index-server
+ */
+class IndexQueryStats {
+public:
+	IndexQueryStats();
+
+	/**
+	 * @return a human readable respresentation
+	 */
+	std::string to_string() const;
+
+	/**
+	 * Resets this stats (setting all counts to 0)
+	 */
+	void reset();
+
+	uint32_t single_hits;
+	uint32_t multi_hits_single_node;
+	uint32_t multi_hits_multi_node;
+	uint32_t partial_single_node;
+	uint32_t partial_multi_node;
+	uint32_t misses;
+	uint32_t queries_issued;
+	uint32_t queries_scheduled;
+
+	void query_finished( const RunningQuery &q );
+
+private:
+	size_t num_queries;
+	double avg_wait_time;
+	double avg_exec_time;
+	double avg_time;
 };
 
 /**

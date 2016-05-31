@@ -16,7 +16,7 @@ namespace cache_exp {
 
 	const std::string srtm_wf = R"WF_ESCAPE(
 {
-  "type": "source",
+  "type": "rasterdb_source",
   "params": {
     "sourcename": "srtm",
     "channel": 0
@@ -26,11 +26,11 @@ namespace cache_exp {
 
 
 const std::string srtm_ts_wf = R"WF_ESCAPE(
-{ "type": "timeShiftOperator",
+{ "type": "timeshift",
   "params": { "shift": { "from": { "unit": "absolute", "value": "1995-06-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-06-15 12:00:01" } }  },
   "sources": { "raster": [
 {
-  "type": "source",
+  "type": "rasterdb_source",
   "params": {
     "sourcename": "srtm",
     "channel": 0
@@ -50,7 +50,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
   },
   "sources": { "raster": [
 {
-  "type": "source",
+  "type": "rasterdb_source",
   "params": {
     "sourcename": "srtm",
     "channel": 0
@@ -70,7 +70,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
   "sources": {
     "raster": [
       {
-        "type": "source",
+        "type": "rasterdb_source",
         "params": {
           "sourcename": "srtm",
           "channel": 0
@@ -92,42 +92,42 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 	},
 	"sources" : {
 		"raster": [
-		  { "type": "timeShiftOperator",
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-01-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-01-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-02-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-02-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-03-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-03-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-04-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-04-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-05-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-05-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-06-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-06-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-07-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-07-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-08-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-08-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-09-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-09-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-10-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-10-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-11-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-11-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
-		  { "type": "timeShiftOperator",
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } },
+		  { "type": "timeshift",
 			"params": { "shift": { "from": { "unit": "absolute", "value": "1995-12-15 12:00:00" }, "to": { "unit": "absolute", "value": "1995-12-15 12:00:01" } }  },
-			"sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } }
+			"sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] } }
 	   ]
 	}
 }
@@ -171,7 +171,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 			  "sources": {
 				"raster": [
 				  {
-					"type": "source",
+					"type": "rasterdb_source",
 					"params": {
 					  "sourcename": "msg9_geos",
 					  "channel": 8,
@@ -213,7 +213,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 			  "sources": {
 				"raster": [
 				  {
-					"type": "source",
+					"type": "rasterdb_source",
 					"params": {
 					  "sourcename": "srtm",
 					  "channel": 0
@@ -230,7 +230,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 0,
@@ -245,7 +245,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 1,
@@ -260,7 +260,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 2,
@@ -275,7 +275,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 3,
@@ -290,7 +290,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 4,
@@ -305,7 +305,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 5,
@@ -320,7 +320,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 6,
@@ -342,7 +342,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 			  "sources": {
 				"raster": [
 				  {
-					"type": "source",
+					"type": "rasterdb_source",
 					"params": {
 					  "sourcename": "msg9_geos",
 					  "channel": 8,
@@ -371,7 +371,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 					"sources": {
 					  "raster": [
 						{
-						  "type": "source",
+						  "type": "rasterdb_source",
 						  "params": {
 							"sourcename": "msg9_geos",
 							"channel": 8,
@@ -386,7 +386,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 					"sources": {
 					  "raster": [
 						{
-						  "type": "source",
+						  "type": "rasterdb_source",
 						  "params": {
 							"sourcename": "msg9_geos",
 							"channel": 3,
@@ -407,7 +407,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 8,
@@ -422,7 +422,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 9,
@@ -437,7 +437,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		"sources": {
 		  "raster": [
 			{
-			  "type": "source",
+			  "type": "rasterdb_source",
 			  "params": {
 				"sourcename": "msg9_geos",
 				"channel": 10,
@@ -470,7 +470,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 		  },
 		  "sources": {
 		    "raster": [{
-		      "type": "timeShiftOperator",
+		      "type": "timeshift",
 			  "params": { "shift": { "from": { "unit": "absolute", "value": ")WF_ESCAPE";
 
 
@@ -478,7 +478,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 
 
 		std::string p3 = R"WF_ESCAPE(" } }  },
-			  "sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] }
+			  "sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] }
 		    }]
 		  }
 		}
@@ -492,7 +492,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 	static QuerySpec shifted_temp( const std::string &timestamp, const std::string &time_to ) {
 		std::string p1 = R"WF_ESCAPE(
 		{
-			  "type": "timeShiftOperator",
+			  "type": "timeshift",
 			  "params": { "shift": { "from": { "unit": "absolute", "value": ")WF_ESCAPE";
 
 
@@ -500,7 +500,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 
 
 		std::string p3 = R"WF_ESCAPE(" } }  },
-			  "sources": { "raster": [{ "type": "source", "params": { "sourcename": "worldclim", "channel": 2 } } ] }
+			  "sources": { "raster": [{ "type": "rasterdb_source", "params": { "sourcename": "worldclim", "channel": 2 } } ] }
 		}
 		)WF_ESCAPE";
 

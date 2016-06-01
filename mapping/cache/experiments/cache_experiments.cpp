@@ -341,7 +341,7 @@ void QueryBatchingExperiment::exec(int nodes, int threads) {
 	pe.execute();
 
 	accum_batched += setup.get_manager().get_costs();
-	queries_scheduled += setup.get_index().get_stats().queries_scheduled;
+	queries_scheduled += setup.get_index().get_stats().get_queries_scheduled();
 }
 
 ////////////////////////////////////////////////////////

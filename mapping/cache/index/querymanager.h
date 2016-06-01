@@ -221,11 +221,14 @@ public:
 	uint32_t partial_multi_node;
 	uint32_t misses;
 	uint32_t queries_issued;
-	uint32_t queries_scheduled;
 
+	uint32_t get_queries_scheduled();
 	void query_finished( const RunningQuery &q );
+	void scheduled( uint32_t node_id );
 
 private:
+	uint32_t queries_scheduled;
+	std::map<uint32_t,uint64_t> node_to_queries;
 	size_t num_queries;
 	double avg_wait_time;
 	double avg_exec_time;

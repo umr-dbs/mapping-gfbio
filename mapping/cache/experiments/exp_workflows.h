@@ -12,7 +12,41 @@
 
 namespace cache_exp {
 	const time_t timestamp = parseIso8601DateTime("2010-06-06T18:00:00.000Z");
+	const time_t timestamp_ndvi = parseIso8601DateTime("2015-06-06T18:00:00.000Z");
 	const TemporalReference tref(TIMETYPE_UNIX,timestamp);
+	const TemporalReference tref_ndvi(TIMETYPE_UNIX,timestamp_ndvi);
+
+	const std::string ndvi_wf = R"WF_ESCAPE(
+{
+  "type": "rasterdb_source",
+  "params": {
+	"sourcename": "ndvi",
+	"channel": 0
+  }
+}
+)WF_ESCAPE";
+
+	const std::string ndvi_proj_wf = R"WF_ESCAPE(
+{
+  "type": "projection",
+  "params": {
+    "src_projection": "EPSG:4326",
+    "dest_projection": "EPSG:3857"
+  },
+  "sources": {
+    "raster": [
+      {
+        "type": "rasterdb_source",
+		"params": {
+		  "sourcename": "ndvi",
+		  "channel": 0
+		}
+      }
+    ]
+  }
+}
+)WF_ESCAPE";
+
 
 	const std::string srtm_wf = R"WF_ESCAPE(
 {
@@ -457,6 +491,8 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 	const QuerySpec avg_temp(avg_temp_wf,EPSG_LATLON,CacheType::RASTER,tref, "Average Temperature");
 	const QuerySpec srtm_proj(srtm_proj_wf,EPSG_WEBMERCATOR,CacheType::RASTER,tref, "SRTM Projected");
 	const QuerySpec srtm(srtm_wf,EPSG_LATLON,CacheType::RASTER,tref, "SRTM");
+	const QuerySpec ndvi(ndvi_wf,EPSG_LATLON,CacheType::RASTER,tref_ndvi, "NDVI");
+	const QuerySpec ndvi_proj(ndvi_proj_wf,EPSG_WEBMERCATOR,CacheType::RASTER,tref_ndvi, "NDVI projected");
 	const QuerySpec srtm_ts(srtm_ts_wf,EPSG_LATLON,CacheType::RASTER,tref, "SRTM Timeshifted");
 	const QuerySpec srtm_ex(srtm_ex_wf,EPSG_LATLON,CacheType::RASTER,tref, "SRTM Expression");
 

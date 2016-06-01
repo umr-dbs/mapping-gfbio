@@ -134,6 +134,7 @@ std::unique_ptr<PendingQuery> BemaQueryManager::create_job(
 	}
 	auto &si = infos.at(node_id);
 	si.p = (qc*alpha) + (si.p * (1-alpha));
+	assign_query(node_id);
 	return make_unique<SimpleJob>(req,node_id);
 }
 

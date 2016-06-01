@@ -308,6 +308,7 @@ LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers, time_t update_int
 
 	for ( auto &n : nodes )
 		threads.push_back( make_unique<std::thread>(TestNodeServer::run_node_thread, n.get()));
+	std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 
 LocalTestSetup::~LocalTestSetup() {

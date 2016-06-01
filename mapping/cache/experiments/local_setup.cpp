@@ -5,7 +5,7 @@
 #include "raster/opencl.h"
 #include <signal.h>
 
-int num_nodes = 4;
+int num_nodes = 10;
 int workers_per_node = 1;
 int index_port = 12346;
 
@@ -105,22 +105,20 @@ int main(void) {
 	std::string relevance = "costlru";
 	std::string caching_strat = "uncached";
 
-	std::string scheduler = "bema";
+	std::string scheduler = "emkde";
 	std::string node_cache_mode = "local";
 	std::string node_cache_repl = "lru";
-	int num_nodes = 4;
-	int workers_per_node = 1;
 	time_t update_interval = 0;
-	int index_port = 12346;
-
 
 	LocalTestSetup lts(
 			num_nodes, workers_per_node, update_interval, cache_capacity, reorg_strategy, relevance, caching_strat, scheduler, node_cache_mode, node_cache_repl, index_port
 	);
 
-	LSpec ls( cache_exp::avg_temp, 32, 256 );
+	LSpec ls( cache_exp::ndvi_proj, 32, 256 );
 	execute( ls );
 	std::cout << lts.get_index().get_stats().to_string() << std::endl;
+
+//	std::this_thread::sleep_for( std::chrono::seconds(3600));
 	return 0;
 }
 

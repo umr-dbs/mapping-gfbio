@@ -143,3 +143,27 @@ void HTTPService::HTTPResponseStream::finishHeaders() {
 bool HTTPService::HTTPResponseStream::hasSentHeaders() {
 	return headers_sent;
 }
+
+
+void HTTPService::HTTPResponseStream::sendJSON(const Json::Value &obj) {
+	sendContentType("application/json");
+	sendDebugHeader();
+	finishHeaders();
+	*this << obj;
+}
+
+void HTTPService::HTTPResponseStream::sendSuccessJSON(Json::Value &obj) {
+	obj["result"] = true;
+	sendJSON(obj);
+}
+
+void HTTPService::HTTPResponseStream::sendSuccessJSON() {
+	Json::Value obj(Json::ValueType::objectValue);
+	sendSuccessJSON(obj);
+}
+
+void HTTPService::HTTPResponseStream::sendFailureJSON(const std::string &error) {
+	Json::Value obj(Json::ValueType::objectValue);
+	obj["result"] = error;
+	sendJSON(obj);
+}

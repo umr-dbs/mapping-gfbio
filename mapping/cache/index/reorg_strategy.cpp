@@ -124,9 +124,6 @@ ReorgStrategy::ReorgStrategy(const IndexCache& cache, double max_usage,
 	cache(cache), max_target_usage(max_usage), relevance_function(std::move(relevance_function)) {
 }
 
-ReorgStrategy::~ReorgStrategy() {
-}
-
 bool ReorgStrategy::requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>>& nodes) const {
 	if ( nodes_changed(nodes) )
 		return true;
@@ -190,6 +187,10 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 	}
 	double target_cap = std::min( bytes_used / bytes_available, max_target_usage );
 	auto all_entries = cache.get_all();
+
+	// Short circuit
+	if ( all_entries.empty() )
+		return;
 
 	// We have removals
 	if ( bytes_used / bytes_available >= max_target_usage ) {

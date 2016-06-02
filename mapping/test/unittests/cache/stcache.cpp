@@ -99,7 +99,7 @@ TEST(STCacheTest,TestQuery) {
 
 	qr = cache.query( sem_id, qrect );
 	EXPECT_FALSE(qr.has_remainder());
-	EXPECT_EQ( 4, qr.keys.size() );
+	EXPECT_EQ( 4, qr.items.size() );
 
 
 }

@@ -5,8 +5,6 @@
  *      Author: mika
  */
 
-#include "cache/node/manager/remote_manager.h"
-#include "cache/node/manager/local_manager.h"
 #include "cache/experiments/exp_util.h"
 #include "cache/experiments/cheat.h"
 
@@ -140,11 +138,8 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg, bool allow
 std::unique_ptr<NodeCacheManager> TestNodeServer::get_mgr(
 		const std::string& cache_mgr, const std::string& strategy,
 		const std::string& local_repl, size_t capacity) {
-	if ( cache_mgr == "remote" )
-		return make_unique<RemoteCacheManager>( strategy, capacity,capacity,capacity,capacity,capacity );
-	else if ( cache_mgr == "local" )
-		return make_unique<LocalCacheManager>( strategy, local_repl, capacity,capacity,capacity,capacity,capacity);
-	throw ArgumentException("Unknown cache mode");
+
+	return NodeCacheManager::by_name(cache_mgr,capacity, capacity, capacity, capacity, capacity,strategy,local_repl);
 }
 
 TestNodeServer::TestNodeServer(int num_threads, uint32_t my_port, const std::string &index_host, uint32_t index_port, const std::string &strategy, const std::string &cache_mgr, const std::string &local_repl, size_t capacity)  :
@@ -186,6 +181,18 @@ void TestIdxServer::trigger_reorg(uint32_t node_id, const ReorgDescription& desc
 		}
 	}
 	throw ArgumentException(concat("No node found for id ", node_id));
+}
+
+TestIdxServer::~TestIdxServer() {
+	QueryStats cumulated;
+	for ( auto &p : nodes ) {
+		Node &n = *p.second;
+		cumulated += n.get_query_stats();
+	}
+	cumulated += query_manager->get_stats();
+	std::cout << "Cumulated " << cumulated.to_string() << std::endl;
+	std::cout << query_manager->get_stats().to_string() << std::endl;
+
 }
 
 void TestIdxServer::wait_for_idle_control_connections() {
@@ -322,6 +329,7 @@ LocalTestSetup::~LocalTestSetup() {
 	idx_server->stop();
 
 	threads[0]->join();
+	Log::warn("Test-Setup done!");
 }
 
 ClientCacheManager& LocalTestSetup::get_client() {

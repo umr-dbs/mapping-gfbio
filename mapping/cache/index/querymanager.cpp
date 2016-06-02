@@ -15,24 +15,13 @@
 
 #include <algorithm>
 
-IndexQueryStats::IndexQueryStats() :
-	single_hits(0),
-	multi_hits_single_node(0),
-	multi_hits_multi_node(0),
-	partial_single_node(0),
-	partial_multi_node(0),
-	misses(0),
+IndexQueryStats::IndexQueryStats() : QueryStats(),
 	queries_issued(0),
 	queries_scheduled(0), num_queries(0), avg_wait_time(0), avg_exec_time(0), avg_time(0) {
 }
 
 void IndexQueryStats::reset() {
-	single_hits = 0;
-	multi_hits_single_node = 0;
-	multi_hits_multi_node = 0;
-	partial_single_node = 0;
-	partial_multi_node = 0;
-	misses = 0;
+	QueryStats::reset();
 	queries_issued = 0;
 	queries_scheduled = 0;
 	num_queries = 0;
@@ -44,12 +33,13 @@ void IndexQueryStats::reset() {
 std::string IndexQueryStats::to_string() const {
 	std::ostringstream ss;
 	ss << "Index-Stats:" << std::endl;
-	ss << "  single hits             : " << single_hits << std::endl;
-	ss << "  puzzle single node      : " << multi_hits_single_node << std::endl;
-	ss << "  puzzle multiple nodes   : " << multi_hits_multi_node << std::endl;
-	ss << "  partial single node     : " << partial_single_node << std::endl;
-	ss << "  partial multiple nodes  : " << partial_multi_node << std::endl;
+	ss << "  single hits             : " << single_local_hits << std::endl;
+	ss << "  puzzle single node      : " << multi_local_hits << std::endl;
+	ss << "  puzzle multiple nodes   : " << multi_remote_hits << std::endl;
+	ss << "  partial single node     : " << multi_local_partials << std::endl;
+	ss << "  partial multiple nodes  : " << multi_remote_partials << std::endl;
 	ss << "  misses                  : " << misses << std::endl;
+	ss << "  hit ratio               : " << get_hit_ratio() << std::endl;
 	ss << "  client queries          : " << queries_issued << std::endl;
 	ss << "  queries scheduled       : " << queries_scheduled << std::endl;
 	ss << "  Average Query Time      : " << avg_time << std::endl;
@@ -82,6 +72,16 @@ void IndexQueryStats::query_finished(const RunningQuery& q) {
 	avg_time = avg_exec_time + avg_wait_time;
 	num_queries += +num_clients;
 }
+
+void IndexQueryStats::issued() {
+	queries_issued++;
+}
+
+//////////////////////////////////////////////////////////////////////
+//
+// LOCKS
+//
+//////////////////////////////////////////////////////////////////////
 
 
 
@@ -156,17 +156,19 @@ std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, cons
 	std::transform(name.cbegin(), name.cend(), lcname.begin(), ::tolower);
 
 	if ( name == "default" )
-		return make_unique<DefaultQueryManager>(mgr,nodes);
+		return make_unique<DefaultQueryManager>(nodes,mgr);
 	else if ( name == "dema" )
-		return make_unique<DemaQueryManager>(nodes);
+		return make_unique<DemaQueryManager>(nodes,mgr);
 	else if ( name == "bema" )
-			return make_unique<BemaQueryManager>(nodes);
+			return make_unique<BemaQueryManager>(nodes,mgr);
 	else if ( name == "emkde" )
-				return make_unique<EMKDEQueryManager>(nodes);
+				return make_unique<EMKDEQueryManager>(nodes,mgr);
+	else if ( name == "hybrid" )
+					return make_unique<HybridQueryManager>(nodes,mgr);
 	else throw ArgumentException(concat("Illegal scheduler name: ", name));
 }
 
-QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes) : nodes(nodes) {
+QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes, IndexCacheManager &caches) : nodes(nodes), caches(caches) {
 }
 
 void QueryManager::schedule_pending_jobs(
@@ -337,3 +339,4 @@ bool RunningQuery::has_clients() const {
 PendingQuery::PendingQuery( std::vector<CacheLocks::Lock> &&locks ) :
 	RunningQuery(std::move(locks)) {
 }
+

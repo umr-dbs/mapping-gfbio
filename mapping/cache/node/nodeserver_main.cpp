@@ -6,8 +6,6 @@
  */
 
 #include "cache/node/nodeserver.h"
-#include "cache/node/manager/remote_manager.h"
-#include "cache/node/manager/local_manager.h"
 #include "cache/manager.h"
 #include "cache/common.h"
 #include "util/configuration.h"
@@ -83,22 +81,7 @@ int main(void) {
 	CachingStrategy::init();
 
 	// Inititalize cache
-	std::unique_ptr<NodeCacheManager> cache_impl;
-
-	std::string mgrlc;
-	mgrlc.resize(mgr.size());
-	std::transform(mgr.cbegin(),mgr.cend(),mgrlc.begin(),::tolower);
-
-//	mgrlc = "remote";
-//	repl = "lru";
-
-	if ( mgrlc == "remote" )
-		cache_impl = make_unique<RemoteCacheManager>(cs, raster_size, point_size, line_size, polygon_size, plot_size);
-	else if ( mgrlc == "local" )
-		cache_impl = make_unique<LocalCacheManager>(cs, repl, raster_size, point_size, line_size, polygon_size, plot_size);
-	else
-		throw ArgumentException(concat("Unknown manager impl: ", mgr));
-
+	std::unique_ptr<NodeCacheManager> cache_impl = NodeCacheManager::by_name(mgr,raster_size, point_size, line_size, polygon_size, plot_size,cs,repl);
 
 	CacheManager::init( cache_impl.get() );
 

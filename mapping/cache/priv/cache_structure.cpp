@@ -30,9 +30,9 @@
 //
 ///////////////////////////////////////////////////////////
 
-template<typename KType>
-CacheQueryInfo<KType>::CacheQueryInfo(const KType &key, const std::shared_ptr<const CacheEntry> &entry, double score) :
-	key(key), entry(entry), score(score) {
+template<typename EType>
+CacheQueryInfo<EType>::CacheQueryInfo( const std::shared_ptr<const EType> &entry, double score) :
+	entry(entry), score(score) {
 }
 
 template<typename KType>
@@ -51,36 +51,36 @@ std::string CacheQueryInfo<KType>::to_string() const {
 //
 ///////////////////////////////////////////////////////////
 
-template<typename KType>
-CacheQueryResult<KType>::CacheQueryResult(const QueryRectangle& query) :
-	covered(query) {
+template<typename EType>
+CacheQueryResult<EType>::CacheQueryResult(const QueryRectangle& query) :
+	covered(query), hit_ratio(0) {
 	remainder.push_back( Cube3(query.x1,query.x2,query.y1,query.y2,query.t1,query.t2) );
 }
 
-template<typename KType>
-CacheQueryResult<KType>::CacheQueryResult( QueryRectangle &&query, std::vector<Cube<3>> &&remainder, std::vector<KType> &&keys) :
-	covered(query),
-	keys(keys),
+template<typename EType>
+CacheQueryResult<EType>::CacheQueryResult( QueryRectangle &&query, std::vector<Cube<3>> &&remainder, std::vector<std::shared_ptr<const EType>> &&items, double hit_ratio) :
+	covered(query), hit_ratio(hit_ratio),
+	items(items),
 	remainder( remainder ) {
 }
 
-template<typename KType>
-bool CacheQueryResult<KType>::has_remainder() const {
+template<typename EType>
+bool CacheQueryResult<EType>::has_remainder() const {
 	return !remainder.empty();
 }
 
-template<typename KType>
-bool CacheQueryResult<KType>::has_hit() const {
-	return !keys.empty();
+template<typename EType>
+bool CacheQueryResult<EType>::has_hit() const {
+	return !items.empty();
 }
 
-template<typename KType>
-std::string CacheQueryResult<KType>::to_string() const {
+template<typename EType>
+std::string CacheQueryResult<EType>::to_string() const {
 	return concat( "CacheQueryResult[",
 	"has_hit: ", has_hit(),
 	",  has_remainder: ", has_remainder(),
 	",  num remainders: ", remainder.size(),
-	",  num keys: ", keys.size(),
+	",  num items: ", items.size(),
 	"]");
 }
 
@@ -143,38 +143,38 @@ std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() con
 //
 
 template<typename KType, typename EType>
-const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRectangle& spec) const {
-	SharedLockGuard g(lock);
-
+const CacheQueryResult<EType> CacheStructure<KType, EType>::query(const QueryRectangle& spec) const {
 	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
 
 	const QueryCube qc(spec);
 
 	// Get intersecting entries
-	auto candidates = get_query_candidates( qc );
+	std::priority_queue<CacheQueryInfo<EType>> candidates;
+	{
+		SharedLockGuard g(lock);
+		candidates = get_query_candidates( qc );
+	}
 
 	// No candidates found
 	if ( candidates.empty() ) {
 		Log::trace("No candidates cached.");
-		return CacheQueryResult<KType>(spec);
+		return CacheQueryResult<EType>(spec);
 	}
 
-	std::vector<CacheQueryInfo<KType>> used_entries;
-	std::vector<KType> ids;
+	std::vector<std::shared_ptr<const EType>> used_entries;
 	std::vector<Cube<3>> remainders{qc}, tmp_remainders;
 
-	ids.reserve(candidates.size());
 	used_entries.reserve(candidates.size());
 
 	while ( !candidates.empty() && !remainders.empty() ) {
 		bool used = false;
-		const CacheQueryInfo<KType> &info = candidates.top();
+		const CacheQueryInfo<EType> &info = candidates.top();
 
 		// Skip incompatible resolutions
 		if ( spec.restype == QueryResolution::Type::PIXELS &&
 			 !used_entries.empty() &&
 			 !CacheCommon::resolution_matches(
-				 info.entry->bounds, used_entries.front().entry->bounds)	) {
+				 info.entry->bounds, used_entries.front()->bounds)	) {
 			candidates.pop();
 			continue;
 		}
@@ -197,8 +197,7 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 		std::swap(remainders,tmp_remainders);
 
 		if ( used ) {
-			ids.push_back(info.key);
-			used_entries.push_back( std::move(info) );
+			used_entries.push_back( info.entry );
 		}
 		candidates.pop();
 	}
@@ -212,8 +211,9 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 	}
 	// Return miss if we have a low coverage (<10%)
 	if ( rem_volume/ qc.volume() > 0.9 )
-		return CacheQueryResult<KType>( spec );
+		return CacheQueryResult<EType>( spec );
 
+	double hit_ratio = 1.0 - rem_volume / qc.volume();
 
 	// Entend expected result
 	auto new_query = enlarge_expected_result(qc, used_entries, u_rems);
@@ -224,15 +224,15 @@ const CacheQueryResult<KType> CacheStructure<KType, EType>::query(const QueryRec
 			rem.set_dimension(2, new_query.t1, new_query.t2);
 	}
 
-	return CacheQueryResult<KType>( std::move(new_query), std::move(u_rems), std::move(ids) );
+	return CacheQueryResult<EType>( std::move(new_query), std::move(u_rems), std::move(used_entries), hit_ratio );
 }
 
 template<typename KType, typename EType>
-std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_query_candidates(
+std::priority_queue<CacheQueryInfo<EType>> CacheStructure<KType, EType>::get_query_candidates(
 	const QueryCube& qc) const {
 
 //	Log::trace("Fetching candidates for query: %s", CacheCommon::qr_to_string(spec).c_str() );
-	std::priority_queue<CacheQueryInfo<KType>> partials;
+	std::priority_queue<CacheQueryInfo<EType>> partials;
 
 	for (auto &e : entries) {
 		CacheCube &bounds = e.second->bounds;
@@ -250,7 +250,7 @@ std::priority_queue<CacheQueryInfo<KType>> CacheStructure<KType, EType>::get_que
 			// Coverage = score for now
 			double score = bounds.intersect(qc).volume() / qc.volume();
 			Log::trace("Score for entry %s: %f", key_to_string(e.first).c_str(), score);
-			partials.push( CacheQueryInfo<KType>( e.first, e.second, score ) );
+			partials.push( CacheQueryInfo<EType>( e.second, score ) );
 
 			// Short circuit full hits
 			if ( (1.0-score) <= std::numeric_limits<double>::epsilon() ) {
@@ -294,7 +294,7 @@ std::vector<Cube<3> > CacheStructure<KType, EType>::union_remainders(
 
 template<typename KType, typename EType>
 QueryRectangle CacheStructure<KType, EType>::enlarge_expected_result( const QueryCube &qc,
-	const std::vector<CacheQueryInfo<KType>> &hits, const std::vector<Cube<3>> &remainders) const {
+	const std::vector<std::shared_ptr<const EType>> &hits, const std::vector<Cube<3>> &remainders) const {
 
 	// Calculated maximum covered cube
 	double values[6] = { -std::numeric_limits<double>::infinity(),
@@ -325,9 +325,9 @@ QueryRectangle CacheStructure<KType, EType>::enlarge_expected_result( const Quer
 	}
 
 	// Do extend
-	for ( auto &cqi : hits ) {
+	for ( auto &entry : hits ) {
 		for ( int i = 0; i < 3; i++ ) {
-			auto &cdim = cqi.entry->bounds.get_dimension(i);
+			auto &cdim = entry->bounds.get_dimension(i);
 			auto &qdim = qc.get_dimension(i);
 			int idx_l = 2*i;
 			int idx_r = idx_l + 1;
@@ -402,12 +402,12 @@ std::string CacheStructure< std::pair<uint32_t, uint64_t>, IndexCacheEntry>::key
 //////////////////////////////////////////////////////////////
 
 template<typename KType, typename EType>
-const CacheQueryResult<KType> Cache<KType, EType>::query(
+const CacheQueryResult<EType> Cache<KType, EType>::query(
 	const std::string& semantic_id, const QueryRectangle& qr) const {
 	try {
 		return get_cache(semantic_id).query(qr);
 	} catch ( const NoSuchElementException &nse ) {
-		return CacheQueryResult<KType>(qr);
+		return CacheQueryResult<EType>(qr);
 	}
 }
 
@@ -465,7 +465,11 @@ CacheStructure<KType, EType>& Cache<KType, EType>::get_cache(
 		throw NoSuchElementException("No structure present for given semantic id");
 }
 
-template class CacheQueryResult<uint64_t>;
+template class CacheQueryResult<NodeCacheEntry<GenericRaster>>;
+template class CacheQueryResult<NodeCacheEntry<PointCollection>>;
+template class CacheQueryResult<NodeCacheEntry<LineCollection>>;
+template class CacheQueryResult<NodeCacheEntry<PolygonCollection>>;
+template class CacheQueryResult<NodeCacheEntry<GenericPlot>>;
 template class CacheStructure<uint64_t, NodeCacheEntry<GenericRaster>>;
 template class CacheStructure<uint64_t, NodeCacheEntry<PointCollection>>;
 template class CacheStructure<uint64_t, NodeCacheEntry<LineCollection>>;
@@ -479,6 +483,6 @@ template class Cache<uint64_t, NodeCacheEntry<PolygonCollection>>;
 template class Cache<uint64_t, NodeCacheEntry<GenericPlot>>;
 
 
-template class CacheQueryResult<std::pair<uint32_t,uint64_t>>;
+template class CacheQueryResult<IndexCacheEntry>;
 template class CacheStructure<std::pair<uint32_t, uint64_t>, IndexCacheEntry> ;
 template class Cache<std::pair<uint32_t, uint64_t>, IndexCacheEntry> ;

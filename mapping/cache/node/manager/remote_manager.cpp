@@ -38,6 +38,12 @@ bool RemoteCacheWrapper<T>::put(const std::string& semantic_id,
 	size_t size = SizeUtil::get_byte_size(*item);
 
 	if (mgr.get_strategy().do_cache(profiler, size)) {
+		if (this->cache.get_current_size() + size
+				> this->cache.get_max_size() * 1.1) {
+			Log::debug("Not caching item, buffer due to overflow");
+			return false;
+		}
+
 		CacheCube cube(*item);
 		// Min/Max resolution hack
 		if (query.restype == QueryResolution::Type::PIXELS) {
@@ -88,35 +94,29 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 			op.getSemanticId().c_str());
 
 	// Local lookup
-	std::vector<std::shared_ptr<const NodeCacheEntry<T>>>entries;
-	CacheQueryResult<uint64_t> qres(rect);
-	{
-		SharedLockGuard g(local_lock);
-		qres = this->cache.query(op.getSemanticId(), rect);
-		// Only process locally if there is no remainder
-		if (!qres.has_remainder()) {
-			for (auto &id : qres.keys) {
-				auto e = this->cache.get(NodeCacheKey(op.getSemanticId(), id));
-				// Track costs
-				profiler.addTotalCosts(e->profile);
-				entries.push_back(e);
-			}
-		}
-	}
+	CacheQueryResult < NodeCacheEntry < T >> qres = this->cache.query(op.getSemanticId(), rect);
+	// Only process locally if there is no remainder
+	if (!qres.has_remainder()) {
+		this->stats.add_query(qres.hit_ratio);
 
-	if (entries.size() == 1) {
-		this->stats.add_single_local_hit();
-		return entries.front()->copy_data();
-	}
-	// Partial or Full puzzle
-	else if (entries.size() > 1) {
-		this->stats.add_multi_local_hit();
-		std::vector<std::shared_ptr<const T>> items;
-		items.reserve(entries.size());
-		for (auto &ne : entries) {
-			items.push_back(ne->data);
+		// Track costs
+		for (auto &e : qres.items)
+			profiler.addTotalCosts(e->profile);
+
+		if (qres.items.size() == 1) {
+			this->stats.add_single_local_hit();
+			return qres.items.front()->copy_data();
 		}
-		return PuzzleJob::process(op, rect, qres.remainder, items, profiler);
+		// puzzle
+		else {
+			this->stats.add_multi_local_hit();
+			std::vector<std::shared_ptr<const T>> items;
+			items.reserve(qres.items.size());
+			for (auto &ne : qres.items) {
+				items.push_back(ne->data);
+			}
+			return PuzzleJob::process(op, rect, qres.remainder, items, profiler);
+		}
 	}
 
 	// Remote lookup
@@ -172,7 +172,7 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 		Log::trace("Partial remote HIT for query: %s on %s: %s",
 				CacheCommon::qr_to_string(rect).c_str(),
 				op.getSemanticId().c_str(), pr.to_string().c_str());
-		return process_puzzle_wo_cache(pr,profiler);
+		return process_puzzle_wo_cache(pr, profiler);
 		break;
 	}
 	default: {
@@ -193,7 +193,6 @@ template<typename T>
 void RemoteCacheWrapper<T>::remove_local(const NodeCacheKey& key) {
 	Log::debug("Removing item from local cache. Key: %s",
 			key.to_string().c_str());
-	ExclusiveLockGuard g(local_lock);
 	this->cache.remove(key);
 }
 
@@ -234,11 +233,11 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle_wo_cache(
 //
 ////////////////////////////////////////////////////////////
 
-RemoteCacheManager::RemoteCacheManager(
-		const std::string &strategy, size_t raster_cache_size,
-		size_t point_cache_size, size_t line_cache_size,
-		size_t polygon_cache_size, size_t plot_cache_size) :
-		NodeCacheManager( strategy,
+RemoteCacheManager::RemoteCacheManager(const std::string &strategy,
+		size_t raster_cache_size, size_t point_cache_size,
+		size_t line_cache_size, size_t polygon_cache_size,
+		size_t plot_cache_size) :
+		NodeCacheManager(strategy,
 				make_unique<RemoteCacheWrapper<GenericRaster>>(*this,
 						raster_cache_size, CacheType::RASTER),
 				make_unique<RemoteCacheWrapper<PointCollection>>(*this,

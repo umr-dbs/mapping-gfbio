@@ -67,6 +67,8 @@ public:
 	NodeCache() = delete;
 	NodeCache( const NodeCache& ) = delete;
 
+	const CacheQueryResult<NodeCacheEntry<EType>> query( const std::string &semantic_id, const QueryRectangle &qr ) const;
+
 	/**
 	 * Adds an entry to the cache. The given data-item is cloned and stored.
 	 * @param semantic_id the semantic id
@@ -140,6 +142,5 @@ private:
 	/** Collects the ids of all accessed entries -- used for delta-statistics */
 	mutable std::unordered_map<std::string,std::set<uint64_t>> access_tracker;
 };
-
 
 #endif /* NODE_CACHE_H_ */

@@ -8,6 +8,7 @@
 int num_nodes = 10;
 int workers_per_node = 1;
 int index_port = 12346;
+size_t num_queries = 2000;
 
 class LSpec {
 public:
@@ -22,8 +23,6 @@ public:
 void execute( LSpec &s ) {
 
 	int num_threads = num_nodes * workers_per_node * 2;
-	size_t num_queries = 1000;
-
 
 	std::default_random_engine eng(std::chrono::system_clock::now().time_since_epoch().count());
 	std::uniform_int_distribution<uint16_t> dist(0, s.tiles*s.tiles-1);
@@ -97,7 +96,7 @@ int main(void) {
 #endif
 	CachingStrategy::init();
 
-	Log::setLevel(Log::LogLevel::INFO);
+	Log::setLevel(Log::LogLevel::WARN);
 
 	size_t cache_capacity = 50 * 1024 * 1024;
 
@@ -105,20 +104,25 @@ int main(void) {
 	std::string relevance = "costlru";
 	std::string caching_strat = "uncached";
 
-	std::string scheduler = "emkde";
-	std::string node_cache_mode = "local";
-	std::string node_cache_repl = "lru";
-	time_t update_interval = 0;
+	std::string scheduler = "default";
+	std::string node_cache_mode = "remote";
+	std::string node_cache_repl = "costlru";
+	time_t update_interval = 500;
 
-	LocalTestSetup lts(
-			num_nodes, workers_per_node, update_interval, cache_capacity, reorg_strategy, relevance, caching_strat, scheduler, node_cache_mode, node_cache_repl, index_port
-	);
+//	std::string in;
 
-	LSpec ls( cache_exp::ndvi_proj, 32, 256 );
-	execute( ls );
-	std::cout << lts.get_index().get_stats().to_string() << std::endl;
+	{
+		LocalTestSetup lts(
+				num_nodes, workers_per_node, update_interval, cache_capacity, reorg_strategy, relevance, caching_strat, scheduler, node_cache_mode, node_cache_repl, index_port
+		);
 
-//	std::this_thread::sleep_for( std::chrono::seconds(3600));
+		LSpec ls( cache_exp::srtm, 16, 256 );
+		execute( ls );
+		lts.get_index().force_stat_update();
+//		std::cin >> in;
+	}
+//	std::cin >> in;
+	Log::warn("DONE!");
 	return 0;
 }
 

@@ -164,7 +164,7 @@ public:
 	 * @param relevance_function the relevance function to use
 	 */
 	ReorgStrategy( const IndexCache &cache, double max_usage, std::unique_ptr<RelevanceFunction> relevance_function);
-	virtual ~ReorgStrategy();
+	virtual ~ReorgStrategy() = default;
 
 	/**
 	 * @param nodes the currently active nodes

@@ -12,12 +12,12 @@
 
 #include <algorithm>
 
-DefaultQueryManager::DefaultQueryManager(IndexCacheManager &caches, const std::map<uint32_t, std::shared_ptr<Node>> &nodes) :
-	QueryManager(nodes), caches(caches) {
+DefaultQueryManager::DefaultQueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes, IndexCacheManager &caches) :
+	QueryManager(nodes, caches) {
 }
 
 void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req ) {
-	stats.queries_issued++;
+	stats.issued();
 	TIME_EXEC("QueryManager.add_request");
 	// Check if running jobs satisfy the given query
 	for (auto &qi : queries) {
@@ -38,10 +38,11 @@ void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req
 	// Perform a cache-query
 	auto &cache = caches.get_cache(req.type);
 	auto res = cache.query(req.semantic_id, req.query);
+	stats.add_query(res.hit_ratio);
 	Log::debug("QueryResult: %s", res.to_string().c_str());
 
 	//  No result --> Check if a pending query may be extended by the given query
-	if ( res.keys.empty() ) {
+	if ( res.items.empty() ) {
 		for (auto &j : pending_jobs) {
 			if (j->extend(req)) {
 				j->add_client(client_id);
@@ -62,10 +63,12 @@ void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
 	auto res = cache.query(req.semantic_id, req.query);
 	Log::debug("QueryResult: %s", res.to_string().c_str());
 
+	stats.add_query(res.hit_ratio);
+
 	// Full single hit
-	if (res.keys.size() == 1 && !res.has_remainder()) {
+	if (res.items.size() == 1 && !res.has_remainder()) {
 		Log::debug("Full HIT. Sending reference.");
-		IndexCacheKey key(req.semantic_id, res.keys.at(0));
+		IndexCacheKey key(req.semantic_id, res.items.front()->id);
 		auto node = nodes.at(key.get_node_id());
 		CacheRef cr(node->host, node->port, key.get_entry_id());
 		// Apply lock
@@ -76,10 +79,10 @@ void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
 	else if (res.has_hit() ) {
 		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f");
 		std::vector<CacheRef> entries;
-		for (auto &id : res.keys) {
-			auto &node = nodes.at(id.first);
-			query.add_lock(CacheLocks::Lock(req.type,IndexCacheKey(req.semantic_id, id)));
-			entries.push_back(CacheRef(node->host, node->port, id.second));
+		for (auto &e : res.items) {
+			auto &node = nodes.at(e->id.first);
+			query.add_lock(CacheLocks::Lock(req.type,IndexCacheKey(req.semantic_id, e->id)));
+			entries.push_back(CacheRef(node->host, node->port, e->id.second));
 		}
 		PuzzleRequest pr( req.type, req.semantic_id, req.query, std::move(res.remainder), std::move(entries) );
 		con.send_partial_hit(pr);
@@ -97,14 +100,14 @@ void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
 // PRIVATE
 //
 
-std::unique_ptr<PendingQuery> DefaultQueryManager::create_job( const BaseRequest &req, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res) {
+std::unique_ptr<PendingQuery> DefaultQueryManager::create_job( const BaseRequest &req, const CacheQueryResult<IndexCacheEntry>& res) {
 	TIME_EXEC("DefaultQueryManager.create_job");
 
 	// Full single hit
-	if (res.keys.size() == 1 && !res.has_remainder()) {
-		stats.single_hits++;
+	if (res.items.size() == 1 && !res.has_remainder()) {
+		stats.single_local_hits++;
 		Log::debug("Full HIT. Sending reference.");
-		IndexCacheKey key(req.semantic_id, res.keys.at(0));
+		IndexCacheKey key(req.semantic_id, res.items.front()->id);
 		DeliveryRequest dr(
 				req.type,
 				req.semantic_id,
@@ -118,8 +121,8 @@ std::unique_ptr<PendingQuery> DefaultQueryManager::create_job( const BaseRequest
 		std::set<uint32_t> node_ids;
 		std::vector<IndexCacheKey> keys;
 		std::vector<CacheRef> entries;
-		for (auto id : res.keys) {
-			IndexCacheKey key(req.semantic_id, id);
+		for (auto e : res.items) {
+			IndexCacheKey key(req.semantic_id, e->id);
 			auto &node = nodes.at(key.get_node_id());
 			keys.push_back(key);
 			node_ids.insert(key.get_node_id());
@@ -133,16 +136,16 @@ std::unique_ptr<PendingQuery> DefaultQueryManager::create_job( const BaseRequest
 
 		// STATS ONLY
 		if ( pr.has_remainders() && node_ids.size() == 1 ) {
-			stats.partial_single_node++;
+			stats.multi_local_partials++;
 		}
 		else if ( pr.has_remainders() ) {
-			stats.partial_multi_node++;
+			stats.multi_remote_partials++;
 		}
 		if ( !pr.has_remainders() && node_ids.size() == 1 ) {
-			stats.multi_hits_single_node++;
+			stats.multi_local_hits++;
 		}
-		else if ( pr.has_remainders() ) {
-			stats.multi_hits_multi_node++;
+		else if ( !pr.has_remainders() ) {
+			stats.multi_remote_hits++;
 		}
 		// END STATS ONLY
 
@@ -169,7 +172,7 @@ std::unique_ptr<PendingQuery> DefaultQueryManager::recreate_job(const RunningQue
 // Jobs
 //
 
-CreateJob::CreateJob( BaseRequest&& request, const DefaultQueryManager &mgr ) :
+CreateJob::CreateJob( BaseRequest&& request, const QueryManager &mgr ) :
 	PendingQuery(), request(request),
 	orig_query(this->request.query),
 	orig_area( (this->request.query.x2 - this->request.query.x1) * (this->request.query.y2 - this->request.query.y1)),

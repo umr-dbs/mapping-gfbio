@@ -453,8 +453,3 @@ void NodeServer::stop() {
 	shutdown = true;
 	wakeup();
 }
-
-NodeServer::~NodeServer() {
-	stop();
-}
-

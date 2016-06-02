@@ -21,8 +21,8 @@ const uint16_t EMKDEQueryManager::SCALE_X = 0xFFFF / 360;
 const uint16_t EMKDEQueryManager::SCALE_Y = 0xFFFF / 180;
 
 EMKDEQueryManager::EMKDEQueryManager(
-		const std::map<uint32_t, std::shared_ptr<Node> >& nodes) :
-		SimpleQueryManager(nodes), alpha(0.3), bandwith(6) {
+		const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &mgr) :
+		SimpleQueryManager(nodes,mgr), alpha(0.3), bandwith(6) {
 	bins.fill(0);
 }
 

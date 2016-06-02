@@ -22,13 +22,13 @@
  * Holds information of how an cache-entry contributes
  * to the result of a query
  */
-template<typename KType>
+template<typename EType>
 class CacheQueryInfo {
 public:
 	/**
 	 * Constructs an instance with the given score, bounds and key
 	 */
-	CacheQueryInfo( const KType &key, const std::shared_ptr<const CacheEntry> &entry, double score );
+	CacheQueryInfo( const std::shared_ptr<const EType> &entry, double score );
 
 	/**
 	 * @return if the current instance is scored lower than the given one
@@ -40,9 +40,7 @@ public:
 	 */
 	std::string to_string() const;
 
-	KType key;
-
-	std::shared_ptr<const CacheEntry> entry;
+	std::shared_ptr<const EType> entry;
 
 	double score;
 };
@@ -55,7 +53,7 @@ public:
  * <li>A list of cubes representing the remaining calculations</li>
  * </ul>
  */
-template<typename KType>
+template<typename EType>
 class CacheQueryResult {
 public:
 
@@ -71,7 +69,7 @@ public:
 	 * @param remainder the list of remainder queries
 	 * @param keys the list of entry-keys required
 	 */
-	CacheQueryResult( QueryRectangle &&query, std::vector<Cube<3>> &&remainder, std::vector<KType> &&keys );
+	CacheQueryResult( QueryRectangle &&query, std::vector<Cube<3>> &&remainder, std::vector<std::shared_ptr<const EType>> &&items, double hit_ratio );
 
 	/**
 	 * @return whether the query has at least one hit in the cache
@@ -89,7 +87,8 @@ public:
 	std::string to_string() const;
 
 	QueryRectangle covered;
-	std::vector<KType> keys;
+	double hit_ratio;
+	std::vector<std::shared_ptr<const EType>> items;
 	std::vector<Cube<3>> remainder;
 };
 
@@ -135,7 +134,7 @@ public:
 	 * @param spec the extend of the query
 	 * @return the search result description
 	 */
-	const CacheQueryResult<KType> query( const QueryRectangle &spec ) const;
+	const CacheQueryResult<EType> query( const QueryRectangle &spec ) const;
 
 	/**
 	 * @return a reference to all stored entries
@@ -164,7 +163,7 @@ private:
 	 * @param spec the extend of the desired result
 	 * @return a list of candidates ordered by their coverage
 	 */
-	std::priority_queue<CacheQueryInfo<KType>> get_query_candidates( const QueryCube &qc ) const;
+	std::priority_queue<CacheQueryInfo<EType>> get_query_candidates( const QueryCube &qc ) const;
 
 	/**
 	 * Tries to minimize the remainder-queries by unioning them. The uinion of two remainders
@@ -182,7 +181,7 @@ private:
 	 * @param remainders the remainders
 	 * @return A query-rectangle describing the expected extend of the query-result
 	 */
-	QueryRectangle enlarge_expected_result( const QueryCube &orig, const std::vector<CacheQueryInfo<KType>> &hits, const std::vector<Cube<3>> &remainders ) const;
+	QueryRectangle enlarge_expected_result( const QueryCube &orig, const std::vector<std::shared_ptr<const EType>> &hits, const std::vector<Cube<3>> &remainders ) const;
 
 public:
 	const std::string semantic_id;
@@ -203,6 +202,7 @@ public:
 	Cache( Cache<KType,EType> && ) = delete;
 	Cache& operator=( const Cache<KType,EType> & ) = delete;
 	Cache& operator=( Cache<KType,EType> && ) = delete;
+	virtual ~Cache() = default;
 
 	/**
 	 * Queries the cache, using the given query-spec.
@@ -210,7 +210,7 @@ public:
 	 * @param spec the extend of the query
 	 * @return the search result description
 	 */
-	const CacheQueryResult<KType> query( const std::string &semantic_id, const QueryRectangle &qr ) const;
+	virtual const CacheQueryResult<EType> query( const std::string &semantic_id, const QueryRectangle &qr ) const;
 protected:
 	/**
 	 * Inserts an element into the cache-structure for the given semantic id

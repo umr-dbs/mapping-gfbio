@@ -39,6 +39,7 @@ public:
 			const std::string &reorg_strategy,
 			const std::string &relevance_function,
 			const std::string &scheduler);
+	~TestIdxServer();
 	void trigger_reorg(uint32_t node_id, const ReorgDescription &desc);
 	void force_stat_update();
 	void force_reorg();

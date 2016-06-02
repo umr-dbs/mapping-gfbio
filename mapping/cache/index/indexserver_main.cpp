@@ -62,9 +62,11 @@ int main(void) {
 	std::string rs = Configuration::get("indexserver.reorg.strategy");
 	std::string rel = Configuration::get("indexserver.reorg.relevance","lru");
 	std::string scheduler = Configuration::get("indexserver.scheduler","default");
+	auto update_interval_str = Configuration::get("indexserver.reorg.interval");
+
 
 //	scheduler = "default";
-	size_t update_interval = 2000;
+	size_t update_interval = atoi(update_interval_str.c_str());
 	if ( scheduler != "default" )
 		update_interval = 0;
 

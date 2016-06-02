@@ -155,6 +155,10 @@ public:
 	 */
 	std::string to_string() const;
 
+	void add_query( double ratio );
+
+	double get_hit_ratio() const;
+
 	/**
 	 * Resets this stats (setting all counts to 0)
 	 */
@@ -167,6 +171,10 @@ public:
 	uint32_t multi_remote_hits;
 	uint32_t multi_remote_partials;
 	uint32_t misses;
+
+protected:
+	size_t queries;
+	double ratios;
 };
 
 

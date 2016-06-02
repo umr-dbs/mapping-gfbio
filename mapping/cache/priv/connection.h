@@ -30,6 +30,7 @@ public:
 	BlockingConnection( BlockingConnection&& ) = delete;
 	BlockingConnection& operator=( const BlockingConnection& ) = delete;
 	BlockingConnection& operator=( BlockingConnection&& ) = delete;
+	virtual ~BlockingConnection() = default;
 
 
 	/**

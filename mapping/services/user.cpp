@@ -24,7 +24,7 @@ void UserService::run() {
 
 		if (request == "login") {
 			auto session = UserDB::createSession(params.get("username"), params.get("password"), 8*3600);
-			result.sendSuccessJSON("session", session->getSessiontoken());
+			response.sendSuccessJSON("session", session->getSessiontoken());
 			return;
 		}
 
@@ -33,7 +33,7 @@ void UserService::run() {
 
 		if (request == "logout") {
 			session->logout();
-			result.sendSuccessJSON();
+			response.sendSuccessJSON();
 			return;
 		}
 
@@ -49,13 +49,13 @@ void UserService::run() {
 					continue;
 				v[name] = root;
 			}
-			result.sendSuccessJSON("sourcelist", v);
+			response.sendSuccessJSON("sourcelist", v);
 			return;
 		}
 
-		result.sendFailureJSON("unknown request");
+		response.sendFailureJSON("unknown request");
 	}
 	catch (const std::exception &e) {
-		result.sendFailureJSON(e.what());
+		response.sendFailureJSON(e.what());
 	}
 }

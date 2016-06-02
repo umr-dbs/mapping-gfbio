@@ -80,16 +80,16 @@ class HTTPService {
 				bool headers_sent;
 		};
 
-		HTTPService(const Params& params, HTTPResponseStream& result, std::ostream &error);
+		HTTPService(const Params& params, HTTPResponseStream& response, std::ostream &error);
 	protected:
 		HTTPService(const HTTPService &other) = delete;
 		HTTPService &operator=(const HTTPService &other) = delete;
 
 		virtual void run() = 0;
-		static std::unique_ptr<HTTPService> getRegisteredService(const std::string &name,const Params& params, HTTPResponseStream& result, std::ostream &error);
+		static std::unique_ptr<HTTPService> getRegisteredService(const std::string &name,const Params& params, HTTPResponseStream& response, std::ostream &error);
 
 		const Params &params;
-		HTTPResponseStream &result;
+		HTTPResponseStream &response;
 		std::ostream &error;
 	public:
 		virtual ~HTTPService() = default;
@@ -101,10 +101,10 @@ class HTTPService {
 
 class HTTPServiceRegistration {
 	public:
-		HTTPServiceRegistration(const char *name, std::unique_ptr<HTTPService> (*constructor)(const HTTPService::Params &params, HTTPService::HTTPResponseStream &result, std::ostream &error));
+		HTTPServiceRegistration(const char *name, std::unique_ptr<HTTPService> (*constructor)(const HTTPService::Params &params, HTTPService::HTTPResponseStream &response, std::ostream &error));
 };
 
-#define REGISTER_HTTP_SERVICE(classname, name) static std::unique_ptr<HTTPService> create##classname(const HTTPService::Params &params, HTTPService::HTTPResponseStream &result, std::ostream &error) { return make_unique<classname>(params, result, error); } static HTTPServiceRegistration register_##classname(name, create##classname)
+#define REGISTER_HTTP_SERVICE(classname, name) static std::unique_ptr<HTTPService> create##classname(const HTTPService::Params &params, HTTPService::HTTPResponseStream &response, std::ostream &error) { return make_unique<classname>(params, response, error); } static HTTPServiceRegistration register_##classname(name, create##classname)
 
 
 #endif

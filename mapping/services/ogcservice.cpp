@@ -222,9 +222,9 @@ void OGCService::exportZip(const char* data, size_t dataLength, const std::strin
 	archive_write_close(archive);
 	archive_write_free(archive);
 
-	result.sendContentType(EXPORT_MIME_PREFIX + format);
-	result.sendHeader("Content-Disposition", "attachment; filename=export.zip");
-	result.sendHeader("Content-Length", concat(used));
-	result.finishHeaders();
-	result.write(reinterpret_cast<const char*>(buffer.data()), used);
+	response.sendContentType(EXPORT_MIME_PREFIX + format);
+	response.sendHeader("Content-Disposition", "attachment; filename=export.zip");
+	response.sendHeader("Content-Length", concat(used));
+	response.finishHeaders();
+	response.write(reinterpret_cast<const char*>(buffer.data()), used);
 }

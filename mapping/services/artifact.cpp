@@ -42,9 +42,9 @@ void ArtifactService::run() {
 
 		UserDB::createArtifact(user, type, name, value);
 
-		result.sendContentType("application/json");
-		result.finishHeaders();
-		result << "{}";
+		response.sendContentType("application/json");
+		response.finishHeaders();
+		response << "{}";
 	} else if(request == "update") {
 		std::string type = params.get("type");
 		std::string name = params.get("name");
@@ -53,9 +53,9 @@ void ArtifactService::run() {
 		auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
 		artifact->updateValue(value);
 
-		result.sendContentType("application/json");
-		result.finishHeaders();
-		result << "{}";
+		response.sendContentType("application/json");
+		response.finishHeaders();
+		response << "{}";
 	} else if(request == "get") {
 		std::string username = params.get("username");
 		std::string type = params.get("type");
@@ -72,9 +72,9 @@ void ArtifactService::run() {
 		Json::Value json(Json::objectValue);
 		json["value"] = value;
 
-		result.sendContentType("application/json");
-		result.finishHeaders();
-		result << json;
+		response.sendContentType("application/json");
+		response.finishHeaders();
+		response << json;
 	} else if(request == "list") {
 		std::string type = params.get("type");
 
@@ -90,9 +90,9 @@ void ArtifactService::run() {
 			json.append(entry);
 		}
 
-		result.sendContentType("application/json");
-		result.finishHeaders();
-		result << json;
+		response.sendContentType("application/json");
+		response.finishHeaders();
+		response << json;
 	} else if(request == "share") {
 		std::string username = params.get("username");
 		std::string type = params.get("type");
@@ -108,8 +108,8 @@ void ArtifactService::run() {
 		else
 			throw ArtifactServiceException("ArtifactService: invalid permission target");
 
-		result.sendContentType("application/json");
-		result.finishHeaders();
-		result << "{}";
+		response.sendContentType("application/json");
+		response.finishHeaders();
+		response << "{}";
 	}
 }

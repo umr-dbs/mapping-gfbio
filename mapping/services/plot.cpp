@@ -55,8 +55,8 @@ void PlotService::run() {
 
 	auto plot = graph->getCachedPlot(rect, profiler);
 
-	result.sendContentType("application/json");
-	result.finishHeaders();
+	response.sendContentType("application/json");
+	response.finishHeaders();
 
-	result << plot->toJSON();
+	response << plot->toJSON();
 }

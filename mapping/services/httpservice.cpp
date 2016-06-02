@@ -13,7 +13,7 @@
 
 
 // The magic of type registration, see REGISTER_SERVICE in httpservice.h
-typedef std::unique_ptr<HTTPService> (*ServiceConstructor)(const HTTPService::Params& params, HTTPService::HTTPResponseStream& result, std::ostream &error);
+typedef std::unique_ptr<HTTPService> (*ServiceConstructor)(const HTTPService::Params& params, HTTPService::HTTPResponseStream& response, std::ostream &error);
 
 static std::unordered_map< std::string, ServiceConstructor > *getRegisteredConstructorsMap() {
 	static std::unordered_map< std::string, ServiceConstructor > registered_constructors;
@@ -26,7 +26,7 @@ HTTPServiceRegistration::HTTPServiceRegistration(const char *name, ServiceConstr
 }
 
 
-std::unique_ptr<HTTPService> HTTPService::getRegisteredService(const std::string &name, const Params& params, HTTPResponseStream& result, std::ostream &error) {
+std::unique_ptr<HTTPService> HTTPService::getRegisteredService(const std::string &name, const Params& params, HTTPResponseStream& response, std::ostream &error) {
 	auto map = getRegisteredConstructorsMap();
 	auto it = map->find(name);
 	if (it == map->end())
@@ -34,12 +34,12 @@ std::unique_ptr<HTTPService> HTTPService::getRegisteredService(const std::string
 
 	auto constructor = it->second;
 
-	auto ptr = constructor(params, result, error);
+	auto ptr = constructor(params, response, error);
 	return ptr;
 }
 
-HTTPService::HTTPService(const Params& params, HTTPResponseStream& result, std::ostream &error)
-	: params(params), result(result), error(error) {
+HTTPService::HTTPService(const Params& params, HTTPResponseStream& response, std::ostream &error)
+	: params(params), response(response), error(error) {
 }
 
 void HTTPService::run(std::streambuf *in, std::streambuf *out, std::streambuf *err) {

@@ -89,7 +89,7 @@ void WCSService::run() {
 
 	std::string version = params.get("version");
 	if (version != "2.0.1")
-		result.send500("Unsupported WCS version");
+		response.send500("Unsupported WCS version");
 
 	if(params.get("request") == "getcoverage") {
 		//for now we will handle the OpGraph as the coverageId
@@ -162,13 +162,13 @@ void WCSService::run() {
 			exportZip(reinterpret_cast<char*>(outDataBuffer), static_cast<size_t>(length), format, *graph->getFullProvenance());
 		} else {
 			//put the HTML headers for download
-			//result.sendContentType("???"); // TODO
-			result.sendHeader("Content-Disposition", concat("attachment; filename=\"",gdalFileName,"\""));
-			result.sendHeader("Content-Length", concat(static_cast<size_t>(length)));
-			result.finishHeaders();
+			//response.sendContentType("???"); // TODO
+			response.sendHeader("Content-Disposition", concat("attachment; filename=\"",gdalFileName,"\""));
+			response.sendHeader("Content-Length", concat(static_cast<size_t>(length)));
+			response.finishHeaders();
 
 			//write the data into the output stream
-			result.write(reinterpret_cast<char*>(outDataBuffer), static_cast<size_t>(length));
+			response.write(reinterpret_cast<char*>(outDataBuffer), static_cast<size_t>(length));
 		}
 
 		//clean the GDAL resources

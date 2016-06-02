@@ -163,7 +163,7 @@ void OGCService::outputSimpleFeatureCollectionCSV(SimpleFeatureCollection *colle
 
 void OGCService::outputSimpleFeatureCollectionARFF(SimpleFeatureCollection* collection){
 	response.sendDebugHeader();
-	response.sendContentType("text/json");
+	response.sendContentType("text/arff");
 	response.sendHeader("Content-Disposition", "attachment; filename=\"export.arff\"");
 	response.finishHeaders();
 	response << collection->toARFF();

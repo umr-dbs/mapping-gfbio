@@ -69,7 +69,7 @@ REGISTER_HTTP_SERVICE(WFSService, "WFS");
 
 void WFSService::run() {
 	if (!params.hasParam("version") || params.get("version") != "2.0.0") {
-		result.send500("wrong version");
+		response.send500("wrong version");
 	}
 
 	switch (stringToRequest.at(params.get("request"))) {
@@ -82,14 +82,14 @@ void WFSService::run() {
 
 		break;
 	default:
-		result.send500("wrong request");
+		response.send500("wrong request");
 		break;
 	}
 }
 
 std::string WFSService::getCapabilities() {
-	result.sendContentType("text/html");
-	result.finishHeaders();
+	response.sendContentType("text/html");
+	response.finishHeaders();
 }
 
 void WFSService::getFeature() {
@@ -195,9 +195,9 @@ void WFSService::getFeature() {
 	if(exportMode) {
 		exportZip(output.c_str(), output.length(), format, *graph->getFullProvenance());
 	} else {
-		result.sendContentType(format);
-		result.finishHeaders();
-		result << output;
+		response.sendContentType(format);
+		response.finishHeaders();
+		response << output;
 	}
 	// VSPs
 	// O

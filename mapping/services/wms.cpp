@@ -31,12 +31,12 @@ void WMSService::run() {
 	// GetMap
 	else if (request == "GetMap") {
 		if (params.get("version") != "1.3.0")
-			result.send500("Invalid version");
+			response.send500("Invalid version");
 
 		int output_width = params.getInt("width");
 		int output_height = params.getInt("height");
 		if (output_width <= 0 || output_height <= 0) {
-			result.send500("output_width not valid");
+			response.send500("output_width not valid");
 		}
 
 		try {
@@ -67,9 +67,9 @@ void WMSService::run() {
 				QueryProfiler profiler;
 				std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect, profiler);
 
-				result.sendContentType("application/json");
-				result.finishHeaders();
-				result << dataVector->toJSON();
+				response.sendContentType("application/json");
+				response.finishHeaders();
+				response << dataVector->toJSON();
 				return;
 			}
 			else {
@@ -120,7 +120,7 @@ void WMSService::run() {
 					}
 				}
 
-				outputImage(result, result_raster.get(), flipx, flipy, colorizer, overlay.get());
+				outputImage(result_raster.get(), flipx, flipy, colorizer, overlay.get());
 			}
 		}
 		catch (const std::exception &e) {
@@ -135,7 +135,7 @@ void WMSService::run() {
 			auto msg = e.what();
 			errorraster->printCentered(1, msg);
 
-			outputImage(result, errorraster.get(), false, false, "hsv");
+			outputImage(errorraster.get(), false, false, "hsv");
 		}
 		// cut into pieces
 
@@ -173,7 +173,7 @@ void WMSService::run() {
 	}
 	else if (request == "GetColorizer") {
 		if (params.get("version") != "1.3.0")
-			result.send500("Invalid version");
+			response.send500("Invalid version");
 
 		bool flipx, flipy;
 		QueryRectangle qrect(
@@ -189,16 +189,16 @@ void WMSService::run() {
 		auto unit = result_raster->dd.unit;
 		auto colorizer = Colorizer::fromUnit(unit);
 
-		result.sendContentType("application/json");
-		result.finishHeaders();
-		result << colorizer->toJson();
+		response.sendContentType("application/json");
+		response.finishHeaders();
+		response << colorizer->toJson();
 	}
 	// GetFeatureInfo (optional)
 	else if (request == "GetFeatureInfo") {
-		result.send500("WMS::GetFeatureInfo not implemented");
+		response.send500("WMS::GetFeatureInfo not implemented");
 
 	}
 	else
-		result.send500("unknown request");
+		response.send500("unknown request");
 
 }

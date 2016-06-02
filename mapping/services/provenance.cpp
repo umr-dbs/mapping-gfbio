@@ -24,8 +24,8 @@ void ProvenanceService::run() {
 
 	auto provenance = graph->getFullProvenance();
 
-	result.sendContentType("application/json");
-	result.finishHeaders();
+	response.sendContentType("application/json");
+	response.finishHeaders();
 
-	result << provenance->toJson();
+	response << provenance->toJson();
 }

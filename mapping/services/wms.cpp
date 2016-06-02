@@ -120,7 +120,7 @@ void WMSService::run() {
 					}
 				}
 
-				outputImage(response, result_raster.get(), flipx, flipy, colorizer, overlay.get());
+				outputImage(result_raster.get(), flipx, flipy, colorizer, overlay.get());
 			}
 		}
 		catch (const std::exception &e) {
@@ -135,7 +135,7 @@ void WMSService::run() {
 			auto msg = e.what();
 			errorraster->printCentered(1, msg);
 
-			outputImage(response, errorraster.get(), false, false, "hsv");
+			outputImage(errorraster.get(), false, false, "hsv");
 		}
 		// cut into pieces
 

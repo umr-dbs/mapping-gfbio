@@ -19,10 +19,10 @@ class OGCService : public HTTPService {
 		TemporalReference parseTime(const Params &params) const;
 		SpatialReference parseBBOX(const std::string bbox_str, epsg_t epsg = EPSG_WEBMERCATOR, bool allow_infinite = false);
 
-		void outputImage(HTTPResponseStream &stream, GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr);
-		void outputSimpleFeatureCollectionGeoJSON(HTTPResponseStream &stream, SimpleFeatureCollection *collection, bool displayMetadata = false);
-		void outputSimpleFeatureCollectionCSV(HTTPResponseStream &stream, SimpleFeatureCollection *collection);
-		void outputSimpleFeatureCollectionARFF(HTTPResponseStream &stream, SimpleFeatureCollection* collection);
+		void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr);
+		void outputSimpleFeatureCollectionGeoJSON(SimpleFeatureCollection *collection, bool displayMetadata = false);
+		void outputSimpleFeatureCollectionCSV(SimpleFeatureCollection *collection);
+		void outputSimpleFeatureCollectionARFF(SimpleFeatureCollection* collection);
 
 		void exportZip(const char* data, size_t dataLength, const std::string &format, ProvenanceCollection &provenance);
 

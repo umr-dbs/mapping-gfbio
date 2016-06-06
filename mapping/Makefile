@@ -119,6 +119,7 @@ EXECACHENODE=cache_node
 EXECACHEEXP=cache_experiments
 EXECLUSEXP=cluster_experiment
 EXELOCAL=local_setup
+EXETESTCLIENT=test_client
 
 
 ifeq (${USE_R},true)
@@ -134,7 +135,7 @@ endif
 
 .SECONDEXPANSION:
 
-all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED} ${EXECACHEEXP} ${EXECLUSEXP} ${EXELOCAL}
+all: $(CL_HEADERS) ${EXE} ${EXECGI} ${TARGET_EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEGEOMETRYTESTBED} ${EXECACHEEXP} ${EXECLUSEXP} ${EXELOCAL} ${EXETESTCLIENT}
 
 #
 # Dependencies and compiler flags of all executables
@@ -174,6 +175,9 @@ ${EXECLUSEXP} : ${OBJ_COMMON} o/cache/index/node.o o/cache/index/index_cache_man
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
 ${EXELOCAL} : ${OBJ_COMMON} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/local_setup.o
+	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
+	
+${EXETESTCLIENT} : ${OBJ_COMMON} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/nbclient.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
 #
@@ -295,7 +299,7 @@ doc:
 	./../docs/makeDoc
 
 clean:
-	rm -f ${EXE} ${EXE_SANITIZED} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEPARSETESTLOGS} ${EXECACHEEXP} ${EXECLUSEXP} ${EXELOCAL}
+	rm -f ${EXE} ${EXE_SANITIZED} ${EXECGI} ${EXERSERVER} ${EXETILESERVER} ${EXECACHEINDEX} ${EXECACHENODE} ${EXEGTEST} ${EXEPARSETESTLOGS} ${EXECACHEEXP} ${EXECLUSEXP} ${EXELOCAL} ${EXETESTCLIENT}
 	rm -f $(CL_HEADERS)
 	find o/ -type f -name '*.o' -delete
 	find o/ -type f -name '*.d' -delete

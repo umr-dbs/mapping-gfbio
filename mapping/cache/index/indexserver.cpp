@@ -309,12 +309,12 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 					break;
 				}
 				case ControlState::REORG_FINISHED:
-					Log::debug("Node %d finished reorganization.", cc.node_id);
+					Log::trace("Node %d finished reorganization.", cc.node_id);
 					cc.release();
 					break;
 				case ControlState::STATS_RECEIVED: {
 					auto &stats = cc.get_stats();
-					Log::debug("Node %d delivered fresh statistics", cc.node_id);
+					Log::trace("Node %d delivered fresh statistics", cc.node_id);
 					auto &node = nodes.at(cc.node_id);
 					node->update_stats(stats);
 					node->last_stat_update = CacheCommon::time_millis();
@@ -353,6 +353,19 @@ void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) 
 					Log::debug("Client-request read: %s", cc.get_request().to_string().c_str() );
 
 					query_manager->add_request(cc.id, cc.get_request());
+					break;
+				case ClientState::AWAIT_STATS: {
+					SystemStats cumulated( query_manager->get_stats() );
+					for ( auto &p : nodes )
+						cumulated += p.second->get_query_stats();
+					cc.send_stats(cumulated);
+					break;
+				}
+				case ClientState::AWAIT_RESET:
+					query_manager->reset_stats();
+					for ( auto &p : nodes )
+						p.second->reset_query_stats();
+					cc.confirm_reset();
 					break;
 				default:
 					throw IllegalStateException(
@@ -437,7 +450,6 @@ void IndexServer::reorganize(bool force) {
 	last_reorg = CacheCommon::time_millis();
 	auto reorgs = caches.reorganize(nodes,force);
 	for (auto &d : reorgs) {
-		Log::debug("Processing removals locally and sending reorg-commands to nodes.");
 		for (auto &rm : d.second.get_removals()) {
 			caches.get_cache(rm.type).remove(IndexCacheKey(rm.semantic_id, d.first, rm.entry_id));
 		}

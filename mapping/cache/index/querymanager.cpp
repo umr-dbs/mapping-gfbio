@@ -15,68 +15,6 @@
 
 #include <algorithm>
 
-IndexQueryStats::IndexQueryStats() : QueryStats(),
-	queries_issued(0),
-	queries_scheduled(0), num_queries(0), avg_wait_time(0), avg_exec_time(0), avg_time(0) {
-}
-
-void IndexQueryStats::reset() {
-	QueryStats::reset();
-	queries_issued = 0;
-	queries_scheduled = 0;
-	num_queries = 0;
-	avg_exec_time = 0;
-	avg_wait_time = 0;
-	avg_time = 0;
-}
-
-std::string IndexQueryStats::to_string() const {
-	std::ostringstream ss;
-	ss << "Index-Stats:" << std::endl;
-	ss << "  single hits             : " << single_local_hits << std::endl;
-	ss << "  puzzle single node      : " << multi_local_hits << std::endl;
-	ss << "  puzzle multiple nodes   : " << multi_remote_hits << std::endl;
-	ss << "  partial single node     : " << multi_local_partials << std::endl;
-	ss << "  partial multiple nodes  : " << multi_remote_partials << std::endl;
-	ss << "  misses                  : " << misses << std::endl;
-	ss << "  hit ratio               : " << get_hit_ratio() << std::endl;
-	ss << "  client queries          : " << queries_issued << std::endl;
-	ss << "  queries scheduled       : " << queries_scheduled << std::endl;
-	ss << "  Average Query Time      : " << avg_time << std::endl;
-	ss << "  Average Query Wait-Time : " << avg_wait_time << std::endl;
-	ss << "  Average Query Exec-Time : " << avg_exec_time << std::endl;
-	ss << "  Distri (NodeId:#Queries): ";
-	for ( auto &p : node_to_queries )
-		ss << "(" << p.first << ": " << p.second << "), ";
-	return ss.str();
-}
-
-uint32_t IndexQueryStats::get_queries_scheduled() {
-	return queries_scheduled;
-}
-
-void IndexQueryStats::scheduled(uint32_t node_id) {
-	queries_scheduled++;
-	auto it = node_to_queries.find(node_id);
-	if ( it == node_to_queries.end() )
-		node_to_queries.emplace(node_id, 1);
-	else
-		it->second++;
-}
-
-
-void IndexQueryStats::query_finished(const RunningQuery& q) {
-	size_t num_clients = q.get_clients().size();
-	avg_exec_time = ((avg_exec_time*num_queries) + (q.time_finished - q.time_scheduled)) / (num_queries+num_clients);
-	avg_wait_time = ((avg_wait_time*num_queries) + (q.time_scheduled - q.time_created)) / (num_queries+num_clients);
-	avg_time = avg_exec_time + avg_wait_time;
-	num_queries += +num_clients;
-}
-
-void IndexQueryStats::issued() {
-	queries_issued++;
-}
-
 //////////////////////////////////////////////////////////////////////
 //
 // LOCKS
@@ -206,7 +144,8 @@ std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
 
 	std::set<uint64_t> clients = it->second->get_clients();
 	it->second->time_finished = CacheCommon::time_millis();
-	stats.query_finished(*(it->second));
+	auto &q = *(it->second);
+	stats.query_finished( clients.size(), q.time_created, q.time_scheduled, q.time_finished  );
 	finished_queries.erase(it);
 	return clients;
 }
@@ -253,7 +192,7 @@ void QueryManager::handle_client_abort(uint64_t client_id) {
 	}
 }
 
-const IndexQueryStats& QueryManager::get_stats() const {
+const SystemStats& QueryManager::get_stats() const {
 	return stats;
 }
 

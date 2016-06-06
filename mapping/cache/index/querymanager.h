@@ -198,38 +198,6 @@ public:
 };
 
 /**
- * Statistics about cache-queries on the index-server
- */
-class IndexQueryStats : public QueryStats {
-public:
-	IndexQueryStats();
-
-	/**
-	 * @return a human readable respresentation
-	 */
-	std::string to_string() const;
-
-	/**
-	 * Resets this stats (setting all counts to 0)
-	 */
-	void reset();
-
-	uint32_t get_queries_scheduled();
-	void query_finished( const RunningQuery &q );
-	void scheduled( uint32_t node_id );
-	void issued();
-
-private:
-	uint32_t queries_issued;
-	uint32_t queries_scheduled;
-	std::map<uint32_t,uint64_t> node_to_queries;
-	size_t num_queries;
-	double avg_wait_time;
-	double avg_exec_time;
-	double avg_time;
-};
-
-/**
  * The query-manager manages all pending and running queries
  */
 class QueryManager {
@@ -316,7 +284,7 @@ public:
 	/**
 	 * @return the query-statistics
 	 */
-	const IndexQueryStats& get_stats() const;
+	const SystemStats& get_stats() const;
 
 	/**
 	 * Resets the query-statistics
@@ -335,7 +303,7 @@ protected:
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> queries;
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> finished_queries;
 	std::list<std::unique_ptr<PendingQuery>> pending_jobs;
-	IndexQueryStats stats;
+	SystemStats stats;
 };
 
 #endif /* QUERYMANAGER_H_ */

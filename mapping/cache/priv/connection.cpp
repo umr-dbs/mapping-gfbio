@@ -234,15 +234,40 @@ void ClientConnection::process_command(uint8_t cmd, BinaryReadBuffer& payload) {
 			request.reset(new BaseRequest(payload));
 			set_state(ClientState::AWAIT_RESPONSE);
 			break;
+		case CMD_GET_STATS:
+			set_state(ClientState::AWAIT_STATS);
+			break;
+		case CMD_RESET_STATS:
+			set_state(ClientState::AWAIT_RESET);
+			break;
 		default:
 			throw NetworkException(concat("Unknown command on client connection: ", cmd));
 	}
+}
+
+void ClientConnection::send_stats(const SystemStats& stats) {
+	ensure_state(ClientState::AWAIT_STATS);
+	set_state(ClientState::WRITING_STATS);
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_STATS);
+	buffer->write(stats);
+	begin_write(std::move(buffer));
+}
+
+void ClientConnection::confirm_reset() {
+	ensure_state(ClientState::AWAIT_RESET);
+	set_state(ClientState::WRITING_RST);
+	auto buffer = make_unique<BinaryWriteBuffer>();
+	buffer->write(RESP_RESETTED);
+	begin_write(std::move(buffer));
 }
 
 void ClientConnection::write_finished() {
 	switch (get_state()) {
 		case ClientState::WRITING_RESPONSE:
 			request.reset();
+		case ClientState::WRITING_STATS:
+		case ClientState::WRITING_RST:
 			set_state(ClientState::IDLE);
 			break;
 		default:
@@ -275,7 +300,11 @@ const BaseRequest& ClientConnection::get_request() const {
 
 const uint32_t ClientConnection::MAGIC_NUMBER;
 const uint8_t ClientConnection::CMD_GET;
+const uint8_t ClientConnection::CMD_GET_STATS;
+const uint8_t ClientConnection::CMD_RESET_STATS;
 const uint8_t ClientConnection::RESP_OK;
+const uint8_t ClientConnection::RESP_STATS;
+const uint8_t ClientConnection::RESP_RESETTED;
 const uint8_t ClientConnection::RESP_ERROR;
 
 /////////////////////////////////////////////////
@@ -738,11 +767,37 @@ const uint8_t DeliveryConnection::CMD_MOVE_DONE;
 const uint8_t DeliveryConnection::RESP_OK;
 const uint8_t DeliveryConnection::RESP_ERROR;
 
+std::unique_ptr<NBClientDeliveryConnection> NBClientDeliveryConnection::create(
+		const DeliveryResponse& dr) {
+	auto skt = BinaryStream::connectTCP(dr.host.c_str(), dr.port, true);
+	BinaryWriteBuffer init, req;
+	init << DeliveryConnection::MAGIC_NUMBER;
+	skt.write(init);
+	req << DeliveryConnection::CMD_GET << dr.delivery_id;
+	skt.write(req);
+	skt.makeNonBlocking();
+	return make_unique<NBClientDeliveryConnection>(std::move(skt));
+}
+
+NBClientDeliveryConnection::NBClientDeliveryConnection(BinaryStream&& stream) : BaseConnection(ClientDeliveryState::REQUEST_SENT,std::move(stream)) {
+}
+
+void NBClientDeliveryConnection::process_command(uint8_t cmd,
+		BinaryReadBuffer& payload) {
+	(void) cmd;
+	(void) payload;
+	// Nothing to do
+}
+
+void NBClientDeliveryConnection::write_finished() {
+}
+
 
 template class BaseConnection<ClientState>;
 template class BaseConnection<WorkerState>;
 template class BaseConnection<ControlState>;
 template class BaseConnection<DeliveryState>;
+template class BaseConnection<ClientDeliveryState>;
 
 template void DeliveryConnection::send(std::shared_ptr<const GenericRaster>);
 template void DeliveryConnection::send(std::shared_ptr<const PointCollection>);

@@ -41,7 +41,7 @@ void ArtifactService::run() {
 			std::string name = params.get("name");
 			std::string value = params.get("value");
 
-			UserDB::createArtifact(user, type, name, value);
+			user.createArtifact(type, name, value);
 
 			response.sendSuccessJSON();
 		} else if(request == "update") {
@@ -49,7 +49,7 @@ void ArtifactService::run() {
 			std::string name = params.get("name");
 			std::string value = params.get("value");
 
-			auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
+			auto artifact = user.loadArtifact(user.getUsername(), type, name);
 			artifact->updateValue(value);
 
 			response.sendSuccessJSON();
@@ -63,7 +63,7 @@ void ArtifactService::run() {
 
 			double timestamp = timeParser->parse(time);
 
-			auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
+			auto artifact = user.loadArtifact(user.getUsername(), type, name);
 			std::string value = artifact->getArtifactVersion(timestamp)->getValue();
 
 			Json::Value json(Json::objectValue);
@@ -73,7 +73,7 @@ void ArtifactService::run() {
 		} else if(request == "list") {
 			std::string type = params.get("type");
 
-			auto artifacts = UserDB::loadArtifactsOfType(user, type);
+			auto artifacts = user.loadArtifactsOfType(type);
 
 			Json::Value jsonArtifacts(Json::arrayValue);
 			for(auto artifact : artifacts) {
@@ -95,7 +95,7 @@ void ArtifactService::run() {
 
 			std::string permission = params.get("permission", "");
 
-			auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
+			auto artifact = user.loadArtifact(user.getUsername(), type, name);
 			if(permission == "user")
 				artifact->shareWithUser(permission);
 			else if(permission == "group")

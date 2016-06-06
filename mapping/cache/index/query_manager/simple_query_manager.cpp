@@ -42,6 +42,7 @@ SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<
 }
 
 void SimpleQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
+	stats.issued();
 	auto j = create_job(req);
 	j->add_client(client_id);
 	pending_jobs.push_back( std::move(j) );

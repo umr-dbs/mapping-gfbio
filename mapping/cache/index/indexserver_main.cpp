@@ -64,11 +64,7 @@ int main(void) {
 	std::string scheduler = Configuration::get("indexserver.scheduler","default");
 	auto update_interval_str = Configuration::get("indexserver.reorg.interval");
 
-
-//	scheduler = "default";
 	size_t update_interval = atoi(update_interval_str.c_str());
-	if ( scheduler != "default" )
-		update_interval = 0;
 
 	instance = new IndexServer(portnr, update_interval, rs, rel, scheduler);
 	instance->run();

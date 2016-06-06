@@ -173,7 +173,7 @@ public:
 	uint32_t misses;
 
 protected:
-	size_t cache_queries;
+	size_t queries;
 	double ratios;
 };
 

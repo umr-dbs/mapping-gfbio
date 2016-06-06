@@ -39,12 +39,10 @@ class WFSService : public OGCService {
 		using OGCService::OGCService;
 		virtual ~WFSService() = default;
 
-		std::string getResponse(const Params &params);
-
 		virtual void run();
 
 	private:
-		std::string getCapabilities();
+		void getCapabilities();
 		void getFeature();
 
 		// TODO: implement
@@ -87,7 +85,7 @@ void WFSService::run() {
 	}
 }
 
-std::string WFSService::getCapabilities() {
+void WFSService::getCapabilities() {
 	result.sendContentType("text/html");
 	result.finishHeaders();
 }
@@ -177,7 +175,7 @@ void WFSService::getFeature() {
 
 	//TODO: respect default output format of WFS and support more datatypes
 	auto format = params.get("outputformat", "application/json");
-	fprintf(stderr, "aaaaaaaaaaa %s %d\n", format.c_str(), format.find(EXPORT_MIME_PREFIX));
+
 	bool exportMode = false;
 	if(format.find(EXPORT_MIME_PREFIX) == 0) {
 		exportMode = true;

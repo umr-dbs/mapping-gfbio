@@ -41,14 +41,15 @@ REGISTER_OPERATOR(PangaeaSourceOperator, "pangaea_source");
 #ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
 	std::unique_ptr<PointCollection> points = make_unique<PointCollection>(rect);
-
+	fprintf(stderr, "x\n");
 	std::stringstream data;
 
 	getStringFromServer(data);
-
+	fprintf(stderr, "%s\n", data.str().c_str());
 	//skip initial comment
 	size_t offset = data.str().find("*/\n") + 2;
 	std::string dataString = data.str().substr(offset);
+	fprintf(stderr, "y\n");
 
 	boost::char_delimiters_separator<char> lineSeparator(false, "", "\n"); //dont tokenize based on whitespace or .
 	boost::char_delimiters_separator<char> elementSeparator(false, "", "\t");
@@ -109,8 +110,8 @@ void PangaeaSourceOperator::getStringFromServer(std::stringstream& data) {
 	url
 		<< "http://doi.pangaea.de/"
 		<< doi << "?format=textfile";
-
-	curl.setOpt(CURLOPT_PROXY, "www-cache.mathematik.uni-marburg.de:3128");
+	fprintf(stderr, "url: %s\n", url.str().c_str());
+	curl.setOpt(CURLOPT_PROXY, "http://www-proxy1.hrz.uni-marburg.de:3128");
 	curl.setOpt(CURLOPT_URL, url.str().c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);

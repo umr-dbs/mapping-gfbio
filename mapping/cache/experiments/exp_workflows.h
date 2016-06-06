@@ -16,6 +16,89 @@ namespace cache_exp {
 	const TemporalReference tref(TIMETYPE_UNIX,timestamp);
 	const TemporalReference tref_ndvi(TIMETYPE_UNIX,timestamp_ndvi);
 
+	const std::string btw_wf = R"WF_ESCAPE(
+{  
+  "type":"expression",
+  "params":{  
+    "expression":"((A<=200.0)&&(B==1)&&(C<=2300))?1:0",
+    "datatype":"Byte",
+    "unit": { "min":0, "max": 1, "measurement":"unknown", "unit":"unknown" }
+  },
+  "sources":{  
+    "raster":[  
+      {  
+        "type":"expression",
+        "params":{  
+          "expression":"((B<=0.0)?A*0.5:0) + ((D<=0.0)?C*0.5:0)",
+          "datatype":"input",
+          "unit": { "min":0, "max": 500, "measurement":"unknown", "unit":"unknown" }
+        },
+        "sources":{  
+          "raster":[  
+            {  
+              "type":"rasterdb_source",
+              "params":{  
+                "sourcename":"btw2015_paper_demo",
+                "channel":0
+              }
+            },
+            {  
+              "type":"rasterdb_source",
+              "params":{  
+                "sourcename":"btw2015_paper_demo",
+                "channel":2,
+                "transform":0
+              }
+            },
+            {  
+              "type":"rasterdb_source",
+              "params":{  
+                "sourcename":"btw2015_paper_demo",
+                "channel":1
+              }
+            },
+            {  
+              "type":"rasterdb_source",
+              "params":{  
+                "sourcename":"btw2015_paper_demo",
+                "channel":3,
+                "transform":0
+              }
+            }
+          ]
+        }
+      },
+      {  
+        "type":"expression",
+        "params":{  
+          "expression":"((A>=1)&&(A<=6))?1:0",
+          "datatype":"Byte",
+          "unit": { "min":0, "max": 1, "measurement":"unknown", "unit":"unknown" }
+        },
+        "sources":{  
+          "raster":[  
+            {  
+              "type":"rasterdb_source",
+              "params":{  
+                "sourcename":"btw2015_paper_demo",
+                "channel":5
+              }
+            }
+          ]
+        }
+      },
+      {  
+        "type":"rasterdb_source",
+        "params":{  
+          "sourcename":"btw2015_paper_demo",
+          "channel":4
+        }
+      }
+    ]
+  }
+}
+)WF_ESCAPE";
+
 	const std::string ndvi_wf = R"WF_ESCAPE(
 {
   "type": "rasterdb_source",
@@ -487,6 +570,7 @@ const std::string srtm_ex_wf = R"WF_ESCAPE(
 )WF_ESCAPE";
 
 
+	const QuerySpec btw(btw_wf,EPSG_LATLON,CacheType::RASTER,TemporalReference(TIMETYPE_UNIX,42), "BTW Cats");
 	const QuerySpec cloud_detection(cloud_detection_wf,EPSG_GEOSMSG,CacheType::RASTER,tref, "CloudDetection");
 	const QuerySpec avg_temp(avg_temp_wf,EPSG_LATLON,CacheType::RASTER,tref, "Average Temperature");
 	const QuerySpec srtm_proj(srtm_proj_wf,EPSG_WEBMERCATOR,CacheType::RASTER,tref, "SRTM Projected");

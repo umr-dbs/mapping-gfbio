@@ -30,86 +30,83 @@ REGISTER_HTTP_SERVICE(ArtifactService, "artifact");
 
 
 void ArtifactService::run() {
-	std::string request = params.get("request");
+	try {
+		std::string request = params.get("request");
 
-	auto session = UserDB::loadSession(params.get("sessiontoken"));
-	auto user = session->getUser();
+		auto session = UserDB::loadSession(params.get("sessiontoken"));
+		auto user = session->getUser();
 
-	if(request == "create") {
-		std::string type = params.get("type");
-		std::string name = params.get("name");
-		std::string value = params.get("value");
+		if(request == "create") {
+			std::string type = params.get("type");
+			std::string name = params.get("name");
+			std::string value = params.get("value");
 
-		UserDB::createArtifact(user, type, name, value);
+			UserDB::createArtifact(user, type, name, value);
 
-		response.sendContentType("application/json");
-		response.finishHeaders();
-		response << "{}";
-	} else if(request == "update") {
-		std::string type = params.get("type");
-		std::string name = params.get("name");
-		std::string value = params.get("value");
+			response.sendSuccessJSON();
+		} else if(request == "update") {
+			std::string type = params.get("type");
+			std::string name = params.get("name");
+			std::string value = params.get("value");
 
-		auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
-		artifact->updateValue(value);
+			auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
+			artifact->updateValue(value);
 
-		response.sendContentType("application/json");
-		response.finishHeaders();
-		response << "{}";
-	} else if(request == "get") {
-		std::string username = params.get("username");
-		std::string type = params.get("type");
-		std::string name = params.get("name");
+			response.sendSuccessJSON();
+		} else if(request == "get") {
+			std::string username = params.get("username");
+			std::string type = params.get("type");
+			std::string name = params.get("name");
 
-		std::string time = params.get("time", "9999-12-31T23:59:59");
-		auto timeParser = TimeParser::create(TimeParser::Format::ISO);
+			std::string time = params.get("time", "9999-12-31T23:59:59");
+			auto timeParser = TimeParser::create(TimeParser::Format::ISO);
 
-		double timestamp = timeParser->parse(time);
+			double timestamp = timeParser->parse(time);
 
-		auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
-		std::string value = artifact->getArtifactVersion(timestamp)->getValue();
+			auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
+			std::string value = artifact->getArtifactVersion(timestamp)->getValue();
 
-		Json::Value json(Json::objectValue);
-		json["value"] = value;
+			Json::Value json(Json::objectValue);
+			json["value"] = value;
 
-		response.sendContentType("application/json");
-		response.finishHeaders();
-		response << json;
-	} else if(request == "list") {
-		std::string type = params.get("type");
+			response.sendSuccessJSON(json);
+		} else if(request == "list") {
+			std::string type = params.get("type");
 
-		auto artifacts = UserDB::loadArtifactsOfType(user, type);
+			auto artifacts = UserDB::loadArtifactsOfType(user, type);
 
-		Json::Value json(Json::arrayValue);
-		for(auto artifact : artifacts) {
-			Json::Value entry(Json::objectValue);
-			entry["user"] = artifact.getUser().getUsername();
-			entry["type"] = artifact.getType();
-			entry["name"] = artifact.getName();
+			Json::Value jsonArtifacts(Json::arrayValue);
+			for(auto artifact : artifacts) {
+				Json::Value entry(Json::objectValue);
+				entry["user"] = artifact.getUser().getUsername();
+				entry["type"] = artifact.getType();
+				entry["name"] = artifact.getName();
 
-			json.append(entry);
+				jsonArtifacts.append(entry);
+			}
+
+			Json::Value json(Json::objectValue);
+			json["artifacts"] = jsonArtifacts;
+			response.sendSuccessJSON(json);
+		} else if(request == "share") {
+			std::string username = params.get("username");
+			std::string type = params.get("type");
+			std::string name = params.get("name");
+
+			std::string permission = params.get("permission", "");
+
+			auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
+			if(permission == "user")
+				artifact->shareWithUser(permission);
+			else if(permission == "group")
+				artifact->shareWithGroup(permission);
+			else
+				throw ArtifactServiceException("ArtifactService: invalid permission target");
+
+			response.sendSuccessJSON();
 		}
-
-		response.sendContentType("application/json");
-		response.finishHeaders();
-		response << json;
-	} else if(request == "share") {
-		std::string username = params.get("username");
-		std::string type = params.get("type");
-		std::string name = params.get("name");
-
-		std::string permission = params.get("permission", "");
-
-		auto artifact = UserDB::loadArtifact(user, user.getUsername(), type, name);
-		if(permission == "user")
-			artifact->shareWithUser(permission);
-		else if(permission == "group")
-			artifact->shareWithGroup(permission);
-		else
-			throw ArtifactServiceException("ArtifactService: invalid permission target");
-
-		response.sendContentType("application/json");
-		response.finishHeaders();
-		response << "{}";
+	}
+	catch (const std::exception &e) {
+		response.sendFailureJSON(e.what());
 	}
 }

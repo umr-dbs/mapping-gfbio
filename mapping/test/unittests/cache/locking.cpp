@@ -47,7 +47,7 @@ TEST(Locking,MgrLocks) {
 	node_map.emplace(n->id,n);
 	IndexCacheManager ic( "capacity","lru" );
 
-	DefaultQueryManager mgr(ic,node_map);
+	DefaultQueryManager mgr(node_map,ic);
 
 	auto &c = ic.get_cache(CacheType::POINT);
 

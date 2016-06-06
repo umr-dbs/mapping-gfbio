@@ -5,8 +5,8 @@
  *      Author: koerberm
  */
 
-#ifndef CACHE_INDEX_QUERY_MANAGER_DEFAULT_QUERY_MANAGER_H_
-#define CACHE_INDEX_QUERY_MANAGER_DEFAULT_QUERY_MANAGER_H_
+#ifndef CACHE_INDEX_QUERY_MANAGER_HYBRID_QUERY_MANAGER_H_
+#define CACHE_INDEX_QUERY_MANAGER_HYBRID_QUERY_MANAGER_H_
 
 #include "cache/index/index_cache_manager.h"
 #include "cache/index/querymanager.h"
@@ -20,8 +20,6 @@
 #include <vector>
 #include <set>
 
-class DefaultQueryManager;
-
 /**
  * Describes a query where the whole result must be computed
  */
@@ -33,7 +31,7 @@ public:
 	 * @param nodes the currently available nodes
 	 * @param cache the cache for this type of request
 	 */
-	CreateJob( BaseRequest &&request, const DefaultQueryManager &mgr );
+	CreateJob( BaseRequest &&request, const QueryManager &mgr );
 
 	bool extend( const BaseRequest &req );
 	uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
@@ -43,7 +41,7 @@ private:
 	BaseRequest request;
 	const QueryRectangle orig_query;
 	const double orig_area;
-	const DefaultQueryManager &mgr;
+	const QueryManager &mgr;
 };
 
 /**
@@ -84,7 +82,7 @@ private:
 class DefaultQueryManager : public QueryManager {
 	friend class CreateJob;
 public:
-	DefaultQueryManager(IndexCacheManager &caches, const std::map<uint32_t,std::shared_ptr<Node>> &nodes);
+	DefaultQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes,IndexCacheManager &caches);
 	void add_request( uint64_t client_id, const BaseRequest &req );
 	void process_worker_query(WorkerConnection& con);
 protected:
@@ -96,10 +94,8 @@ private:
 	 * @param res the result of the cache-query
 	 * @return a ready-to-schedule job satisfying the given request
 	 */
-	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req, const CacheQueryResult<std::pair<uint32_t,uint64_t>>& res );
-
-	IndexCacheManager &caches;
+	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req, const CacheQueryResult<IndexCacheEntry>& res );
 };
 
 
-#endif /* CACHE_INDEX_QUERY_MANAGER_DEFAULT_QUERY_MANAGER_H_ */
+#endif /* CACHE_INDEX_QUERY_MANAGER_HYBRID_QUERY_MANAGER_H_ */

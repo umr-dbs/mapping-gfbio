@@ -132,41 +132,41 @@ SpatialReference OGCService::parseBBOX(const std::string bbox_str, epsg_t epsg, 
 
 
 
-void OGCService::outputImage(HTTPResponseStream &stream, GenericRaster *raster, bool flipx, bool flipy, const std::string &colors, Raster2D<uint8_t> *overlay) {
+void OGCService::outputImage(GenericRaster *raster, bool flipx, bool flipy, const std::string &colors, Raster2D<uint8_t> *overlay) {
 	// For now, always guess the colorizer, ignore any user-specified colors
 	//auto colorizer = Colorizer::create(colors);
 	auto colorizer = Colorizer::fromUnit(raster->dd.unit);
 
-	if (!stream.hasSentHeaders()) {
-		stream.sendDebugHeader();
-		stream.sendContentType("image/png");
-		stream.finishHeaders();
+	if (!response.hasSentHeaders()) {
+		response.sendDebugHeader();
+		response.sendContentType("image/png");
+		response.finishHeaders();
 	}
 
-	raster->toPNG(stream, *colorizer, flipx, flipy, overlay); //"/tmp/xyz.tmp.png");
+	raster->toPNG(response, *colorizer, flipx, flipy, overlay); //"/tmp/xyz.tmp.png");
 }
 
-void OGCService::outputSimpleFeatureCollectionGeoJSON(HTTPResponseStream &stream, SimpleFeatureCollection *collection, bool displayMetadata) {
-	stream.sendDebugHeader();
-	stream.sendContentType("application/json");
-	stream.finishHeaders();
-	stream << collection->toGeoJSON(displayMetadata);
+void OGCService::outputSimpleFeatureCollectionGeoJSON(SimpleFeatureCollection *collection, bool displayMetadata) {
+	response.sendDebugHeader();
+	response.sendContentType("application/json");
+	response.finishHeaders();
+	response << collection->toGeoJSON(displayMetadata);
 }
 
-void OGCService::outputSimpleFeatureCollectionCSV(HTTPResponseStream &stream, SimpleFeatureCollection *collection) {
-	stream.sendDebugHeader();
-	stream.sendContentType("text/csv");
-	stream.sendHeader("Content-Disposition", "attachment; filename=\"export.csv\"");
-	stream.finishHeaders();
-	stream << collection->toCSV();
+void OGCService::outputSimpleFeatureCollectionCSV(SimpleFeatureCollection *collection) {
+	response.sendDebugHeader();
+	response.sendContentType("text/csv");
+	response.sendHeader("Content-Disposition", "attachment; filename=\"export.csv\"");
+	response.finishHeaders();
+	response << collection->toCSV();
 }
 
-void OGCService::outputSimpleFeatureCollectionARFF(HTTPResponseStream &stream, SimpleFeatureCollection* collection){
-	stream.sendDebugHeader();
-	stream.sendContentType("text/json");
-	stream.sendHeader("Content-Disposition", "attachment; filename=\"export.arff\"");
-	stream.finishHeaders();
-	stream << collection->toARFF();
+void OGCService::outputSimpleFeatureCollectionARFF(SimpleFeatureCollection* collection){
+	response.sendDebugHeader();
+	response.sendContentType("text/arff");
+	response.sendHeader("Content-Disposition", "attachment; filename=\"export.arff\"");
+	response.finishHeaders();
+	response << collection->toARFF();
 }
 
 void OGCService::exportZip(const char* data, size_t dataLength, const std::string &format, ProvenanceCollection &provenance) {
@@ -222,9 +222,9 @@ void OGCService::exportZip(const char* data, size_t dataLength, const std::strin
 	archive_write_close(archive);
 	archive_write_free(archive);
 
-	result.sendContentType(EXPORT_MIME_PREFIX + format);
-	result.sendHeader("Content-Disposition", "attachment; filename=export.zip");
-	result.sendHeader("Content-Length", concat(used));
-	result.finishHeaders();
-	result.write(reinterpret_cast<const char*>(buffer.data()), used);
+	response.sendContentType(EXPORT_MIME_PREFIX + format);
+	response.sendHeader("Content-Disposition", "attachment; filename=export.zip");
+	response.sendHeader("Content-Length", concat(used));
+	response.finishHeaders();
+	response.write(reinterpret_cast<const char*>(buffer.data()), used);
 }

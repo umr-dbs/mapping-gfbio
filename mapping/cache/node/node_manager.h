@@ -47,6 +47,8 @@ public:
 	/** Adds a full miss */
 	void add_miss();
 
+	void add_query(double ratio);
+
 	/**
 	 * @return the current counters
 	 */
@@ -174,6 +176,9 @@ protected:
 class NodeCacheManager : public CacheManager {
 	static thread_local WorkerContext context;
 public:
+	static std::unique_ptr<NodeCacheManager> by_name( const std::string &name, size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
+			size_t polygon_cache_size, size_t plot_cache_size, const std::string &strategy = "uncached", const std::string &local_replacement = "lru" );
+
 	/**
 	 * Constructs a new instance
 	 * @param strategy the caching strategy to use

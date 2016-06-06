@@ -1,8 +1,13 @@
 #include "cache/experiments/exp_util.h"
+#include "cache/experiments/exp_workflows.h"
 #include "util/configuration.h"
 #include "util/log.h"
 #include "raster/opencl.h"
 #include <signal.h>
+
+int num_nodes = 10;
+int workers_per_node = 1;
+int index_port = 12346;
 
 void termination_handler(int signum) {
 	if ( signum == SIGSEGV ) {
@@ -47,26 +52,21 @@ int main(void) {
 
 	Log::setLevel(Log::LogLevel::INFO);
 
-	time_t update_interval = 0;
 	size_t cache_capacity = 50 * 1024 * 1024;
 
 	std::string reorg_strategy = "geo";
 	std::string relevance = "costlru";
-	std::string caching_strat = "uncached";
+	std::string caching_strat = "always";
 
-	std::string scheduler = "emkde";
-	std::string node_cache_mode = "local";
-	std::string node_cache_repl = "lru";
-	int num_nodes = 4;
-	int workers_per_node = 1;
-	int index_port = 12346;
-
+	std::string scheduler = "default";
+	std::string node_cache_mode = "remote";
+	std::string node_cache_repl = "costlru";
+	time_t update_interval = 500;
 
 	LocalTestSetup lts(
 			num_nodes, workers_per_node, update_interval, cache_capacity, reorg_strategy, relevance, caching_strat, scheduler, node_cache_mode, node_cache_repl, index_port
 	);
-
-	std::this_thread::sleep_for( std::chrono::seconds(3600));
+	std::this_thread::sleep_for(std::chrono::seconds(3600));
 	return 0;
 }
 

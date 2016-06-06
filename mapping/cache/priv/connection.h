@@ -30,6 +30,7 @@ public:
 	BlockingConnection( BlockingConnection&& ) = delete;
 	BlockingConnection& operator=( const BlockingConnection& ) = delete;
 	BlockingConnection& operator=( BlockingConnection&& ) = delete;
+	virtual ~BlockingConnection() = default;
 
 
 	/**
@@ -75,6 +76,9 @@ public:
 		write(params...);
 		return read();
 	}
+
+	int get_read_fd() const { return socket.getReadFD(); };
+	int get_write_fd() const { return socket.getWriteFD(); };
 
 private:
 	template<typename Head>
@@ -315,7 +319,9 @@ private:
  * Models states of ClientConnections
  */
 enum class ClientState {
-	IDLE, AWAIT_RESPONSE, WRITING_RESPONSE
+	IDLE, AWAIT_RESPONSE, WRITING_RESPONSE,
+	AWAIT_STATS, WRITING_STATS,
+	AWAIT_RESET, WRITING_RST
 };
 
 /**
@@ -333,11 +339,18 @@ public:
 	//
 	static const uint8_t CMD_GET = 1;
 
+	static const uint8_t CMD_GET_STATS = 2;
+	static const uint8_t CMD_RESET_STATS = 3;
+
 	//
 	// Response from index-server after successfully
 	// processing a request. Data on stream is:
 	// DeliveryResponse
 	static const uint8_t RESP_OK = 10;
+
+	static const uint8_t RESP_STATS = 11;
+
+	static const uint8_t RESP_RESETTED = 12;
 
 	//
 	// Returned on errors by the index-server.
@@ -352,6 +365,10 @@ public:
 	 * @param response the response to send
 	 */
 	void send_response(const DeliveryResponse &response);
+
+	void send_stats( const SystemStats &stats );
+
+	void confirm_reset();
 
 	/**
 	 * Sends the given error and resets the state to IDLE
@@ -828,6 +845,19 @@ private:
 
 	uint64_t delivery_id;
 	TypedNodeCacheKey cache_key;
+};
+
+enum class ClientDeliveryState {
+	REQUEST_SENT
+};
+
+class NBClientDeliveryConnection : public BaseConnection<ClientDeliveryState> {
+public:
+	static std::unique_ptr<NBClientDeliveryConnection> create( const DeliveryResponse &dr );
+	NBClientDeliveryConnection(BinaryStream &&stream);
+protected:
+	void process_command( uint8_t cmd, BinaryReadBuffer& payload );
+	void write_finished();
 };
 
 #endif /* CONNECTION_H_ */

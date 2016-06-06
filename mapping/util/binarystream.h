@@ -148,7 +148,7 @@ class BinaryWriteBuffer {
 		};
 	public:
 		BinaryWriteBuffer();
-		~BinaryWriteBuffer();
+		virtual ~BinaryWriteBuffer();
 
 		/*
 		 * Methods for writing.

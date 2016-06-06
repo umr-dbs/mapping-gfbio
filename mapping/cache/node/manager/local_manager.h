@@ -32,7 +32,6 @@ protected:
 	PuzzleUtil<T> &get_puzzle_util();
 private:
 	LocalCacheManager &mgr;
-	RWLock local_lock;
 	std::unique_ptr<LocalReplacement<T>> replacement;
 };
 

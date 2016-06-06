@@ -15,41 +15,13 @@
 
 #include <algorithm>
 
-IndexQueryStats::IndexQueryStats() :
-	single_hits(0),
-	multi_hits_single_node(0),
-	multi_hits_multi_node(0),
-	partial_single_node(0),
-	partial_multi_node(0),
-	misses(0),
-	queries_issued(0),
-	queries_scheduled(0) {
-}
+//////////////////////////////////////////////////////////////////////
+//
+// LOCKS
+//
+//////////////////////////////////////////////////////////////////////
 
-void IndexQueryStats::reset() {
-	single_hits = 0;
-	multi_hits_single_node = 0;
-	multi_hits_multi_node = 0;
-	partial_single_node = 0;
-	partial_multi_node = 0;
-	misses = 0;
-	queries_issued = 0;
-	queries_scheduled = 0;
-}
 
-std::string IndexQueryStats::to_string() const {
-	std::ostringstream ss;
-	ss << "Index-Stats:" << std::endl;
-	ss << "  single hits           : " << single_hits << std::endl;
-	ss << "  puzzle single node    : " << multi_hits_single_node << std::endl;
-	ss << "  puzzle multiple nodes : " << multi_hits_multi_node << std::endl;
-	ss << "  partial single node   : " << partial_single_node << std::endl;
-	ss << "  partial multiple nodes: " << partial_multi_node << std::endl;
-	ss << "  misses                : " << misses << std::endl;
-	ss << "  client queries        : " << queries_issued << std::endl;
-	ss << "  queries scheduled     : " << queries_scheduled;
-	return ss.str();
-}
 
 CacheLocks::Lock::Lock(CacheType type, const IndexCacheKey& key) :
 	IndexCacheKey(key), type(type) {
@@ -122,17 +94,19 @@ std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, cons
 	std::transform(name.cbegin(), name.cend(), lcname.begin(), ::tolower);
 
 	if ( name == "default" )
-		return make_unique<DefaultQueryManager>(mgr,nodes);
+		return make_unique<DefaultQueryManager>(nodes,mgr);
 	else if ( name == "dema" )
-		return make_unique<DemaQueryManager>(nodes);
+		return make_unique<DemaQueryManager>(nodes,mgr);
 	else if ( name == "bema" )
-			return make_unique<BemaQueryManager>(nodes);
+			return make_unique<BemaQueryManager>(nodes,mgr);
 	else if ( name == "emkde" )
-				return make_unique<EMKDEQueryManager>(nodes);
+				return make_unique<EMKDEQueryManager>(nodes,mgr);
+	else if ( name == "hybrid" )
+					return make_unique<HybridQueryManager>(nodes,mgr);
 	else throw ArgumentException(concat("Illegal scheduler name: ", name));
 }
 
-QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes) : nodes(nodes) {
+QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes, IndexCacheManager &caches) : nodes(nodes), caches(caches) {
 }
 
 void QueryManager::schedule_pending_jobs(
@@ -142,7 +116,8 @@ void QueryManager::schedule_pending_jobs(
 	while (it != pending_jobs.end()) {
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
-			stats.queries_scheduled++;
+			(*it)->time_scheduled = CacheCommon::time_millis();
+			stats.scheduled(worker_connections.at(con_id)->node_id);
 			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
 			queries.emplace(con_id, std::move(*it));
 			it = pending_jobs.erase(it);
@@ -168,6 +143,9 @@ std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
 		throw IllegalStateException(concat("No finished query found for worker: ",worker_id));
 
 	std::set<uint64_t> clients = it->second->get_clients();
+	it->second->time_finished = CacheCommon::time_millis();
+	auto &q = *(it->second);
+	stats.query_finished( clients.size(), q.time_created, q.time_scheduled, q.time_finished  );
 	finished_queries.erase(it);
 	return clients;
 }
@@ -214,7 +192,7 @@ void QueryManager::handle_client_abort(uint64_t client_id) {
 	}
 }
 
-const IndexQueryStats& QueryManager::get_stats() const {
+const SystemStats& QueryManager::get_stats() const {
 	return stats;
 }
 
@@ -231,7 +209,7 @@ bool QueryManager::is_locked( CacheType type, const IndexCacheKey& key) const {
 //
 
 RunningQuery::RunningQuery( std::vector<CacheLocks::Lock> &&locks ) :
-	locks(std::move(locks)) {
+	locks(std::move(locks)), time_created(CacheCommon::time_millis()), time_scheduled(0), time_finished(0) {
 	QueryManager::locks.add_locks(this->locks);
 }
 

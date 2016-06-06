@@ -12,7 +12,34 @@
 #include <json/json.h>
 
 /*
- * This class provides access to the artifacts in the UserDB
+ * This class provides access to the artifacts in the UserDB.
+ * Parameter request defines the type of request
+ *
+ * Operations:
+ * - request = create: Create a new artifact
+ *   - parameters:
+ *     - type
+ *     - name
+ *     - value
+ * - request = update: Update the value of an existing artifact
+ *   - parameters:
+ *     - type
+ *     - name
+ *     - value
+ * - request = get: get the value of a given artifact at a given time (latest version if not specified)
+ *   - parameters:
+ *     - username
+ *     - type
+ *     - name
+ *     - time (optional)
+ * - request = list: list all artifacts of a given type
+ *   - parmeters:
+ *     - type
+ * - request = share: share an artifact with a given user
+ *   - parameters:
+ *     - username
+ *     - type
+ *     - name
  */
 class ArtifactService : public HTTPService {
 public:

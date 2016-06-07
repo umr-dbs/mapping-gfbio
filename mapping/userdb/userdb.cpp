@@ -5,6 +5,7 @@
 #include "util/exceptions.h"
 #include "util/configuration.h"
 #include "util/concat.h"
+#include "util/make_unique.h"
 
 #include <time.h>
 #include <unordered_map>
@@ -119,7 +120,7 @@ void UserDB::Session::logout() {
 bool UserDB::Session::isExpired() {
 	if (expires == 0)
 		return false;
-	if (expires < time(nullptr))
+	if (expires < UserDB::time())
 		return true;
 	return false;
 }
@@ -140,7 +141,7 @@ UserDB::Artifact::Artifact(artifactid_t artifactid, std::shared_ptr<User> user, 
 }
 
 std::shared_ptr<UserDB::ArtifactVersion> UserDB::Artifact::getLatestArtifactVersion() {
-	return UserDB::loadArtifactVersion(*user, artifactid, time(0));
+	return UserDB::loadArtifactVersion(*user, artifactid, UserDB::time());
 }
 
 std::shared_ptr<UserDB::ArtifactVersion> UserDB::Artifact::getArtifactVersion(time_t timestamp) {
@@ -160,6 +161,23 @@ std::shared_ptr<UserDB::User> UserDB::Artifact::shareWithUser(const std::string 
 std::shared_ptr<UserDB::Group> UserDB::Artifact::shareWithGroup(const std::string &groupname) {
 	return UserDB::shareArtifactWithGroup(artifactid, groupname);
 }
+
+
+/*
+ * Clock
+ */
+UserDB::Clock::~Clock() {}
+
+std::unique_ptr<UserDB::Clock> UserDB::clock;
+
+class UnixClock : public UserDB::Clock {
+	public:
+		virtual ~UnixClock() {}
+		virtual time_t time() {
+			return ::time(nullptr);
+		}
+};
+
 
 /*
  * UserDB backend registration
@@ -244,7 +262,7 @@ std::string UserDB::createRandomToken(size_t length) {
 /*
  * UserDB
  */
-void UserDB::init(const std::string &backend, const std::string &location) {
+void UserDB::init(const std::string &backend, const std::string &location, std::unique_ptr<Clock> _clock) {
 	if (userdb_backend != nullptr)
 		throw MustNotHappenException("UserDB::init() was called multiple times");
 
@@ -257,6 +275,11 @@ void UserDB::init(const std::string &backend, const std::string &location) {
 
 	auto constructor = map->at(backend);
 	userdb_backend = constructor(location);
+
+	if (_clock != nullptr)
+		clock = std::move(_clock);
+	else
+		clock = make_unique<UnixClock>();
 }
 
 void UserDB::initFromConfiguration() {
@@ -267,6 +290,12 @@ void UserDB::initFromConfiguration() {
 
 void UserDB::shutdown() {
 	userdb_backend = nullptr;
+}
+
+time_t UserDB::time() {
+	if (clock == nullptr)
+		throw ArgumentException("UserDB::time(), call init() first");
+	return clock->time();
 }
 
 std::shared_ptr<UserDB::User> UserDB::loadUser(UserDB::userid_t userid) {
@@ -339,7 +368,7 @@ std::shared_ptr<UserDB::Session> UserDB::createSession(const std::string &userna
 	// API keys are normal sessions without an expiration date, modeled by expires = 0.
 	time_t expires = 0;
 	if (duration_in_seconds > 0)
-		expires = time(nullptr) + duration_in_seconds;
+		expires = time() + duration_in_seconds;
 	auto userid = userdb_backend->authenticateUser(username, password);
 	auto sessiontoken = userdb_backend->createSession(userid, expires);
 	return loadSession(sessiontoken);
@@ -349,7 +378,7 @@ std::shared_ptr<UserDB::Session> UserDB::createSessionForExternalUser(const std:
 	// API keys are normal sessions without an expiration date, modeled by expires = 0.
 	time_t expires = 0;
 	if (duration_in_seconds > 0)
-		expires = time(nullptr) + duration_in_seconds;
+		expires = time() + duration_in_seconds;
 	auto userid = userdb_backend->findExternalUser(externalid);
 	auto sessiontoken = userdb_backend->createSession(userid, expires);
 	return loadSession(sessiontoken);
@@ -369,7 +398,7 @@ void UserDB::destroySession(const std::string &sessiontoken) {
 }
 
 std::shared_ptr<UserDB::Artifact> UserDB::createArtifact(const UserDB::User &user, const std::string &type, const std::string &name, const std::string &value) {
-	artifactid_t artifactid = userdb_backend->createArtifact(user.userid, type, name, value);
+	artifactid_t artifactid = userdb_backend->createArtifact(user.userid, type, name, time(), value);
 	auto artifactData =  userdb_backend->loadArtifact(artifactid);
 	return std::make_shared<Artifact>(artifactid, loadUser(artifactData.userid), artifactData.type, artifactData.name, artifactData.lastChanged, artifactData.versions);
 }
@@ -387,7 +416,9 @@ std::shared_ptr<UserDB::ArtifactVersion> UserDB::loadArtifactVersion(const User 
 }
 
 time_t UserDB::updateArtifactValue(const User &user, const std::string &type, const std::string &name, const std::string &value) {
-	return userdb_backend->updateArtifactValue(user.userid, type, name, value);
+	auto timestamp = time();
+	userdb_backend->updateArtifactValue(user.userid, type, name, timestamp, value);
+	return timestamp;
 }
 
 

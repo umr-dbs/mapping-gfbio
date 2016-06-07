@@ -6,6 +6,9 @@
  */
 
 #include "cache/node/node_manager.h"
+#include "cache/node/manager/local_manager.h"
+#include "cache/node/manager/remote_manager.h"
+#include "cache/node/manager/hybrid_manager.h"
 #include "cache/node/puzzle_util.h"
 #include "cache/priv/connection.h"
 
@@ -59,6 +62,11 @@ void ActiveQueryStats::add_miss() {
 QueryStats ActiveQueryStats::get() const {
 	std::lock_guard<std::mutex> g(mtx);
 	return QueryStats(*this);
+}
+
+void ActiveQueryStats::add_query(double ratio) {
+	std::lock_guard<std::mutex> g(mtx);
+	QueryStats::add_query(ratio);
 }
 
 QueryStats ActiveQueryStats::get_and_reset() {
@@ -160,6 +168,27 @@ NodeCacheWrapper<PolygonCollection>& NodeCacheManager::get_polygon_cache() {
 NodeCacheWrapper<GenericPlot>& NodeCacheManager::get_plot_cache() {
 	return *plot_wrapper;
 }
+
+
+
+std::unique_ptr<NodeCacheManager> NodeCacheManager::by_name(
+		const std::string& name, size_t raster_size, size_t point_size, size_t line_size,
+		size_t polygon_size, size_t plot_size, const std::string &strategy, const std::string& local_replacement) {
+	std::string mgrlc;
+	mgrlc.resize(name.size());
+	std::transform(name.cbegin(),name.cend(),mgrlc.begin(),::tolower);
+
+
+	if ( mgrlc == "remote" )
+		return make_unique<RemoteCacheManager>(strategy, raster_size, point_size, line_size, polygon_size, plot_size);
+	else if ( mgrlc == "local" )
+		return make_unique<LocalCacheManager>(strategy, local_replacement, raster_size, point_size, line_size, polygon_size, plot_size);
+	else if ( mgrlc == "hybrid" )
+		return make_unique<HybridCacheManager>(strategy, raster_size, point_size, line_size, polygon_size, plot_size);
+	else
+		throw ArgumentException(concat("Unknown manager impl: ", name));
+}
+
 
 void NodeCacheManager::set_self_port(uint32_t port) {
 	my_port = port;

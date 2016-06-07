@@ -58,7 +58,10 @@ static const XMLCh tagNameTitle[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chC
 static const XMLCh tagNameDetails[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_D,chLatin_e,chLatin_t,chLatin_a,chLatin_i,chLatin_l,chLatin_s,chNull};
 
 /**
- * Operator that gets points from pangaea
+ * Operator that reads a given ABCD file and loads all units
+ *
+ * Parameters:
+ * - path: the path of the ABCD file
  */
 class ABCDSourceOperator : public GenericOperator {
 	public:

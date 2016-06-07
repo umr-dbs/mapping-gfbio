@@ -32,6 +32,7 @@ class UserDB {
 		class User;
 		class Group;
 		class Session;
+		class Artifact;
 
 		// helper classes
 		class Permissions {
@@ -47,6 +48,7 @@ class UserDB {
 		};
 		class User {
 			friend class UserDB;
+
 			public:
 				User(userid_t userid, const std::string &username, const std::string &externalid, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups);
 
@@ -59,6 +61,36 @@ class UserDB {
 				void setExternalid(const std::string &externalid);
 				std::shared_ptr<User> addPermission(const std::string &permission);
 				std::shared_ptr<User> removePermission(const std::string &permission);
+
+				/**
+				 * Create an artifact
+				 * @param type the type of the artifact
+				 * @param name the name of the artifact
+				 * @param value the value of the artifact
+				 * @return the new artifact
+				 */
+				std::shared_ptr<UserDB::Artifact> createArtifact(const std::string &type, const std::string &name, const std::string &value);
+
+				/**
+				 * Load latest version of an artifact.
+				 * If no artifact satisfying the parameters exists, an exception is thrown.
+				 * If the user has no permission to load the artifact an exception is thrown (TODO)
+				 * @param username name of the user who owns the artifact
+				 * @param type the type of the artifact
+				 * @param name the name of the artifact
+				 * @return the artifact
+				 */
+				std::shared_ptr<Artifact> loadArtifact(const std::string &username, const std::string &type, const std::string &name);
+
+				/**
+				 * Load a list of the names of all artifacts a given user has permission to on of a given type
+				 * @param type the type of the artifacts
+				 * @return the artifact
+				 */
+				std::vector<Artifact> loadArtifactsOfType(const std::string &type);
+
+
+
 			private:
 				userid_t userid;
 				std::string username;
@@ -159,6 +191,23 @@ class UserDB {
 
 		static std::shared_ptr<Group> createGroup(const std::string &groupname);
 
+		// these should only be called by backend implementations
+		static std::string createRandomToken(size_t length);
+	private:
+		static std::shared_ptr<User> loadUser(userid_t userid);
+		static void addUserPermission(userid_t userid, const std::string &permission);
+		static void removeUserPermission(userid_t userid, const std::string &permission);
+		static void setUserPassword(userid_t userid, const std::string &password);
+		static void setUserExternalid(userid_t userid, const std::string &externalid);
+
+		static std::shared_ptr<Group> loadGroup(groupid_t groupid);
+		static void addGroupPermission(groupid_t groupid, const std::string &permission);
+		static void removeGroupPermission(groupid_t groupid, const std::string &permission);
+		static void addUserToGroup(userid_t userid, groupid_t groupid);
+		static void removeUserFromGroup(userid_t userid, groupid_t groupid);
+
+		static void destroySession(const std::string &sessiontoken);
+
 		/**
 		 * Create an artifact
 		 * @param user the user who creates this artifact
@@ -189,23 +238,6 @@ class UserDB {
 		 */
 		static std::vector<Artifact> loadArtifactsOfType(const User &user, const std::string &type);
 
-		// these should only be called by backend implementations
-		static std::string createRandomToken(size_t length);
-	private:
-		static std::shared_ptr<User> loadUser(userid_t userid);
-		static void addUserPermission(userid_t userid, const std::string &permission);
-		static void removeUserPermission(userid_t userid, const std::string &permission);
-		static void setUserPassword(userid_t userid, const std::string &password);
-		static void setUserExternalid(userid_t userid, const std::string &externalid);
-
-		static std::shared_ptr<Group> loadGroup(groupid_t groupid);
-		static void addGroupPermission(groupid_t groupid, const std::string &permission);
-		static void removeGroupPermission(groupid_t groupid, const std::string &permission);
-		static void addUserToGroup(userid_t userid, groupid_t groupid);
-		static void removeUserFromGroup(userid_t userid, groupid_t groupid);
-
-		static void destroySession(const std::string &sessiontoken);
-
 		static std::shared_ptr<ArtifactVersion> loadArtifactVersion(const User &user, artifactid_t artifactid, time_t timestamp);
 		static time_t updateArtifactValue(const User &user, const std::string &type, const std::string &name, const std::string &value);
 		static std::shared_ptr<UserDB::User> shareArtifactWithUser(artifactid_t artifactid, const std::string &username);
@@ -213,6 +245,7 @@ class UserDB {
 
 		static time_t time();
 		static std::unique_ptr<Clock> clock;
+
 		// TODO: sessioncache?
 };
 

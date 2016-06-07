@@ -29,6 +29,7 @@ time_t parseIso8601DateTime(std::string dateTimeString);
 void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg =
 		EPSG_WEBMERCATOR, bool allow_infinite = false);
 
+
 //
 // Test classes
 //
@@ -39,11 +40,12 @@ public:
 			const std::string &reorg_strategy,
 			const std::string &relevance_function,
 			const std::string &scheduler);
+	~TestIdxServer();
 	void trigger_reorg(uint32_t node_id, const ReorgDescription &desc);
 	void force_stat_update();
 	void force_reorg();
 	void reset_stats();
-	IndexQueryStats get_stats();
+	SystemStats get_stats();
 private:
 	void wait_for_idle_control_connections();
 };

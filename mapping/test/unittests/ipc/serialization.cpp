@@ -280,6 +280,18 @@ TEST(Serialization, NodeEntryStats) {
 	checkSerializationConstructor(nes);
 }
 
+TEST(Serialization, SystemStats) {
+	SystemStats ss;
+	ss.misses++;
+	ss.single_local_hits += 10;
+	ss.issued();
+	ss.scheduled(1);
+	ss.scheduled(1);
+	ss.scheduled(2);
+	ss.query_finished(2,10, 20, 25);
+	checkSerializationConstructor(ss);
+}
+
 TEST(Serialization, HandshakeEntry) {
 	CacheCube cc(SpatioTemporalReference(
 				SpatialReference(EPSG_LATLON, -180, -90, 180, 90),

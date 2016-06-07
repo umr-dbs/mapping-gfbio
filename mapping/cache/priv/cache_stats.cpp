@@ -154,7 +154,7 @@ CacheHandshake::CacheHandshake(BinaryReadBuffer& buffer) : CacheContent(buffer) 
 ///////////////////////////////////////////////////////////
 
 QueryStats::QueryStats() : single_local_hits(0), multi_local_hits(0), multi_local_partials(0),
-	single_remote_hits(0), multi_remote_hits(0), multi_remote_partials(0), misses(0) {
+	single_remote_hits(0), multi_remote_hits(0), multi_remote_partials(0), misses(0), queries(0), ratios(0) {
 }
 
 QueryStats::QueryStats(BinaryReadBuffer& buffer) :
@@ -164,7 +164,9 @@ QueryStats::QueryStats(BinaryReadBuffer& buffer) :
 	single_remote_hits(buffer.read<uint32_t>()),
 	multi_remote_hits(buffer.read<uint32_t>()),
 	multi_remote_partials(buffer.read<uint32_t>()),
-	misses(buffer.read<uint32_t>()){
+	misses(buffer.read<uint32_t>()),
+	queries(buffer.read<uint64_t>()),
+	ratios(buffer.read<double>()) {
 }
 
 QueryStats QueryStats::operator +(const QueryStats& stats) const {
@@ -176,6 +178,8 @@ QueryStats QueryStats::operator +(const QueryStats& stats) const {
 	res.multi_remote_hits += stats.multi_remote_hits;
 	res.multi_remote_partials += stats.multi_remote_partials;
 	res.misses += stats.misses;
+	res.queries += stats.queries;
+	res.ratios += stats.ratios;
 	return res;
 }
 
@@ -187,13 +191,24 @@ QueryStats& QueryStats::operator +=(const QueryStats& stats) {
 	multi_remote_hits += stats.multi_remote_hits;
 	multi_remote_partials += stats.multi_remote_partials;
 	misses += stats.misses;
+	queries += stats.queries;
+	ratios += stats.ratios;
 	return *this;
 }
 
 void QueryStats::serialize(BinaryWriteBuffer& buffer, bool) const {
 	buffer << single_local_hits << multi_local_hits << multi_local_partials;
 	buffer << single_remote_hits << multi_remote_hits << multi_remote_partials;
-	buffer << misses;
+	buffer << misses << queries << ratios;
+}
+
+void QueryStats::add_query(double ratio) {
+	ratios += ratio;
+	queries++;
+}
+
+double QueryStats::get_hit_ratio() const {
+	return (queries > 0) ? (ratios/queries) : 0;
 }
 
 void QueryStats::reset() {
@@ -204,6 +219,8 @@ void QueryStats::reset() {
 	multi_remote_hits = 0;
 	multi_remote_partials = 0;
 	misses = 0;
+	queries = 0;
+	ratios = 0;
 }
 
 std::string QueryStats::to_string() const {
@@ -215,9 +232,112 @@ std::string QueryStats::to_string() const {
 	ss << "  remote single hits: " << single_remote_hits << std::endl;
 	ss << "  remote multi hits : " << multi_remote_hits << std::endl;
 	ss << "  remote partials   : " << multi_remote_partials << std::endl;
-	ss << "  misses            : " << misses;
+	ss << "  misses            : " << misses << std::endl;
+	ss << "  hit-ratio         : " << (ratios / queries) << std::endl;
+	ss << "  cache-queries     : " << queries;
 	return ss.str();
 }
+
+///////////////////////////////////////////////////////////
+//
+// SYSTEM-STATS
+//
+///////////////////////////////////////////////////////////
+
+SystemStats::SystemStats() : QueryStats(),
+	queries_issued(0),
+	queries_scheduled(0), query_counter(0), avg_wait_time(0), avg_exec_time(0), avg_time(0) {
+}
+
+void SystemStats::reset() {
+	QueryStats::reset();
+	queries_issued = 0;
+	queries_scheduled = 0;
+	query_counter = 0;
+	avg_exec_time = 0;
+	avg_wait_time = 0;
+	avg_time = 0;
+  node_to_queries.clear();
+}
+
+std::string SystemStats::to_string() const {
+	std::ostringstream ss;
+	ss << "Index-Stats:" << std::endl;
+	ss << "  single hits              : " << single_local_hits << std::endl;
+	ss << "  puzzle single node       : " << multi_local_hits << std::endl;
+	ss << "  puzzle multiple nodes    : " << multi_remote_hits << std::endl;
+	ss << "  partial single node      : " << multi_local_partials << std::endl;
+	ss << "  partial multiple nodes   : " << multi_remote_partials << std::endl;
+	ss << "  misses                   : " << misses << std::endl;
+	ss << "  hit ratio                : " << get_hit_ratio() << std::endl;
+	ss << "  cache-queries            : " << queries << std::endl;
+	ss << "  requests received        : " << queries_issued << std::endl;
+	ss << "  requests scheduled       : " << queries_scheduled << std::endl;
+	ss << "  Average Query Time       : " << avg_time << std::endl;
+	ss << "  Average Query Wait-Time  : " << avg_wait_time << std::endl;
+	ss << "  Average Query Exec-Time  : " << avg_exec_time << std::endl;
+	ss << "  Distrib (NodeId:#Queries): ";
+	for ( auto &p : node_to_queries )
+		ss << "(" << p.first << ": " << p.second << "), ";
+	return ss.str();
+}
+
+uint32_t SystemStats::get_queries_scheduled() {
+	return queries_scheduled;
+}
+
+void SystemStats::scheduled(uint32_t node_id) {
+	queries_scheduled++;
+	auto it = node_to_queries.find(node_id);
+	if ( it == node_to_queries.end() )
+		node_to_queries.emplace(node_id, 1);
+	else
+		it->second++;
+}
+
+
+void SystemStats::query_finished(uint32_t num_clients, size_t time_created, size_t time_scheduled, size_t time_finished ) {
+	avg_exec_time = ((avg_exec_time*query_counter) + (time_finished - time_scheduled)) / (query_counter+num_clients);
+	avg_wait_time = ((avg_wait_time*query_counter) + (time_scheduled - time_created)) / (query_counter+num_clients);
+	avg_time = avg_exec_time + avg_wait_time;
+	query_counter += +num_clients;
+}
+
+SystemStats::SystemStats(BinaryReadBuffer& buffer) : QueryStats(buffer),
+		queries_issued(buffer.read<uint32_t>()),
+		queries_scheduled(buffer.read<uint32_t>()),
+		query_counter(buffer.read<uint32_t>()),
+		avg_wait_time(buffer.read<double>()),
+		avg_exec_time(buffer.read<double>()),
+		avg_time(buffer.read<double>()) {
+
+	uint64_t map_size = buffer.read<uint64_t>();
+
+	for ( size_t i = 0; i < map_size; i++ ) {
+		uint32_t k = buffer.read<uint32_t>();
+		uint64_t v = buffer.read<uint64_t>();
+		node_to_queries.emplace(k,v);
+	}
+}
+
+void SystemStats::serialize(BinaryWriteBuffer& buffer,
+		bool is_persistent_memory) const {
+	QueryStats::serialize(buffer,is_persistent_memory);
+	buffer << queries_issued << queries_scheduled << query_counter;
+	buffer << avg_wait_time << avg_exec_time << avg_time;
+
+	uint64_t s = node_to_queries.size();
+
+	buffer << s;
+	for ( auto &p : node_to_queries ) {
+		buffer << p.first << p.second;
+	}
+}
+
+void SystemStats::issued() {
+	queries_issued++;
+}
+
 
 ///////////////////////////////////////////////////////////
 //

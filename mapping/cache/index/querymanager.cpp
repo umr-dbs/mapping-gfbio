@@ -15,73 +15,11 @@
 
 #include <algorithm>
 
-IndexQueryStats::IndexQueryStats() :
-	single_hits(0),
-	multi_hits_single_node(0),
-	multi_hits_multi_node(0),
-	partial_single_node(0),
-	partial_multi_node(0),
-	misses(0),
-	queries_issued(0),
-	queries_scheduled(0), num_queries(0), avg_wait_time(0), avg_exec_time(0), avg_time(0) {
-}
-
-void IndexQueryStats::reset() {
-	single_hits = 0;
-	multi_hits_single_node = 0;
-	multi_hits_multi_node = 0;
-	partial_single_node = 0;
-	partial_multi_node = 0;
-	misses = 0;
-	queries_issued = 0;
-	queries_scheduled = 0;
-	num_queries = 0;
-	avg_exec_time = 0;
-	avg_wait_time = 0;
-	avg_time = 0;
-}
-
-std::string IndexQueryStats::to_string() const {
-	std::ostringstream ss;
-	ss << "Index-Stats:" << std::endl;
-	ss << "  single hits             : " << single_hits << std::endl;
-	ss << "  puzzle single node      : " << multi_hits_single_node << std::endl;
-	ss << "  puzzle multiple nodes   : " << multi_hits_multi_node << std::endl;
-	ss << "  partial single node     : " << partial_single_node << std::endl;
-	ss << "  partial multiple nodes  : " << partial_multi_node << std::endl;
-	ss << "  misses                  : " << misses << std::endl;
-	ss << "  client queries          : " << queries_issued << std::endl;
-	ss << "  queries scheduled       : " << queries_scheduled << std::endl;
-	ss << "  Average Query Time      : " << avg_time << std::endl;
-	ss << "  Average Query Wait-Time : " << avg_wait_time << std::endl;
-	ss << "  Average Query Exec-Time : " << avg_exec_time << std::endl;
-	ss << "  Distri (NodeId:#Queries): ";
-	for ( auto &p : node_to_queries )
-		ss << "(" << p.first << ": " << p.second << "), ";
-	return ss.str();
-}
-
-uint32_t IndexQueryStats::get_queries_scheduled() {
-	return queries_scheduled;
-}
-
-void IndexQueryStats::scheduled(uint32_t node_id) {
-	queries_scheduled++;
-	auto it = node_to_queries.find(node_id);
-	if ( it == node_to_queries.end() )
-		node_to_queries.emplace(node_id, 1);
-	else
-		it->second++;
-}
-
-
-void IndexQueryStats::query_finished(const RunningQuery& q) {
-	size_t num_clients = q.get_clients().size();
-	avg_exec_time = ((avg_exec_time*num_queries) + (q.time_finished - q.time_scheduled)) / (num_queries+num_clients);
-	avg_wait_time = ((avg_wait_time*num_queries) + (q.time_scheduled - q.time_created)) / (num_queries+num_clients);
-	avg_time = avg_exec_time + avg_wait_time;
-	num_queries += +num_clients;
-}
+//////////////////////////////////////////////////////////////////////
+//
+// LOCKS
+//
+//////////////////////////////////////////////////////////////////////
 
 
 
@@ -156,17 +94,19 @@ std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, cons
 	std::transform(name.cbegin(), name.cend(), lcname.begin(), ::tolower);
 
 	if ( name == "default" )
-		return make_unique<DefaultQueryManager>(mgr,nodes);
+		return make_unique<DefaultQueryManager>(nodes,mgr);
 	else if ( name == "dema" )
-		return make_unique<DemaQueryManager>(nodes);
+		return make_unique<DemaQueryManager>(nodes,mgr);
 	else if ( name == "bema" )
-			return make_unique<BemaQueryManager>(nodes);
+			return make_unique<BemaQueryManager>(nodes,mgr);
 	else if ( name == "emkde" )
-				return make_unique<EMKDEQueryManager>(nodes);
+				return make_unique<EMKDEQueryManager>(nodes,mgr);
+	else if ( name == "hybrid" )
+					return make_unique<HybridQueryManager>(nodes,mgr);
 	else throw ArgumentException(concat("Illegal scheduler name: ", name));
 }
 
-QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes) : nodes(nodes) {
+QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes, IndexCacheManager &caches) : nodes(nodes), caches(caches) {
 }
 
 void QueryManager::schedule_pending_jobs(
@@ -204,7 +144,8 @@ std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
 
 	std::set<uint64_t> clients = it->second->get_clients();
 	it->second->time_finished = CacheCommon::time_millis();
-	stats.query_finished(*(it->second));
+	auto &q = *(it->second);
+	stats.query_finished( clients.size(), q.time_created, q.time_scheduled, q.time_finished  );
 	finished_queries.erase(it);
 	return clients;
 }
@@ -251,7 +192,7 @@ void QueryManager::handle_client_abort(uint64_t client_id) {
 	}
 }
 
-const IndexQueryStats& QueryManager::get_stats() const {
+const SystemStats& QueryManager::get_stats() const {
 	return stats;
 }
 
@@ -337,3 +278,4 @@ bool RunningQuery::has_clients() const {
 PendingQuery::PendingQuery( std::vector<CacheLocks::Lock> &&locks ) :
 	RunningQuery(std::move(locks)) {
 }
+

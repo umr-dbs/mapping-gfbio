@@ -38,7 +38,7 @@ public:
 
 	NodeServer( std::unique_ptr<NodeCacheManager> manager, uint32_t my_port, std::string index_host,
 			uint32_t index_port, int num_threads);
-	~NodeServer();
+	virtual ~NodeServer() = default;
 
 	/**
 	 * Fires up the node-server and will return after

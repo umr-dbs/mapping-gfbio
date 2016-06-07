@@ -5,7 +5,8 @@
  *      Author: koerberm
  */
 
-#include "simple_query_manager.h"
+#include "cache/index/query_manager/simple_query_manager.h"
+#include "cache/index/query_manager/default_query_manager.h"
 #include "util/exceptions.h"
 
 SimpleJob::SimpleJob(const BaseRequest &request, uint32_t node_id) : PendingQuery(), request(request), node_id(node_id) {
@@ -37,10 +38,11 @@ const BaseRequest& SimpleJob::get_request() const {
 }
 
 
-SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) : QueryManager(nodes) {
+SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : QueryManager(nodes, caches) {
 }
 
 void SimpleQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
+	stats.issued();
 	auto j = create_job(req);
 	j->add_client(client_id);
 	pending_jobs.push_back( std::move(j) );
@@ -63,7 +65,7 @@ std::unique_ptr<PendingQuery> SimpleQueryManager::recreate_job(const RunningQuer
 
 
 DemaQueryManager::DemaQueryManager(
-		const std::map<uint32_t, std::shared_ptr<Node> >& nodes) : SimpleQueryManager(nodes), alpha(0.3) {
+		const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : SimpleQueryManager(nodes, caches), alpha(0.3) {
 }
 
 std::unique_ptr<PendingQuery> DemaQueryManager::create_job(
@@ -103,7 +105,7 @@ std::unique_ptr<PendingQuery> DemaQueryManager::create_job(
 //
 
 BemaQueryManager::BemaQueryManager(
-		const std::map<uint32_t, std::shared_ptr<Node> >& nodes) : DemaQueryManager(nodes) {
+		const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : DemaQueryManager(nodes, caches) {
 }
 
 std::unique_ptr<PendingQuery> BemaQueryManager::create_job(
@@ -155,4 +157,17 @@ void BemaQueryManager::assign_query(uint32_t node) {
 int BemaQueryManager::get_assignments(uint32_t node) {
 	auto it = assignment_map.find(node);
 	return (it==assignment_map.end()) ? 0 : it->second;
+}
+
+//
+// Hybrid
+//
+
+HybridQueryManager::HybridQueryManager(
+		const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : SimpleQueryManager(nodes,caches) {
+}
+
+std::unique_ptr<PendingQuery> HybridQueryManager::create_job(
+		const BaseRequest& req) {
+	return make_unique<CreateJob>(BaseRequest(req), *this);
 }

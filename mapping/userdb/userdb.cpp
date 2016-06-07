@@ -78,6 +78,18 @@ void UserDB::User::setPassword(const std::string &password) {
 	externalid = "";
 }
 
+std::shared_ptr<UserDB::Artifact> UserDB::User::createArtifact(const std::string &type, const std::string &name, const std::string &value) {
+	return UserDB::createArtifact(*this, type, name, value);
+}
+
+std::shared_ptr<UserDB::Artifact> UserDB::User::loadArtifact(const std::string &username, const std::string &type, const std::string &name) {
+	return UserDB::loadArtifact(*this, username, type, name);
+}
+
+std::vector<UserDB::Artifact> UserDB::User::loadArtifactsOfType(const std::string &type) {
+	return UserDB::loadArtifactsOfType(*this, type);
+}
+
 /*
  * Group
  */

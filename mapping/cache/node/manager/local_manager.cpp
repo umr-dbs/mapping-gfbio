@@ -19,13 +19,12 @@
 
 template<class T>
 LocalCacheWrapper<T>::LocalCacheWrapper(LocalCacheManager &mgr, const std::string &repl, size_t size, CacheType type ) :
-	NodeCacheWrapper<T>(mgr, size, type ), mgr(mgr), replacement(LocalReplacement<T>::by_name(repl)) {
+	NodeCacheWrapper<T>(mgr, size, type ), mgr(mgr), replacement(make_unique<LocalReplacement<T>>( LocalRelevanceFunction::by_name(repl))) {
 }
 
 template<class T>
 bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 		const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
-
 	size_t size = SizeUtil::get_byte_size(*item);
 	if ( mgr.get_strategy().do_cache(profiler,size) && size <= this->cache.get_max_size() ) {
 		CacheCube cube(*item);
@@ -50,7 +49,6 @@ bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
 		}
 		// Perform put
-		ExclusiveLockGuard g(local_lock);
 		Log::debug("Adding item to local cache");
 		auto rems = replacement->get_removals(this->cache,size);
 		for ( auto &r : rems ) {
@@ -67,25 +65,18 @@ template<class T>
 std::unique_ptr<T> LocalCacheWrapper<T>::query(GenericOperator& op,
 		const QueryRectangle& rect, QueryProfiler &profiler) {
 
-	std::vector<std::shared_ptr<const NodeCacheEntry<T>>> entries;
-	CacheQueryResult<uint64_t> qres(rect);
-
-	// Perform query and collect results
-	{
-		SharedLockGuard g(local_lock);
-		qres = this->cache.query(op.getSemanticId(), rect);
-		for ( auto &id : qres.keys ) {
-			auto e = this->cache.get(NodeCacheKey(op.getSemanticId(), id));
-			// Track costs
-			profiler.addTotalCosts(e->profile);
-			entries.push_back( e );
-		}
+	CacheQueryResult<NodeCacheEntry<T>> qres = this->cache.query(op.getSemanticId(), rect);
+	for ( auto &e : qres.items ) {
+		// Track costs
+		profiler.addTotalCosts(e->profile);
 	}
 
+	this->stats.add_query(qres.hit_ratio);
+
 	// Full single local hit
-	if ( !qres.has_remainder() && qres.keys.size() == 1 ) {
+	if ( !qres.has_remainder() && qres.items.size() == 1 ) {
 		this->stats.add_single_local_hit();
-		return entries.front()->copy_data();
+		return qres.items.front()->copy_data();
 	}
 	// Partial or Full puzzle
 	else if ( qres.has_hit() ) {
@@ -95,8 +86,8 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(GenericOperator& op,
 			this->stats.add_multi_local_hit();
 
 		std::vector<std::shared_ptr<const T>> items;
-		items.reserve(entries.size());
-		for ( auto &ne : entries )
+		items.reserve(qres.items.size());
+		for ( auto &ne : qres.items )
 			items.push_back(ne->data);
 
 		return PuzzleJob::process(op,rect,qres.remainder,items,profiler);

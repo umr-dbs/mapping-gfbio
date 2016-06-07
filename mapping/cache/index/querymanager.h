@@ -198,44 +198,6 @@ public:
 };
 
 /**
- * Statistics about cache-queries on the index-server
- */
-class IndexQueryStats {
-public:
-	IndexQueryStats();
-
-	/**
-	 * @return a human readable respresentation
-	 */
-	std::string to_string() const;
-
-	/**
-	 * Resets this stats (setting all counts to 0)
-	 */
-	void reset();
-
-	uint32_t single_hits;
-	uint32_t multi_hits_single_node;
-	uint32_t multi_hits_multi_node;
-	uint32_t partial_single_node;
-	uint32_t partial_multi_node;
-	uint32_t misses;
-	uint32_t queries_issued;
-
-	uint32_t get_queries_scheduled();
-	void query_finished( const RunningQuery &q );
-	void scheduled( uint32_t node_id );
-
-private:
-	uint32_t queries_scheduled;
-	std::map<uint32_t,uint64_t> node_to_queries;
-	size_t num_queries;
-	double avg_wait_time;
-	double avg_exec_time;
-	double avg_time;
-};
-
-/**
  * The query-manager manages all pending and running queries
  */
 class QueryManager {
@@ -253,7 +215,7 @@ public:
 	 * @param caches the available cache
 	 * @param nodes a reference to the attached nodes
 	 */
-	QueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes);
+	QueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes, IndexCacheManager &caches);
 
 	/**
 	 * Adds a new client-request to the processing pipeline. The manager
@@ -322,7 +284,7 @@ public:
 	/**
 	 * @return the query-statistics
 	 */
-	const IndexQueryStats& get_stats() const;
+	const SystemStats& get_stats() const;
 
 	/**
 	 * Resets the query-statistics
@@ -337,10 +299,11 @@ protected:
 	virtual std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query ) = 0;
 
 	const std::map<uint32_t,std::shared_ptr<Node>> &nodes;
+	IndexCacheManager &caches;
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> queries;
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> finished_queries;
 	std::list<std::unique_ptr<PendingQuery>> pending_jobs;
-	IndexQueryStats stats;
+	SystemStats stats;
 };
 
 #endif /* QUERYMANAGER_H_ */

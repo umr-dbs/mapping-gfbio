@@ -72,7 +72,45 @@ const std::vector< std::pair<ErrorHandling, std::string> > ErrorHandlingMap {
 EnumConverter<ErrorHandling>ErrorHandlingConverter(ErrorHandlingMap);
 
 /*
- * Now define the operator
+ * Operator that reads files with values delimited by a given value.
+ * It conforms to RFC 4180 but adds support for other delimiters.
+ * One line in the file corrsponds to one feature.
+ *
+ * Parameters:
+ * - filename: path to the input file
+ * - field_separator: the delimiter
+ * - geometry_specification: the type in the geometry column(s)
+ *   - "xy": two columns for the 2 spatial dimensions
+ *   - "wkt": a single column containing the feature geometry as well-known-text
+ * - time: the type of the time column(s)
+ *   - "none": no time information is mapped
+ *   - "start": only start information is mapped. duration has to specified in the duration attribute
+ *   - "start+end": start and end information is mapped
+ *   - "start+duration": start and duration information is mapped
+ * -  duration: the duration of the time validity for all features in the file
+ * - time1_format: a json object mapping a column to the start time
+ *   - format: define the format of the column
+ *     - "custom": define a custom format in the attribute "custom_format"
+ *     - "seconds": time column is numeric and contains seconds as UNIX timestamp
+ *     - "dmyhm": %d-%B-%Y  %H:%M
+ *     - "iso": time column contains string with ISO8601
+ * - time2_format: a json object mapping a columns to the end time (cf. time1_format)
+ * - columns: a json object mapping the columns to data, time, space. Columns that are not listed are skipped when parsin.
+ *   - x: the name of the column containing the x coordinate (or the wkt string)
+ *   - y: the name of the column containing the y coordinate
+ *   - time1: the name of the first time column
+ *   - time2: the name of the second time column
+ *   - numeric: an array of column names containing numeric values
+ *   - textual: an array of column names containing alpha-numeric values
+ * - on_error: specify the type of error handling
+ *   - "skip"
+ *   - "abort"
+ *   - "keep"
+ * - provenance: specify the provenance of a file as an array of json object containing
+ *   - citation
+ *   - license
+ *   - uri
+ *
  */
 class CSVSourceOperator : public GenericOperator {
 	public:

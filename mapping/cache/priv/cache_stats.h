@@ -155,6 +155,10 @@ public:
 	 */
 	std::string to_string() const;
 
+	void add_query( double ratio );
+
+	double get_hit_ratio() const;
+
 	/**
 	 * Resets this stats (setting all counts to 0)
 	 */
@@ -167,7 +171,48 @@ public:
 	uint32_t multi_remote_hits;
 	uint32_t multi_remote_partials;
 	uint32_t misses;
+
+protected:
+	size_t queries;
+	double ratios;
 };
+
+/**
+ * Statistics about cache-queries on the index-server
+ */
+class SystemStats : public QueryStats {
+public:
+	SystemStats();
+
+	SystemStats( BinaryReadBuffer &buffer );
+
+	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
+
+	/**
+	 * @return a human readable respresentation
+	 */
+	std::string to_string() const;
+
+	/**
+	 * Resets this stats (setting all counts to 0)
+	 */
+	void reset();
+
+	uint32_t get_queries_scheduled();
+	void query_finished( uint32_t num_clients, size_t time_created, size_t time_scheduled, size_t time_finished );
+	void scheduled( uint32_t node_id );
+	void issued();
+
+private:
+	uint32_t queries_issued;
+	uint32_t queries_scheduled;
+	uint32_t query_counter;
+	double avg_wait_time;
+	double avg_exec_time;
+	double avg_time;
+	std::map<uint32_t,uint64_t> node_to_queries;
+};
+
 
 
 /**

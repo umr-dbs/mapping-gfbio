@@ -5,7 +5,14 @@
 #include <json/json.h>
 
 /**
- * Operator that takes Well-Known-Text as parameter
+ * Operator that reads features in Well-Known-Text
+ *
+ * Parameters:
+ * - wkt
+ * - type
+ *   - "points"
+ *   - "lines"
+ *   - "polygons"
  */
 class WKTSourceOperator : public GenericOperator {
 	public:

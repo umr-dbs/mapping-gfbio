@@ -64,6 +64,18 @@ NodeCache<EType>::NodeCache(CacheType type, size_t max_size) :
 }
 
 template<typename EType>
+const CacheQueryResult<NodeCacheEntry<EType> > NodeCache<EType>::query(
+		const std::string& semantic_id, const QueryRectangle& qr) const {
+
+	auto res = Cache<uint64_t,NodeCacheEntry<EType>>::query(semantic_id,qr);
+	for ( std::shared_ptr<const NodeCacheEntry<EType>> &e : res.items ) {
+		track_access(NodeCacheKey(semantic_id,e->entry_id), * const_cast<NodeCacheEntry<EType>*>( e.get()));
+	}
+
+	return res;
+}
+
+template<typename EType>
 CacheHandshake NodeCache<EType>::get_all() const {
 
 	CacheHandshake result(type,get_max_size(),get_current_size());

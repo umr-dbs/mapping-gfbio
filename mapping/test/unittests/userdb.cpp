@@ -1,15 +1,25 @@
 #include "userdb/userdb.h"
 #include "util/configuration.h"
 #include "util/exceptions.h"
+#include "util/make_unique.h"
 
 #include <gtest/gtest.h>
 
-
+class UserDBTestClock : public UserDB::Clock {
+	public:
+		UserDBTestClock(time_t *now) : now(now) {}
+		virtual ~UserDBTestClock() {};
+		virtual time_t time() {
+			return *now;
+		};
+		time_t *now;
+};
 
 TEST(UserDB, testALL) {
 	// We must protect against overwriting the production DB, so make sure to use a custom configuration here!
 	// init() will throw if the UserDB was initialized before.
-	UserDB::init("sqlite", ":memory:");
+	time_t now = time(nullptr);
+	UserDB::init("sqlite", ":memory:", make_unique<UserDBTestClock>(&now));
 
 	const std::string username = "dummy";
 	const std::string password = "12345";
@@ -84,7 +94,6 @@ TEST(UserDB, testALL) {
 
 
 
-	// artifacts
 	// create artifact
 	auto artifact = UserDB::createArtifact(*user, "project", "Test Project", "test_project");
 	EXPECT_EQ("project", artifact->getType());
@@ -92,7 +101,7 @@ TEST(UserDB, testALL) {
 	EXPECT_EQ("test_project", artifact->getLatestArtifactVersion()->getValue());
 
 	// update
-	sleep(1); // wait for one second, because user + time has to be unique for an artifact version
+	now++; // increase time one second, because user + time has to be unique for an artifact version
 	artifact->updateValue("new value");
 
 	// load artifact
@@ -106,7 +115,7 @@ TEST(UserDB, testALL) {
 	EXPECT_EQ("test_project", version1->getValue());
 
 	// load artifacts of type
-	sleep(1); // wait to fix order of projects in result
+	now++; // increase time by 1 second
 	artifact = UserDB::createArtifact(*user, "project", "Test Project 2", "test_project 2");
 	artifact = UserDB::createArtifact(*user, "rscript", "My R script", "1 + 2");
 

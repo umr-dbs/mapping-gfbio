@@ -95,36 +95,41 @@ class UserDB {
 				time_t expires;
 		};
 		class ArtifactVersion {
-		public:
-			ArtifactVersion(time_t timestamp, const std::string &value);
-			time_t getTimestamp() { return timestamp; };
-			std::string &getValue() { return value; };
-		private:
-			time_t timestamp;
-			std::string value;
+			public:
+				ArtifactVersion(time_t timestamp, const std::string &value);
+				time_t getTimestamp() { return timestamp; };
+				std::string &getValue() { return value; };
+			private:
+				time_t timestamp;
+				std::string value;
 		};
 		class Artifact {
-		public:
-			Artifact(artifactid_t artifactid, std::shared_ptr<User> user, const std::string &type, const std::string &name, time_t lastChanged, std::vector<time_t> versions);
-			Artifact(artifactid_t artifactid, std::shared_ptr<User> user, const std::string &type, const std::string &name, time_t lastChanged);
-			std::string &getType() { return type; };
-			std::string &getName() { return name; };
-			User &getUser() { return *user; };
-			time_t getLastChanged() { return lastChanged; };
-			std::shared_ptr<ArtifactVersion> getLatestArtifactVersion();
-			std::shared_ptr<ArtifactVersion> getArtifactVersion(time_t timestamp);
-			std::vector<time_t> &getVersions() { return versions; }
-			time_t updateValue(const std::string &value);
-			std::shared_ptr<UserDB::User> shareWithUser(const std::string& username);
-			std::shared_ptr<UserDB::Group> shareWithGroup(const std::string& groupname);
-		private:
-			artifactid_t artifactid;
-			std::shared_ptr<User> user;
-			std::vector<time_t> versions;
-			std::string username;
-			std::string type;
-			std::string name;
-			time_t lastChanged;
+			public:
+				Artifact(artifactid_t artifactid, std::shared_ptr<User> user, const std::string &type, const std::string &name, time_t lastChanged, std::vector<time_t> versions);
+				Artifact(artifactid_t artifactid, std::shared_ptr<User> user, const std::string &type, const std::string &name, time_t lastChanged);
+				std::string &getType() { return type; };
+				std::string &getName() { return name; };
+				User &getUser() { return *user; };
+				time_t getLastChanged() { return lastChanged; };
+				std::shared_ptr<ArtifactVersion> getLatestArtifactVersion();
+				std::shared_ptr<ArtifactVersion> getArtifactVersion(time_t timestamp);
+				std::vector<time_t> &getVersions() { return versions; }
+				time_t updateValue(const std::string &value);
+				std::shared_ptr<UserDB::User> shareWithUser(const std::string& username);
+				std::shared_ptr<UserDB::Group> shareWithGroup(const std::string& groupname);
+			private:
+				artifactid_t artifactid;
+				std::shared_ptr<User> user;
+				std::vector<time_t> versions;
+				std::string username;
+				std::string type;
+				std::string name;
+				time_t lastChanged;
+		};
+		class Clock {
+			public:
+				virtual ~Clock();
+				virtual time_t time() = 0;
 		};
 
 		// exceptions
@@ -143,7 +148,7 @@ class UserDB {
 
 		// static methods
 		static void initFromConfiguration();
-		static void init(const std::string &backend, const std::string &location);
+		static void init(const std::string &backend, const std::string &location, std::unique_ptr<Clock> clock = nullptr);
 		static void shutdown();
 
 		static std::shared_ptr<User> createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password);
@@ -206,6 +211,8 @@ class UserDB {
 		static std::shared_ptr<UserDB::User> shareArtifactWithUser(artifactid_t artifactid, const std::string &username);
 		static std::shared_ptr<UserDB::Group> shareArtifactWithGroup(artifactid_t artifactid, const std::string &username);
 
+		static time_t time();
+		static std::unique_ptr<Clock> clock;
 		// TODO: sessioncache?
 };
 

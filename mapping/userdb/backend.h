@@ -78,8 +78,8 @@ class UserDBBackend {
 		virtual void destroySession(const std::string &sessiontoken) = 0;
 
 		// Artifacts
-		virtual artifactid_t createArtifact(userid_t userid, const std::string &type, const std::string &name, const std::string &value) = 0;
-		virtual time_t updateArtifactValue(userid_t userid, const std::string &type, const std::string &name, const std::string &value) = 0;
+		virtual artifactid_t createArtifact(userid_t userid, const std::string &type, const std::string &name, time_t time, const std::string &value) = 0;
+		virtual void updateArtifactValue(userid_t userid, const std::string &type, const std::string &name, time_t time, const std::string &value) = 0;
 		virtual ArtifactData loadArtifact(artifactid_t artifactid) = 0;
 		virtual ArtifactData loadArtifact(const std::string& username, const std::string &type, const std::string &name) = 0;
 		virtual ArtifactVersionData loadArtifactVersionData(userid_t userid, artifactid_t artifactid, time_t timestamp) = 0;

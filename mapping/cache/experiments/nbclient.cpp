@@ -5,8 +5,14 @@
  *      Author: koerberm
  */
 
+#include "datatypes/linecollection.h"
+#include "datatypes/pointcollection.h"
+#include "datatypes/polygoncollection.h"
 #include "cache/experiments/exp_util.h"
 #include "cache/experiments/exp_workflows.h"
+#include "services/httpparsing.h"
+#include "services/ogcservice.h"
+
 #include <mutex>
 #include <random>
 
@@ -180,13 +186,147 @@ std::queue<QTriple> btw_queries(int num_queries) {
 	return queries_from_spec(num_queries, cache_exp::btw, 64, 512 );
 }
 
-int main(void) {
+
+class OGCServiceWrapper : public OGCService {
+	public:
+		using OGCService::OGCService;
+		using OGCService::parseEPSG;
+		using OGCService::parseTime;
+		using OGCService::parseBBOX;
+		virtual void run() { throw 1; };
+};
+
+std::queue<QTriple> replay_logs(char *logfile) {
+	std::queue<QTriple> queries;
+
+	// instantiate an OGCService for parsing
+
+	// this is an ostream without a streambuf. The library *should* handle that and simply output nothing.
+	std::ostream nullstream(nullptr);
+	HTTPService::Params _p;
+	HTTPService::HTTPResponseStream _hrs(nullptr);
+	OGCServiceWrapper ogc(_p, _hrs, nullstream);
+
+	FILE *f = fopen(logfile, "r");
+	char line[10000];
+	while (fgets(line, 10000, f) != nullptr) {
+		auto len = strlen(line);
+		if (line[len-1] == '\n')
+			line[len-1] = '\0';
+		std::string l(line);
+		// remove the /cgi-bin/mapping?
+		auto pos = l.find_first_of('?');
+		if (pos != std::string::npos)
+			l = l.substr(pos+1);
+
+		try {
+			HTTPService::Params params;
+			parseQuery(l, params);
+
+			auto service = params.get("service");
+			if (service == "WMS") {
+				if (params.get("request") != "GetMap")
+					throw ArgumentException("Not GetMap");
+
+				// raster query
+				auto query_epsg = ogc.parseEPSG(params, "crs");
+				SpatialReference sref = ogc.parseBBOX(params.get("bbox"), query_epsg, false);
+				TemporalReference tref = ogc.parseTime(params);
+
+				int output_width = params.getInt("width");
+				int output_height = params.getInt("height");
+				QueryRectangle qrect(
+					sref,
+					tref,
+					QueryResolution::pixels(output_width, output_height)
+				);
+				auto graph = GenericOperator::fromJSON(params.get("layers"));
+
+				queries.push(QTriple(CacheType::RASTER, qrect, graph->getSemanticId()));
+				//QueryProfiler profiler;
+				//auto result_raster = graph->getCachedRaster(qrect,profiler,GenericOperator::RasterQM::LOOSE);
+			}
+			else if (service == "WFS") {
+				auto typeNames = params.get("typenames");
+				size_t pos = typeNames.find(":");
+
+				if(pos == std::string::npos)
+					throw ArgumentException(concat("WFSService: typeNames delimiter not found", typeNames));
+
+				auto featureTypeString = typeNames.substr(0, pos);
+				auto queryString = typeNames.substr(pos + 1);
+
+				TemporalReference tref = ogc.parseTime(params);
+				if(!params.hasParam("srsname"))
+					throw new ArgumentException("WFSService: Parameter srsname is missing");
+				epsg_t queryEpsg = ogc.parseEPSG(params, "srsname");
+
+				SpatialReference sref(queryEpsg);
+				if(params.hasParam("bbox")) {
+					sref = ogc.parseBBOX(params.get("bbox"), queryEpsg);
+				}
+
+				auto graph = GenericOperator::fromJSON(queryString);
+
+				QueryProfiler profiler;
+
+				QueryRectangle rect(
+					sref,
+					tref,
+					QueryResolution::none()
+				);
+
+				std::unique_ptr<SimpleFeatureCollection> features;
+
+				CacheType type;
+				if (featureTypeString == "points") {
+					type = CacheType::POINT;
+					//features = graph->getCachedPointCollection(rect, profiler);
+				}
+				else if (featureTypeString == "lines") {
+					type = CacheType::LINE;
+					//features = graph->getCachedLineCollection(rect, profiler);
+				}
+				else if (featureTypeString == "polygons") {
+					type = CacheType::POLYGON;
+					//features = graph->getCachedPolygonCollection(rect, profiler);
+				}
+				else
+					throw ArgumentException(concat("Unknown featureTypeString in WFS: ", featureTypeString));
+
+				queries.push(QTriple(CacheType::RASTER, rect, graph->getSemanticId()));
+			}
+			else if (service == "WCS") {
+				continue;
+			}
+			else
+				throw ArgumentException("Unknown service");
+
+			//printf("%s\n", l.c_str());
+		}
+		catch (const std::exception &e) {
+			fprintf(stderr, "Exception parsing query: %s\nError: %s\n", l.c_str(), e.what());
+		}
+		catch (...) {
+			fprintf(stderr, "Exception parsing query: %s\n", l.c_str());
+		}
+	}
+
+	return queries;
+}
+
+int main(int argc, char *argv[]) {
 	Configuration::loadFromDefaultPaths();
 	Log::setLevel(Log::LogLevel::INFO);
 
-//	auto qs = queries_from_spec(2000, cache_exp::srtm, 32, 256);
-
-	auto qs = btw_queries(1000);
+	std::queue<QTriple> qs;
+	if (argc >= 2) {
+		qs = replay_logs(argv[1]);
+	}
+	else {
+		//	auto qs = queries_from_spec(2000, cache_exp::srtm, 32, 256);
+		qs = btw_queries(1000);
+	}
 
 	int inter_arrival = 10;
 

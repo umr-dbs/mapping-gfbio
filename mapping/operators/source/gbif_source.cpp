@@ -66,7 +66,7 @@ void GBIFSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 #ifndef MAPPING_OPERATOR_STUBS
 
 std::string GBIFSourceOperator::resolveTaxa(pqxx::connection &connection) {
-	connection.prepare("taxa", "SELECT DISTINCT taxon FROM gbif.gbif_taxon_to_name WHERE name ILIKE $1")("text");
+	connection.prepare("taxa", "SELECT DISTINCT taxon FROM gbif.gbif_taxon_to_name WHERE name ILIKE $1");
 	pqxx::work work(connection);
 	pqxx::result result = work.prepared("taxa")(scientificName + "%").exec();
 
@@ -87,7 +87,7 @@ void GBIFSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	std::string taxa = resolveTaxa(connection);
 
 
-	connection.prepare("provenance", "SELECT DISTINCT key, citation, uri from gbif.gbif_lite_time join gbif.gbif using (id) join gbif2.datasets ON (key = dataset_id) WHERE taxon = ANY($1)")("text");
+	connection.prepare("provenance", "SELECT DISTINCT key, citation, uri from gbif.gbif_lite_time join gbif.gbif using (id) join gbif2.datasets ON (key = dataset_id) WHERE taxon = ANY($1)");
 	pqxx::work work(connection);
 	pqxx::result result = work.prepared("provenance")(taxa).exec();
 
@@ -109,10 +109,10 @@ std::unique_ptr<PointCollection> GBIFSourceOperator::getPointCollection(const Qu
 	auto points = make_unique<PointCollection>(rect);
 	if(includeMetadata) {
 		points->feature_attributes.addTextualAttribute("scientific_name", Unit::unknown());
-		connection.prepare("occurrences", "SELECT ST_X(geom) lon, ST_Y(geom) lat, extract(epoch from gbif.gbif_lite_time.event_date), scientific_name from gbif.gbif_lite_time join gbif.gbif using (id) WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)")("text")("numeric")("numeric")("numeric")("numeric");
+		connection.prepare("occurrences", "SELECT ST_X(geom) lon, ST_Y(geom) lat, extract(epoch from gbif.gbif_lite_time.event_date), scientific_name from gbif.gbif_lite_time join gbif.gbif using (id) WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
 	}
 	else
-		connection.prepare("occurrences", "SELECT ST_X(geom) x, ST_Y(geom) y, extract(epoch from event_date) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)")("text")("numeric")("numeric")("numeric")("numeric");
+		connection.prepare("occurrences", "SELECT ST_X(geom) x, ST_Y(geom) y, extract(epoch from event_date) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
 
 	pqxx::work work(connection);
 	pqxx::result result = work.prepared("occurrences")(taxa)(rect.x1)(rect.y1)(rect.x2)(rect.y2).exec();

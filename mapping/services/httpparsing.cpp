@@ -123,9 +123,11 @@ static void parseKeyValuePair(const std::string& q, std::map<std::string, std::s
 /**
  * Parses a query string into a given Params structure.
  */
-static void parseQuery(const std::string& q, HTTPService::Params &params) {
-	if (q.length() == 0)
+void parseQuery(const std::string& query, HTTPService::Params &params) {
+	if (query.length() == 0)
 		return;
+
+	auto q = urldecode(query);
 
 	// see RFC 3986 ch. 3.4
 
@@ -158,7 +160,7 @@ static void parseQuery(const std::string& q, HTTPService::Params &params) {
  * Parses a url encoded POST request
  */
 static void parsePostUrlEncoded(HTTPService::Params &params, std::istream &in) {
-	std::string query = urldecode(getPostData(in));
+	std::string query = getPostData(in);
 	parseQuery(query, params);
 }
 
@@ -441,9 +443,7 @@ void parsePostData(HTTPService::Params &params, std::istream &in) {
  * Parses GET data from a HTTP request
  */
 void parseGetData(HTTPService::Params &params) {
-
 	std::string query_string = getenv_str("QUERY_STRING");
-	query_string = urldecode(query_string);
 
 	parseQuery(query_string, params);
 }

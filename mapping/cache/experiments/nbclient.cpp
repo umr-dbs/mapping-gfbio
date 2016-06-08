@@ -319,12 +319,13 @@ int main(int argc, char *argv[]) {
 	Configuration::loadFromDefaultPaths();
 	Log::setLevel(Log::LogLevel::INFO);
 
+	std::queue<QTriple> qs;
 	if (argc >= 2) {
-		auto qs = replay_logs(argv[1]);
+		qs = replay_logs(argv[1]);
 	}
 	else {
 		//	auto qs = queries_from_spec(2000, cache_exp::srtm, 32, 256);
-		auto qs = btw_queries(1000);
+		qs = btw_queries(1000);
 	}
 
 	int inter_arrival = 10;

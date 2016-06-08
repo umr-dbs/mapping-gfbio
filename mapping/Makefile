@@ -27,7 +27,7 @@ OPT_FLAGS=-O2
 -include Makefile.local
 
 # now let's see if all our libraries are present
-EXTERNAL_LIBS := jsoncpp gdal libpng zlib libpqxx libcurl sqlite3 libarchive
+EXTERNAL_LIBS := jsoncpp gdal libpng zlib "libpqxx >= 4.0.0" libcurl sqlite3 libarchive
 ifeq (${USE_ABCD},true)
 	EXTERNAL_LIBS+= xerces-c
 endif

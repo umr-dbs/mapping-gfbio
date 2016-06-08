@@ -33,8 +33,8 @@ class SQLiteUserDBBackend : public UserDBBackend {
 		virtual SessionData loadSession(const std::string &sessiontoken);
 		virtual void destroySession(const std::string &sessiontoken);
 
-		virtual artifactid_t createArtifact(userid_t userid, const std::string &type, const std::string &name, const std::string &value);
-		virtual time_t updateArtifactValue(userid_t userid, const std::string &type, const std::string &name, const std::string &value);
+		virtual artifactid_t createArtifact(userid_t userid, const std::string &type, const std::string &name, time_t time, const std::string &value);
+		virtual void updateArtifactValue(userid_t userid, const std::string &type, const std::string &name, time_t time, const std::string &value);
 		virtual ArtifactData loadArtifact(artifactid_t artifactid);
 		virtual ArtifactData loadArtifact(const std::string &username, const std::string &type, const std::string &name);
 		virtual ArtifactVersionData loadArtifactVersionData(userid_t userid, artifactid_t artifactid, time_t timestamp);
@@ -352,7 +352,9 @@ bool SQLiteUserDBBackend::verifyPwdHash(const std::string &password, const std::
 }
 
 
-
+/*
+ * Artifacts
+ */
 UserDBBackend::artifactid_t SQLiteUserDBBackend::loadArtifactId(userid_t userid, const std::string &type, const std::string name) {
 	auto stmt = db.prepare("SELECT artifactid from artifacts where userid = ? and type = ? and name = ?");
 	stmt.bind(1, userid);
@@ -365,7 +367,7 @@ UserDBBackend::artifactid_t SQLiteUserDBBackend::loadArtifactId(userid_t userid,
 	return stmt.getInt64(0);
 }
 
-UserDBBackend::artifactid_t SQLiteUserDBBackend::createArtifact(userid_t userid, const std::string &type, const std::string &name, const std::string &value) {
+UserDBBackend::artifactid_t SQLiteUserDBBackend::createArtifact(userid_t userid, const std::string &type, const std::string &name, time_t timestamp, const std::string &value) {
 	// TODO begin transaction
 	// insert artifact
 	auto stmt = db.prepare("INSERT INTO artifacts (userid, type, name) VALUES (?, ?, ?)");
@@ -378,7 +380,7 @@ UserDBBackend::artifactid_t SQLiteUserDBBackend::createArtifact(userid_t userid,
 	auto artifactid = db.getLastInsertId();
 	stmt = db.prepare("INSERT INTO artifact_versions (artifactid, timestamp, value) VALUES (?, ?, ?)");
 	stmt.bind(1, artifactid);
-	stmt.bind(2, (int64_t)time(0)); //TODO check
+	stmt.bind(2, (int64_t)timestamp); //TODO check
 	stmt.bind(3, value);
 	stmt.exec();
 
@@ -387,16 +389,13 @@ UserDBBackend::artifactid_t SQLiteUserDBBackend::createArtifact(userid_t userid,
 	return artifactid;
 }
 
-time_t SQLiteUserDBBackend::updateArtifactValue(UserDBBackend::userid_t userid, const std::string &type, const std::string &name, const std::string &value) {
+void SQLiteUserDBBackend::updateArtifactValue(UserDBBackend::userid_t userid, const std::string &type, const std::string &name, time_t timestamp, const std::string &value) {
 	artifactid_t artifactid = loadArtifactId(userid, type, name);
-	time_t timestamp = time(0);
 	auto stmt = db.prepare("INSERT INTO artifact_versions (artifactid, timestamp, value) VALUES (?, ?, ?)");
 	stmt.bind(1, artifactid);
-	stmt.bind(2, (int64_t)timestamp); //TODO check
+	stmt.bind(2, (int64_t)timestamp);
 	stmt.bind(3, value);
 	stmt.exec();
-
-	return timestamp;
 }
 
 UserDBBackend::ArtifactData SQLiteUserDBBackend::loadArtifact(UserDBBackend::artifactid_t artifactid) {

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <sstream>
 #include <cmath>
+#include <limits>
 
 
 static void png_write_wrapper(png_structp png_ptr, png_bytep data, png_size_t length) {
@@ -37,8 +38,8 @@ template<typename T> void Raster2D<T>::toPNG(std::ostream &output, const Coloriz
 	}
 
 	// calculate the actual min/max so we can include only the range we require in the palette
-	T actual_min = dd.getMaxByDatatype();
-	T actual_max = dd.getMinByDatatype();
+	T actual_min = std::numeric_limits<T>::max();
+	T actual_max = std::numeric_limits<T>::min();
 	bool found_pixel = false;
 	auto size = getPixelCount();
 	for (size_t i=0;i<size;i++) {
@@ -54,7 +55,11 @@ template<typename T> void Raster2D<T>::toPNG(std::ostream &output, const Coloriz
 		actual_max = 1;
 	}
 	if (actual_max <= actual_min) {
-		actual_max = actual_min + 1;
+		actual_min = actual_max;
+		if (actual_min >= std::numeric_limits<T>::max() - 1)
+			actual_min--;
+		else
+			actual_max++;
 	}
 
 	if (!std::isfinite(actual_min) || !std::isfinite(actual_max))

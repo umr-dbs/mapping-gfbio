@@ -207,7 +207,7 @@ void WFSService::getFeature() {
 
 std::unique_ptr<PointCollection> WFSService::clusterPoints(const PointCollection &points, const Params &params) const {
 
-	if(params.hasParam("width") || params.hasParam("height")) {
+	if(!params.hasParam("width") || !params.hasParam("height")) {
 		throw ArgumentException("WFSService: Cluster operation needs width and height specified");
 	}
 

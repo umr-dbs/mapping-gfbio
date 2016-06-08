@@ -5,7 +5,7 @@
 * jsonCPP 0.6.x - http://jsoncpp.sourceforge.net/ (libjsoncpp-dev, public domain/MIT)
 * xxd (part of vim)
 * GEOS - http://trac.osgeo.org/geos/ (libgeos++-dev, LGPL)
-* libpq++ - postgres (libpqxx3-dev, BSD?)
+* libpqxx - postgres (libpqxx-dev, BSD)
 * libcurl - (libcurl3-dev, MIT)
 * bzip2 - (libbz2-dev, ??)
 * xerces-c - (libxerces-c-dev, Apache) might already be present for GDAL

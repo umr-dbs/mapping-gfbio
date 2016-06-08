@@ -8,14 +8,39 @@
 #include "cache/experiments/exp_util.h"
 #include "cache/experiments/exp_workflows.h"
 #include <mutex>
+#include <random>
 
 std::vector<std::unique_ptr<BlockingConnection>> connections;
 std::vector<std::unique_ptr<NBClientDeliveryConnection>> del_cons;
 std::mutex mtx;
 bool done = false;
 
+//std::string host = "pc12412.mathematik.uni-marburg.de";
+//int port = 10042;
 std::string host = "127.0.0.1";
 int port = 12346;
+
+
+
+//
+// RANDOM STUFF
+//
+std::random_device rd;
+std::mt19937 gen(rd());
+std::uniform_real_distribution<> dis;
+
+
+int next_poisson(int lambda) {
+	// Let L ← e−λ, k ← 0 and p ← 1.
+	double l = std::exp(-lambda);
+	double p = 1;
+	int    k = 0;
+	do {
+		k += 1;
+		p *= dis(gen);
+	} while (p > l);
+	return k-1;
+}
 
 std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
 		uint32_t tiles, uint32_t res) {
@@ -44,6 +69,8 @@ std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
 	return queries;
 }
 
+
+
 void issue_queries(std::queue<QTriple> *queries, int inter_arrival) {
 
 	auto sleep = std::chrono::milliseconds(0);
@@ -68,7 +95,7 @@ void issue_queries(std::queue<QTriple> *queries, int inter_arrival) {
 		} catch (const NetworkException &ex) {
 			Log::error("Issuing request failed: %s", ex.what());
 		}
-		sleep = std::chrono::milliseconds(inter_arrival);
+		sleep = std::chrono::milliseconds( next_poisson(inter_arrival) );
 	}
 	done = true;
 	Log::info("Finished posing queries.");
@@ -149,30 +176,27 @@ void process_del_cons(fd_set *readfds) {
 	}
 }
 
+std::queue<QTriple> btw_queries(int num_queries) {
+	return queries_from_spec(num_queries, cache_exp::btw, 64, 512 );
+}
+
 int main(void) {
 	Configuration::loadFromDefaultPaths();
 	Log::setLevel(Log::LogLevel::INFO);
 
-	auto qs = queries_from_spec(10000, cache_exp::srtm, 32, 256);
+//	auto qs = queries_from_spec(2000, cache_exp::srtm, 32, 256);
 
-	QueryRectangle qr = cache_exp::srtm.random_rectangle_percent(0.0625, 256);
-	std::queue<QTriple> qs2;
+	auto qs = btw_queries(1000);
 
-	std::string wf =
-			GenericOperator::fromJSON(cache_exp::srtm.workflow)->getSemanticId();
-
-	qs2.push(QTriple(cache_exp::srtm.type, qr, wf));
-	qs2.push(QTriple(cache_exp::srtm.type, qr, wf));
-
-	int inter_arrival = 500;
+	int inter_arrival = 10;
 
 	auto c = BlockingConnection::create(host, port, true,
 			ClientConnection::MAGIC_NUMBER);
 	auto rst = c->write_and_read(ClientConnection::CMD_RESET_STATS);
 
-	std::thread t(issue_queries, &qs2, inter_arrival);
 
-//	if ( done && connections.empty() && del_cons.empty() )
+	std::thread t(issue_queries, &qs, inter_arrival);
+
 	while (!done || !connections.empty() || !del_cons.empty()) {
 		if (connections.empty() && del_cons.empty()) {
 			std::this_thread::sleep_for(std::chrono::milliseconds(1));

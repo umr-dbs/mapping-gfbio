@@ -154,7 +154,7 @@ CacheHandshake::CacheHandshake(BinaryReadBuffer& buffer) : CacheContent(buffer) 
 ///////////////////////////////////////////////////////////
 
 QueryStats::QueryStats() : single_local_hits(0), multi_local_hits(0), multi_local_partials(0),
-	single_remote_hits(0), multi_remote_hits(0), multi_remote_partials(0), misses(0), queries(0), ratios(0) {
+	single_remote_hits(0), multi_remote_hits(0), multi_remote_partials(0), misses(0), result_bytes(0), queries(0), ratios(0) {
 }
 
 QueryStats::QueryStats(BinaryReadBuffer& buffer) :
@@ -165,6 +165,7 @@ QueryStats::QueryStats(BinaryReadBuffer& buffer) :
 	multi_remote_hits(buffer.read<uint32_t>()),
 	multi_remote_partials(buffer.read<uint32_t>()),
 	misses(buffer.read<uint32_t>()),
+	result_bytes(buffer.read<uint64_t>()),
 	queries(buffer.read<uint64_t>()),
 	ratios(buffer.read<double>()) {
 }
@@ -178,6 +179,7 @@ QueryStats QueryStats::operator +(const QueryStats& stats) const {
 	res.multi_remote_hits += stats.multi_remote_hits;
 	res.multi_remote_partials += stats.multi_remote_partials;
 	res.misses += stats.misses;
+	res.result_bytes += stats.result_bytes;
 	res.queries += stats.queries;
 	res.ratios += stats.ratios;
 	return res;
@@ -191,6 +193,7 @@ QueryStats& QueryStats::operator +=(const QueryStats& stats) {
 	multi_remote_hits += stats.multi_remote_hits;
 	multi_remote_partials += stats.multi_remote_partials;
 	misses += stats.misses;
+	result_bytes += stats.result_bytes;
 	queries += stats.queries;
 	ratios += stats.ratios;
 	return *this;
@@ -199,7 +202,7 @@ QueryStats& QueryStats::operator +=(const QueryStats& stats) {
 void QueryStats::serialize(BinaryWriteBuffer& buffer, bool) const {
 	buffer << single_local_hits << multi_local_hits << multi_local_partials;
 	buffer << single_remote_hits << multi_remote_hits << multi_remote_partials;
-	buffer << misses << queries << ratios;
+	buffer << misses << result_bytes << queries << ratios;
 }
 
 void QueryStats::add_query(double ratio) {
@@ -219,6 +222,7 @@ void QueryStats::reset() {
 	multi_remote_hits = 0;
 	multi_remote_partials = 0;
 	misses = 0;
+	result_bytes = 0;
 	queries = 0;
 	ratios = 0;
 }
@@ -235,6 +239,7 @@ std::string QueryStats::to_string() const {
 	ss << "  misses            : " << misses << std::endl;
 	ss << "  hit-ratio         : " << (ratios / queries) << std::endl;
 	ss << "  cache-queries     : " << queries;
+	ss << "  result-bytes      : " << result_bytes;
 	return ss.str();
 }
 
@@ -269,6 +274,7 @@ std::string SystemStats::to_string() const {
 	ss << "  partial single node      : " << multi_local_partials << std::endl;
 	ss << "  partial multiple nodes   : " << multi_remote_partials << std::endl;
 	ss << "  misses                   : " << misses << std::endl;
+	ss << "  result-bytes             : " << result_bytes << std::endl;
 	ss << "  hit ratio                : " << get_hit_ratio() << std::endl;
 	ss << "  cache-queries            : " << queries << std::endl;
 	ss << "  requests received        : " << queries_issued << std::endl;

@@ -770,6 +770,17 @@ const uint8_t DeliveryConnection::RESP_ERROR;
 std::unique_ptr<NBClientDeliveryConnection> NBClientDeliveryConnection::create(
 		const DeliveryResponse& dr) {
 	auto skt = BinaryStream::connectTCP(dr.host.c_str(), dr.port, true);
+
+	struct linger so_linger;
+	so_linger.l_onoff = true;
+	so_linger.l_linger = 0;
+	setsockopt(skt.getReadFD(),
+		SOL_SOCKET,
+		SO_LINGER,
+		&so_linger,
+		sizeof so_linger);
+
+
 	BinaryWriteBuffer init, req;
 	init << DeliveryConnection::MAGIC_NUMBER;
 	skt.write(init);

@@ -172,6 +172,8 @@ public:
 	uint32_t multi_remote_partials;
 	uint32_t misses;
 
+	uint64_t result_bytes;
+
 protected:
 	size_t queries;
 	double ratios;

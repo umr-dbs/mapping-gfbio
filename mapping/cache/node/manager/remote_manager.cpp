@@ -37,6 +37,8 @@ bool RemoteCacheWrapper<T>::put(const std::string& semantic_id,
 
 	size_t size = SizeUtil::get_byte_size(*item);
 
+	this->stats.add_result_bytes(size);
+
 	if (mgr.get_strategy().do_cache(profiler, size)) {
 		if (this->cache.get_current_size() + size
 				> this->cache.get_max_size() * 1.1) {

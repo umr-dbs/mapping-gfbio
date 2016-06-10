@@ -26,6 +26,9 @@ template<class T>
 bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 		const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	size_t size = SizeUtil::get_byte_size(*item);
+
+	this->stats.add_result_bytes(size);
+
 	if ( mgr.get_strategy().do_cache(profiler,size) && size <= this->cache.get_max_size() ) {
 		CacheCube cube(*item);
 		// Min/Max resolution hack

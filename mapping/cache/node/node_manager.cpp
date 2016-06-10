@@ -59,6 +59,11 @@ void ActiveQueryStats::add_miss() {
 	misses++;
 }
 
+void ActiveQueryStats::add_result_bytes(uint64_t bytes) {
+	std::lock_guard<std::mutex> g(mtx);
+	result_bytes+=bytes;
+}
+
 QueryStats ActiveQueryStats::get() const {
 	std::lock_guard<std::mutex> g(mtx);
 	return QueryStats(*this);

@@ -23,9 +23,9 @@ std::vector<std::unique_ptr<NBClientDeliveryConnection>> del_cons;
 std::mutex mtx;
 bool done = false;
 
-std::string host = "pc12412.mathematik.uni-marburg.de";
+//std::string host = "pc12412.mathematik.uni-marburg.de";
 int port = 10042;
-//std::string host = "127.0.0.1";
+std::string host = "127.0.0.1";
 //int port = 12346;
 
 
@@ -109,9 +109,10 @@ void issue_queries(std::queue<QTriple> *queries, int inter_arrival) {
 					BlockingConnection::create(host, port, true,
 							ClientConnection::MAGIC_NUMBER);
 
+
 			struct linger so_linger;
 			so_linger.l_onoff = true;
-			so_linger.l_linger = 0;
+			so_linger.l_linger = 1;
 			setsockopt(con->get_read_fd(),
 			    SOL_SOCKET,
 			    SO_LINGER,
@@ -370,13 +371,23 @@ int main(int argc, char *argv[]) {
 	Configuration::loadFromDefaultPaths();
 	Log::setLevel(Log::LogLevel::INFO);
 
-	int inter_arrival = atoi(argv[1]);
+	std::queue<QTriple> qs;
+	int inter_arrival;
+
+	if ( argc < 3 ) {
+		inter_arrival = 1000;
+		qs =queries_from_spec(3, cache_exp::srtm, 64, 512 );
+	}
+	else {
+		inter_arrival = atoi(argv[1]);
+		qs = create_run(argc,argv);
+	}
+
+
 
 	auto c = BlockingConnection::create(host, port, true,
 			ClientConnection::MAGIC_NUMBER);
 	auto rst = c->write_and_read(ClientConnection::CMD_RESET_STATS);
-
-	std::queue<QTriple> qs = create_run(argc,argv);
 
 	std::thread t(issue_queries, &qs, inter_arrival);
 

@@ -773,7 +773,7 @@ std::unique_ptr<NBClientDeliveryConnection> NBClientDeliveryConnection::create(
 
 	struct linger so_linger;
 	so_linger.l_onoff = true;
-	so_linger.l_linger = 0;
+	so_linger.l_linger = 1;
 	setsockopt(skt.getReadFD(),
 		SOL_SOCKET,
 		SO_LINGER,

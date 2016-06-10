@@ -16,15 +16,17 @@
 #include <mutex>
 #include <random>
 
+#include <sys/socket.h>
+
 std::vector<std::unique_ptr<BlockingConnection>> connections;
 std::vector<std::unique_ptr<NBClientDeliveryConnection>> del_cons;
 std::mutex mtx;
 bool done = false;
 
-//std::string host = "pc12412.mathematik.uni-marburg.de";
-//int port = 10042;
-std::string host = "127.0.0.1";
-int port = 12346;
+std::string host = "pc12412.mathematik.uni-marburg.de";
+int port = 10042;
+//std::string host = "127.0.0.1";
+//int port = 12346;
 
 
 
@@ -48,11 +50,9 @@ int next_poisson(int lambda) {
 	return k-1;
 }
 
-std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
+std::queue<QTriple> disjoint_queries_from_spec(uint32_t num_queries, const QuerySpec &s,
 		uint32_t tiles, uint32_t res) {
 
-	std::default_random_engine eng(
-			std::chrono::system_clock::now().time_since_epoch().count());
 	std::uniform_int_distribution<uint16_t> dist(0, tiles * tiles - 1);
 
 	double extend = std::min((s.bounds.x2 - s.bounds.x1) / tiles,
@@ -62,13 +62,31 @@ std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
 
 	std::queue<QTriple> queries;
 	for (size_t i = 0; i < num_queries; i++) {
-		uint16_t tile = dist(eng);
+		uint16_t tile = dist(gen);
 		uint16_t y = tile / tiles;
 		uint16_t x = tile % tiles;
 
 		double x1 = s.bounds.x1 + x * extend;
 		double y1 = s.bounds.y1 + y * extend;
 
+		QueryRectangle qr = s.rectangle(x1, y1, extend, res);
+		queries.push(QTriple(CacheType::RASTER, qr, wf));
+	}
+	return queries;
+}
+
+std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
+		uint32_t tiles, uint32_t res) {
+
+	double extend = std::min((s.bounds.x2 - s.bounds.x1) / tiles,
+			(s.bounds.y2 - s.bounds.y1) / tiles);
+
+	std::string wf = GenericOperator::fromJSON(s.workflow)->getSemanticId();
+
+	std::queue<QTriple> queries;
+	for (size_t i = 0; i < num_queries; i++) {
+		double x1 = s.bounds.x1 + (s.bounds.x2 - s.bounds.x1 - extend) * dis(gen);
+		double y1 = s.bounds.y1 + (s.bounds.y2 - s.bounds.y1 - extend) * dis(gen);
 		QueryRectangle qr = s.rectangle(x1, y1, extend, res);
 		queries.push(QTriple(CacheType::RASTER, qr, wf));
 	}
@@ -90,6 +108,17 @@ void issue_queries(std::queue<QTriple> *queries, int inter_arrival) {
 			std::unique_ptr<BlockingConnection> con =
 					BlockingConnection::create(host, port, true,
 							ClientConnection::MAGIC_NUMBER);
+
+			struct linger so_linger;
+			so_linger.l_onoff = true;
+			so_linger.l_linger = 0;
+			setsockopt(con->get_read_fd(),
+			    SOL_SOCKET,
+			    SO_LINGER,
+			    &so_linger,
+			    sizeof so_linger);
+
+
 			auto &q = queries->front();
 			con->write(ClientConnection::CMD_GET,
 					BaseRequest(q.type, q.semantic_id, q.query));
@@ -196,7 +225,7 @@ class OGCServiceWrapper : public OGCService {
 		virtual void run() { throw 1; };
 };
 
-std::queue<QTriple> replay_logs(char *logfile) {
+std::queue<QTriple> replay_logs(const char *logfile) {
 	std::queue<QTriple> queries;
 
 	// instantiate an OGCService for parsing
@@ -308,32 +337,46 @@ std::queue<QTriple> replay_logs(char *logfile) {
 			fprintf(stderr, "Exception parsing query: %s\nError: %s\n", l.c_str(), e.what());
 		}
 		catch (...) {
-			fprintf(stderr, "Exception parsing query: %s\n", l.c_str());
+//			fprintf(stderr, "Exception parsing query: %s\n", l.c_str());
 		}
 	}
 
 	return queries;
 }
 
+std::queue<QTriple> create_run( int argc, char *argv[] ) {
+
+	std::string workload = argv[2];
+
+	if ( workload == "btw_dis")
+		return disjoint_queries_from_spec(30000, cache_exp::btw, 64, 512 );
+	else if ( workload == "btw" )
+		return queries_from_spec(30000, cache_exp::btw, 64, 512 );
+	if ( workload == "srtm_dis")
+			return disjoint_queries_from_spec(30000, cache_exp::srtm, 64, 512 );
+	else if ( workload == "srtm" )
+		return queries_from_spec(30000, cache_exp::srtm, 64, 512 );
+	else {
+		auto res = replay_logs( workload.c_str() );
+		while ( res.size() > 30000 )
+			res.pop();
+		return res;
+	}
+
+}
+
+
 int main(int argc, char *argv[]) {
 	Configuration::loadFromDefaultPaths();
 	Log::setLevel(Log::LogLevel::INFO);
 
-	std::queue<QTriple> qs;
-	if (argc >= 2) {
-		qs = replay_logs(argv[1]);
-	}
-	else {
-		//	auto qs = queries_from_spec(2000, cache_exp::srtm, 32, 256);
-		qs = btw_queries(1000);
-	}
-
-	int inter_arrival = 10;
+	int inter_arrival = atoi(argv[1]);
 
 	auto c = BlockingConnection::create(host, port, true,
 			ClientConnection::MAGIC_NUMBER);
 	auto rst = c->write_and_read(ClientConnection::CMD_RESET_STATS);
 
+	std::queue<QTriple> qs = create_run(argc,argv);
 
 	std::thread t(issue_queries, &qs, inter_arrival);
 

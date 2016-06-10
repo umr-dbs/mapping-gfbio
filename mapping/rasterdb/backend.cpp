@@ -49,7 +49,7 @@ RasterDBBackend::rasterid_t RasterDBBackend::createRaster(int channel, double ti
 	throw std::runtime_error("RasterDBBackend::createRaster() not implemented in this backend");
 }
 
-void RasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression) {
+void RasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, const std::string &compression) {
 	throw std::runtime_error("RasterDBBackend::writeTile() not implemented in this backend");
 }
 

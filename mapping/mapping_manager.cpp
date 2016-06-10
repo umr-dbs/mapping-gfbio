@@ -9,7 +9,6 @@
 #include "cache/manager.h"
 
 #include "operators/operator.h"
-#include "rasterdb/converters/converter.h"
 
 #include "userdb/userdb.h"
 
@@ -180,13 +179,7 @@ static void import(int argc, char *argv[]) {
 		int channelid = atoi(argv[5]);
 		double time_start = atof(argv[6]);
 		double duration = atof(argv[7]);
-		RasterConverter::Compression compression = RasterConverter::Compression::GZIP;
-		if (argv[8][0] == 'P')
-			compression = RasterConverter::Compression::PREDICTED;
-		else if (argv[8][0] == 'G')
-			compression = RasterConverter::Compression::GZIP;
-		else if (argv[8][0] == 'R')
-			compression = RasterConverter::Compression::UNCOMPRESSED;
+		std::string compression = argv[8];
 		db->import(filename, sourcechannel, channelid, time_start, time_start+duration, compression);
 	}
 	catch (std::exception &e) {

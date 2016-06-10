@@ -295,7 +295,7 @@ void RasterDB::cleanup() {
 
 
 
-void RasterDB::import(const char *filename, int sourcechannel, int channelid, double time_start, double time_end, RasterConverter::Compression compression) {
+void RasterDB::import(const char *filename, int sourcechannel, int channelid, double time_start, double time_end, const std::string &compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 
@@ -323,7 +323,7 @@ void RasterDB::import(const char *filename, int sourcechannel, int channelid, do
 }
 
 
-void RasterDB::import(GenericRaster *raster, int channelid, double time_start, double time_end, RasterConverter::Compression compression) {
+void RasterDB::import(GenericRaster *raster, int channelid, double time_start, double time_end, const std::string &compression) {
 	if (!isWriteable())
 		throw SourceException("Cannot import into a source opened as read-only");
 	if (channelid < 0 || channelid >= channelcount)
@@ -390,7 +390,7 @@ void RasterDB::import(GenericRaster *raster, int channelid, double time_start, d
 					auto buffer = RasterConverter::direct_encode(tile.get(), compression);
 
 					backend->writeTile(rasterid, *buffer, xsize, ysize, zsize, xoff*zoomfactor, yoff*zoomfactor, zoff*zoomfactor, zoom, compression);
-					printf("    tile saved, compression %d, size: %ld -> %ld (%f)\n", (int) compression, tile->getDataSize(), buffer->size, (double) buffer->size / tile->getDataSize());
+					printf("    tile saved, compression %s, size: %ld -> %ld (%f)\n", compression.c_str(), tile->getDataSize(), buffer->size, (double) buffer->size / tile->getDataSize());
 				}
 			}
 		}

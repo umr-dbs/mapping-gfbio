@@ -134,7 +134,7 @@ void LocalRasterDBBackend::open(const std::string &_sourcename, bool writeable) 
 			" filenr INTEGER NOT NULL,"
 			" fileoffset INTEGER NOT NULL,"
 			" filebytes INTEGER NOT NULL,"
-			" compression INTEGER NOT NULL"
+			" compression STRING NOT NULL"
 			")"
 		);
 		db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_rxyzz ON tiles (rasterid, x1, y1, z1, zoom)");
@@ -218,7 +218,7 @@ RasterDBBackend::rasterid_t LocalRasterDBBackend::createRaster(int channel, doub
 	return rasterid;
 }
 
-void LocalRasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression) {
+void LocalRasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, const std::string &compression) {
 	if (!this->is_opened)
 		throw ArgumentException("Cannot call writeTile() before open() on a RasterDBBackend");
 
@@ -388,7 +388,7 @@ const std::vector<RasterDBBackend::TileDescription> LocalRasterDBBackend::enumer
 		int fileid = stmt.getInt(7);
 		size_t fileoffset = stmt.getInt64(8);
 		size_t filebytes = stmt.getInt64(9);
-		RasterConverter::Compression method = (RasterConverter::Compression) stmt.getInt(10);
+		std::string method = stmt.getString(10);
 
 		uint32_t tile_width = (r_x2-r_x1) >> zoom;
 		uint32_t tile_height = (r_y2-r_y1) >> zoom;

@@ -1,7 +1,4 @@
 #include "rasterdb/converters/converter.h"
-#include "rasterdb/converters/raw.h"
-
-#include "raster/profiler.h"
 
 #include <memory>
 #include "util/make_unique.h"
@@ -25,6 +22,17 @@ static void checkLittleEndian(void)
 /**
  * RawConverter: raw buffer, uncompressed
  */
+class RawConverter : public RasterConverter {
+	public:
+		RawConverter();
+		virtual std::unique_ptr<ByteBuffer> encode(GenericRaster *raster);
+		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
+};
+REGISTER_RASTERCONVERTER(RawConverter, "RAW");
+// for backwards compatibility with the old enum
+class RawConverter2 : public RawConverter {};
+REGISTER_RASTERCONVERTER(RawConverter2, "1");
+
 RawConverter::RawConverter() {
 	checkLittleEndian();
 }
@@ -48,6 +56,17 @@ std::unique_ptr<GenericRaster> RawConverter::decode(ByteBuffer &buffer, const Da
 /**
  * BzipConverter: raw buffer, compressed
  */
+class BzipConverter : public RasterConverter {
+	public:
+		BzipConverter();
+		virtual std::unique_ptr<ByteBuffer> encode(GenericRaster *raster);
+		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
+};
+REGISTER_RASTERCONVERTER(BzipConverter, "BZIP");
+// for backwards compatibility with the old enum
+class BzipConverter2 : public BzipConverter {};
+REGISTER_RASTERCONVERTER(BzipConverter2, "2");
+
 BzipConverter::BzipConverter() {
 	checkLittleEndian();
 }
@@ -94,6 +113,17 @@ std::unique_ptr<GenericRaster> BzipConverter::decode(ByteBuffer &buffer, const D
 /**
  * GzipConverter: raw buffer, compressed
  */
+class GzipConverter : public RasterConverter {
+	public:
+		GzipConverter();
+		virtual std::unique_ptr<ByteBuffer> encode(GenericRaster *raster);
+		virtual std::unique_ptr<GenericRaster> decode(ByteBuffer &buffer, const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
+};
+REGISTER_RASTERCONVERTER(GzipConverter, "GZIP");
+// for backwards compatibility with the old enum
+class GzipConverter2 : public GzipConverter {};
+REGISTER_RASTERCONVERTER(GzipConverter2, "4");
+
 GzipConverter::GzipConverter() {
 	checkLittleEndian();
 }

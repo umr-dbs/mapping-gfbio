@@ -1,5 +1,5 @@
-#include "converters/converter.h"
-#include "converters/raw.h"
+#include "rasterdb/converters/converter.h"
+#include "rasterdb/converters/raw.h"
 
 #include "raster/profiler.h"
 

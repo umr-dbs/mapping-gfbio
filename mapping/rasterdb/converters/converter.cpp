@@ -1,7 +1,7 @@
 #include "datatypes/raster.h"
 #include "datatypes/raster/raster_priv.h"
-#include "converters/converter.h"
-#include "converters/raw.h"
+#include "rasterdb/converters/converter.h"
+#include "rasterdb/converters/raw.h"
 
 #include <memory>
 #include <sstream>

@@ -1,5 +1,5 @@
-#ifndef CONVERTERS_RAW_H
-#define CONVERTERS_RAW_H
+#ifndef RASTERDB_CONVERTERS_RAW_H
+#define RASTERDB_CONVERTERS_RAW_H
 
 
 class RawConverter : public RasterConverter {

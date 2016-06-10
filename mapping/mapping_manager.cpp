@@ -9,7 +9,7 @@
 #include "cache/manager.h"
 
 #include "operators/operator.h"
-#include "converters/converter.h"
+#include "rasterdb/converters/converter.h"
 
 #include "userdb/userdb.h"
 

@@ -7,7 +7,7 @@
 #include <mutex>
 
 #include "datatypes/raster.h"
-#include "converters/converter.h"
+#include "rasterdb/converters/converter.h"
 
 class RasterDBBackend;
 class RasterDBChannel;

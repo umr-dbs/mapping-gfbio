@@ -294,7 +294,7 @@ std::queue<QTriple> replay_logs(char *logfile) {
 				else
 					throw ArgumentException(concat("Unknown featureTypeString in WFS: ", featureTypeString));
 
-				queries.push(QTriple(CacheType::RASTER, rect, graph->getSemanticId()));
+				queries.push(QTriple(type, rect, graph->getSemanticId()));
 			}
 			else if (service == "WCS") {
 				continue;

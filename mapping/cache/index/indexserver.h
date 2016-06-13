@@ -65,40 +65,36 @@ public:
 private:
 	/**
 	 * Adds the fds of all connections to the read-/write-set and kills faulty connections
-	 * @param readfds the set of fds to wait for data to read
-	 * @param writefds the set of fds to wait for data to write
-	 * @return the number of the "greatest" fd
 	 */
-	int setup_fdset( fd_set *readfds, fd_set *writefds);
+	void setup_fdset( struct pollfd *fds, size_t &pos );
 
-	// Processes the handshake on newly established connections
 	/**
 	 * Processes the handshake with newly accepted connections
 	 * @param new_fds the accepted but not initialized connections
 	 * @param readfds the set of fds
 	 */
-	void process_handshake( std::vector<std::unique_ptr<NewNBConnection>> &new_fds, fd_set *readfds);
+	void process_handshake( std::vector<std::unique_ptr<NewNBConnection>> &new_fds );
 
 	/**
 	 * Processes actions on control-connections
 	 * @param readfds the set of fds to wait for data to read
 	 * @param writefds the set of fds to wait for data to write
 	 */
-	void process_control_connections(fd_set *readfds, fd_set* writefds);
+	void process_control_connections();
 
 	/**
 	 * Processes actions on worker-connections
 	 * @param readfds the set of fds to wait for data to read
 	 * @param writefds the set of fds to wait for data to write
 	 */
-	void process_worker_connections(fd_set *readfds, fd_set* writefds);
+	void process_worker_connections();
 
 	/**
 	 * Processes actions on client-connections
 	 * @param readfds the set of fds to wait for data to read
 	 * @param writefds the set of fds to wait for data to write
 	 */
-	void process_client_connections(fd_set *readfds, fd_set* writefds);
+	void process_client_connections();
 
 	// Adjusts the cache according to the given reorg
 	/**

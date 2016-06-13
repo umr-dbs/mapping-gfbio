@@ -152,12 +152,11 @@ public:
 private:
 
 	/**
-	 * Adds the fds of all connections to the appropriate fd_set
-	 * @param readfds the fd_set for reads
-	 * @param writefds the fd_set for writes
-	 * @return the greatest fd found in active connections
+	 * Processes the handshake with newly accepted connections
+	 * @param new_fds the accepted but not initialized connections
+	 * @param readfds the set of fds
 	 */
-	int setup_fdset( fd_set *readfds, fd_set* write_fds);
+	void process_handshake( std::vector<std::unique_ptr<NewNBConnection>> &new_fds );
 
 	/**
 	 * Processes all active connections. Checks if socket is ready
@@ -165,7 +164,7 @@ private:
 	 * @param readfds the fd_set for reads
 	 * @param writefds the fd_set for writes
 	 */
-	void process_connections(fd_set *readfds, fd_set* write_fds);
+	void process_connections();
 
 	/**
 	 * Processes direct requests to a cache-entry.

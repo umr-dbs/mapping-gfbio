@@ -56,7 +56,7 @@ int main(void) {
 
 	std::string reorg_strategy = "geo";
 	std::string relevance = "costlru";
-	std::string caching_strat = "always";
+	std::string caching_strat = "uncached";
 
 	std::string scheduler = "default";
 	std::string node_cache_mode = "remote";

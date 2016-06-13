@@ -111,118 +111,118 @@ void DeliveryManager::run() {
 	Log::info("Starting Delivery-Manager");
 	int delivery_fd = CacheCommon::get_listening_socket(listen_port,true,SOMAXCONN);
 
+	struct pollfd fds[0xffff];
+	fds[0].fd = delivery_fd;
+	fds[0].events = POLLIN;
+	fds[1].fd = wakeup_pipe.getReadFD();
+	fds[1].events = POLLIN;
+
+	size_t num_fds;
+
 	std::vector<std::unique_ptr<NewNBConnection>> new_cons;
 
 	// Read on delivery-socket
 	while (!shutdown) {
-		struct timeval tv { 2, 0 };
-		fd_set readfds;
-		fd_set writefds;
-		FD_ZERO(&readfds);
-		FD_ZERO(&writefds);
-		// Add listen socket
-		FD_SET(wakeup_pipe.getReadFD(), &readfds);
-		FD_SET(delivery_fd, &readfds);
+		// Prepare listen socket
+		fds[0].revents = 0;
+		// Prepare wakeup
+		fds[1].revents = 0;
 
-		int maxfd = std::max(delivery_fd,wakeup_pipe.getReadFD());
+		num_fds = 2;
 
-		// Add newly accepted sockets
-		for (auto &nc : new_cons) {
-			FD_SET(nc->get_read_fd(), &readfds);
-			maxfd = std::max(maxfd, nc->get_read_fd());
+		// setup new connections
+		auto nc_iter = new_cons.begin();
+		while ( nc_iter != new_cons.end() ){
+			if ( (*nc_iter)->is_faulty() )
+				nc_iter = new_cons.erase(nc_iter);
+			else {
+				(*nc_iter)->prepare(&fds[num_fds++]);
+				nc_iter++;
+			}
 		}
 
-		maxfd = std::max(maxfd, setup_fdset(&readfds,&writefds));
-
-		int ret = select(maxfd + 1, &readfds, &writefds, nullptr, &tv);
-		if (ret <= 0)
-			continue;
-
-		if (FD_ISSET(wakeup_pipe.getReadFD(), &readfds) ) {
-			// we have been woken, now we need to read any outstanding data or the pipe will remain readable
-			char buf[1024];
-			read(wakeup_pipe.getReadFD(), buf, 1024);
+		// Setup active connections
+		auto dciter = connections.begin();
+			while (dciter != connections.end()) {
+			DeliveryConnection &dc = **dciter;
+			if ( dc.is_faulty() )
+				dciter = connections.erase(dciter);
+			else {
+				dc.prepare(&fds[num_fds++]);
+				dciter++;
+			}
 		}
 
-		// Current connections
-		// Action on delivery connections
-		process_connections(&readfds,&writefds);
 
-		// Handshake
-		auto it = new_cons.begin();
-		while (it != new_cons.end()) {
-			auto &nc = **it;
-			try {
-				if (FD_ISSET(nc.get_read_fd(), &readfds) && nc.input() ) {
-					auto &data = nc.get_data();
-					uint32_t magic = data.read<uint32_t>();
-					if (magic == DeliveryConnection::MAGIC_NUMBER) {
-						std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(nc.release_stream());
-						Log::debug("New delivery-connection createdm, id: %d", dc->id);
-						connections.push_back(std::move(dc));
-					}
-					else
-						Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
-					it = new_cons.erase(it);
+		int poll_ret = poll(fds, num_fds, 1000 );
+		if (poll_ret < 0 && errno != EINTR) {
+			Log::error("Select returned error: %s", strerror(errno));
+			exit(1);
+		}
+		else if (poll_ret > 0) {
+			if ( fds[1].revents & POLLIN ) {
+				// we have been woken, now we need to read any outstanding data or the pipe will remain readable
+				char buf[1024];
+				read(wakeup_pipe.getReadFD(), buf, 1024);
+			}
+
+			// Current connections
+			// Action on delivery connections
+			process_connections();
+
+			// Handshake
+			process_handshake(new_cons);
+
+			// New delivery connection
+			if ( fds[0].revents & POLLIN ) {
+				struct sockaddr_storage remote_addr;
+				socklen_t sin_size = sizeof(remote_addr);
+				int new_fd = accept(delivery_fd, (struct sockaddr *) &remote_addr, &sin_size);
+				if (new_fd == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
+					Log::error("Accept failed: %d", strerror(errno));
+				else if (new_fd > 0) {
+					Log::debug("New connection established, fd: %d", new_fd);
+					new_cons.push_back( make_unique<NewNBConnection>(&remote_addr,new_fd) );
 				}
-				else
-					it++;
-			} catch (const std::exception &e) {
-				Log::error("Error on new connection: %s. Dropping.", e.what());
-				it = new_cons.erase(it);
 			}
+			remove_expired_deliveries();
 		}
-
-		// New delivery connection
-		if (FD_ISSET(delivery_fd, &readfds)) {
-			struct sockaddr_storage remote_addr;
-			socklen_t sin_size = sizeof(remote_addr);
-			int new_fd = accept(delivery_fd, (struct sockaddr *) &remote_addr, &sin_size);
-			if (new_fd == -1 && errno != EAGAIN && errno != EWOULDBLOCK)
-				Log::error("Accept failed: %d", strerror(errno));
-			else if (new_fd > 0) {
-				Log::debug("New connection established, fd: %d", new_fd);
-				new_cons.push_back( make_unique<NewNBConnection>(&remote_addr,new_fd) );
-			}
-		}
-		remove_expired_deliveries();
 	}
 	close(delivery_fd);
 	Log::info("Delivery-Manager done.");
 }
 
-int DeliveryManager::setup_fdset(fd_set* readfds, fd_set* write_fds) {
-	int maxfd = -1;
-	auto dciter = connections.begin();
-	while (dciter != connections.end()) {
-		DeliveryConnection &dc = **dciter;
-		if ( dc.is_faulty() )
-			dciter = connections.erase(dciter);
-		else if ( dc.is_writing() ) {
-			FD_SET(dc.get_write_fd(), write_fds);
-			maxfd = std::max(maxfd, dc.get_write_fd());
-			dciter++;
-		}
-		else {
-			FD_SET(dc.get_read_fd(), readfds);
-			maxfd = std::max(maxfd, dc.get_read_fd());
-			dciter++;
+void DeliveryManager::process_handshake(
+		std::vector<std::unique_ptr<NewNBConnection> >& new_cons) {
+	auto it = new_cons.begin();
+	while (it != new_cons.end()) {
+		auto &nc = **it;
+		try {
+			if ( nc.process() ) {
+				auto &data = nc.get_data();
+				uint32_t magic = data.read<uint32_t>();
+				if (magic == DeliveryConnection::MAGIC_NUMBER) {
+					std::unique_ptr<DeliveryConnection> dc = make_unique<DeliveryConnection>(nc.release_socket());
+					Log::debug("New delivery-connection createdm, id: %d", dc->id);
+					connections.push_back(std::move(dc));
+				}
+				else
+					Log::warn("Received unknown magic-number: %d. Dropping connection.", magic);
+				it = new_cons.erase(it);
+			}
+			else
+				it++;
+		} catch (const std::exception &e) {
+			Log::error("Error on new connection: %s. Dropping.", e.what());
+			it = new_cons.erase(it);
 		}
 	}
-	return maxfd;
+
 }
 
-void DeliveryManager::process_connections(fd_set* readfds, fd_set* writefds) {
+void DeliveryManager::process_connections() {
 	for ( auto &dc : connections ) {
-		if ( dc->is_writing() && FD_ISSET(dc->get_write_fd(), writefds) ) {
-			dc->output();
-		}
-		else if ( !dc->is_writing() && FD_ISSET(dc->get_read_fd(), readfds)) {
-
-			// Read from connection -- continue if nothing is to do
-			if ( !dc->input() )
-				continue;
-
+		if ( dc->process() ) {
 			switch ( dc->get_state() ) {
 				case DeliveryState::DELIVERY_REQUEST_READ: {
 					uint64_t id = dc->get_delivery_id();

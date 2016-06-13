@@ -19,6 +19,7 @@
 #include <map>
 #include <memory>
 #include <cstring> //strerror
+#include <poll.h>
 
 /**
  * Models a simple blocking connection
@@ -154,10 +155,33 @@ private:
 	bool consume_wakeup;
 };
 
+class PollableConnection {
+public:
+	PollableConnection() = delete;
+	PollableConnection( const PollableConnection& ) = delete;
+	PollableConnection( PollableConnection&& ) = delete;
+	PollableConnection& operator=( const PollableConnection& ) = delete;
+	PollableConnection& operator=( PollableConnection&& ) = delete;
+	virtual ~PollableConnection() = default;
+
+	PollableConnection( BinaryStream &&socket );
+
+	virtual bool is_faulty() const = 0;
+
+	virtual void prepare(struct pollfd *poll_fd) = 0;
+
+	virtual bool process() = 0;
+protected:
+	std::string flags_to_string( short flags ) const;
+
+	BinaryStream socket;
+	struct pollfd *poll_fd;
+};
+
 /**
  * Models a newly established non-blocking connection
  */
-class NewNBConnection {
+class NewNBConnection : public PollableConnection {
 public:
 	NewNBConnection() = delete;
 	NewNBConnection( const NewNBConnection& ) = delete;
@@ -174,15 +198,18 @@ public:
 	NewNBConnection( struct sockaddr_storage *remote_addr, int fd );
 
 	/**
-	 * @return the file-descriptor data is read from
+	 * Prepares the pollfd structure for the next cycle
 	 */
-	int get_read_fd() const;
+	virtual void prepare(struct pollfd *poll_fd);
 
 	/**
-	 * Reads the first data from the socket
-	 * @return whether the initial data was completely read
+	 * Handles socket-event if any.
+	 * @return true if action is required, false otherwise
 	 */
-	bool input();
+	virtual bool process();
+
+
+	virtual bool is_faulty() const;
 
 	/**
 	 * Returns the handshake data read after the connection was established.
@@ -194,11 +221,11 @@ public:
 	/**
 	 * Releases the underlying stream for usage in concrete connections
 	 */
-	BinaryStream release_stream();
+	BinaryStream release_socket();
 
 	std::string hostname;
 private:
-	BinaryStream stream;
+	bool faulty;
 	BinaryReadBuffer buffer;
 };
 
@@ -206,7 +233,7 @@ private:
  * Base class for all non-blocking connections
  */
 template<typename StateType>
-class BaseConnection {
+class BaseConnection : public PollableConnection {
 private:
 	static uint64_t next_id;
 public:
@@ -225,36 +252,21 @@ public:
 	virtual ~BaseConnection() = default;
 
 	/**
-	 * Called if data is available on the unerlying socket and this connection is not in writing mode
-	 * @return whether the data was completely read and action is required
+	 * Prepares the pollfd structure for the next cycle
 	 */
-	bool input();
+	virtual void prepare(struct pollfd *poll_fd);
 
 	/**
-	 * Called if data can be written to the unerlying socket and this connection is in writing-mode
+	 * Handles socket-event if any.
+	 * @return true if action is required, false otherwise
 	 */
-	void output();
+	virtual bool process();
 
-	/**
-	 * @return the fd used for writes by this connection
-	 */
-	int get_write_fd() const;
-
-	/**
-	 * @return the fd used for reads by this connection
-	 */
-	int get_read_fd() const;
 
 	/**
 	 * @return whether an error occured on this connection and it should be discarded
 	 */
-	bool is_faulty() const;
-
-
-	/**
-	 * @return whether this connection is currently writing data
-	 */
-	bool is_writing() const;
+	virtual bool is_faulty() const;
 
 	/**
 	 * @return the current state of this connection
@@ -272,15 +284,15 @@ protected:
 	virtual void process_command( uint8_t cmd, BinaryReadBuffer& payload ) = 0;
 
 	/**
+	 * Callback invoked whenever a write-request was finished.
+	 */
+	virtual void write_finished() = 0;
+
+	/**
 	 * Called by concrete classes to write data
 	 * @param buffer a buffer containing the data to write
 	 */
 	void begin_write( std::unique_ptr<BinaryWriteBuffer> buffer );
-
-	/**
-	 * Callback invoked whenever a write-request was finished.
-	 */
-	virtual void write_finished() = 0;
 
 	/**
 	 * Changes the connection's state.
@@ -293,7 +305,24 @@ protected:
 	 */
 	template<typename... States>
 	void ensure_state( const States... states ) const;
+
 private:
+	/**
+	 * Called if data is available on the unerlying socket and this connection is not in writing mode
+	 * @return whether the data was completely read and action is required
+	 */
+	bool input();
+
+	/**
+	 * Called if data can be written to the unerlying socket and this connection is in writing-mode
+	 */
+	void output();
+
+	/**
+	 * @return whether this connection is currently writing data
+	 */
+	bool is_writing() const;
+
 	/**
 	 * Recursive part of the state check
 	 * @param state a valid state
@@ -310,7 +339,6 @@ private:
 
 	StateType state;
 	bool faulty;
-	BinaryStream socket;
 	std::unique_ptr<BinaryReadBuffer> reader;
 	std::unique_ptr<BinaryWriteBuffer> writer;
 };

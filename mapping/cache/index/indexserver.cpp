@@ -49,48 +49,59 @@ void IndexServer::run() {
 	int listen_socket = CacheCommon::get_listening_socket(port,true,SOMAXCONN);
 	Log::info("index-server: listening on node-port: %d", port);
 
+
+	struct pollfd fds[0xffff];
+	fds[0].fd = listen_socket;
+	fds[0].events = POLLIN;
+	fds[1].fd = wakeup_pipe.getReadFD();
+	fds[1].events = POLLIN;
+
+
 	std::vector<std::unique_ptr<NewNBConnection>> new_cons;
+	size_t num_fds;
 
 	while (!shutdown) {
-		struct timeval tv { 1, 0 };
-		fd_set readfds, writefds;
-		FD_ZERO(&readfds);
-		FD_ZERO(&writefds);
+		// Prepare listen socket
+		fds[0].revents = 0;
 
-		// Add listen socket
-		FD_SET(wakeup_pipe.getReadFD(), &readfds);
-		FD_SET(listen_socket, &readfds);
+		// Prepare wakeup
+		fds[1].revents = 0;
 
-		int maxfd = std::max(listen_socket,wakeup_pipe.getReadFD());
+		num_fds = 2;
 
-		// Add newly accepted sockets
-		for (auto &nc : new_cons) {
-			FD_SET(nc->get_read_fd(), &readfds);
-			maxfd = std::max(maxfd, nc->get_read_fd());
+		// setup new connections
+		auto nc_iter = new_cons.begin();
+		while ( nc_iter != new_cons.end() ){
+			if ( (*nc_iter)->is_faulty() )
+				nc_iter = new_cons.erase(nc_iter);
+			else {
+				(*nc_iter)->prepare(&fds[num_fds++]);
+				nc_iter++;
+			}
 		}
 
-		// Setup existing connections
-		maxfd = std::max(maxfd, setup_fdset(&readfds, &writefds));
 
-		int sel_ret = select(maxfd + 1, &readfds, &writefds, nullptr, &tv);
-		if (sel_ret < 0 && errno != EINTR) {
-			Log::error("Select returned error: %s", strerror(errno));
+		setup_fdset(fds,num_fds);
+
+		int poll_ret = poll(fds, num_fds, 1000 );
+		if (poll_ret < 0 && errno != EINTR) {
+			Log::error("Poll returned error: %s", strerror(errno));
+			exit(1);
 		}
-		else if (sel_ret > 0) {
-			if (FD_ISSET(wakeup_pipe.getReadFD(), &readfds) ) {
+		else if (poll_ret > 0) {
+			if ( fds[1].revents & POLLIN ) {
 				// we have been woken, now we need to read any outstanding data or the pipe will remain readable
 				char buf[1024];
 				read(wakeup_pipe.getReadFD(), buf, 1024);
 			}
 
-			process_worker_connections(&readfds,&writefds);
-			process_control_connections(&readfds, &writefds);
-			process_client_connections(&readfds, &writefds);
-
-			process_handshake(new_cons, &readfds);
+			process_worker_connections();
+			process_control_connections();
+			process_client_connections();
+			process_handshake(new_cons);
 
 			// Accept new connections
-			if (FD_ISSET(listen_socket, &readfds)) {
+			if ( fds[0].revents & POLLIN ) {
 				struct sockaddr_storage remote_addr;
 				socklen_t sin_size = sizeof(remote_addr);
 				int new_fd = accept(listen_socket, (struct sockaddr *) &remote_addr, &sin_size);
@@ -148,8 +159,7 @@ void IndexServer::run() {
 	Log::info("Index-Server done.");
 }
 
-int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
-	int maxfd = -1;
+void IndexServer::setup_fdset(struct pollfd *fds, size_t &pos) {
 
 	auto wit = worker_connections.begin();
 	while (wit != worker_connections.end()) {
@@ -158,14 +168,8 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 			query_manager->worker_failed(wc.id);
 			worker_connections.erase(wit++);
 		}
-		else if (wc.is_writing()) {
-			FD_SET(wc.get_write_fd(), writefds);
-			maxfd = std::max(maxfd, wc.get_write_fd());
-			wit++;
-		}
 		else {
-			FD_SET(wc.get_read_fd(), readfds);
-			maxfd = std::max(maxfd, wc.get_read_fd());
+			wc.prepare(&fds[pos++]);
 			wit++;
 		}
 	}
@@ -179,14 +183,8 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 			query_manager->node_failed(cc.node_id);
 			control_connections.erase(ccit++);
 		}
-		else if (cc.is_writing()) {
-			FD_SET(cc.get_write_fd(), writefds);
-			maxfd = std::max(maxfd, cc.get_write_fd());
-			ccit++;
-		}
 		else {
-			FD_SET(cc.get_read_fd(), readfds);
-			maxfd = std::max(maxfd, cc.get_read_fd());
+			cc.prepare(&fds[pos++]);
 			ccit++;
 		}
 	}
@@ -201,31 +199,24 @@ int IndexServer::setup_fdset(fd_set* readfds, fd_set *writefds) {
 			}
 			client_connections.erase(clit++);
 		}
-		else if (cc.is_writing()) {
-			FD_SET(cc.get_write_fd(), writefds);
-			maxfd = std::max(maxfd, cc.get_write_fd());
-			clit++;
-		}
 		else {
-			FD_SET(cc.get_read_fd(), readfds);
-			maxfd = std::max(maxfd, cc.get_read_fd());
+			cc.prepare(&fds[pos++]);
 			clit++;
 		}
 	}
-	return maxfd;
 }
 
-void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>> &new_fds, fd_set* readfds) {
+void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>> &new_fds) {
 	auto it = new_fds.begin();
 	while (it != new_fds.end()) {
-		auto &nc = **it;
 		try {
-			if (FD_ISSET(nc.get_read_fd(), readfds) && nc.input() ) {
+			auto &nc = **it;
+			if ( nc.process() ) {
 				auto &data = nc.get_data();
 				uint32_t magic = data.read<uint32_t>();
 				switch (magic) {
 					case ClientConnection::MAGIC_NUMBER: {
-						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(nc.release_stream());
+						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(nc.release_socket());
 						Log::trace("New client connections established");
 						if ( !client_connections.emplace(cc->id, std::move(cc)).second )
 							throw MustNotHappenException("Emplaced same connection-id twice!");
@@ -233,7 +224,7 @@ void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>
 					}
 					case WorkerConnection::MAGIC_NUMBER: {
 						uint32_t node_id = data.read<uint32_t>();
-						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(nc.release_stream(),node_id);
+						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(nc.release_socket(),node_id);
 						Log::info("New worker registered for node: %d, id: %d", node_id, wc->id);
 						if ( !worker_connections.emplace(wc->id, std::move(wc)).second )
 							throw MustNotHappenException("Emplaced same connection-id twice!");
@@ -242,7 +233,7 @@ void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>
 					case ControlConnection::MAGIC_NUMBER: {
 						NodeHandshake hs(data);
 						auto node = std::make_shared<Node>(next_node_id++, nc.hostname, hs);
-						auto con  = make_unique<ControlConnection>(nc.release_stream(), node->id, node->host);
+						auto con  = make_unique<ControlConnection>(nc.release_socket(), node->id, node->host);
 						node->control_connection = con->id;
 						nodes.emplace(node->id, node);
 						caches.process_handshake(node->id,hs);
@@ -265,7 +256,7 @@ void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>
 	}
 }
 
-void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds) {
+void IndexServer::process_control_connections() {
 	for (auto &e : control_connections) {
 		ControlConnection &cc = *e.second;
 		// Check if node is waiting for a confirmation
@@ -281,15 +272,8 @@ void IndexServer::process_control_connections(fd_set* readfds, fd_set* writefds)
 			if ( !query_manager->is_locked( node_key.type, key ) )
 				cc.confirm_remove();
 		}
-		// Normal handling
-		else if (cc.is_writing() && FD_ISSET(cc.get_write_fd(), writefds)) {
-			cc.output();
-		}
-		else if (!cc.is_writing() && FD_ISSET(cc.get_read_fd(), readfds)) {
-			// Read from connection -- continue if nothing is to do
-			if ( !cc.input() )
-				continue;
-
+		// Default handling
+		else if ( cc.process() ) {
 			switch (cc.get_state()) {
 				case ControlState::MOVE_RESULT_READ: {
 					Log::trace("Node %d migrated one cache-entry.", cc.node_id);
@@ -336,17 +320,10 @@ void IndexServer::handle_reorg_result(const ReorgMoveResult& res) {
 	caches.get_cache(res.type).move(old,new_key);
 }
 
-void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) {
+void IndexServer::process_client_connections() {
 	for (auto &e : client_connections) {
 		ClientConnection &cc = *e.second;
-		if (cc.is_writing() && FD_ISSET(cc.get_write_fd(), writefds)) {
-			cc.output();
-		}
-		else if (!cc.is_writing() && FD_ISSET(cc.get_read_fd(), readfds)) {
-			// Read from connection -- continue if nothing is to do
-			if ( !cc.input() )
-				continue;
-
+		if ( cc.process() ) {
 			// Handle state-changes
 			switch (cc.get_state()) {
 				case ClientState::AWAIT_RESPONSE:
@@ -375,17 +352,10 @@ void IndexServer::process_client_connections(fd_set* readfds, fd_set* writefds) 
 	}
 }
 
-void IndexServer::process_worker_connections(fd_set* readfds, fd_set* writefds) {
+void IndexServer::process_worker_connections() {
 	for (auto &e : worker_connections) {
 		WorkerConnection &wc = *e.second;
-		if (wc.is_writing() && FD_ISSET(wc.get_write_fd(), writefds)) {
-			wc.output();
-		}
-		else if (!wc.is_writing() && FD_ISSET(wc.get_read_fd(), readfds)) {
-			// Read from connection -- continue if nothing is to do
-			if ( !wc.input() )
-				continue;
-
+		if (wc.process()) {
 			// Handle state-changes
 			switch (wc.get_state()) {
 				case WorkerState::ERROR: {

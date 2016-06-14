@@ -95,9 +95,9 @@ void IndexServer::run() {
 				read(wakeup_pipe.getReadFD(), buf, 1024);
 			}
 
+			process_client_connections();
 			process_worker_connections();
 			process_control_connections();
-			process_client_connections();
 			process_handshake(new_cons);
 
 			// Accept new connections
@@ -160,7 +160,6 @@ void IndexServer::run() {
 }
 
 void IndexServer::setup_fdset(struct pollfd *fds, size_t &pos) {
-
 	auto wit = worker_connections.begin();
 	while (wit != worker_connections.end()) {
 		WorkerConnection &wc = *wit->second;
@@ -217,7 +216,7 @@ void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>
 				switch (magic) {
 					case ClientConnection::MAGIC_NUMBER: {
 						std::unique_ptr<ClientConnection> cc = make_unique<ClientConnection>(nc.release_socket());
-						Log::trace("New client connections established");
+						Log::trace("New client connections established, id: %lu", cc->id);
 						if ( !client_connections.emplace(cc->id, std::move(cc)).second )
 							throw MustNotHappenException("Emplaced same connection-id twice!");
 						break;
@@ -321,16 +320,17 @@ void IndexServer::handle_reorg_result(const ReorgMoveResult& res) {
 }
 
 void IndexServer::process_client_connections() {
-	for (auto &e : client_connections) {
-		ClientConnection &cc = *e.second;
+	auto it = client_connections.begin();
+	while (it != client_connections.end()) {
+		ClientConnection &cc = *it->second;
 		if ( cc.process() ) {
 			// Handle state-changes
 			switch (cc.get_state()) {
 				case ClientState::AWAIT_RESPONSE:
 					Log::debug("Client-request read: %s", cc.get_request().to_string().c_str() );
-
 					query_manager->add_request(cc.id, cc.get_request());
-					break;
+					it = suspend_client(it);
+					continue;
 				case ClientState::AWAIT_STATS: {
 					SystemStats cumulated( query_manager->get_stats() );
 					for ( auto &p : nodes )
@@ -349,6 +349,7 @@ void IndexServer::process_client_connections() {
 						concat("Illegal client-connection state after read: ", (int) cc.get_state()));
 			}
 		}
+		it++;
 	}
 }
 
@@ -364,11 +365,13 @@ void IndexServer::process_worker_connections() {
 					query_manager->close_worker(wc.id);
 					auto clients = query_manager->release_worker(wc.id);
 					for (auto &cid : clients) {
-						try {
-							client_connections.at(cid)->send_error(wc.get_error_message());
-						} catch (const std::out_of_range &oor) {
-							Log::warn("Client %d does not exist.", cid);
+						auto cc = suspended_client_connections.find(cid);
+						if ( cc != suspended_client_connections.end() ) {
+							cc->second->send_error(wc.get_error_message());
+							resume_client(cc);
 						}
+						else
+							Log::warn("Client %d does not exist.", cid);
 					}
 					wc.release();
 					break;
@@ -385,11 +388,13 @@ void IndexServer::process_worker_connections() {
 					Log::debug("Worker returned delivery: %s", response.to_string().c_str());
 					auto clients = query_manager->release_worker(wc.id);
 					for (auto &cid : clients) {
-						try {
-							client_connections.at(cid)->send_response(response);
-						} catch (const std::out_of_range &oor) {
-							Log::warn("Client %d does not exist.", cid);
+						auto cc = suspended_client_connections.find(cid);
+						if ( cc != suspended_client_connections.end() ) {
+							cc->second->send_response(response);
+							resume_client(cc);
 						}
+						else
+							Log::warn("Client %d does not exist.", cid);
 					}
 					wc.release();
 					break;
@@ -427,6 +432,18 @@ void IndexServer::reorganize(bool force) {
 		if (!d.second.is_empty())
 			control_connections.at(d.second.node->control_connection)->send_reorg(d.second);
 	}
+}
+
+IndexServer::client_map::iterator IndexServer::suspend_client(client_map::iterator element) {
+	Log::trace("Suspending client connection: %lu", element->first);
+	suspended_client_connections.emplace(element->first, std::move(element->second));
+	return client_connections.erase(element);
+}
+
+IndexServer::client_map::iterator IndexServer::resume_client(client_map::iterator element) {
+	Log::trace("Resuming client connection: %lu", element->first);
+	client_connections.emplace(element->first, std::move(element->second));
+	return suspended_client_connections.erase(element);
 }
 
 std::string IndexServer::stats_string() const {

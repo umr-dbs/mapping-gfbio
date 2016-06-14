@@ -277,7 +277,7 @@ template<typename StateType>
 bool BaseConnection<StateType>::process() {
 	bool res = false;
 	if ( poll_fd == nullptr )
-		throw IllegalStateException("NewNBConnection: Process called without previous call to prepare.");
+		throw IllegalStateException(concat("BaseConnection: Process called without previous call to prepare, con-id: ", id));
 
 	if ( is_writing() && (poll_fd->revents & POLLOUT) ) {
 		output();

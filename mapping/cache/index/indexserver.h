@@ -117,12 +117,18 @@ private:
 
 	void wakeup();
 
+	typedef std::map<uint64_t,std::unique_ptr<ClientConnection>> client_map;
+
+	client_map::iterator suspend_client( client_map::iterator element );
+	client_map::iterator resume_client( client_map::iterator element );
+
 	// The currently known nodes
 	std::map<uint32_t,std::shared_ptr<Node>> nodes;
 	// Connections
 	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
 	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
+	std::map<uint64_t,std::unique_ptr<ClientConnection>>  suspended_client_connections;
 
 	IndexCacheManager caches;
 

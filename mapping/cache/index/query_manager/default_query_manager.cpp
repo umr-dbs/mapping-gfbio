@@ -182,46 +182,93 @@ CreateJob::CreateJob( BaseRequest&& request, const QueryManager &mgr ) :
 bool CreateJob::extend(const BaseRequest& req) {
 	if ( req.type == request.type &&
 		 req.semantic_id == request.semantic_id &&
-		 orig_query.TemporalReference::contains(req.query) &&
 		 orig_query.restype == req.query.restype) {
 
-		double nx1, nx2, ny1, ny2, narea;
+		QueryCube current(request.query);
+		QueryCube requested(req.query);
+		auto combined = current.combine(requested);
 
-		nx1 = std::min(request.query.x1, req.query.x1);
-		ny1 = std::min(request.query.y1, req.query.y1);
-		nx2 = std::max(request.query.x2, req.query.x2);
-		ny2 = std::max(request.query.y2, req.query.y2);
+		if ( (current.volume() + requested.volume()) * 1.01 >= combined.volume() ) {
+			SpatialReference sref(orig_query.epsg, combined.get_dimension(0).a,
+												   combined.get_dimension(1).a,
+												   combined.get_dimension(0).b,
+												   combined.get_dimension(1).b);
 
-		narea = (nx2 - nx1) * (ny2 - ny1);
+			TemporalReference tref(orig_query.timetype, combined.get_dimension(2).a, combined.get_dimension(2).b);
 
-		if (orig_query.restype == QueryResolution::Type::NONE && narea / orig_area <= 4.01) {
-			SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
-			request.query = QueryRectangle(sref, orig_query, orig_query);
-			return true;
-		}
-		else if (orig_query.restype == QueryResolution::Type::PIXELS && narea / orig_area <= 4.01) {
-			// Check resolution
-			double my_xres = (orig_query.x2 - orig_query.x1) / orig_query.xres;
-			double my_yres = (orig_query.y2 - orig_query.y1) / orig_query.yres;
-
-			double q_xres = (req.query.x2 - req.query.x1) / req.query.xres;
-			double q_yres = (req.query.y2 - req.query.y1) / req.query.yres;
-
-			if (std::abs(1.0 - my_xres / q_xres) < 0.01 && std::abs(1.0 - my_yres / q_yres) < 0.01) {
-
-				uint32_t nxres = std::ceil(
-					orig_query.xres * ((nx2 - nx1) / (orig_query.x2 - orig_query.x1)));
-				uint32_t nyres = std::ceil(
-					orig_query.yres * ((ny2 - ny1) / (orig_query.y2 - orig_query.y1)));
-
-				SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
-				request.query = QueryRectangle(sref, orig_query, QueryResolution::pixels(nxres, nyres));
+			if ( orig_query.restype == QueryResolution::Type::NONE ) {
+				request.query = QueryRectangle(sref,tref,QueryResolution::none());
 				return true;
+			}
+			else if ( orig_query.TemporalReference::contains(tref) ) {
+				// Check resolution
+				double my_xres = (orig_query.x2 - orig_query.x1) / orig_query.xres;
+				double my_yres = (orig_query.y2 - orig_query.y1) / orig_query.yres;
+
+				double q_xres = (req.query.x2 - req.query.x1) / req.query.xres;
+				double q_yres = (req.query.y2 - req.query.y1) / req.query.yres;
+
+				if (std::abs(1.0 - my_xres / q_xres) < 0.01 && std::abs(1.0 - my_yres / q_yres) < 0.01) {
+
+					uint32_t nxres = std::ceil(
+						orig_query.xres * ((sref.x2 - sref.x1) / (orig_query.x2 - orig_query.x1)));
+					uint32_t nyres = std::ceil(
+						orig_query.yres * ((sref.y2 - sref.y1) / (orig_query.y2 - orig_query.y1)));
+
+					request.query = QueryRectangle(sref, tref, QueryResolution::pixels(nxres, nyres));
+					return true;
+				}
 			}
 		}
 	}
 	return false;
 }
+
+
+//bool CreateJob::extend(const BaseRequest& req) {
+//	if ( req.type == request.type &&
+//		 req.semantic_id == request.semantic_id &&
+//		 orig_query.TemporalReference::contains(req.query) &&
+//		 orig_query.restype == req.query.restype) {
+//
+//		double nx1, nx2, ny1, ny2, narea;
+//
+//		nx1 = std::min(request.query.x1, req.query.x1);
+//		ny1 = std::min(request.query.y1, req.query.y1);
+//		nx2 = std::max(request.query.x2, req.query.x2);
+//		ny2 = std::max(request.query.y2, req.query.y2);
+//
+//		narea = (nx2 - nx1) * (ny2 - ny1);
+//
+//
+//		if (orig_query.restype == QueryResolution::Type::NONE && narea / orig_area <= 4.01) {
+//			SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
+//			request.query = QueryRectangle(sref, orig_query, orig_query);
+//			return true;
+//		}
+//		else if (orig_query.restype == QueryResolution::Type::PIXELS && narea / orig_area <= 4.01) {
+//			// Check resolution
+//			double my_xres = (orig_query.x2 - orig_query.x1) / orig_query.xres;
+//			double my_yres = (orig_query.y2 - orig_query.y1) / orig_query.yres;
+//
+//			double q_xres = (req.query.x2 - req.query.x1) / req.query.xres;
+//			double q_yres = (req.query.y2 - req.query.y1) / req.query.yres;
+//
+//			if (std::abs(1.0 - my_xres / q_xres) < 0.01 && std::abs(1.0 - my_yres / q_yres) < 0.01) {
+//
+//				uint32_t nxres = std::ceil(
+//					orig_query.xres * ((nx2 - nx1) / (orig_query.x2 - orig_query.x1)));
+//				uint32_t nyres = std::ceil(
+//					orig_query.yres * ((ny2 - ny1) / (orig_query.y2 - orig_query.y1)));
+//
+//				SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
+//				request.query = QueryRectangle(sref, orig_query, QueryResolution::pixels(nxres, nyres));
+//				return true;
+//			}
+//		}
+//	}
+//	return false;
+//}
 
 uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
 	// Do not schedule if we have no nodes

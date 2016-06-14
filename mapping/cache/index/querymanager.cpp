@@ -117,7 +117,6 @@ void QueryManager::schedule_pending_jobs(
 		uint64_t con_id = (*it)->schedule(worker_connections);
 		if (con_id != 0) {
 			(*it)->time_scheduled = CacheCommon::time_millis();
-			stats.scheduled(worker_connections.at(con_id)->node_id);
 			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
 			queries.emplace(con_id, std::move(*it));
 			it = pending_jobs.erase(it);
@@ -137,15 +136,23 @@ size_t QueryManager::close_worker(uint64_t worker_id) {
 	return res;
 }
 
-std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
+std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id, uint32_t node_id) {
 	auto it = finished_queries.find(worker_id);
 	if ( it == finished_queries.end() )
 		throw IllegalStateException(concat("No finished query found for worker: ",worker_id));
 
-	std::set<uint64_t> clients = it->second->get_clients();
-	it->second->time_finished = CacheCommon::time_millis();
 	auto &q = *(it->second);
-	stats.query_finished( clients.size(), q.time_created, q.time_scheduled, q.time_finished  );
+
+	std::set<uint64_t> clients = q.get_clients();
+	q.time_finished = CacheCommon::time_millis();
+
+	// Tell on which node the queries were scheduled
+	stats.scheduled(node_id, clients.size());
+
+	for ( auto &tp : q.client_times ) {
+		uint64_t wait = tp > q.time_scheduled ? 0 : q.time_scheduled - tp;
+		stats.query_finished(wait,q.time_finished - std::max(tp,q.time_scheduled));
+	}
 	finished_queries.erase(it);
 	return clients;
 }
@@ -192,7 +199,7 @@ void QueryManager::handle_client_abort(uint64_t client_id) {
 	}
 }
 
-const SystemStats& QueryManager::get_stats() const {
+SystemStats& QueryManager::get_stats() {
 	return stats;
 }
 
@@ -257,10 +264,13 @@ bool RunningQuery::satisfies( const BaseRequest& req) const {
 
 void RunningQuery::add_client(uint64_t client) {
 	clients.insert(client);
+	client_times.push_back(CacheCommon::time_millis());
 }
 
 void RunningQuery::add_clients(const std::set<uint64_t>& clients) {
 	this->clients.insert(clients.begin(),clients.end());
+	for ( size_t i = 0; i < clients.size(); i++ )
+		client_times.push_back(CacheCommon::time_millis());
 }
 
 const std::set<uint64_t>& RunningQuery::get_clients() const {

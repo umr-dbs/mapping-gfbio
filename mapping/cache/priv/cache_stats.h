@@ -201,16 +201,31 @@ public:
 	void reset();
 
 	uint32_t get_queries_scheduled();
-	void query_finished( uint32_t num_clients, size_t time_created, size_t time_scheduled, size_t time_finished );
-	void scheduled( uint32_t node_id );
+	void query_finished( uint64_t wait_time, uint64_t exec_time );
+	void scheduled( uint32_t node_id, uint64_t num_clients = 1 );
 	void issued();
+	void add_reorg_cycle( uint64_t duration );
 
 private:
 	uint32_t queries_issued;
 	uint32_t queries_scheduled;
 	uint32_t query_counter;
+	uint32_t reorg_cycles;
+
+	double max_reorg_time;
+	double min_reorg_time;
+	double avg_reorg_time;
+
+	double max_wait_time;
+	double min_wait_time;
 	double avg_wait_time;
+
+	double max_exec_time;
+	double min_exec_time;
 	double avg_exec_time;
+
+	double max_time;
+	double min_time;
 	double avg_time;
 	std::map<uint32_t,uint64_t> node_to_queries;
 };

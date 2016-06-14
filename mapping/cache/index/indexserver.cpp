@@ -363,7 +363,7 @@ void IndexServer::process_worker_connections() {
 					Log::warn("Worker returned error: %s. Forwarding to client.",
 						wc.get_error_message().c_str());
 					query_manager->close_worker(wc.id);
-					auto clients = query_manager->release_worker(wc.id);
+					auto clients = query_manager->release_worker(wc.id, wc.node_id);
 					for (auto &cid : clients) {
 						auto cc = suspended_client_connections.find(cid);
 						if ( cc != suspended_client_connections.end() ) {
@@ -386,7 +386,7 @@ void IndexServer::process_worker_connections() {
 					auto &node = nodes.at(wc.node_id);
 					DeliveryResponse response(node->host,node->port, wc.get_delivery_id());
 					Log::debug("Worker returned delivery: %s", response.to_string().c_str());
-					auto clients = query_manager->release_worker(wc.id);
+					auto clients = query_manager->release_worker(wc.id, wc.node_id);
 					for (auto &cid : clients) {
 						auto cc = suspended_client_connections.find(cid);
 						if ( cc != suspended_client_connections.end() ) {
@@ -432,6 +432,7 @@ void IndexServer::reorganize(bool force) {
 		if (!d.second.is_empty())
 			control_connections.at(d.second.node->control_connection)->send_reorg(d.second);
 	}
+	query_manager->get_stats().add_reorg_cycle( CacheCommon::time_millis() - last_reorg);
 }
 
 IndexServer::client_map::iterator IndexServer::suspend_client(client_map::iterator element) {

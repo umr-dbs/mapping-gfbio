@@ -156,6 +156,7 @@ public:
 private:
 	std::vector<CacheLocks::Lock> locks;
 	std::set<uint64_t> clients;
+	std::vector<uint64_t> client_times;
 	uint64_t time_created;
 	uint64_t time_scheduled;
 	uint64_t time_finished;
@@ -267,7 +268,7 @@ public:
 	 * before calling this method
 	 * @param worker_id the id of the worker
 	 */
-	std::set<uint64_t> release_worker( uint64_t worker_id );
+	std::set<uint64_t> release_worker( uint64_t worker_id, uint32_t node_id );
 
 	/**
 	 * Handles cancelled client requests. If there are no other clients
@@ -284,7 +285,7 @@ public:
 	/**
 	 * @return the query-statistics
 	 */
-	const SystemStats& get_stats() const;
+	SystemStats& get_stats();
 
 	/**
 	 * Resets the query-statistics

@@ -144,7 +144,7 @@ std::vector<std::shared_ptr<EType> > CacheStructure<KType, EType>::get_all() con
 
 template<typename KType, typename EType>
 const CacheQueryResult<EType> CacheStructure<KType, EType>::query(const QueryRectangle& spec) const {
-//	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
+	Log::trace("Querying cache for: %s", CacheCommon::qr_to_string(spec).c_str() );
 
 	const QueryCube qc(spec);
 

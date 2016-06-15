@@ -261,6 +261,8 @@ std::unique_ptr<GenericPlot> PuzzleJob::compute(GenericOperator& op,
 template<class T>
 std::unique_ptr<T> PuzzleJob::puzzle(const SpatioTemporalReference& bbox,
 		const std::vector<std::shared_ptr<const T> >& items) {
+	(void) bbox;
+	(void) items;
 	throw OperatorException("Puzzling only possible for concrete instances");
 }
 

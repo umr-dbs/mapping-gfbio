@@ -96,7 +96,34 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(GenericOperator& op,
 		for ( auto &ne : qres.items )
 			items.push_back(ne->data);
 
-		return PuzzleJob::process(op,rect,qres.remainder,items,profiler);
+
+		mgr.get_worker_context().add_call();
+		if ( mgr.get_worker_context().get_stack_depth() > 100 ) {
+			mgr.get_worker_context().remove_call();
+			throw NoSuchElementException("MISS");
+		}
+		auto res = PuzzleJob::process(op,rect,qres.remainder,items,profiler);
+
+		if ( mgr.get_worker_context().do_traceback() ) {
+			std::ostringstream rems;
+			std::ostringstream i_cubes;
+
+			for ( Cube<3> &c : qres.remainder ) {
+				rems << std::endl << c.to_string();
+			}
+			for ( auto &nce : qres.items ) {
+				i_cubes << std::endl << nce->bounds.to_string();
+			}
+
+
+			Log::warn("Stack-Depth above 100:\nQuery: %s\nRect: %s\nItems: %s\nRemainders: %s",
+					op.getSemanticId().c_str(),
+					CacheCommon::qr_to_string(rect).c_str(),
+					i_cubes.str().c_str(),
+					rems.str().c_str());
+		}
+		mgr.get_worker_context().remove_call();
+		return res;
 	}
 	else {
 		this->stats.add_miss();

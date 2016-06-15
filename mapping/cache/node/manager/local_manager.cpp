@@ -53,10 +53,13 @@ bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 		}
 		// Perform put
 		Log::debug("Adding item to local cache");
-		auto rems = replacement->get_removals(this->cache,size);
-		for ( auto &r : rems ) {
-			Log::trace("Dropping entry due to space requirement: %s", r.NodeCacheKey::to_string().c_str());
-			this->cache.remove(r);
+		{
+			std::lock_guard<std::mutex> g(rem_mtx);
+			auto rems = replacement->get_removals(this->cache,size);
+			for ( auto &r : rems ) {
+				Log::trace("Dropping entry due to space requirement: %s", r.NodeCacheKey::to_string().c_str());
+				this->cache.remove(r);
+			}
 		}
 		this->cache.put(semantic_id,item,CacheEntry( cube, size + sizeof(NodeCacheEntry<T>), profiler));
 		return true;

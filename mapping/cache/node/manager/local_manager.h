@@ -31,6 +31,7 @@ public:
 protected:
 	PuzzleUtil<T> &get_puzzle_util();
 private:
+	std::mutex rem_mtx;
 	LocalCacheManager &mgr;
 	std::unique_ptr<LocalReplacement<T>> replacement;
 };

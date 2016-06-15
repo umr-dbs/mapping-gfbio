@@ -39,7 +39,14 @@ SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<
 
 void SimpleQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
 	stats.issued();
-	auto j = create_job(req);
+	std::unique_ptr<PendingQuery> j;
+	try {
+		j = create_job(req);
+	} catch ( const std::exception &e ) {
+		Log::warn("Error while creating job, falling back to default scheduling: %s", e.what());
+		// 0 node-id means schedule on any!
+		j = make_unique<SimpleJob>(req,0);
+	}
 	j->add_client(client_id);
 	pending_jobs.push_back( std::move(j) );
 }
@@ -50,7 +57,14 @@ void SimpleQueryManager::process_worker_query(WorkerConnection& con) {
 }
 
 std::unique_ptr<PendingQuery> SimpleQueryManager::recreate_job(const RunningQuery& query) {
-	auto res = create_job(query.get_request());
+	std::unique_ptr<PendingQuery> res;
+	try {
+		res = create_job(query.get_request());
+	} catch ( const std::exception &e ) {
+		Log::warn("Error while creating job, falling back to default scheduling: %s", e.what());
+		// 0 node-id means schedule on any!
+		res = make_unique<SimpleJob>(query.get_request(),0);
+	}
 	res->add_clients(query.get_clients());
 	return res;
 }

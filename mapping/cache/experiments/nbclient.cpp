@@ -158,14 +158,12 @@ void issue_queries(std::queue<QTriple> *queries, int inter_arrival) {
 				std::lock_guard<std::mutex> guard(mtx);
 				connections.push_back( PollWrapper(std::move(con)) );
 			}
-			queries->pop();
-
 			time_t elapsed = CacheCommon::time_millis() - start;
 			sleep = std::max((time_t)0, next_poisson(inter_arrival) - elapsed );
-
 		} catch (const NetworkException &ex) {
 			Log::error("Issuing request failed: %s", ex.what());
 		}
+		queries->pop();
 	}
 	done = true;
 	Log::info("Finished posing queries.");
@@ -381,7 +379,7 @@ std::queue<QTriple> replay_logs(const char *logfile) {
 }
 
 std::queue<QTriple> create_run( int argc, char *argv[] ) {
-
+	(void) argc;
 	std::string workload = argv[2];
 
 	if ( workload == "btw_dis")
@@ -411,7 +409,7 @@ int main(int argc, char *argv[]) {
 
 	if ( argc < 3 ) {
 		inter_arrival = 6;
-		qs =queries_from_spec(30000, cache_exp::srtm, 64, 512 );
+		qs = queries_from_spec(30000, cache_exp::btw, 64, 512 );
 	}
 	else {
 		inter_arrival = atoi(argv[1]);

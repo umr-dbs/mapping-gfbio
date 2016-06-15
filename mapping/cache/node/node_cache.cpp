@@ -93,7 +93,10 @@ template<typename EType>
 void NodeCache<EType>::remove(const NodeCacheKey& key) {
 	try {
 		auto entry = this->remove_int(key.semantic_id, key.entry_id);
-		current_size -= entry->size;
+		if ( entry->size > current_size )
+			current_size = 0;
+		else
+			current_size -= entry->size;
 	} catch (const NoSuchElementException &nse) {
 		Log::warn("Item could not be removed: %s", key.to_string().c_str());
 	}

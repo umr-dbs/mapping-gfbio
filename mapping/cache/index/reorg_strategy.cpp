@@ -151,7 +151,7 @@ bool ReorgStrategy::requires_reorg(const std::map<uint32_t,std::shared_ptr<Node>
 				(sqsum - (sum*sum) / nodes.size()) / (nodes.size()) ));
 
 	// Use Coefficient of variation
-	return  maxu >= 1.0 || (stddev / avg) > 0.1;
+	return  maxu >= 1.0 || (avg > 0 && (stddev / avg) > 0.1);
 }
 
 

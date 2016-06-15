@@ -96,8 +96,7 @@ void IndexServer::run() {
 			}
 
 			process_client_connections();
-			process_worker_connections();
-			process_control_connections();
+			process_nodes();
 			process_handshake(new_cons);
 
 			// Accept new connections
@@ -115,7 +114,7 @@ void IndexServer::run() {
 			}
 		}
 		// Schedule Jobs
-		query_manager->schedule_pending_jobs(worker_connections);
+		query_manager->schedule_pending_jobs();
 
 		if ( update_interval == 0 )
 			continue;
@@ -129,10 +128,9 @@ void IndexServer::run() {
 		// Check timestamps
 		for (auto &kv : nodes) {
 			Node& node = *kv.second;
-			ControlConnection &cc = *control_connections.at(node.control_connection);
-			oldest_stats = std::min(oldest_stats, node.last_stat_update);
+			oldest_stats = std::min(oldest_stats, node.last_stats_request());
 			// Remeber if all connections are idle -> Allows reorg
-			all_idle &= (cc.get_state() == ControlState::IDLE);
+			all_idle &= node.is_control_connection_idle();
 		}
 
 
@@ -147,9 +145,8 @@ void IndexServer::run() {
 		if ( !requires_reorg ) {
 			for (auto &kv : nodes) {
 				Node& node = *kv.second;
-				ControlConnection &cc = *control_connections.at(node.control_connection);
-				if (cc.get_state() == ControlState::IDLE && (now - node.last_stat_update) > update_interval) {
-					cc.send_get_stats();
+				if ( node.is_control_connection_idle() && (now - node.last_stats_request()) > update_interval) {
+					node.send_stats_request();
 				}
 			}
 		}
@@ -160,31 +157,17 @@ void IndexServer::run() {
 }
 
 void IndexServer::setup_fdset(struct pollfd *fds, size_t &pos) {
-	auto wit = worker_connections.begin();
-	while (wit != worker_connections.end()) {
-		WorkerConnection &wc = *wit->second;
-		if (wc.is_faulty()) {
-			query_manager->worker_failed(wc.id);
-			worker_connections.erase(wit++);
-		}
-		else {
-			wc.prepare(&fds[pos++]);
-			wit++;
-		}
-	}
-
-	auto ccit = control_connections.begin();
-	while (ccit != control_connections.end()) {
-		ControlConnection &cc = *ccit->second;
-		if (cc.is_faulty()) {
-			caches.remove_all_by_node(cc.node_id);
-			nodes.erase(cc.node_id);
-			query_manager->node_failed(cc.node_id);
-			control_connections.erase(ccit++);
-		}
-		else {
-			cc.prepare(&fds[pos++]);
-			ccit++;
+	auto niter = nodes.begin();
+	while ( niter != nodes.end() ) {
+		auto node = niter->second;
+		try {
+			node->setup_connections(fds,pos,*query_manager);
+			niter++;
+		} catch ( const NodeFailedException &nfe ) {
+			Log::warn("Node-failure: %s", nfe.what() );
+			niter = nodes.erase(niter);
+			caches.remove_all_by_node(node->id);
+			query_manager->node_failed(node->id);
 		}
 	}
 
@@ -225,20 +208,17 @@ void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>
 						uint32_t node_id = data.read<uint32_t>();
 						std::unique_ptr<WorkerConnection> wc = make_unique<WorkerConnection>(nc.release_socket(),node_id);
 						Log::info("New worker registered for node: %d, id: %d", node_id, wc->id);
-						if ( !worker_connections.emplace(wc->id, std::move(wc)).second )
-							throw MustNotHappenException("Emplaced same connection-id twice!");
+						nodes.at(node_id)->add_worker(std::move(wc));
 						break;
 					}
 					case ControlConnection::MAGIC_NUMBER: {
 						NodeHandshake hs(data);
-						auto node = std::make_shared<Node>(next_node_id++, nc.hostname, hs);
-						auto con  = make_unique<ControlConnection>(nc.release_socket(), node->id, node->host);
-						node->control_connection = con->id;
+						uint32_t id = next_node_id++;
+
+						auto node = std::make_shared<Node>(id, nc.hostname, hs, make_unique<ControlConnection>(nc.release_socket(), id, nc.hostname) );
 						nodes.emplace(node->id, node);
 						caches.process_handshake(node->id,hs);
-						Log::info("New node registered. ID: %d, hostname: %s, control-connection-id: %d", node->id, nc.hostname.c_str(), con->id);
-						if ( !control_connections.emplace(con->id, std::move(con)).second )
-							throw MustNotHappenException("Emplaced same connection-id twice!");
+						Log::info("New node registered. ID: %d, hostname: %s", node->id, nc.hostname.c_str() );
 						break;
 					}
 					default:
@@ -255,60 +235,68 @@ void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>
 	}
 }
 
-void IndexServer::process_control_connections() {
-	for (auto &e : control_connections) {
-		ControlConnection &cc = *e.second;
-		// Check if node is waiting for a confirmation
-		if ( cc.get_state() == ControlState::MOVE_RESULT_READ ) {
-			auto res = cc.get_move_result();
-			IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
-			if ( !query_manager->is_locked(res.type, old) )
-				cc.confirm_move();
+void IndexServer::process_nodes() {
+	for ( auto &p : nodes ) {
+		auto &node = *p.second;
+		try {
+			process_control_connection(node);
+			process_worker_connections(node);
+		} catch ( const std::exception &e ) {
+			Log::error("Error processing connections of node %ud: %s", node.id, e.what());
 		}
-		else if ( cc.get_state() == ControlState::REMOVE_REQUEST_READ ) {
-			auto &node_key = cc.get_remove_request();
-			IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
-			if ( !query_manager->is_locked( node_key.type, key ) )
-				cc.confirm_remove();
-		}
-		// Default handling
-		else if ( cc.process() ) {
-			switch (cc.get_state()) {
-				case ControlState::MOVE_RESULT_READ: {
-					Log::trace("Node %d migrated one cache-entry.", cc.node_id);
-					auto res = cc.get_move_result();
-					handle_reorg_result(res);
-					IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
-					if ( !query_manager->is_locked(res.type, old) )
-						cc.confirm_move();
-					break;
-				}
-				case ControlState::REMOVE_REQUEST_READ: {
-					Log::trace("Node %d requested removal of entry: %s", cc.node_id, cc.get_remove_request().to_string().c_str() );
-					auto &node_key = cc.get_remove_request();
-					IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
-					if ( !query_manager->is_locked( node_key.type, key ) )
-						cc.confirm_remove();
-					break;
-				}
-				case ControlState::REORG_FINISHED:
-					Log::trace("Node %d finished reorganization.", cc.node_id);
-					cc.release();
-					break;
-				case ControlState::STATS_RECEIVED: {
-					auto &stats = cc.get_stats();
-					Log::trace("Node %d delivered fresh statistics", cc.node_id);
-					auto &node = nodes.at(cc.node_id);
-					node->update_stats(stats);
-					node->last_stat_update = CacheCommon::time_millis();
-					caches.update_stats(cc.node_id, stats);
-					cc.release();
-					break;
-				}
-				default:
-					throw IllegalStateException(
-						concat("Illegal control-connection state after read: ", (int) cc.get_state()));
+	}
+}
+
+void IndexServer::process_control_connection( Node &node ) {
+	auto &cc = node.get_control_connection();
+	// Check if node is waiting for a confirmation
+	if ( cc.get_state() == ControlState::MOVE_RESULT_READ ) {
+		auto res = cc.get_move_result();
+		IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
+		if ( !query_manager->is_locked(res.type, old) )
+			cc.confirm_move();
+	}
+	else if ( cc.get_state() == ControlState::REMOVE_REQUEST_READ ) {
+		auto &node_key = cc.get_remove_request();
+		IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
+		if ( !query_manager->is_locked( node_key.type, key ) )
+			cc.confirm_remove();
+	}
+	// Default handling
+	else if ( cc.process() ) {
+		switch (cc.get_state()) {
+			case ControlState::MOVE_RESULT_READ: {
+				Log::trace("Node %d migrated one cache-entry.", cc.node_id);
+				auto res = cc.get_move_result();
+				handle_reorg_result(res);
+				IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
+				if ( !query_manager->is_locked(res.type, old) )
+					cc.confirm_move();
+				break;
 			}
+			case ControlState::REMOVE_REQUEST_READ: {
+				Log::trace("Node %d requested removal of entry: %s", cc.node_id, cc.get_remove_request().to_string().c_str() );
+				auto &node_key = cc.get_remove_request();
+				IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
+				if ( !query_manager->is_locked( node_key.type, key ) )
+					cc.confirm_remove();
+				break;
+			}
+			case ControlState::REORG_FINISHED:
+				Log::trace("Node %d finished reorganization.", cc.node_id);
+				cc.release();
+				break;
+			case ControlState::STATS_RECEIVED: {
+				auto &stats = cc.get_stats();
+				Log::trace("Node %d delivered fresh statistics", cc.node_id);
+				node.update_stats(stats);
+				caches.update_stats(cc.node_id, stats);
+				cc.release();
+				break;
+			}
+			default:
+				throw IllegalStateException(
+					concat("Illegal control-connection state after read: ", (int) cc.get_state()));
 		}
 	}
 }
@@ -328,8 +316,13 @@ void IndexServer::process_client_connections() {
 			switch (cc.get_state()) {
 				case ClientState::AWAIT_RESPONSE:
 					Log::debug("Client-request read: %s", cc.get_request().to_string().c_str() );
-					query_manager->add_request(cc.id, cc.get_request());
-					it = suspend_client(it);
+					try {
+						query_manager->add_request(cc.id, cc.get_request());
+						it = suspend_client(it);
+					} catch ( const std::exception &ex ) {
+						Log::warn("QueryManager returned error while adding request: %s",ex.what());
+						cc.send_error("Unable to serve request. Try again later!");
+					}
 					continue;
 				case ClientState::AWAIT_STATS: {
 					SystemStats cumulated( query_manager->get_stats() );
@@ -353,8 +346,9 @@ void IndexServer::process_client_connections() {
 	}
 }
 
-void IndexServer::process_worker_connections() {
-	for (auto &e : worker_connections) {
+void IndexServer::process_worker_connections(Node &node) {
+	std::vector<uint64_t> finished_workers;
+	for (auto &e : node.get_busy_workers() ) {
 		WorkerConnection &wc = *e.second;
 		if (wc.process()) {
 			// Handle state-changes
@@ -373,7 +367,7 @@ void IndexServer::process_worker_connections() {
 						else
 							Log::warn("Client %d does not exist.", cid);
 					}
-					wc.release();
+					finished_workers.push_back(wc.id);
 					break;
 				}
 				case WorkerState::DONE: {
@@ -383,8 +377,7 @@ void IndexServer::process_worker_connections() {
 					break;
 				}
 				case WorkerState::DELIVERY_READY: {
-					auto &node = nodes.at(wc.node_id);
-					DeliveryResponse response(node->host,node->port, wc.get_delivery_id());
+					DeliveryResponse response(node.host,node.port, wc.get_delivery_id());
 					Log::debug("Worker returned delivery: %s", response.to_string().c_str());
 					auto clients = query_manager->release_worker(wc.id, wc.node_id);
 					for (auto &cid : clients) {
@@ -396,7 +389,7 @@ void IndexServer::process_worker_connections() {
 						else
 							Log::warn("Client %d does not exist.", cid);
 					}
-					wc.release();
+					finished_workers.push_back(wc.id);
 					break;
 				}
 				case WorkerState::NEW_ENTRY: {
@@ -418,6 +411,8 @@ void IndexServer::process_worker_connections() {
 			}
 		}
 	}
+	for ( auto &id : finished_workers )
+		node.release_worker(id);
 }
 
 void IndexServer::reorganize(bool force) {
@@ -428,9 +423,7 @@ void IndexServer::reorganize(bool force) {
 		for (auto &rm : d.second.get_removals()) {
 			caches.get_cache(rm.type).remove(IndexCacheKey(rm.semantic_id, d.first, rm.entry_id));
 		}
-
-		if (!d.second.is_empty())
-			control_connections.at(d.second.node->control_connection)->send_reorg(d.second);
+		d.second.submit();
 	}
 	query_manager->get_stats().add_reorg_cycle( CacheCommon::time_millis() - last_reorg);
 }
@@ -440,6 +433,7 @@ IndexServer::client_map::iterator IndexServer::suspend_client(client_map::iterat
 	suspended_client_connections.emplace(element->first, std::move(element->second));
 	return client_connections.erase(element);
 }
+
 
 IndexServer::client_map::iterator IndexServer::resume_client(client_map::iterator element) {
 	Log::trace("Resuming client connection: %lu", element->first);

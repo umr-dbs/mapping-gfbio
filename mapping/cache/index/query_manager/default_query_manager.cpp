@@ -270,30 +270,6 @@ bool CreateJob::extend(const BaseRequest& req) {
 //	return false;
 //}
 
-uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	// Do not schedule if we have no nodes
-	if ( mgr.nodes.empty() )
-		return 0;
-
-	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.node_id == node_id && con.get_state() == WorkerState::IDLE) {
-			con.process_request(WorkerConnection::CMD_CREATE, request);
-			return con.id;
-		}
-	}
-	// Fallback
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.get_state() == WorkerState::IDLE) {
-			con.process_request(WorkerConnection::CMD_CREATE, request);
-			return con.id;
-		}
-	}
-	return 0;
-}
-
 bool CreateJob::is_affected_by_node(uint32_t node_id) {
 	(void) node_id;
 	return false;
@@ -301,6 +277,15 @@ bool CreateJob::is_affected_by_node(uint32_t node_id) {
 
 const BaseRequest& CreateJob::get_request() const {
 	return request;
+}
+
+std::vector<uint32_t> CreateJob::get_target_nodes() const {
+	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
+	return std::vector<uint32_t>{node_id,0};
+}
+
+uint8_t CreateJob::get_command() const {
+	return WorkerConnection::CMD_CREATE;
 }
 
 //
@@ -311,17 +296,6 @@ DeliverJob::DeliverJob(DeliveryRequest&& request, const IndexCacheKey &key) :
 	PendingQuery(std::vector<CacheLocks::Lock>{CacheLocks::Lock(request.type,key)}),
 	request(request),
 	node(key.get_node_id()) {
-}
-
-uint64_t DeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.node_id == node && con.get_state() == WorkerState::IDLE) {
-			con.process_request(WorkerConnection::CMD_DELIVER, request);
-			return con.id;
-		}
-	}
-	return 0;
 }
 
 bool DeliverJob::is_affected_by_node(uint32_t node_id) {
@@ -336,6 +310,14 @@ const BaseRequest& DeliverJob::get_request() const {
 	return request;
 }
 
+std::vector<uint32_t> DeliverJob::get_target_nodes() const {
+	return std::vector<uint32_t>{node};
+}
+
+uint8_t DeliverJob::get_command() const {
+	return WorkerConnection::CMD_DELIVER;
+}
+
 //
 // PUZZLE JOB
 //
@@ -344,23 +326,10 @@ PuzzleJob::PuzzleJob(PuzzleRequest&& request, const std::vector<IndexCacheKey> &
 	PendingQuery(),
 	request(std::move(request)) {
 	for ( auto &k : keys ) {
-		nodes.insert(k.get_node_id());
+		if ( nodes.insert(k.get_node_id()).second )
+			nodes_priorized.push_back(k.get_node_id() );
 		add_lock( CacheLocks::Lock(request.type,k) );
 	}
-}
-
-uint64_t PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &node : nodes) {
-		for (auto &e : connections) {
-			auto &con = *e.second;
-			if (!con.is_faulty() && con.node_id == node
-				&& con.get_state() == WorkerState::IDLE) {
-				con.process_request(WorkerConnection::CMD_PUZZLE, request);
-				return con.id;
-			}
-		}
-	}
-	return 0;
 }
 
 bool PuzzleJob::is_affected_by_node(uint32_t node_id) {
@@ -374,4 +343,13 @@ bool PuzzleJob::extend(const BaseRequest&) {
 
 const BaseRequest& PuzzleJob::get_request() const {
 	return request;
+}
+
+
+std::vector<uint32_t> PuzzleJob::get_target_nodes() const {
+	return nodes_priorized;
+}
+
+uint8_t PuzzleJob::get_command() const {
+	return WorkerConnection::CMD_PUZZLE;
 }

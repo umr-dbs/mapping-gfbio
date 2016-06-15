@@ -35,6 +35,8 @@ public:
 	NodeReorgDescription& operator=( const NodeReorgDescription & ) = delete;
 	NodeReorgDescription& operator=( NodeReorgDescription && ) = default;
 
+	void submit() const;
+
 	const std::shared_ptr<Node> node;
 };
 

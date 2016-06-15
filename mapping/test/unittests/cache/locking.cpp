@@ -41,7 +41,7 @@ CacheEntry create_entry( const SpatialReference &sref ) {
 
 TEST(Locking,MgrLocks) {
 	NodeHandshake hs(4711, std::vector<CacheHandshake>{} );
-	std::shared_ptr<Node> n( new Node(1,"fakehost",hs) );
+	std::shared_ptr<Node> n( new Node(1,"fakehost",hs, std::unique_ptr<ControlConnection>()) );
 	std::map<uint32_t,std::shared_ptr<Node>> node_map;
 	std::string sem_id = "test";
 	node_map.emplace(n->id,n);

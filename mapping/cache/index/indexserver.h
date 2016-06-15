@@ -27,6 +27,7 @@
 #include <vector>
 #include <deque>
 
+
 /**
  * The heart of the cache.
  * The index accepts connections from clients as well
@@ -80,14 +81,20 @@ private:
 	 * @param readfds the set of fds to wait for data to read
 	 * @param writefds the set of fds to wait for data to write
 	 */
-	void process_control_connections();
+	void process_nodes();
+
+
+	/**
+	 * Processes actions on control-connections
+	 * @param cc the connection to handle
+	 */
+	void process_control_connection(Node &node);
 
 	/**
 	 * Processes actions on worker-connections
-	 * @param readfds the set of fds to wait for data to read
-	 * @param writefds the set of fds to wait for data to write
+	 * @param the connection to handle
 	 */
-	void process_worker_connections();
+	void process_worker_connections(Node &node);
 
 	/**
 	 * Processes actions on client-connections
@@ -125,8 +132,8 @@ private:
 	// The currently known nodes
 	std::map<uint32_t,std::shared_ptr<Node>> nodes;
 	// Connections
-	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
-	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
+//	std::map<uint64_t,std::unique_ptr<ControlConnection>> control_connections;
+//	std::map<uint64_t,std::unique_ptr<WorkerConnection>>  worker_connections;
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  client_connections;
 	std::map<uint64_t,std::unique_ptr<ClientConnection>>  suspended_client_connections;
 

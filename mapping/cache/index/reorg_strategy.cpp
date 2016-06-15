@@ -18,6 +18,11 @@ NodeReorgDescription::NodeReorgDescription( std::shared_ptr<Node> node ) :
 	node(node) {
 }
 
+void NodeReorgDescription::submit() const {
+	if ( !is_empty() )
+		node->send_reorg(*this);
+}
+
 //
 // RELEVANCE
 //

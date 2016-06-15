@@ -109,18 +109,40 @@ std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, cons
 QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes, IndexCacheManager &caches) : nodes(nodes), caches(caches) {
 }
 
-void QueryManager::schedule_pending_jobs(
-	const std::map<uint64_t, std::unique_ptr<WorkerConnection> > &worker_connections) {
+void QueryManager::schedule_pending_jobs() {
+
+	size_t num_workers = 0;
+	for ( auto &kv : nodes ) {
+		num_workers += kv.second->num_idle_workers();
+	}
 
 	auto it = pending_jobs.begin();
-	while (it != pending_jobs.end()) {
-		uint64_t con_id = (*it)->schedule(worker_connections);
-		if (con_id != 0) {
-			(*it)->time_scheduled = CacheCommon::time_millis();
-			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
-			queries.emplace(con_id, std::move(*it));
+	while (  num_workers > 0 &&  it != pending_jobs.end()) {
+		auto &q = **it;
+
+		auto nids = q.get_target_nodes();
+		uint64_t worker = 0;
+		for ( auto &nid : nids ) {
+			// Schedule on any node
+			if ( nid == 0 ) {
+				for ( auto ni = nodes.begin(); ni != nodes.end() && worker == 0; ni++ ) {
+					worker = ni->second->schedule_request(q.get_command(),q.get_request());
+				}
+			}
+			else {
+				auto &node = nodes.at(nid);
+				worker = node->schedule_request(q.get_command(),q.get_request());
+			}
+		}
+		// Found a worker... Done!
+		if ( worker > 0 ) {
+			num_workers--;
+			q.time_scheduled = CacheCommon::time_millis();
+			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), worker);
+			queries.emplace(worker, std::move(*it));
 			it = pending_jobs.erase(it);
 		}
+		// Suspend scheduling
 		else
 			++it;
 	}

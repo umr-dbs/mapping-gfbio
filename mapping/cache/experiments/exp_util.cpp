@@ -186,9 +186,9 @@ TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval,
 void TestIdxServer::trigger_reorg(uint32_t node_id,
 		const ReorgDescription& desc) {
 	Log::info("Triggering reorg");
-	for (auto &cc : control_connections) {
-		if (cc.second->node_id == node_id) {
-			cc.second->send_reorg(desc);
+	for ( auto &n : nodes ) {
+		if ( n.first == node_id ) {
+			n.second->send_reorg(desc);
 			wakeup();
 			return;
 		}
@@ -215,8 +215,8 @@ void TestIdxServer::wait_for_idle_control_connections() {
 		if (!all_idle)
 			std::this_thread::sleep_for(std::chrono::milliseconds(10));
 		all_idle = true;
-		for (auto &kv : control_connections) {
-			all_idle &= kv.second->get_state() == ControlState::IDLE;
+		for (auto &kv : nodes) {
+			all_idle &= kv.second->is_control_connection_idle();
 		}
 	} while (!all_idle);
 }
@@ -224,8 +224,8 @@ void TestIdxServer::wait_for_idle_control_connections() {
 void TestIdxServer::force_stat_update() {
 	wait_for_idle_control_connections();
 
-	for (auto &kv : control_connections) {
-		kv.second->send_get_stats();
+	for (auto &kv : nodes) {
+		kv.second->send_stats_request();
 	}
 	wakeup();
 	wait_for_idle_control_connections();

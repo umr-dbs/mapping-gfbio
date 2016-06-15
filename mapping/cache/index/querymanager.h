@@ -190,7 +190,9 @@ public:
 	 * Schedules this query on one of the given connections, if possible
 	 * @return the id of the worker-connection used for scheduling (0 if none).
 	 */
-	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
+	virtual std::vector<uint32_t> get_target_nodes() const = 0;
+
+	virtual uint8_t get_command() const = 0;
 
 	/**
 	 * @return whether this query depends on the node with the given id (e.g. references a cache-entry)
@@ -238,7 +240,7 @@ public:
 	 * preferred node.
 	 * @param worker_connections the currently available worker-connections
 	 */
-	virtual void schedule_pending_jobs( const std::map<uint64_t, std::unique_ptr<WorkerConnection>> &worker_connections );
+	virtual void schedule_pending_jobs();
 
 	/**
 	 * Handle if a worker failed (e.g. the connection was lost).

@@ -12,18 +12,6 @@
 SimpleJob::SimpleJob(const BaseRequest &request, uint32_t node_id) : PendingQuery(), request(request), node_id(node_id) {
 }
 
-uint64_t SimpleJob::schedule(
-		const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.node_id == node_id && con.get_state() == WorkerState::IDLE) {
-			con.process_request(WorkerConnection::CMD_CREATE, request);
-			return con.id;
-		}
-	}
-	return 0;
-}
-
 bool SimpleJob::is_affected_by_node(uint32_t node_id) {
 	return node_id == this->node_id;
 }
@@ -35,6 +23,14 @@ bool SimpleJob::extend(const BaseRequest& req) {
 
 const BaseRequest& SimpleJob::get_request() const {
 	return request;
+}
+
+std::vector<uint32_t> SimpleJob::get_target_nodes() const {
+	return std::vector<uint32_t>{node_id};
+}
+
+uint8_t SimpleJob::get_command() const {
+	return WorkerConnection::CMD_CREATE;
 }
 
 
@@ -171,3 +167,4 @@ std::unique_ptr<PendingQuery> HybridQueryManager::create_job(
 		const BaseRequest& req) {
 	return make_unique<CreateJob>(BaseRequest(req), *this);
 }
+

@@ -22,9 +22,10 @@ public:
 	SimpleJob( const BaseRequest &request, uint32_t node_id );
 
 	bool extend( const BaseRequest &req );
-	uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
 	bool is_affected_by_node( uint32_t node_id );
 	const BaseRequest& get_request() const;
+	virtual std::vector<uint32_t> get_target_nodes() const;
+	virtual uint8_t get_command() const;
 private:
 	BaseRequest request;
 	uint32_t node_id;

@@ -90,7 +90,8 @@ std::vector<std::unique_ptr<T> > PuzzleJob::compute_remainders(
 	std::vector<std::unique_ptr<T>> result;
 	{
 		QueryProfilerStoppingGuard sg(profiler);
-		for (auto &rqr : get_remainder_queries(query, remainder, ref_result)) {
+		auto rem_queries = get_remainder_queries(query, remainder, ref_result);
+		for (auto &rqr : rem_queries) {
 			result.push_back(compute<T>(op, rqr, profiler));
 		}
 	}

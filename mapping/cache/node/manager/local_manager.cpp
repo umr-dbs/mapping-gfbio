@@ -52,7 +52,7 @@ bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
 		}
 		// Perform put
-		Log::debug("Adding item to local cache");
+		Log::trace("Adding item to local cache");
 		{
 			std::lock_guard<std::mutex> g(rem_mtx);
 			auto rems = replacement->get_removals(this->cache,size);

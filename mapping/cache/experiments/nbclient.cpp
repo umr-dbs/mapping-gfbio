@@ -383,9 +383,9 @@ std::queue<QTriple> create_run( int argc, char *argv[] ) {
 	std::string workload = argv[2];
 
 	if ( workload == "btw_dis")
-		return disjoint_queries_from_spec(30000, cache_exp::btw, 64, 512 );
+		return disjoint_queries_from_spec(30000, cache_exp::btw, 64, 256 );
 	else if ( workload == "btw" )
-		return queries_from_spec(30000, cache_exp::btw, 64, 512 );
+		return queries_from_spec(30000, cache_exp::btw, 64, 256 );
 	if ( workload == "srtm_dis")
 			return disjoint_queries_from_spec(30000, cache_exp::srtm, 64, 512 );
 	else if ( workload == "srtm" )
@@ -409,7 +409,7 @@ int main(int argc, char *argv[]) {
 
 	if ( argc < 3 ) {
 		inter_arrival = 6;
-		qs = queries_from_spec(30000, cache_exp::btw, 64, 512 );
+		qs = queries_from_spec(30000, cache_exp::btw, 64, 256 );
 	}
 	else {
 		inter_arrival = atoi(argv[1]);

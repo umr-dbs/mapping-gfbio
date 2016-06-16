@@ -196,7 +196,7 @@ void QueryManager::worker_failed(uint64_t worker_id) {
 }
 
 void QueryManager::node_failed(uint32_t node_id) {
-	Log::info("Node with id: %u failed. Rescheduling jobs!", node_id)
+	Log::info("Node with id: %u failed. Rescheduling jobs!", node_id);
 	auto iter = pending_jobs.begin();
 
 	while ( iter != pending_jobs.end() ) {

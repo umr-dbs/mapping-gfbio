@@ -19,7 +19,17 @@
 #include <json/json.h>
 #include "datatypes/pointcollection.h"
 
-
+/**
+ * Operator that executes an R script on the R server and return the result
+ *
+ * Parameters:
+ * - source: the source code of the R script
+ * - result_type: the result of the R script
+ *   - points
+ *   - raster
+ *   - text
+ *   - plot
+ */
 class RScriptOperator : public GenericOperator {
 	public:
 		RScriptOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

@@ -10,6 +10,9 @@
 
 /**
  * Operator that gets points from pangaea
+ *
+ * Parameters:
+ * - doi: the DOI of the dataset
  */
 class PangaeaSourceOperator : public GenericOperator {
 	public:

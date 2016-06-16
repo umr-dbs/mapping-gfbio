@@ -15,6 +15,13 @@
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
 
+/**
+ * Operator that projects raster and feature data to a given projection
+ *
+ * Parameters:
+ * - src_epsg: the epsg code of the source projection
+ * - dest_epsg: the epsg code of the destination projection
+ */
 class ProjectionOperator : public GenericOperator {
 	public:
 		ProjectionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

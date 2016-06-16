@@ -11,7 +11,12 @@
 
 
 /**
- * Filter simple pointcollection by a polygoncollection
+ * Operator that filter a point collection by a polygon collection.
+ * All points that are contained in polygon are kept. If a point is not covered
+ * at all time, it will be split into multiple points of limited temporal validity.
+ *
+ * Parameters:
+ * none
  */
 class PointInPolygonFilterOperator : public GenericOperator {
 	public:

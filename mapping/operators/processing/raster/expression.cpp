@@ -11,7 +11,21 @@
 #include <json/json.h>
 #include <gdal_priv.h>
 
-
+/**
+ * Operator that evaluates an expression on a given set of rasters
+ *
+ * Parameters:
+ * - expression: string that specifies the calculation. Input rasters are referenced by A, B,... e.g. A*2 + B
+ * - output_type: the data type of the result
+ *   - Byte
+ *   - Int16
+ *   - UInt16
+ *   - Int32
+ *   - UInt32
+ *   - Float32
+ *   - Float64
+ * - output_unit: Unit of the result, "unknown" if unspecified
+ */
 class ExpressionOperator : public GenericOperator {
 	public:
 		ExpressionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

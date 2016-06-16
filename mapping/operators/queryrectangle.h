@@ -5,6 +5,10 @@
 
 class BinaryStream;
 
+/**
+ * This class encapsulates the requested resolution of an operator result.
+ * For features the resoltuion has to be NONE
+ */
 class QueryResolution {
 	public:
 		enum class Type : uint16_t {
@@ -32,6 +36,9 @@ class QueryResolution {
 		uint32_t yres;
 };
 
+/**
+ * The query rectangle specifies a spatial and temporal range for which a result shall be computed.
+ */
 class QueryRectangle : public SpatialReference, public TemporalReference, public QueryResolution {
 	public:
 		QueryRectangle(const SpatialReference &s, const TemporalReference &t, const QueryResolution &r) : SpatialReference(s), TemporalReference(t), QueryResolution(r) {}

@@ -14,6 +14,13 @@
 #include <geos/geom/prep/PreparedGeometryFactory.h>
 #include "datatypes/pointcollection.h"
 
+/**
+ * Operator that subtracts one feature collection from another.
+ * It currently only supports subtracting points
+ *
+ * Parameters:
+ * - epsilonDistance: The distance (in units of the coordinate system) in which points are subtracted
+ */
 class DifferenceOperator: public GenericOperator {
 	public:
 		DifferenceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

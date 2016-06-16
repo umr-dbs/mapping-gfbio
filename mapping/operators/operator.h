@@ -22,7 +22,15 @@ class LineCollection;
 class PolygonCollection;
 class GenericPlot;
 
-
+/**
+ * Base class for operators. It encapsulates cached access to results.
+ *
+ * Implementing operators have to provide
+ *  - getRaster/(Point/Line/Polygon)Collection/Plot method, that return the result of a computation
+ *    on given input data and a spatio-temporal query rectangle
+ *  - semantic parameter string that gives a canonic representation of the operator
+ *  - getProvenance method that attaches the source/license information of new data the operator introduces
+ */
 class GenericOperator {
 	friend class CacheManager;
 	friend class GraphReorgStrategy;

@@ -10,7 +10,15 @@
 #include <limits>
 #include <cmath>
 
-
+/**
+ * Operator that filters a feature collection based on the range of an numeric attribute
+ *
+ * Parameters:
+ * - name: the name of the attribute
+ * - includeNoData: boolean whether no data value is kept
+ * - rangeMin: the lower bound of the filter
+ * - rangeMax the upper bound of the filter
+ */
 class NumericAttributeFilterOperator: public GenericOperator {
 	public:
 		NumericAttributeFilterOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);

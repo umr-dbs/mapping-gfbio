@@ -17,7 +17,8 @@
 #include "util/timemodification.h"
 
 /**
- * Change the time of the query rectangle.
+ * Operator that modifies the temporal dimension of a query rectangle.
+ * It allows the modification of the validity of results, to combine data with different temporal validity
  */
 class TimeShiftOperator : public GenericOperator {
 	public:

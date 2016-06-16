@@ -12,7 +12,14 @@
 #include <json/json.h>
 
 
-// RasterSource Operator
+/**
+ * Operator that gets raster data from the rasterdb
+ *
+ * Parameters:
+ * - sourcename: the name of the datasource
+ * - channel: the index of the requested channel
+ * - transform: true, if the specified transform function in the datasource should be applied
+ */
 class RasterDBSourceOperator : public GenericOperator {
 	public:
 		RasterDBSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

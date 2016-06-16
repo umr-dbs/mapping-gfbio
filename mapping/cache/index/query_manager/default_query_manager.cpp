@@ -98,8 +98,21 @@ void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
 			con.send_miss();
 		}
 	} catch ( const std::out_of_range &oor ) {
-		Log::error("No active query found for worker-query. WorkerID: %ul", con.id);
-		Log::error("Contained in finished queries? %d", (finished_queries.find(con.id) != finished_queries.end()));
+		std::ostringstream aqs;
+		for ( auto &p : queries ) {
+			aqs << p.first << ",";
+		}
+		std::ostringstream fqs;
+		for ( auto &p : finished_queries ) {
+			fqs << p.first << ",";
+		}
+
+		std::ostringstream ns;
+		for ( auto &p : nodes) {
+			ns << p.second->to_string() << std::endl;
+		}
+		Log::error("No active query found for worker-query. WorkerID: %ul. Traceback:\nActive queries: %s\nFinished queries: %s\nNodes:\n%s", con.id, aqs.str().c_str(), fqs.str().c_str(), ns.str().c_str());
+		throw IllegalStateException(concat("Worker ", con.id, " issued query w/o active query"));
 	}
 }
 

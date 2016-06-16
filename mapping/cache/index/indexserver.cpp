@@ -238,12 +238,8 @@ void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>
 void IndexServer::process_nodes() {
 	for ( auto &p : nodes ) {
 		auto &node = *p.second;
-//		try {
-			process_control_connection(node);
-			process_worker_connections(node);
-//		} catch ( const std::exception &e ) {
-//			Log::error("Error processing connections of node %ud: %s", node.id, e.what());
-//		}
+		process_control_connection(node);
+		process_worker_connections(node);
 	}
 }
 

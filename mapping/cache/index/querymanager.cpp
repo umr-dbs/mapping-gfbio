@@ -120,18 +120,20 @@ void QueryManager::schedule_pending_jobs() {
 
 		auto nids = q.get_target_nodes();
 		uint64_t worker = 0;
-		for ( auto &nid : nids ) {
+
+		for ( auto nid = nids.begin(); worker == 0 && nid != nids.end(); nid++ ) {
 			// Schedule on any node
-			if ( nid == 0 ) {
+			if ( (*nid) == 0 ) {
 				for ( auto ni = nodes.begin(); ni != nodes.end() && worker == 0; ni++ ) {
 					worker = ni->second->schedule_request(q.get_command(),q.get_request());
 				}
 			}
 			else {
-				auto &node = nodes.at(nid);
+				auto &node = nodes.at(*nid);
 				worker = node->schedule_request(q.get_command(),q.get_request());
 			}
 		}
+
 		// Found a worker... Done!
 		if ( worker > 0 ) {
 			num_workers--;

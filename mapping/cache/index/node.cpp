@@ -112,6 +112,16 @@ std::string Node::to_string() const {
 	std::ostringstream ss;
 	ss << "Node " << id << "[" << std::endl;
 	ss << "  " << query_stats.to_string() << std::endl;
+	ss << "  busy workers: ";
+	for ( auto &p : busy_workers ) {
+		ss << p.first << ",";
+	}
+	ss << std::endl;
+	ss << "  idle workers: ";
+	for ( auto &w : idle_workers ) {
+		ss << w->id << ",";
+	}
+	ss << std::endl;
 	ss << "]";
 	return ss.str();
 }

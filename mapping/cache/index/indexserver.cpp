@@ -418,7 +418,7 @@ void IndexServer::process_worker_connections(Node &node) {
 void IndexServer::reorganize(bool force) {
 	// Remember time of this reorg
 	last_reorg = CacheCommon::time_millis();
-	auto reorgs = caches.reorganize(nodes,force);
+	auto reorgs = caches.reorganize(nodes,*query_manager,force);
 	for (auto &d : reorgs) {
 		for (auto &rm : d.second.get_removals()) {
 			caches.get_cache(rm.type).remove(IndexCacheKey(rm.semantic_id, d.first, rm.entry_id));

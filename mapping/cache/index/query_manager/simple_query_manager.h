@@ -35,7 +35,7 @@ private:
 class SimpleQueryManager : public QueryManager {
 public:
 public:
-	SimpleQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes, IndexCacheManager &caches);
+	SimpleQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes);
 	void add_request( uint64_t client_id, const BaseRequest &req );
 	void process_worker_query(WorkerConnection& con);
 	bool use_reorg() const;
@@ -59,7 +59,7 @@ public:
 
 class DemaQueryManager : public SimpleQueryManager {
 public:
-	DemaQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes, IndexCacheManager &caches);
+	DemaQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes );
 protected:
 	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req);
 	double alpha;
@@ -68,7 +68,7 @@ protected:
 
 class BemaQueryManager : public DemaQueryManager {
 public:
-  BemaQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes, IndexCacheManager &caches);
+  BemaQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes);
 protected:
   std::unique_ptr<PendingQuery> create_job(const BaseRequest &req);
 private:
@@ -78,17 +78,5 @@ private:
   std::map<uint32_t,int> assignment_map;
   std::deque<uint32_t> assignments;
 };
-
-/*
- * Hybrid
- */
-
-class HybridQueryManager : public SimpleQueryManager {
-public:
-	HybridQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes, IndexCacheManager &caches);
-protected:
-	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req);
-};
-
 
 #endif /* CACHE_INDEX_QUERY_MANAGER_DEMA_QUERY_MANAGER_H_ */

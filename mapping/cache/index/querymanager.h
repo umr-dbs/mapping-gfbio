@@ -220,7 +220,7 @@ public:
 	 * @param caches the available cache
 	 * @param nodes a reference to the attached nodes
 	 */
-	QueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes, IndexCacheManager &caches);
+	QueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes);
 
 	/**
 	 * Adds a new client-request to the processing pipeline. The manager
@@ -304,7 +304,6 @@ protected:
 	virtual std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query ) = 0;
 
 	const std::map<uint32_t,std::shared_ptr<Node>> &nodes;
-	IndexCacheManager &caches;
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> queries;
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> finished_queries;
 	std::list<std::unique_ptr<PendingQuery>> pending_jobs;

@@ -13,7 +13,7 @@
 #include <algorithm>
 
 DefaultQueryManager::DefaultQueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes, IndexCacheManager &caches) :
-	QueryManager(nodes, caches) {
+	QueryManager(nodes), caches(caches) {
 }
 
 bool DefaultQueryManager::use_reorg() const {
@@ -62,39 +62,44 @@ void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req
 
 void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
 	auto &req = con.get_query();
-	auto &query = *queries.at(con.id);
-	auto &cache = caches.get_cache(req.type);
-	auto res = cache.query(req.semantic_id, req.query);
-	Log::debug("QueryResult: %s", res.to_string().c_str());
+	try {
+		auto &query = *queries.at(con.id);
+		auto &cache = caches.get_cache(req.type);
+		auto res = cache.query(req.semantic_id, req.query);
+		Log::debug("QueryResult: %s", res.to_string().c_str());
 
-	stats.add_query(res.hit_ratio);
+		stats.add_query(res.hit_ratio);
 
-	// Full single hit
-	if (res.items.size() == 1 && !res.has_remainder()) {
-		Log::debug("Full HIT. Sending reference.");
-		IndexCacheKey key(req.semantic_id, res.items.front()->id);
-		auto node = nodes.at(key.get_node_id());
-		CacheRef cr(node->host, node->port, key.get_entry_id());
-		// Apply lock
-		query.add_lock( CacheLocks::Lock(req.type,key) );
-		con.send_hit(cr);
-	}
-	// Puzzle
-	else if (res.has_hit() ) {
-		Log::debug("Partial HIT. Sending puzzle-request, coverage: %f");
-		std::vector<CacheRef> entries;
-		for (auto &e : res.items) {
-			auto &node = nodes.at(e->id.first);
-			query.add_lock(CacheLocks::Lock(req.type,IndexCacheKey(req.semantic_id, e->id)));
-			entries.push_back(CacheRef(node->host, node->port, e->id.second));
+		// Full single hit
+		if (res.items.size() == 1 && !res.has_remainder()) {
+			Log::debug("Full HIT. Sending reference.");
+			IndexCacheKey key(req.semantic_id, res.items.front()->id);
+			auto node = nodes.at(key.get_node_id());
+			CacheRef cr(node->host, node->port, key.get_entry_id());
+			// Apply lock
+			query.add_lock( CacheLocks::Lock(req.type,key) );
+			con.send_hit(cr);
 		}
-		PuzzleRequest pr( req.type, req.semantic_id, req.query, std::move(res.remainder), std::move(entries) );
-		con.send_partial_hit(pr);
-	}
-	// Full miss
-	else {
-		Log::debug("Full MISS.");
-		con.send_miss();
+		// Puzzle
+		else if (res.has_hit() ) {
+			Log::debug("Partial HIT. Sending puzzle-request, coverage: %f");
+			std::vector<CacheRef> entries;
+			for (auto &e : res.items) {
+				auto &node = nodes.at(e->id.first);
+				query.add_lock(CacheLocks::Lock(req.type,IndexCacheKey(req.semantic_id, e->id)));
+				entries.push_back(CacheRef(node->host, node->port, e->id.second));
+			}
+			PuzzleRequest pr( req.type, req.semantic_id, req.query, std::move(res.remainder), std::move(entries) );
+			con.send_partial_hit(pr);
+		}
+		// Full miss
+		else {
+			Log::debug("Full MISS.");
+			con.send_miss();
+		}
+	} catch ( const std::out_of_range &oor ) {
+		Log::error("No active query found for worker-query. WorkerID: %ul", con.id);
+		Log::error("Contained in finished queries? %d", (finished_queries.find(con.id) != finished_queries.end()));
 	}
 }
 
@@ -176,7 +181,7 @@ std::unique_ptr<PendingQuery> DefaultQueryManager::recreate_job(const RunningQue
 // Jobs
 //
 
-CreateJob::CreateJob( BaseRequest&& request, const QueryManager &mgr ) :
+CreateJob::CreateJob( BaseRequest&& request, const DefaultQueryManager &mgr ) :
 	PendingQuery(), request(request),
 	orig_query(this->request.query),
 	orig_area( (this->request.query.x2 - this->request.query.x1) * (this->request.query.y2 - this->request.query.y1)),

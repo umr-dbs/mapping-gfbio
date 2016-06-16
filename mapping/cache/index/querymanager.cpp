@@ -96,17 +96,15 @@ std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, cons
 	if ( name == "default" )
 		return make_unique<DefaultQueryManager>(nodes,mgr);
 	else if ( name == "dema" )
-		return make_unique<DemaQueryManager>(nodes,mgr);
+		return make_unique<DemaQueryManager>(nodes);
 	else if ( name == "bema" )
-			return make_unique<BemaQueryManager>(nodes,mgr);
+		return make_unique<BemaQueryManager>(nodes);
 	else if ( name == "emkde" )
-				return make_unique<EMKDEQueryManager>(nodes,mgr);
-	else if ( name == "hybrid" )
-					return make_unique<HybridQueryManager>(nodes,mgr);
+		return make_unique<EMKDEQueryManager>(nodes);
 	else throw ArgumentException(concat("Illegal scheduler name: ", name));
 }
 
-QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes, IndexCacheManager &caches) : nodes(nodes), caches(caches) {
+QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes ) : nodes(nodes) {
 }
 
 void QueryManager::schedule_pending_jobs() {
@@ -180,6 +178,7 @@ std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id, uint32_t nod
 }
 
 void QueryManager::worker_failed(uint64_t worker_id) {
+	Log::info("Worker with id: %lu failed. Rescheduling jobs!", worker_id);
 	auto fi = finished_queries.find(worker_id);
 	if ( fi != finished_queries.end() ) {
 		auto job = recreate_job(*fi->second);
@@ -197,6 +196,7 @@ void QueryManager::worker_failed(uint64_t worker_id) {
 }
 
 void QueryManager::node_failed(uint32_t node_id) {
+	Log::info("Node with id: %u failed. Rescheduling jobs!", node_id)
 	auto iter = pending_jobs.begin();
 
 	while ( iter != pending_jobs.end() ) {

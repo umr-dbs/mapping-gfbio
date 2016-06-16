@@ -34,7 +34,7 @@ uint8_t SimpleJob::get_command() const {
 }
 
 
-SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : QueryManager(nodes, caches) {
+SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) : QueryManager(nodes) {
 }
 
 void SimpleQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
@@ -79,7 +79,7 @@ bool SimpleQueryManager::use_reorg() const {
 
 
 DemaQueryManager::DemaQueryManager(
-		const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : SimpleQueryManager(nodes, caches), alpha(0.3) {
+		const std::map<uint32_t, std::shared_ptr<Node> >& nodes) : SimpleQueryManager(nodes), alpha(0.3) {
 }
 
 std::unique_ptr<PendingQuery> DemaQueryManager::create_job(
@@ -119,7 +119,7 @@ std::unique_ptr<PendingQuery> DemaQueryManager::create_job(
 //
 
 BemaQueryManager::BemaQueryManager(
-		const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : DemaQueryManager(nodes, caches) {
+		const std::map<uint32_t, std::shared_ptr<Node> >& nodes) : DemaQueryManager(nodes) {
 }
 
 std::unique_ptr<PendingQuery> BemaQueryManager::create_job(
@@ -171,17 +171,4 @@ void BemaQueryManager::assign_query(uint32_t node) {
 int BemaQueryManager::get_assignments(uint32_t node) {
 	auto it = assignment_map.find(node);
 	return (it==assignment_map.end()) ? 0 : it->second;
-}
-
-//
-// Hybrid
-//
-
-HybridQueryManager::HybridQueryManager(
-		const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : SimpleQueryManager(nodes,caches) {
-}
-
-std::unique_ptr<PendingQuery> HybridQueryManager::create_job(
-		const BaseRequest& req) {
-	return make_unique<CreateJob>(BaseRequest(req), *this);
 }

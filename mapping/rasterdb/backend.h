@@ -1,8 +1,8 @@
 #ifndef RASTERDB_BACKEND_H
 #define RASTERDB_BACKEND_H
 
-#include "converters/converter.h"
 #include "datatypes/attributes.h"
+#include "rasterdb/converters/converter.h"
 #include <stdint.h>
 #include <vector>
 
@@ -16,7 +16,7 @@ class RasterDBBackend {
 
 		class TileDescription {
 			public:
-				TileDescription(tileid_t tileid, int channelid, int fileid, size_t offset, size_t size, uint32_t x1, uint32_t y1, uint32_t z1, uint32_t width, uint32_t height, uint32_t depth, RasterConverter::Compression compression)
+				TileDescription(tileid_t tileid, int channelid, int fileid, size_t offset, size_t size, uint32_t x1, uint32_t y1, uint32_t z1, uint32_t width, uint32_t height, uint32_t depth, const std::string &compression)
 					: tileid(tileid), channelid(channelid), fileid(fileid), offset(offset), size(size), x1(x1), y1(y1), z1(z1), width(width), height(height), depth(depth), compression(compression) {}
 				TileDescription(BinaryReadBuffer &buffer);
 				void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
@@ -28,7 +28,7 @@ class RasterDBBackend {
 				size_t size;
 				uint32_t x1, y1, z1;
 				uint32_t width, height, depth;
-				RasterConverter::Compression compression;
+				std::string compression;
 		};
 
 		class RasterDescription {
@@ -50,7 +50,7 @@ class RasterDBBackend {
 		virtual void open(const std::string &sourcename, bool writeable) = 0;
 
 		virtual rasterid_t createRaster(int channel, double time_start, double time_end, const AttributeMaps &global_attributes);
-		virtual void writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, RasterConverter::Compression compression);
+		virtual void writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, const std::string &compression);
 		virtual void linkRaster(int channelid, double time_of_reference, double time_start, double time_end);
 
 		virtual std::string readJSON() = 0;

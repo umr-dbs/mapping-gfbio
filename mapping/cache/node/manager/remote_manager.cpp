@@ -37,6 +37,8 @@ bool RemoteCacheWrapper<T>::put(const std::string& semantic_id,
 
 	size_t size = SizeUtil::get_byte_size(*item);
 
+	this->stats.add_result_bytes(size);
+
 	if (mgr.get_strategy().do_cache(profiler, size)) {
 		if (this->cache.get_current_size() + size
 				> this->cache.get_max_size() * 1.1) {
@@ -115,7 +117,7 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 			for (auto &ne : qres.items) {
 				items.push_back(ne->data);
 			}
-			return PuzzleJob::process(op, rect, qres.remainder, items, profiler);
+			return PuzzleUtil::process(op, rect, qres.remainder, items, profiler);
 		}
 	}
 
@@ -223,7 +225,7 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle_wo_cache(
 		parts.push_back(retriever.fetch(request.semantic_id, ref, profiler));
 
 	auto op = GenericOperator::fromJSON(request.semantic_id);
-	return PuzzleJob::process(*op, request.query, request.remainder, parts,
+	return PuzzleUtil::process(*op, request.query, request.remainder, parts,
 			profiler);
 }
 

@@ -28,9 +28,8 @@ public:
 	std::unique_ptr<T> process_puzzle( const PuzzleRequest& request, QueryProfiler &parent_profiler );
 	MetaCacheEntry put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, CacheEntry &&info );
 	void remove_local(const NodeCacheKey &key);
-protected:
-	PuzzleUtil<T> &get_puzzle_util();
 private:
+	std::mutex rem_mtx;
 	LocalCacheManager &mgr;
 	std::unique_ptr<LocalReplacement<T>> replacement;
 };

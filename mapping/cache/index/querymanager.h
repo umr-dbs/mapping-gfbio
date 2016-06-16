@@ -156,6 +156,7 @@ public:
 private:
 	std::vector<CacheLocks::Lock> locks;
 	std::set<uint64_t> clients;
+	std::vector<uint64_t> client_times;
 	uint64_t time_created;
 	uint64_t time_scheduled;
 	uint64_t time_finished;
@@ -189,7 +190,9 @@ public:
 	 * Schedules this query on one of the given connections, if possible
 	 * @return the id of the worker-connection used for scheduling (0 if none).
 	 */
-	virtual uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections ) = 0;
+	virtual std::vector<uint32_t> get_target_nodes() const = 0;
+
+	virtual uint8_t get_command() const = 0;
 
 	/**
 	 * @return whether this query depends on the node with the given id (e.g. references a cache-entry)
@@ -209,6 +212,8 @@ public:
 	static std::unique_ptr<QueryManager> by_name( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const std::string &name );
 
 	virtual ~QueryManager() = default;
+
+	virtual bool use_reorg() const = 0;
 
 	/**
 	 * Creates a new instance
@@ -237,7 +242,7 @@ public:
 	 * preferred node.
 	 * @param worker_connections the currently available worker-connections
 	 */
-	virtual void schedule_pending_jobs( const std::map<uint64_t, std::unique_ptr<WorkerConnection>> &worker_connections );
+	virtual void schedule_pending_jobs();
 
 	/**
 	 * Handle if a worker failed (e.g. the connection was lost).
@@ -267,7 +272,7 @@ public:
 	 * before calling this method
 	 * @param worker_id the id of the worker
 	 */
-	std::set<uint64_t> release_worker( uint64_t worker_id );
+	std::set<uint64_t> release_worker( uint64_t worker_id, uint32_t node_id );
 
 	/**
 	 * Handles cancelled client requests. If there are no other clients
@@ -284,7 +289,7 @@ public:
 	/**
 	 * @return the query-statistics
 	 */
-	const SystemStats& get_stats() const;
+	SystemStats& get_stats();
 
 	/**
 	 * Resets the query-statistics

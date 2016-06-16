@@ -32,7 +32,7 @@ class GenericPlot;
  *  - getProvenance method that attaches the source/license information of new data the operator introduces
  */
 class GenericOperator {
-	friend class CacheManager;
+	friend class PuzzleUtil;
 	friend class GraphReorgStrategy;
 	friend class QuerySpec;
 	public:

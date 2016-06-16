@@ -288,7 +288,7 @@ TEST(Serialization, SystemStats) {
 	ss.scheduled(1);
 	ss.scheduled(1);
 	ss.scheduled(2);
-	ss.query_finished(2,10, 20, 25);
+	ss.query_finished(10, 20);
 	checkSerializationConstructor(ss);
 }
 

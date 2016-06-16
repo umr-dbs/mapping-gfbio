@@ -26,6 +26,9 @@ template<class T>
 bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 		const std::unique_ptr<T> &item, const QueryRectangle &query, const QueryProfiler &profiler) {
 	size_t size = SizeUtil::get_byte_size(*item);
+
+	this->stats.add_result_bytes(size);
+
 	if ( mgr.get_strategy().do_cache(profiler,size) && size <= this->cache.get_max_size() ) {
 		CacheCube cube(*item);
 		// Min/Max resolution hack
@@ -49,11 +52,14 @@ bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 				cube.resolution_info.pixel_scale_y.b = std::numeric_limits<double>::infinity();
 		}
 		// Perform put
-		Log::debug("Adding item to local cache");
-		auto rems = replacement->get_removals(this->cache,size);
-		for ( auto &r : rems ) {
-			Log::trace("Dropping entry due to space requirement: %s", r.NodeCacheKey::to_string().c_str());
-			this->cache.remove(r);
+		Log::trace("Adding item to local cache");
+		{
+			std::lock_guard<std::mutex> g(rem_mtx);
+			auto rems = replacement->get_removals(this->cache,size);
+			for ( auto &r : rems ) {
+				Log::trace("Dropping entry due to space requirement: %s", r.NodeCacheKey::to_string().c_str());
+				this->cache.remove(r);
+			}
 		}
 		this->cache.put(semantic_id,item,CacheEntry( cube, size + sizeof(NodeCacheEntry<T>), profiler));
 		return true;
@@ -90,7 +96,8 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(GenericOperator& op,
 		for ( auto &ne : qres.items )
 			items.push_back(ne->data);
 
-		return PuzzleJob::process(op,rect,qres.remainder,items,profiler);
+
+		return PuzzleUtil::process(op,rect,qres.remainder,items,profiler);
 	}
 	else {
 		this->stats.add_miss();

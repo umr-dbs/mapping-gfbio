@@ -8,6 +8,8 @@
 #include "cache/priv/cache_stats.h"
 #include "util/concat.h"
 
+#include <limits>
+
 
 ///////////////////////////////////////////////////////////
 //
@@ -154,7 +156,7 @@ CacheHandshake::CacheHandshake(BinaryReadBuffer& buffer) : CacheContent(buffer) 
 ///////////////////////////////////////////////////////////
 
 QueryStats::QueryStats() : single_local_hits(0), multi_local_hits(0), multi_local_partials(0),
-	single_remote_hits(0), multi_remote_hits(0), multi_remote_partials(0), misses(0), queries(0), ratios(0) {
+	single_remote_hits(0), multi_remote_hits(0), multi_remote_partials(0), misses(0), result_bytes(0), queries(0), ratios(0) {
 }
 
 QueryStats::QueryStats(BinaryReadBuffer& buffer) :
@@ -165,6 +167,7 @@ QueryStats::QueryStats(BinaryReadBuffer& buffer) :
 	multi_remote_hits(buffer.read<uint32_t>()),
 	multi_remote_partials(buffer.read<uint32_t>()),
 	misses(buffer.read<uint32_t>()),
+	result_bytes(buffer.read<uint64_t>()),
 	queries(buffer.read<uint64_t>()),
 	ratios(buffer.read<double>()) {
 }
@@ -178,6 +181,7 @@ QueryStats QueryStats::operator +(const QueryStats& stats) const {
 	res.multi_remote_hits += stats.multi_remote_hits;
 	res.multi_remote_partials += stats.multi_remote_partials;
 	res.misses += stats.misses;
+	res.result_bytes += stats.result_bytes;
 	res.queries += stats.queries;
 	res.ratios += stats.ratios;
 	return res;
@@ -191,6 +195,7 @@ QueryStats& QueryStats::operator +=(const QueryStats& stats) {
 	multi_remote_hits += stats.multi_remote_hits;
 	multi_remote_partials += stats.multi_remote_partials;
 	misses += stats.misses;
+	result_bytes += stats.result_bytes;
 	queries += stats.queries;
 	ratios += stats.ratios;
 	return *this;
@@ -199,7 +204,7 @@ QueryStats& QueryStats::operator +=(const QueryStats& stats) {
 void QueryStats::serialize(BinaryWriteBuffer& buffer, bool) const {
 	buffer << single_local_hits << multi_local_hits << multi_local_partials;
 	buffer << single_remote_hits << multi_remote_hits << multi_remote_partials;
-	buffer << misses << queries << ratios;
+	buffer << misses << result_bytes << queries << ratios;
 }
 
 void QueryStats::add_query(double ratio) {
@@ -219,6 +224,7 @@ void QueryStats::reset() {
 	multi_remote_hits = 0;
 	multi_remote_partials = 0;
 	misses = 0;
+	result_bytes = 0;
 	queries = 0;
 	ratios = 0;
 }
@@ -235,6 +241,7 @@ std::string QueryStats::to_string() const {
 	ss << "  misses            : " << misses << std::endl;
 	ss << "  hit-ratio         : " << (ratios / queries) << std::endl;
 	ss << "  cache-queries     : " << queries;
+	ss << "  result-bytes      : " << result_bytes;
 	return ss.str();
 }
 
@@ -246,7 +253,23 @@ std::string QueryStats::to_string() const {
 
 SystemStats::SystemStats() : QueryStats(),
 	queries_issued(0),
-	queries_scheduled(0), query_counter(0), avg_wait_time(0), avg_exec_time(0), avg_time(0) {
+	queries_scheduled(0), query_counter(0), reorg_cycles(0),
+
+	max_reorg_time(0),
+	min_reorg_time(std::numeric_limits<double>::infinity()),
+	avg_reorg_time(0),
+
+	max_wait_time(0),
+	min_wait_time(std::numeric_limits<double>::infinity()),
+	avg_wait_time(0),
+
+	max_exec_time(0),
+	min_exec_time(std::numeric_limits<double>::infinity()),
+	avg_exec_time(0),
+
+	max_time(0),
+	min_time(std::numeric_limits<double>::infinity()),
+	avg_time(0) {
 }
 
 void SystemStats::reset() {
@@ -254,9 +277,24 @@ void SystemStats::reset() {
 	queries_issued = 0;
 	queries_scheduled = 0;
 	query_counter = 0;
-	avg_exec_time = 0;
+	reorg_cycles = 0;
+
+	max_reorg_time = 0;
+	min_reorg_time = std::numeric_limits<double>::infinity();
+	avg_reorg_time = 0;
+
+	max_wait_time = 0;
+	min_wait_time = std::numeric_limits<double>::infinity();
 	avg_wait_time = 0;
+
+	max_exec_time = 0;
+	min_exec_time = std::numeric_limits<double>::infinity();
+	avg_exec_time = 0;
+
+	max_time = 0;
+	min_time = std::numeric_limits<double>::infinity();
 	avg_time = 0;
+
   node_to_queries.clear();
 }
 
@@ -269,14 +307,30 @@ std::string SystemStats::to_string() const {
 	ss << "  partial single node      : " << multi_local_partials << std::endl;
 	ss << "  partial multiple nodes   : " << multi_remote_partials << std::endl;
 	ss << "  misses                   : " << misses << std::endl;
+	ss << "  result-bytes             : " << result_bytes << std::endl;
 	ss << "  hit ratio                : " << get_hit_ratio() << std::endl;
 	ss << "  cache-queries            : " << queries << std::endl;
 	ss << "  requests received        : " << queries_issued << std::endl;
 	ss << "  requests scheduled       : " << queries_scheduled << std::endl;
-	ss << "  Average Query Time       : " << avg_time << std::endl;
-	ss << "  Average Query Wait-Time  : " << avg_wait_time << std::endl;
-	ss << "  Average Query Exec-Time  : " << avg_exec_time << std::endl;
-	ss << "  Distrib (NodeId:#Queries): ";
+	ss << "  reorg cycles             : " << reorg_cycles << std::endl;
+
+	ss << "  max reorg duration       : " << max_reorg_time << std::endl;
+	ss << "  min reorg duration       : " << min_reorg_time << std::endl;
+	ss << "  avg reorg duration       : " << avg_reorg_time << std::endl;
+
+	ss << "  max query wait-time      : " << max_wait_time << std::endl;
+	ss << "  min query wait-time      : " << min_wait_time << std::endl;
+	ss << "  avg query wait-time      : " << avg_wait_time << std::endl;
+
+	ss << "  max query exec-time      : " << max_exec_time << std::endl;
+	ss << "  min query exec-time      : " << min_exec_time << std::endl;
+	ss << "  avg query exec-time      : " << avg_exec_time << std::endl;
+
+	ss << "  max query time           : " << max_time << std::endl;
+	ss << "  min query time           : " << min_time << std::endl;
+	ss << "  avg query time           : " << avg_time << std::endl;
+
+	ss << "  distrib (NodeId:#Queries): ";
 	for ( auto &p : node_to_queries )
 		ss << "(" << p.first << ": " << p.second << "), ";
 	return ss.str();
@@ -286,29 +340,59 @@ uint32_t SystemStats::get_queries_scheduled() {
 	return queries_scheduled;
 }
 
-void SystemStats::scheduled(uint32_t node_id) {
+void SystemStats::scheduled(uint32_t node_id, uint64_t num_clients) {
 	queries_scheduled++;
 	auto it = node_to_queries.find(node_id);
 	if ( it == node_to_queries.end() )
-		node_to_queries.emplace(node_id, 1);
+		node_to_queries.emplace(node_id, num_clients);
 	else
-		it->second++;
+		it->second+=num_clients;
 }
 
 
-void SystemStats::query_finished(uint32_t num_clients, size_t time_created, size_t time_scheduled, size_t time_finished ) {
-	avg_exec_time = ((avg_exec_time*query_counter) + (time_finished - time_scheduled)) / (query_counter+num_clients);
-	avg_wait_time = ((avg_wait_time*query_counter) + (time_scheduled - time_created)) / (query_counter+num_clients);
+void SystemStats::query_finished(uint64_t wait_time, uint64_t exec_time ) {
+	avg_exec_time = (avg_exec_time*query_counter + exec_time) / (query_counter+1);
+	avg_wait_time = (avg_wait_time*query_counter + wait_time) / (query_counter+1);
 	avg_time = avg_exec_time + avg_wait_time;
-	query_counter += +num_clients;
+
+	min_wait_time = std::min((double)wait_time, min_wait_time);
+	min_exec_time = std::min((double)exec_time, min_exec_time);
+	min_time = std::min((double)wait_time+exec_time, min_time);
+
+	max_wait_time = std::max((double)wait_time, max_wait_time);
+	max_exec_time = std::max((double)exec_time, max_exec_time);
+	max_time = std::max((double)wait_time+exec_time, max_time);
+
+	query_counter++;
+}
+
+void SystemStats::add_reorg_cycle(uint64_t duration) {
+	avg_reorg_time = (avg_reorg_time*reorg_cycles + duration) / (reorg_cycles+1);
+	min_reorg_time = std::min((double)duration, min_reorg_time);
+	max_reorg_time = std::max((double)duration, max_reorg_time);
+	reorg_cycles++;
 }
 
 SystemStats::SystemStats(BinaryReadBuffer& buffer) : QueryStats(buffer),
 		queries_issued(buffer.read<uint32_t>()),
 		queries_scheduled(buffer.read<uint32_t>()),
 		query_counter(buffer.read<uint32_t>()),
+		reorg_cycles(buffer.read<uint32_t>()),
+
+		max_reorg_time(buffer.read<double>()),
+		min_reorg_time(buffer.read<double>()),
+		avg_reorg_time(buffer.read<double>()),
+
+		max_wait_time(buffer.read<double>()),
+		min_wait_time(buffer.read<double>()),
 		avg_wait_time(buffer.read<double>()),
+
+		max_exec_time(buffer.read<double>()),
+		min_exec_time(buffer.read<double>()),
 		avg_exec_time(buffer.read<double>()),
+
+		max_time(buffer.read<double>()),
+		min_time(buffer.read<double>()),
 		avg_time(buffer.read<double>()) {
 
 	uint64_t map_size = buffer.read<uint64_t>();
@@ -323,11 +407,14 @@ SystemStats::SystemStats(BinaryReadBuffer& buffer) : QueryStats(buffer),
 void SystemStats::serialize(BinaryWriteBuffer& buffer,
 		bool is_persistent_memory) const {
 	QueryStats::serialize(buffer,is_persistent_memory);
-	buffer << queries_issued << queries_scheduled << query_counter;
-	buffer << avg_wait_time << avg_exec_time << avg_time;
+	buffer << queries_issued << queries_scheduled << query_counter << reorg_cycles;
+
+	buffer << max_reorg_time << min_reorg_time << avg_reorg_time ;
+	buffer << max_wait_time << min_wait_time << avg_wait_time ;
+	buffer << max_exec_time << min_exec_time << avg_exec_time;
+	buffer << max_time << min_time << avg_time;
 
 	uint64_t s = node_to_queries.size();
-
 	buffer << s;
 	for ( auto &p : node_to_queries ) {
 		buffer << p.first << p.second;
@@ -400,4 +487,3 @@ std::string NodeHandshake::to_string() const {
 
 template class CacheContent<NodeEntryStats>;
 template class CacheContent<HandshakeEntry> ;
-

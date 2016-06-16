@@ -63,12 +63,45 @@ std::unique_ptr<BinaryReadBuffer> WakeableBlockingConnection::read_timeout(
 
 ///////////////////////////////////////////////////////////
 //
+// Pollable connections
+//
+///////////////////////////////////////////////////////////
+
+PollableConnection::PollableConnection(BinaryStream&& socket) : socket(std::move(socket)),  poll_fd(nullptr) {
+}
+
+std::string PollableConnection::flags_to_string(short flags) const {
+	std::ostringstream ss;
+
+	if ( flags & POLLIN )
+		ss << "POLLIN,";
+	if ( flags & POLLOUT )
+		ss << "POLLOUT,";
+	if ( flags & POLLPRI )
+		ss << "POLLPRI,";
+	if ( flags & POLLERR )
+		ss << "POLLERR,";
+	if ( flags & POLLHUP )
+		ss << "POLLHUP,";
+	if ( flags & POLLNVAL)
+		ss << "POLLNVAL,";
+
+	auto res = ss.str();
+
+	if ( res.length() > 0 )
+		return res.substr(0,res.length()-1);
+	else
+		return res;
+}
+
+///////////////////////////////////////////////////////////
+//
 // NewNBConnection
 //
 ///////////////////////////////////////////////////////////
 
 NewNBConnection::NewNBConnection( struct sockaddr_storage *remote_addr, int fd ) :
-	stream( BinaryStream::fromAcceptedSocket(fd, true) ) {
+	PollableConnection( BinaryStream::fromAcceptedSocket(fd, true) ), faulty(false) {
 
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
@@ -78,19 +111,7 @@ NewNBConnection::NewNBConnection( struct sockaddr_storage *remote_addr, int fd )
 				 NI_NUMERICHOST | NI_NUMERICSERV);
 
 	hostname.assign(hbuf);
-	stream.makeNonBlocking();
-}
-
-int NewNBConnection::get_read_fd() const {
-	auto fd = stream.getReadFD();
-	if (fd >= 0)
-		return fd;
-	throw IllegalStateException("Stream released already");
-}
-
-bool NewNBConnection::input() {
-	stream.readNB(buffer);
-	return buffer.isRead();
+	socket.makeNonBlocking();
 }
 
 BinaryReadBuffer& NewNBConnection::get_data() {
@@ -100,19 +121,52 @@ BinaryReadBuffer& NewNBConnection::get_data() {
 		throw IllegalStateException("Buffer not fully read");
 }
 
-BinaryStream NewNBConnection::release_stream() {
-	return std::move(stream);
+void NewNBConnection::prepare(struct pollfd *poll_fd) {
+	this->poll_fd = poll_fd;
+	poll_fd->fd = socket.getReadFD();
+	poll_fd->revents = 0;
+	poll_fd->events = POLLIN;
+}
+
+bool NewNBConnection::process() {
+	bool res = false;
+	if ( poll_fd == nullptr )
+		throw IllegalStateException("NewNBConnection: Process called without previous call to prepare.");
+
+	try {
+		if ( (poll_fd->revents & POLLIN) != 0 ) {
+			socket.readNB(buffer);
+			res = buffer.isRead();
+		}
+		else if ( poll_fd->revents != 0 ) {
+			Log::warn("Poll delivered unexpected state: %s", flags_to_string(poll_fd->revents).c_str() );
+			faulty = true;
+		}
+	} catch ( const NetworkException &ne ) {
+		Log::warn("Error reading from new established connection: %s", ne.what());
+		faulty = true;
+	}
+	poll_fd = nullptr;
+	return res;
+}
+
+bool NewNBConnection::is_faulty() const {
+	return faulty;
+}
+
+BinaryStream NewNBConnection::release_socket() {
+	return std::move(socket);
 }
 
 ///////////////////////////////////////////////////////////
 //
-// CacheAll
+// Base NB-Connection
 //
 ///////////////////////////////////////////////////////////
 
 template<typename StateType>
-BaseConnection<StateType>::BaseConnection(StateType state, BinaryStream &&socket) :
-	id(next_id++), state(state), faulty(false), socket(std::move(socket)), reader(new BinaryReadBuffer() ) {
+BaseConnection<StateType>::BaseConnection(StateType state, BinaryStream &&socket) : PollableConnection(std::move(socket)),
+	id(next_id++), state(state), faulty(false), reader(new BinaryReadBuffer() ) {
 }
 
 template<typename StateType>
@@ -166,16 +220,6 @@ void BaseConnection<StateType>::begin_write(std::unique_ptr<BinaryWriteBuffer> b
 }
 
 template<typename StateType>
-int BaseConnection<StateType>::get_read_fd() const {
-	return socket.getReadFD();
-}
-
-template<typename StateType>
-int BaseConnection<StateType>::get_write_fd() const {
-	return socket.getWriteFD();
-}
-
-template<typename StateType>
 bool BaseConnection<StateType>::is_writing() const {
 	return writer != nullptr;
 }
@@ -212,6 +256,43 @@ bool BaseConnection<StateType>::_ensure_state(StateType state,
 template<typename StateType>
 bool BaseConnection<StateType>::_ensure_state(StateType state) const {
 	return this->state == state;
+}
+
+
+template<typename StateType>
+void BaseConnection<StateType>::prepare(struct pollfd *poll_fd) {
+	this->poll_fd = poll_fd;
+	poll_fd->revents = 0;
+	if ( is_writing() ) {
+		poll_fd->fd = socket.getWriteFD();
+		poll_fd->events = POLLOUT;
+	}
+	else {
+		poll_fd->fd = socket.getReadFD();
+		poll_fd->events = POLLIN;
+	}
+}
+
+template<typename StateType>
+bool BaseConnection<StateType>::process() {
+	bool res = false;
+	if ( poll_fd == nullptr )
+		throw IllegalStateException(concat("BaseConnection: Process called without previous call to prepare, con-id: ", id));
+
+	if ( is_writing() && (poll_fd->revents & POLLOUT) ) {
+		output();
+	}
+	else if ( !is_writing() && (poll_fd->revents & POLLIN) ) {
+		res = input();
+	}
+	else if ( poll_fd->revents != 0 ){
+		Log::warn("Poll delivered unexpected state: %s", flags_to_string(poll_fd->revents).c_str() );
+		faulty = true;
+	}
+
+	poll_fd = nullptr;
+
+	return res;
 }
 
 template<typename StateType>
@@ -266,6 +347,8 @@ void ClientConnection::write_finished() {
 	switch (get_state()) {
 		case ClientState::WRITING_RESPONSE:
 			request.reset();
+			set_state(ClientState::IDLE);
+			break;
 		case ClientState::WRITING_STATS:
 		case ClientState::WRITING_RST:
 			set_state(ClientState::IDLE);
@@ -767,9 +850,27 @@ const uint8_t DeliveryConnection::CMD_MOVE_DONE;
 const uint8_t DeliveryConnection::RESP_OK;
 const uint8_t DeliveryConnection::RESP_ERROR;
 
+
+//////////////////////////////////////////////////////////
+//
+// Experiment stuff
+//
+//////////////////////////////////////////////////////////
+
 std::unique_ptr<NBClientDeliveryConnection> NBClientDeliveryConnection::create(
 		const DeliveryResponse& dr) {
 	auto skt = BinaryStream::connectTCP(dr.host.c_str(), dr.port, true);
+
+	struct linger so_linger;
+	so_linger.l_onoff = true;
+	so_linger.l_linger = 1;
+	setsockopt(skt.getReadFD(),
+		SOL_SOCKET,
+		SO_LINGER,
+		&so_linger,
+		sizeof so_linger);
+
+
 	BinaryWriteBuffer init, req;
 	init << DeliveryConnection::MAGIC_NUMBER;
 	skt.write(init);

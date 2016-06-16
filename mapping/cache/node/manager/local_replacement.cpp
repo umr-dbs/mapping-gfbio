@@ -63,7 +63,7 @@ std::vector<LocalRef> LocalReplacement<T>::get_removals(NodeCache<T>& cache,
 		size_t space_required) {
 	std::vector<LocalRef> all_entries;
 
-	size_t avail = cache.get_max_size() - cache.get_current_size();
+	size_t avail = (cache.get_current_size() > cache.get_max_size()) ? 0 : cache.get_max_size() - cache.get_current_size();
 	if ( avail < space_required ) {
 		CacheHandshake hs = cache.get_all();
 		for (auto &p : hs.get_items()) {

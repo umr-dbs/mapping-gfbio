@@ -16,15 +16,46 @@
 #include <mutex>
 #include <random>
 
-std::vector<std::unique_ptr<BlockingConnection>> connections;
+#include <sys/socket.h>
+
+class PollWrapper {
+public:
+	PollWrapper( std::unique_ptr<BlockingConnection> con );
+	void prepare( struct pollfd *poll_fd );
+	bool is_ready() const;
+	bool has_error() const;
+	std::unique_ptr<BlockingConnection> connection;
+private:
+	struct pollfd *poll_fd;
+};
+
+void PollWrapper::prepare(struct pollfd* poll_fd) {
+	this->poll_fd = poll_fd;
+	this->poll_fd->fd = connection->get_read_fd();
+	this->poll_fd->events = POLLIN;
+	this->poll_fd->revents = 0;
+}
+
+PollWrapper::PollWrapper(std::unique_ptr<BlockingConnection> con) : connection(std::move(con)), poll_fd(nullptr) {
+}
+
+bool PollWrapper::is_ready() const {
+	return (poll_fd != nullptr) && (poll_fd->revents & POLLIN);
+}
+
+bool PollWrapper::has_error() const {
+	return (poll_fd != nullptr) && poll_fd->revents != 0 && poll_fd->revents != POLLIN;
+}
+
+std::vector<PollWrapper> connections;
 std::vector<std::unique_ptr<NBClientDeliveryConnection>> del_cons;
 std::mutex mtx;
 bool done = false;
 
 //std::string host = "pc12412.mathematik.uni-marburg.de";
-//int port = 10042;
+int port = 10042;
 std::string host = "127.0.0.1";
-int port = 12346;
+//int port = 12346;
 
 
 
@@ -36,11 +67,11 @@ std::mt19937 gen(rd());
 std::uniform_real_distribution<> dis;
 
 
-int next_poisson(int lambda) {
+time_t next_poisson(int lambda) {
 	// Let L ← e−λ, k ← 0 and p ← 1.
 	double l = std::exp(-lambda);
 	double p = 1;
-	int    k = 0;
+	time_t    k = 0;
 	do {
 		k += 1;
 		p *= dis(gen);
@@ -48,11 +79,9 @@ int next_poisson(int lambda) {
 	return k-1;
 }
 
-std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
+std::queue<QTriple> disjoint_queries_from_spec(uint32_t num_queries, const QuerySpec &s,
 		uint32_t tiles, uint32_t res) {
 
-	std::default_random_engine eng(
-			std::chrono::system_clock::now().time_since_epoch().count());
 	std::uniform_int_distribution<uint16_t> dist(0, tiles * tiles - 1);
 
 	double extend = std::min((s.bounds.x2 - s.bounds.x1) / tiles,
@@ -62,7 +91,7 @@ std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
 
 	std::queue<QTriple> queries;
 	for (size_t i = 0; i < num_queries; i++) {
-		uint16_t tile = dist(eng);
+		uint16_t tile = dist(gen);
 		uint16_t y = tile / tiles;
 		uint16_t x = tile % tiles;
 
@@ -75,41 +104,73 @@ std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
 	return queries;
 }
 
+std::queue<QTriple> queries_from_spec(uint32_t num_queries, const QuerySpec &s,
+		uint32_t tiles, uint32_t res) {
+
+	double extend = std::min((s.bounds.x2 - s.bounds.x1) / tiles,
+			(s.bounds.y2 - s.bounds.y1) / tiles);
+
+	std::string wf = GenericOperator::fromJSON(s.workflow)->getSemanticId();
+
+	std::queue<QTriple> queries;
+	for (size_t i = 0; i < num_queries; i++) {
+		double x1 = s.bounds.x1 + (s.bounds.x2 - s.bounds.x1 - extend) * dis(gen);
+		double y1 = s.bounds.y1 + (s.bounds.y2 - s.bounds.y1 - extend) * dis(gen);
+		QueryRectangle qr = s.rectangle(x1, y1, extend, res);
+		queries.push(QTriple(CacheType::RASTER, qr, wf));
+	}
+	return queries;
+}
+
 
 
 void issue_queries(std::queue<QTriple> *queries, int inter_arrival) {
 
-	auto sleep = std::chrono::milliseconds(0);
+	time_t sleep = 0;
 
 	Log::info("Posing %lu queries with %dms inter-arrival time.",
 			queries->size(), inter_arrival);
 
 	while (!queries->empty()) {
 		try {
-			std::this_thread::sleep_for(sleep);
+			if ( sleep > 0 )
+				std::this_thread::sleep_for(std::chrono::milliseconds(sleep));
+			auto start = CacheCommon::time_millis();
 			std::unique_ptr<BlockingConnection> con =
 					BlockingConnection::create(host, port, true,
 							ClientConnection::MAGIC_NUMBER);
+
+
+			struct linger so_linger;
+			so_linger.l_onoff = true;
+			so_linger.l_linger = 1;
+			setsockopt(con->get_read_fd(),
+			    SOL_SOCKET,
+			    SO_LINGER,
+			    &so_linger,
+			    sizeof so_linger);
+
+
 			auto &q = queries->front();
 			con->write(ClientConnection::CMD_GET,
 					BaseRequest(q.type, q.semantic_id, q.query));
 			{
 				std::lock_guard<std::mutex> guard(mtx);
-				connections.push_back(std::move(con));
+				connections.push_back( PollWrapper(std::move(con)) );
 			}
-			queries->pop();
+			time_t elapsed = CacheCommon::time_millis() - start;
+			sleep = std::max((time_t)0, next_poisson(inter_arrival) - elapsed );
 		} catch (const NetworkException &ex) {
 			Log::error("Issuing request failed: %s", ex.what());
 		}
-		sleep = std::chrono::milliseconds( next_poisson(inter_arrival) );
+		queries->pop();
 	}
 	done = true;
 	Log::info("Finished posing queries.");
 
 }
 
-int setup_fdset(fd_set *readfds) {
-	int maxfd = 0;
+void setup_fdset(struct pollfd *fds, size_t &pos) {
 
 	auto it = del_cons.begin();
 	while (it != del_cons.end()) {
@@ -117,28 +178,30 @@ int setup_fdset(fd_set *readfds) {
 		if (c.is_faulty())
 			it = del_cons.erase(it);
 		else {
-			FD_SET(c.get_read_fd(), readfds);
-			maxfd = std::max(maxfd, c.get_read_fd());
+			c.prepare(&fds[pos++]);
 			it++;
 		}
 	}
 
 	std::lock_guard<std::mutex> guard(mtx);
-	for (auto &c : connections) {
-		FD_SET(c->get_read_fd(), readfds);
-		maxfd = std::max(maxfd, c->get_read_fd());
+	auto cit = connections.begin();
+	while ( cit != connections.end() ) {
+		if ( cit->has_error() )
+			cit = connections.erase(cit);
+		else {
+			cit->prepare(&fds[pos++]);
+			cit++;
+		}
 	}
-	return maxfd;
 }
 
-void process_connections(fd_set *readfds) {
+void process_connections() {
 	std::lock_guard<std::mutex> guard(mtx);
 	auto it = connections.begin();
 	while (it != connections.end()) {
-		auto &c = **it;
 		try {
-			if (FD_ISSET(c.get_read_fd(), readfds)) {
-				auto resp = c.read();
+			if ( it->is_ready() ) {
+				auto resp = it->connection->read();
 				uint8_t rc = resp->read<uint8_t>();
 				switch (rc) {
 				case ClientConnection::RESP_OK: {
@@ -165,12 +228,12 @@ void process_connections(fd_set *readfds) {
 	}
 }
 
-void process_del_cons(fd_set *readfds) {
+void process_del_cons() {
 	auto it = del_cons.begin();
 	while (it != del_cons.end()) {
 		auto &c = **it;
 		try {
-			if ( FD_ISSET(c.get_read_fd(),readfds) && c.input()) {
+			if ( c.process() ) {
 				Log::debug("Delivery swallowed!");
 				it = del_cons.erase(it);
 			} else
@@ -196,7 +259,7 @@ class OGCServiceWrapper : public OGCService {
 		virtual void run() { throw 1; };
 };
 
-std::queue<QTriple> replay_logs(char *logfile) {
+std::queue<QTriple> replay_logs(const char *logfile) {
 	std::queue<QTriple> queries;
 
 	// instantiate an OGCService for parsing
@@ -294,7 +357,7 @@ std::queue<QTriple> replay_logs(char *logfile) {
 				else
 					throw ArgumentException(concat("Unknown featureTypeString in WFS: ", featureTypeString));
 
-				queries.push(QTriple(CacheType::RASTER, rect, graph->getSemanticId()));
+				queries.push(QTriple(type, rect, graph->getSemanticId()));
 			}
 			else if (service == "WCS") {
 				continue;
@@ -308,34 +371,62 @@ std::queue<QTriple> replay_logs(char *logfile) {
 			fprintf(stderr, "Exception parsing query: %s\nError: %s\n", l.c_str(), e.what());
 		}
 		catch (...) {
-			fprintf(stderr, "Exception parsing query: %s\n", l.c_str());
+//			fprintf(stderr, "Exception parsing query: %s\n", l.c_str());
 		}
 	}
 
 	return queries;
 }
 
+std::queue<QTriple> create_run( int argc, char *argv[] ) {
+	(void) argc;
+	std::string workload = argv[2];
+
+	if ( workload == "btw_dis")
+		return disjoint_queries_from_spec(30000, cache_exp::btw, 64, 256 );
+	else if ( workload == "btw" )
+		return queries_from_spec(30000, cache_exp::btw, 64, 256 );
+	if ( workload == "srtm_dis")
+			return disjoint_queries_from_spec(30000, cache_exp::srtm, 64, 512 );
+	else if ( workload == "srtm" )
+		return queries_from_spec(30000, cache_exp::srtm, 64, 512 );
+	else {
+		auto res = replay_logs( workload.c_str() );
+		while ( res.size() > 30000 )
+			res.pop();
+		return res;
+	}
+
+}
+
+
 int main(int argc, char *argv[]) {
 	Configuration::loadFromDefaultPaths();
 	Log::setLevel(Log::LogLevel::INFO);
 
 	std::queue<QTriple> qs;
-	if (argc >= 2) {
-		qs = replay_logs(argv[1]);
+	int inter_arrival;
+
+	if ( argc < 3 ) {
+		inter_arrival = 6;
+		qs = queries_from_spec(30000, cache_exp::btw, 64, 256 );
 	}
 	else {
-		//	auto qs = queries_from_spec(2000, cache_exp::srtm, 32, 256);
-		qs = btw_queries(1000);
+		inter_arrival = atoi(argv[1]);
+		qs = create_run(argc,argv);
 	}
 
-	int inter_arrival = 10;
+
 
 	auto c = BlockingConnection::create(host, port, true,
 			ClientConnection::MAGIC_NUMBER);
 	auto rst = c->write_and_read(ClientConnection::CMD_RESET_STATS);
 
-
 	std::thread t(issue_queries, &qs, inter_arrival);
+
+
+	struct pollfd fds[0xffff];
+	size_t num_fds;
 
 	while (!done || !connections.empty() || !del_cons.empty()) {
 		if (connections.empty() && del_cons.empty()) {
@@ -343,18 +434,16 @@ int main(int argc, char *argv[]) {
 			continue;
 		}
 
-		struct timeval tv { 1, 0 };
-		fd_set readfds;
-		FD_ZERO(&readfds);
+		num_fds = 0;
 
-		int maxfd = setup_fdset(&readfds);
-
-		int sel_ret = select(maxfd + 1, &readfds, nullptr, nullptr, &tv);
-		if (sel_ret < 0 && errno != EINTR) {
-			Log::error("Select returned error: %s", strerror(errno));
-		} else if (sel_ret > 0) {
-			process_connections(&readfds);
-			process_del_cons(&readfds);
+		setup_fdset(fds,num_fds);
+		int poll_ret = poll(fds,num_fds,1000);
+		if (poll_ret < 0 && errno != EINTR) {
+			Log::error("Poll returned error: %s", strerror(errno));
+			exit(1);
+		} else if (poll_ret > 0) {
+			process_del_cons();
+			process_connections();
 		}
 	}
 	Log::info("Processing finished. Requesting stats.");
@@ -371,4 +460,3 @@ int main(int argc, char *argv[]) {
 
 	return 0;
 }
-

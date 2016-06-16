@@ -109,19 +109,40 @@ std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, cons
 QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes, IndexCacheManager &caches) : nodes(nodes), caches(caches) {
 }
 
-void QueryManager::schedule_pending_jobs(
-	const std::map<uint64_t, std::unique_ptr<WorkerConnection> > &worker_connections) {
+void QueryManager::schedule_pending_jobs() {
+
+	size_t num_workers = 0;
+	for ( auto &kv : nodes ) {
+		num_workers += kv.second->num_idle_workers();
+	}
 
 	auto it = pending_jobs.begin();
-	while (it != pending_jobs.end()) {
-		uint64_t con_id = (*it)->schedule(worker_connections);
-		if (con_id != 0) {
-			(*it)->time_scheduled = CacheCommon::time_millis();
-			stats.scheduled(worker_connections.at(con_id)->node_id);
-			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), con_id);
-			queries.emplace(con_id, std::move(*it));
+	while (  num_workers > 0 &&  it != pending_jobs.end()) {
+		auto &q = **it;
+
+		auto nids = q.get_target_nodes();
+		uint64_t worker = 0;
+		for ( auto &nid : nids ) {
+			// Schedule on any node
+			if ( nid == 0 ) {
+				for ( auto ni = nodes.begin(); ni != nodes.end() && worker == 0; ni++ ) {
+					worker = ni->second->schedule_request(q.get_command(),q.get_request());
+				}
+			}
+			else {
+				auto &node = nodes.at(nid);
+				worker = node->schedule_request(q.get_command(),q.get_request());
+			}
+		}
+		// Found a worker... Done!
+		if ( worker > 0 ) {
+			num_workers--;
+			q.time_scheduled = CacheCommon::time_millis();
+			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), worker);
+			queries.emplace(worker, std::move(*it));
 			it = pending_jobs.erase(it);
 		}
+		// Suspend scheduling
 		else
 			++it;
 	}
@@ -137,15 +158,23 @@ size_t QueryManager::close_worker(uint64_t worker_id) {
 	return res;
 }
 
-std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id) {
+std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id, uint32_t node_id) {
 	auto it = finished_queries.find(worker_id);
 	if ( it == finished_queries.end() )
 		throw IllegalStateException(concat("No finished query found for worker: ",worker_id));
 
-	std::set<uint64_t> clients = it->second->get_clients();
-	it->second->time_finished = CacheCommon::time_millis();
 	auto &q = *(it->second);
-	stats.query_finished( clients.size(), q.time_created, q.time_scheduled, q.time_finished  );
+
+	std::set<uint64_t> clients = q.get_clients();
+	q.time_finished = CacheCommon::time_millis();
+
+	// Tell on which node the queries were scheduled
+	stats.scheduled(node_id, clients.size());
+
+	for ( auto &tp : q.client_times ) {
+		uint64_t wait = tp > q.time_scheduled ? 0 : q.time_scheduled - tp;
+		stats.query_finished(wait,q.time_finished - std::max(tp,q.time_scheduled));
+	}
 	finished_queries.erase(it);
 	return clients;
 }
@@ -192,7 +221,7 @@ void QueryManager::handle_client_abort(uint64_t client_id) {
 	}
 }
 
-const SystemStats& QueryManager::get_stats() const {
+SystemStats& QueryManager::get_stats() {
 	return stats;
 }
 
@@ -257,10 +286,13 @@ bool RunningQuery::satisfies( const BaseRequest& req) const {
 
 void RunningQuery::add_client(uint64_t client) {
 	clients.insert(client);
+	client_times.push_back(CacheCommon::time_millis());
 }
 
 void RunningQuery::add_clients(const std::set<uint64_t>& clients) {
 	this->clients.insert(clients.begin(),clients.end());
+	for ( size_t i = 0; i < clients.size(); i++ )
+		client_times.push_back(CacheCommon::time_millis());
 }
 
 const std::set<uint64_t>& RunningQuery::get_clients() const {

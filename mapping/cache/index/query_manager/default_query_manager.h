@@ -34,9 +34,10 @@ public:
 	CreateJob( BaseRequest &&request, const QueryManager &mgr );
 
 	bool extend( const BaseRequest &req );
-	uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
 	bool is_affected_by_node( uint32_t node_id );
 	const BaseRequest& get_request() const;
+	virtual std::vector<uint32_t> get_target_nodes() const;
+	virtual uint8_t get_command() const;
 private:
 	BaseRequest request;
 	const QueryRectangle orig_query;
@@ -51,9 +52,10 @@ class DeliverJob : public PendingQuery {
 public:
 	DeliverJob( DeliveryRequest &&request, const IndexCacheKey &key );
 	bool extend( const BaseRequest &req );
-	uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
 	bool is_affected_by_node( uint32_t node_id );
 	const BaseRequest& get_request() const;
+	virtual std::vector<uint32_t> get_target_nodes() const;
+	virtual uint8_t get_command() const;
 private:
 	DeliveryRequest request;
 	uint32_t node;
@@ -67,11 +69,13 @@ class PuzzleJob : public PendingQuery {
 public:
 	PuzzleJob( PuzzleRequest &&request, const std::vector<IndexCacheKey> &keys );
 	bool extend( const BaseRequest &req );
-	uint64_t schedule( const std::map<uint64_t,std::unique_ptr<WorkerConnection>> &connections );
 	bool is_affected_by_node( uint32_t node_id );
 	const BaseRequest& get_request() const;
+	virtual std::vector<uint32_t> get_target_nodes() const;
+	virtual uint8_t get_command() const;
 private:
 	PuzzleRequest request;
+	std::vector<uint32_t> nodes_priorized;
 	std::set<uint32_t> nodes;
 };
 
@@ -85,6 +89,7 @@ public:
 	DefaultQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes,IndexCacheManager &caches);
 	void add_request( uint64_t client_id, const BaseRequest &req );
 	void process_worker_query(WorkerConnection& con);
+	bool use_reorg() const;
 protected:
 	std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query );
 private:

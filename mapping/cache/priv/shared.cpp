@@ -55,6 +55,10 @@ bool ResolutionInfo::matches(const QueryCube& query) const {
     );
 }
 
+std::string ResolutionInfo::to_string() const {
+	return concat("Resolution[ x: ", actual_pixel_scale_x, ", y: ", actual_pixel_scale_y, " ranges: ", pixel_scale_x.to_string(), "x", pixel_scale_y.to_string(), "]" );
+}
+
 ///////////////////////////////////////////////////////////
 //
 // BASE CUBE
@@ -138,6 +142,10 @@ void CacheCube::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) 
 
 const Interval& CacheCube::get_timespan() const {
 	return get_dimension(2);
+}
+
+std::string CacheCube::to_string() const {
+	return concat( Cube<3>::to_string(), ", ", resolution_info.to_string() );
 }
 
 ///////////////////////////////////////////////////////////

@@ -18,7 +18,6 @@
 
 
 class NodeCacheManager;
-template<typename T> class PuzzleUtil;
 
 /**
  * This class holds the current query-statistics.
@@ -43,6 +42,9 @@ public:
 
 	/** Adds a partial remote hit, with remainders */
 	void add_multi_remote_partial();
+
+	/** Adds the given amount of bytes */
+	void add_result_bytes(uint64_t bytes);
 
 	/** Adds a full miss */
 	void add_miss();

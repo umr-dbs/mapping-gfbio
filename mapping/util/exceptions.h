@@ -43,6 +43,7 @@ _CUSTOM_EXCEPTION_CLASS(TimeoutException, CacheException);
 _CUSTOM_EXCEPTION_CLASS(InterruptedException, CacheException);
 _CUSTOM_EXCEPTION_CLASS(DeliveryException, CacheException);
 _CUSTOM_EXCEPTION_CLASS(IllegalStateException, CacheException);
+_CUSTOM_EXCEPTION_CLASS(NodeFailedException, CacheException);
 
 
 

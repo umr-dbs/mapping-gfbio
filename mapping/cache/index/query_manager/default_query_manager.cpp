@@ -16,6 +16,10 @@ DefaultQueryManager::DefaultQueryManager(const std::map<uint32_t, std::shared_pt
 	QueryManager(nodes, caches) {
 }
 
+bool DefaultQueryManager::use_reorg() const {
+	return true;
+}
+
 void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req ) {
 	stats.issued();
 	TIME_EXEC("QueryManager.add_request");
@@ -182,70 +186,93 @@ CreateJob::CreateJob( BaseRequest&& request, const QueryManager &mgr ) :
 bool CreateJob::extend(const BaseRequest& req) {
 	if ( req.type == request.type &&
 		 req.semantic_id == request.semantic_id &&
-		 orig_query.TemporalReference::contains(req.query) &&
 		 orig_query.restype == req.query.restype) {
 
-		double nx1, nx2, ny1, ny2, narea;
+		QueryCube current(request.query);
+		QueryCube requested(req.query);
+		auto combined = current.combine(requested);
 
-		nx1 = std::min(request.query.x1, req.query.x1);
-		ny1 = std::min(request.query.y1, req.query.y1);
-		nx2 = std::max(request.query.x2, req.query.x2);
-		ny2 = std::max(request.query.y2, req.query.y2);
+		if ( (current.volume() + requested.volume()) * 1.01 >= combined.volume() ) {
+			SpatialReference sref(orig_query.epsg, combined.get_dimension(0).a,
+												   combined.get_dimension(1).a,
+												   combined.get_dimension(0).b,
+												   combined.get_dimension(1).b);
 
-		narea = (nx2 - nx1) * (ny2 - ny1);
+			TemporalReference tref(orig_query.timetype, combined.get_dimension(2).a, combined.get_dimension(2).b);
 
-		if (orig_query.restype == QueryResolution::Type::NONE && narea / orig_area <= 4.01) {
-			SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
-			request.query = QueryRectangle(sref, orig_query, orig_query);
-			return true;
-		}
-		else if (orig_query.restype == QueryResolution::Type::PIXELS && narea / orig_area <= 4.01) {
-			// Check resolution
-			double my_xres = (orig_query.x2 - orig_query.x1) / orig_query.xres;
-			double my_yres = (orig_query.y2 - orig_query.y1) / orig_query.yres;
-
-			double q_xres = (req.query.x2 - req.query.x1) / req.query.xres;
-			double q_yres = (req.query.y2 - req.query.y1) / req.query.yres;
-
-			if (std::abs(1.0 - my_xres / q_xres) < 0.01 && std::abs(1.0 - my_yres / q_yres) < 0.01) {
-
-				uint32_t nxres = std::ceil(
-					orig_query.xres * ((nx2 - nx1) / (orig_query.x2 - orig_query.x1)));
-				uint32_t nyres = std::ceil(
-					orig_query.yres * ((ny2 - ny1) / (orig_query.y2 - orig_query.y1)));
-
-				SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
-				request.query = QueryRectangle(sref, orig_query, QueryResolution::pixels(nxres, nyres));
+			if ( orig_query.restype == QueryResolution::Type::NONE ) {
+				request.query = QueryRectangle(sref,tref,QueryResolution::none());
 				return true;
+			}
+			else if ( orig_query.TemporalReference::contains(tref) ) {
+				// Check resolution
+				double my_xres = (orig_query.x2 - orig_query.x1) / orig_query.xres;
+				double my_yres = (orig_query.y2 - orig_query.y1) / orig_query.yres;
+
+				double q_xres = (req.query.x2 - req.query.x1) / req.query.xres;
+				double q_yres = (req.query.y2 - req.query.y1) / req.query.yres;
+
+				if (std::abs(1.0 - my_xres / q_xres) < 0.01 && std::abs(1.0 - my_yres / q_yres) < 0.01) {
+
+					uint32_t nxres = std::ceil(
+						orig_query.xres * ((sref.x2 - sref.x1) / (orig_query.x2 - orig_query.x1)));
+					uint32_t nyres = std::ceil(
+						orig_query.yres * ((sref.y2 - sref.y1) / (orig_query.y2 - orig_query.y1)));
+
+					request.query = QueryRectangle(sref, tref, QueryResolution::pixels(nxres, nyres));
+					return true;
+				}
 			}
 		}
 	}
 	return false;
 }
 
-uint64_t CreateJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	// Do not schedule if we have no nodes
-	if ( mgr.nodes.empty() )
-		return 0;
 
-	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.node_id == node_id && con.get_state() == WorkerState::IDLE) {
-			con.process_request(WorkerConnection::CMD_CREATE, request);
-			return con.id;
-		}
-	}
-	// Fallback
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.get_state() == WorkerState::IDLE) {
-			con.process_request(WorkerConnection::CMD_CREATE, request);
-			return con.id;
-		}
-	}
-	return 0;
-}
+//bool CreateJob::extend(const BaseRequest& req) {
+//	if ( req.type == request.type &&
+//		 req.semantic_id == request.semantic_id &&
+//		 orig_query.TemporalReference::contains(req.query) &&
+//		 orig_query.restype == req.query.restype) {
+//
+//		double nx1, nx2, ny1, ny2, narea;
+//
+//		nx1 = std::min(request.query.x1, req.query.x1);
+//		ny1 = std::min(request.query.y1, req.query.y1);
+//		nx2 = std::max(request.query.x2, req.query.x2);
+//		ny2 = std::max(request.query.y2, req.query.y2);
+//
+//		narea = (nx2 - nx1) * (ny2 - ny1);
+//
+//
+//		if (orig_query.restype == QueryResolution::Type::NONE && narea / orig_area <= 4.01) {
+//			SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
+//			request.query = QueryRectangle(sref, orig_query, orig_query);
+//			return true;
+//		}
+//		else if (orig_query.restype == QueryResolution::Type::PIXELS && narea / orig_area <= 4.01) {
+//			// Check resolution
+//			double my_xres = (orig_query.x2 - orig_query.x1) / orig_query.xres;
+//			double my_yres = (orig_query.y2 - orig_query.y1) / orig_query.yres;
+//
+//			double q_xres = (req.query.x2 - req.query.x1) / req.query.xres;
+//			double q_yres = (req.query.y2 - req.query.y1) / req.query.yres;
+//
+//			if (std::abs(1.0 - my_xres / q_xres) < 0.01 && std::abs(1.0 - my_yres / q_yres) < 0.01) {
+//
+//				uint32_t nxres = std::ceil(
+//					orig_query.xres * ((nx2 - nx1) / (orig_query.x2 - orig_query.x1)));
+//				uint32_t nyres = std::ceil(
+//					orig_query.yres * ((ny2 - ny1) / (orig_query.y2 - orig_query.y1)));
+//
+//				SpatialReference sref(orig_query.epsg, nx1, ny1, nx2, ny2);
+//				request.query = QueryRectangle(sref, orig_query, QueryResolution::pixels(nxres, nyres));
+//				return true;
+//			}
+//		}
+//	}
+//	return false;
+//}
 
 bool CreateJob::is_affected_by_node(uint32_t node_id) {
 	(void) node_id;
@@ -256,6 +283,15 @@ const BaseRequest& CreateJob::get_request() const {
 	return request;
 }
 
+std::vector<uint32_t> CreateJob::get_target_nodes() const {
+	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
+	return std::vector<uint32_t>{node_id,0};
+}
+
+uint8_t CreateJob::get_command() const {
+	return WorkerConnection::CMD_CREATE;
+}
+
 //
 // DELIVCER JOB
 //
@@ -264,17 +300,6 @@ DeliverJob::DeliverJob(DeliveryRequest&& request, const IndexCacheKey &key) :
 	PendingQuery(std::vector<CacheLocks::Lock>{CacheLocks::Lock(request.type,key)}),
 	request(request),
 	node(key.get_node_id()) {
-}
-
-uint64_t DeliverJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.node_id == node && con.get_state() == WorkerState::IDLE) {
-			con.process_request(WorkerConnection::CMD_DELIVER, request);
-			return con.id;
-		}
-	}
-	return 0;
 }
 
 bool DeliverJob::is_affected_by_node(uint32_t node_id) {
@@ -289,6 +314,14 @@ const BaseRequest& DeliverJob::get_request() const {
 	return request;
 }
 
+std::vector<uint32_t> DeliverJob::get_target_nodes() const {
+	return std::vector<uint32_t>{node};
+}
+
+uint8_t DeliverJob::get_command() const {
+	return WorkerConnection::CMD_DELIVER;
+}
+
 //
 // PUZZLE JOB
 //
@@ -297,23 +330,10 @@ PuzzleJob::PuzzleJob(PuzzleRequest&& request, const std::vector<IndexCacheKey> &
 	PendingQuery(),
 	request(std::move(request)) {
 	for ( auto &k : keys ) {
-		nodes.insert(k.get_node_id());
+		if ( nodes.insert(k.get_node_id()).second )
+			nodes_priorized.push_back(k.get_node_id() );
 		add_lock( CacheLocks::Lock(request.type,k) );
 	}
-}
-
-uint64_t PuzzleJob::schedule(const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &node : nodes) {
-		for (auto &e : connections) {
-			auto &con = *e.second;
-			if (!con.is_faulty() && con.node_id == node
-				&& con.get_state() == WorkerState::IDLE) {
-				con.process_request(WorkerConnection::CMD_PUZZLE, request);
-				return con.id;
-			}
-		}
-	}
-	return 0;
 }
 
 bool PuzzleJob::is_affected_by_node(uint32_t node_id) {
@@ -327,4 +347,13 @@ bool PuzzleJob::extend(const BaseRequest&) {
 
 const BaseRequest& PuzzleJob::get_request() const {
 	return request;
+}
+
+
+std::vector<uint32_t> PuzzleJob::get_target_nodes() const {
+	return nodes_priorized;
+}
+
+uint8_t PuzzleJob::get_command() const {
+	return WorkerConnection::CMD_PUZZLE;
 }

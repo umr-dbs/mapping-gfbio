@@ -18,8 +18,8 @@ TEST(ReorgTest,CapacityReorg) {
 	NodeHandshake h1(42, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 30, 20) } );
 	NodeHandshake h2(4711, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 30, 0) } );
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1, std::unique_ptr<ControlConnection>()));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2, std::unique_ptr<ControlConnection>()));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);
@@ -65,8 +65,8 @@ TEST(ReorgTest,GeographicReorg) {
 	NodeHandshake h1(42, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 40, 20) } );
 	NodeHandshake h2(4711, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 40, 0) } );
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1, std::unique_ptr<ControlConnection>()));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2, std::unique_ptr<ControlConnection>()));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);
@@ -120,8 +120,8 @@ TEST(ReorgTest,GraphReorg) {
 	NodeHandshake h1(42, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 40, 29) } );
 	NodeHandshake h2(4711, std::vector<CacheHandshake>{ CacheHandshake(CacheType::RASTER, 40, 0) } );
 
-	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1));
-	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2));
+	std::shared_ptr<Node> n1 = std::shared_ptr<Node>(new Node(1, "localhost", h1, std::unique_ptr<ControlConnection>() ));
+	std::shared_ptr<Node> n2 = std::shared_ptr<Node>(new Node(2, "localhost", h2, std::unique_ptr<ControlConnection>() ));
 
 	std::map<uint32_t, std::shared_ptr<Node>> nodes;
 	nodes.emplace(1, n1);

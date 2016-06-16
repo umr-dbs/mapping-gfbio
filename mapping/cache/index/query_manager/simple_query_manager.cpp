@@ -12,18 +12,6 @@
 SimpleJob::SimpleJob(const BaseRequest &request, uint32_t node_id) : PendingQuery(), request(request), node_id(node_id) {
 }
 
-uint64_t SimpleJob::schedule(
-		const std::map<uint64_t, std::unique_ptr<WorkerConnection> >& connections) {
-	for (auto &e : connections) {
-		auto &con = *e.second;
-		if (!con.is_faulty() && con.node_id == node_id && con.get_state() == WorkerState::IDLE) {
-			con.process_request(WorkerConnection::CMD_CREATE, request);
-			return con.id;
-		}
-	}
-	return 0;
-}
-
 bool SimpleJob::is_affected_by_node(uint32_t node_id) {
 	return node_id == this->node_id;
 }
@@ -37,13 +25,28 @@ const BaseRequest& SimpleJob::get_request() const {
 	return request;
 }
 
+std::vector<uint32_t> SimpleJob::get_target_nodes() const {
+	return std::vector<uint32_t>{node_id};
+}
+
+uint8_t SimpleJob::get_command() const {
+	return WorkerConnection::CMD_CREATE;
+}
+
 
 SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<Node> >& nodes, IndexCacheManager &caches) : QueryManager(nodes, caches) {
 }
 
 void SimpleQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
 	stats.issued();
-	auto j = create_job(req);
+	std::unique_ptr<PendingQuery> j;
+	try {
+		j = create_job(req);
+	} catch ( const std::exception &e ) {
+		Log::warn("Error while creating job, falling back to default scheduling: %s", e.what());
+		// 0 node-id means schedule on any!
+		j = make_unique<SimpleJob>(req,0);
+	}
 	j->add_client(client_id);
 	pending_jobs.push_back( std::move(j) );
 }
@@ -54,9 +57,20 @@ void SimpleQueryManager::process_worker_query(WorkerConnection& con) {
 }
 
 std::unique_ptr<PendingQuery> SimpleQueryManager::recreate_job(const RunningQuery& query) {
-	auto res = create_job(query.get_request());
+	std::unique_ptr<PendingQuery> res;
+	try {
+		res = create_job(query.get_request());
+	} catch ( const std::exception &e ) {
+		Log::warn("Error while creating job, falling back to default scheduling: %s", e.what());
+		// 0 node-id means schedule on any!
+		res = make_unique<SimpleJob>(query.get_request(),0);
+	}
 	res->add_clients(query.get_clients());
 	return res;
+}
+
+bool SimpleQueryManager::use_reorg() const {
+	return false;
 }
 
 //

@@ -94,7 +94,7 @@ BinaryStream BinaryStream::connectTCP(const char *hostname, int port, bool no_de
 	int new_fd = socket(servinfo->ai_family, servinfo->ai_socktype, servinfo->ai_protocol);
 	if (new_fd < 0) {
 		freeaddrinfo(servinfo);
-		throw NetworkException("BinaryStream: unable to create socket()");
+		throw NetworkException(concat("BinaryStream: unable to create socket()", strerror(errno)));
 	}
 
 	if (connect(new_fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1) {

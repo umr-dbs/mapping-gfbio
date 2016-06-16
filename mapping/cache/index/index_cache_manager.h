@@ -81,7 +81,7 @@ public:
 	 * @param force whether to force reorganization, even it is not required due to rules
 	 * @return the reorg-commands to trigger
 	 */
-	std::map<uint32_t, NodeReorgDescription> reorganize(const std::map<uint32_t, std::shared_ptr<Node> > &nodes, bool force = false );
+	std::map<uint32_t, NodeReorgDescription> reorganize(const std::map<uint32_t, std::shared_ptr<Node> > &nodes, const QueryManager &qm, bool force = false );
 
 	/**
 	 * Uses the reorg-strategy to determine the best node to schedule the given request on

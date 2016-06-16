@@ -238,12 +238,8 @@ void IndexServer::process_handshake(std::vector<std::unique_ptr<NewNBConnection>
 void IndexServer::process_nodes() {
 	for ( auto &p : nodes ) {
 		auto &node = *p.second;
-		try {
-			process_control_connection(node);
-			process_worker_connections(node);
-		} catch ( const std::exception &e ) {
-			Log::error("Error processing connections of node %ud: %s", node.id, e.what());
-		}
+		process_control_connection(node);
+		process_worker_connections(node);
 	}
 }
 
@@ -418,7 +414,7 @@ void IndexServer::process_worker_connections(Node &node) {
 void IndexServer::reorganize(bool force) {
 	// Remember time of this reorg
 	last_reorg = CacheCommon::time_millis();
-	auto reorgs = caches.reorganize(nodes,force);
+	auto reorgs = caches.reorganize(nodes,*query_manager,force);
 	for (auto &d : reorgs) {
 		for (auto &rm : d.second.get_removals()) {
 			caches.get_cache(rm.type).remove(IndexCacheKey(rm.semantic_id, d.first, rm.entry_id));

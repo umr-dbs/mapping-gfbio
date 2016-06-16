@@ -86,8 +86,8 @@ uint32_t IndexCacheManager::find_node_for_job(const BaseRequest& request,const s
 	return get_info(request.type).reorg_strategy->get_node_for_job(request,nodes);
 }
 
-std::map<uint32_t, NodeReorgDescription> IndexCacheManager::reorganize(const std::map<uint32_t, std::shared_ptr<Node> > &nodes, bool force) {
-	Log::info("Calculating reorganization of cache");
+std::map<uint32_t, NodeReorgDescription> IndexCacheManager::reorganize(const std::map<uint32_t, std::shared_ptr<Node> > &nodes, const QueryManager &qm, bool force) {
+	Log::debug("Calculating reorganization of cache");
 
 	std::map<uint32_t, NodeReorgDescription> result;
 	for (auto &kv : nodes)
@@ -95,8 +95,8 @@ std::map<uint32_t, NodeReorgDescription> IndexCacheManager::reorganize(const std
 
 	for ( CacheInfo &c : all_caches ) {
 		if ( c.reorg_strategy->requires_reorg(nodes) || force )
-			c.reorg_strategy->reorganize(result);
+			c.reorg_strategy->reorganize(result, qm);
 	}
-	Log::info("Finished calculating reorganization of cache");
+	Log::debug("Finished calculating reorganization of cache");
 	return result;
 }

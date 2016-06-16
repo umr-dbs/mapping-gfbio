@@ -21,7 +21,7 @@ public:
 class EMKDEQueryManager : public SimpleQueryManager {
 public:
 public:
-	EMKDEQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes, IndexCacheManager &mgr);
+	EMKDEQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes);
 protected:
 	std::unique_ptr<PendingQuery> create_job(const BaseRequest &req);
 

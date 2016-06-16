@@ -20,6 +20,8 @@
 #include <vector>
 #include <set>
 
+class DefaultQueryManager;
+
 /**
  * Describes a query where the whole result must be computed
  */
@@ -31,7 +33,7 @@ public:
 	 * @param nodes the currently available nodes
 	 * @param cache the cache for this type of request
 	 */
-	CreateJob( BaseRequest &&request, const QueryManager &mgr );
+	CreateJob( BaseRequest &&request, const DefaultQueryManager &mgr );
 
 	bool extend( const BaseRequest &req );
 	bool is_affected_by_node( uint32_t node_id );
@@ -42,7 +44,7 @@ private:
 	BaseRequest request;
 	const QueryRectangle orig_query;
 	const double orig_area;
-	const QueryManager &mgr;
+	const DefaultQueryManager &mgr;
 };
 
 /**
@@ -93,6 +95,7 @@ public:
 protected:
 	std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query );
 private:
+	IndexCacheManager &caches;
 	/**
 	 * Creates a new job based on the given request and cache-query result
 	 * @param req the request

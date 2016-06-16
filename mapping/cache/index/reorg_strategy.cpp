@@ -178,7 +178,7 @@ uint32_t ReorgStrategy::get_least_used_node(
 	return min_id;
 }
 
-void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) {
+void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result, const QueryManager &qm) {
 	if ( result.empty() )
 		return;
 
@@ -202,12 +202,23 @@ void ReorgStrategy::reorganize(std::map<uint32_t,NodeReorgDescription> &result) 
 		relevance_function->new_turn();
 		std::sort( all_entries.begin(), all_entries.end(), std::ref(*relevance_function) );
 
-		while ( bytes_used / bytes_available >= max_target_usage ) {
+
+		std::vector<std::shared_ptr<const IndexCacheEntry>> kept;
+		while ( !all_entries.empty() && bytes_used / bytes_available >= max_target_usage ) {
 			auto &e = all_entries.back();
-			bytes_used -= e->size;
-			result.at(e->get_node_id()).add_removal( TypedNodeCacheKey(cache.type,e->semantic_id,e->get_entry_id()) );
+			if ( !qm.is_locked(cache.type,IndexCacheKey(e->semantic_id,e->id)) ) {
+				bytes_used -= e->size;
+				result.at(e->get_node_id()).add_removal( TypedNodeCacheKey(cache.type,e->semantic_id,e->get_entry_id()) );
+			}
+			else
+				kept.push_back(e);
 			all_entries.pop_back();
 		}
+		if ( bytes_used / bytes_available >= max_target_usage )
+			Log::warn("Too many locks... could not remove enough entries due to locks!");
+
+		for ( auto i = kept.rbegin(); i != kept.rend(); i++ )
+			all_entries.push_back(*i);
 	}
 
 	std::map<uint32_t, ReorgNode> distrib;

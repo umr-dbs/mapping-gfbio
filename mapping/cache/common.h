@@ -72,7 +72,8 @@ public:
 	RWLock() : read_count(0) {};
 
 	void lock_shared() {
-		std::lock_guard<std::mutex> g(mtx);
+		std::lock_guard<std::mutex> g(w_prio);
+		std::lock_guard<std::mutex> g2(mtx);
 		read_count++;
 		if ( read_count == 1 )
 			w_lock.lock();
@@ -86,6 +87,7 @@ public:
 	}
 
 	void lock_exclusive() {
+		std::lock_guard<std::mutex> g(w_prio);
 		w_lock.lock();
 	};
 
@@ -94,6 +96,7 @@ public:
 	};
 private:
 	int read_count;
+	std::mutex w_prio;
 	std::mutex mtx;
 	std::mutex w_lock;
 };

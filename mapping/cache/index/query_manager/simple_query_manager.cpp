@@ -69,6 +69,10 @@ std::unique_ptr<PendingQuery> SimpleQueryManager::recreate_job(const RunningQuer
 	return res;
 }
 
+bool SimpleQueryManager::use_reorg() const {
+	return false;
+}
+
 //
 // DEMA
 //
@@ -181,4 +185,3 @@ std::unique_ptr<PendingQuery> HybridQueryManager::create_job(
 		const BaseRequest& req) {
 	return make_unique<CreateJob>(BaseRequest(req), *this);
 }
-

@@ -16,6 +16,10 @@ DefaultQueryManager::DefaultQueryManager(const std::map<uint32_t, std::shared_pt
 	QueryManager(nodes, caches) {
 }
 
+bool DefaultQueryManager::use_reorg() const {
+	return true;
+}
+
 void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req ) {
 	stats.issued();
 	TIME_EXEC("QueryManager.add_request");

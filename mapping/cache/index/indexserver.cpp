@@ -135,7 +135,7 @@ void IndexServer::run() {
 
 
 		// Reorganize
-		if ( oldest_stats > last_reorg ) {
+		if ( query_manager->use_reorg() && oldest_stats > last_reorg ) {
 			requires_reorg = caches.require_reorg( nodes );
 			if ( requires_reorg && all_idle )
 				reorganize();

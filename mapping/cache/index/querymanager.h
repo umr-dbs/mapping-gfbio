@@ -213,6 +213,8 @@ public:
 
 	virtual ~QueryManager() = default;
 
+	virtual bool use_reorg() const = 0;
+
 	/**
 	 * Creates a new instance
 	 * @param caches the available cache

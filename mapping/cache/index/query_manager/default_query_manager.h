@@ -89,6 +89,7 @@ public:
 	DefaultQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes,IndexCacheManager &caches);
 	void add_request( uint64_t client_id, const BaseRequest &req );
 	void process_worker_query(WorkerConnection& con);
+	bool use_reorg() const;
 protected:
 	std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query );
 private:

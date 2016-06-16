@@ -248,8 +248,9 @@ void IndexServer::process_control_connection( Node &node ) {
 	// Check if node is waiting for a confirmation
 	if ( cc.get_state() == ControlState::MOVE_RESULT_READ ) {
 		auto res = cc.get_move_result();
-		IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
-		if ( !query_manager->is_locked(res.type, old) )
+		IndexCacheKey from(res.semantic_id, res.from_node_id, res.entry_id);
+		IndexCacheKey to(res.semantic_id,res.to_node_id,res.to_cache_id);
+		if ( query_manager->process_move(res.type,from,to) )
 			cc.confirm_move();
 	}
 	else if ( cc.get_state() == ControlState::REMOVE_REQUEST_READ ) {
@@ -265,8 +266,9 @@ void IndexServer::process_control_connection( Node &node ) {
 				Log::trace("Node %d migrated one cache-entry.", cc.node_id);
 				auto res = cc.get_move_result();
 				handle_reorg_result(res);
-				IndexCacheKey old(res.semantic_id, res.from_node_id, res.entry_id);
-				if ( !query_manager->is_locked(res.type, old) )
+				IndexCacheKey from(res.semantic_id, res.from_node_id, res.entry_id);
+				IndexCacheKey to(res.semantic_id,res.to_node_id,res.to_cache_id);
+				if ( query_manager->process_move(res.type,from,to) )
 					cc.confirm_move();
 				break;
 			}

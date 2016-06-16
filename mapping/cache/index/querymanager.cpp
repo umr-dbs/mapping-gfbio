@@ -28,16 +28,11 @@ CacheLocks::Lock::Lock(CacheType type, const IndexCacheKey& key) :
 }
 
 bool CacheLocks::Lock::operator <(const Lock& l) const {
-	return (type <  l.type) ||
-		   (type == l.type && id.first <  l.id.first) ||
-		   (type == l.type && id.first == l.id.first && id.second <  l.id.second) ||
-		   (type == l.type && id.first == l.id.first && id.second == l.id.second && semantic_id < l.semantic_id);
+	return type < l.type || (type == l.type && IndexCacheKey::operator <(l));
 }
 
 bool CacheLocks::Lock::operator ==(const Lock& l) const {
-	return type == l.type &&
-		   id == l.id &&
-		   semantic_id == l.semantic_id;
+	return type == l.type && IndexCacheKey::operator ==(l);
 }
 
 
@@ -49,36 +44,45 @@ bool CacheLocks::is_locked(const Lock& lock) const {
 	return locks.find(lock) != locks.end();
 }
 
-void CacheLocks::add_lock(const Lock& lock) {
+void CacheLocks::add_lock(const Lock& lock, uint64_t query_id) {
 	auto it = locks.find(lock);
-	if ( it != locks.end() )
-		it->second++;
-	else if ( !locks.emplace( lock, 1 ).second )
-		throw IllegalStateException("Locking failed!");
+	if ( it != locks.end() ) {
+		if ( !it->second.emplace(query_id).second )
+			throw IllegalStateException(concat("Could not add lock ", lock.to_string(), " to query ", query_id));
+	}
+	else if ( !locks.emplace( lock, std::unordered_set<uint64_t>{query_id} ).second )
+		throw IllegalStateException(concat("Could not add lock ", lock.to_string(), " to query ", query_id));
 }
 
-void CacheLocks::add_locks(const std::vector<Lock>& locks) {
+void CacheLocks::add_locks(const std::set<Lock>& locks, uint64_t query_id) {
 	for ( auto &l : locks )
-		add_lock(l);
+		add_lock(l,query_id);
 }
 
-void CacheLocks::remove_lock(const Lock& lock) {
+void CacheLocks::remove_lock(const Lock& lock, uint64_t query_id) {
 	auto it = locks.find(lock);
 		if ( it != locks.end() ) {
-			if ( it->second == 1 )
+			if ( it->second.erase(query_id) == 0 )
+				throw IllegalStateException(concat("Lock: ", it->first.to_string(), " was not set for query: ", query_id));
+			if ( it->second.empty() )
 				locks.erase(it);
-			else if ( it->second > 1 )
-				it->second--;
-			else
-				throw IllegalStateException("Illegal state on locks!");
 		}
 		else
 			throw ArgumentException(concat("No lock held for key: ", lock.to_string()) );
 }
 
-void CacheLocks::remove_locks(const std::vector<Lock>& locks) {
+void CacheLocks::remove_locks(const std::set<Lock>& locks, uint64_t query_id) {
 	for ( auto &l : locks )
-			remove_lock(l);
+			remove_lock(l,query_id);
+}
+
+std::unordered_set<uint64_t> CacheLocks::get_queries(const Lock& lock) const {
+	return locks.at(lock);
+}
+
+void CacheLocks::move_lock(const Lock& from, const Lock& to, uint64_t query_id) {
+	remove_lock(from, query_id);
+	add_lock(to, query_id);
 }
 
 //
@@ -116,7 +120,7 @@ void QueryManager::schedule_pending_jobs() {
 
 	auto it = pending_jobs.begin();
 	while (  num_workers > 0 &&  it != pending_jobs.end()) {
-		auto &q = **it;
+		auto &q = *it->second;
 
 		auto nids = q.get_target_nodes();
 		uint64_t worker = 0;
@@ -138,8 +142,8 @@ void QueryManager::schedule_pending_jobs() {
 		if ( worker > 0 ) {
 			num_workers--;
 			q.time_scheduled = CacheCommon::time_millis();
-			Log::debug("Scheduled request: %s\non worker: %d", (*it)->get_request().to_string().c_str(), worker);
-			queries.emplace(worker, std::move(*it));
+			Log::debug("Scheduled request: %s\non worker: %d", q.get_request().to_string().c_str(), worker);
+			queries.emplace(worker, std::move(it->second));
 			it = pending_jobs.erase(it);
 		}
 		// Suspend scheduling
@@ -185,7 +189,7 @@ void QueryManager::worker_failed(uint64_t worker_id) {
 	if ( fi != finished_queries.end() ) {
 		auto job = recreate_job(*fi->second);
 		finished_queries.erase(fi);
-		pending_jobs.push_back(std::move(job));
+		add_query(std::move(job));
 		return;
 	}
 
@@ -193,7 +197,7 @@ void QueryManager::worker_failed(uint64_t worker_id) {
 	if ( fi != queries.end() ) {
 		auto job = recreate_job(*fi->second);
 		queries.erase(fi);
-		pending_jobs.push_back(std::move(job));
+		add_query(std::move(job));
 	}
 }
 
@@ -202,9 +206,9 @@ void QueryManager::node_failed(uint32_t node_id) {
 	auto iter = pending_jobs.begin();
 
 	while ( iter != pending_jobs.end() ) {
-		if ( (*iter)->is_affected_by_node(node_id) ) {
-			auto nj = recreate_job(**iter);
-			*iter = std::move(nj);
+		if ( iter->second->is_affected_by_node(node_id) ) {
+			auto nj = recreate_job(*iter->second);
+			iter->second = std::move(nj);
 		}
 		iter++;
 	}
@@ -213,7 +217,7 @@ void QueryManager::node_failed(uint32_t node_id) {
 void QueryManager::handle_client_abort(uint64_t client_id) {
 	auto iter = pending_jobs.begin();
 	while ( iter != pending_jobs.end() ) {
-		auto &jd = **iter;
+		auto &jd = *iter->second;
 		if ( jd.remove_client(client_id) && !jd.has_clients() ) {
 			Log::info("Cancelled request for client: %ld", client_id);
 			pending_jobs.erase(iter);
@@ -235,27 +239,53 @@ bool QueryManager::is_locked( CacheType type, const IndexCacheKey& key) const {
 	return locks.is_locked(type,key);
 }
 
+bool QueryManager::process_move(CacheType type, const IndexCacheKey& from, const IndexCacheKey& to) {
+	CacheLocks::Lock lfrom(type,from);
+	CacheLocks::Lock lto(type,to);
+	if ( locks.is_locked(lfrom) ) {
+		auto qids = locks.get_queries(lfrom);
+		auto qiter = qids.begin();
+		while ( qiter != qids.end() ) {
+			try {
+				pending_jobs.at(*qiter)->entry_moved(lfrom,lto,nodes);
+				qiter = qids.erase(qiter);
+			} catch ( const std::out_of_range &oor ) {
+				qiter++;
+			}
+		}
+		return qids.empty();
+	}
+	else
+		return true;
+}
+
+void QueryManager::add_query(std::unique_ptr<PendingQuery> query) {
+	pending_jobs.emplace(query->id, std::move(query));
+}
+
 //
 // Jobs
 //
 
-RunningQuery::RunningQuery( std::vector<CacheLocks::Lock> &&locks ) :
-	locks(std::move(locks)), time_created(CacheCommon::time_millis()), time_scheduled(0), time_finished(0) {
-	QueryManager::locks.add_locks(this->locks);
+uint64_t RunningQuery::next_id = 1;
+
+RunningQuery::RunningQuery( std::set<CacheLocks::Lock> &&locks ) :
+	id(next_id++), locks(std::move(locks)), time_created(CacheCommon::time_millis()), time_scheduled(0), time_finished(0) {
+	QueryManager::locks.add_locks(this->locks,id);
 }
 
 RunningQuery::~RunningQuery() {
-	QueryManager::locks.remove_locks(this->locks);
+	QueryManager::locks.remove_locks(this->locks,id);
 }
 
 void RunningQuery::add_lock(const CacheLocks::Lock& lock) {
-	QueryManager::locks.add_lock(lock);
-	locks.push_back(lock);
+	QueryManager::locks.add_lock(lock,id);
+	locks.emplace(lock);
 }
 
-void RunningQuery::add_locks(const std::vector<CacheLocks::Lock>& locks) {
-	QueryManager::locks.add_locks(locks);
-	this->locks.insert(this->locks.end(),locks.begin(),locks.end());
+void RunningQuery::add_locks(const std::set<CacheLocks::Lock>& locks) {
+	QueryManager::locks.add_locks(locks,id);
+	this->locks.insert(locks.begin(),locks.end());
 }
 
 
@@ -309,7 +339,13 @@ bool RunningQuery::has_clients() const {
 	return !clients.empty();
 }
 
-PendingQuery::PendingQuery( std::vector<CacheLocks::Lock> &&locks ) :
+PendingQuery::PendingQuery( std::set<CacheLocks::Lock> &&locks ) :
 	RunningQuery(std::move(locks)) {
 }
 
+void PendingQuery::entry_moved(const CacheLocks::Lock& from, const CacheLocks::Lock& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
+	QueryManager::locks.move_lock(from,to,id);
+	locks.erase(from);
+	locks.insert(to);
+	replace_reference(from,to,nmap);
+}

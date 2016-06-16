@@ -11,18 +11,19 @@ TEST(Locking,CacheLocksTest) {
 	IndexCacheKey key("Test",1,1);
 	CacheLocks::Lock l( CacheType::POINT, key );
 
-	locks.add_lock(l);
+
+	locks.add_lock(l,1);
 	ASSERT_TRUE(  locks.is_locked(l) );
 	ASSERT_TRUE(  locks.is_locked( CacheType::POINT, key) );
 	ASSERT_FALSE( locks.is_locked( CacheType::RASTER, key) );
 
-	locks.add_lock(l);
+	locks.add_lock(l,2);
 	ASSERT_TRUE(  locks.is_locked(l) );
 
-	locks.remove_lock(l);
+	locks.remove_lock(l,2);
 	ASSERT_TRUE(  locks.is_locked(l) );
 
-	locks.remove_lock(l);
+	locks.remove_lock(l,1);
 	ASSERT_FALSE(  locks.is_locked(l) );
 }
 

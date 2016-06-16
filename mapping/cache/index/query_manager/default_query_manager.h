@@ -40,6 +40,8 @@ public:
 	const BaseRequest& get_request() const;
 	virtual std::vector<uint32_t> get_target_nodes() const;
 	virtual uint8_t get_command() const;
+protected:
+	void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 private:
 	BaseRequest request;
 	const QueryRectangle orig_query;
@@ -58,6 +60,8 @@ public:
 	const BaseRequest& get_request() const;
 	virtual std::vector<uint32_t> get_target_nodes() const;
 	virtual uint8_t get_command() const;
+protected:
+	void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 private:
 	DeliveryRequest request;
 	uint32_t node;
@@ -75,8 +79,11 @@ public:
 	const BaseRequest& get_request() const;
 	virtual std::vector<uint32_t> get_target_nodes() const;
 	virtual uint8_t get_command() const;
+protected:
+	void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 private:
 	PuzzleRequest request;
+	std::vector<IndexCacheKey> keys;
 	std::vector<uint32_t> nodes_priorized;
 	std::set<uint32_t> nodes;
 };

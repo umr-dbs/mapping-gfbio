@@ -24,6 +24,17 @@ IndexCacheKey::IndexCacheKey(const std::string &semantic_id, uint32_t node_id, u
 	semantic_id(semantic_id), id(node_id,entry_id) {
 }
 
+bool IndexCacheKey::operator <(const IndexCacheKey& l) const {
+	return (id.first <  l.id.first) ||
+		   (id.first == l.id.first && id.second <  l.id.second) ||
+		   (id.first == l.id.first && id.second == l.id.second && semantic_id < l.semantic_id);
+}
+
+bool IndexCacheKey::operator ==(const IndexCacheKey& l) const {
+	return id == l.id &&
+		   semantic_id == l.semantic_id;
+}
+
 uint32_t IndexCacheKey::get_node_id() const {
 	return id.first;
 }

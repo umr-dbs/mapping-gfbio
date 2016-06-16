@@ -33,8 +33,8 @@ void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req
 
 	// Check if pending jobs satisfy the given query
 	for (auto &j : pending_jobs) {
-		if (j->satisfies(req)) {
-			j->add_client(client_id);
+		if (j.second->satisfies(req)) {
+			j.second->add_client(client_id);
 			return;
 		}
 	}
@@ -48,8 +48,8 @@ void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req
 	//  No result --> Check if a pending query may be extended by the given query
 	if ( res.items.empty() ) {
 		for (auto &j : pending_jobs) {
-			if (j->extend(req)) {
-				j->add_client(client_id);
+			if (j.second->extend(req)) {
+				j.second->add_client(client_id);
 				return;
 			}
 		}
@@ -57,7 +57,7 @@ void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req
 	// Create a new job
 	auto job = create_job(req,res);
 	job->add_client(client_id);
-	pending_jobs.push_back(std::move(job));
+	add_query(std::move(job));
 }
 
 void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
@@ -310,12 +310,19 @@ uint8_t CreateJob::get_command() const {
 	return WorkerConnection::CMD_CREATE;
 }
 
+void CreateJob::replace_reference(const IndexCacheKey& from,
+		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
+	(void) from;
+	(void) to;
+	(void) nmap;
+}
+
 //
 // DELIVCER JOB
 //
 
 DeliverJob::DeliverJob(DeliveryRequest&& request, const IndexCacheKey &key) :
-	PendingQuery(std::vector<CacheLocks::Lock>{CacheLocks::Lock(request.type,key)}),
+	PendingQuery(std::set<CacheLocks::Lock>{CacheLocks::Lock(request.type,key)}),
 	request(request),
 	node(key.get_node_id()) {
 }
@@ -340,13 +347,21 @@ uint8_t DeliverJob::get_command() const {
 	return WorkerConnection::CMD_DELIVER;
 }
 
+void DeliverJob::replace_reference(const IndexCacheKey& from,
+		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
+	(void) from;
+	(void) nmap;
+	request.entry_id = to.id.second;
+	node = to.id.first;
+}
+
 //
 // PUZZLE JOB
 //
 
 PuzzleJob::PuzzleJob(PuzzleRequest&& request, const std::vector<IndexCacheKey> &keys) :
 	PendingQuery(),
-	request(std::move(request)) {
+	request(std::move(request)), keys(keys) {
 	for ( auto &k : keys ) {
 		if ( nodes.insert(k.get_node_id()).second )
 			nodes_priorized.push_back(k.get_node_id() );
@@ -374,4 +389,27 @@ std::vector<uint32_t> PuzzleJob::get_target_nodes() const {
 
 uint8_t PuzzleJob::get_command() const {
 	return WorkerConnection::CMD_PUZZLE;
+}
+
+
+void PuzzleJob::replace_reference(const IndexCacheKey& from,
+		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
+
+	nodes.clear();
+	nodes_priorized.clear();
+
+	for ( auto i = keys.begin(); i != keys.end(); i++ ) {
+		if ( *i == from )
+			*i = to;
+	}
+
+	std::vector<CacheRef> refs;
+	for ( auto &k : keys) {
+		if ( nodes.insert(k.get_node_id()).second )
+			nodes_priorized.push_back(k.get_node_id() );
+		auto &n = nmap.at(k.id.first);
+		refs.push_back( CacheRef(n->host,n->port,k.id.second) );
+	}
+
+	request.parts = refs;
 }

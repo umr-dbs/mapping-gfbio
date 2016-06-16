@@ -59,7 +59,7 @@ void AttributeArraysHelper::append_arr(AttributeArrays::AttributeArray<T>& dest,
 }
 
 template<class T>
-std::unique_ptr<T> PuzzleJob::process(GenericOperator &op,
+std::unique_ptr<T> PuzzleUtil::process(GenericOperator &op,
 		const QueryRectangle& query, const std::vector<Cube<3> >& remainder,
 		const std::vector<std::shared_ptr<const T> >& items,
 		QueryProfiler &profiler) {
@@ -84,7 +84,7 @@ std::unique_ptr<T> PuzzleJob::process(GenericOperator &op,
 }
 
 template<class T>
-std::vector<std::unique_ptr<T> > PuzzleJob::compute_remainders(
+std::vector<std::unique_ptr<T> > PuzzleUtil::compute_remainders(
 		const QueryRectangle& query, GenericOperator &op, const T& ref_result, const std::vector<Cube<3> >& remainder, QueryProfiler& profiler) {
 	TIME_EXEC("PuzzleUtil.compute_remainders");
 	std::vector<std::unique_ptr<T>> result;
@@ -99,7 +99,7 @@ std::vector<std::unique_ptr<T> > PuzzleJob::compute_remainders(
 }
 
 template<class T>
-std::vector<QueryRectangle> PuzzleJob::get_remainder_queries(
+std::vector<QueryRectangle> PuzzleUtil::get_remainder_queries(
 		const QueryRectangle& query, const std::vector<Cube<3> >& remainder, const T& ref_result) {
 	(void) ref_result;
 	std::vector<QueryRectangle> result;
@@ -115,7 +115,7 @@ std::vector<QueryRectangle> PuzzleJob::get_remainder_queries(
 }
 
 template<>
-std::vector<QueryRectangle> PuzzleJob::get_remainder_queries(
+std::vector<QueryRectangle> PuzzleUtil::get_remainder_queries(
 		const QueryRectangle& query, const std::vector<Cube<3> >& remainder, const GenericRaster& ref_result) {
 
 	std::vector<QueryRectangle> result;
@@ -146,7 +146,7 @@ std::vector<QueryRectangle> PuzzleJob::get_remainder_queries(
 }
 
 
-void PuzzleJob::snap_to_pixel_grid( double &v1, double &v2, double ref, double scale ) {
+void PuzzleUtil::snap_to_pixel_grid( double &v1, double &v2, double ref, double scale ) {
 	if ( ref < v1 )
 		v1 = ref + std::floor( (v1-ref) / scale)*scale;
 	else
@@ -159,7 +159,7 @@ void PuzzleJob::snap_to_pixel_grid( double &v1, double &v2, double ref, double s
 //
 
 template<class T>
-SpatioTemporalReference PuzzleJob::enlarge_puzzle(const QueryRectangle& query,
+SpatioTemporalReference PuzzleUtil::enlarge_puzzle(const QueryRectangle& query,
 		const std::vector<std::shared_ptr<const T> >& items) {
 
 	TIME_EXEC("PuzzleUtil.enlarge");
@@ -206,7 +206,7 @@ SpatioTemporalReference PuzzleJob::enlarge_puzzle(const QueryRectangle& query,
 }
 
 template<>
-SpatioTemporalReference PuzzleJob::enlarge_puzzle(const QueryRectangle& query,
+SpatioTemporalReference PuzzleUtil::enlarge_puzzle(const QueryRectangle& query,
 		const std::vector<std::shared_ptr<const GenericPlot> >& items) {
 	(void) items;
 	return SpatioTemporalReference(query, query);
@@ -217,41 +217,41 @@ SpatioTemporalReference PuzzleJob::enlarge_puzzle(const QueryRectangle& query,
 //
 
 template<class T>
-std::unique_ptr<T> PuzzleJob::compute(GenericOperator& op,
+std::unique_ptr<T> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
 	throw OperatorException("Computation only possible for concrete instances");
 }
 
 template<>
-std::unique_ptr<GenericRaster> PuzzleJob::compute(GenericOperator& op,
+std::unique_ptr<GenericRaster> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	auto res = op.getCachedRaster(query, qp);
+	auto res = op.getRaster(query, qp);
 	res->setRepresentation(GenericRaster::Representation::CPU);
 	return res;
 }
 
 template<>
-std::unique_ptr<PointCollection> PuzzleJob::compute(GenericOperator& op,
+std::unique_ptr<PointCollection> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	return op.getCachedPointCollection(query, qp);
+	return op.getPointCollection(query, qp);
 }
 
 template<>
-std::unique_ptr<LineCollection> PuzzleJob::compute(GenericOperator& op,
+std::unique_ptr<LineCollection> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	return op.getCachedLineCollection(query, qp);
+	return op.getLineCollection(query, qp);
 }
 
 template<>
-std::unique_ptr<PolygonCollection> PuzzleJob::compute(GenericOperator& op,
+std::unique_ptr<PolygonCollection> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	return op.getCachedPolygonCollection(query, qp);
+	return op.getPolygonCollection(query, qp);
 }
 
 template<>
-std::unique_ptr<GenericPlot> PuzzleJob::compute(GenericOperator& op,
+std::unique_ptr<GenericPlot> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	return op.getCachedPlot(query, qp);
+	return op.getPlot(query, qp);
 }
 
 //
@@ -259,7 +259,7 @@ std::unique_ptr<GenericPlot> PuzzleJob::compute(GenericOperator& op,
 //
 
 template<class T>
-std::unique_ptr<T> PuzzleJob::puzzle(const SpatioTemporalReference& bbox,
+std::unique_ptr<T> PuzzleUtil::puzzle(const SpatioTemporalReference& bbox,
 		const std::vector<std::shared_ptr<const T> >& items) {
 	(void) bbox;
 	(void) items;
@@ -267,7 +267,7 @@ std::unique_ptr<T> PuzzleJob::puzzle(const SpatioTemporalReference& bbox,
 }
 
 template<>
-std::unique_ptr<GenericPlot> PuzzleJob::puzzle(
+std::unique_ptr<GenericPlot> PuzzleUtil::puzzle(
 		const SpatioTemporalReference& bbox,
 		const std::vector<std::shared_ptr<const GenericPlot> >& items) {
 	(void) bbox;
@@ -276,7 +276,7 @@ std::unique_ptr<GenericPlot> PuzzleJob::puzzle(
 }
 
 template<>
-std::unique_ptr<GenericRaster> PuzzleJob::puzzle(
+std::unique_ptr<GenericRaster> PuzzleUtil::puzzle(
 		const SpatioTemporalReference& bbox,
 		const std::vector<std::shared_ptr<const GenericRaster> >& items) {
 	TIME_EXEC("Puzzler.puzzle");
@@ -319,7 +319,7 @@ std::unique_ptr<GenericRaster> PuzzleJob::puzzle(
 //
 
 template<class T>
-std::unique_ptr<T> PuzzleJob::puzzle_feature_collection(
+std::unique_ptr<T> PuzzleUtil::puzzle_feature_collection(
 		const SpatioTemporalReference& bbox,
 		const std::vector<std::shared_ptr<const T> >& items) {
 	TIME_EXEC("Puzzler.puzzle");
@@ -359,24 +359,24 @@ std::unique_ptr<T> PuzzleJob::puzzle_feature_collection(
 }
 
 template<>
-void PuzzleJob::append_idxs(PointCollection& dest, const PointCollection& src) {
+void PuzzleUtil::append_idxs(PointCollection& dest, const PointCollection& src) {
 	append_idx_vec(dest.start_feature, src.start_feature);
 }
 
 template<>
-void PuzzleJob::append_idxs(LineCollection& dest, const LineCollection& src) {
+void PuzzleUtil::append_idxs(LineCollection& dest, const LineCollection& src) {
 	append_idx_vec(dest.start_feature, src.start_feature);
 	append_idx_vec(dest.start_line, src.start_line);
 }
 
 template<>
-void PuzzleJob::append_idxs(PolygonCollection& dest, const PolygonCollection& src) {
+void PuzzleUtil::append_idxs(PolygonCollection& dest, const PolygonCollection& src) {
 	append_idx_vec(dest.start_feature, src.start_feature);
 	append_idx_vec(dest.start_polygon, src.start_polygon);
 	append_idx_vec(dest.start_ring, src.start_ring);
 }
 
-void PuzzleJob::append_idx_vec(std::vector<uint32_t>& dest,
+void PuzzleUtil::append_idx_vec(std::vector<uint32_t>& dest,
 		const std::vector<uint32_t>& src) {
 	dest.reserve(dest.size() + src.size() - 1);
 	size_t ext = dest.back();
@@ -488,11 +488,11 @@ std::unique_ptr<GenericPlot> RemoteRetriever<GenericPlot>::read_item(
 // INSTANTIATE ALL
 //
 
-template std::unique_ptr<GenericRaster> PuzzleJob::process<GenericRaster>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const GenericRaster>>&, QueryProfiler&);
-template std::unique_ptr<PointCollection> PuzzleJob::process<PointCollection>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const PointCollection>>&, QueryProfiler&);
-template std::unique_ptr<LineCollection> PuzzleJob::process<LineCollection>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const LineCollection>>&, QueryProfiler&);
-template std::unique_ptr<PolygonCollection> PuzzleJob::process<PolygonCollection>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const PolygonCollection>>&, QueryProfiler&);
-template std::unique_ptr<GenericPlot> PuzzleJob::process<GenericPlot>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const GenericPlot>>&, QueryProfiler&);
+template std::unique_ptr<GenericRaster> PuzzleUtil::process<GenericRaster>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const GenericRaster>>&, QueryProfiler&);
+template std::unique_ptr<PointCollection> PuzzleUtil::process<PointCollection>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const PointCollection>>&, QueryProfiler&);
+template std::unique_ptr<LineCollection> PuzzleUtil::process<LineCollection>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const LineCollection>>&, QueryProfiler&);
+template std::unique_ptr<PolygonCollection> PuzzleUtil::process<PolygonCollection>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const PolygonCollection>>&, QueryProfiler&);
+template std::unique_ptr<GenericPlot> PuzzleUtil::process<GenericPlot>(GenericOperator&, const QueryRectangle&, const std::vector<Cube<3>>&, const std::vector<std::shared_ptr<const GenericPlot>>&, QueryProfiler&);
 
 template class LocalRetriever<GenericRaster> ;
 template class LocalRetriever<GenericPlot> ;

@@ -12,7 +12,7 @@
 #include "cache/priv/requests.h"
 #include "operators/operator.h"
 
-class PuzzleJob {
+class PuzzleUtil {
 	template <class T> friend class LocalCacheWrapper;
 public:
 	template<class T>

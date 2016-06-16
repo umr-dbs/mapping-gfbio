@@ -18,7 +18,6 @@
 
 
 class NodeCacheManager;
-template<typename T> class PuzzleUtil;
 
 /**
  * This class holds the current query-statistics.
@@ -88,18 +87,7 @@ public:
 	 * @return this worker's connection to the index-server
 	 */
 	BlockingConnection& get_index_connection() const;
-
-	void add_call();
-
-	void remove_call();
-
-	uint32_t get_stack_depth();
-
-	bool do_traceback() const;
 private:
-
-	uint32_t stack_depth;
-	bool traceback;
 	BlockingConnection* index_connection;
 };
 

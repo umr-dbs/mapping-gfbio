@@ -110,7 +110,7 @@ std::unique_ptr<T> HybridCacheWrapper<T>::query(GenericOperator& op,
 		for ( auto &ne : qres.items )
 			items.push_back(ne->data);
 
-		return PuzzleJob::process(op,rect,qres.remainder,items,profiler);
+		return PuzzleUtil::process(op,rect,qres.remainder,items,profiler);
 	}
 	else {
 		this->stats.add_miss();

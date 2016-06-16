@@ -24,7 +24,7 @@ class GenericPlot;
 
 
 class GenericOperator {
-	friend class CacheManager;
+	friend class PuzzleUtil;
 	friend class GraphReorgStrategy;
 	friend class QuerySpec;
 	public:

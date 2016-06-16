@@ -117,7 +117,7 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 			for (auto &ne : qres.items) {
 				items.push_back(ne->data);
 			}
-			return PuzzleJob::process(op, rect, qres.remainder, items, profiler);
+			return PuzzleUtil::process(op, rect, qres.remainder, items, profiler);
 		}
 	}
 
@@ -225,7 +225,7 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle_wo_cache(
 		parts.push_back(retriever.fetch(request.semantic_id, ref, profiler));
 
 	auto op = GenericOperator::fromJSON(request.semantic_id);
-	return PuzzleJob::process(*op, request.query, request.remainder, parts,
+	return PuzzleUtil::process(*op, request.query, request.remainder, parts,
 			profiler);
 }
 

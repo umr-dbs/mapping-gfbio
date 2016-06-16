@@ -88,7 +88,7 @@ QueryStats ActiveQueryStats::get_and_reset() {
 //
 ////////////////////////////////////////////////////////////
 
-WorkerContext::WorkerContext() : stack_depth(0), traceback(false), index_connection(nullptr) {
+WorkerContext::WorkerContext() : index_connection(nullptr) {
 }
 
 BlockingConnection& WorkerContext::get_index_connection() const {
@@ -99,27 +99,6 @@ BlockingConnection& WorkerContext::get_index_connection() const {
 
 void WorkerContext::set_index_connection(BlockingConnection *con) {
 	index_connection = con;
-}
-
-void WorkerContext::add_call() {
-	stack_depth++;
-	if ( stack_depth > 100 )
-		traceback = true;
-}
-
-void WorkerContext::remove_call() {
-	stack_depth--;
-	if ( stack_depth == 0 )
-		traceback = false;
-}
-
-uint32_t WorkerContext::get_stack_depth() {
-	return stack_depth;
-}
-
-
-bool WorkerContext::do_traceback() const {
-	return traceback;
 }
 
 ////////////////////////////////////////////////////////////

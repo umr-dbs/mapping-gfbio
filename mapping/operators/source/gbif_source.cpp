@@ -57,10 +57,10 @@ GBIFSourceOperator::~GBIFSourceOperator() {
 REGISTER_OPERATOR(GBIFSourceOperator, "gbif_source");
 
 void GBIFSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "{";
-	stream << "\"scientificName\":\"" << scientificName << "\",";
-	stream << "\"includeMetadata\":\"" << includeMetadata << "\",";
-	stream << "}";
+	Json::Value json(Json::objectValue);
+	json["scientificName"] = scientificName;
+	json["includeMetadata"] = includeMetadata;
+	stream << json;
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

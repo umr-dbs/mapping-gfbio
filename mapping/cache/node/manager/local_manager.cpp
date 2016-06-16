@@ -108,13 +108,15 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(GenericOperator& op,
 			std::ostringstream rems;
 			std::ostringstream i_cubes;
 
-			for ( Cube<3> &c : qres.remainder ) {
-				rems << std::endl << c.to_string();
+			auto _rems = PuzzleJob::get_remainder_queries(rect, qres.remainder, *items.front() );
+			for ( QueryRectangle &c : _rems ) {
+				rems << std::endl << CacheCommon::qr_to_string(c);
 			}
+
+
 			for ( auto &nce : qres.items ) {
 				i_cubes << std::endl << nce->bounds.to_string();
 			}
-
 
 			Log::warn("Stack-Depth above 100:\nQuery: %s\nRect: %s\nItems: %s\nRemainders: %s",
 					op.getSemanticId().c_str(),

@@ -59,6 +59,11 @@ public:
 	 */
 	bool matches( const QueryCube &query ) const;
 
+	/**
+	 * @return a string-representation of this resolution
+	 */
+	std::string to_string() const;
+
 	QueryResolution::Type restype;
 	Interval pixel_scale_x;
 	Interval pixel_scale_y;
@@ -176,6 +181,8 @@ public:
 	 * @return the timespan, this entry is valid for
 	 */
 	const Interval& get_timespan() const;
+
+	std::string to_string() const;
 
 	ResolutionInfo resolution_info;
 };

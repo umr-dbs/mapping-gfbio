@@ -89,7 +89,6 @@ std::vector<std::unique_ptr<T> > PuzzleUtil::compute_remainders(
 	TIME_EXEC("PuzzleUtil.compute_remainders");
 	std::vector<std::unique_ptr<T>> result;
 	{
-		QueryProfilerStoppingGuard sg(profiler);
 		auto rem_queries = get_remainder_queries(query, remainder, ref_result);
 		for (auto &rqr : rem_queries) {
 			result.push_back(compute<T>(op, rqr, profiler));

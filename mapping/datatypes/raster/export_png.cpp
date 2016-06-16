@@ -65,12 +65,20 @@ template<typename T> void Raster2D<T>::toPNG(std::ostream &output, const Coloriz
 	if (!std::isfinite(actual_min) || !std::isfinite(actual_max))
 		throw ExporterException("Cannot export PNG with infinite raster values");
 
+	if(dd.unit.isDiscrete()) {
+		actual_min = 1;
+		actual_max = 22;
+	}
+
 	//auto actual_range = RasterTypeInfo<T>::getRange(actual_min, actual_max);
 
 	uint32_t colors[256];
 	colors[0] = color_from_rgba(0,0,0,0);
 	colors[1] = color_from_rgba(255,0,255,255);
-	colorizer.fillPalette(&colors[2], 254, actual_min, actual_max);
+	if(dd.unit.isDiscrete()) {
+		colorizer.fillPalette(&colors[2], 22, actual_min, actual_max);
+	} else
+		colorizer.fillPalette(&colors[2], 254, actual_min, actual_max);
 
 	if (overlay) {
 		std::ostringstream msg;
@@ -151,8 +159,12 @@ template<typename T> void Raster2D<T>::toPNG(std::ostream &output, const Coloriz
 			else {
 				if (actual_min == actual_max)
 					row[x] = 3;
-				else
-					row[x] = round(253.0 * ((float) v - actual_min) / (actual_max - actual_min)) + 2;
+				else {
+					if(dd.unit.isDiscrete())
+						row[x] = v + 2;
+					else
+						row[x] = round(253.0 * ((float) v - actual_min) / (actual_max - actual_min)) + 2;
+				}
 			}
 			if (overlay && row[x] != 1) {
 				// calculate the distance to the closest image border

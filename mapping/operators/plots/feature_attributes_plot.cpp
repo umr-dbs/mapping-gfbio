@@ -10,6 +10,13 @@
 #include <cmath>
 #include "datatypes/pointcollection.h"
 
+/**
+ * Operator that plots feature attributes
+ * It currently only support 2 or 3 attributes
+ *
+ * Parameters:
+ * - attributeName: list of attributes to use for the plot
+ */
 class FeatureAttributesPlotOperator: public GenericOperator {
 	public:
 		FeatureAttributesPlotOperator(int sourcecounts[], GenericOperator *sources[],	Json::Value &params);

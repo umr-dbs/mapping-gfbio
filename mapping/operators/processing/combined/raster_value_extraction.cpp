@@ -14,7 +14,16 @@
 #include <vector>
 #include <utility>
 
-
+/**
+ * Operator that extracts raster information and attaches them to features.
+ * It currently only supports attaching raster values to (simple) point collections.
+ *
+ * Parameters:
+ * - names: array of names for the new feature attributes that contain the raster values
+ *          A name has to be specified for each input raster
+ * - xResolution: the x resolution for the input rasters in pixels
+ * - yResolution: the y resolution for the input rasters in pixels
+ */
 class RasterValueExtractionOperator: public GenericOperator {
 	public:
 		RasterValueExtractionOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

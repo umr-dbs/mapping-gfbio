@@ -8,7 +8,12 @@
 #include <json/json.h>
 #include <algorithm>
 
-
+/**
+ * Operator that classifies a raster based on given data ranges.
+ *
+ * Parameters:
+ * not stable yet
+ */
 class ClassificationOperator : public GenericOperator {
 	public:
 		ClassificationOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

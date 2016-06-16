@@ -7,7 +7,9 @@
 #include <cmath>
 #include <json/json.h>
 
-
+/**
+ * Operator that computes a matrix kernel on a raster
+ */
 class MatrixOperator : public GenericOperator {
 	public:
 		MatrixOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

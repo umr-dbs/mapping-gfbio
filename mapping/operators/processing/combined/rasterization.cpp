@@ -12,6 +12,15 @@
 #include <algorithm>
 #include "datatypes/pointcollection.h"
 
+/**
+ * Operator that rasterizes features.
+ * It currently only suppors rendering a point collection as a heatmap
+ *
+ * Parameters:
+ * - renderattribute: the name of the attribute whose frequency is counted for the heatmap
+ *                    if no renderattribute is given, the location alone is taken for rendering
+ * - radius: the radius for each point in the heatmap
+ */
 class RasterizationOperator : public GenericOperator {
 	public:
 		RasterizationOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

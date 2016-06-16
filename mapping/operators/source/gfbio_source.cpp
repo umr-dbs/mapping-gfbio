@@ -17,7 +17,9 @@
 #include "datatypes/polygoncollection.h"
 #include <json/json.h>
 
-
+/**
+ * Source operator that gets occurrence data from the GFBioJavaWebserver
+ */
 class GFBioSourceOperator : public GenericOperator {
 	public:
 		GFBioSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
@@ -56,11 +58,11 @@ GFBioSourceOperator::~GFBioSourceOperator() {
 REGISTER_OPERATOR(GFBioSourceOperator, "gfbio_source");
 
 void GFBioSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
-	stream << "{";
-	stream << "\"datasource\":\"" << datasource << "\","
-			<< "\"query\":\"" << query << "\","
-			<< "\"includeMetadata\":\"" << includeMetadata << "\"";
-	stream << "}";
+	Json::Value json(Json::objectValue);
+	json["datasource"] = datasource;
+	json["query"] = query;
+	json["includeMetadata"] = includeMetadata;
+	stream << json;
 }
 
 #ifndef MAPPING_OPERATOR_STUBS

@@ -9,7 +9,13 @@
 #include <json/json.h>
 #include "datatypes/pointcollection.h"
 
-
+/**
+ * Operator that retrieves points from a postgres database
+ *
+ * Parameters:
+ * - connection: a string containing the connection information for the database
+ * - query: an SQL query
+ */
 class PostgresSourceOperator : public GenericOperator {
 	public:
 		PostgresSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);

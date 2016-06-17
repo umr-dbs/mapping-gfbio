@@ -57,7 +57,8 @@ int port = 10042;
 std::string host = "127.0.0.1";
 //int port = 12346;
 
-
+size_t responses_read = 0;
+size_t results_read = 0;
 
 //
 // RANDOM STUFF
@@ -202,6 +203,8 @@ void process_connections() {
 		try {
 			if ( it->is_ready() ) {
 				auto resp = it->connection->read();
+				responses_read++;
+				Log::info("Progress: %lu/%lu", responses_read, results_read);
 				uint8_t rc = resp->read<uint8_t>();
 				switch (rc) {
 				case ClientConnection::RESP_OK: {
@@ -234,6 +237,8 @@ void process_del_cons() {
 		auto &c = **it;
 		try {
 			if ( c.process() ) {
+				results_read++;
+				Log::info("Progress: %lu/%lu", responses_read, results_read);
 				Log::debug("Delivery swallowed!");
 				it = del_cons.erase(it);
 			} else

@@ -273,6 +273,10 @@ public:
 	 */
 	StateType get_state() const;
 
+	time_t get_last_action() const;
+
+	void set_faulty();
+
 	// This connection's id
 	const uint64_t id;
 protected:
@@ -341,6 +345,7 @@ private:
 	bool faulty;
 	std::unique_ptr<BinaryReadBuffer> reader;
 	std::unique_ptr<BinaryWriteBuffer> writer;
+	time_t last_action;
 };
 
 /**

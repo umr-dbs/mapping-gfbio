@@ -166,7 +166,7 @@ BinaryStream NewNBConnection::release_socket() {
 
 template<typename StateType>
 BaseConnection<StateType>::BaseConnection(StateType state, BinaryStream &&socket) : PollableConnection(std::move(socket)),
-	id(next_id++), state(state), faulty(false), reader(new BinaryReadBuffer() ) {
+	id(next_id++), state(state), faulty(false), reader(new BinaryReadBuffer() ), last_action(CacheCommon::time_millis()) {
 }
 
 template<typename StateType>
@@ -214,6 +214,7 @@ template<typename StateType>
 void BaseConnection<StateType>::begin_write(std::unique_ptr<BinaryWriteBuffer> buffer) {
 	if ( reader->isEmpty() && !writer ) {
 		this->writer = std::move(buffer);
+		last_action = CacheCommon::time_millis();
 	}
 	else
 		throw IllegalStateException("Cannot start write. Another read or write action is in progress.");
@@ -254,6 +255,16 @@ bool BaseConnection<StateType>::_ensure_state(StateType state,
 }
 
 template<typename StateType>
+time_t BaseConnection<StateType>::get_last_action() const {
+	return last_action;
+}
+
+template<typename StateType>
+void BaseConnection<StateType>::set_faulty() {
+	faulty = true;
+}
+
+template<typename StateType>
 bool BaseConnection<StateType>::_ensure_state(StateType state) const {
 	return this->state == state;
 }
@@ -281,9 +292,11 @@ bool BaseConnection<StateType>::process() {
 
 	if ( is_writing() && (poll_fd->revents & POLLOUT) ) {
 		output();
+		last_action = CacheCommon::time_millis();
 	}
 	else if ( !is_writing() && (poll_fd->revents & POLLIN) ) {
 		res = input();
+		last_action = CacheCommon::time_millis();
 	}
 	else if ( poll_fd->revents != 0 ){
 		Log::warn("Poll delivered unexpected state: %s", flags_to_string(poll_fd->revents).c_str() );

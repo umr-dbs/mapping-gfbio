@@ -147,6 +147,7 @@ void IndexServer::run() {
 				Node& node = *kv.second;
 				if ( node.is_control_connection_idle() && (now - node.last_stats_request()) > update_interval) {
 					node.send_stats_request();
+//					Log::info("Node-state: %s", node.to_string().c_str());
 				}
 			}
 		}
@@ -245,6 +246,12 @@ void IndexServer::process_nodes() {
 
 void IndexServer::process_control_connection( Node &node ) {
 	auto &cc = node.get_control_connection();
+	if ( cc.get_last_action() + 60000 < CacheCommon::time_millis() && cc.get_state() != ControlState::IDLE ) {
+		Log::warn("Control-Connection stuck in non-idle state for more than 1 min. Closing!");
+		cc.set_faulty();
+		return;
+	}
+
 	// Check if node is waiting for a confirmation
 	if ( cc.get_state() == ControlState::MOVE_RESULT_READ ) {
 		auto res = cc.get_move_result();
@@ -348,6 +355,13 @@ void IndexServer::process_worker_connections(Node &node) {
 	std::vector<uint64_t> finished_workers;
 	for (auto &e : node.get_busy_workers() ) {
 		WorkerConnection &wc = *e.second;
+
+		if ( wc.get_last_action() + 60000 < CacheCommon::time_millis() && wc.get_state() != WorkerState::IDLE ) {
+			Log::warn("Worker-Connection stuck in non-idle state for more than 1 min. Closing!");
+			wc.set_faulty();
+			continue;
+		}
+
 		if (wc.process()) {
 			// Handle state-changes
 			switch (wc.get_state()) {

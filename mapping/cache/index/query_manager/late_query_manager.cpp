@@ -205,7 +205,7 @@ void LateQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
 		}
 	}
 	// Create a new job
-	auto job = make_unique<LateJob>(req,caches);
+	auto job = make_unique<LateJob>(req,caches,stats);
 	job->add_client(client_id);
 	add_query(std::move(job));
 }
@@ -272,7 +272,7 @@ bool LateQueryManager::use_reorg() const {
 
 std::unique_ptr<PendingQuery> LateQueryManager::recreate_job(
 		const RunningQuery& query) {
-	std::unique_ptr<PendingQuery> res = make_unique<LateJob>(query.get_request(),caches);
+	std::unique_ptr<PendingQuery> res = make_unique<LateJob>(query.get_request(),caches,stats);
 	res->add_clients(query.get_clients());
 	return res;
 }

@@ -47,8 +47,7 @@ bool CacheLocks::is_locked(const Lock& lock) const {
 void CacheLocks::add_lock(const Lock& lock, uint64_t query_id) {
 	auto it = locks.find(lock);
 	if ( it != locks.end() ) {
-		if ( !it->second.emplace(query_id).second )
-			throw IllegalStateException(concat("Could not add lock ", lock.to_string(), " to query ", query_id));
+		it->second.emplace(query_id);
 	}
 	else if ( !locks.emplace( lock, std::unordered_set<uint64_t>{query_id} ).second )
 		throw IllegalStateException(concat("Could not add lock ", lock.to_string(), " to query ", query_id));
@@ -279,13 +278,13 @@ RunningQuery::~RunningQuery() {
 }
 
 void RunningQuery::add_lock(const CacheLocks::Lock& lock) {
-	QueryManager::locks.add_lock(lock,id);
-	locks.emplace(lock);
+	if ( locks.emplace(lock).second )
+		QueryManager::locks.add_lock(lock,id);
 }
 
 void RunningQuery::add_locks(const std::set<CacheLocks::Lock>& locks) {
-	QueryManager::locks.add_locks(locks,id);
-	this->locks.insert(locks.begin(),locks.end());
+	for ( auto &l :locks )
+		add_lock(l);
 }
 
 

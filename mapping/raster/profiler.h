@@ -16,6 +16,10 @@ namespace Profiler {
 	void stop(const char *msg);
 	std::vector<std::string> get();
 	void print(const char *separator = ", ");
+
+	/**
+	 * Profiler that collects information about execution times of operators
+	 */
 	class Profiler {
 		public:
 			Profiler(const char *msg) : msg(msg) { start(msg); };

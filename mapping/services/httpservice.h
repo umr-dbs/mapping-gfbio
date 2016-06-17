@@ -10,6 +10,9 @@
 
 #include <json/json.h>
 
+/**
+ * Base class for http webservices. Provides methods for parsing and output
+ */
 class HTTPService {
 	public:
 		// class Params

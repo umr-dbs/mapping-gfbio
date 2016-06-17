@@ -32,7 +32,8 @@ const std::vector< std::pair<FeatureType, std::string> > featureTypeMap = {
 EnumConverter<FeatureType> featureTypeConverter(featureTypeMap);
 
 /**
- * A simple incomplete implementation of the WFS standard, just enough so that OpenLayers can use it.
+ * Implementation of the OGC WFS standard http://www.opengeospatial.org/standards/wfs
+ * It currently only supports our specific use cases
  */
 class WFSService : public OGCService {
 	public:

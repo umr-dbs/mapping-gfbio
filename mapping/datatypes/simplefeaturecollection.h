@@ -8,7 +8,9 @@
 #include <string>
 #include <limits>
 
-
+/**
+ * This class models a 2 dimensional coordinate used in the feature collections
+ */
 class Coordinate {
 	public:
 		Coordinate(BinaryReadBuffer &buffer);

@@ -2,6 +2,9 @@
 #include <curl/curl.h>
 #include <string>
 
+/**
+ * This class encapsulates calls to curl and enables calling external URLs
+ */
 class cURL {
 	typedef size_t (*write_callback)(void *buffer, size_t size, size_t nmemb, void *userp);
 	typedef size_t (*read_callback)(char *bufptr, size_t size, size_t nitems, void *userp);

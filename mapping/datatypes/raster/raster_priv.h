@@ -3,6 +3,9 @@
 
 #include "datatypes/raster.h"
 
+/**
+ * Base class for n dimensional rasters
+ */
 template<typename T, int dimensions> class Raster : public GenericRaster {
 	public:
 		Raster(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth);
@@ -32,6 +35,9 @@ template<typename T, int dimensions> class Raster : public GenericRaster {
 
 class RasterOperator;
 
+/**
+ * Class that encapsulates 2 dimensional rasters
+ */
 template<typename T> class Raster2D : public Raster<T, 2> {
 	public:
 		Raster2D(const DataDescription &datadescription, const SpatioTemporalReference &stref, uint32_t width, uint32_t height, uint32_t depth = 0);

@@ -7,6 +7,9 @@
 
 #include "datatypes/plot.h"
 
+/**
+ * This class models a one dimensional histograms with variable number of buckets
+ */
 class Histogram : public GenericPlot {
 	public:
 		Histogram(int number_of_buckets, double min, double max);

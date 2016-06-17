@@ -4,7 +4,9 @@
 #include "userdb/userdb.h"
 #include "util/make_unique.h"
 
-
+/**
+ * Base class for UserDB backends
+ */
 class UserDBBackend {
 	friend class UserDB;
 

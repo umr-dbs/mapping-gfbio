@@ -8,6 +8,18 @@
 
 #include <json/json.h>
 
+/**
+ * This class provides user specific methods
+ *
+ * Operations:
+ * - request = login: login with credential, returns sessiontoken
+ *   - parameters:
+ *     - username
+ *     - password
+ * - request = logout: destroys current session
+ * - request = sourcelist: get list of available raster sources
+ *
+ */
 class UserService : public HTTPService {
 	public:
 		using HTTPService::HTTPService;

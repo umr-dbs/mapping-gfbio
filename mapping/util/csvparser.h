@@ -4,7 +4,9 @@
 #include <istream>
 #include <vector>
 
-
+/**
+ * A parser for delimiter separated text files
+ */
 class CSVParser {
 	public:
 		CSVParser(std::istream &in, char field_separator = ',');

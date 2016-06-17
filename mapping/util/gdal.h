@@ -9,6 +9,9 @@ namespace GDAL {
 	void init();
 	std::string SRSFromEPSG(epsg_t epsg);
 
+	/**
+	 * This class allows the transformation of coordinates between two projections
+	 */
 	class CRSTransformer {
 		public:
 			CRSTransformer(epsg_t in_epsg, epsg_t out_epsg);

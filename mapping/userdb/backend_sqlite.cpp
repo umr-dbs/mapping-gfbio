@@ -4,7 +4,9 @@
 #include "util/sqlite.h"
 #include "util/sha1.h"
 
-
+/**
+ * A UserDB backend using SQLite
+ */
 class SQLiteUserDBBackend : public UserDBBackend {
 	public:
 		SQLiteUserDBBackend(const std::string &filename);

@@ -1,11 +1,3 @@
-/*
- * Templates for mapping enums to strings and back.
- *
- * Mostly used for parameter parsing. Don't use it for enums with lots of values.
- *
- * For an example how to use this, see operators/points/csvpointsource.cpp
- */
-
 #include "util/exceptions.h"
 
 #include <string>
@@ -13,6 +5,14 @@
 #include <vector>
 #include <json/json.h>
 
+
+/*
+ * Templates for mapping enums to strings and back.
+ *
+ * Mostly used for parameter parsing. Don't use it for enums with lots of values.
+ *
+ * For an example how to use this, see operators/points/csvpointsource.cpp
+ */
 template<typename T>
 class EnumConverter {
 	public:

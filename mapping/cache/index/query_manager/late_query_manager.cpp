@@ -7,9 +7,10 @@
 
 #include "cache/index/query_manager/late_query_manager.h"
 
-LateJob::LateJob(const BaseRequest& request, IndexCacheManager &caches) : caches(caches), request(request),
+LateJob::LateJob(const BaseRequest& request, IndexCacheManager &caches, SystemStats &stats) : caches(caches), request(request),
 	orig_query(this->request.query),
-	orig_area( (this->request.query.x2 - this->request.query.x1) * (this->request.query.y2 - this->request.query.y1)) {
+	orig_area( (this->request.query.x2 - this->request.query.x1) * (this->request.query.y2 - this->request.query.y1)),
+	stats(stats) {
 }
 
 bool LateJob::extend(const BaseRequest& req) {
@@ -137,20 +138,17 @@ uint64_t LateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap)
 		Log::debug("Full MISS.");
 		uint32_t node_id = caches.find_node_for_job(request,nmap);
 		worker = nmap.at(node_id)->schedule_request(WorkerConnection::CMD_CREATE,request);
-		if ( worker == 0 ) {
-			for ( auto i = nmap.begin(); worker == 0 && i != nmap.end(); i++ ) {
-				worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
-			}
-		}
+//		if ( worker == 0 ) {
+//			for ( auto i = nmap.begin(); worker == 0 && i != nmap.end(); i++ ) {
+//				worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
+//			}
+//		}
 	}
 
 	if ( worker > 0 ) {
 		add_locks(locks);
-		//TODO: Stats?
+		stats += tmp;
 	}
-
-	Log::info("Submitted to worker: %lu", worker);
-
 	return worker;
 }
 
@@ -266,7 +264,6 @@ void LateQueryManager::process_worker_query(WorkerConnection& con) {
 		Log::error("No active query found for worker-query. WorkerID: %ul. Traceback:\nActive queries: %s\nFinished queries: %s\nNodes:\n%s", con.id, aqs.str().c_str(), fqs.str().c_str(), ns.str().c_str());
 		throw IllegalStateException(concat("Worker ", con.id, " issued query w/o active query"));
 	}
-
 }
 
 bool LateQueryManager::use_reorg() const {

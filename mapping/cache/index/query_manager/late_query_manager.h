@@ -12,7 +12,7 @@
 
 class LateJob : public PendingQuery {
 public:
-	LateJob( const BaseRequest &request, IndexCacheManager &caches );
+	LateJob( const BaseRequest &request, IndexCacheManager &caches, SystemStats &stats );
 
 	bool extend( const BaseRequest &req );
 	bool is_affected_by_node( uint32_t node_id );
@@ -25,6 +25,7 @@ private:
 	BaseRequest request;
 	const QueryRectangle orig_query;
 	const double orig_area;
+	SystemStats &stats;
 };
 
 

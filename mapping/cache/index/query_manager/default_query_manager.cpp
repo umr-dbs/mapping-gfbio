@@ -309,11 +309,11 @@ void CreateJob::replace_reference(const IndexCacheKey& from,
 uint64_t CreateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap) {
 	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
 	uint64_t worker = nmap.at(node_id)->schedule_request(WorkerConnection::CMD_CREATE,request);
-	if ( worker == 0 ) {
-		for ( auto i = nmap.begin(); i != nmap.end() && worker == 0; i++ ) {
-			worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
-		}
-	}
+//	if ( worker == 0 ) {
+//		for ( auto i = nmap.begin(); i != nmap.end() && worker == 0; i++ ) {
+//			worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
+//		}
+//	}
 	return worker;
 }
 

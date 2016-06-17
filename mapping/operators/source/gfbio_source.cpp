@@ -158,7 +158,7 @@ void GFBioSourceOperator::performQuery(const QueryRectangle& rect, std::stringst
 		<< curl.escape(datasource) << "&query=" << curl.escape(query)
 		<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
 		<< rect.x2 << "," << rect.y2 << "&includeMetadata=" << includeMetadata;
-	fprintf(stderr, url.str().c_str());
+
 	getStringFromServer(url.str(), data);
 }
 

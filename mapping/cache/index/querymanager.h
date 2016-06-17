@@ -18,6 +18,7 @@
 #include <list>
 #include <vector>
 #include <set>
+#include <unordered_set>
 
 class QueryManager;
 
@@ -60,27 +61,31 @@ public:
 	 * Adds the given lock
 	 * @param lock the lock to add
 	 */
-	void add_lock( const Lock &lock );
+	void add_lock( const Lock &lock, uint64_t query_id );
 
 	/**
 	 * Adds the given locks
 	 * @param locks the locks to add
 	 */
-	void add_locks( const std::vector<Lock> &locks );
+	void add_locks( const std::set<Lock> &locks, uint64_t query_id );
 
 	/**
 	 * Removes the given lock
 	 * @param lock the lock to remove
 	 */
-	void remove_lock( const Lock &lock );
+	void remove_lock( const Lock &lock, uint64_t query_id );
 
 	/**
 	 * Removes the given locks
 	 * @param locks the locks to remove
 	 */
-	void remove_locks( const std::vector<Lock> &locks );
+	void remove_locks( const std::set<Lock> &locks, uint64_t query_id );
+
+	void move_lock( const Lock &from, const Lock &to, uint64_t query_id );
+
+	std::unordered_set<uint64_t> get_queries( const Lock& lock ) const;
 private:
-	std::map<Lock,uint16_t> locks;
+	std::map<Lock,std::unordered_set<uint64_t>> locks;
 };
 
 /**
@@ -89,12 +94,16 @@ private:
 class RunningQuery {
 	friend class QueryManager;
 	friend class IndexQueryStats;
+	friend class PendingQuery;
+
+	static uint64_t next_id;
+
 public:
 	/**
 	 * Creates a new instance and sets the given locks
 	 * @param locks the locks to obtain
 	 */
-	RunningQuery( std::vector<CacheLocks::Lock> &&locks = std::vector<CacheLocks::Lock>() );
+	RunningQuery( std::set<CacheLocks::Lock> &&locks = std::set<CacheLocks::Lock>() );
 	virtual ~RunningQuery();
 
 	RunningQuery( const RunningQuery& ) = delete;
@@ -118,7 +127,7 @@ public:
 	 * Adds the given locks to the locks held by this query
 	 * @param locks the locks to add
 	 */
-	void add_locks( const std::vector<CacheLocks::Lock> &locks );
+	void add_locks( const std::set<CacheLocks::Lock> &locks );
 
 	/**
 	 * Adds the given client as a consumer of this query's result
@@ -153,8 +162,9 @@ public:
 	 */
 	virtual const BaseRequest& get_request() const = 0;
 
+	const uint64_t id;
 private:
-	std::vector<CacheLocks::Lock> locks;
+	std::set<CacheLocks::Lock> locks;
 	std::set<uint64_t> clients;
 	std::vector<uint64_t> client_times;
 	uint64_t time_created;
@@ -171,13 +181,15 @@ public:
 	 * Creates a new instance and sets the given locks
 	 * @param locks the locks to obtain
 	 */
-	PendingQuery( std::vector<CacheLocks::Lock> &&locks = std::vector<CacheLocks::Lock>() );
+	PendingQuery( std::set<CacheLocks::Lock> &&locks = std::set<CacheLocks::Lock>() );
 	virtual ~PendingQuery() = default;
 	PendingQuery( const PendingQuery& ) = delete;
 	PendingQuery( PendingQuery&& ) = default;
 
 	PendingQuery& operator=(const PendingQuery&) = delete;
 	PendingQuery& operator=(PendingQuery&&) = default;
+
+	void entry_moved( const CacheLocks::Lock& from, const CacheLocks::Lock& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 
 	/**
 	 * Extends this queries result dimension to satisfy the given request
@@ -198,6 +210,9 @@ public:
 	 * @return whether this query depends on the node with the given id (e.g. references a cache-entry)
 	 */
 	virtual bool is_affected_by_node( uint32_t node_id ) = 0;
+
+protected:
+	virtual void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap ) = 0;
 };
 
 /**
@@ -206,7 +221,9 @@ public:
 class QueryManager {
 private:
 	friend class RunningQuery;
+	friend class PendingQuery;
 	friend class CreateJob;
+	friend class DefaultQueryManager;
 	static CacheLocks locks;
 public:
 	static std::unique_ptr<QueryManager> by_name( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const std::string &name );
@@ -287,6 +304,11 @@ public:
 	bool is_locked( CacheType type, const IndexCacheKey &key ) const;
 
 	/**
+	 * @return true if all locks could be moved, false otherwise
+	 */
+	bool process_move(CacheType type, const IndexCacheKey& from, const IndexCacheKey& to);
+
+	/**
 	 * @return the query-statistics
 	 */
 	SystemStats& get_stats();
@@ -296,6 +318,8 @@ public:
 	 */
 	void reset_stats();
 protected:
+	void add_query( std::unique_ptr<PendingQuery> query );
+
 	/**
 	 * Re-schedules a job after a worker-/node-failure
 	 * @param query the query to reschedule
@@ -304,10 +328,12 @@ protected:
 	virtual std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query ) = 0;
 
 	const std::map<uint32_t,std::shared_ptr<Node>> &nodes;
+	SystemStats stats;
+private:
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> queries;
 	std::unordered_map<uint64_t,std::unique_ptr<RunningQuery>> finished_queries;
-	std::list<std::unique_ptr<PendingQuery>> pending_jobs;
-	SystemStats stats;
+	std::unordered_map<uint64_t,std::unique_ptr<PendingQuery>> pending_jobs;
+
 };
 
 #endif /* QUERYMANAGER_H_ */

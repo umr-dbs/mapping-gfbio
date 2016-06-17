@@ -42,6 +42,9 @@ public:
 	 */
 	IndexCacheKey( const std::string &semantic_id, uint32_t node_id, uint64_t entry_id );
 
+	bool operator<( const IndexCacheKey &l ) const;
+	bool operator==( const IndexCacheKey &l ) const;
+
 	/**
 	 * @return the id of the node hosting this entry
 	 */

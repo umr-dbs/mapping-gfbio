@@ -33,6 +33,12 @@ uint8_t SimpleJob::get_command() const {
 	return WorkerConnection::CMD_CREATE;
 }
 
+void SimpleJob::replace_reference(const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap ) {
+	(void) from;
+	(void) to;
+	(void) nmap;
+}
+
 
 SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) : QueryManager(nodes) {
 }
@@ -48,7 +54,7 @@ void SimpleQueryManager::add_request(uint64_t client_id, const BaseRequest& req)
 		j = make_unique<SimpleJob>(req,0);
 	}
 	j->add_client(client_id);
-	pending_jobs.push_back( std::move(j) );
+	add_query(std::move(j));
 }
 
 void SimpleQueryManager::process_worker_query(WorkerConnection& con) {

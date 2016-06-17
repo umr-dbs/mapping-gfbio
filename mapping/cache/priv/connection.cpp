@@ -214,6 +214,7 @@ template<typename StateType>
 void BaseConnection<StateType>::begin_write(std::unique_ptr<BinaryWriteBuffer> buffer) {
 	if ( reader->isEmpty() && !writer ) {
 		this->writer = std::move(buffer);
+		last_action = CacheCommon::time_millis();
 	}
 	else
 		throw IllegalStateException("Cannot start write. Another read or write action is in progress.");

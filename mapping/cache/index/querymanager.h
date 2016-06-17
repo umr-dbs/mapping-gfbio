@@ -157,9 +157,6 @@ public:
 	 */
 	bool has_clients() const;
 
-	/**
-	 * @return the request used to schedule this query
-	 */
 	virtual const BaseRequest& get_request() const = 0;
 
 	const uint64_t id;
@@ -198,19 +195,12 @@ public:
 	 */
 	virtual bool extend( const BaseRequest &req ) = 0;
 
-	/**
-	 * Schedules this query on one of the given connections, if possible
-	 * @return the id of the worker-connection used for scheduling (0 if none).
-	 */
-	virtual std::vector<uint32_t> get_target_nodes() const = 0;
-
-	virtual uint8_t get_command() const = 0;
+	virtual uint64_t submit(const std::map<uint32_t, std::shared_ptr<Node>> &nmap) = 0;
 
 	/**
 	 * @return whether this query depends on the node with the given id (e.g. references a cache-entry)
 	 */
 	virtual bool is_affected_by_node( uint32_t node_id ) = 0;
-
 protected:
 	virtual void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap ) = 0;
 };
@@ -224,6 +214,7 @@ private:
 	friend class PendingQuery;
 	friend class CreateJob;
 	friend class DefaultQueryManager;
+	friend class LateQueryManager;
 	static CacheLocks locks;
 public:
 	static std::unique_ptr<QueryManager> by_name( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const std::string &name );

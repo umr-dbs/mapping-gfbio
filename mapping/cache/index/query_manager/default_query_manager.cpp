@@ -297,24 +297,28 @@ bool CreateJob::is_affected_by_node(uint32_t node_id) {
 	return false;
 }
 
-const BaseRequest& CreateJob::get_request() const {
-	return request;
-}
-
-std::vector<uint32_t> CreateJob::get_target_nodes() const {
-	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
-	return std::vector<uint32_t>{node_id,0};
-}
-
-uint8_t CreateJob::get_command() const {
-	return WorkerConnection::CMD_CREATE;
-}
-
 void CreateJob::replace_reference(const IndexCacheKey& from,
 		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
 	(void) from;
 	(void) to;
 	(void) nmap;
+}
+
+
+
+uint64_t CreateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap) {
+	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
+	uint64_t worker = nmap.at(node_id)->schedule_request(WorkerConnection::CMD_CREATE,request);
+	if ( worker == 0 ) {
+		for ( auto i = nmap.begin(); i != nmap.end() && worker == 0; i++ ) {
+			worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
+		}
+	}
+	return worker;
+}
+
+const BaseRequest& CreateJob::get_request() const {
+	return request;
 }
 
 //
@@ -335,24 +339,20 @@ bool DeliverJob::extend(const BaseRequest&) {
 	return false;
 }
 
-const BaseRequest& DeliverJob::get_request() const {
-	return request;
-}
-
-std::vector<uint32_t> DeliverJob::get_target_nodes() const {
-	return std::vector<uint32_t>{node};
-}
-
-uint8_t DeliverJob::get_command() const {
-	return WorkerConnection::CMD_DELIVER;
-}
-
 void DeliverJob::replace_reference(const IndexCacheKey& from,
 		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
 	(void) from;
 	(void) nmap;
 	request.entry_id = to.id.second;
 	node = to.id.first;
+}
+
+uint64_t DeliverJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap) {
+	return nmap.at(node)->schedule_request(WorkerConnection::CMD_DELIVER,request);
+}
+
+const BaseRequest& DeliverJob::get_request() const {
+	return request;
 }
 
 //
@@ -378,20 +378,6 @@ bool PuzzleJob::extend(const BaseRequest&) {
 	return false;
 }
 
-const BaseRequest& PuzzleJob::get_request() const {
-	return request;
-}
-
-
-std::vector<uint32_t> PuzzleJob::get_target_nodes() const {
-	return nodes_priorized;
-}
-
-uint8_t PuzzleJob::get_command() const {
-	return WorkerConnection::CMD_PUZZLE;
-}
-
-
 void PuzzleJob::replace_reference(const IndexCacheKey& from,
 		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
 
@@ -412,4 +398,20 @@ void PuzzleJob::replace_reference(const IndexCacheKey& from,
 	}
 
 	request.parts = refs;
+}
+
+uint64_t PuzzleJob::submit(
+		const std::map<uint32_t, std::shared_ptr<Node> >& nmap) {
+	uint64_t worker = 0;
+	for ( auto &nid : nodes_priorized ) {
+		worker = nmap.at(nid)->schedule_request(WorkerConnection::CMD_PUZZLE,request);
+		if ( worker > 0 )
+			break;
+	}
+	return worker;
+
+}
+
+const BaseRequest& PuzzleJob::get_request() const {
+	return request;
 }

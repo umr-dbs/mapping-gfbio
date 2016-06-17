@@ -9,6 +9,7 @@
 #include "cache/index/query_manager/default_query_manager.h"
 #include "cache/index/query_manager/simple_query_manager.h"
 #include "cache/index/query_manager/emkde_query_manager.h"
+#include "cache/index/query_manager/late_query_manager.h"
 #include "cache/index/indexserver.h"
 #include "cache/common.h"
 #include "util/make_unique.h"
@@ -98,6 +99,8 @@ std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, cons
 
 	if ( name == "default" )
 		return make_unique<DefaultQueryManager>(nodes,mgr);
+	else if ( name == "late" )
+		return make_unique<LateQueryManager>(nodes,mgr);
 	else if ( name == "dema" )
 		return make_unique<DemaQueryManager>(nodes);
 	else if ( name == "bema" )
@@ -121,27 +124,13 @@ void QueryManager::schedule_pending_jobs() {
 	while (  num_workers > 0 &&  it != pending_jobs.end()) {
 		auto &q = *it->second;
 
-		auto nids = q.get_target_nodes();
-		uint64_t worker = 0;
-
-		for ( auto nid = nids.begin(); worker == 0 && nid != nids.end(); nid++ ) {
-			// Schedule on any node
-			if ( (*nid) == 0 ) {
-				for ( auto ni = nodes.begin(); ni != nodes.end() && worker == 0; ni++ ) {
-					worker = ni->second->schedule_request(q.get_command(),q.get_request());
-				}
-			}
-			else {
-				auto &node = nodes.at(*nid);
-				worker = node->schedule_request(q.get_command(),q.get_request());
-			}
-		}
+		uint64_t worker = q.submit(nodes);
 
 		// Found a worker... Done!
 		if ( worker > 0 ) {
 			num_workers--;
 			q.time_scheduled = CacheCommon::time_millis();
-			Log::debug("Scheduled request: %s\non worker: %d", q.get_request().to_string().c_str(), worker);
+			Log::debug("Scheduled request on worker: %d", worker);
 			queries.emplace(worker, std::move(it->second));
 			it = pending_jobs.erase(it);
 		}

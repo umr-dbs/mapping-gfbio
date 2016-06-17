@@ -302,6 +302,7 @@ std::string SystemStats::to_string() const {
 	std::ostringstream ss;
 	ss << "Index-Stats:" << std::endl;
 	ss << "  single hits              : " << single_local_hits << std::endl;
+	ss << "  single remote hits       : " << single_remote_hits << std::endl;
 	ss << "  puzzle single node       : " << multi_local_hits << std::endl;
 	ss << "  puzzle multiple nodes    : " << multi_remote_hits << std::endl;
 	ss << "  partial single node      : " << multi_local_partials << std::endl;

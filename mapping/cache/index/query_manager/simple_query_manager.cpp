@@ -21,17 +21,14 @@ bool SimpleJob::extend(const BaseRequest& req) {
 	return false;
 }
 
+uint64_t SimpleJob::submit(const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
+	return nmap.at(node_id)->schedule_request(WorkerConnection::CMD_CREATE,request);
+}
+
 const BaseRequest& SimpleJob::get_request() const {
 	return request;
 }
 
-std::vector<uint32_t> SimpleJob::get_target_nodes() const {
-	return std::vector<uint32_t>{node_id};
-}
-
-uint8_t SimpleJob::get_command() const {
-	return WorkerConnection::CMD_CREATE;
-}
 
 void SimpleJob::replace_reference(const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap ) {
 	(void) from;
@@ -39,6 +36,9 @@ void SimpleJob::replace_reference(const IndexCacheKey &from, const IndexCacheKey
 	(void) nmap;
 }
 
+/**
+ * MGR
+ */
 
 SimpleQueryManager::SimpleQueryManager(const std::map<uint32_t, std::shared_ptr<Node> >& nodes) : QueryManager(nodes) {
 }

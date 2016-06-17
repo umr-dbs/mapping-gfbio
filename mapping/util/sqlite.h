@@ -7,6 +7,9 @@ class sqlite3_stmt;
 #include <string>
 #include <stdint.h>
 
+/**
+ * SQLite wrapper
+ */
 class SQLite {
 	private:
 		class SQLiteStatement {

@@ -4,6 +4,10 @@
 #include "datatypes/raster.h"
 #include "util/timeparser.h"
 
+/**
+ * Implementation of the OGC WCS standard http://www.opengeospatial.org/standards/wcs
+ * It currently only supports our specific use cases
+ */
 class WCSService : public OGCService {
 	public:
 		using OGCService::OGCService;

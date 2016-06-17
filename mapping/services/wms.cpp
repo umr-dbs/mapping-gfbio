@@ -8,7 +8,10 @@
 #include "util/configuration.h"
 #include "util/debug.h"
 
-
+/**
+ * Implementation of the OGC WMS standard http://www.opengeospatial.org/standards/wms
+ * It currently only supports our specific use cases
+ */
 class WMSService : public OGCService {
 	public:
 		using OGCService::OGCService;

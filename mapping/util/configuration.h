@@ -4,6 +4,14 @@
 
 #include <string>
 
+/**
+ * Class for loading the configuration of the application.
+ * It loads key, value parameters from the following location in the given order
+ * 1. /etc/mapping.conf
+ * 2. working directory mapping.conf
+ * 3. environment variables starting with MAPPING_ and mapping_
+ *
+ */
 class Configuration {
 	public:
 		static void loadFromDefaultPaths();

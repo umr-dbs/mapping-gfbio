@@ -11,6 +11,9 @@
 #include "datatypes/plot.h"
 #include "util/make_unique.h"
 
+/**
+ * This plot outputs n dimensional numeric attribute vectors as JSON
+ */
 template<std::size_t dimensions>
 class XYGraph : public GenericPlot {
 	public:

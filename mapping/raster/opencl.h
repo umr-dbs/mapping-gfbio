@@ -35,6 +35,9 @@ namespace RasterOpenCL {
 
 	size_t getMaxAllocSize();
 
+	/**
+	 * This class allows the execution of OpenCL kernels on mapping input data
+	 */
 	class CLProgram {
 		public:
 			CLProgram();

@@ -13,6 +13,9 @@
 #include <cstdio>
 #include <stdarg.h>
 
+/**
+ * Log functionality
+ */
 class Log {
 public:
 	enum class LogLevel {

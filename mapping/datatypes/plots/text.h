@@ -5,6 +5,9 @@
 
 #include "datatypes/plot.h"
 
+/**
+ * This plot outputs text encapuslated in JSON
+ */
 class TextPlot : public GenericPlot {
 	public:
 		TextPlot(const std::string &text);

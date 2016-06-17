@@ -5,6 +5,9 @@
 
 #include "datatypes/plot.h"
 
+/**
+ * This plot outputs a png image as base64 encapsulated in JSON
+ */
 class PNGPlot : public GenericPlot {
 	public:
 		PNGPlot(const std::string &binary);

@@ -11,6 +11,9 @@
 #include <boost/date_time/gregorian/gregorian.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 
+/**
+ * This class provides methods for modifying time, to be used in the TimeShiftOperator
+ */
 class TimeShift {
 	public:
 		/**

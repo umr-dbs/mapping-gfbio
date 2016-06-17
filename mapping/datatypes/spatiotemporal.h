@@ -38,6 +38,9 @@ class QueryRectangle;
 class BinaryReadBuffer;
 class BinaryWriteBuffer;
 
+/**
+ * This class represents a spatial reference, consisting of a projection and a spatial rectangle
+ */
 class SpatialReference {
 	public:
 		/*

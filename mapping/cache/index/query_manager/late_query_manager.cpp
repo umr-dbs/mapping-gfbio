@@ -275,7 +275,7 @@ bool LateQueryManager::use_reorg() const {
 
 std::unique_ptr<PendingQuery> LateQueryManager::recreate_job(
 		const RunningQuery& query) {
-	auto res = make_unique<LateJob>(query.get_request(),caches);
+	std::unique_ptr<PendingQuery> res = make_unique<LateJob>(query.get_request(),caches);
 	res->add_clients(query.get_clients());
 	return res;
 }

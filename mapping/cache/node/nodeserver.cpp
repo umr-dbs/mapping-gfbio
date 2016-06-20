@@ -295,7 +295,7 @@ void NodeServer::process_control_command(BinaryReadBuffer &payload) {
 			}
 
 			auto time = CacheCommon::time_millis()-start;
-			Log::debug("Finished Processing reorg, %lu removals, %lu moves took: %lums", d.get_removals().size(), d.get_moves().size(),time);
+			Log::info("Finished Processing reorg, %lu removals, %lu moves took: %lums", d.get_removals().size(), d.get_moves().size(),time);
 
 			control_connection->write(ControlConnection::RESP_REORG_DONE);
 			break;

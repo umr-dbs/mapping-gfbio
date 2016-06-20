@@ -266,6 +266,24 @@ std::unique_ptr<T> PuzzleUtil::puzzle(const SpatioTemporalReference& bbox,
 }
 
 template<>
+std::unique_ptr<PointCollection> PuzzleUtil::puzzle(const SpatioTemporalReference& bbox,
+		const std::vector<std::shared_ptr<const PointCollection> >& items) {
+	return puzzle_feature_collection(bbox,items);
+}
+
+template<>
+std::unique_ptr<LineCollection> PuzzleUtil::puzzle(const SpatioTemporalReference& bbox,
+		const std::vector<std::shared_ptr<const LineCollection> >& items) {
+	return puzzle_feature_collection(bbox,items);
+}
+
+template<>
+std::unique_ptr<PolygonCollection> PuzzleUtil::puzzle(const SpatioTemporalReference& bbox,
+		const std::vector<std::shared_ptr<const PolygonCollection> >& items) {
+	return puzzle_feature_collection(bbox,items);
+}
+
+template<>
 std::unique_ptr<GenericPlot> PuzzleUtil::puzzle(
 		const SpatioTemporalReference& bbox,
 		const std::vector<std::shared_ptr<const GenericPlot> >& items) {

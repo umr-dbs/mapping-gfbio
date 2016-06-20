@@ -907,3 +907,84 @@ template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_pt
 template void DeliveryConnection::write_data( BinaryWriteBuffer&, std::shared_ptr<const PolygonCollection>& );
 template void DeliveryConnection::write_data(BinaryWriteBuffer&,
 		std::shared_ptr<const GenericPlot>&);
+
+PooledConnection::PooledConnection(std::unique_ptr<BlockingConnection> con, ConnectionPool &pool) :
+	faulty(false), pool(pool), con(std::move(con)) {
+}
+
+PooledConnection::PooledConnection(PooledConnection&& c) : faulty(c.faulty), pool(c.pool), con(std::move(c.con)) {
+}
+
+PooledConnection::~PooledConnection() {
+	if ( !faulty )
+		pool.release(std::move(con));
+}
+
+BlockingConnection& PooledConnection::get_connection() {
+	return *con;
+}
+
+void PooledConnection::set_faulty() {
+	faulty = true;
+}
+
+//
+// Pool
+//
+
+
+ConnectionPool::ConnectionPool(const std::string host, uint32_t port,
+		uint32_t magic_number, uint32_t max_idle) : host(host), port(port), magic_number(magic_number), max_idle(max_idle) {
+}
+
+PooledConnection ConnectionPool::get() {
+	std::unique_ptr<BlockingConnection> con;
+	{
+		std::lock_guard<std::mutex> g(mtx);
+		if ( !idle_connections.empty() ) {
+			con = std::move(idle_connections.back());
+			idle_connections.pop_back();
+		}
+	}
+	if ( !con )
+	 con = create();
+
+	return PooledConnection(std::move(con),*this);
+}
+
+std::unique_ptr<BlockingConnection> ConnectionPool::create() {
+	return BlockingConnection::create(host,port,true,magic_number);
+}
+
+void ConnectionPool::release(std::unique_ptr<BlockingConnection> con) {
+	std::lock_guard<std::mutex> g(mtx);
+	if ( idle_connections.size() < max_idle )
+		idle_connections.push_back(std::move(con));
+}
+
+//
+// Multi Pool
+//
+
+MultiConnectionPool::MultiConnectionPool(uint32_t magic_number) : magic_number(magic_number){
+}
+
+PooledConnection MultiConnectionPool::get(const std::string& host,
+		uint32_t port) {
+	return get_pool(host,port).get();
+}
+
+
+
+ConnectionPool& MultiConnectionPool::get_pool(const std::string& host,
+		uint32_t port) {
+	std::pair<std::string,uint32_t> key(host,port);
+	std::lock_guard<std::mutex> g(mtx);
+	auto i = pool_map.find(key);
+	if ( i == pool_map.end() ) {
+		auto ires = pool_map.emplace(key,make_unique<ConnectionPool>(host,port,magic_number));
+		return *ires.first->second;
+	}
+	else
+		return *i->second;
+}

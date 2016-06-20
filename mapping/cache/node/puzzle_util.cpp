@@ -7,6 +7,7 @@
 
 #include "cache/node/puzzle_util.h"
 #include "cache/priv/connection.h"
+#include "cache/node/nodeserver.h"
 
 #include "datatypes/raster.h"
 #include "datatypes/pointcollection.h"
@@ -459,30 +460,34 @@ std::unique_ptr<T> RemoteRetriever<T>::load(const std::string& semantic_id,
 	Log::debug("Fetching cache-entry from: %s:%d, key: %d", ref.host.c_str(),
 			ref.port, ref.entry_id);
 
-	auto con = BlockingConnection::create(ref.host, ref.port, true,
-			DeliveryConnection::MAGIC_NUMBER);
-	auto resp = con->write_and_read(DeliveryConnection::CMD_GET_CACHED_ITEM,
-			key);
-	uint8_t rc = resp->read<uint8_t>();
+	auto dg = NodeServer::delivery_pool.get(ref.host,ref.port);
 
-	switch (rc) {
-	case DeliveryConnection::RESP_OK: {
-		FetchInfo mi(*resp);
-		// Add the original costs
-		qp.addTotalCosts(mi.profile);
-		// Add the network-costs
-		qp.addIOCost(mi.size);
-		return read_item(*resp);
-	}
-	case DeliveryConnection::RESP_ERROR: {
-		std::string err_msg = resp->read<std::string>();
-		Log::debug("Remote-entry gone: %s", err_msg.c_str());
-		throw DeliveryException(err_msg);
-	}
-	default: {
-		Log::error("Delivery returned unknown code: %d", rc);
-		throw DeliveryException("Delivery returned unknown code");
-	}
+	try {
+		auto resp = dg.get_connection().write_and_read(DeliveryConnection::CMD_GET_CACHED_ITEM,key);
+		uint8_t rc = resp->read<uint8_t>();
+
+		switch (rc) {
+		case DeliveryConnection::RESP_OK: {
+			FetchInfo mi(*resp);
+			// Add the original costs
+			qp.addTotalCosts(mi.profile);
+			// Add the network-costs
+			qp.addIOCost(mi.size);
+			return read_item(*resp);
+		}
+		case DeliveryConnection::RESP_ERROR: {
+			std::string err_msg = resp->read<std::string>();
+			Log::debug("Remote-entry gone: %s", err_msg.c_str());
+			throw DeliveryException(err_msg);
+		}
+		default: {
+			Log::error("Delivery returned unknown code: %d", rc);
+			throw DeliveryException("Delivery returned unknown code");
+		}
+		}
+	} catch ( const NetworkException &ne ) {
+		dg.set_faulty();
+		throw DeliveryException("Connection failure");
 	}
 }
 

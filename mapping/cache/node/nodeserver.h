@@ -35,6 +35,7 @@ class NodeServer {
 	friend class TestNodeServer;
 	friend class TestCacheMan;
 public:
+	static MultiConnectionPool delivery_pool;
 
 	NodeServer( std::unique_ptr<NodeCacheManager> manager, uint32_t my_port, std::string index_host,
 			uint32_t index_port, int num_threads);

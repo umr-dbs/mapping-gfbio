@@ -64,6 +64,11 @@ void ActiveQueryStats::add_result_bytes(uint64_t bytes) {
 	result_bytes+=bytes;
 }
 
+void ActiveQueryStats::add_lost_put() {
+	std::lock_guard<std::mutex> g(mtx);
+	lost_puts++;
+}
+
 QueryStats ActiveQueryStats::get() const {
 	std::lock_guard<std::mutex> g(mtx);
 	return QueryStats(*this);

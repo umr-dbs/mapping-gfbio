@@ -148,12 +148,14 @@ UserDBBackend::userid_t SQLiteUserDBBackend::createUser(const std::string &usern
 }
 
 UserDBBackend::UserData SQLiteUserDBBackend::loadUser(userid_t userid) {
-	auto stmt = db.prepare("SELECT username, externalid FROM users WHERE userid = ?");
+	auto stmt = db.prepare("SELECT username, realname, email, externalid FROM users WHERE userid = ?");
 	stmt.bind(1, userid);
 	if (!stmt.next())
 		throw UserDB::database_error("UserDB: user not found");
 	std::string username = stmt.getString(0);
-	auto externalid_ptr = stmt.getString(1);
+	std::string realname = stmt.getString(1);
+	std::string email = stmt.getString(2);
+	auto externalid_ptr = stmt.getString(3);
 	std::string externalid;
 	if (externalid_ptr != nullptr)
 		externalid = std::string(externalid_ptr);
@@ -171,7 +173,7 @@ UserDBBackend::UserData SQLiteUserDBBackend::loadUser(userid_t userid) {
 	while (stmt.next())
 		groups.push_back(stmt.getInt64(0));
 
-	return UserData{userid, username, externalid, std::move(permissions), std::move(groups)};
+	return UserData{userid, username, realname, email, externalid, std::move(permissions), std::move(groups)};
 }
 
 

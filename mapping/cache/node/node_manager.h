@@ -46,6 +46,8 @@ public:
 	/** Adds the given amount of bytes */
 	void add_result_bytes(uint64_t bytes);
 
+	void add_lost_put();
+
 	/** Adds a full miss */
 	void add_miss();
 

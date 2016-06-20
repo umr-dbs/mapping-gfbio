@@ -16,10 +16,12 @@
 #include "util/concat.h"
 #include "util/exceptions.h"
 
+#include <mutex>
 #include <map>
 #include <memory>
 #include <cstring> //strerror
 #include <poll.h>
+
 
 /**
  * Models a simple blocking connection
@@ -866,5 +868,58 @@ protected:
 	void process_command( uint8_t cmd, BinaryReadBuffer& payload );
 	void write_finished();
 };
+
+class ConnectionPool;
+
+class PooledConnection {
+	friend class ConnectionPool;
+	PooledConnection( std::unique_ptr<BlockingConnection> con, ConnectionPool &pool );
+public:
+	PooledConnection( const PooledConnection& ) = delete;
+	PooledConnection( PooledConnection && );
+	~PooledConnection();
+
+	BlockingConnection& get_connection();
+	void set_faulty();
+private:
+	bool faulty;
+	ConnectionPool& pool;
+	std::unique_ptr<BlockingConnection> con;
+};
+
+class ConnectionPool {
+	friend class PooledConnection;
+public:
+	ConnectionPool( const std::string host, uint32_t port, uint32_t magic_number, uint32_t max_idle = 4 );
+	ConnectionPool( const ConnectionPool & ) = delete;
+	ConnectionPool( ConnectionPool&& ) = delete;
+	ConnectionPool& operator=( const ConnectionPool & ) = delete;
+	ConnectionPool& operator=( ConnectionPool && ) = delete;
+	PooledConnection get();
+private:
+	std::unique_ptr<BlockingConnection> create();
+	void release( std::unique_ptr<BlockingConnection> con );
+
+	std::string host;
+	uint32_t port;
+	uint32_t magic_number;
+	std::vector<std::unique_ptr<BlockingConnection>> idle_connections;
+	std::mutex mtx;
+	uint32_t max_idle;
+};
+
+class MultiConnectionPool {
+	typedef std::map<std::pair<std::string,uint32_t>,std::unique_ptr<ConnectionPool>> PMap;
+public:
+	MultiConnectionPool(uint32_t magic_number);
+	PooledConnection get(const std::string &host, uint32_t port);
+private:
+	ConnectionPool& get_pool(const std::string &host, uint32_t port);
+
+	uint32_t magic_number;
+	std::mutex mtx;
+	PMap pool_map;
+};
+
 
 #endif /* CONNECTION_H_ */

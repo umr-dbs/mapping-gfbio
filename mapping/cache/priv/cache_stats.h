@@ -173,6 +173,7 @@ public:
 	uint32_t misses;
 
 	uint64_t result_bytes;
+	uint64_t lost_puts;
 
 protected:
 	size_t queries;

@@ -31,6 +31,9 @@
 //
 ////////////////////////////////////////////////////////////
 
+MultiConnectionPool NodeServer::delivery_pool(DeliveryConnection::MAGIC_NUMBER);
+
+
 NodeServer::NodeServer(std::unique_ptr<NodeCacheManager> manager, uint32_t my_port, std::string index_host, uint32_t index_port,
 	int num_threads) :
 	shutdown(false), workers_up(false), my_id(-1), my_port(my_port), index_host(index_host), index_port(index_port),
@@ -342,9 +345,10 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item ) {
 
 
 	// Send move request
+	auto dg = delivery_pool.get(item.from_host, item.from_port);
 	try {
-		auto del_con = BlockingConnection::create(item.from_host,item.from_port, true, DeliveryConnection::MAGIC_NUMBER);
-		auto resp = del_con->write_and_read(DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
+		auto &del_con = dg.get_connection();
+		auto resp = del_con.write_and_read(DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
 
 		uint8_t del_resp = resp->read<uint8_t>();
 
@@ -386,9 +390,10 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item ) {
 			default:
 				throw NetworkException(concat("Received illegal response from delivery-node: ", del_resp));
 		}
-		confirm_move(*del_con, item, new_cache_id);
+		confirm_move(del_con, item, new_cache_id);
 	} catch (const NetworkException &ne) {
 		Log::error("Could not process move: %s", ne.what());
+		dg.set_faulty();
 		return;
 	}
 }

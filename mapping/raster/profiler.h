@@ -1,9 +1,9 @@
 #ifndef RASTER_PROFILER_H
 #define RASTER_PROFILER_H
 
-#ifndef RASTER_DO_PROFILE
-#define RASTER_DO_PROFILE 1
-#endif
+//#ifndef RASTER_DO_PROFILE
+//#define RASTER_DO_PROFILE 1
+//#endif
 
 #if RASTER_DO_PROFILE
 #include <string>

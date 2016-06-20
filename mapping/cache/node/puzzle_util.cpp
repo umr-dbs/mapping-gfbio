@@ -352,9 +352,9 @@ std::unique_ptr<T> PuzzleUtil::puzzle_feature_collection(
 		for (auto feature : *src) {
 			keep.push_back(
 					src->featureIntersectsRectangle(feature, bbox.x1, bbox.y1,
-							bbox.x2, bbox.y2)
-							&& !(src->time[feature].t1 > bbox.t2
-									|| src->time[feature].t2 < bbox.t1));
+							bbox.x2, bbox.y2) && (!src->hasTime() ||
+							 !(src->time[feature].t1 > bbox.t2
+									|| src->time[feature].t2 < bbox.t1)));
 		}
 		std::unique_ptr<T> filtered = src->filter(keep);
 

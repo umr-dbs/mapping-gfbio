@@ -202,6 +202,23 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 		src_x2 = px;
 		src_y2 = py;
 
+		SpatialReference ex = SpatialReference::extent(src_epsg);
+		if ( src_x2 <= src_x1 ) {
+			if ( std::abs(src_x2-ex.x1) < std::abs(src_x1-ex.x2 ) )
+				src_x2 = ex.x2;
+			else
+				src_x1 = ex.x1;
+		}
+
+		if ( src_y2 <= src_y1 ) {
+			if ( std::abs(src_y2-ex.y1) < std::abs(src_y1-ex.y2 ) )
+				src_y2 = ex.y2;
+			else
+				src_y1 = ex.y1;
+		}
+
+
+
 		// TODO: welche Auflösung der Quelle brauchen wir denn überhaupt?
 /*
 		printf("Content-type: text/plain\r\n\r\n");

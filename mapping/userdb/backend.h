@@ -21,6 +21,8 @@ class UserDBBackend {
 		struct UserData {
 			userid_t userid;
 			std::string username;
+			std::string realname;
+			std::string email;
 			std::string externalid;
 			UserDB::Permissions permissions;
 			std::vector<groupid_t> groupids;

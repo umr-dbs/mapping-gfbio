@@ -18,6 +18,7 @@
  *     - password
  * - request = logout: destroys current session
  * - request = sourcelist: get list of available raster sources
+ * - request = info: get user information
  *
  */
 class UserService : public HTTPService {
@@ -62,6 +63,18 @@ void UserService::run() {
 				v[name] = root;
 			}
 			response.sendSuccessJSON("sourcelist", v);
+			return;
+		}
+
+		if(request == "info") {
+			UserDB::User &user = session->getUser();
+
+			Json::Value json(Json::ValueType::objectValue);
+			json["username"] = user.getUsername();
+			json["realname"] = user.getRealname();
+			json["email"] = user.getEmail();
+
+			response.sendSuccessJSON(json);
 			return;
 		}
 

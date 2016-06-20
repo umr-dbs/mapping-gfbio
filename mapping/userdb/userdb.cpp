@@ -44,8 +44,8 @@ bool UserDB::Permissions::hasPermission(const std::string &permission) {
 /*
  * User
  */
-UserDB::User::User(userid_t userid, const std::string &username, const std::string &externalid, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups)
-	: userid(userid), username(username), externalid(externalid), groups(groups), user_permissions(user_permissions) {
+UserDB::User::User(userid_t userid, const std::string &username, const std::string &realname, const std::string &email, const std::string &externalid, Permissions &&user_permissions, std::vector<std::shared_ptr<Group>> &&groups)
+	: userid(userid), username(username), realname(realname), email(email), externalid(externalid), groups(groups), user_permissions(user_permissions) {
 	all_permissions.addPermissions(user_permissions);
 	for (auto &group : groups)
 		all_permissions.addPermissions(group->group_permissions);
@@ -303,7 +303,7 @@ std::shared_ptr<UserDB::User> UserDB::loadUser(UserDB::userid_t userid) {
 	std::vector<std::shared_ptr<Group>> groups;
 	for (auto groupid : userdata.groupids)
 		groups.push_back(loadGroup(groupid));
-	auto user = std::make_shared<User>(userid, userdata.username, userdata.externalid, std::move(userdata.permissions), std::move(groups));
+	auto user = std::make_shared<User>(userid, userdata.username, userdata.realname, userdata.email, userdata.externalid, std::move(userdata.permissions), std::move(groups));
 	return user;
 }
 

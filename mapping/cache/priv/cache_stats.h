@@ -201,7 +201,7 @@ public:
 	void reset();
 
 	uint32_t get_queries_scheduled();
-	void query_finished( uint64_t wait_time, uint64_t exec_time );
+	void query_finished( uint32_t num_clients, uint64_t wait_time, uint64_t exec_time );
 	void scheduled( uint32_t node_id, uint64_t num_clients = 1 );
 	void issued();
 	void add_reorg_cycle( uint64_t duration );

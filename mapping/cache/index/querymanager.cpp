@@ -17,15 +17,15 @@
 #include <algorithm>
 
 std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes,
-		const std::string& name) {
+		const std::string& name, bool enable_batching) {
 	std::string lcname;
 	lcname.resize(name.size());
 	std::transform(name.cbegin(), name.cend(), lcname.begin(), ::tolower);
 
 	if ( name == "default" )
-		return make_unique<DefaultQueryManager>(nodes,mgr);
+		return make_unique<DefaultQueryManager>(nodes,mgr, enable_batching);
 	else if ( name == "late" )
-		return make_unique<LateQueryManager>(nodes,mgr);
+		return make_unique<LateQueryManager>(nodes,mgr, enable_batching);
 	else if ( name == "dema" )
 		return make_unique<DemaQueryManager>(nodes);
 	else if ( name == "bema" )
@@ -87,11 +87,7 @@ std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id, uint32_t nod
 
 	// Tell on which node the queries were scheduled
 	stats.scheduled(node_id, clients.size());
-
-	for ( auto &tp : q.client_times ) {
-		uint64_t wait = tp > q.time_scheduled ? 0 : q.time_scheduled - tp;
-		stats.query_finished(wait,q.time_finished - std::max(tp,q.time_scheduled));
-	}
+	stats.query_finished(q.clients.size(), q.time_scheduled-q.time_created,q.time_finished - q.time_scheduled);
 	finished_queries.erase(it);
 	return clients;
 }
@@ -194,13 +190,10 @@ bool RunningQuery::satisfies( const BaseRequest& req) const {
 
 void RunningQuery::add_client(uint64_t client) {
 	clients.insert(client);
-	client_times.push_back(CacheCommon::time_millis());
 }
 
 void RunningQuery::add_clients(const std::set<uint64_t>& clients) {
 	this->clients.insert(clients.begin(),clients.end());
-	for ( size_t i = 0; i < clients.size(); i++ )
-		client_times.push_back(CacheCommon::time_millis());
 }
 
 const std::set<uint64_t>& RunningQuery::get_clients() const {

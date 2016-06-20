@@ -153,40 +153,42 @@ uint64_t LateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap)
 
 LateQueryManager::LateQueryManager(
 		const std::map<uint32_t, std::shared_ptr<Node> >& nodes,
-		IndexCacheManager& caches) : QueryManager(nodes), caches(caches) {
+		IndexCacheManager& caches, bool enable_batching) : QueryManager(nodes), caches(caches), enable_batching(enable_batching) {
 }
 
 void LateQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
 	stats.issued();
-	TIME_EXEC("QueryManager.add_request");
-	// Check if running jobs satisfy the given query
-	for (auto &qi : queries) {
-		if (qi.second->satisfies(req)) {
-			qi.second->add_client(client_id);
-			return;
+	if ( enable_batching ) {
+		TIME_EXEC("QueryManager.add_request");
+		// Check if running jobs satisfy the given query
+		for (auto &qi : queries) {
+			if (qi.second->satisfies(req)) {
+				qi.second->add_client(client_id);
+				return;
+			}
 		}
-	}
 
-	// Check if pending jobs satisfy the given query
-	for (auto &j : pending_jobs) {
-		if (j.second->satisfies(req)) {
-			j.second->add_client(client_id);
-			return;
-		}
-	}
-
-	// Perform a cache-query
-	auto &cache = caches.get_cache(req.type);
-	auto res = cache.query(req.semantic_id, req.query);
-	stats.add_query(res.hit_ratio);
-	Log::debug("QueryResult: %s", res.to_string().c_str());
-
-	//  No result --> Check if a pending query may be extended by the given query
-	if ( res.items.empty() ) {
+		// Check if pending jobs satisfy the given query
 		for (auto &j : pending_jobs) {
-			if (j.second->extend(req)) {
+			if (j.second->satisfies(req)) {
 				j.second->add_client(client_id);
 				return;
+			}
+		}
+
+		// Perform a cache-query
+		auto &cache = caches.get_cache(req.type);
+		auto res = cache.query(req.semantic_id, req.query);
+		stats.add_query(res.hit_ratio);
+		Log::debug("QueryResult: %s", res.to_string().c_str());
+
+		//  No result --> Check if a pending query may be extended by the given query
+		if ( res.items.empty() ) {
+			for (auto &j : pending_jobs) {
+				if (j.second->extend(req)) {
+					j.second->add_client(client_id);
+					return;
+				}
 			}
 		}
 	}

@@ -178,8 +178,8 @@ NodeCacheManager& TestNodeServer::get_cache_manager() {
 
 TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval,
 		const std::string &reorg_strategy,
-		const std::string &relevance_function, const std::string &scheduler) :
-		IndexServer(port, update_interval, reorg_strategy, relevance_function,
+		const std::string &relevance_function, const std::string &scheduler, bool batching) :
+		IndexServer(port, update_interval, reorg_strategy, relevance_function, batching,
 				scheduler) {
 }
 
@@ -309,12 +309,12 @@ void TestCacheMan::reset_costs() {
 LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers,
 		time_t update_interval, size_t capacity, std::string reorg_strat,
 		std::string relevance_function, std::string c_strat,
-		std::string scheduler, std::string node_cache, std::string node_repl,
+		std::string scheduler, bool batching, std::string node_cache, std::string node_repl,
 		int index_port) :
 
 		index_port(index_port), ccm("127.0.0.1", index_port), idx_server(
 				make_unique<TestIdxServer>(index_port, update_interval,
-						reorg_strat, relevance_function, scheduler)) {
+						reorg_strat, relevance_function, scheduler, batching)) {
 
 	for (int i = 1; i <= num_nodes; i++)
 		nodes.push_back(

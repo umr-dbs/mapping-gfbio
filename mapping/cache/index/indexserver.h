@@ -50,7 +50,7 @@ public:
 	 * @param reorg_strategy the name of the reorg-strategy to use
 	 * @param relevance_function the name of the relevance-function to use
 	 */
-	IndexServer( int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function, const std::string &scheduler = "default" );
+	IndexServer( int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function, bool enable_batching, const std::string &scheduler = "default" );
 	virtual ~IndexServer() = default;
 
 	/* Fires up the index-server and will return after

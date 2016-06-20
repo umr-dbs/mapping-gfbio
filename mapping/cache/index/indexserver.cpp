@@ -28,9 +28,9 @@
 //
 ////////////////////////////////////////////////////////////
 
-IndexServer::IndexServer(int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function, const std::string &scheduler) :
+IndexServer::IndexServer(int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function, bool enable_batching, const std::string &scheduler) :
 	caches(reorg_strategy,relevance_function), port(port), shutdown(false), next_node_id(1),
-	query_manager(QueryManager::by_name(this->caches,this->nodes,scheduler)), last_reorg(CacheCommon::time_millis()), update_interval(update_interval), wakeup_pipe(BinaryStream::makePipe()) {
+	query_manager(QueryManager::by_name(this->caches,this->nodes,scheduler,enable_batching)), last_reorg(CacheCommon::time_millis()), update_interval(update_interval), wakeup_pipe(BinaryStream::makePipe()) {
 }
 
 void IndexServer::stop() {

@@ -29,7 +29,7 @@ private:
 
 class LateQueryManager : public QueryManager {
 public:
-	LateQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes,IndexCacheManager &caches);
+	LateQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes,IndexCacheManager &caches, bool enable_batching);
 	void add_request( uint64_t client_id, const BaseRequest &req );
 	void process_worker_query(WorkerConnection& con);
 	bool use_reorg() const;
@@ -37,6 +37,7 @@ protected:
 	std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query );
 private:
 	IndexCacheManager &caches;
+	bool enable_batching;
 };
 
 #endif /* CACHE_INDEX_QUERY_MANAGER_LATE_QUERY_MANAGER_H_ */

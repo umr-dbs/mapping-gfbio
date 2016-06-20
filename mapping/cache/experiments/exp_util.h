@@ -39,7 +39,8 @@ public:
 	TestIdxServer(uint32_t port, time_t update_interval,
 			const std::string &reorg_strategy,
 			const std::string &relevance_function,
-			const std::string &scheduler);
+			const std::string &scheduler,
+			bool batching);
 	~TestIdxServer();
 	void trigger_reorg(uint32_t node_id, const ReorgDescription &desc);
 	void force_stat_update();
@@ -123,6 +124,7 @@ public:
 			std::string relevance_function,
 			std::string c_strat,
 			std::string scheduler = "default",
+			bool batching = true,
 			std::string node_cache = "remote",
 			std::string node_repl = "lru",
 			int index_port = atoi(

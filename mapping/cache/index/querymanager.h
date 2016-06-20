@@ -85,7 +85,6 @@ public:
 	const uint64_t id;
 private:
 	std::set<uint64_t> clients;
-	std::vector<uint64_t> client_times;
 	uint64_t time_created;
 	uint64_t time_scheduled;
 	uint64_t time_finished;
@@ -134,7 +133,7 @@ private:
 	friend class DefaultQueryManager;
 	friend class LateQueryManager;
 public:
-	static std::unique_ptr<QueryManager> by_name( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const std::string &name );
+	static std::unique_ptr<QueryManager> by_name( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const std::string &name, bool enable_batching );
 
 	virtual ~QueryManager() = default;
 

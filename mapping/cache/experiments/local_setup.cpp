@@ -6,7 +6,7 @@
 #include <signal.h>
 
 int num_nodes = 10;
-int workers_per_node = 1;
+int workers_per_node = 4;
 int index_port = 12346;
 
 void termination_handler(int signum) {
@@ -58,13 +58,14 @@ int main(void) {
 	std::string relevance = "costlru";
 	std::string caching_strat = "uncached";
 
-	std::string scheduler = "default";
+	std::string scheduler = "late";
+	bool batching = true;
 	std::string node_cache_mode = "remote";
-	std::string node_cache_repl = "costlru";
+	std::string node_cache_repl = "lru";
 	time_t update_interval = 500;
 
 	LocalTestSetup lts(
-			num_nodes, workers_per_node, update_interval, cache_capacity, reorg_strategy, relevance, caching_strat, scheduler, node_cache_mode, node_cache_repl, index_port
+			num_nodes, workers_per_node, update_interval, cache_capacity, reorg_strategy, relevance, caching_strat, scheduler, batching, node_cache_mode, node_cache_repl, index_port
 	);
 	std::this_thread::sleep_for(std::chrono::seconds(3600));
 	return 0;

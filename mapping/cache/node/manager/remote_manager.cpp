@@ -85,6 +85,10 @@ bool RemoteCacheWrapper<T>::put(const std::string& semantic_id,
 template<typename T>
 std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 		const QueryRectangle& rect, QueryProfiler &profiler) {
+	if ( op.getDepth() == 0 )
+		throw NoSuchElementException("No query on depth=0");
+
+
 	TIME_EXEC("CacheManager.query");
 	Log::debug("Querying item: %s on %s",
 			CacheCommon::qr_to_string(rect).c_str(),

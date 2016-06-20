@@ -86,7 +86,7 @@ private:
 class DefaultQueryManager : public QueryManager {
 	friend class CreateJob;
 public:
-	DefaultQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes,IndexCacheManager &caches);
+	DefaultQueryManager(const std::map<uint32_t,std::shared_ptr<Node>> &nodes,IndexCacheManager &caches, bool enable_batching);
 	void add_request( uint64_t client_id, const BaseRequest &req );
 	void process_worker_query(WorkerConnection& con);
 	bool use_reorg() const;
@@ -94,6 +94,8 @@ protected:
 	std::unique_ptr<PendingQuery> recreate_job( const RunningQuery &query );
 private:
 	IndexCacheManager &caches;
+	bool enable_batching;
+
 	/**
 	 * Creates a new job based on the given request and cache-query result
 	 * @param req the request

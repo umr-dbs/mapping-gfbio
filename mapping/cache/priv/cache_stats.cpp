@@ -351,20 +351,23 @@ void SystemStats::scheduled(uint32_t node_id, uint64_t num_clients) {
 }
 
 
-void SystemStats::query_finished(uint64_t wait_time, uint64_t exec_time ) {
-	avg_exec_time = (avg_exec_time*query_counter + exec_time) / (query_counter+1);
-	avg_wait_time = (avg_wait_time*query_counter + wait_time) / (query_counter+1);
+void SystemStats::query_finished(uint32_t num_clients, uint64_t wait_time, uint64_t exec_time ) {
+	double w = (double) wait_time / num_clients;
+	double e = (double) exec_time / num_clients;
+
+	avg_exec_time = (avg_exec_time*query_counter + exec_time) / (query_counter+num_clients);
+	avg_wait_time = (avg_wait_time*query_counter + wait_time) / (query_counter+num_clients);
 	avg_time = avg_exec_time + avg_wait_time;
 
-	min_wait_time = std::min((double)wait_time, min_wait_time);
-	min_exec_time = std::min((double)exec_time, min_exec_time);
-	min_time = std::min((double)wait_time+exec_time, min_time);
+	min_wait_time = std::min(w, min_wait_time);
+	min_exec_time = std::min(e, min_exec_time);
+	min_time = std::min(w+e, min_time);
 
-	max_wait_time = std::max((double)wait_time, max_wait_time);
-	max_exec_time = std::max((double)exec_time, max_exec_time);
-	max_time = std::max((double)wait_time+exec_time, max_time);
+	max_wait_time = std::max(w, max_wait_time);
+	max_exec_time = std::max(e, max_exec_time);
+	max_time = std::max(w+e, max_time);
 
-	query_counter++;
+	query_counter+=num_clients;
 }
 
 void SystemStats::add_reorg_cycle(uint64_t duration) {

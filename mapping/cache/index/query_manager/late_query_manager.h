@@ -18,8 +18,6 @@ public:
 	bool is_affected_by_node( uint32_t node_id );
 	uint64_t submit(const std::map<uint32_t, std::shared_ptr<Node>> &nmap);
 	const BaseRequest& get_request() const;
-protected:
-	void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 private:
 	IndexCacheManager &caches;
 	BaseRequest request;

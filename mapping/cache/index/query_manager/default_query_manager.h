@@ -39,8 +39,6 @@ public:
 	bool is_affected_by_node( uint32_t node_id );
 	uint64_t submit(const std::map<uint32_t, std::shared_ptr<Node>> &nmap);
 	const BaseRequest& get_request() const;
-protected:
-	void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 private:
 	BaseRequest request;
 	const QueryRectangle orig_query;
@@ -58,8 +56,6 @@ public:
 	bool is_affected_by_node( uint32_t node_id );
 	uint64_t submit(const std::map<uint32_t, std::shared_ptr<Node>> &nmap);
 	const BaseRequest& get_request() const;
-protected:
-	void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 private:
 	DeliveryRequest request;
 	uint32_t node;
@@ -76,8 +72,6 @@ public:
 	bool is_affected_by_node( uint32_t node_id );
 	uint64_t submit(const std::map<uint32_t, std::shared_ptr<Node>> &nmap);
 	const BaseRequest& get_request() const;
-protected:
-	void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 private:
 	PuzzleRequest request;
 	std::vector<IndexCacheKey> keys;

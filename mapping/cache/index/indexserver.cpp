@@ -252,20 +252,6 @@ void IndexServer::process_control_connection( Node &node ) {
 		return;
 	}
 
-	// Check if node is waiting for a confirmation
-	if ( cc.get_state() == ControlState::MOVE_RESULT_READ ) {
-		auto res = cc.get_move_result();
-		IndexCacheKey from(res.semantic_id, res.from_node_id, res.entry_id);
-		IndexCacheKey to(res.semantic_id,res.to_node_id,res.to_cache_id);
-		if ( query_manager->process_move(res.type,from,to) )
-			cc.confirm_move();
-	}
-	else if ( cc.get_state() == ControlState::REMOVE_REQUEST_READ ) {
-		auto &node_key = cc.get_remove_request();
-		IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
-		if ( !query_manager->is_locked( node_key.type, key ) )
-			cc.confirm_remove();
-	}
 	// Default handling
 	else if ( cc.process() ) {
 		switch (cc.get_state()) {
@@ -275,16 +261,7 @@ void IndexServer::process_control_connection( Node &node ) {
 				handle_reorg_result(res);
 				IndexCacheKey from(res.semantic_id, res.from_node_id, res.entry_id);
 				IndexCacheKey to(res.semantic_id,res.to_node_id,res.to_cache_id);
-				if ( query_manager->process_move(res.type,from,to) )
-					cc.confirm_move();
-				break;
-			}
-			case ControlState::REMOVE_REQUEST_READ: {
-				Log::trace("Node %d requested removal of entry: %s", cc.node_id, cc.get_remove_request().to_string().c_str() );
-				auto &node_key = cc.get_remove_request();
-				IndexCacheKey key(node_key.semantic_id, cc.node_id, node_key.entry_id );
-				if ( !query_manager->is_locked( node_key.type, key ) )
-					cc.confirm_remove();
+				cc.confirm_move();
 				break;
 			}
 			case ControlState::REORG_FINISHED:
@@ -430,7 +407,7 @@ void IndexServer::process_worker_connections(Node &node) {
 void IndexServer::reorganize(bool force) {
 	// Remember time of this reorg
 	last_reorg = CacheCommon::time_millis();
-	auto reorgs = caches.reorganize(nodes,*query_manager,force);
+	auto reorgs = caches.reorganize(nodes,force);
 	for (auto &d : reorgs) {
 		for (auto &rm : d.second.get_removals()) {
 			caches.get_cache(rm.type).remove(IndexCacheKey(rm.semantic_id, d.first, rm.entry_id));

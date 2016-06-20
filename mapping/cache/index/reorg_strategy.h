@@ -186,7 +186,7 @@ public:
 	 * Adds reorganization commands according to the concrete strategy to the given result
 	 * @param result the accumulator to add reorg-commands to
 	 */
-	void reorganize( std::map<uint32_t,NodeReorgDescription> &result, const QueryManager &qm );
+	void reorganize( std::map<uint32_t,NodeReorgDescription> &result );
 protected:
 	/**
 	 * @return the node with the least capacity usage

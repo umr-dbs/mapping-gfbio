@@ -76,8 +76,6 @@ uint64_t LateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap)
 
 	uint64_t worker = 0;
 
-	std::set<CacheLocks::Lock> locks;
-
 	// Full single hit
 	if (res.items.size() == 1 && !res.has_remainder()) {
 		tmp.single_local_hits++;
@@ -88,7 +86,6 @@ uint64_t LateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap)
 				request.semantic_id,
 				res.covered,
 				key.get_entry_id());
-		locks.emplace( CacheLocks::Lock(request.type,key) );
 		worker = nmap.at(key.id.first)->schedule_request(WorkerConnection::CMD_DELIVER,dr);
 	}
 	// Puzzle
@@ -100,12 +97,11 @@ uint64_t LateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap)
 		std::vector<CacheRef> entries;
 		for (auto e : res.items) {
 			IndexCacheKey key(request.semantic_id, e->id);
-			locks.emplace( CacheLocks::Lock(request.type,key) );
 			auto &node = nmap.at(key.get_node_id());
 			keys.push_back(key);
 			if ( node_ids.emplace(key.get_node_id()).second )
 				prio_nodes.push_back(key.get_node_id());
-			entries.push_back(CacheRef(node->host, node->port, key.get_entry_id()));
+			entries.push_back(CacheRef(node->host, node->port, key.get_entry_id(),e->bounds));
 		}
 		PuzzleRequest pr(
 				request.type,
@@ -138,32 +134,22 @@ uint64_t LateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap)
 		Log::debug("Full MISS.");
 		uint32_t node_id = caches.find_node_for_job(request,nmap);
 		worker = nmap.at(node_id)->schedule_request(WorkerConnection::CMD_CREATE,request);
-//		if ( worker == 0 ) {
-//			for ( auto i = nmap.begin(); worker == 0 && i != nmap.end(); i++ ) {
-//				worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
-//			}
-//		}
+		if ( worker == 0 ) {
+			for ( auto i = nmap.begin(); worker == 0 && i != nmap.end(); i++ ) {
+				worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
+			}
+		}
 	}
 
 	if ( worker > 0 ) {
-		add_locks(locks);
 		stats += tmp;
 	}
 	return worker;
 }
 
-void LateJob::replace_reference(const IndexCacheKey& from,
-		const IndexCacheKey& to,
-		const std::map<uint32_t, std::shared_ptr<Node> >& nmap) {
-	(void) from;
-	(void) to;
-	(void) nmap;
-}
-
 /*
  * MANAGER
  */
-
 
 LateQueryManager::LateQueryManager(
 		const std::map<uint32_t, std::shared_ptr<Node> >& nodes,
@@ -213,7 +199,6 @@ void LateQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
 void LateQueryManager::process_worker_query(WorkerConnection& con) {
 	auto &req = con.get_query();
 	try {
-		auto &query = *queries.at(con.id);
 		auto &cache = caches.get_cache(req.type);
 		auto res = cache.query(req.semantic_id, req.query);
 		Log::debug("QueryResult: %s", res.to_string().c_str());
@@ -225,9 +210,8 @@ void LateQueryManager::process_worker_query(WorkerConnection& con) {
 			Log::debug("Full HIT. Sending reference.");
 			IndexCacheKey key(req.semantic_id, res.items.front()->id);
 			auto node = nodes.at(key.get_node_id());
-			CacheRef cr(node->host, node->port, key.get_entry_id());
+			CacheRef cr(node->host, node->port, key.get_entry_id(),res.items.front()->bounds);
 			// Apply lock
-			query.add_lock( CacheLocks::Lock(req.type,key) );
 			con.send_hit(cr);
 		}
 		// Puzzle
@@ -236,8 +220,7 @@ void LateQueryManager::process_worker_query(WorkerConnection& con) {
 			std::vector<CacheRef> entries;
 			for (auto &e : res.items) {
 				auto &node = nodes.at(e->id.first);
-				query.add_lock(CacheLocks::Lock(req.type,IndexCacheKey(req.semantic_id, e->id)));
-				entries.push_back(CacheRef(node->host, node->port, e->id.second));
+				entries.push_back(CacheRef(node->host, node->port, e->id.second,e->bounds));
 			}
 			PuzzleRequest pr( req.type, req.semantic_id, req.query, std::move(res.remainder), std::move(entries) );
 			con.send_partial_hit(pr);

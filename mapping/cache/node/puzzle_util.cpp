@@ -69,6 +69,7 @@ std::unique_ptr<T> PuzzleUtil::process(GenericOperator &op,
 
 	// Create remainder
 	Log::trace("Creating remainder queries.");
+
 	auto ref = items.front();
 	auto remainders = compute_remainders<T>(query, op, *ref, remainder, profiler);
 
@@ -314,10 +315,8 @@ std::unique_ptr<GenericRaster> PuzzleUtil::puzzle(
 
 		if (x >= width || y >= height || x + raster->width <= 0
 				|| y + raster->height <= 0)
-			Log::info(
-					"Puzzle piece out of result-raster, result: %s, piece: %s",
-					CacheCommon::stref_to_string(result->stref).c_str(),
-					CacheCommon::stref_to_string(raster->stref).c_str());
+			Log::debug(
+					"Puzzle piece out of result-raster, target: pos[%dx%d] dim[%dx%d], piece: dim[%dx%d]", x, y, result->width, result->height, raster->width, raster->height);
 		else {
 			try {
 				result->blit(raster.get(), x, y);
@@ -442,8 +441,12 @@ std::shared_ptr<const T> RemoteRetriever<T>::fetch(
 	if (ref_handler.is_local_ref(ref)) {
 		return LocalRetriever<T>::fetch(semantic_id, ref, qp);
 	} else {
-		auto res = load(semantic_id, ref, qp);
-		return std::shared_ptr<const T>(res.release());
+		try {
+			auto res = load(semantic_id, ref, qp);
+			return std::shared_ptr<const T>(res.release());
+		} catch ( const DeliveryException &de ) {
+			throw NoSuchElementException("Remote entry gone!");
+		}
 	}
 }
 
@@ -473,7 +476,7 @@ std::unique_ptr<T> RemoteRetriever<T>::load(const std::string& semantic_id,
 	}
 	case DeliveryConnection::RESP_ERROR: {
 		std::string err_msg = resp->read<std::string>();
-		Log::error("Delivery returned error: %s", err_msg.c_str());
+		Log::debug("Remote-entry gone: %s", err_msg.c_str());
 		throw DeliveryException(err_msg);
 	}
 	default: {

@@ -29,13 +29,6 @@ const BaseRequest& SimpleJob::get_request() const {
 	return request;
 }
 
-
-void SimpleJob::replace_reference(const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap ) {
-	(void) from;
-	(void) to;
-	(void) nmap;
-}
-
 /**
  * MGR
  */

@@ -5,6 +5,8 @@
 #include "cache/index/query_manager/default_query_manager.h"
 #include "cache/index/reorg_strategy.h"
 
+#if 0
+
 TEST(Locking,CacheLocksTest) {
 
 	CacheLocks locks;
@@ -81,4 +83,6 @@ TEST(Locking,MgrLocks) {
 	ASSERT_FALSE( mgr.is_locked( CacheType::POINT, IndexCacheKey(sem_id,1,1) ) );
 
 }
+
+#endif
 

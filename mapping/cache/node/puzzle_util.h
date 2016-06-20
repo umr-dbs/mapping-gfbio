@@ -102,7 +102,7 @@ public:
 	 * @param id the id to create a local reference for
 	 * @return a reference to the local cache-entry with the given id
 	 */
-	virtual CacheRef create_local_ref(uint64_t id) const = 0;
+	virtual CacheRef create_local_ref(uint64_t id, const Cube<3> &bounds) const = 0;
 	/**
 	 * @param ref the CacheRef to check
 	 * @return whether the given ref points to a local cache entry

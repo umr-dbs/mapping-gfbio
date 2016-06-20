@@ -23,71 +23,6 @@
 class QueryManager;
 
 
-
-/**
- * Manages locks on cache-entries
- */
-class CacheLocks {
-public:
-	/**
-	 * Models a single lock
-	 */
-	class Lock : public IndexCacheKey {
-	public:
-		/**
-		 * Creates a new instance for the given entry
-		 * @param type the type of the cache entry
-		 * @param key the entry's key
-		 */
-		Lock( CacheType type, const IndexCacheKey &key );
-		bool operator<( const Lock &l ) const;
-		bool operator==( const Lock &l ) const;
-		CacheType type;
-	};
-public:
-	/**
-	 * @param type the type of the cache entry
-	 * @param key the entry's key
-	 * @return whether the given entry is locked
-	 */
-	bool is_locked( CacheType type, const IndexCacheKey &key ) const;
-	/**
-	 * @param lock the lock to check
-	 * @return whether the given entry is locked
-	 */
-	bool is_locked( const Lock &lock ) const;
-
-	/**
-	 * Adds the given lock
-	 * @param lock the lock to add
-	 */
-	void add_lock( const Lock &lock, uint64_t query_id );
-
-	/**
-	 * Adds the given locks
-	 * @param locks the locks to add
-	 */
-	void add_locks( const std::set<Lock> &locks, uint64_t query_id );
-
-	/**
-	 * Removes the given lock
-	 * @param lock the lock to remove
-	 */
-	void remove_lock( const Lock &lock, uint64_t query_id );
-
-	/**
-	 * Removes the given locks
-	 * @param locks the locks to remove
-	 */
-	void remove_locks( const std::set<Lock> &locks, uint64_t query_id );
-
-	void move_lock( const Lock &from, const Lock &to, uint64_t query_id );
-
-	std::unordered_set<uint64_t> get_queries( const Lock& lock ) const;
-private:
-	std::map<Lock,std::unordered_set<uint64_t>> locks;
-};
-
 /**
  * Models a query currently executed by a worker
  */
@@ -103,7 +38,7 @@ public:
 	 * Creates a new instance and sets the given locks
 	 * @param locks the locks to obtain
 	 */
-	RunningQuery( std::set<CacheLocks::Lock> &&locks = std::set<CacheLocks::Lock>() );
+	RunningQuery();
 	virtual ~RunningQuery();
 
 	RunningQuery( const RunningQuery& ) = delete;
@@ -116,18 +51,6 @@ public:
 	 * @return whether this query satisfies the given request
 	 */
 	bool satisfies( const BaseRequest &req ) const;
-
-	/**
-	 * Adds the given lock to the locks held by this query
-	 * @param lock the lock to add
-	 */
-	void add_lock( const CacheLocks::Lock &key );
-
-	/**
-	 * Adds the given locks to the locks held by this query
-	 * @param locks the locks to add
-	 */
-	void add_locks( const std::set<CacheLocks::Lock> &locks );
 
 	/**
 	 * Adds the given client as a consumer of this query's result
@@ -161,7 +84,6 @@ public:
 
 	const uint64_t id;
 private:
-	std::set<CacheLocks::Lock> locks;
 	std::set<uint64_t> clients;
 	std::vector<uint64_t> client_times;
 	uint64_t time_created;
@@ -178,15 +100,13 @@ public:
 	 * Creates a new instance and sets the given locks
 	 * @param locks the locks to obtain
 	 */
-	PendingQuery( std::set<CacheLocks::Lock> &&locks = std::set<CacheLocks::Lock>() );
+	PendingQuery();
 	virtual ~PendingQuery() = default;
 	PendingQuery( const PendingQuery& ) = delete;
 	PendingQuery( PendingQuery&& ) = default;
 
 	PendingQuery& operator=(const PendingQuery&) = delete;
 	PendingQuery& operator=(PendingQuery&&) = default;
-
-	void entry_moved( const CacheLocks::Lock& from, const CacheLocks::Lock& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap );
 
 	/**
 	 * Extends this queries result dimension to satisfy the given request
@@ -201,8 +121,6 @@ public:
 	 * @return whether this query depends on the node with the given id (e.g. references a cache-entry)
 	 */
 	virtual bool is_affected_by_node( uint32_t node_id ) = 0;
-protected:
-	virtual void replace_reference( const IndexCacheKey &from, const IndexCacheKey &to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap ) = 0;
 };
 
 /**
@@ -215,7 +133,6 @@ private:
 	friend class CreateJob;
 	friend class DefaultQueryManager;
 	friend class LateQueryManager;
-	static CacheLocks locks;
 public:
 	static std::unique_ptr<QueryManager> by_name( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const std::string &name );
 
@@ -288,16 +205,6 @@ public:
 	 * @param client_id the id of the disconnected client
 	 */
 	void handle_client_abort( uint64_t client_id );
-
-	/**
-	 * @return whether the given entry is locked by a query
-	 */
-	bool is_locked( CacheType type, const IndexCacheKey &key ) const;
-
-	/**
-	 * @return true if all locks could be moved, false otherwise
-	 */
-	bool process_move(CacheType type, const IndexCacheKey& from, const IndexCacheKey& to);
 
 	/**
 	 * @return the query-statistics

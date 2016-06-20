@@ -589,12 +589,6 @@ void ControlConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) 
 			set_state(ControlState::MOVE_RESULT_READ);
 			break;
 		}
-		case RESP_REORG_REMOVE_REQUEST: {
-			ensure_state(ControlState::REORGANIZING);
-			remove_request.reset(new TypedNodeCacheKey(payload));
-			set_state(ControlState::REMOVE_REQUEST_READ);
-			break;
-		}
 		case RESP_REORG_DONE: {
 			ensure_state(ControlState::REORGANIZING);
 			set_state(ControlState::REORG_FINISHED);
@@ -616,10 +610,6 @@ void ControlConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) 
 void ControlConnection::write_finished() {
 	switch (get_state()) {
 		case ControlState::SENDING_REORG:
-			set_state(ControlState::REORGANIZING);
-			break;
-		case ControlState::SENDING_MOVE_CONFIRM:
-		case ControlState::SENDING_REMOVE_CONFIRM:
 			set_state(ControlState::REORGANIZING);
 			break;
 		case ControlState::SENDING_STATS_REQUEST:
@@ -646,18 +636,7 @@ void ControlConnection::send_reorg(const ReorgDescription& desc) {
 
 void ControlConnection::confirm_move() {
 	ensure_state(ControlState::MOVE_RESULT_READ);
-	set_state(ControlState::SENDING_MOVE_CONFIRM);
-	auto buffer = make_unique<BinaryWriteBuffer>();
-	buffer->write(CMD_MOVE_OK);
-	begin_write(std::move(buffer));
-}
-
-void ControlConnection::confirm_remove() {
-	ensure_state(ControlState::REMOVE_REQUEST_READ);
-	set_state(ControlState::SENDING_REMOVE_CONFIRM);
-	auto buffer = make_unique<BinaryWriteBuffer>();
-	buffer->write(CMD_REMOVE_OK);
-	begin_write(std::move(buffer));
+	set_state(ControlState::REORGANIZING);
 }
 
 void ControlConnection::send_get_stats() {
@@ -682,11 +661,6 @@ const ReorgMoveResult& ControlConnection::get_move_result() const {
 	return *move_result;
 }
 
-const TypedNodeCacheKey& ControlConnection::get_remove_request() const {
-	ensure_state(ControlState::REMOVE_REQUEST_READ);
-	return *remove_request;
-}
-
 const NodeStats& ControlConnection::get_stats() const {
 	ensure_state(ControlState::STATS_RECEIVED);
 	return *stats;
@@ -696,7 +670,6 @@ const NodeStats& ControlConnection::get_stats() const {
 
 void ControlConnection::reset() {
 	move_result.reset();
-	remove_request.reset();
 	stats.reset();
 	set_state(ControlState::IDLE);
 }
@@ -704,8 +677,6 @@ void ControlConnection::reset() {
 const uint32_t ControlConnection::MAGIC_NUMBER;
 const uint8_t ControlConnection::CMD_REORG;
 const uint8_t ControlConnection::CMD_GET_STATS;
-const uint8_t ControlConnection::CMD_MOVE_OK;
-const uint8_t ControlConnection::CMD_REMOVE_OK;
 const uint8_t ControlConnection::CMD_HELLO;
 const uint8_t ControlConnection::RESP_REORG_ITEM_MOVED;
 const uint8_t ControlConnection::RESP_REORG_REMOVE_REQUEST;

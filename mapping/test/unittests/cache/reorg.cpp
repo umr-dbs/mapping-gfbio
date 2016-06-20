@@ -51,7 +51,7 @@ TEST(ReorgTest,CapacityReorg) {
 	}
 
 	DemaQueryManager dqm(nodes);
-	reorg->reorganize(res, dqm);
+	reorg->reorganize(res);
 	EXPECT_EQ(2,res.at(2).node->id);
 	EXPECT_EQ(1,res.at(2).get_moves().size());
 //	EXPECT_EQ(1,res.at(2).get_moves().at(0).entry_id);
@@ -102,8 +102,7 @@ TEST(ReorgTest,GeographicReorg) {
 		res.emplace(kv.first, NodeReorgDescription(kv.second));
 	}
 
-	DemaQueryManager dqm(nodes);
-	reorg->reorganize(res, dqm);
+	reorg->reorganize(res);
 
 	EXPECT_EQ(2,res.at(2).node->id);
 	EXPECT_EQ(1,res.at(2).get_moves().size());
@@ -147,8 +146,7 @@ TEST(ReorgTest,GraphReorg) {
 	cache.put("OP2 {SRC}", 1, 8, createGraphEntry(2) );
 
 
-	DemaQueryManager dqm(nodes);
-	reorg->reorganize(res, dqm);
+	reorg->reorganize(res);
 
 	EXPECT_EQ(4,res.at(2).get_moves().size());
 //	EXPECT_EQ(3,res.at(2).get_moves().at(0).entry_id);

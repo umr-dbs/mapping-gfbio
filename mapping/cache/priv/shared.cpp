@@ -330,18 +330,19 @@ std::string DeliveryResponse::to_string() const {
 ///////////////////////////////////////////////////////////
 
 
-CacheRef::CacheRef(const std::string& host, uint32_t port, uint64_t entry_id) :
-	ForeignRef(host,port), entry_id(entry_id) {
+CacheRef::CacheRef(const std::string& host, uint32_t port, uint64_t entry_id, const Cube<3> &bounds) :
+	ForeignRef(host,port), entry_id(entry_id), bounds(bounds) {
 }
 
-CacheRef::CacheRef(BinaryReadBuffer& buffer) : ForeignRef(buffer), entry_id( buffer.read<uint64_t>() ) {
+CacheRef::CacheRef(BinaryReadBuffer& buffer) : ForeignRef(buffer), entry_id( buffer.read<uint64_t>()), bounds(buffer) {
 }
 
 void CacheRef::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
 	ForeignRef::serialize(buffer, is_persistent_memory);
 	buffer.write(entry_id);
+	bounds.serialize(buffer,is_persistent_memory);
 }
 
 std::string CacheRef::to_string() const {
-	return concat( "CacheRef[", host, ":", port, ", entry_id: ", entry_id, "]");
+	return concat( "CacheRef[", host, ":", port, ", entry_id: ", entry_id, ", bounds: ", bounds.to_string(), "]");
 }

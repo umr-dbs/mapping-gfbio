@@ -624,8 +624,7 @@ private:
 enum class ControlState {
 	SENDING_HELLO, IDLE,
 	SENDING_REORG, REORGANIZING,
-	READING_MOVE_RESULT, MOVE_RESULT_READ, SENDING_MOVE_CONFIRM,
-	READING_REMOVE_REQUEST, REMOVE_REQUEST_READ, SENDING_REMOVE_CONFIRM,
+	READING_MOVE_RESULT, MOVE_RESULT_READ,
 	REORG_FINISHED,
 	SENDING_STATS_REQUEST, STATS_REQUESTED, READING_STATS, STATS_RECEIVED
 };
@@ -649,18 +648,6 @@ public:
 	// of the local cache stats
 	//
 	static const uint8_t CMD_GET_STATS = 41;
-
-	//
-	// Tells the node that the move on index was OK
-	// There is no data on stream
-	//
-	static const uint8_t CMD_MOVE_OK = 42;
-
-	//
-	// Tells the node that the given item can
-	// safely be removed from the cache
-	//
-	static const uint8_t CMD_REMOVE_OK = 43;
 
 	//
 	// Response from index-server after successful
@@ -705,12 +692,6 @@ public:
 	void confirm_move();
 
 	/**
-	 * Tells the node that an entry can safely be removed
-	 * Required state is REMOVE_REQUEST_READ
-	 */
-	void confirm_remove();
-
-	/**
 	 * Tells the node to send fresh statistics
 	 * Required state is IDLE
 	 */
@@ -729,12 +710,6 @@ public:
 	const ReorgMoveResult& get_move_result() const;
 
 	/**
-	 * Required state is REMOVE_REQUEST_READ.
-	 * @return the unique key of the item to remove
-	 */
-	const TypedNodeCacheKey& get_remove_request() const;
-
-	/**
 	 * Required state is STATS_RECEIVED
 	 * @return the stats delivered by the node
 	 */
@@ -747,7 +722,6 @@ protected:
 private:
 	void reset();
 	std::unique_ptr<ReorgMoveResult> move_result;
-	std::unique_ptr<TypedNodeCacheKey> remove_request;
 	std::unique_ptr<NodeStats> stats;
 };
 

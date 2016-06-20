@@ -144,35 +144,39 @@ void NodeServer::process_create_request(BlockingConnection &index_con,
 void NodeServer::process_puzzle_request(BlockingConnection &index_con,
 		const PuzzleRequest& request) {
 	TIME_EXEC("RequestProcessing.puzzle");
-	QueryProfiler qp;
-	switch ( request.type ) {
-		case CacheType::RASTER: {
-			auto res = manager->get_raster_cache().process_puzzle(request,qp);
-			finish_request( index_con, std::shared_ptr<const GenericRaster>(res.release()) );
-			break;
+	try {
+		QueryProfiler qp;
+		switch ( request.type ) {
+			case CacheType::RASTER: {
+				auto res = manager->get_raster_cache().process_puzzle(request,qp);
+				finish_request( index_con, std::shared_ptr<const GenericRaster>(res.release()) );
+				break;
+			}
+			case CacheType::POINT: {
+				auto res = manager->get_point_cache().process_puzzle(request,qp);
+				finish_request( index_con, std::shared_ptr<const PointCollection>(res.release()) );
+				break;
+			}
+			case CacheType::LINE: {
+				auto res = manager->get_line_cache().process_puzzle(request,qp);
+				finish_request( index_con, std::shared_ptr<const LineCollection>(res.release()) );
+				break;
+			}
+			case CacheType::POLYGON: {
+				auto res = manager->get_polygon_cache().process_puzzle(request,qp);
+				finish_request( index_con, std::shared_ptr<const PolygonCollection>(res.release()) );
+				break;
+			}
+			case CacheType::PLOT: {
+				auto res = manager->get_plot_cache().process_puzzle(request,qp);
+				finish_request( index_con, std::shared_ptr<const GenericPlot>(res.release()) );
+				break;
+			}
+			default:
+				throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));
 		}
-		case CacheType::POINT: {
-			auto res = manager->get_point_cache().process_puzzle(request,qp);
-			finish_request( index_con, std::shared_ptr<const PointCollection>(res.release()) );
-			break;
-		}
-		case CacheType::LINE: {
-			auto res = manager->get_line_cache().process_puzzle(request,qp);
-			finish_request( index_con, std::shared_ptr<const LineCollection>(res.release()) );
-			break;
-		}
-		case CacheType::POLYGON: {
-			auto res = manager->get_polygon_cache().process_puzzle(request,qp);
-			finish_request( index_con, std::shared_ptr<const PolygonCollection>(res.release()) );
-			break;
-		}
-		case CacheType::PLOT: {
-			auto res = manager->get_plot_cache().process_puzzle(request,qp);
-			finish_request( index_con, std::shared_ptr<const GenericPlot>(res.release()) );
-			break;
-		}
-		default:
-			throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));
+	} catch ( const NoSuchElementException &nse ) {
+		process_create_request(index_con,request);
 	}
 }
 
@@ -181,24 +185,28 @@ void NodeServer::process_delivery_request(BlockingConnection &index_con,
 	TIME_EXEC("RequestProcessing.delivery");
 	NodeCacheKey key(request.semantic_id,request.entry_id);
 
-	switch ( request.type ) {
-		case CacheType::RASTER:
-			finish_request( index_con, manager->get_raster_cache().get(key)->data );
-			break;
-		case CacheType::POINT:
-			finish_request( index_con, manager->get_point_cache().get(key)->data );
-			break;
-		case CacheType::LINE:
-			finish_request( index_con, manager->get_line_cache().get(key)->data );
-			break;
-		case CacheType::POLYGON:
-			finish_request( index_con, manager->get_polygon_cache().get(key)->data );
-			break;
-		case CacheType::PLOT:
-			finish_request( index_con, manager->get_plot_cache().get(key)->data );
-			break;
-		default:
-			throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));
+	try {
+		switch ( request.type ) {
+			case CacheType::RASTER:
+				finish_request( index_con, manager->get_raster_cache().get(key)->data );
+				break;
+			case CacheType::POINT:
+				finish_request( index_con, manager->get_point_cache().get(key)->data );
+				break;
+			case CacheType::LINE:
+				finish_request( index_con, manager->get_line_cache().get(key)->data );
+				break;
+			case CacheType::POLYGON:
+				finish_request( index_con, manager->get_polygon_cache().get(key)->data );
+				break;
+			case CacheType::PLOT:
+				finish_request( index_con, manager->get_plot_cache().get(key)->data );
+				break;
+			default:
+				throw ArgumentException(concat("Type ", (int) request.type, " not supported yet"));
+		}
+	} catch ( const NoSuchElementException &nse ) {
+		process_create_request(index_con,request);
 	}
 }
 
@@ -274,14 +282,18 @@ void NodeServer::process_control_command(BinaryReadBuffer &payload) {
 	uint8_t cmd = payload.read<uint8_t>();
 	switch (cmd) {
 		case ControlConnection::CMD_REORG: {
-			Log::debug("Received reorg command.");
 			ReorgDescription d(payload);
+			auto start = CacheCommon::time_millis();
 			for (auto &rem_item : d.get_removals()) {
 				handle_reorg_remove_item(rem_item);
 			}
 			for (auto &move_item : d.get_moves()) {
 				handle_reorg_move_item(move_item);
 			}
+
+			auto time = CacheCommon::time_millis()-start;
+			Log::debug("Finished Processing reorg, %lu removals, %lu moves took: %lums", d.get_removals().size(), d.get_moves().size(),time);
+
 			control_connection->write(ControlConnection::RESP_REORG_DONE);
 			break;
 		}
@@ -301,32 +313,24 @@ void NodeServer::process_control_command(BinaryReadBuffer &payload) {
 void NodeServer::handle_reorg_remove_item( const TypedNodeCacheKey &item ) {
 	Log::debug("Removing item from cache. Key: %s", item.to_string().c_str() );
 
-	auto resp = control_connection->write_and_read(ControlConnection::RESP_REORG_REMOVE_REQUEST, item);
-	uint8_t rc = resp->read<uint8_t>();
-
-	if ( rc == ControlConnection::CMD_REMOVE_OK ) {
-		switch (item.type) {
-			case CacheType::RASTER:
-				manager->get_raster_cache().remove_local(item);
-				break;
-			case CacheType::POINT:
-				manager->get_point_cache().remove_local(item);
-				break;
-			case CacheType::LINE:
-				manager->get_line_cache().remove_local(item);
-				break;
-			case CacheType::POLYGON:
-				manager->get_polygon_cache().remove_local(item);
-				break;
-			case CacheType::PLOT:
-				manager->get_plot_cache().remove_local(item);
-				break;
-			default:
-				throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
-		}
-	}
-	else {
-		Log::error("Index did not confirm removal. Skipping. Response was: %d", rc);
+	switch (item.type) {
+		case CacheType::RASTER:
+			manager->get_raster_cache().remove_local(item);
+			break;
+		case CacheType::POINT:
+			manager->get_point_cache().remove_local(item);
+			break;
+		case CacheType::LINE:
+			manager->get_line_cache().remove_local(item);
+			break;
+		case CacheType::POLYGON:
+			manager->get_polygon_cache().remove_local(item);
+			break;
+		case CacheType::PLOT:
+			manager->get_plot_cache().remove_local(item);
+			break;
+		default:
+			throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
 	}
 }
 
@@ -341,6 +345,7 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item ) {
 	try {
 		auto del_con = BlockingConnection::create(item.from_host,item.from_port, true, DeliveryConnection::MAGIC_NUMBER);
 		auto resp = del_con->write_and_read(DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
+
 		uint8_t del_resp = resp->read<uint8_t>();
 
 		switch (del_resp) {
@@ -391,27 +396,19 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item ) {
 void NodeServer::confirm_move(BlockingConnection &del_stream, const ReorgMoveItem& item, uint64_t new_id) {
 	// Notify index
 	ReorgMoveResult rr(item.type, item.semantic_id, item.from_node_id, item.entry_id, my_id, new_id);
-	auto iresp = control_connection->write_and_read(ControlConnection::RESP_REORG_ITEM_MOVED,rr);
 
 	try {
-		uint8_t rc = iresp->read<uint8_t>();
-		if ( rc == ControlConnection::CMD_MOVE_OK ) {
-			Log::debug("Reorg of item finished. Notifying delivery instance.");
-			del_stream.write(DeliveryConnection::CMD_MOVE_DONE);
-		}
-		else {
-			Log::warn("Index could not handle reorg of: %s:%d", item.semantic_id.c_str(), item.entry_id);
-			switch ( item.type ) {
-			case CacheType::RASTER: manager->get_raster_cache().remove_local(item); break;
-			case CacheType::POINT: manager->get_point_cache().remove_local(item); break;
-			case CacheType::LINE: manager->get_line_cache().remove_local(item); break;
-			case CacheType::POLYGON: manager->get_polygon_cache().remove_local(item); break;
-			case CacheType::PLOT: manager->get_plot_cache().remove_local(item); break;
-			default: throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
-			}
-		}
+		control_connection->write(ControlConnection::RESP_REORG_ITEM_MOVED,rr);
+		del_stream.write(DeliveryConnection::CMD_MOVE_DONE);
 	} catch (const NetworkException &ne) {
-		Log::error("Could not confirm reorg of raster-item to delivery instance.");
+		switch ( item.type ) {
+		case CacheType::RASTER: manager->get_raster_cache().remove_local(item); break;
+		case CacheType::POINT: manager->get_point_cache().remove_local(item); break;
+		case CacheType::LINE: manager->get_line_cache().remove_local(item); break;
+		case CacheType::POLYGON: manager->get_polygon_cache().remove_local(item); break;
+		case CacheType::PLOT: manager->get_plot_cache().remove_local(item); break;
+		default: throw ArgumentException(concat("Type ", (int) item.type, " not supported yet"));
+		}
 	}
 }
 

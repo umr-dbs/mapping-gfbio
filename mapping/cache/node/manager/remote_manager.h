@@ -66,7 +66,7 @@ public:
 	 * @param id the id of the cache-entry to reference
 	 * @return a reference to the cache-entry with the given id
 	 */
-	CacheRef create_local_ref(uint64_t id) const;
+	CacheRef create_local_ref(uint64_t id, const Cube<3> &bounds ) const;
 
 	/**
 	 * Checks whether the given reference points to this node

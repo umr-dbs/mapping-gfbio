@@ -199,7 +199,7 @@ TEST(Serialization, DeliveryResponse) {
 }
 
 TEST(Serialization, CacheRef) {
-	CacheRef cr("localhost",4711,1);
+	CacheRef cr("localhost",4711,1, Cube3(0,1,0,1,0,1));
 	checkSerializationConstructor(cr);
 }
 
@@ -237,7 +237,8 @@ TEST(Serialization, PuzzleRequest) {
 	);
 
 	std::vector<Cube<3>> remainder{ Cube3(0,1,0,1,0,1), Cube3(1,2,1,2,1,2) };
-	std::vector<CacheRef> refs{ CacheRef("localhost",4711,1), CacheRef("localhost",4711,1) };
+	Cube3 bounds(1,2,1,2,0,1);
+	std::vector<CacheRef> refs{ CacheRef("localhost",4711,1,bounds), CacheRef("localhost",4711,1,bounds) };
 
 	PuzzleRequest pr( CacheType::RASTER,"key",qr, remainder, refs );
 	checkSerializationConstructor(pr);

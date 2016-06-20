@@ -138,7 +138,11 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 				"Full single remote HIT for query: %s on %s. Returning cached raster.",
 				CacheCommon::qr_to_string(rect).c_str(),
 				op.getSemanticId().c_str());
-		return retriever.load(op.getSemanticId(), CacheRef(*resp), profiler);
+		try {
+			return retriever.load(op.getSemanticId(), CacheRef(*resp), profiler);
+		} catch ( const DeliveryException &de ) {
+			throw NoSuchElementException("Remote-entry gone!");
+		}
 	}
 		// Full miss on whole cache
 	case WorkerConnection::RESP_QUERY_MISS: {
@@ -147,7 +151,6 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 				CacheCommon::qr_to_string(rect).c_str(),
 				op.getSemanticId().c_str());
 		throw NoSuchElementException("Cache-Miss.");
-		break;
 	}
 		// Puzzle time
 	case WorkerConnection::RESP_QUERY_PARTIAL: {
@@ -216,12 +219,29 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle_wo_cache(
 
 	std::vector<std::shared_ptr<const T>> parts;
 
-	for (auto &ref : request.parts)
-		parts.push_back(retriever.fetch(request.semantic_id, ref, profiler));
+	std::vector<Cube<3>> rems;
+	rems.insert(rems.begin(), request.remainder.begin(), request.remainder.end());
 
-	auto op = GenericOperator::fromJSON(request.semantic_id);
-	return PuzzleUtil::process(*op, request.query, request.remainder, parts,
-			profiler);
+	for (auto &ref : request.parts) {
+		try {
+			parts.push_back(retriever.fetch(request.semantic_id, ref, profiler));
+		} catch ( const NoSuchElementException &nse ) {
+			Log::debug("Puzzle-piece gone, adding to remainders");
+			SpatialReference sref(request.query.epsg,ref.bounds.get_dimension(0).a,ref.bounds.get_dimension(1).a,
+					ref.bounds.get_dimension(0).b,ref.bounds.get_dimension(1).b);
+
+			rems.push_back(ref.bounds);
+		}
+	}
+
+	// All parts gone!
+	if ( parts.empty() ) {
+		throw NoSuchElementException("All puzzle pieces gone!");
+	}
+	else {
+		auto op = GenericOperator::fromJSON(request.semantic_id);
+		return PuzzleUtil::process(*op, request.query, request.remainder, parts, profiler);
+	}
 }
 
 ////////////////////////////////////////////////////////////
@@ -247,8 +267,8 @@ RemoteCacheManager::RemoteCacheManager(const std::string &strategy,
 						plot_cache_size, CacheType::PLOT)) {
 }
 
-CacheRef RemoteCacheManager::create_local_ref(uint64_t id) const {
-	return CacheRef(my_host, my_port, id);
+CacheRef RemoteCacheManager::create_local_ref(uint64_t id, const Cube<3> &bounds) const {
+	return CacheRef(my_host, my_port, id,bounds);
 }
 
 bool RemoteCacheManager::is_local_ref(const CacheRef& ref) const {

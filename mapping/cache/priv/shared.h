@@ -452,7 +452,7 @@ public:
 	 * @param port the port to connect to
 	 * @param entry_id the unique id of the referenced entry
 	 */
-	CacheRef( const std::string &host, uint32_t port, uint64_t entry_id );
+	CacheRef( const std::string &host, uint32_t port, uint64_t entry_id, const Cube<3> &bounds );
 
 	/**
 	 * Constructs an instance from the given buffer
@@ -472,6 +472,7 @@ public:
 	std::string to_string() const;
 
 	uint64_t entry_id;
+	Cube<3> bounds;
 };
 
 #endif /* PRIV_SHARED_H_ */

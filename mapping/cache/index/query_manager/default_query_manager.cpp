@@ -63,7 +63,7 @@ void DefaultQueryManager::add_request(uint64_t client_id, const BaseRequest &req
 void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
 	auto &req = con.get_query();
 	try {
-		auto &query = *queries.at(con.id);
+		queries.at(con.id);
 		auto &cache = caches.get_cache(req.type);
 		auto res = cache.query(req.semantic_id, req.query);
 		Log::debug("QueryResult: %s", res.to_string().c_str());
@@ -75,9 +75,8 @@ void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
 			Log::debug("Full HIT. Sending reference.");
 			IndexCacheKey key(req.semantic_id, res.items.front()->id);
 			auto node = nodes.at(key.get_node_id());
-			CacheRef cr(node->host, node->port, key.get_entry_id());
+			CacheRef cr(node->host, node->port, key.get_entry_id(),res.items.front()->bounds);
 			// Apply lock
-			query.add_lock( CacheLocks::Lock(req.type,key) );
 			con.send_hit(cr);
 		}
 		// Puzzle
@@ -86,8 +85,7 @@ void DefaultQueryManager::process_worker_query(WorkerConnection& con) {
 			std::vector<CacheRef> entries;
 			for (auto &e : res.items) {
 				auto &node = nodes.at(e->id.first);
-				query.add_lock(CacheLocks::Lock(req.type,IndexCacheKey(req.semantic_id, e->id)));
-				entries.push_back(CacheRef(node->host, node->port, e->id.second));
+				entries.push_back(CacheRef(node->host, node->port, e->id.second, e->bounds));
 			}
 			PuzzleRequest pr( req.type, req.semantic_id, req.query, std::move(res.remainder), std::move(entries) );
 			con.send_partial_hit(pr);
@@ -148,7 +146,7 @@ std::unique_ptr<PendingQuery> DefaultQueryManager::create_job( const BaseRequest
 			auto &node = nodes.at(key.get_node_id());
 			keys.push_back(key);
 			node_ids.insert(key.get_node_id());
-			entries.push_back(CacheRef(node->host, node->port, key.get_entry_id()));
+			entries.push_back(CacheRef(node->host, node->port, key.get_entry_id(),e->bounds));
 		}
 		PuzzleRequest pr(
 				req.type,
@@ -297,23 +295,14 @@ bool CreateJob::is_affected_by_node(uint32_t node_id) {
 	return false;
 }
 
-void CreateJob::replace_reference(const IndexCacheKey& from,
-		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
-	(void) from;
-	(void) to;
-	(void) nmap;
-}
-
-
-
 uint64_t CreateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap) {
 	uint32_t node_id = mgr.caches.find_node_for_job(request,mgr.nodes);
 	uint64_t worker = nmap.at(node_id)->schedule_request(WorkerConnection::CMD_CREATE,request);
-//	if ( worker == 0 ) {
-//		for ( auto i = nmap.begin(); i != nmap.end() && worker == 0; i++ ) {
-//			worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
-//		}
-//	}
+	if ( worker == 0 ) {
+		for ( auto i = nmap.begin(); i != nmap.end() && worker == 0; i++ ) {
+			worker = i->second->schedule_request(WorkerConnection::CMD_CREATE,request);
+		}
+	}
 	return worker;
 }
 
@@ -326,7 +315,7 @@ const BaseRequest& CreateJob::get_request() const {
 //
 
 DeliverJob::DeliverJob(DeliveryRequest&& request, const IndexCacheKey &key) :
-	PendingQuery(std::set<CacheLocks::Lock>{CacheLocks::Lock(request.type,key)}),
+	PendingQuery(),
 	request(request),
 	node(key.get_node_id()) {
 }
@@ -337,14 +326,6 @@ bool DeliverJob::is_affected_by_node(uint32_t node_id) {
 
 bool DeliverJob::extend(const BaseRequest&) {
 	return false;
-}
-
-void DeliverJob::replace_reference(const IndexCacheKey& from,
-		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
-	(void) from;
-	(void) nmap;
-	request.entry_id = to.id.second;
-	node = to.id.first;
 }
 
 uint64_t DeliverJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap) {
@@ -365,7 +346,6 @@ PuzzleJob::PuzzleJob(PuzzleRequest&& request, const std::vector<IndexCacheKey> &
 	for ( auto &k : keys ) {
 		if ( nodes.insert(k.get_node_id()).second )
 			nodes_priorized.push_back(k.get_node_id() );
-		add_lock( CacheLocks::Lock(request.type,k) );
 	}
 }
 
@@ -376,28 +356,6 @@ bool PuzzleJob::is_affected_by_node(uint32_t node_id) {
 
 bool PuzzleJob::extend(const BaseRequest&) {
 	return false;
-}
-
-void PuzzleJob::replace_reference(const IndexCacheKey& from,
-		const IndexCacheKey& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
-
-	nodes.clear();
-	nodes_priorized.clear();
-
-	for ( auto i = keys.begin(); i != keys.end(); i++ ) {
-		if ( *i == from )
-			*i = to;
-	}
-
-	std::vector<CacheRef> refs;
-	for ( auto &k : keys) {
-		if ( nodes.insert(k.get_node_id()).second )
-			nodes_priorized.push_back(k.get_node_id() );
-		auto &n = nmap.at(k.id.first);
-		refs.push_back( CacheRef(n->host,n->port,k.id.second) );
-	}
-
-	request.parts = refs;
 }
 
 uint64_t PuzzleJob::submit(

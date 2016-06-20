@@ -16,81 +16,6 @@
 
 #include <algorithm>
 
-//////////////////////////////////////////////////////////////////////
-//
-// LOCKS
-//
-//////////////////////////////////////////////////////////////////////
-
-
-
-CacheLocks::Lock::Lock(CacheType type, const IndexCacheKey& key) :
-	IndexCacheKey(key), type(type) {
-}
-
-bool CacheLocks::Lock::operator <(const Lock& l) const {
-	return type < l.type || (type == l.type && IndexCacheKey::operator <(l));
-}
-
-bool CacheLocks::Lock::operator ==(const Lock& l) const {
-	return type == l.type && IndexCacheKey::operator ==(l);
-}
-
-
-bool CacheLocks::is_locked(CacheType type, const IndexCacheKey& key) const {
-	return is_locked( Lock(type,key) );
-}
-
-bool CacheLocks::is_locked(const Lock& lock) const {
-	return locks.find(lock) != locks.end();
-}
-
-void CacheLocks::add_lock(const Lock& lock, uint64_t query_id) {
-	auto it = locks.find(lock);
-	if ( it != locks.end() ) {
-		it->second.emplace(query_id);
-	}
-	else if ( !locks.emplace( lock, std::unordered_set<uint64_t>{query_id} ).second )
-		throw IllegalStateException(concat("Could not add lock ", lock.to_string(), " to query ", query_id));
-}
-
-void CacheLocks::add_locks(const std::set<Lock>& locks, uint64_t query_id) {
-	for ( auto &l : locks )
-		add_lock(l,query_id);
-}
-
-void CacheLocks::remove_lock(const Lock& lock, uint64_t query_id) {
-	auto it = locks.find(lock);
-		if ( it != locks.end() ) {
-			if ( it->second.erase(query_id) == 0 )
-				throw IllegalStateException(concat("Lock: ", it->first.to_string(), " was not set for query: ", query_id));
-			if ( it->second.empty() )
-				locks.erase(it);
-		}
-		else
-			throw ArgumentException(concat("No lock held for key: ", lock.to_string()) );
-}
-
-void CacheLocks::remove_locks(const std::set<Lock>& locks, uint64_t query_id) {
-	for ( auto &l : locks )
-			remove_lock(l,query_id);
-}
-
-std::unordered_set<uint64_t> CacheLocks::get_queries(const Lock& lock) const {
-	return locks.at(lock);
-}
-
-void CacheLocks::move_lock(const Lock& from, const Lock& to, uint64_t query_id) {
-	remove_lock(from, query_id);
-	add_lock(to, query_id);
-}
-
-//
-//
-//
-
-CacheLocks QueryManager::locks;
-
 std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes,
 		const std::string& name) {
 	std::string lcname;
@@ -223,30 +148,6 @@ void QueryManager::reset_stats() {
 	stats.reset();
 }
 
-bool QueryManager::is_locked( CacheType type, const IndexCacheKey& key) const {
-	return locks.is_locked(type,key);
-}
-
-bool QueryManager::process_move(CacheType type, const IndexCacheKey& from, const IndexCacheKey& to) {
-	CacheLocks::Lock lfrom(type,from);
-	CacheLocks::Lock lto(type,to);
-	if ( locks.is_locked(lfrom) ) {
-		auto qids = locks.get_queries(lfrom);
-		auto qiter = qids.begin();
-		while ( qiter != qids.end() ) {
-			try {
-				pending_jobs.at(*qiter)->entry_moved(lfrom,lto,nodes);
-				qiter = qids.erase(qiter);
-			} catch ( const std::out_of_range &oor ) {
-				qiter++;
-			}
-		}
-		return qids.empty();
-	}
-	else
-		return true;
-}
-
 void QueryManager::add_query(std::unique_ptr<PendingQuery> query) {
 	pending_jobs.emplace(query->id, std::move(query));
 }
@@ -257,25 +158,12 @@ void QueryManager::add_query(std::unique_ptr<PendingQuery> query) {
 
 uint64_t RunningQuery::next_id = 1;
 
-RunningQuery::RunningQuery( std::set<CacheLocks::Lock> &&locks ) :
-	id(next_id++), locks(std::move(locks)), time_created(CacheCommon::time_millis()), time_scheduled(0), time_finished(0) {
-	QueryManager::locks.add_locks(this->locks,id);
+RunningQuery::RunningQuery() :
+	id(next_id++), time_created(CacheCommon::time_millis()), time_scheduled(0), time_finished(0) {
 }
 
 RunningQuery::~RunningQuery() {
-	QueryManager::locks.remove_locks(this->locks,id);
 }
-
-void RunningQuery::add_lock(const CacheLocks::Lock& lock) {
-	if ( locks.emplace(lock).second )
-		QueryManager::locks.add_lock(lock,id);
-}
-
-void RunningQuery::add_locks(const std::set<CacheLocks::Lock>& locks) {
-	for ( auto &l :locks )
-		add_lock(l);
-}
-
 
 bool RunningQuery::satisfies( const BaseRequest& req) const {
 	const BaseRequest &my_req = get_request();
@@ -327,13 +215,6 @@ bool RunningQuery::has_clients() const {
 	return !clients.empty();
 }
 
-PendingQuery::PendingQuery( std::set<CacheLocks::Lock> &&locks ) :
-	RunningQuery(std::move(locks)) {
+PendingQuery::PendingQuery() : RunningQuery() {
 }
 
-void PendingQuery::entry_moved(const CacheLocks::Lock& from, const CacheLocks::Lock& to, const std::map<uint32_t, std::shared_ptr<Node>> &nmap) {
-	QueryManager::locks.move_lock(from,to,id);
-	locks.erase(from);
-	locks.insert(to);
-	replace_reference(from,to,nmap);
-}

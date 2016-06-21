@@ -286,16 +286,21 @@ void NodeServer::process_control_command(BinaryReadBuffer &payload) {
 	switch (cmd) {
 		case ControlConnection::CMD_REORG: {
 			ReorgDescription d(payload);
-			auto start = CacheCommon::time_millis();
+
+			time_t remove = 0, fetch = 0, confirm = 0;
+
+			remove = CacheCommon::time_millis();
 			for (auto &rem_item : d.get_removals()) {
 				handle_reorg_remove_item(rem_item);
 			}
-			for (auto &move_item : d.get_moves()) {
-				handle_reorg_move_item(move_item);
-			}
+			remove = (CacheCommon::time_millis() - remove);
 
-			auto time = CacheCommon::time_millis()-start;
-			Log::info("Finished Processing reorg, %lu removals, %lu moves took: %lums", d.get_removals().size(), d.get_moves().size(),time);
+			time_t time = CacheCommon::time_millis();
+			for (auto &move_item : d.get_moves()) {
+				handle_reorg_move_item(move_item, fetch, confirm);
+			}
+			time = CacheCommon::time_millis()-time;
+			Log::info("Finished Processing reorg, %lu removals (%dms), %lu moves (%dms -- Fetch: %dms, Confirm: %dms)", d.get_removals().size(), remove, d.get_moves().size(), time, fetch, confirm);
 
 			control_connection->write(ControlConnection::RESP_REORG_DONE);
 			break;
@@ -337,18 +342,22 @@ void NodeServer::handle_reorg_remove_item( const TypedNodeCacheKey &item ) {
 	}
 }
 
-void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item ) {
+void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item, time_t &fetch, time_t &confirm ) {
 	uint64_t new_cache_id;
 
 	Log::debug("Moving item from node %d to node %d. Key: %s:%d ", item.from_node_id, my_id,
 		item.semantic_id.c_str(), item.entry_id);
 
 
+	time_t f = CacheCommon::time_millis();
+	time_t c = 0;
+
 	// Send move request
 	auto dg = delivery_pool.get(item.from_host, item.from_port);
 	try {
 		auto &del_con = dg.get_connection();
 		auto resp = del_con.write_and_read(DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
+		fetch += (CacheCommon::time_millis() - f);
 
 		uint8_t del_resp = resp->read<uint8_t>();
 
@@ -390,7 +399,9 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item ) {
 			default:
 				throw NetworkException(concat("Received illegal response from delivery-node: ", del_resp));
 		}
+		c = CacheCommon::time_millis();
 		confirm_move(del_con, item, new_cache_id);
+		confirm += (CacheCommon::time_millis() - c);
 	} catch (const NetworkException &ne) {
 		Log::error("Could not process move: %s", ne.what());
 		dg.set_faulty();

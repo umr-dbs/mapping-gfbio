@@ -357,7 +357,8 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item, time_t &fetc
 	try {
 		auto &del_con = dg.get_connection();
 		auto resp = del_con.write_and_read(DeliveryConnection::CMD_MOVE_ITEM,TypedNodeCacheKey(item));
-		fetch += (CacheCommon::time_millis() - f);
+		f = (CacheCommon::time_millis() - f);
+		fetch += f;
 
 		uint8_t del_resp = resp->read<uint8_t>();
 
@@ -401,7 +402,10 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item, time_t &fetc
 		}
 		c = CacheCommon::time_millis();
 		confirm_move(del_con, item, new_cache_id);
-		confirm += (CacheCommon::time_millis() - c);
+		c = (CacheCommon::time_millis() - c);
+		confirm += c;
+		Log::info("  Moving entry finished: %lubytes, fetch: %dms, confirm: %dms", resp->getPayloadSize(), f, c);
+
 	} catch (const NetworkException &ne) {
 		Log::error("Could not process move: %s", ne.what());
 		dg.set_faulty();

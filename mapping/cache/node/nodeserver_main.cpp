@@ -26,12 +26,16 @@ void termination_handler(int signum) {
 }
 
 void set_signal_handler() {
-	struct sigaction new_action, old_action;
+	struct sigaction new_action, old_action, ignore;
 
 	/* Set up the structure to specify the new action. */
 	new_action.sa_handler = termination_handler;
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = 0;
+
+	ignore.sa_handler = SIG_IGN;
+	sigemptyset(&ignore.sa_mask);
+	ignore.sa_flags = 0;
 
 	sigaction(SIGINT, NULL, &old_action);
 	if (old_action.sa_handler != SIG_IGN)
@@ -44,6 +48,9 @@ void set_signal_handler() {
 		sigaction(SIGTERM, &new_action, NULL);
 	sigaction(SIGSEGV, NULL, &old_action);
 		sigaction(SIGSEGV, &new_action, NULL);
+
+	sigaction(SIGPIPE, NULL, &old_action);
+		sigaction(SIGPIPE,&ignore,NULL);
 }
 
 int main(void) {

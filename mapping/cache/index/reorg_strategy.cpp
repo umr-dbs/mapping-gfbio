@@ -278,6 +278,11 @@ uint32_t CapacityReorgStrategy::get_node_for_job(const BaseRequest &request,
 	return get_least_used_node(nodes);
 }
 
+void CapacityReorgStrategy::node_failed(uint32_t node_id) {
+	(void) node_id;
+	// Nothing to do
+}
+
 void CapacityReorgStrategy::distribute(std::map<uint32_t, ReorgNode>& result,
 		std::vector<std::shared_ptr<const IndexCacheEntry> >& all_entries) {
 
@@ -395,6 +400,15 @@ uint32_t GraphReorgStrategy::get_node_for_job(const BaseRequest& request,
 		return get_least_used_node(nodes);
 	else
 		return node;
+}
+
+void GraphReorgStrategy::node_failed(uint32_t node_id) {
+	for ( auto i = assignments.begin(); i != assignments.end(); ) {
+		if ( i->second == node_id )
+			i = assignments.erase(i);
+		else
+			i++;
+	}
 }
 
 uint32_t GraphReorgStrategy::find_node_for_graph(const GenericOperator& op) const {
@@ -594,6 +608,18 @@ uint32_t GeographicReorgStrategy::get_node_for_job(const BaseRequest &request,
 	return get_least_used_node(nodes);
 }
 
+void GeographicReorgStrategy::node_failed(uint32_t node_id) {
+	for ( auto i = z_bounds.begin(); i != z_bounds.end(); ) {
+		if ( i->second == node_id ) {
+			i = z_bounds.erase(i);
+			if ( i == z_bounds.end() && !z_bounds.empty() )
+				z_bounds.back().first = MAX_Z;
+		}
+		else
+			i++;
+	}
+}
+
 void GeographicReorgStrategy::distribute(std::map<uint32_t, ReorgNode>& result,
 		std::vector<std::shared_ptr<const IndexCacheEntry> >& all_entries) {
 
@@ -638,4 +664,3 @@ void GeographicReorgStrategy::distribute(std::map<uint32_t, ReorgNode>& result,
 	// Add last bound
 	z_bounds.push_back( std::make_pair(MAX_Z,nodes.back().get().id) );
 }
-

@@ -62,11 +62,7 @@ public:
 	 */
 	bool require_reorg(const std::map<uint32_t, std::shared_ptr<Node> > &nodes) const;
 
-	/**
-	 * Removes all entries hosted at the given node from the global cache
-	 * @param node_id the id of the node
-	 */
-	void remove_all_by_node( uint32_t node_id );
+	void node_failed( uint32_t node_id );
 
 	/**
 	 * Updates the statistics for the cache-entries hosted at the given node

@@ -182,6 +182,8 @@ public:
 	 */
 	virtual uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const = 0;
 
+	virtual void node_failed(uint32_t node_id) = 0;
+
 	/**
 	 * Adds reorganization commands according to the concrete strategy to the given result
 	 * @param result the accumulator to add reorg-commands to
@@ -221,6 +223,7 @@ public:
 	static bool node_sort( const std::shared_ptr<const IndexCacheEntry> &e1, const std::shared_ptr<const IndexCacheEntry> &e2 );
 	CapacityReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);
 	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	void node_failed(uint32_t node_id);
 protected:
 	void distribute( std::map<uint32_t, ReorgNode> &result, std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries );
 private:
@@ -254,6 +257,7 @@ public:
 	static void append( std::shared_ptr<GNode> node, std::vector<std::shared_ptr<GNode>> &roots );
 	GraphReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);
 	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	void node_failed(uint32_t node_id);
 protected:
 	void distribute( std::map<uint32_t, ReorgNode> &result, std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries );
 private:
@@ -279,6 +283,7 @@ public:
 	GeographicReorgStrategy(const IndexCache &cache, double target_usage, std::unique_ptr<RelevanceFunction> relevance_function);
 	// It must be ensured that at least on node is present in the given map
 	uint32_t get_node_for_job( const BaseRequest &request, const std::map<uint32_t,std::shared_ptr<Node>> &nodes ) const;
+	void node_failed(uint32_t node_id);
 protected:
 	void distribute( std::map<uint32_t, ReorgNode> &result, std::vector<std::shared_ptr<const IndexCacheEntry>> &all_entries );
 private:

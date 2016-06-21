@@ -167,7 +167,7 @@ void IndexServer::setup_fdset(struct pollfd *fds, size_t &pos) {
 		} catch ( const NodeFailedException &nfe ) {
 			Log::warn("Node-failure: %s", nfe.what() );
 			niter = nodes.erase(niter);
-			caches.remove_all_by_node(node->id);
+			caches.node_failed(node->id);
 			query_manager->node_failed(node->id);
 		}
 	}

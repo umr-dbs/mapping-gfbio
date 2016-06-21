@@ -33,6 +33,13 @@ IndexCacheManager::IndexCacheManager(const std::string& reorg_strategy, const st
 	all_caches.push_back(plot_cache);
 }
 
+void IndexCacheManager::node_failed(uint32_t node_id) {
+	for ( CacheInfo &c : all_caches ) {
+		c.cache->remove_all_by_node(node_id);
+		c.reorg_strategy->node_failed(node_id);
+	}
+}
+
 const IndexCacheManager::CacheInfo& IndexCacheManager::get_info(CacheType type) const {
 	switch ( type ) {
 		case CacheType::RASTER:
@@ -59,11 +66,6 @@ bool IndexCacheManager::require_reorg(const std::map<uint32_t, std::shared_ptr<N
 		if ( c.reorg_strategy->requires_reorg(nodes) )
 			return true;
 	return false;
-}
-
-void IndexCacheManager::remove_all_by_node(uint32_t node_id) {
-	for ( CacheInfo &c : all_caches )
-		c.cache->remove_all_by_node(node_id);
 }
 
 void IndexCacheManager::process_handshake(uint32_t node_id, const NodeHandshake& hs) {

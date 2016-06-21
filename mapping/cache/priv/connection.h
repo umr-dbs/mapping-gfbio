@@ -250,7 +250,7 @@ public:
 	 * @param state the initial stats of the connection
 	 * @param socket the underlying socket
 	 */
-	BaseConnection(StateType state, BinaryStream &&socket);
+	BaseConnection(StateType state, const std::string &type, BinaryStream &&socket);
 	virtual ~BaseConnection() = default;
 
 	/**
@@ -348,6 +348,8 @@ private:
 	std::unique_ptr<BinaryReadBuffer> reader;
 	std::unique_ptr<BinaryWriteBuffer> writer;
 	time_t last_action;
+protected:
+	const std::string type;
 };
 
 /**

@@ -165,8 +165,8 @@ BinaryStream NewNBConnection::release_socket() {
 ///////////////////////////////////////////////////////////
 
 template<typename StateType>
-BaseConnection<StateType>::BaseConnection(StateType state, BinaryStream &&socket) : PollableConnection(std::move(socket)),
-	id(next_id++), state(state), faulty(false), reader(new BinaryReadBuffer() ), last_action(CacheCommon::time_millis()) {
+BaseConnection<StateType>::BaseConnection(StateType state, const std::string &type, BinaryStream &&socket) : PollableConnection(std::move(socket)),
+	id(next_id++), state(state), faulty(false), reader(new BinaryReadBuffer() ), last_action(CacheCommon::time_millis()), type(type) {
 }
 
 template<typename StateType>
@@ -175,7 +175,7 @@ bool BaseConnection<StateType>::input() {
 	try {
 		bool eof = socket.readNB(*reader, reader->isEmpty() );
 		if ( eof ) {
-			Log::debug("Connection closed %d", id);
+			Log::debug("%s-connection (%lu): closed", type.c_str(), id);
 			faulty = true;
 		}
 		else if ( reader->isRead() ) {
@@ -184,7 +184,7 @@ bool BaseConnection<StateType>::input() {
 			return true;
 		}
 	} catch ( const NetworkException &ne ) {
-		Log::warn("An error occured during read on connection %d: %s", id, ne.what());
+		Log::warn("%s-connection (%lu): read failed: %s", type.c_str(), id, ne.what());
 		faulty = true;
 		reader.reset(new BinaryReadBuffer());
 	}
@@ -201,13 +201,13 @@ void BaseConnection<StateType>::output() {
 				writer.reset();
 			}
 		} catch ( const NetworkException &ne ) {
-			Log::warn("An error occured during write on connection: %d", id);
+			Log::warn("%s-connection (%lu): write failed: %s", type.c_str(), id, ne.what());
 			faulty = true;
 			writer.reset();
 		}
 	}
 	else
-		throw IllegalStateException("Cannot trigger write while not in writing state.");
+		throw IllegalStateException(concat(type, "-connection (",id,"): Cannot trigger write while not in writing state."));
 }
 
 template<typename StateType>
@@ -217,7 +217,7 @@ void BaseConnection<StateType>::begin_write(std::unique_ptr<BinaryWriteBuffer> b
 		last_action = CacheCommon::time_millis();
 	}
 	else
-		throw IllegalStateException("Cannot start write. Another read or write action is in progress.");
+		throw IllegalStateException(concat(type, "-connection (",id,"): cannot start write: Another read or write action is in progress."));
 }
 
 template<typename StateType>
@@ -244,7 +244,7 @@ template<typename StateType>
 template<typename... States>
 void BaseConnection<StateType>::ensure_state(const States... states) const {
 	if ( !_ensure_state(states...) )
-		throw IllegalStateException("Illegal state");
+		throw IllegalStateException(concat(type,"-connection (", id , "): not in required state."));
 }
 
 template<typename StateType>
@@ -288,7 +288,7 @@ template<typename StateType>
 bool BaseConnection<StateType>::process() {
 	bool res = false;
 	if ( poll_fd == nullptr )
-		throw IllegalStateException(concat("BaseConnection: Process called without previous call to prepare, con-id: ", id));
+		throw IllegalStateException(concat(type,"-connection (", id, "): process called without previous call to prepare."));
 
 	if ( is_writing() && (poll_fd->revents & POLLOUT) ) {
 		output();
@@ -299,7 +299,7 @@ bool BaseConnection<StateType>::process() {
 		last_action = CacheCommon::time_millis();
 	}
 	else if ( poll_fd->revents != 0 ){
-		Log::warn("Poll delivered unexpected state: %s", flags_to_string(poll_fd->revents).c_str() );
+		Log::warn("%s-connection: poll delivered unexpected state: %s", type.c_str(), flags_to_string(poll_fd->revents).c_str() );
 		faulty = true;
 	}
 
@@ -318,7 +318,7 @@ uint64_t BaseConnection<StateType>::next_id = 1;
 /////////////////////////////////////////////////
 
 ClientConnection::ClientConnection(BinaryStream &&socket) :
-	BaseConnection(ClientState::IDLE, std::move(socket)) {
+	BaseConnection(ClientState::IDLE, "Client", std::move(socket)) {
 }
 
 void ClientConnection::process_command(uint8_t cmd, BinaryReadBuffer& payload) {
@@ -410,7 +410,7 @@ const uint8_t ClientConnection::RESP_ERROR;
 /////////////////////////////////////////////////
 
 WorkerConnection::WorkerConnection(BinaryStream &&socket, uint32_t node_id) :
-	BaseConnection(WorkerState::IDLE, std::move(socket)), node_id(node_id), delivery_id(0) {
+	BaseConnection(WorkerState::IDLE, "Worker", std::move(socket)), node_id(node_id), delivery_id(0) {
 }
 
 void WorkerConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) {
@@ -573,7 +573,7 @@ const uint8_t WorkerConnection::RESP_DELIVERY_QTY;
 /////////////////////////////////////////////////
 
 ControlConnection::ControlConnection(BinaryStream &&socket, uint32_t node_id, const std::string &hostname) :
-	BaseConnection(ControlState::SENDING_HELLO, std::move(socket)), node_id(node_id) {
+	BaseConnection(ControlState::SENDING_HELLO, "Control", std::move(socket)), node_id(node_id) {
 	auto buffer = make_unique<BinaryWriteBuffer>();
 	buffer->write(CMD_HELLO);
 	buffer->write(node_id);
@@ -690,7 +690,7 @@ const uint8_t ControlConnection::RESP_STATS;
 /////////////////////////////////////////////////
 
 DeliveryConnection::DeliveryConnection(BinaryStream &&socket) :
-	BaseConnection(DeliveryState::IDLE, std::move(socket)), delivery_id(0), cache_key(CacheType::UNKNOWN,"", 0) {
+	BaseConnection(DeliveryState::IDLE, "Delivery", std::move(socket)), delivery_id(0), cache_key(CacheType::UNKNOWN,"", 0) {
 }
 
 void DeliveryConnection::process_command(uint8_t cmd, BinaryReadBuffer &payload) {
@@ -864,7 +864,7 @@ std::unique_ptr<NBClientDeliveryConnection> NBClientDeliveryConnection::create(
 	return make_unique<NBClientDeliveryConnection>(std::move(skt));
 }
 
-NBClientDeliveryConnection::NBClientDeliveryConnection(BinaryStream&& stream) : BaseConnection(ClientDeliveryState::REQUEST_SENT,std::move(stream)) {
+NBClientDeliveryConnection::NBClientDeliveryConnection(BinaryStream&& stream) : BaseConnection(ClientDeliveryState::REQUEST_SENT, "NBClient",std::move(stream)) {
 }
 
 void NBClientDeliveryConnection::process_command(uint8_t cmd,

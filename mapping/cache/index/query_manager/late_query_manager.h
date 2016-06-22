@@ -22,7 +22,7 @@ private:
 	IndexCacheManager &caches;
 	BaseRequest request;
 	const QueryRectangle orig_query;
-	const double orig_area;
+	const double max_volume;
 	SystemStats &stats;
 };
 

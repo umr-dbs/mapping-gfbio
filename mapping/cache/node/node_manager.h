@@ -71,6 +71,7 @@ private:
  * This class holds all information sensitive for a worker-thread
  */
 class WorkerContext {
+	friend class PuzzleGuard;
 public:
 	/** Constructs a new instance */
 	WorkerContext();
@@ -89,10 +90,22 @@ public:
 	 * @return this worker's connection to the index-server
 	 */
 	BlockingConnection& get_index_connection() const;
+
+	bool is_puzzling() const;
+	uint32_t get_puzzle_depth() const;
+
 private:
+	uint32_t puzzling;
 	BlockingConnection* index_connection;
 };
 
+class PuzzleGuard {
+public:
+	PuzzleGuard( WorkerContext &ctx );
+	~PuzzleGuard();
+private:
+	WorkerContext &ctx;
+};
 
 //
 // Node-Cache

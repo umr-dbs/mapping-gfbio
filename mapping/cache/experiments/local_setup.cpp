@@ -17,12 +17,16 @@ void termination_handler(int signum) {
 }
 
 void set_signal_handler() {
-	struct sigaction new_action, old_action;
+	struct sigaction new_action, old_action, ignore;
 
 	/* Set up the structure to specify the new action. */
 	new_action.sa_handler = termination_handler;
 	sigemptyset(&new_action.sa_mask);
 	new_action.sa_flags = 0;
+
+	ignore.sa_handler = SIG_IGN;
+	sigemptyset(&ignore.sa_mask);
+	ignore.sa_flags = 0;
 
 	sigaction(SIGINT, NULL, &old_action);
 	if (old_action.sa_handler != SIG_IGN)
@@ -35,6 +39,10 @@ void set_signal_handler() {
 		sigaction(SIGTERM, &new_action, NULL);
 	sigaction(SIGSEGV, NULL, &old_action);
 		sigaction(SIGSEGV, &new_action, NULL);
+
+	sigaction(SIGPIPE, NULL, &old_action);
+		sigaction(SIGPIPE,&ignore,NULL);
+
 }
 
 int main(void) {
@@ -56,11 +64,11 @@ int main(void) {
 
 	std::string reorg_strategy = "geo";
 	std::string relevance = "costlru";
-	std::string caching_strat = "uncached";
+	std::string caching_strat = "always";
 
-	std::string scheduler = "late";
+	std::string scheduler = "dema";
 	bool batching = true;
-	std::string node_cache_mode = "remote";
+	std::string node_cache_mode = "local";
 	std::string node_cache_repl = "lru";
 	time_t update_interval = 500;
 

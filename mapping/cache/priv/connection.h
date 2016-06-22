@@ -866,9 +866,12 @@ class NBClientDeliveryConnection : public BaseConnection<ClientDeliveryState> {
 public:
 	static std::unique_ptr<NBClientDeliveryConnection> create( const DeliveryResponse &dr );
 	NBClientDeliveryConnection(BinaryStream &&stream);
+  size_t get_bytes_read() const;
 protected:
 	void process_command( uint8_t cmd, BinaryReadBuffer& payload );
 	void write_finished();
+private:
+  size_t _read;
 };
 
 class ConnectionPool;

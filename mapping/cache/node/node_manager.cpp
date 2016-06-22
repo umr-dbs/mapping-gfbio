@@ -256,3 +256,18 @@ template class NodeCacheWrapper<LineCollection>;
 template class NodeCacheWrapper<PolygonCollection>;
 template class NodeCacheWrapper<GenericPlot> ;
 
+bool WorkerContext::is_puzzling() const {
+	return puzzling > 0;
+}
+
+uint32_t WorkerContext::get_puzzle_depth() const {
+	return puzzling;
+}
+
+PuzzleGuard::PuzzleGuard(WorkerContext& ctx) : ctx(ctx) {
+	ctx.puzzling++;
+}
+
+PuzzleGuard::~PuzzleGuard() {
+	ctx.puzzling--;
+}

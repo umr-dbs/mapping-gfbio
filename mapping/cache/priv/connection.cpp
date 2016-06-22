@@ -864,15 +864,21 @@ std::unique_ptr<NBClientDeliveryConnection> NBClientDeliveryConnection::create(
 	return make_unique<NBClientDeliveryConnection>(std::move(skt));
 }
 
-NBClientDeliveryConnection::NBClientDeliveryConnection(BinaryStream&& stream) : BaseConnection(ClientDeliveryState::REQUEST_SENT, "NBClient",std::move(stream)) {
+NBClientDeliveryConnection::NBClientDeliveryConnection(BinaryStream&& stream) : BaseConnection(ClientDeliveryState::REQUEST_SENT, "NBClient",std::move(stream)), _read(0) {
 }
 
 void NBClientDeliveryConnection::process_command(uint8_t cmd,
 		BinaryReadBuffer& payload) {
 	(void) cmd;
+  _read += payload.getPayloadSize();
 	(void) payload;
 	// Nothing to do
 }
+
+size_t NBClientDeliveryConnection::get_bytes_read() const {
+  return _read;
+}
+
 
 void NBClientDeliveryConnection::write_finished() {
 }

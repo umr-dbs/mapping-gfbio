@@ -39,7 +39,7 @@ public:
 	MetaCacheEntry put_local(const std::string &semantic_id, const std::unique_ptr<T> &item, CacheEntry &&info );
 	void remove_local(const NodeCacheKey &key);
 private:
-	std::unique_ptr<T> process_puzzle_wo_cache( const PuzzleRequest& request, QueryProfiler &profiler );
+	std::unique_ptr<T> process_puzzle_int( GenericOperator &op,const PuzzleRequest& request, QueryProfiler &profiler );
 
 	RemoteCacheManager &mgr;
 	RemoteRetriever<T> retriever;

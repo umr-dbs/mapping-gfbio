@@ -208,21 +208,20 @@ void WFSService::getFeature() {
 
 std::unique_ptr<PointCollection> WFSService::clusterPoints(const PointCollection &points, const Params &params) const {
 
-	if(!params.hasParam("width") || !params.hasParam("height")) {
-		throw ArgumentException("WFSService: Cluster operation needs width and height specified");
+	if(!params.hasParam("resolution")) {
+		throw ArgumentException("WFSService: Cluster operation needs a resolution specified");
 	}
 
-	size_t width, height;
+	double resolution;
 
 	try {
-		width = std::stol(params.get("width"));
-		height = std::stol(params.get("height"));
+		resolution = std::stod(params.get("resolution"));
 	} catch (const std::invalid_argument &e) {
-		throw ArgumentException("WFSService: width and height parameters must be integers");
+		throw ArgumentException("WFSService: resolution parameter must be a double value");
 	}
 
-	if (width <= 0 || height <= 0) {
-		throw ArgumentException("WFSService: width or height not valid");
+	if (resolution <= 0) {
+		throw ArgumentException("WFSService: resolution is invalid (must be positive)");
 	}
 
 	auto clusteredPoints = make_unique<PointCollection>(points.stref);
@@ -232,19 +231,17 @@ std::unique_ptr<PointCollection> WFSService::clusterPoints(const PointCollection
 	auto x2 = sref.x2;
 	auto y1 = sref.y1;
 	auto y2 = sref.y2;
-	auto xres = width;
-	auto yres = height;
 	pv::CircleClusteringQuadTree clusterer(
 			pv::BoundingBox(
-					pv::Coordinate((x2 + x1) / (2 * xres),
-							(y2 + y1) / (2 * yres)),
-					pv::Dimension((x2 - x1) / (2 * xres),
-							(y2 - y1) / (2 * yres)), 1), 1);
+					pv::Coordinate((x2 + x1) / (2 * resolution),
+							(y2 + y1) / (2 * resolution)),
+					pv::Dimension((x2 - x1) / (2 * resolution),
+							(y2 - y1) / (2 * resolution)), 1), 1);
 	for (const Coordinate& pointOld : points.coordinates) {
 		clusterer.insert(
 				std::make_shared<pv::Circle>(
-						pv::Coordinate(pointOld.x / xres,
-								pointOld.y / yres), 5, 1));
+						pv::Coordinate(pointOld.x / resolution,
+								pointOld.y / resolution), 5, 1));
 	}
 
 	// PROPERTYNAME
@@ -260,8 +257,8 @@ std::unique_ptr<PointCollection> WFSService::clusterPoints(const PointCollection
 	attr_radius.reserve(circles.size());
 	attr_number.reserve(circles.size());
 	for (auto& circle : circles) {
-		size_t idx = clusteredPoints->addSinglePointFeature(Coordinate(circle->getX() * xres,
-				circle->getY() * yres));
+		size_t idx = clusteredPoints->addSinglePointFeature(Coordinate(circle->getX() * resolution,
+				circle->getY() * resolution));
 		attr_radius.set(idx, circle->getRadius());
 		attr_number.set(idx, circle->getNumberOfPoints());
 	}

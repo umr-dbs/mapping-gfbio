@@ -250,7 +250,7 @@ public:
 	 * @param state the initial stats of the connection
 	 * @param socket the underlying socket
 	 */
-	BaseConnection(StateType state, BinaryStream &&socket);
+	BaseConnection(StateType state, const std::string &type, BinaryStream &&socket);
 	virtual ~BaseConnection() = default;
 
 	/**
@@ -348,6 +348,8 @@ private:
 	std::unique_ptr<BinaryReadBuffer> reader;
 	std::unique_ptr<BinaryWriteBuffer> writer;
 	time_t last_action;
+protected:
+	const std::string type;
 };
 
 /**
@@ -864,9 +866,12 @@ class NBClientDeliveryConnection : public BaseConnection<ClientDeliveryState> {
 public:
 	static std::unique_ptr<NBClientDeliveryConnection> create( const DeliveryResponse &dr );
 	NBClientDeliveryConnection(BinaryStream &&stream);
+  size_t get_bytes_read() const;
 protected:
 	void process_command( uint8_t cmd, BinaryReadBuffer& payload );
 	void write_finished();
+private:
+  size_t _read;
 };
 
 class ConnectionPool;

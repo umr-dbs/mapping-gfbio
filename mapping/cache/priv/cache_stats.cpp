@@ -244,8 +244,8 @@ std::string QueryStats::to_string() const {
 	ss << "  remote partials   : " << multi_remote_partials << std::endl;
 	ss << "  misses            : " << misses << std::endl;
 	ss << "  hit-ratio         : " << (ratios / queries) << std::endl;
-	ss << "  cache-queries     : " << queries;
-	ss << "  result-bytes      : " << result_bytes;
+	ss << "  cache-queries     : " << queries << std::endl;
+	ss << "  result-bytes      : " << result_bytes << std::endl;
 	ss << "  lost puts         : " << lost_puts;
 	return ss.str();
 }
@@ -314,7 +314,7 @@ std::string SystemStats::to_string() const {
 	ss << "  partial multiple nodes   : " << multi_remote_partials << std::endl;
 	ss << "  misses                   : " << misses << std::endl;
 	ss << "  result-bytes             : " << result_bytes << std::endl;
-	ss << "  lost puts                : " << lost_puts;
+	ss << "  lost puts                : " << lost_puts << std::endl;
 	ss << "  hit ratio                : " << get_hit_ratio() << std::endl;
 	ss << "  cache-queries            : " << queries << std::endl;
 	ss << "  requests received        : " << queries_issued << std::endl;

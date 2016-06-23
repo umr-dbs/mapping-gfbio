@@ -51,6 +51,7 @@ std::vector<PollWrapper> connections;
 std::vector<std::unique_ptr<NBClientDeliveryConnection>> del_cons;
 std::mutex mtx;
 bool done = false;
+size_t max_res_size = 0;
 
 //std::string host = "pc12412.mathematik.uni-marburg.de";
 int port = 10042;
@@ -211,6 +212,7 @@ void process_connections() {
 					DeliveryResponse dr(*resp);
 					Log::debug("Revceived response: %s", dr.to_string().c_str());
 					del_cons.push_back(NBClientDeliveryConnection::create(dr));
+//					NBClientDeliveryConnection::create(dr);
 					break;
 				}
 				case ClientConnection::RESP_ERROR: {
@@ -238,8 +240,8 @@ void process_del_cons() {
 		try {
 			if ( c.process() ) {
 				results_read++;
-				Log::info("Progress: %lu/%lu", responses_read, results_read);
-				Log::debug("Delivery swallowed!");
+        max_res_size = std::max(max_res_size, c.get_bytes_read());
+//				Log::debug("Progress: %lu/%lu", responses_read, results_read);
 				it = del_cons.erase(it);
 			} else
 				it++;
@@ -415,20 +417,18 @@ int main(int argc, char *argv[]) {
 	if ( argc < 3 ) {
 		inter_arrival = 6;
 		qs = queries_from_spec(30000, cache_exp::btw, 64, 256 );
+//		qs = replay_logs("41k_queries.txt");
 	}
 	else {
 		inter_arrival = atoi(argv[1]);
 		qs = create_run(argc,argv);
 	}
 
-
-
 	auto c = BlockingConnection::create(host, port, true,
 			ClientConnection::MAGIC_NUMBER);
 	auto rst = c->write_and_read(ClientConnection::CMD_RESET_STATS);
 
 	std::thread t(issue_queries, &qs, inter_arrival);
-
 
 	struct pollfd fds[0xffff];
 	size_t num_fds;
@@ -451,7 +451,7 @@ int main(int argc, char *argv[]) {
 			process_connections();
 		}
 	}
-	Log::info("Processing finished. Requesting stats.");
+	Log::info("Processing finished. Requesting stats: Max result-size: %lu", max_res_size);
 	t.join();
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 

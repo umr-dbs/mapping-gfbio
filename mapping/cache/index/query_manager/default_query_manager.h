@@ -42,7 +42,7 @@ public:
 private:
 	BaseRequest request;
 	const QueryRectangle orig_query;
-	const double orig_area;
+	const double max_volume;
 	const DefaultQueryManager &mgr;
 };
 

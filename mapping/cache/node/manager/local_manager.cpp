@@ -70,6 +70,8 @@ bool LocalCacheWrapper<T>::put(const std::string &semantic_id,
 template<class T>
 std::unique_ptr<T> LocalCacheWrapper<T>::query(GenericOperator& op,
 		const QueryRectangle& rect, QueryProfiler &profiler) {
+	if ( mgr.get_worker_context().get_puzzle_depth() > op.getDepth() )
+		throw NoSuchElementException("No query");
 
 	CacheQueryResult<NodeCacheEntry<T>> qres = this->cache.query(op.getSemanticId(), rect);
 	for ( auto &e : qres.items ) {
@@ -96,7 +98,7 @@ std::unique_ptr<T> LocalCacheWrapper<T>::query(GenericOperator& op,
 		for ( auto &ne : qres.items )
 			items.push_back(ne->data);
 
-
+		PuzzleGuard pg(mgr.get_worker_context());
 		return PuzzleUtil::process(op,rect,qres.remainder,items,profiler);
 	}
 	else {

@@ -120,7 +120,7 @@ private:
 	 * Manages the migration of the given item to this node
 	 * @param item the description of the item to migrate
 	 */
-	void handle_reorg_move_item( const ReorgMoveItem &item );
+	void handle_reorg_move_item( const ReorgMoveItem &item, time_t &fetch, time_t &confirm );
 
 	/**
 	 * Removes the given item from the local cache of this node

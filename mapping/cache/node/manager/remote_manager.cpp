@@ -85,6 +85,9 @@ bool RemoteCacheWrapper<T>::put(const std::string& semantic_id,
 template<typename T>
 std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 		const QueryRectangle& rect, QueryProfiler &profiler) {
+	if ( op.getDepth() == 0 || mgr.get_worker_context().get_puzzle_depth() > op.getDepth() )
+		throw NoSuchElementException("No query");
+
 	TIME_EXEC("CacheManager.query");
 	Log::debug("Querying item: %s on %s",
 			CacheCommon::qr_to_string(rect).c_str(),
@@ -172,7 +175,7 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::query(GenericOperator& op,
 		Log::trace("Partial remote HIT for query: %s on %s: %s",
 				CacheCommon::qr_to_string(rect).c_str(),
 				op.getSemanticId().c_str(), pr.to_string().c_str());
-		return process_puzzle_wo_cache(pr, profiler);
+		return process_puzzle_int(op,pr, profiler);
 		break;
 	}
 	default: {
@@ -203,16 +206,15 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle(
 	std::unique_ptr<T> result;
 	QueryProfiler profiler;
 	{
+		auto op = GenericOperator::fromJSON(request.semantic_id);
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
-		result = process_puzzle_wo_cache(request, profiler);
+		result = process_puzzle_int(*op,request, profiler);
 	}
-	if (put(request.semantic_id, result, request.query, profiler))
-		parent_profiler.cached(profiler);
 	return result;
 }
 
 template<typename T>
-std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle_wo_cache(
+std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle_int( GenericOperator &op,
 		const PuzzleRequest& request, QueryProfiler& profiler) {
 
 	TIME_EXEC("CacheManager.puzzle");
@@ -239,8 +241,8 @@ std::unique_ptr<T> RemoteCacheWrapper<T>::process_puzzle_wo_cache(
 		throw NoSuchElementException("All puzzle pieces gone!");
 	}
 	else {
-		auto op = GenericOperator::fromJSON(request.semantic_id);
-		return PuzzleUtil::process(*op, request.query, request.remainder, parts, profiler);
+		PuzzleGuard pg(mgr.get_worker_context());
+		return PuzzleUtil::process(op, request.query, request.remainder, parts, profiler);
 	}
 }
 

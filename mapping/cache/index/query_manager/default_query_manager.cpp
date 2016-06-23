@@ -208,7 +208,7 @@ std::unique_ptr<PendingQuery> DefaultQueryManager::recreate_job(const RunningQue
 CreateJob::CreateJob( BaseRequest&& request, const DefaultQueryManager &mgr ) :
 	PendingQuery(), request(request),
 	orig_query(this->request.query),
-	orig_area( (this->request.query.x2 - this->request.query.x1) * (this->request.query.y2 - this->request.query.y1)),
+	max_volume( QueryCube(this->request.query).volume() * 4.04 ),
 	mgr(mgr) {
 }
 
@@ -221,7 +221,7 @@ bool CreateJob::extend(const BaseRequest& req) {
 		QueryCube requested(req.query);
 		auto combined = current.combine(requested);
 
-		if ( (current.volume() + requested.volume()) * 1.01 >= combined.volume() ) {
+		if ( combined.volume() <= max_volume && (current.volume() + requested.volume()) * 1.01 >= combined.volume() ) {
 			SpatialReference sref(orig_query.epsg, combined.get_dimension(0).a,
 												   combined.get_dimension(1).a,
 												   combined.get_dimension(0).b,

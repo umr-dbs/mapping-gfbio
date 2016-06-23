@@ -218,8 +218,15 @@ void GFBioService::run() {
 
 			while ((ent = readdir(dir)) != nullptr) {
 				std::string name = ent->d_name;
-				if (name.length() > suffix.length() && name.compare(name.length() - suffix.length(), suffix.length(), suffix) == 0)
-					archives.append(name);
+				if (name.length() > suffix.length() && name.compare(name.length() - suffix.length(), suffix.length(), suffix) == 0) {
+					// TODO store and get metadata
+					Json::Value archive(Json::objectValue);
+					archive["file"] = name;
+					archive["provider"] = name.substr(0, name.find("_"));
+					archive["dataset"] = name.substr(name.find("_") + 1, name.length() - name.find("_") - 5);
+					archive["link"] = "http://example.com";
+					archives.append(archive);
+				}
 			}
 			closedir(dir);
 

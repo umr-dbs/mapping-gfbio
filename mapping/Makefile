@@ -101,6 +101,10 @@ OBJ_OPERATORS_STUBS=${OBJ_OPERATORS_COMMON} ${OBJ_OPERATORS_ALLSTUBS}
 OBJ_CACHE_COMMON=o/cache/common.o o/cache/priv/shared.o o/cache/priv/requests.o o/cache/priv/connection.o o/cache/priv/redistribution.o o/cache/priv/cache_stats.o o/cache/priv/cache_structure.o o/cache/node/node_cache.o o/cache/manager.o o/cache/priv/caching_strategy.o o/cache/priv/cube.o
 OBJ_COMMON=${OBJ_CACHE_COMMON} ${OBJ_RASTER} ${OBJ_RASTERDB} ${OBJ_DATATYPES} ${OBJ_CONVERTERS} ${OBJ_PLOT} ${OBJ_POINTVISUALIZATION} ${OBJ_OPERATORS} ${OBJ_UTIL}
 
+OBJ_NODE_SERVER=o/cache/node/node_config.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o
+OBJ_INDEX_SERVER=o/cache/index/index_config.o o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/query_manager/late_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o
+OBJ_CACHE_EXP=o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o
+
 SRC_UNITTEST:=$(wildcard test/unittests/*.cpp) $(wildcard test/unittests/*/*.cpp)
 OBJ_UNITTEST:=$(patsubst test/%,o/test/%,$(SRC_UNITTEST:.cpp=.o))
 
@@ -153,7 +157,7 @@ ${EXECGI}:	o/cgi.o ${OBJ_COMMON} ${OBJ_SERVICES} ${OBJ_USERDB}
 ${EXERSERVER}:	o/rserver/rserver.o o/operators/queryrectangle.o o/operators/queryprofiler.o ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/raster/profiler.o o/cache/common.o o/util/server_nonblocking.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_R}
 
-${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} ${OBJ_USERDB} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/query_manager/late_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/util/server_nonblocking.o ${OBJ_UNITTEST} o/libgtest.a
+${EXEGTEST}:	${OBJ_COMMON} ${OBJ_SERVICES} ${OBJ_USERDB} ${OBJ_INDEX_SERVER} ${OBJ_NODE_SERVER} ${OBJ_CACHE_EXP} o/util/server_nonblocking.o ${OBJ_UNITTEST} o/libgtest.a
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL} ${LDFLAGS_GTEST}
 
 ${EXEPARSETESTLOGS}:	o/test/systemtests/parse_logs.o
@@ -162,22 +166,22 @@ ${EXEPARSETESTLOGS}:	o/test/systemtests/parse_logs.o
 ${EXETILESERVER}: o/rasterdb/tileserver.o o/util/server_nonblocking.o o/rasterdb/backend.o o/rasterdb/backend_local.o o/datatypes/attributes.o o/datatypes/unit.o o/util/binarystream.o o/util/sha1.o o/util/sqlite.o o/util/configuration.o o/util/sizeutil.o o/util/log.o
 	${CPP} $+ -o $@  ${LDFLAGS}
 
-${EXECACHEINDEX}:	${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/index/indexserver_main.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/query_manager/late_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/raster/profiler.o 
+${EXECACHEINDEX}:	${OBJ_CACHE_COMMON} ${OBJ_OPERATORS_COMMON} ${OBJ_DATATYPES_NOCL} ${OBJ_UTIL} ${OBJ_INDEX_SERVER} o/cache/index/indexserver_main.o o/raster/profiler.o
 	${CPP} $+ -o $@ ${LDFLAGS}
 
-${EXECACHENODE}:	${OBJ_COMMON} o/cache/node/nodeserver_main.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o 
+${EXECACHENODE}:	${OBJ_COMMON} ${OBJ_NODE_SERVER} o/cache/node/nodeserver_main.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
-${EXECACHEEXP}:	${OBJ_COMMON} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/query_manager/late_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/cache_experiments_main.o
+${EXECACHEEXP}:	${OBJ_COMMON} ${OBJ_INDEX_SERVER} ${OBJ_NODE_SERVER} ${OBJ_CACHE_EXP} o/cache/experiments/cache_experiments_main.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
-${EXECLUSEXP} : ${OBJ_COMMON} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/query_manager/late_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/cluster_experiment.o 
+${EXECLUSEXP} : ${OBJ_COMMON} ${OBJ_INDEX_SERVER} ${OBJ_NODE_SERVER} ${OBJ_CACHE_EXP} o/cache/experiments/cluster_experiment.o 
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
-${EXELOCAL} : ${OBJ_COMMON} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/query_manager/late_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/local_setup.o
+${EXELOCAL} : ${OBJ_COMMON} ${OBJ_INDEX_SERVER} ${OBJ_NODE_SERVER} ${OBJ_CACHE_EXP} o/cache/experiments/local_setup.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 	
-${EXETESTCLIENT} : ${OBJ_COMMON} o/cache/index/node.o o/cache/index/index_cache_manager.o o/cache/node/nodeserver.o o/cache/node/delivery.o o/cache/node/node_manager.o o/cache/node/manager/local_manager.o o/cache/node/manager/local_replacement.o o/cache/node/manager/remote_manager.o o/cache/node/manager/hybrid_manager.o o/cache/node/puzzle_util.o o/cache/index/indexserver.o o/cache/index/querymanager.o o/cache/index/query_manager/default_query_manager.o o/cache/index/query_manager/simple_query_manager.o o/cache/index/query_manager/emkde_query_manager.o o/cache/index/query_manager/late_query_manager.o o/cache/index/index_cache.o o/cache/index/reorg_strategy.o o/cache/experiments/exp_util.o o/cache/experiments/cache_experiments.o o/cache/experiments/nbclient.o o/services/httpservice.o o/services/httpparsing.o o/services/ogcservice.o
+${EXETESTCLIENT} : ${OBJ_COMMON} ${OBJ_INDEX_SERVER} ${OBJ_NODE_SERVER} ${OBJ_CACHE_EXP} o/cache/experiments/nbclient.o o/services/httpservice.o o/services/httpparsing.o o/services/ogcservice.o
 	${CPP} $+ -o $@ ${LDFLAGS} ${LDFLAGS_CL}
 
 #

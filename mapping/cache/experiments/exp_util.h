@@ -36,11 +36,7 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg =
 
 class TestIdxServer: public IndexServer {
 public:
-	TestIdxServer(uint32_t port, time_t update_interval,
-			const std::string &reorg_strategy,
-			const std::string &relevance_function,
-			const std::string &scheduler,
-			bool batching);
+	TestIdxServer(const IndexConfig &cfg);
 	~TestIdxServer();
 	void trigger_reorg(uint32_t node_id, const ReorgDescription &desc);
 	void force_stat_update();
@@ -52,17 +48,13 @@ private:
 };
 
 class TestNodeServer: public NodeServer {
-	static std::unique_ptr<NodeCacheManager> get_mgr( const std::string &cache_mgr, const std::string &strategy, const std::string &local_repl, size_t capacity );
 public:
 	static void run_node_thread(TestNodeServer *ns);
 
-
-	TestNodeServer(int num_threads, uint32_t my_port,
-			const std::string &index_host, uint32_t index_port,
-			const std::string &strategy, const std::string &cache_mgr, const std::string &local_repl, size_t capacity = 5 * 1024 * 1024);
+	TestNodeServer( const NodeConfig &config );
 	NodeCacheManager &get_cache_manager();
 	uint32_t get_id() const {return NodeServer::my_id;};
-	uint32_t get_port() const {return NodeServer::my_port;};
+	uint32_t get_port() const {return NodeServer::config.delivery_port;};
 	const std::string& get_host() const {return NodeServer::my_host;};
 
 	bool owns_current_thread();
@@ -119,16 +111,10 @@ class LocalCacheManager;
 
 class LocalTestSetup {
 public:
-	LocalTestSetup(int num_nodes, int num_workers, time_t update_interval,
-			size_t capacity, std::string reorg_strat,
-			std::string relevance_function,
-			std::string c_strat,
-			std::string scheduler = "default",
-			bool batching = true,
-			std::string node_cache = "remote",
-			std::string node_repl = "lru",
-			int index_port = atoi(
-					Configuration::get("indexserver.port").c_str()));
+	LocalTestSetup(
+			int num_nodes,
+			const NodeConfig &cfg,
+			const IndexConfig &icfg);
 	~LocalTestSetup();
 	ClientCacheManager &get_client();
 	TestIdxServer &get_index();
@@ -137,7 +123,6 @@ public:
 
 	std::vector<std::unique_ptr<TestNodeServer>>& get_nodes();
 private:
-	int index_port;
 	TestCacheMan mgr;
 	ClientCacheManager ccm;
 	std::unique_ptr<TestIdxServer> idx_server;

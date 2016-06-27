@@ -277,6 +277,56 @@ SystemStats::SystemStats() : QueryStats(),
 	avg_time(0) {
 }
 
+SystemStats SystemStats::operator +(const SystemStats& stats) const {
+	SystemStats res;
+	res += *this;
+	res += stats;
+	return res;
+}
+
+SystemStats& SystemStats::operator +=(const SystemStats& stats) {
+	QueryStats::operator +=(stats);
+
+	if ( reorg_cycles + stats.reorg_cycles > 0 ) {
+		max_reorg_time = std::max(max_reorg_time,stats.max_reorg_time);
+		min_reorg_time = std::min(min_reorg_time,stats.min_reorg_time);
+		avg_reorg_time = ((avg_reorg_time*reorg_cycles) + (stats.avg_reorg_time*stats.reorg_cycles)) / (reorg_cycles + stats.reorg_cycles);
+	}
+
+	if ( query_counter + stats.query_counter > 0 ) {
+		max_wait_time = std::max(max_wait_time,stats.max_wait_time);
+		min_wait_time = std::min(min_wait_time,stats.min_wait_time);
+		avg_wait_time = ((avg_wait_time*query_counter) + (stats.avg_wait_time*stats.query_counter)) / (query_counter + stats.query_counter);
+
+		max_exec_time = std::max(max_exec_time,stats.max_exec_time);
+		min_exec_time = std::min(min_exec_time,stats.min_exec_time);
+		avg_exec_time = ((avg_exec_time*query_counter) + (stats.avg_exec_time*stats.query_counter)) / (query_counter + stats.query_counter);
+
+		max_time = std::max(max_time,stats.max_time);
+		min_time = std::min(min_time,stats.min_time);
+		avg_time = ((avg_time*query_counter) + (stats.avg_time*stats.query_counter)) / (query_counter + stats.query_counter);
+	}
+
+	queries_issued += stats.queries_issued;
+	queries_scheduled += stats.queries_scheduled;
+	query_counter += stats.query_counter;
+	reorg_cycles += stats.reorg_cycles;
+
+	for ( auto &p : stats.node_to_queries ) {
+		auto i = node_to_queries.find(p.first);
+		if ( i == node_to_queries.end() )
+			node_to_queries.emplace(p.first,p.second);
+		else
+			i->second += p.second;
+	}
+	return *this;
+}
+
+SystemStats& SystemStats::operator +=(const QueryStats& stats) {
+	QueryStats::operator +=(stats);
+	return *this;
+}
+
 void SystemStats::reset() {
 	QueryStats::reset();
 	queries_issued = 0;
@@ -497,3 +547,4 @@ std::string NodeHandshake::to_string() const {
 
 template class CacheContent<NodeEntryStats>;
 template class CacheContent<HandshakeEntry> ;
+

@@ -28,9 +28,10 @@
 //
 ////////////////////////////////////////////////////////////
 
-IndexServer::IndexServer(int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function, bool enable_batching, const std::string &scheduler) :
-	caches(reorg_strategy,relevance_function), port(port), shutdown(false), next_node_id(1),
-	query_manager(QueryManager::by_name(this->caches,this->nodes,scheduler,enable_batching)), last_reorg(CacheCommon::time_millis()), update_interval(update_interval), wakeup_pipe(BinaryStream::makePipe()) {
+IndexServer::IndexServer(const IndexConfig &config) :
+	caches(config), config(config), shutdown(false), next_node_id(1),
+	query_manager(QueryManager::from_config(this->caches,this->nodes,config)), last_reorg(CacheCommon::time_millis()), wakeup_pipe(BinaryStream::makePipe()) {
+	Log::info("IndexServer successfully setup. %s", config.to_string().c_str());
 }
 
 void IndexServer::stop() {
@@ -46,8 +47,8 @@ void IndexServer::wakeup() {
 }
 
 void IndexServer::run() {
-	int listen_socket = CacheCommon::get_listening_socket(port,true,SOMAXCONN);
-	Log::info("index-server: listening on node-port: %d", port);
+	int listen_socket = CacheCommon::get_listening_socket(config.port,true,SOMAXCONN);
+	Log::info("index-server: listening on node-port: %d", config.port);
 
 
 	struct pollfd fds[0xffff];
@@ -116,7 +117,7 @@ void IndexServer::run() {
 		// Schedule Jobs
 		query_manager->schedule_pending_jobs();
 
-		if ( update_interval == 0 )
+		if ( config.update_interval == 0 )
 			continue;
 
 
@@ -145,7 +146,7 @@ void IndexServer::run() {
 		if ( !requires_reorg ) {
 			for (auto &kv : nodes) {
 				Node& node = *kv.second;
-				if ( node.is_control_connection_idle() && (now - node.last_stats_request()) > update_interval) {
+				if ( node.is_control_connection_idle() && (now - node.last_stats_request()) > config.update_interval) {
 					node.send_stats_request();
 //					Log::info("Node-state: %s", node.to_string().c_str());
 				}

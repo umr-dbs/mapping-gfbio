@@ -138,21 +138,8 @@ void parseBBOX(double *bbox, const std::string bbox_str, epsg_t epsg,
 // Test extensions
 //
 
-std::unique_ptr<NodeCacheManager> TestNodeServer::get_mgr(
-		const std::string& cache_mgr, const std::string& strategy,
-		const std::string& local_repl, size_t capacity) {
-
-	return NodeCacheManager::by_name(cache_mgr, capacity, capacity, capacity,
-			capacity, capacity, strategy, local_repl);
-}
-
-TestNodeServer::TestNodeServer(int num_threads, uint32_t my_port,
-		const std::string &index_host, uint32_t index_port,
-		const std::string &strategy, const std::string &cache_mgr,
-		const std::string &local_repl, size_t capacity) :
-		NodeServer(get_mgr(cache_mgr, strategy, local_repl, capacity), my_port,
-				index_host, index_port, num_threads) {
-
+TestNodeServer::TestNodeServer(const NodeConfig &config ) :
+		NodeServer(config, NodeCacheManager::from_config(config)) {
 }
 
 bool TestNodeServer::owns_current_thread() {
@@ -176,11 +163,8 @@ NodeCacheManager& TestNodeServer::get_cache_manager() {
 
 // Test index
 
-TestIdxServer::TestIdxServer(uint32_t port, time_t update_interval,
-		const std::string &reorg_strategy,
-		const std::string &relevance_function, const std::string &scheduler, bool batching) :
-		IndexServer(port, update_interval, reorg_strategy, relevance_function, batching,
-				scheduler) {
+TestIdxServer::TestIdxServer(const IndexConfig &cfg) :
+		IndexServer(cfg) {
 }
 
 void TestIdxServer::trigger_reorg(uint32_t node_id,
@@ -306,21 +290,20 @@ void TestCacheMan::reset_costs() {
 	costs.uncached_io = 0;
 }
 
-LocalTestSetup::LocalTestSetup(int num_nodes, int num_workers,
-		time_t update_interval, size_t capacity, std::string reorg_strat,
-		std::string relevance_function, std::string c_strat,
-		std::string scheduler, bool batching, std::string node_cache, std::string node_repl,
-		int index_port) :
+LocalTestSetup::LocalTestSetup(
+		int num_nodes,
+		const NodeConfig &cfg,
+		const IndexConfig &icfg) :
 
-		index_port(index_port), ccm("127.0.0.1", index_port), idx_server(
-				make_unique<TestIdxServer>(index_port, update_interval,
-						reorg_strat, relevance_function, scheduler, batching)) {
+		ccm("127.0.0.1", icfg.port), idx_server(
+				make_unique<TestIdxServer>(icfg)) {
 
-	for (int i = 1; i <= num_nodes; i++)
-		nodes.push_back(
-				make_unique<TestNodeServer>(num_workers, index_port + i,
-						"127.0.0.1", index_port, c_strat, node_cache, node_repl,
-						capacity));
+	uint nport = cfg.delivery_port;
+	for (int i = 1; i <= num_nodes; i++) {
+		NodeConfig ncfg(cfg);
+		ncfg.delivery_port = nport++;
+		nodes.push_back( make_unique<TestNodeServer>(ncfg) );
+	}
 
 	for (auto &n : nodes)
 		mgr.add_instance(n.get());

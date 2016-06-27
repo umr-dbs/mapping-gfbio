@@ -19,12 +19,12 @@ IndexCacheManager::CacheInfo::CacheInfo(CacheType type, const std::string& reorg
 	reorg_strategy( ReorgStrategy::by_name(*this->cache, reorg_strategy, relevance_function)){
 }
 
-IndexCacheManager::IndexCacheManager(const std::string& reorg_strategy, const std::string &relevance_function) :
-	raster_cache(CacheType::RASTER,reorg_strategy,relevance_function),
-	point_cache(CacheType::POINT,reorg_strategy,relevance_function),
-	line_cache(CacheType::LINE,reorg_strategy,relevance_function),
-	poly_cache(CacheType::POLYGON,reorg_strategy,relevance_function),
-	plot_cache(CacheType::PLOT,reorg_strategy,relevance_function){
+IndexCacheManager::IndexCacheManager(const IndexConfig &config) :
+	raster_cache(CacheType::RASTER,config.reorg_strategy,config.relevance_function),
+	point_cache(CacheType::POINT,config.reorg_strategy,config.relevance_function),
+	line_cache(CacheType::LINE,config.reorg_strategy,config.relevance_function),
+	poly_cache(CacheType::POLYGON,config.reorg_strategy,config.relevance_function),
+	plot_cache(CacheType::PLOT,config.reorg_strategy,config.relevance_function){
 
 	all_caches.push_back(raster_cache);
 	all_caches.push_back(point_cache);

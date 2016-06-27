@@ -55,8 +55,8 @@ void Delivery::send(DeliveryConnection& connection) {
 //
 ////////////////////////////////////////////////////////////
 
-DeliveryManager::DeliveryManager(uint32_t listen_port, NodeCacheManager &manager) :
-	shutdown(false), listen_port(listen_port), delivery_id(1), manager(manager), wakeup_pipe(BinaryStream::makePipe()) {
+DeliveryManager::DeliveryManager(const NodeConfig &config, NodeCacheManager &manager) :
+	shutdown(false), config(config), delivery_id(1), manager(manager), wakeup_pipe(BinaryStream::makePipe()) {
 }
 
 template <typename T>
@@ -109,7 +109,7 @@ void DeliveryManager::wakeup() {
 
 void DeliveryManager::run() {
 	Log::info("Starting Delivery-Manager");
-	int delivery_fd = CacheCommon::get_listening_socket(listen_port,true,SOMAXCONN);
+	int delivery_fd = CacheCommon::get_listening_socket(config.delivery_port,true,SOMAXCONN);
 
 	struct pollfd fds[0xffff];
 	fds[0].fd = delivery_fd;

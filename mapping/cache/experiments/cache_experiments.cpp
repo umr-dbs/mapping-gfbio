@@ -210,7 +210,24 @@ void RelevanceExperiment::run_once() {
 }
 
 void RelevanceExperiment::exec(const std::string& relevance, size_t capacity, double &accum) {
-	LocalTestSetup setup( 1, 1, 100, capacity, "geo", relevance, "always" );
+	NodeConfig ncfg = NodeConfig::fromConfiguration();
+	ncfg.num_workers = 1;
+	ncfg.mgr_impl = "remote";
+	ncfg.raster_size = capacity;
+	ncfg.point_size = capacity;
+	ncfg.line_size = capacity;
+	ncfg.polygon_size = capacity;
+	ncfg.plot_size = capacity;
+	ncfg.caching_strategy = "always";
+
+	IndexConfig icfg = IndexConfig::fromConfiguration();
+	icfg.update_interval = 100;
+	icfg.scheduler = "default";
+	icfg.reorg_strategy = "geo";
+	icfg.relevance_function = relevance;
+	icfg.batching_enabled = true;
+
+	LocalTestSetup setup( 1, ncfg , icfg );
 	TimePoint start, end;
 	for ( auto &q : queries ) {
 		start = SysClock::now();
@@ -330,8 +347,25 @@ void QueryBatchingExperiment::run_once() {
 
 
 void QueryBatchingExperiment::exec(int nodes, int threads) {
+	NodeConfig ncfg = NodeConfig::fromConfiguration();
+	ncfg.num_workers = threads;
+	ncfg.mgr_impl = "remote";
+	ncfg.raster_size = capacity;
+	ncfg.point_size = capacity;
+	ncfg.line_size = capacity;
+	ncfg.polygon_size = capacity;
+	ncfg.plot_size = capacity;
+	ncfg.caching_strategy = "never";
 
-	LocalTestSetup setup( nodes, threads, 0, capacity, "geo", "costlru", "never" );
+	IndexConfig icfg = IndexConfig::fromConfiguration();
+	icfg.update_interval = 0;
+	icfg.scheduler = "default";
+	icfg.reorg_strategy = "geo";
+	icfg.relevance_function = "costlru";
+	icfg.batching_enabled = true;
+
+
+	LocalTestSetup setup( nodes, ncfg, icfg );
 
 	std::deque<QTriple> queries;
 	for ( auto &q : this->queries )
@@ -428,7 +462,25 @@ void ReorgExperiment::run_once() {
 }
 
 void ReorgExperiment::exec(const std::string& strategy, QueryStats& stats) {
-	LocalTestSetup setup( 10, 1, 50, capacity, strategy, "costlru", "always" );
+	NodeConfig ncfg = NodeConfig::fromConfiguration();
+	ncfg.num_workers = 1;
+	ncfg.mgr_impl = "remote";
+	ncfg.raster_size = capacity;
+	ncfg.point_size = capacity;
+	ncfg.line_size = capacity;
+	ncfg.polygon_size = capacity;
+	ncfg.plot_size = capacity;
+	ncfg.caching_strategy = "always";
+
+	IndexConfig icfg = IndexConfig::fromConfiguration();
+	icfg.update_interval = 50;
+	icfg.scheduler = "default";
+	icfg.reorg_strategy = strategy;
+	icfg.relevance_function = "costlru";
+	icfg.batching_enabled = true;
+
+
+	LocalTestSetup setup( 10, ncfg, icfg );
 	std::this_thread::sleep_for( std::chrono::milliseconds(500) );
 	setup.get_index().force_reorg();
 

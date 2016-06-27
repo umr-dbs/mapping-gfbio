@@ -60,21 +60,31 @@ int main(void) {
 
 	Log::setLevel(Log::LogLevel::INFO);
 
-	size_t cache_capacity = 50 * 1024 * 1024;
+	size_t capacity = 50 * 1024 * 1024;
 
-	std::string reorg_strategy = "geo";
-	std::string relevance = "costlru";
-	std::string caching_strat = "always";
+	NodeConfig ncfg;
+	ncfg.index_host = "127.0.0.1";
+	ncfg.index_port = index_port;
+	ncfg.delivery_port = 12347;
+	ncfg.num_workers = workers_per_node;
+	ncfg.raster_size = capacity;
+	ncfg.point_size = capacity;
+	ncfg.line_size = capacity;
+	ncfg.polygon_size = capacity;
+	ncfg.plot_size = capacity;
+	ncfg.mgr_impl = "remote";
+	ncfg.local_replacement = "lru";
+	ncfg.caching_strategy = "uncached";
 
-	std::string scheduler = "dema";
-	bool batching = true;
-	std::string node_cache_mode = "local";
-	std::string node_cache_repl = "lru";
-	time_t update_interval = 500;
+	IndexConfig icfg;
+	icfg.port = index_port;
+	icfg.update_interval = 500;
+	icfg.scheduler = "default";
+	icfg.reorg_strategy = "geo";
+	icfg.relevance_function = "costlru";
+	icfg.batching_enabled = false;
 
-	LocalTestSetup lts(
-			num_nodes, workers_per_node, update_interval, cache_capacity, reorg_strategy, relevance, caching_strat, scheduler, batching, node_cache_mode, node_cache_repl, index_port
-	);
+	LocalTestSetup lts(num_nodes, ncfg, icfg);
 	std::this_thread::sleep_for(std::chrono::seconds(3600));
 	return 0;
 }

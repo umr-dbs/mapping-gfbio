@@ -189,6 +189,17 @@ public:
 
 	SystemStats( BinaryReadBuffer &buffer );
 
+
+	SystemStats operator+( const SystemStats& stats ) const;
+
+
+	SystemStats& operator+=( const SystemStats& stats );
+
+
+	SystemStats& operator+=( const QueryStats& stats );
+
+
+
 	void serialize(BinaryWriteBuffer &buffer, bool is_persistent_memory) const;
 
 	/**

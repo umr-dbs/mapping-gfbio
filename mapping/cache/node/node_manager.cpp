@@ -93,7 +93,7 @@ QueryStats ActiveQueryStats::get_and_reset() {
 //
 ////////////////////////////////////////////////////////////
 
-WorkerContext::WorkerContext() : index_connection(nullptr) {
+WorkerContext::WorkerContext() : puzzling(0), index_connection(nullptr) {
 }
 
 BlockingConnection& WorkerContext::get_index_connection() const {
@@ -181,22 +181,20 @@ NodeCacheWrapper<GenericPlot>& NodeCacheManager::get_plot_cache() {
 
 
 
-std::unique_ptr<NodeCacheManager> NodeCacheManager::by_name(
-		const std::string& name, size_t raster_size, size_t point_size, size_t line_size,
-		size_t polygon_size, size_t plot_size, const std::string &strategy, const std::string& local_replacement) {
+std::unique_ptr<NodeCacheManager> NodeCacheManager::from_config( const NodeConfig &config ) {
 	std::string mgrlc;
-	mgrlc.resize(name.size());
-	std::transform(name.cbegin(),name.cend(),mgrlc.begin(),::tolower);
+	mgrlc.resize(config.mgr_impl.size());
+	std::transform(config.mgr_impl.cbegin(),config.mgr_impl.cend(),mgrlc.begin(),::tolower);
 
 
 	if ( mgrlc == "remote" )
-		return make_unique<RemoteCacheManager>(strategy, raster_size, point_size, line_size, polygon_size, plot_size);
+		return make_unique<RemoteCacheManager>(config.caching_strategy, config.raster_size, config.point_size, config.line_size, config.polygon_size, config.plot_size);
 	else if ( mgrlc == "local" )
-		return make_unique<LocalCacheManager>(strategy, local_replacement, raster_size, point_size, line_size, polygon_size, plot_size);
+		return make_unique<LocalCacheManager>(config.caching_strategy, config.local_replacement, config.raster_size, config.point_size, config.line_size, config.polygon_size, config.plot_size);
 	else if ( mgrlc == "hybrid" )
-		return make_unique<HybridCacheManager>(strategy, raster_size, point_size, line_size, polygon_size, plot_size);
+		return make_unique<HybridCacheManager>(config.caching_strategy, config.raster_size, config.point_size, config.line_size, config.polygon_size, config.plot_size);
 	else
-		throw ArgumentException(concat("Unknown manager impl: ", name));
+		throw ArgumentException(concat("Unknown manager impl: ", config.mgr_impl));
 }
 
 

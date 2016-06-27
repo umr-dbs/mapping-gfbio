@@ -69,10 +69,12 @@ const BaseRequest& LateJob::get_request() const {
 
 uint64_t LateJob::submit(const std::map<uint32_t, std::shared_ptr<Node> >& nmap) {
 
-	QueryStats tmp;
+	SystemStats tmp;
 
 	IndexCache &cache = caches.get_cache(request.type);
 	auto res = cache.query( request.semantic_id, request.query );
+
+	tmp.add_query(res.hit_ratio);
 
 	uint64_t worker = 0;
 
@@ -176,19 +178,11 @@ void LateQueryManager::add_request(uint64_t client_id, const BaseRequest& req) {
 			}
 		}
 
-		// Perform a cache-query
-		auto &cache = caches.get_cache(req.type);
-		auto res = cache.query(req.semantic_id, req.query);
-		stats.add_query(res.hit_ratio);
-		Log::debug("QueryResult: %s", res.to_string().c_str());
-
 		//  No result --> Check if a pending query may be extended by the given query
-		if ( res.items.empty() ) {
-			for (auto &j : pending_jobs) {
-				if (j.second->extend(req)) {
-					j.second->add_client(client_id);
-					return;
-				}
+		for (auto &j : pending_jobs) {
+			if (j.second->extend(req)) {
+				j.second->add_client(client_id);
+				return;
 			}
 		}
 	}

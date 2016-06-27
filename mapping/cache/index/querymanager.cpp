@@ -84,9 +84,9 @@ std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id, uint32_t nod
 	std::set<uint64_t> clients = q.get_clients();
 	q.time_finished = CacheCommon::time_millis();
 
-	// Tell on which node the queries were scheduled
-	stats.scheduled(node_id, clients.size());
-	stats.query_finished(q.clients.size(), q.time_scheduled-q.time_created,q.time_finished - q.time_scheduled);
+	// Tell on which node the query was scheduled
+	stats.scheduled(node_id);
+	stats.query_finished(q.time_scheduled - q.time_created,q.time_finished - q.time_scheduled);
 	finished_queries.erase(it);
 	return clients;
 }

@@ -258,7 +258,7 @@ bool WorkerContext::is_puzzling() const {
 	return puzzling > 0;
 }
 
-uint32_t WorkerContext::get_puzzle_depth() const {
+int WorkerContext::get_puzzle_depth() const {
 	return puzzling;
 }
 

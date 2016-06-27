@@ -94,9 +94,9 @@ bool ReorgDescription::is_empty() const {
 void ReorgDescription::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
 	buffer.write(static_cast<uint64_t>(moves.size()));
 	for (auto &item : moves)
-		buffer.write(item);
+		item.serialize(buffer,is_persistent_memory);
 
 	buffer.write(static_cast<uint64_t>(removals.size()));
 	for (auto &item : removals)
-		buffer.write(item);
+		item.serialize(buffer,is_persistent_memory);
 }

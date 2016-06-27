@@ -354,38 +354,43 @@ void SystemStats::reset() {
 }
 
 std::string SystemStats::to_string() const {
+	double q_ratio = (double) queries_scheduled / (double) queries_issued;
+
 	std::ostringstream ss;
 	ss << "Index-Stats:" << std::endl;
-	ss << "  single hits              : " << single_local_hits << std::endl;
-	ss << "  single remote hits       : " << single_remote_hits << std::endl;
-	ss << "  puzzle single node       : " << multi_local_hits << std::endl;
-	ss << "  puzzle multiple nodes    : " << multi_remote_hits << std::endl;
-	ss << "  partial single node      : " << multi_local_partials << std::endl;
-	ss << "  partial multiple nodes   : " << multi_remote_partials << std::endl;
-	ss << "  misses                   : " << misses << std::endl;
-	ss << "  result-bytes             : " << result_bytes << std::endl;
-	ss << "  lost puts                : " << lost_puts << std::endl;
-	ss << "  hit ratio                : " << get_hit_ratio() << std::endl;
-	ss << "  cache-queries            : " << queries << std::endl;
-	ss << "  requests received        : " << queries_issued << std::endl;
-	ss << "  requests scheduled       : " << queries_scheduled << std::endl;
-	ss << "  reorg cycles             : " << reorg_cycles << std::endl;
+	ss << "  single hits               : " << single_local_hits << std::endl;
+	ss << "  single remote hits        : " << single_remote_hits << std::endl;
+	ss << "  puzzle single node        : " << multi_local_hits << std::endl;
+	ss << "  puzzle multiple nodes     : " << multi_remote_hits << std::endl;
+	ss << "  partial single node       : " << multi_local_partials << std::endl;
+	ss << "  partial multiple nodes    : " << multi_remote_partials << std::endl;
+	ss << "  misses                    : " << misses << std::endl;
+	ss << "  result-bytes              : " << result_bytes << std::endl;
+	ss << "  lost puts                 : " << lost_puts << std::endl;
+	ss << "  hit ratio                 : " << get_hit_ratio() << std::endl;
+	ss << "  cache-queries             : " << queries << std::endl;
+	ss << "  requests received         : " << queries_issued << std::endl;
+	ss << "  requests scheduled        : " << queries_scheduled << std::endl;
+	ss << "  reorg cycles              : " << reorg_cycles << std::endl;
 
-	ss << "  max reorg duration       : " << max_reorg_time << std::endl;
-	ss << "  min reorg duration       : " << min_reorg_time << std::endl;
-	ss << "  avg reorg duration       : " << avg_reorg_time << std::endl;
+	ss << "  max reorg duration        : " << max_reorg_time << std::endl;
+	ss << "  min reorg duration        : " << min_reorg_time << std::endl;
+	ss << "  avg reorg duration        : " << avg_reorg_time << std::endl;
 
-	ss << "  max query wait-time      : " << max_wait_time << std::endl;
-	ss << "  min query wait-time      : " << min_wait_time << std::endl;
-	ss << "  avg query wait-time      : " << avg_wait_time << std::endl;
+	ss << "  max query wait-time       : " << max_wait_time << std::endl;
+	ss << "  min query wait-time       : " << min_wait_time << std::endl;
+	ss << "  avg query wait-time       : " << avg_wait_time << std::endl;
+	ss << "  avg query wait-time (norm): " << (avg_wait_time*q_ratio) << std::endl;
 
-	ss << "  max query exec-time      : " << max_exec_time << std::endl;
-	ss << "  min query exec-time      : " << min_exec_time << std::endl;
-	ss << "  avg query exec-time      : " << avg_exec_time << std::endl;
+	ss << "  max query exec-time       : " << max_exec_time << std::endl;
+	ss << "  min query exec-time       : " << min_exec_time << std::endl;
+	ss << "  avg query exec-time       : " << avg_exec_time << std::endl;
+	ss << "  avg query exec-time (norm): " << (avg_exec_time*q_ratio) << std::endl;
 
-	ss << "  max query time           : " << max_time << std::endl;
-	ss << "  min query time           : " << min_time << std::endl;
-	ss << "  avg query time           : " << avg_time << std::endl;
+	ss << "  max query time            : " << max_time << std::endl;
+	ss << "  min query time            : " << min_time << std::endl;
+	ss << "  avg query time            : " << avg_time << std::endl;
+	ss << "  avg query time (norm)     : " << (avg_time*q_ratio) << std::endl;
 
 	ss << "  distrib (NodeId:#Queries): ";
 	for ( auto &p : node_to_queries )
@@ -397,22 +402,22 @@ uint32_t SystemStats::get_queries_scheduled() {
 	return queries_scheduled;
 }
 
-void SystemStats::scheduled(uint32_t node_id, uint64_t num_clients) {
+void SystemStats::scheduled(uint32_t node_id) {
 	queries_scheduled++;
 	auto it = node_to_queries.find(node_id);
 	if ( it == node_to_queries.end() )
-		node_to_queries.emplace(node_id, num_clients);
+		node_to_queries.emplace(node_id, 1);
 	else
-		it->second+=num_clients;
+		it->second++;
 }
 
 
-void SystemStats::query_finished(uint32_t num_clients, uint64_t wait_time, uint64_t exec_time ) {
-	double w = (double) wait_time / num_clients;
-	double e = (double) exec_time / num_clients;
+void SystemStats::query_finished(uint64_t wait_time, uint64_t exec_time ) {
+	double w = (double) wait_time;
+	double e = (double) exec_time;
 
-	avg_exec_time = (avg_exec_time*query_counter + exec_time) / (query_counter+num_clients);
-	avg_wait_time = (avg_wait_time*query_counter + wait_time) / (query_counter+num_clients);
+	avg_exec_time = (avg_exec_time*query_counter + exec_time) / (query_counter+1);
+	avg_wait_time = (avg_wait_time*query_counter + wait_time) / (query_counter+1);
 	avg_time = avg_exec_time + avg_wait_time;
 
 	min_wait_time = std::min(w, min_wait_time);
@@ -423,7 +428,7 @@ void SystemStats::query_finished(uint32_t num_clients, uint64_t wait_time, uint6
 	max_exec_time = std::max(e, max_exec_time);
 	max_time = std::max(w+e, max_time);
 
-	query_counter+=num_clients;
+	query_counter++;
 }
 
 void SystemStats::add_reorg_cycle(uint64_t duration) {
@@ -507,7 +512,7 @@ void NodeStats::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) 
 	buffer.write(query_stats);
 	buffer.write(static_cast<uint64_t>(stats.size()));
 	for ( auto &e : stats ) {
-		buffer.write(e);
+		e.serialize(buffer, is_persistent_memory);
 	}
 }
 
@@ -531,10 +536,11 @@ NodeHandshake::NodeHandshake(BinaryReadBuffer& buffer) {
 }
 
 void NodeHandshake::serialize(BinaryWriteBuffer& buffer, bool is_persistent_memory) const {
+	(void) is_persistent_memory;
 	buffer.write(port);
 	buffer.write( static_cast<uint64_t>(data.size()) );
 	for ( auto &e : data )
-		buffer.write(e);
+		e.serialize(buffer, is_persistent_memory);
 }
 
 const std::vector<CacheHandshake>& NodeHandshake::get_data() const {

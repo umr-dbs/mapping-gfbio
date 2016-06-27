@@ -93,10 +93,10 @@ public:
 	BlockingConnection& get_index_connection() const;
 
 	bool is_puzzling() const;
-	uint32_t get_puzzle_depth() const;
+	int get_puzzle_depth() const;
 
 private:
-	uint32_t puzzling;
+	int puzzling;
 	BlockingConnection* index_connection;
 };
 

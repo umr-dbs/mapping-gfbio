@@ -19,7 +19,7 @@ NodeConfig NodeConfig::fromConfiguration() {
 	result.mgr_impl = Configuration::get("nodeserver.cache.manager");
 
 	result.caching_strategy = Configuration::get("nodeserver.cache.strategy");
-	result.mgr_impl = Configuration::get("nodeserver.cache.local.replacement", "lru");
+	result.local_replacement = Configuration::get("nodeserver.cache.local.replacement", "lru");
 
 	result.raster_size = Configuration::getInt("nodeserver.cache.raster.size");
 	result.point_size = Configuration::getInt("nodeserver.cache.points.size");

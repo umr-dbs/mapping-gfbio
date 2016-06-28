@@ -68,7 +68,7 @@ class ABCDSourceOperator : public GenericOperator {
 	public:
 		ABCDSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 			assumeSources(0);
-			inputFile = Configuration::get("gfbio.abcd.datapath") + "/" + params.get("path", "").asString();
+			inputFile = params.get("path", "").asString();
 		}
 
 #ifndef MAPPING_OPERATOR_STUBS
@@ -385,7 +385,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 	XMLPlatformUtils::Initialize(); //TODO: only do this once for long running process
 	{
 		auto parser = createParser();
-		parser->parseURI(inputFile.c_str());
+		parser->parseURI((Configuration::get("gfbio.abcd.datapath") + "/" +inputFile).c_str());
 		DOMDocument* doc = parser->getDocument(); //deleted by parser when done
 		if(doc == nullptr)
 			throw OperatorException(concat("ABCDSource: could not parse document document null:", inputFile));
@@ -451,7 +451,7 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	{
 		auto parser = createParser();
 
-		parser->parseURI(inputFile.c_str());
+		parser->parseURI((Configuration::get("gfbio.abcd.datapath") + "/" +inputFile).c_str());
 
 		DOMDocument* doc = parser->getDocument(); //deleted by parser when done
 		if(doc == nullptr)

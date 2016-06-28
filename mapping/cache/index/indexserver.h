@@ -50,7 +50,7 @@ public:
 	 * @param reorg_strategy the name of the reorg-strategy to use
 	 * @param relevance_function the name of the relevance-function to use
 	 */
-	IndexServer( int port, time_t update_interval, const std::string &reorg_strategy, const std::string &relevance_function, bool enable_batching, const std::string &scheduler = "default" );
+	IndexServer( const IndexConfig &config );
 	virtual ~IndexServer() = default;
 
 	/* Fires up the index-server and will return after
@@ -139,8 +139,8 @@ private:
 
 	IndexCacheManager caches;
 
-	// The port the index-server is listening on
-	int port;
+	IndexConfig config;
+
 
 	// Indicator telling if the server should shutdown
 	bool shutdown;
@@ -153,9 +153,6 @@ private:
 
 	// timestamp of the last reorganization
 	time_t last_reorg;
-
-	// Interval for stats-updates and reorg (in ms)
-	time_t update_interval;
 
 	BinaryStream wakeup_pipe;
 };

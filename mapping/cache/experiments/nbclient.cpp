@@ -205,7 +205,7 @@ void process_connections() {
 			if ( it->is_ready() ) {
 				auto resp = it->connection->read();
 				responses_read++;
-				Log::info("Progress: %lu/%lu", responses_read, results_read);
+//				Log::info("Progress: %lu/%lu", responses_read, results_read);
 				uint8_t rc = resp->read<uint8_t>();
 				switch (rc) {
 				case ClientConnection::RESP_OK: {
@@ -416,7 +416,7 @@ int main(int argc, char *argv[]) {
 
 	if ( argc < 3 ) {
 		inter_arrival = 6;
-		qs = queries_from_spec(30000, cache_exp::btw, 64, 256 );
+		qs = queries_from_spec(3000, cache_exp::btw, 64, 256 );
 //		qs = replay_logs("41k_queries.txt");
 	}
 	else {
@@ -427,6 +427,8 @@ int main(int argc, char *argv[]) {
 	auto c = BlockingConnection::create(host, port, true,
 			ClientConnection::MAGIC_NUMBER);
 	auto rst = c->write_and_read(ClientConnection::CMD_RESET_STATS);
+
+	auto start = CacheCommon::time_millis();
 
 	std::thread t(issue_queries, &qs, inter_arrival);
 
@@ -451,7 +453,7 @@ int main(int argc, char *argv[]) {
 			process_connections();
 		}
 	}
-	Log::info("Processing finished. Requesting stats: Max result-size: %lu", max_res_size);
+	Log::info("Processing finished. Duration: %ldms. Requesting stats: Max result-size: %lu", (CacheCommon::time_millis()-start), max_res_size);
 	t.join();
 	std::this_thread::sleep_for(std::chrono::seconds(1));
 

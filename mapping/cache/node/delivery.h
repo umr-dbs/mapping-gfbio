@@ -9,6 +9,7 @@
 #define DELIVERY_H_
 
 #include "cache/node/node_manager.h"
+#include "cache/node/node_config.h"
 #include "cache/priv/connection.h"
 #include "operators/operator.h"
 
@@ -116,7 +117,7 @@ public:
 	 * @param listen_port the port to listen on
 	 * @param manager the cache-manager used for direct requests
 	 */
-	DeliveryManager(uint32_t listen_port, NodeCacheManager &manager);
+	DeliveryManager(const NodeConfig &config, NodeCacheManager &manager);
 	~DeliveryManager();
 
 	/**
@@ -202,8 +203,7 @@ private:
 	/** Indicator telling if the manager should shutdown */
 	bool shutdown;
 
-	/** The port the manager listens at */
-	uint32_t listen_port;
+	NodeConfig config;
 
 	/** the mutex used to acces the stored deliveries */
 	std::mutex delivery_mutex;

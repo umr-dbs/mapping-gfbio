@@ -36,6 +36,8 @@ bool RemoteCacheWrapper<T>::put(const std::string& semantic_id,
 	auto &idx_con = mgr.get_worker_context().get_index_connection();
 
 	size_t size = SizeUtil::get_byte_size(*item);
+  if ( size > 25 * 1024 * 1024 )
+      Log::info("Big result found: %lu", size);
 
 	this->stats.add_result_bytes(size);
 

@@ -8,6 +8,7 @@
 #ifndef CACHE_NODE_MANAGER_H_
 #define CACHE_NODE_MANAGER_H_
 
+#include "cache/node/node_config.h"
 #include "cache/priv/cache_stats.h"
 #include "cache/priv/caching_strategy.h"
 #include "cache/priv/connection.h"
@@ -92,10 +93,10 @@ public:
 	BlockingConnection& get_index_connection() const;
 
 	bool is_puzzling() const;
-	uint32_t get_puzzle_depth() const;
+	int get_puzzle_depth() const;
 
 private:
-	uint32_t puzzling;
+	int puzzling;
 	BlockingConnection* index_connection;
 };
 
@@ -193,8 +194,7 @@ protected:
 class NodeCacheManager : public CacheManager {
 	static thread_local WorkerContext context;
 public:
-	static std::unique_ptr<NodeCacheManager> by_name( const std::string &name, size_t raster_cache_size, size_t point_cache_size, size_t line_cache_size,
-			size_t polygon_cache_size, size_t plot_cache_size, const std::string &strategy = "uncached", const std::string &local_replacement = "lru" );
+	static std::unique_ptr<NodeCacheManager> from_config( const NodeConfig &config );
 
 	/**
 	 * Constructs a new instance

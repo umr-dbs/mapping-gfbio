@@ -9,6 +9,7 @@
 #define QUERYMANAGER_H_
 
 #include "cache/index/index_cache_manager.h"
+#include "cache/index/index_config.h"
 #include "cache/priv/shared.h"
 #include "cache/priv/connection.h"
 
@@ -133,7 +134,7 @@ private:
 	friend class DefaultQueryManager;
 	friend class LateQueryManager;
 public:
-	static std::unique_ptr<QueryManager> by_name( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const std::string &name, bool enable_batching );
+	static std::unique_ptr<QueryManager> from_config( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const IndexConfig &config );
 
 	virtual ~QueryManager() = default;
 

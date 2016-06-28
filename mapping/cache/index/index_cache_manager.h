@@ -9,6 +9,7 @@
 #define INDEX_INDEX_CACHE_MANAGER_H_
 
 #include "cache/index/index_cache.h"
+#include "cache/index/index_config.h"
 #include "cache/index/reorg_strategy.h"
 #include "cache/index/node.h"
 #include "cache/priv/cache_stats.h"
@@ -37,7 +38,7 @@ public:
 	/**
 	 * Manages cache-instances for all data-types
 	 */
-	IndexCacheManager( const std::string &reorg_strategy, const std::string &relevance_function );
+	IndexCacheManager( const IndexConfig &config );
 	IndexCacheManager() = delete;
 	IndexCacheManager( const IndexCacheManager& ) = delete;
 	IndexCacheManager( IndexCacheManager&& ) = delete;

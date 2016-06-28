@@ -16,23 +16,22 @@
 
 #include <algorithm>
 
-std::unique_ptr<QueryManager> QueryManager::by_name(IndexCacheManager& mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes,
-		const std::string& name, bool enable_batching) {
+std::unique_ptr<QueryManager> QueryManager::from_config( IndexCacheManager &mgr, const std::map<uint32_t,std::shared_ptr<Node>> &nodes, const IndexConfig &config ) {
 	std::string lcname;
-	lcname.resize(name.size());
-	std::transform(name.cbegin(), name.cend(), lcname.begin(), ::tolower);
+	lcname.resize(config.scheduler.size());
+	std::transform(config.scheduler.cbegin(), config.scheduler.cend(), lcname.begin(), ::tolower);
 
-	if ( name == "default" )
-		return make_unique<DefaultQueryManager>(nodes,mgr, enable_batching);
-	else if ( name == "late" )
-		return make_unique<LateQueryManager>(nodes,mgr, enable_batching);
-	else if ( name == "dema" )
+	if ( lcname == "default" )
+		return make_unique<DefaultQueryManager>(nodes,mgr, config.batching_enabled);
+	else if ( lcname == "late" )
+		return make_unique<LateQueryManager>(nodes,mgr, config.batching_enabled);
+	else if ( lcname == "dema" )
 		return make_unique<DemaQueryManager>(nodes);
-	else if ( name == "bema" )
+	else if ( lcname == "bema" )
 		return make_unique<BemaQueryManager>(nodes);
-	else if ( name == "emkde" )
+	else if ( lcname == "emkde" )
 		return make_unique<EMKDEQueryManager>(nodes);
-	else throw ArgumentException(concat("Illegal scheduler name: ", name));
+	else throw ArgumentException(concat("Illegal scheduler name: ", config.scheduler));
 }
 
 QueryManager::QueryManager(const std::map<uint32_t, std::shared_ptr<Node>> &nodes ) : nodes(nodes) {
@@ -85,9 +84,9 @@ std::set<uint64_t> QueryManager::release_worker(uint64_t worker_id, uint32_t nod
 	std::set<uint64_t> clients = q.get_clients();
 	q.time_finished = CacheCommon::time_millis();
 
-	// Tell on which node the queries were scheduled
-	stats.scheduled(node_id, clients.size());
-	stats.query_finished(q.clients.size(), q.time_scheduled-q.time_created,q.time_finished - q.time_scheduled);
+	// Tell on which node the query was scheduled
+	stats.scheduled(node_id);
+	stats.query_finished(q.time_scheduled - q.time_created,q.time_finished - q.time_scheduled);
 	finished_queries.erase(it);
 	return clients;
 }

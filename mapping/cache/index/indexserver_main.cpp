@@ -60,21 +60,11 @@ int main(void) {
 	// Disable GDAL Error Messages
 	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
 
-	auto portstr = Configuration::get("indexserver.port");
-
 	Log::setLevel(Configuration::get("log.level","info"));
 
-	auto portnr = atoi(portstr.c_str());
+	auto cfg = IndexConfig::fromConfiguration();
 
-	std::string rs = Configuration::get("indexserver.reorg.strategy");
-	std::string rel = Configuration::get("indexserver.reorg.relevance","lru");
-	std::string scheduler = Configuration::get("indexserver.scheduler","default");
-	auto update_interval_str = Configuration::get("indexserver.reorg.interval");
-	bool batching = Configuration::getBool("indexserver.batching.enable",true);
-
-	size_t update_interval = atoi(update_interval_str.c_str());
-
-	instance = new IndexServer(portnr, update_interval, rs, rel, batching, scheduler);
+	instance = new IndexServer(cfg);
 	instance->run();
 	return 0;
 }

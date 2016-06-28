@@ -9,6 +9,7 @@
 #define NODE_NODESERVER_H_
 
 #include "cache/node/node_manager.h"
+#include "cache/node/node_config.h"
 #include "cache/common.h"
 #include "cache/node/delivery.h"
 #include "cache/priv/connection.h"
@@ -37,8 +38,7 @@ class NodeServer {
 public:
 	static MultiConnectionPool delivery_pool;
 
-	NodeServer( std::unique_ptr<NodeCacheManager> manager, uint32_t my_port, std::string index_host,
-			uint32_t index_port, int num_threads);
+	NodeServer( const NodeConfig &config, std::unique_ptr<NodeCacheManager> manager );
 	virtual ~NodeServer() = default;
 
 	/**
@@ -140,6 +140,8 @@ private:
 
 	void wakeup();
 
+	NodeConfig config;
+
 	/** Indicator telling if the server should shutdown */
 	bool shutdown;
 
@@ -149,20 +151,7 @@ private:
 	/**  This node's id -- provided by the index-server */
 	uint32_t my_id;
 
-	/** This node's listen-port (for delivery-connections) */
-	uint32_t my_port;
-
-	/** This node's hostname */
 	std::string my_host;
-
-	/** The hostname of the index-server */
-	std::string index_host;
-
-	/** The port on the index-server */
-	uint32_t index_port;
-
-	/** The number of worker-threads to use */
-	int num_treads;
 
 	/** The control-connection */
 	std::unique_ptr<WakeableBlockingConnection> control_connection;

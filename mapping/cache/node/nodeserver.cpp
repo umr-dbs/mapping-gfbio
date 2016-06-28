@@ -34,18 +34,18 @@
 MultiConnectionPool NodeServer::delivery_pool(DeliveryConnection::MAGIC_NUMBER);
 
 
-NodeServer::NodeServer(std::unique_ptr<NodeCacheManager> manager, uint32_t my_port, std::string index_host, uint32_t index_port,
-	int num_threads) :
-	shutdown(false), workers_up(false), my_id(-1), my_port(my_port), index_host(index_host), index_port(index_port),
-	num_treads(num_threads), delivery_manager(my_port,*manager), manager(std::move(manager)), wakeup_pipe(BinaryStream::makePipe()) {
-	this->manager->set_self_port(my_port);
+NodeServer::NodeServer(const NodeConfig &config, std::unique_ptr<NodeCacheManager> manager) :
+	config(config), shutdown(false), workers_up(false), my_id(-1),
+	delivery_manager(config,*manager), manager(std::move(manager)), wakeup_pipe(BinaryStream::makePipe()) {
+	this->manager->set_self_port(config.delivery_port);
+	Log::info("NodeServer successfully setup. %s", config.to_string().c_str());
 }
 
 void NodeServer::worker_loop() {
 	while (workers_up && !shutdown) {
 		try {
 			// Setup index connection
-			auto idx_con = WakeableBlockingConnection::create(index_host,index_port, wakeup_pipe, false ,true,WorkerConnection::MAGIC_NUMBER,my_id);
+			auto idx_con = WakeableBlockingConnection::create(config.index_host,config.index_port, wakeup_pipe, false ,true,WorkerConnection::MAGIC_NUMBER,my_id);
 			manager->get_worker_context().set_index_connection(idx_con.get());
 
 			Log::debug("Worker connected to index-server");
@@ -245,7 +245,7 @@ void NodeServer::run() {
 			setup_control_connection();
 
 			workers_up = true;
-			for (int i = 0; i < num_treads; i++)
+			for (int i = 0; i < config.num_workers; i++)
 				workers.push_back(make_unique<std::thread>(&NodeServer::worker_loop, this));
 
 			// Read on control
@@ -404,7 +404,7 @@ void NodeServer::handle_reorg_move_item( const ReorgMoveItem& item, time_t &fetc
 		confirm_move(del_con, item, new_cache_id);
 		c = (CacheCommon::time_millis() - c);
 		confirm += c;
-		Log::info("  Moving entry finished: %lubytes, fetch: %dms, confirm: %dms", resp->getPayloadSize(), f, c);
+//		Log::info("  Moving entry finished: %lubytes, fetch: %dms, confirm: %dms", resp->getPayloadSize(), f, c);
 
 	} catch (const NetworkException &ne) {
 		Log::error("Could not process move: %s", ne.what());
@@ -433,11 +433,11 @@ void NodeServer::confirm_move(BlockingConnection &del_stream, const ReorgMoveIte
 }
 
 void NodeServer::setup_control_connection() {
-	Log::info("Connecting to index-server: %s:%d", index_host.c_str(), index_port);
+	Log::info("Connecting to index-server: %s:%d", config.index_host.c_str(), config.index_port);
 
 	// Establish connection
 	NodeHandshake hs = manager->create_handshake();
-	this->control_connection = WakeableBlockingConnection::create(index_host,index_port, wakeup_pipe, true, true, ControlConnection::MAGIC_NUMBER,hs);
+	this->control_connection = WakeableBlockingConnection::create(config.index_host,config.index_port, wakeup_pipe, true, true, ControlConnection::MAGIC_NUMBER,hs);
 
 
 	Log::debug("Waiting for response from index-server");

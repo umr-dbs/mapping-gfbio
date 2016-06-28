@@ -2,6 +2,7 @@
 #include "datatypes/pointcollection.h"
 #include "util/make_unique.h"
 #include "util/exceptions.h"
+#include "util/configuration.h"
 
 #include <sstream>
 #include <json/json.h>
@@ -67,7 +68,7 @@ class ABCDSourceOperator : public GenericOperator {
 	public:
 		ABCDSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 			assumeSources(0);
-			inputFile = params.get("path", "").asString();
+			inputFile = Configuration::get("gfbio.abcd.datapath") + "/" + params.get("path", "").asString();
 		}
 
 #ifndef MAPPING_OPERATOR_STUBS
@@ -161,7 +162,8 @@ bool ABCDSourceOperator::handleGathering(DOMElement& unit) {
 		DOMNodeList* coordinates = gathering.getElementsByTagName(tagNameCoordinatesLatLong);
 
 		bool addedCoordinates = false;
-		for (XMLSize_t coordinate = 0; coordinate < coordinates->getLength(); ++coordinate) {
+		auto size = coordinates->getLength();
+		for (XMLSize_t coordinate = 0; coordinate < size; ++coordinate) {
 			double x,y;
 
 			DOMElement* coordinateElement = dynamic_cast<DOMElement*>(coordinates->item(coordinate));
@@ -244,7 +246,8 @@ void ABCDSourceOperator::handleXMLAttributes(DOMNode& node, std::string path,
 
 		path += "/" + transcode(element.getTagName());
 		if(node.hasAttributes()) {
-			for(XMLSize_t attribute = 0; attribute < node.getAttributes()->getLength(); ++attribute) {
+			auto size = node.getAttributes()->getLength();
+			for(XMLSize_t attribute = 0; attribute < size; ++attribute) {
 				xercesc::DOMNode& attributeNode = *node.getAttributes()->item(attribute);
 				xercesc::DOMAttr& attr = (xercesc::DOMAttr&) attributeNode;
 
@@ -263,7 +266,8 @@ void ABCDSourceOperator::handleXMLAttributes(DOMNode& node, std::string path,
 
 		//visit children
 		if(node.hasChildNodes()) {
-			for(XMLSize_t child = 0; child < node.getChildNodes()->getLength(); ++child){
+			auto size = node.getChildNodes()->getLength();
+			for(XMLSize_t child = 0; child < size; ++child){
 				handleXMLAttributes(*node.getChildNodes()->item(child), path, setDoubleAttribute, setStringAttribute);
 			}
 		}
@@ -283,8 +287,12 @@ void ABCDSourceOperator::handleXMLAttributes(DOMNode& node, std::string path,
 				setDoubleAttribute(path, parseDouble(node.getNodeValue()));
 			}
 			else {
-				std::string value = transcode(node.getNodeValue());
-				setStringAttribute(path, value);
+				try {
+					std::string value = transcode(node.getTextContent());
+					setStringAttribute(path, value);
+				} catch(...){
+					fprintf(stderr, "Error transcoding path %s\n", path.c_str());
+				}
 			}
 		}
 	} else {
@@ -344,10 +352,12 @@ void ABCDSourceOperator::handleGlobalAttributes(DOMElement& dataSet){
 void ABCDSourceOperator::handleUnits(DOMDocument& doc) {
 	DOMNodeList* units = doc.getElementsByTagName(tagNameUnit);
 
-	for(XMLSize_t unit = 0; unit < units->getLength(); ++unit){
+	auto size = units->getLength(); // don't recompute in loop, very expensive
+	for(XMLSize_t unit = 0; unit < size; ++unit){
 		DOMNode* unitNode = units->item(unit);
 		DOMElement* unitElement = dynamic_cast<DOMElement*>(unitNode);
 		handleUnit(*unitElement);
+//		fprintf(stderr, "handled unit %d/%d\n", unit, size);
 	}
 }
 
@@ -375,27 +385,21 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 	XMLPlatformUtils::Initialize(); //TODO: only do this once for long running process
 	{
 		auto parser = createParser();
-
 		parser->parseURI(inputFile.c_str());
-
 		DOMDocument* doc = parser->getDocument(); //deleted by parser when done
 		if(doc == nullptr)
-			throw OperatorException(concat("ABCDSource: could not parse document:", inputFile));
-
+			throw OperatorException(concat("ABCDSource: could not parse document document null:", inputFile));
 
 		//handle DataSet metadata
 		DOMNodeList* dataSets = doc->getElementsByTagName(tagNameDataSet);
 		if(dataSets->getLength() == 0)
-			throw OperatorException(concat("ABCDSource: could not parse document:", inputFile));
+			throw OperatorException(concat("ABCDSource: could not parse document no datasets found:", inputFile));
 		handleGlobalAttributes(dynamic_cast<DOMElement&>(*dataSets->item(0)));
-
 		//handle Units
 		handleUnits(*doc);
 	}
 
-
 	XMLPlatformUtils::Terminate(); //TODO: only do this once for long running process
-
 	points->validate();
 	return points->filterBySpatioTemporalReferenceIntersection(rect);
 }
@@ -454,7 +458,8 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
 			throw OperatorException(concat("ABCDSource: could not parse document:", inputFile));
 
 		DOMNodeList* iprStatementsList = doc->getElementsByTagName(tagNameIPRStatements);
-		for(size_t i = 0; i < iprStatementsList->getLength(); ++i) {
+		auto size = iprStatementsList->getLength();
+		for(size_t i = 0; i < size; ++i) {
 			DOMElement& element = dynamic_cast<DOMElement&>(*iprStatementsList->item(i));
 			handleIPRStatements(element, pc);
 		}

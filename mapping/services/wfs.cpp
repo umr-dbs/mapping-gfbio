@@ -194,7 +194,7 @@ void WFSService::getFeature() {
 	if(exportMode) {
 		exportZip(output.c_str(), output.length(), format, *graph->getFullProvenance());
 	} else {
-		response.sendContentType(format);
+		response.sendContentType(format + "; charset=utf-8");
 		response.finishHeaders();
 		response << output;
 	}

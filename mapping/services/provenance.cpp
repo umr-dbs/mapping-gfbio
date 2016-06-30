@@ -2,6 +2,8 @@
 #include "services/httpservice.h"
 #include "operators/operator.h"
 
+#include <locale>
+
 /*
  * This class serves provenance information of a query.
  *
@@ -24,8 +26,7 @@ void ProvenanceService::run() {
 
 	auto provenance = graph->getFullProvenance();
 
-	response.sendContentType("application/json");
+	response.sendContentType("application/json; charset=utf-8");
 	response.finishHeaders();
-
 	response << provenance->toJson();
 }

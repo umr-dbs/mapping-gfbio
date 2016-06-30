@@ -23,6 +23,7 @@
 #include <xercesc/dom/DOMTypeInfo.hpp>
 #include <xercesc/util/XMLString.hpp>
 #include <xercesc/util/PlatformUtils.hpp>
+#include <xercesc/util/TransService.hpp>
 #include <xercesc/util/XMLException.hpp>
 #include <xercesc/util/PSVIUni.hpp>
 #include <xercesc/sax/SAXException.hpp>
@@ -86,6 +87,7 @@ class ABCDSourceOperator : public GenericOperator {
 
 #ifndef MAPPING_OPERATOR_STUBS
 		std::unique_ptr<PointCollection> points;
+
 		void handleUnits(DOMDocument& doc);
 		void handleGlobalAttributes(DOMElement& dataSet);
 		void handleUnit(DOMElement& unit);
@@ -107,6 +109,10 @@ class ABCDSourceOperator : public GenericOperator {
 
 		std::unique_ptr<DOMLSParserImpl> createParser();
 
+		std::string transcode(const XMLCh* ch) const;
+		static const size_t TRANSCODE_BUFFER_SIZE = 16 * 1024;
+		XMLTranscoder* transcoder;
+
 #endif
 
 };
@@ -118,13 +124,17 @@ REGISTER_OPERATOR(ABCDSourceOperator, "abcd_source");
 /**
  * Convert Xerces chars to string
  */
-std::string transcode(const XMLCh* ch){
-	if(ch == nullptr)
+std::string ABCDSourceOperator::transcode(const XMLCh* ch) const {
+	if (ch == nullptr)
 		return "";
 
-	char* chars = XMLString::transcode(ch);
-	std::string string(chars);
-	XMLString::release(&chars);
+	XMLSize_t charsEaten = 0;
+	char bytesNodeValue[4096];
+	XMLSize_t charsReturned = transcoder->transcodeTo(ch,
+			XMLString::stringLen(ch), (XMLByte*) bytesNodeValue, 4096,
+			charsEaten, XMLTranscoder::UnRep_Throw);
+
+	std::string string(bytesNodeValue, charsReturned);
 
 	return string;
 }
@@ -362,6 +372,10 @@ void ABCDSourceOperator::handleUnits(DOMDocument& doc) {
 }
 
 std::unique_ptr<DOMLSParserImpl> ABCDSourceOperator::createParser() {
+	//transcoder
+	XMLTransService::Codes code;
+	transcoder = XMLPlatformUtils::fgTransService->makeNewTranscoderFor("UTF-8", code, TRANSCODE_BUFFER_SIZE);
+
 	//create parser
 	static const XMLCh gLS[] = { chLatin_L, chLatin_S, chNull };
 	DOMImplementation*  impl = DOMImplementationRegistry::getDOMImplementation(gLS); //deleted by XMLPlatform::Terminate

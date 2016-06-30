@@ -376,6 +376,9 @@ std::unique_ptr<DOMLSParserImpl> ABCDSourceOperator::createParser() {
 	XMLTransService::Codes code;
 	transcoder = XMLPlatformUtils::fgTransService->makeNewTranscoderFor("UTF-8", code, TRANSCODE_BUFFER_SIZE);
 
+	if(code != XMLTransService::Codes::Ok)
+		throw OperatorException("ABCDSource: could not create transcoder for UTF-8");
+
 	//create parser
 	static const XMLCh gLS[] = { chLatin_L, chLatin_S, chNull };
 	DOMImplementation*  impl = DOMImplementationRegistry::getDOMImplementation(gLS); //deleted by XMLPlatform::Terminate
@@ -412,7 +415,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 		//handle Units
 		handleUnits(*doc);
 	}
-
+	delete transcoder; //transcoder has to be deleted before Terminate, thus wrapping member with unique_ptr not possible here
 	XMLPlatformUtils::Terminate(); //TODO: only do this once for long running process
 	points->validate();
 	return points->filterBySpatioTemporalReferenceIntersection(rect);
@@ -478,7 +481,7 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
 			handleIPRStatements(element, pc);
 		}
 	}
-
+	delete transcoder;
 	XMLPlatformUtils::Terminate(); //TODO: only do this once for long running process
 }
 

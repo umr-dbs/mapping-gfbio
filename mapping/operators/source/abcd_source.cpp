@@ -111,7 +111,7 @@ class ABCDSourceOperator : public GenericOperator {
 
 		std::string transcode(const XMLCh* ch) const;
 		static const size_t TRANSCODE_BUFFER_SIZE = 16 * 1024;
-		XMLTranscoder* transcoder;
+		XMLTranscoder* transcoder = nullptr;
 
 #endif
 
@@ -129,7 +129,7 @@ std::string ABCDSourceOperator::transcode(const XMLCh* ch) const {
 		return "";
 
 	XMLSize_t charsEaten = 0;
-	char bytesNodeValue[4096];
+	char bytesNodeValue[TRANSCODE_BUFFER_SIZE];
 	XMLSize_t charsReturned = transcoder->transcodeTo(ch,
 			XMLString::stringLen(ch), (XMLByte*) bytesNodeValue, 4096,
 			charsEaten, XMLTranscoder::UnRep_Throw);

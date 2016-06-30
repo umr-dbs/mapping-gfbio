@@ -2,8 +2,6 @@
 #include "services/httpservice.h"
 #include "operators/operator.h"
 
-#include <locale>
-
 /*
  * This class serves provenance information of a query.
  *

@@ -17,7 +17,7 @@
 	{
 		"params" : 
 		{
-			"path" : "test/systemtests/data/gfbio_abcd/abcd_example.xml"
+			"path" : "abcd_example.xml"
 		},
 		"type" : "abcd_source"
 	},

@@ -146,7 +146,7 @@ bool HTTPService::HTTPResponseStream::hasSentHeaders() {
 
 
 void HTTPService::HTTPResponseStream::sendJSON(const Json::Value &obj) {
-	sendContentType("application/json");
+	sendContentType("application/json; charset=utf-8");
 	sendDebugHeader();
 	finishHeaders();
 	*this << obj;

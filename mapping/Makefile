@@ -28,11 +28,6 @@ OPT_FLAGS=-O2
 # to override any of these options, create Makefile.local and set them there
 -include Makefile.local
 
-PKGLIBS_CORE := jsoncpp gdal libpng zlib "libpqxx >= 4.0.0" libcurl sqlite3 libarchive
-
-LDFLAGS := -lpthread -pthread -lbz2 -lturbojpeg -lgeos -lboost_date_time
-LDFLAGS_CL := -lOpenCL
-
 # The testcases are run with full error checking. Currently, the following two tools are used:
 # AddressSanitizer, see http://clang.llvm.org/docs/AddressSanitizer.html
 # UndefinedBehaviorSanitizer, see http://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html
@@ -40,14 +35,28 @@ SANITIZE_FLAGS:=-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer
 # -fno-sanitize-recover=undefined would exit on undefined behaviour, but needs a more recent version of clang
 # -fsanitize=integer for warnings on (defined) unsigned overflows
 
+LDFLAGS := -lpthread -pthread -lbz2 -lturbojpeg -lgeos -lboost_date_time
+LDFLAGS_CL := -lOpenCL
+
 
 # these variables will be appended to by the module definitions
 ALL_TARGETS := 
+OBJS_CORE :=
+OBJS_CORE_WITHCL := 
+OBJS_CORE_NOCL :=
+OBJS_OPERATORS := 
+OBJS_SERVICES := 
+OBJS_GTEST := 
+PKGLIBS_CORE :=
 
 # Now include the module definitions
 include Module.mk
 # TODO: include stuff from MODULES_LIST
 
+OBJS_CORE_NOCL := $(OBJS_CORE) $(OBJS_CORE_NOCL)
+OBJS_CORE := $(OBJS_CORE) $(OBJS_CORE_WITHCL)
+
+OBJ_OPERATORS_STUBS := $(OBJ_OPERATORS:o/operators/%=o/operators_stub/%)
 
 # before we start generating targets, make sure the first target is "all"
 .PHONY: default clean systemtest systemtest_testenvironment systemtest_testcases unittest doc
@@ -86,8 +95,6 @@ endif
 
 
 CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. $(shell pkg-config --cflags $(ALL_PKGLIBS))
-#CPPFLAGS_R:=-I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/local/lib/R/site-library/***REMOVED***/include/ -I/usr/lib/R/site-library/***REMOVED***/include/ -I/usr/share/R/include
-#LDFLAGS_R=-L/usr/lib/R/lib -lR -L/usr/local/lib/R/site-library/***REMOVED***/lib -l***REMOVED*** -Wl,-rpath,/usr/local/lib/R/site-library/***REMOVED***/lib
 CL_SOURCES:=$(wildcard operators/*/*.cl) $(wildcard operators/*/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 
@@ -130,9 +137,6 @@ operators/%.cl.h: operators/%.cl
 	echo $+ | sed -e 's/\.cl$$//' -e 's:/:_:g' -e 's/\(^.*$$\)/static const std::string \1(\1_cl, \1_cl_len);/' >> $@
 
 .PRECIOUS: operators/%.cl.h
-
-#o/rserver/%.o: rserver/%.cpp | $${@D}/.f
-#	${CPP} ${CPPFLAGS} ${CPPFLAGS_R} -MMD -MF ${@:.o=.d} -c $< -o $@
 
 
 # there are variables in the dependencies, we need SECONDEXPANSION for them. 

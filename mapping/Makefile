@@ -105,7 +105,6 @@ TEST_LOGS:=$(TEST_QUERIES:.json=.log)
 
 ifneq (${USE_OPENCL},true)
   CPPFLAGS := ${CPPFLAGS} -DMAPPING_NO_OPENCL=1
-  #CPPFLAGS_R := ${CPPFLAGS_R} -DMAPPING_NO_OPENCL=1
   LDFLAGS_CL := 
 endif
 
@@ -118,11 +117,11 @@ all: $(CL_HEADERS) $(ALL_NAMES)
 # gtest library
 # instructions taken from https://github.com/google/googletest/blob/master/googletest/README.md
 #
-o/gtest-all.o: ${GTEST_DIR}/src/gtest-all.cc
-	${CPP} ${CPPFLAGS} -I${GTEST_DIR} -pthread -o $@ -c ${GTEST_DIR}/src/gtest-all.cc
+o/core/gtest-all.o: ${GTEST_DIR}/src/gtest-all.cc
+	${CPP} ${CPPFLAGS} -I${GTEST_DIR} -pthread -o $@ -c $<
 
-o/libgtest.a: o/gtest-all.o
-	ar -rv o/libgtest.a o/gtest-all.o
+o/core/libgtest.a: o/core/gtest-all.o
+	ar -rv $@ $<
 
 
 #
@@ -142,14 +141,14 @@ operators/%.cl.h: operators/%.cl
 # there are variables in the dependencies, we need SECONDEXPANSION for them. 
 .SECONDEXPANSION:
 
-o/operators_stub/%.o: operators/%.cpp | $${@D}/.f
+o/core/operators_stub/%.o: operators/%.cpp | $${@D}/.f
 	${CPP} ${CPPFLAGS} -DMAPPING_OPERATOR_STUBS=1 -MMD -MF ${@:.o=.d} -c $< -o $@
 
-o/%.o: %.cpp | $${@D}/.f $(CL_HEADERS)
+o/core/%.o: %.cpp | $${@D}/.f $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
 
 # .san.o = compiled with Sanitation
-o/%.san.o: %.cpp | $${@D}/.f $(CL_HEADERS)
+o/core/%.san.o: %.cpp | $${@D}/.f $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} ${SANITIZE_FLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
 
 o/%/.f:

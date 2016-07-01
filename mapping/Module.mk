@@ -19,7 +19,7 @@ OBJ_CONVERTERS=o/rasterdb/converters/converter.o o/rasterdb/converters/raw.o
 OBJ_OPERATORS_SOURCE = o/operators/source/csv_source.o o/operators/source/gfbio_source.o o/operators/source/pangaea_source.o o/operators/source/postgres_source.o o/operators/source/rasterdb_source.o o/operators/source/wkt_source.o o/operators/source/gbif_source.o
 OBJ_OPERATORS_PROCESSING_RASTER=o/operators/processing/raster/matrixkernel.o o/operators/processing/raster/expression.o o/operators/processing/raster/classification.o
 OBJ_OPERATORS_PROCESSING_FEATURES=o/operators/processing/features/difference.o o/operators/processing/features/numeric_attribute_filter.o o/operators/processing/features/point_in_polygon_filter.o
-OBJ_OPERATORS_PROCESSING_COMBINED=o/operators/processing/combined/projection.o o/operators/processing/combined/r_script.o o/operators/processing/combined/raster_value_extraction.o o/operators/processing/combined/rasterization.o o/operators/processing/combined/timeshift.o
+OBJ_OPERATORS_PROCESSING_COMBINED=o/operators/processing/combined/projection.o o/operators/processing/combined/raster_value_extraction.o o/operators/processing/combined/rasterization.o o/operators/processing/combined/timeshift.o
 OBJ_OPERATORS_PROCESSING_METEOSAT=o/operators/processing/meteosat/temperature.o o/operators/processing/meteosat/reflectance.o o/operators/processing/meteosat/solarangle.o o/operators/processing/meteosat/radiance.o o/operators/processing/meteosat/pansharpening.o o/operators/processing/meteosat/gccthermthresholddetection.o o/operators/processing/meteosat/co2correction.o
 OBJ_OPERATORS_PLOTS=o/operators/plots/histogram.o o/operators/plots/feature_attributes_plot.o
 # TODO: move to gfbio module

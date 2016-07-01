@@ -22,8 +22,8 @@ USE_ABCD=true
 DBG_FLAGS=-g
 OPT_FLAGS=-O2
 
-#MODULES_PATH=./../
-#MODULES_LIST=mapping-r mapping-gfbio
+MODULES_PATH=..
+MODULES_LIST=
 
 # to override any of these options, create Makefile.local and set them there
 -include Makefile.local
@@ -48,10 +48,11 @@ OBJS_OPERATORS :=
 OBJS_SERVICES := 
 OBJS_GTEST := 
 PKGLIBS_CORE :=
+CPPFLAGS := ${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I.
 
 # Now include the module definitions
 include Module.mk
-# TODO: include stuff from MODULES_LIST
+$(foreach module,$(MODULES_LIST),$(eval include $(MODULES_PATH)/$(module)/Module.mk))
 
 OBJS_CORE_NOCL := $(OBJS_CORE) $(OBJS_CORE_NOCL)
 OBJS_CORE := $(OBJS_CORE) $(OBJS_CORE_WITHCL)
@@ -62,6 +63,9 @@ OBJ_OPERATORS_STUBS := $(OBJ_OPERATORS:o/operators/%=o/operators_stub/%)
 .PHONY: default clean systemtest systemtest_testenvironment systemtest_testcases unittest doc
 
 .DELETE_ON_ERROR:
+
+# disable implicit rules for %.o etc
+.SUFFIXES:
 
 default: all
 
@@ -93,8 +97,8 @@ ifneq ($(ALL_PKGLIBS_EXIST),0)
   $(error Could not find required library, we need $(ALL_PKGLIBS))
 endif
 
+CPPFLAGS += $(shell pkg-config --cflags $(ALL_PKGLIBS))
 
-CPPFLAGS:=${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I. $(shell pkg-config --cflags $(ALL_PKGLIBS))
 CL_SOURCES:=$(wildcard operators/*/*.cl) $(wildcard operators/*/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
 
@@ -137,6 +141,19 @@ operators/%.cl.h: operators/%.cl
 
 .PRECIOUS: operators/%.cl.h
 
+# we need to create directories in o/, but directories cannot be dependencies
+# so instead we create a file .f in each directory..
+o/%/.f:
+	mkdir -p $(dir $@)
+	touch $@
+	
+o/.f:
+	touch $@
+
+.PRECIOUS: o/%/.f
+
+.PRECIOUS: o/.f
+
 
 # there are variables in the dependencies, we need SECONDEXPANSION for them. 
 .SECONDEXPANSION:
@@ -151,17 +168,18 @@ o/core/%.o: %.cpp | $${@D}/.f $(CL_HEADERS)
 o/core/%.san.o: %.cpp | $${@D}/.f $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} ${SANITIZE_FLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
 
-o/%/.f:
-	mkdir -p $(dir $@)
-	touch $@
-	
-o/.f:
-	touch $@
+# now we need to create similar rules once for each included module
+define MODULE_template
+o/$(1)/operators_stub/%.o: $$(MODULES_PATH)/$(1)/operators/%.cpp | $$$${@D}/.f
+	$${CPP} $${CPPFLAGS} -I$$(MODULES_PATH)/$(1)/ -DMAPPING_OPERATOR_STUBS=1 -MMD -MF $${@:.o=.d} -c $$< -o $$@
 
-.PRECIOUS: o/%/.f
+o/$(1)/%.o: $$(MODULES_PATH)/$(1)/%.cpp | $$$${@D}/.f #$$(CL_HEADERS)
+	$${CPP} $${CPPFLAGS} -I$$(MODULES_PATH)/$(1)/ -MMD -MF $${@:.o=.d} -c $$< -o $$@
 
-.PRECIOUS: o/.f
-
+o/$(1)/%.san.o: $$(MODULES_PATH)/$(1)/%.cpp | $$$${@D}/.f #$(CL_HEADERS)
+	$${CPP} $${CPPFLAGS} $${SANITIZE_FLAGS} -I$$(MODULES_PATH)/$(1)/ -MMD -MF $${@:.o=.d} -c $$< -o $$@
+endef
+$(foreach module,$(MODULES_LIST),$(eval $(call MODULE_template,$(module))))
 
 
 #

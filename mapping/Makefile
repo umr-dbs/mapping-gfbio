@@ -49,15 +49,23 @@ OBJS_SERVICES :=
 OBJS_GTEST := 
 PKGLIBS_CORE :=
 CPPFLAGS := ${DBG_FLAGS} ${OPT_FLAGS} -Wall -Wextra -pedantic-errors -std=c++11 -I.
+TEST_QUERIES := $(notdir $(wildcard test/systemtests/queries/*.json))
 
 # Now include the module definitions
 include Module.mk
-$(foreach module,$(MODULES_LIST),$(eval include $(MODULES_PATH)/$(module)/Module.mk))
+define MODULE_include
+  MODULEPATH := $$(MODULES_PATH)/$(1)/
+  include $$(MODULEPATH)/Module.mk
+  TEST_QUERIES += $$(notdir $$(wildcard $$(MODULEPATH)/test/systemtests/queries/*.json))
+endef
+$(foreach module,$(MODULES_LIST),$(eval $(call MODULE_include,$(module))))
 
 OBJS_CORE_NOCL := $(OBJS_CORE) $(OBJS_CORE_NOCL)
 OBJS_CORE := $(OBJS_CORE) $(OBJS_CORE_WITHCL)
 
 OBJ_OPERATORS_STUBS := $(OBJ_OPERATORS:o/operators/%=o/operators_stub/%)
+
+TEST_LOGS:=$(addprefix o/testresults/,$(TEST_QUERIES:.json=.log))
 
 # before we start generating targets, make sure the first target is "all"
 .PHONY: default clean systemtest systemtest_testenvironment systemtest_testcases unittest doc
@@ -99,12 +107,10 @@ endif
 
 CPPFLAGS += $(shell pkg-config --cflags $(ALL_PKGLIBS))
 
+
+# TODO: modularize somehow
 CL_SOURCES:=$(wildcard operators/*/*.cl) $(wildcard operators/*/*/*.cl)
 CL_HEADERS:=$(CL_SOURCES:.cl=.cl.h)
-
-# TODO: modularize these
-TEST_QUERIES:=$(wildcard test/systemtests/queries/*.json)
-TEST_LOGS:=$(TEST_QUERIES:.json=.log)
 
 
 ifneq (${USE_OPENCL},true)
@@ -150,9 +156,7 @@ o/%/.f:
 o/.f:
 	touch $@
 
-.PRECIOUS: o/%/.f
-
-.PRECIOUS: o/.f
+.PRECIOUS: o/%/.f o/.f
 
 
 # there are variables in the dependencies, we need SECONDEXPANSION for them. 
@@ -168,6 +172,11 @@ o/core/%.o: %.cpp | $${@D}/.f $(CL_HEADERS)
 o/core/%.san.o: %.cpp | $${@D}/.f $(CL_HEADERS)
 	${CPP} ${CPPFLAGS} ${SANITIZE_FLAGS} -MMD -MF ${@:.o=.d} -c $< -o $@
 
+# note: use /usr/bin/time instead of time, because the latter may be a shell's builtin without the required POSIX options
+# The || true at the end is to prevent make from aborting after the first failed test. The actual return code is in the log. 
+o/testresults/%.log: test/systemtests/queries/%.json ${TARGET_MANAGER_SAN_NAME} | $${@D}/.f
+	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" LSAN_OPTIONS="suppressions=test/systemtests/lsan.suppressions" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${TARGET_MANAGER_SAN_NAME} testquery $< >$@ 2>&1 || true
+
 # now we need to create similar rules once for each included module
 define MODULE_template
 o/$(1)/operators_stub/%.o: $$(MODULES_PATH)/$(1)/operators/%.cpp | $$$${@D}/.f
@@ -178,6 +187,10 @@ o/$(1)/%.o: $$(MODULES_PATH)/$(1)/%.cpp | $$$${@D}/.f #$$(CL_HEADERS)
 
 o/$(1)/%.san.o: $$(MODULES_PATH)/$(1)/%.cpp | $$$${@D}/.f #$(CL_HEADERS)
 	$${CPP} $${CPPFLAGS} $${SANITIZE_FLAGS} -I$$(MODULES_PATH)/$(1)/ -MMD -MF $${@:.o=.d} -c $$< -o $$@
+
+o/testresults/%.log: $$(MODULES_PATH)/$(1)/test/systemtests/queries/%.json $${TARGET_MANAGER_SAN_NAME} | $$$${@D}/.f
+	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ASAN_SYMBOLIZER_PATH="$${LLVM_SYMBOLIZER}" ASAN_OPTIONS="$${ASAN_OPTIONS}" UBSAN_OPTIONS="$${UBSAN_OPTIONS}" LSAN_OPTIONS="suppressions=test/systemtests/lsan.suppressions" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./$${TARGET_MANAGER_SAN_NAME} testquery $$< >$$@ 2>&1 || true
+
 endef
 $(foreach module,$(MODULES_LIST),$(eval $(call MODULE_template,$(module))))
 
@@ -227,16 +240,11 @@ systemtest_testcases: ${TARGET_MANAGER_NAME} ${TEST_LOGS}
 	echo "All logs written"
 
 systemtest_testenvironment: ${TARGET_MANAGER_NAME}
-	rm -f test/systemtests/data/world1.dat test/systemtests/data/world1.db
+	#rm -f test/systemtests/data/world1.dat test/systemtests/data/world1.db
 	rm -f test/systemtests/data/ndvi.dat test/systemtests/data/ndvi.db
 	#./${EXE} createsource 4326 test/systemtests/data/world1.tif  >test/systemtests/data/test_world1.json
-	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ; ./${TARGET_MANAGER_NAME} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
+	#export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ; ./${TARGET_MANAGER_NAME} import world1 test/systemtests/data/world1.tif 1 0 0 2000000000 RAW
 	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ; bash test/systemtests/data/ndvi/import.sh 
-
-# note: use /usr/bin/time instead of time, because the latter may be a shell's builtin without the required POSIX options
-# The || true at the end is to prevent make from aborting after the first failed test. The actual return code is in the log. 
-test/systemtests/queries/%.log: test/systemtests/queries/%.json ${TARGET_MANAGER_SAN_NAME}
-	export MAPPING_CONFIGURATION=test/systemtests/mapping_test.conf ASAN_SYMBOLIZER_PATH="${LLVM_SYMBOLIZER}" ASAN_OPTIONS="${ASAN_OPTIONS}" UBSAN_OPTIONS="${UBSAN_OPTIONS}" LSAN_OPTIONS="suppressions=test/systemtests/lsan.suppressions" ; /usr/bin/time --format="\nTESTCASE_ELAPSED_TIME: %e\nTESTCASE_RETURN_CODE: %x" ./${TARGET_MANAGER_SAN_NAME} testquery $< >$@ 2>&1 || true
 
 unittest: ${TARGET_GTEST_NAME}
 	./${TARGET_GTEST_NAME} --gtest_color=yes --gtest_output="xml:test/unittest_latest.xml" || true

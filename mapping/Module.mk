@@ -22,14 +22,14 @@ OBJS_CORE += o/core/operators/operator.o o/core/operators/provenance.o o/core/op
 #
 # HTTP Services
 #
-OBJS_SERVICES += o/core/services/httpservice.o o/core/services/httpparsing.o o/core/services/user.o o/core/services/ogcservice.o o/core/services/wms.o o/core/services/wcs.o o/core/services/wfs.o o/core/services/plot.o o/core/services/provenance.o o/core/services/artifact.o o/core/services/gfbio.o
+OBJS_SERVICES += o/core/services/httpservice.o o/core/services/httpparsing.o o/core/services/user.o o/core/services/ogcservice.o o/core/services/wms.o o/core/services/wcs.o o/core/services/wfs.o o/core/services/plot.o o/core/services/provenance.o o/core/services/artifact.o
 # pointvisualization is only used by services, so that's where it goes
 OBJS_SERVICES += o/core/pointvisualization/BoundingBox.o o/core/pointvisualization/Circle.o o/core/pointvisualization/Coordinate.o o/core/pointvisualization/Dimension.o o/core/pointvisualization/FindResult.o o/core/pointvisualization/QuadTreeNode.o o/core/pointvisualization/CircleClusteringQuadTree.o
 
 #
 # Operators
 #
-OBJS_OPERATORS += o/core/operators/source/csv_source.o o/core/operators/source/gfbio_source.o o/core/operators/source/pangaea_source.o o/core/operators/source/postgres_source.o o/core/operators/source/rasterdb_source.o o/core/operators/source/wkt_source.o o/core/operators/source/gbif_source.o
+OBJS_OPERATORS += o/core/operators/source/csv_source.o o/core/operators/source/postgres_source.o o/core/operators/source/rasterdb_source.o o/core/operators/source/wkt_source.o
 OBJS_OPERATORS += o/core/operators/processing/raster/matrixkernel.o o/core/operators/processing/raster/expression.o o/core/operators/processing/raster/classification.o
 OBJS_OPERATORS += o/core/operators/processing/features/difference.o o/core/operators/processing/features/numeric_attribute_filter.o o/core/operators/processing/features/point_in_polygon_filter.o
 OBJS_OPERATORS += o/core/operators/processing/combined/projection.o o/core/operators/processing/combined/raster_value_extraction.o o/core/operators/processing/combined/rasterization.o o/core/operators/processing/combined/timeshift.o
@@ -38,11 +38,6 @@ OBJS_OPERATORS += o/core/util/sunpos.o
 OBJS_OPERATORS += o/core/operators/plots/histogram.o o/core/operators/plots/feature_attributes_plot.o
 OBJS_OPERATORS += o/core/datatypes/plots/histogram.o o/core/datatypes/plots/text.o o/core/datatypes/plots/png.o
 
-# TODO: move to gfbio module
-ifeq (${USE_ABCD},true)
-	OBJS_OPERATORS += o/core/operators/source/abcd_source.o
-	PKGLIBS_CORE += xerces-c
-endif
 
 # Cache: needs to be core for now
 OBJS_CORE += o/core/cache/common.o o/core/cache/priv/shared.o o/core/cache/priv/requests.o o/core/cache/priv/connection.o o/core/cache/priv/redistribution.o o/core/cache/priv/cache_stats.o o/core/cache/priv/cache_structure.o o/core/cache/node/node_cache.o o/core/cache/manager.o o/core/cache/priv/caching_strategy.o o/core/cache/priv/cube.o
@@ -64,8 +59,6 @@ OBJS_GTEST += $(patsubst test/%,o/core/test/%,$(SRC_GTEST:.cpp=.o))
 OBJS_GTEST += o/core/util/server_nonblocking.o
 # TODO: these dependencies are ridiculous and need to be cleaned up
 OBJS_GTEST += ${OBJ_INDEX_SERVER} ${OBJ_NODE_SERVER} ${OBJ_CACHE_EXP} 
-
-
 
 
 # now define all binaries we wish to create

@@ -109,7 +109,7 @@ std::unique_ptr<PointCollection> GBIFSourceOperator::getPointCollection(const Qu
 	auto points = make_unique<PointCollection>(rect);
 	if(includeMetadata) {
 		points->feature_attributes.addTextualAttribute("scientific_name", Unit::unknown());
-		connection.prepare("occurrences", "SELECT ST_X(geom) lon, ST_Y(geom) lat, extract(epoch from gbif.gbif_lite_time.event_date), scientific_name from gbif.gbif_lite_time join gbif.gbif using (id) WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
+		connection.prepare("occurrences", "SELECT ST_X(geom) lon, ST_Y(geom) lat, extract(epoch from gbif.gbif_lite_time.event_date), name as scientific_name from gbif.gbif_lite_time join gbif.gbif_taxon_to_name using (taxon) WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
 	}
 	else
 		connection.prepare("occurrences", "SELECT ST_X(geom) x, ST_Y(geom) y, extract(epoch from event_date) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
@@ -125,18 +125,19 @@ std::unique_ptr<PointCollection> GBIFSourceOperator::getPointCollection(const Qu
     	auto row = result[i];
     	points->addSinglePointFeature(Coordinate(row[0].as<double>(), row[1].as<double>()));
 
-    	double t;
-    	if(row[2].is_null())
-    		t = rect.beginning_of_time();
-    	else
-    		t = row[2].as<double>();
-
-    	points->time.push_back(TimeInterval(t, rect.end_of_time()));
+//    	double t;
+//    	if(row[2].is_null())
+//    		t = rect.beginning_of_time();
+//    	else
+//    		t = row[2].as<double>();
+//
+//    	points->time.push_back(TimeInterval(t, rect.end_of_time()));
 
     	if(includeMetadata) {
     		points->feature_attributes.textual("scientific_name").set(i, row[3].as<std::string>());
     	}
     }
+    points->addDefaultTimestamps();
 
     return points;
 }

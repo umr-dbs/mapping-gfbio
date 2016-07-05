@@ -23,7 +23,7 @@
 #include <dirent.h> // opendir(), ..
 
 
-static const char *LOG_ROOT = "test/systemtests/queries/";
+static const char *LOG_ROOT = "o/testresults/";
 
 
 // mapping's core system does not require an XML library, and we do not

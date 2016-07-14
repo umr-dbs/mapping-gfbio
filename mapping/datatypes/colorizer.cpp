@@ -251,6 +251,19 @@ static const Colorizer::ColorTable glc2000_breakpoints = {
 	Colorizer::Breakpoint(23, color_from_rgba(0, 0, 0, 0)) // invalid value
 };
 
+// for 24bit rgb images
+static const Colorizer::ColorTable color_red = {
+	Colorizer::Breakpoint(  0, color_from_rgba(0, 0, 0)),
+	Colorizer::Breakpoint(255, color_from_rgba(255, 0, 0))
+};
+static const Colorizer::ColorTable color_green = {
+	Colorizer::Breakpoint(  0, color_from_rgba(0, 0, 0)),
+	Colorizer::Breakpoint(255, color_from_rgba(0, 255, 0))
+};
+static const Colorizer::ColorTable color_blue = {
+	Colorizer::Breakpoint(  0, color_from_rgba(0, 0, 0)),
+	Colorizer::Breakpoint(255, color_from_rgba(0, 0, 255))
+};
 
 std::unique_ptr<Colorizer> Colorizer::fromUnit(const Unit &unit) {
 	if (unit.getMeasurement() == "temperature" && unit.getUnit() == "c")
@@ -261,6 +274,14 @@ std::unique_ptr<Colorizer> Colorizer::fromUnit(const Unit &unit) {
 		return make_unique<Colorizer>(heatmap_breakpoints);
 	if (unit.getMeasurement() == "radiation" && unit.getUnit() == "cpm")
 		return make_unique<Colorizer>(cpm_breakpoints);
+	if (unit.getMeasurement() == "color") {
+		if (unit.getUnit() == "red")
+			return make_unique<Colorizer>(color_red);
+		if (unit.getUnit() == "green")
+			return make_unique<Colorizer>(color_green);
+		if (unit.getUnit() == "blue")
+			return make_unique<Colorizer>(color_blue);
+	}
 	if (unit.getUnit() == "errormessage")
 		return make_unique<Colorizer>(error_breakpoints, Interpolation::NEAREST);
 	// TODO: we need a better default colorizer, optimized for contrast

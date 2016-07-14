@@ -156,6 +156,10 @@ void GFBioService::run() {
 
 		if(request == "queryDataSources") {
 			std::string scientificName = params.get("term");
+			if(scientificName.size() < 3) {
+				response.sendFailureJSON("Term has to be >= 3 characters");
+				return;
+			}
 
 			Json::Value json(Json::objectValue);
 			Json::Value sources(Json::arrayValue);

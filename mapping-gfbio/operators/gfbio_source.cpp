@@ -6,6 +6,8 @@
 #include "util/csvparser.h"
 #include "util/configuration.h"
 #include "util/make_unique.h"
+#include "util/gfbiodatautil.h"
+#include "datatypes/simplefeaturecollections/wkbutil.h"
 
 #include <string>
 #include <sstream>
@@ -16,9 +18,11 @@
 #include "datatypes/pointcollection.h"
 #include "datatypes/polygoncollection.h"
 #include <json/json.h>
+#include <pqxx/pqxx>
 
 /**
- * Source operator that gets occurrence data from the GFBioJavaWebserver
+ * This operator fetches GBIF occurrences directly from postgres. It should eventually be replaced by a
+ * more generic vector source.
  */
 class GFBioSourceOperator : public GenericOperator {
 	public:
@@ -34,23 +38,21 @@ class GFBioSourceOperator : public GenericOperator {
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
-#ifndef MAPPING_OPERATOR_STUBS
-		void getStringFromServer(const std::string url, std::stringstream& data);
-		void performQuery(const QueryRectangle& rect, std::stringstream& data, std::string format);
-#endif
-		std::string datasource;
-		std::string query;
-		cURL curl;
-		std::string includeMetadata;
+		std::string scientificName;
+		std::string dataSource;
+		bool includeMetadata;
 };
 
 
 GFBioSourceOperator::GFBioSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
 
-	datasource = params.get("datasource", "").asString();
-	query = params.get("query", "").asString();
-	includeMetadata = params.get("includeMetadata", "false").asString();
+	scientificName = params.get("scientificName", "").asString();
+	dataSource = params.get("dataSource", "").asString();
+	includeMetadata = params.get("includeMetadata", false).asBool();
+
+	if(scientificName.length() < 3)
+		throw ArgumentException("GBIFSourceOperator: scientificName must contain at least 3 characters");
 }
 
 GFBioSourceOperator::~GFBioSourceOperator() {
@@ -59,115 +61,100 @@ REGISTER_OPERATOR(GFBioSourceOperator, "gfbio_source");
 
 void GFBioSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 	Json::Value json(Json::objectValue);
-	json["datasource"] = datasource;
-	json["query"] = query;
+	json["scientificName"] = scientificName;
 	json["includeMetadata"] = includeMetadata;
 	stream << json;
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
 
+
 void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
-	std::ostringstream url;
-		url
-			<< Configuration::get("operators.gfbiosource.webserviceurl")
-			<< "provenance"  << "?datasource="
-			<< curl.escape(datasource) << "&query=" << curl.escape(query);
+	if(dataSource == "GBIF") {
+		pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
 
-	std::stringstream data;
-	getStringFromServer(url.str(), data);
+		std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
 
-	Json::Reader reader(Json::Features::strictMode());
-	Json::Value root;
-	if (!reader.parse(data, root))
-		throw OperatorException("GFBioSourceOperator: Provenance information could not be parsed");
 
-	for(unsigned int i = 0; i < root.size(); ++i) {
-		Json::Value entry = root.get(i, "");
-		Provenance provenance;
-		provenance.citation = entry["citation"].asString();
-		provenance.uri = entry["uri"].asString();
-		provenance.license = entry["license"].asString();
+		connection.prepare("provenance", "SELECT DISTINCT key, citation, uri from gbif.gbif_lite_time join gbif.gbif using (id) join gbif2.datasets ON (key = dataset_id) WHERE taxon = ANY($1)");
+		pqxx::work work(connection);
+		pqxx::result result = work.prepared("provenance")(taxa).exec();
 
-		pc.add(provenance);
+		for(size_t i = 0; i < result.size(); ++i) {
+			auto row = result[i];
+			pc.add(Provenance(row[1].as<std::string>(), "", row[2].as<std::string>(), ""));
+		}
+	} else {
+		pc.add(Provenance("IUCN 2014. The IUCN Red List of Threatened Species. Version 2014.1. http://www.iucnredlist.org. Downloaded on 06/01/2014.", "", "http://www.iucnredlist.org/", "http://spatial-data.s3.amazonaws.com/groups/Red%20List%20Terms%20&%20Conditions%20of%20Use.pdf"));
 	}
 }
 
 
 std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points_out = make_unique<PointCollection>(rect);
+	//connect
+	//TODO: reuse
+	pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
 
-	std::stringstream data;
-	performQuery(rect, data, "CSV");
-	profiler.addIOCost( data.tellp() );
+	std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
 
-	try {
-		CSVParser parser(data, ',');
-
-		auto header = parser.readHeaders();
-		//TODO: distinguish between numeric and textual properties, figure out units
-		for(int i=2; i < header.size(); i++){
-			points_out->feature_attributes.addTextualAttribute(header[i], Unit::unknown());
-		}
-
-		while(true){
-			auto tuple = parser.readTuple();
-			if (tuple.size() < 1)
-				break;
-
-			size_t idx = points_out->addSinglePointFeature(Coordinate(std::stod(tuple[0]),std::stod(tuple[1])));
-			//double year = std::atof(csv[3].c_str());
-
-			for(int i=2; i < tuple.size(); i++)
-				points_out->feature_attributes.textual(header[i]).set(idx, tuple[i]);
-		}
-		//fprintf(stderr, data.str().c_str());
-		return points_out;
+	//fetch occurrences
+	auto points = make_unique<PointCollection>(rect);
+	if(includeMetadata) {
+		points->feature_attributes.addTextualAttribute("scientific_name", Unit::unknown());
+		connection.prepare("occurrences", "SELECT ST_X(geom) lon, ST_Y(geom) lat, extract(epoch from gbif.gbif_lite_time.event_date), name as scientific_name from gbif.gbif_lite_time join gbif.gbif_taxon_to_name using (taxon) WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
 	}
-	catch (const OperatorException &e) {
-		data.seekg(0, std::ios_base::beg);
-		fprintf(stderr, "CSV:\n%s\n", data.str().c_str());
-		throw;
-	}
+	else
+		connection.prepare("occurrences", "SELECT ST_X(geom) x, ST_Y(geom) y, extract(epoch from event_date) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
 
+	pqxx::work work(connection);
+	pqxx::result result = work.prepared("occurrences")(taxa)(rect.x1)(rect.y1)(rect.x2)(rect.y2).exec();
+    work.commit();
+
+    //build feature collection
+    //TODO: use cursor
+    points->time.reserve(result.size());
+    for(size_t i = 0; i < result.size(); ++i) {
+    	auto row = result[i];
+    	points->addSinglePointFeature(Coordinate(row[0].as<double>(), row[1].as<double>()));
+
+//    	double t;
+//    	if(row[2].is_null())
+//    		t = rect.beginning_of_time();
+//    	else
+//    		t = row[2].as<double>();
+//
+//    	points->time.push_back(TimeInterval(t, rect.end_of_time()));
+
+    	if(includeMetadata) {
+    		points->feature_attributes.textual("scientific_name").set(i, row[3].as<std::string>());
+    	}
+    }
+    points->addDefaultTimestamps();
+
+    return points;
 }
 
 
-// pc12316:81/GFBioJavaWS/Wizzard/fetchDataSource/WKB?datasource=IUCN&query={"globalAttributes":{"speciesName":"Puma concolor"}}
 std::unique_ptr<PolygonCollection> GFBioSourceOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	if (rect.epsg != EPSG_LATLON) {
-		std::ostringstream msg;
-		msg << "GFBioSourceOperator: Shouldn't load points in a projection other than latlon (got " << (int) rect.epsg << ", expected " << (int) EPSG_LATLON << ")";
-		throw OperatorException(msg.str());
-	}
+	//connect
+	//TODO: reuse
+	pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
 
-	std::stringstream data;
-	performQuery(rect, data, "WKB");
-	profiler.addIOCost( data.tellp() );
+	std::string taxa = GFBioDataUtil::resolveTaxaNames(connection, scientificName);
 
-	auto polygonCollection = WKBUtil::readPolygonCollection(data, rect);
 
-	return polygonCollection;
+	connection.prepare("occurrences", "SELECT ST_AsEWKT(ST_Collect(geom)) FROM iucn.expert_ranges_all WHERE lower(binomial) = ANY ($1)");
+
+	pqxx::work work(connection);
+	pqxx::result result = work.prepared("occurrences")(taxa).exec();
+    work.commit();
+
+    std::string wkt = result[0][0].as<std::string>();
+
+    auto polygons = WKBUtil::readPolygonCollection(wkt, rect);
+
+    return polygons;
 }
 
-void GFBioSourceOperator::performQuery(const QueryRectangle& rect, std::stringstream& data, std::string format) {
-	std::ostringstream url;
-	url
-		<< Configuration::get("operators.gfbiosource.webserviceurl")
-		<< "fetchDataSource/" << format << "?datasource="
-		<< curl.escape(datasource) << "&query=" << curl.escape(query)
-		<< "&BBOX=" << std::fixed << rect.x1 << "," << rect.y1 << ","
-		<< rect.x2 << "," << rect.y2 << "&includeMetadata=" << includeMetadata;
 
-	getStringFromServer(url.str(), data);
-}
-
-void GFBioSourceOperator::getStringFromServer(const std::string url, std::stringstream& data) {
-	curl.setOpt(CURLOPT_PROXY, Configuration::get("operators.gfbiosource.proxy", "").c_str());
-	curl.setOpt(CURLOPT_URL, url.c_str());
-	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
-	curl.setOpt(CURLOPT_WRITEDATA, &data);
-
-	curl.perform();
-}
 #endif

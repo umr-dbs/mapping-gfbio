@@ -5,12 +5,15 @@
 #include "util/concat.h"
 #include "util/exceptions.h"
 #include "util/curl.h"
+#include "util/gfbiodatautil.h"
 
 #include <cstring>
 #include <sstream>
 #include <json/json.h>
 
 #include <dirent.h>
+
+#include <pqxx/pqxx>
 
 /*
  * This class provides methods for GFBio users
@@ -125,7 +128,58 @@ void GFBioService::run() {
 			return;
 		}
 
-		// anything except login is only allowed with a valid session, so check for it.
+		// helper methods for gbif source
+		if(request == "searchSpecies") {
+			std::string term = params.get("term");
+			if(term.size() < 3) {
+				response.sendFailureJSON("Term has to be >= 3 characters");
+				return;
+			}
+
+			pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
+
+			connection.prepare("searchSpecies", "SELECT name FROM gbif.gbif_taxon_to_name WHERE lower(name) like lower($1)");
+			pqxx::work work(connection);
+			pqxx::result result = work.prepared("searchSpecies")(term + "%").exec();
+
+			Json::Value json(Json::objectValue);
+			Json::Value names(Json::arrayValue);
+			for(size_t i = 0; i < result.size(); ++i) {
+				auto row = result[i];
+				names.append(row[0].as<std::string>());
+			}
+
+			json["speciesNames"] = names;
+			response.sendSuccessJSON(json);
+			return;
+		}
+
+		if(request == "queryDataSources") {
+			std::string scientificName = params.get("term");
+
+			Json::Value json(Json::objectValue);
+			Json::Value sources(Json::arrayValue);
+
+			Json::Value gbif(Json::objectValue);
+			gbif["name"] = "GBIF";
+			gbif["count"] = (unsigned long long) GFBioDataUtil::countGBIFResults(scientificName);
+
+			sources.append(gbif);
+
+			Json::Value iucn(Json::objectValue);
+			iucn["name"] = "IUCN";
+			iucn["count"] = (unsigned long long) GFBioDataUtil::countIUCNResults(scientificName);
+
+			sources.append(iucn);
+
+			json["dataSources"] = sources;
+
+			response.sendSuccessJSON(json);
+			return;
+		}
+
+
+		//protected methods
 		auto session = UserDB::loadSession(params.get("sessiontoken"));
 
 		if (request == "baskets") {
@@ -232,7 +286,9 @@ void GFBioService::run() {
 
 			json["archives"] = archives;
 			response.sendSuccessJSON(json);
+			return;
 		}
+
 	}
 	catch (const std::exception &e) {
 		response.sendFailureJSON(e.what());

@@ -23,7 +23,7 @@ DBG_FLAGS=-g
 OPT_FLAGS=-O2
 
 MODULES_PATH=..
-MODULES_LIST=
+MODULES_LIST=mapping-gfbio
 
 # to override any of these options, create Makefile.local and set them there
 -include Makefile.local

@@ -450,17 +450,21 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 
 	auto rasterdescription = backend->getClosestRaster(channelid, t.t1, t.t2);
 	auto rasterid = rasterdescription.rasterid;
-	zoom = backend->getBestZoom(rasterid, zoom);
-	int zoomfactor = 1 << zoom;
+	auto loaded_zoom = backend->getBestZoom(rasterid, zoom);
 
-	if (x1 % zoomfactor || y1 % zoomfactor || x2 % zoomfactor || y2 % zoomfactor)
+	// If there is no zoom on disk that's low enough, we cannot just return the next best zoom.
+	// Otherwise, we might attempt to return a high-resolution image over a large area, running out of memory.
+	auto returned_zoom = std::max(zoom, loaded_zoom);
+	int returned_zoomfactor = 1 << returned_zoom;
+
+	if (x1 % returned_zoomfactor || y1 % returned_zoomfactor || x2 % returned_zoomfactor || y2 % returned_zoomfactor)
 		throw ArgumentException("RasterDB::load(): cannot load from zoomed version with odd coordinates");
 
 	// Figure out the CRS after cutting and zooming
-	auto width = (x2-x1) >> zoom;
-	auto height = (y2-y1) >> zoom;
-	auto scale_x = crs->scale[0]*zoomfactor;
-	auto scale_y = crs->scale[1]*zoomfactor;
+	auto width = (x2-x1) >> returned_zoom;
+	auto height = (y2-y1) >> returned_zoom;
+	auto scale_x = crs->scale[0]*returned_zoomfactor;
+	auto scale_y = crs->scale[1]*returned_zoomfactor;
 	auto origin_x = crs->PixelToWorldX(x1);
 	auto origin_y = crs->PixelToWorldY(y1);
 	GDALCRS zoomed_and_cut_crs(crs->epsg, width, height, origin_x, origin_y, scale_x, scale_y);
@@ -491,7 +495,7 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 	result->clear(transformed_dd.no_data);
 
 	// Load all overlapping parts and blit them onto the empty raster
-	auto tiles = backend->enumerateTiles(channelid, rasterid, x1, y1, x2, y2, zoom);
+	auto tiles = backend->enumerateTiles(channelid, rasterid, x1, y1, x2, y2, loaded_zoom);
 
 	// If no tiles were found, that's ok. return a raster filled with nodata.
 	//if (tiles.size() <= 0)
@@ -504,14 +508,26 @@ std::unique_ptr<GenericRaster> RasterDB::load(int channelid, const TemporalRefer
 		if (io_cost)
 			*io_cost += tile.size;
 
+		if (loaded_zoom != returned_zoom) {
+			auto new_width = tile_raster->width >> (returned_zoom - loaded_zoom);
+			auto new_height = tile_raster->height >> (returned_zoom - loaded_zoom);
+			if (new_width <= 0 || new_height <= 0)
+				continue;
+			tile_raster = tile_raster->scale(new_width, new_height);
+		}
+
+		int64_t blit_dest_x = ((int64_t) tile.x1-x1) >> returned_zoom;
+		int64_t blit_dest_y = ((int64_t) tile.y1-y1) >> returned_zoom;
+		int64_t blit_dest_z = 0; // ((int64_t) tile.z1-z1) >> returned_zoom
+
 		if (transform && channels[channelid]->hasTransform()) {
 			transformedBlit(
 				result.get(), tile_raster.get(),
-				((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* (r_z1-z1) >> zoom*/,
+				blit_dest_x, blit_dest_y, blit_dest_z,
 				channels[channelid]->getOffset(result_attributes), channels[channelid]->getScale(result_attributes));
 		}
 		else
-			result->blit(tile_raster.get(), ((int64_t) tile.x1-x1) >> zoom, ((int64_t) tile.y1-y1) >> zoom, 0/* ((int64_t) r_z1-z1) >> zoom*/);
+			result->blit(tile_raster.get(), blit_dest_x, blit_dest_y, blit_dest_z);
 	}
 
 	if (flipx || flipy) {

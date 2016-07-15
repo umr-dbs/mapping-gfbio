@@ -129,7 +129,7 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
     		points->feature_attributes.textual("scientific_name").set(i, row[3].as<std::string>());
     	}
     }
-    points->addDefaultTimestamps();
+    //points->addDefaultTimestamps();
 
     return points;
 }

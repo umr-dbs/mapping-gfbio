@@ -24,8 +24,11 @@ void SQLite::open(const char *filename, bool readonly) {
 		throw SQLiteException("DB already open");
 
 	int rc = sqlite3_open_v2(filename, &db, readonly ? (SQLITE_OPEN_READONLY) : (SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE), nullptr);
+
 	if (rc != SQLITE_OK)
 		throw SQLiteException(concat("Can't open database ", filename, ": ", sqlite3_errmsg(db)));
+
+	sqlite3_busy_timeout(db, 1000);
 }
 
 

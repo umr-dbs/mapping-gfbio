@@ -21,7 +21,7 @@
 #include <pqxx/pqxx>
 
 /**
- * This operator fetches GBIF occurrences directly from postgres. It should eventually be replaced by a
+ * This operator fetches GBIF occurrences and IUCN expert rangesdirectly from postgres. It should eventually be replaced by a
  * more generic vector source.
  */
 class GFBioSourceOperator : public GenericOperator {
@@ -52,7 +52,7 @@ GFBioSourceOperator::GFBioSourceOperator(int sourcecounts[], GenericOperator *so
 	includeMetadata = params.get("includeMetadata", false).asBool();
 
 	if(scientificName.length() < 3)
-		throw ArgumentException("GBIFSourceOperator: scientificName must contain at least 3 characters");
+		throw ArgumentException("GFBioSourceOperator: scientificName must contain at least 3 characters");
 }
 
 GFBioSourceOperator::~GFBioSourceOperator() {
@@ -71,7 +71,7 @@ void GFBioSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 
 void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	if(dataSource == "GBIF") {
-		pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
+		pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
 
 		std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
 
@@ -93,7 +93,7 @@ void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
 std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	//connect
 	//TODO: reuse
-	pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
+	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
 
 	std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
 
@@ -138,7 +138,7 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
 std::unique_ptr<PolygonCollection> GFBioSourceOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
 	//connect
 	//TODO: reuse
-	pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
+	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
 
 	std::string taxa = GFBioDataUtil::resolveTaxaNames(connection, scientificName);
 

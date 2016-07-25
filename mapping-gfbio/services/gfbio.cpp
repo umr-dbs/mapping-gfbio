@@ -11,9 +11,7 @@
 #include <sstream>
 #include <json/json.h>
 
-#include <dirent.h>
-
-#include <pqxx/pqxx>
+#include <fstream>
 
 /*
  * This class provides methods for GFBio users
@@ -182,6 +180,26 @@ void GFBioService::run() {
 			return;
 		}
 
+		if(request == "abcd") {
+			auto path = Configuration::get("gfbio.abcd.datapath");
+
+			std::ifstream file(path + "gfbio_datacenters.json");
+			if (!file.is_open()) {
+				response.sendFailureJSON("gfbio_datacenters.json missing");
+				return;
+			}
+
+			Json::Reader reader(Json::Features::strictMode());
+			Json::Value root;
+			if (!reader.parse(file, root)) {
+				response.sendFailureJSON("gfbio_datacenters.json invalid");
+				return;
+			}
+
+			response.sendSuccessJSON(root);
+			return;
+		}
+
 
 		//protected methods
 		auto session = UserDB::loadSession(params.get("sessiontoken"));
@@ -258,38 +276,6 @@ void GFBioService::run() {
 			json["baskets"] = jsonBaskets;
 			response.sendSuccessJSON(json);
 
-			return;
-		}
-
-		if(request == "abcd") {
-			auto path = Configuration::get("gfbio.abcd.datapath");
-
-			std::string suffix = ".xml";
-
-			DIR *dir = opendir(path.c_str());
-			struct dirent *ent;
-			if (dir == nullptr)
-				throw ArgumentException(concat("Could not open path for enumerating: ", path));
-
-			Json::Value json(Json::objectValue);
-			Json::Value archives(Json::arrayValue);
-
-			while ((ent = readdir(dir)) != nullptr) {
-				std::string name = ent->d_name;
-				if (name.length() > suffix.length() && name.compare(name.length() - suffix.length(), suffix.length(), suffix) == 0) {
-					// TODO store and get metadata
-					Json::Value archive(Json::objectValue);
-					archive["file"] = name;
-					archive["provider"] = name.substr(0, name.find("_"));
-					archive["dataset"] = name.substr(name.find("_") + 1, name.length() - name.find("_") - 5);
-					archive["link"] = "http://example.com";
-					archives.append(archive);
-				}
-			}
-			closedir(dir);
-
-			json["archives"] = archives;
-			response.sendSuccessJSON(json);
 			return;
 		}
 

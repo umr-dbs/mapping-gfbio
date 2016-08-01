@@ -209,14 +209,14 @@ UserDBBackend::userid_t SQLiteUserDBBackend::findExternalUser(const std::string 
 }
 
 void SQLiteUserDBBackend::setUserExternalid(userid_t userid, const std::string &externalid) {
-	auto stmt = db.prepare("UPDATE users SET pwhash = 'external', externalid = ? WHERE userid = ? LIMIT 1");
+	auto stmt = db.prepare("UPDATE users SET pwhash = 'external', externalid = ? WHERE userid = ?");
 	stmt.bind(1, externalid);
 	stmt.bind(2, userid);
 	stmt.exec();
 }
 
 void SQLiteUserDBBackend::setUserPassword(userid_t userid, const std::string &password) {
-	auto stmt = db.prepare("UPDATE users SET pwhash = ?, externalid = NULL WHERE userid = ? LIMIT 1");
+	auto stmt = db.prepare("UPDATE users SET pwhash = ?, externalid = NULL WHERE userid = ?");
 	stmt.bind(1, createPwdHash(password));
 	stmt.bind(2, userid);
 	stmt.exec();
@@ -229,7 +229,7 @@ void SQLiteUserDBBackend::addUserPermission(userid_t userid, const std::string &
 	stmt.exec();
 }
 void SQLiteUserDBBackend::removeUserPermission(userid_t userid, const std::string &permission) {
-	auto stmt = db.prepare("DELETE from user_permissions WHERE userid = ? AND permission = ? LIMIT 1");
+	auto stmt = db.prepare("DELETE from user_permissions WHERE userid = ? AND permission = ?");
 	stmt.bind(1, userid);
 	stmt.bind(2, permission);
 	stmt.exec();
@@ -278,7 +278,7 @@ void SQLiteUserDBBackend::addUserToGroup(userid_t userid, groupid_t groupid) {
 	stmt.exec();
 }
 void SQLiteUserDBBackend::removeUserFromGroup(userid_t userid, groupid_t groupid) {
-	auto stmt = db.prepare("DELETE from user_to_group WHERE userid = ? AND groupid = ? LIMIT 1");
+	auto stmt = db.prepare("DELETE from user_to_group WHERE userid = ? AND groupid = ?");
 	stmt.bind(1, userid);
 	stmt.bind(2, groupid);
 	stmt.exec();
@@ -292,7 +292,7 @@ void SQLiteUserDBBackend::addGroupPermission(groupid_t groupid, const std::strin
 
 }
 void SQLiteUserDBBackend::removeGroupPermission(groupid_t groupid, const std::string &permission) {
-	auto stmt = db.prepare("DELETE from group_permissions WHERE groupid = ? AND permission = ? LIMIT 1");
+	auto stmt = db.prepare("DELETE from group_permissions WHERE groupid = ? AND permission = ?");
 	stmt.bind(1, groupid);
 	stmt.bind(2, permission);
 	stmt.exec();

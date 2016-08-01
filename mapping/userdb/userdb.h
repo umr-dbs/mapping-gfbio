@@ -35,6 +35,12 @@ class UserDB {
 		class Artifact;
 
 		// helper classes
+		class Cacheable {
+			public:
+				Cacheable();
+				time_t cache_expires;
+		};
+
 		class Permissions {
 			friend class UserDB;
 			public:
@@ -117,7 +123,7 @@ class UserDB {
 				Permissions group_permissions;
 				friend class User;
 		};
-		class Session {
+		class Session : public Cacheable {
 			public:
 				Session(const std::string &sessiontoken, std::shared_ptr<User> user, time_t expires);
 
@@ -184,7 +190,7 @@ class UserDB {
 
 		// static methods
 		static void initFromConfiguration();
-		static void init(const std::string &backend, const std::string &location, std::unique_ptr<Clock> clock = nullptr);
+		static void init(const std::string &backend, const std::string &location, std::unique_ptr<Clock> clock = nullptr, int sessioncache_timeout = 0);
 		static void shutdown();
 
 		static std::shared_ptr<User> createUser(const std::string &username, const std::string &realname, const std::string &email, const std::string &password);
@@ -249,8 +255,6 @@ class UserDB {
 
 		static time_t time();
 		static std::unique_ptr<Clock> clock;
-
-		// TODO: sessioncache?
 };
 
 

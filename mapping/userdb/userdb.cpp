@@ -11,12 +11,16 @@
 #include <unordered_map>
 #include <random>
 #include <cstring>
+#include <mutex>
 
 // all of these just to open /dev/urandom ..
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+
+UserDB::Cacheable::Cacheable() : cache_expires(0) {}
 
 
 /*
@@ -257,12 +261,48 @@ std::string UserDB::createRandomToken(size_t length) {
 }
 
 
+/*
+ * Sessioncache
+ */
+/*
+ * As the sessioncache is a process-local cache, global cache invalidation is impossible.
+ * To make sure that permission changes or logouts take effect soon enough, this timeout should remain low.
+ */
+static int sessioncache_timeout = 0;
+static std::unordered_map<std::string, std::weak_ptr<UserDB::Session> > sessioncache;
+static std::mutex sessioncache_mutex;
+
+static std::shared_ptr<UserDB::Session> loadSessionFromCache(const std::string &sessiontoken, time_t t) {
+	if (sessioncache_timeout <= 0)
+		return nullptr;
+
+	std::lock_guard<std::mutex> lock(sessioncache_mutex);
+	auto it = sessioncache.find(sessiontoken);
+	if (it != sessioncache.end()) {
+		auto &weak_ptr = it->second;
+		auto session = weak_ptr.lock();
+		if (session && session->cache_expires >= t)
+			return session;
+		else
+			sessioncache.erase(it);
+	}
+	return nullptr;
+}
+
+static void addSessionToCache(std::shared_ptr<UserDB::Session> &session, time_t t) {
+	if (sessioncache_timeout <= 0)
+		return;
+
+	session->cache_expires = t + sessioncache_timeout;
+	std::lock_guard<std::mutex> lock(sessioncache_mutex);
+	sessioncache[session->getSessiontoken()] = std::weak_ptr<UserDB::Session>(session);
+}
 
 
 /*
  * UserDB
  */
-void UserDB::init(const std::string &backend, const std::string &location, std::unique_ptr<Clock> _clock) {
+void UserDB::init(const std::string &backend, const std::string &location, std::unique_ptr<Clock> _clock, int _sessioncache_timeout) {
 	if (userdb_backend != nullptr)
 		throw MustNotHappenException("UserDB::init() was called multiple times");
 
@@ -280,12 +320,15 @@ void UserDB::init(const std::string &backend, const std::string &location, std::
 		clock = std::move(_clock);
 	else
 		clock = make_unique<UnixClock>();
+
+	sessioncache_timeout = _sessioncache_timeout;
 }
 
 void UserDB::initFromConfiguration() {
 	auto backend = Configuration::get("userdb.backend");
 	auto location = Configuration::get("userdb." + backend + ".location");
-	init(backend, location);
+	auto sessioncache_timeout = Configuration::getInt("userdb.sessioncache.timeout", 0);
+	init(backend, location, nullptr, sessioncache_timeout);
 }
 
 void UserDB::shutdown() {
@@ -384,12 +427,25 @@ std::shared_ptr<UserDB::Session> UserDB::createSessionForExternalUser(const std:
 	return loadSession(sessiontoken);
 }
 
+
 std::shared_ptr<UserDB::Session> UserDB::loadSession(const std::string &sessiontoken) {
-	auto sessiondata = userdb_backend->loadSession(sessiontoken);
-	auto user = loadUser(sessiondata.userid);
-	auto session = std::make_shared<UserDB::Session>(sessiontoken, user, sessiondata.expires);
+	auto t = time();
+
+	// try reading from the sessioncache first
+	auto session = loadSessionFromCache(sessiontoken, t);
+
+	// now read from the backend
+	if (!session) {
+		auto sessiondata = userdb_backend->loadSession(sessiontoken);
+		auto user = loadUser(sessiondata.userid);
+		session = std::make_shared<UserDB::Session>(sessiontoken, user, sessiondata.expires);
+		addSessionToCache(session, t);
+	}
+
+	// We also store expired sessions in the cache, to make throwing this exception cheaper.
 	if (session->isExpired())
 		throw UserDB::session_expired_error();
+
 	return session;
 }
 

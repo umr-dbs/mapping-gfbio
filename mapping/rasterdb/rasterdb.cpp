@@ -3,8 +3,6 @@
 #include "datatypes/raster/typejuggling.h"
 #include "rasterdb/rasterdb.h"
 #include "rasterdb/backend.h"
-#include "rasterdb/backend_local.h"
-#include "rasterdb/backend_remote.h"
 #include "converters/converter.h"
 #include "util/sqlite.h"
 #include "util/configuration.h"
@@ -155,11 +153,9 @@ class RasterDBChannel {
 
 std::unique_ptr<RasterDBBackend> instantiate_backend() {
 	auto backendtype = Configuration::get("rasterdb.backend", "local");
+	auto backendlocation = Configuration::get("rasterdb." + backendtype + ".location");
 
-	if (backendtype == "remote")
-		return make_unique<RemoteRasterDBBackend>();
-	else
-		return make_unique<LocalRasterDBBackend>();
+	return RasterDBBackend::create(backendtype, backendlocation);
 }
 
 

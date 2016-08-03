@@ -3,6 +3,8 @@
 
 #include "datatypes/attributes.h"
 #include "rasterdb/converters/converter.h"
+#include "util/make_unique.h"
+
 #include <stdint.h>
 #include <vector>
 
@@ -42,6 +44,8 @@ class RasterDBBackend {
 				double time_end;
 		};
 
+		static std::unique_ptr<RasterDBBackend> create(const std::string &backend, const std::string &location);
+
 		virtual ~RasterDBBackend() {};
 
 		virtual std::vector<std::string> enumerateSources() = 0;
@@ -69,5 +73,13 @@ class RasterDBBackend {
 		bool is_opened;
 		bool is_writeable;
 };
+
+class RasterDBBackendRegistration {
+	public:
+		RasterDBBackendRegistration(const char *name, std::unique_ptr<RasterDBBackend> (*constructor)(const std::string &));
+};
+
+#define REGISTER_RASTERDB_BACKEND(classname, name) static std::unique_ptr<RasterDBBackend> create##classname(const std::string &location) { return make_unique<classname>(location); } static RasterDBBackendRegistration register_##classname(name, create##classname)
+
 
 #endif

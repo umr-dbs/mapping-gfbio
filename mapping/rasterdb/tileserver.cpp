@@ -1,6 +1,5 @@
 #include "util/exceptions.h"
 #include "rasterdb/backend.h"
-#include "rasterdb/backend_local.h"
 #include "rasterdb/backend_remote.h"
 #include "util/configuration.h"
 #include "util/make_unique.h"
@@ -14,13 +13,13 @@ class TileServerConnection : public NonblockingServer::Connection {
 	private:
 		virtual void processData(std::unique_ptr<BinaryReadBuffer> request);
 		virtual void processDataAsync();
-		std::shared_ptr<LocalRasterDBBackend> backend;
+		std::shared_ptr<RasterDBBackend> backend;
 		std::unique_ptr<RasterDBBackend::TileDescription> tile;
 };
 
 TileServerConnection::TileServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id) {
 	Log::info("%d: connected", id);
-	backend = make_unique<LocalRasterDBBackend>();
+	backend = RasterDBBackend::create("local", Configuration::get("rasterdb.local.location"));
 }
 
 TileServerConnection::~TileServerConnection() {

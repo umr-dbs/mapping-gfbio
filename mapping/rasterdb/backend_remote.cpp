@@ -18,7 +18,9 @@
 #include <unistd.h>
 
 
-RemoteRasterDBBackend::RemoteRasterDBBackend() {
+RemoteRasterDBBackend::RemoteRasterDBBackend(const std::string &location) {
+	// TODO: actually parse location
+
 	auto servername = Configuration::get("rasterdb.remote.host");
 	auto serverport = Configuration::get("rasterdb.remote.port");
 	cache_directory = Configuration::get("rasterdb.remote.cache", "");
@@ -285,3 +287,5 @@ std::unique_ptr<ByteBuffer> RemoteRasterDBBackend::readTile(const TileDescriptio
 	}
 	return bb;
 }
+
+REGISTER_RASTERDB_BACKEND(RemoteRasterDBBackend, "remote");

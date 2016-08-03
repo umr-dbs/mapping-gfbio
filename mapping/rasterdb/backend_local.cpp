@@ -1,21 +1,58 @@
 
-#include "rasterdb/backend_local.h"
-#include "util/configuration.h"
-#include "util/make_unique.h"
+#include "rasterdb/backend.h"
 
+#include "util/sqlite.h"
 
 #include <sys/file.h> // flock()
 #include <sys/types.h> // the next three are for posix open()
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <string>
+
 #include <iostream>
 #include <fstream>
-
 #include <dirent.h>
 
 
-LocalRasterDBBackend::LocalRasterDBBackend() : lockedfile(-1) {
+class LocalRasterDBBackend : public RasterDBBackend {
+	public:
+		LocalRasterDBBackend(const std::string &location);
+		virtual ~LocalRasterDBBackend();
+
+		virtual std::vector<std::string> enumerateSources();
+		virtual std::string readJSON(const std::string &sourcename);
+
+		virtual void open(const std::string &sourcename, bool writeable);
+		virtual std::string readJSON();
+		virtual rasterid_t createRaster(int channel, double time_start, double time_end, const AttributeMaps &attributes);
+		virtual void writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom, const std::string &compression);
+		virtual void linkRaster(int channelid, double time_of_reference, double time_start, double time_end);
+
+
+		virtual RasterDescription getClosestRaster(int channelid, double t1, double t2);
+		virtual void readAttributes(rasterid_t rasterid, AttributeMaps &attributes);
+		virtual int getBestZoom(rasterid_t rasterid, int desiredzoom);
+		virtual const std::vector<TileDescription> enumerateTiles(int channelid, rasterid_t rasterid, int x1, int y1, int x2, int y2, int zoom = 0);
+		virtual bool hasTile(rasterid_t rasterid, uint32_t width, uint32_t height, uint32_t depth, int offx, int offy, int offz, int zoom);
+		virtual std::unique_ptr<ByteBuffer> readTile(const TileDescription &tiledesc);
+
+	private:
+		void init();
+		void cleanup();
+
+		int lockedfile;
+		std::string location;
+		std::string sourcename;
+		std::string filename_json;
+		std::string filename_data;
+		std::string filename_db;
+		std::string json;
+		SQLite db;
+};
+
+
+LocalRasterDBBackend::LocalRasterDBBackend(const std::string &location) : lockedfile(-1), location(location) {
 }
 
 LocalRasterDBBackend::~LocalRasterDBBackend() {
@@ -31,14 +68,12 @@ static bool has_suffix(const std::string &str, const std::string &suffix) {
 std::vector<std::string> LocalRasterDBBackend::enumerateSources() {
 	std::vector<std::string> sourcenames;
 
-	auto path = Configuration::get("rasterdb.local.path", "");
-
 	std::string suffix = ".json";
 
-	DIR *dir = opendir(path.c_str());
+	DIR *dir = opendir(location.c_str());
 	struct dirent *ent;
 	if (dir == nullptr)
-		throw ArgumentException(concat("Could not open path for enumerating: ", path));
+		throw ArgumentException(concat("Could not open path for enumerating: ", location));
 
 	while ((ent = readdir(dir)) != nullptr) {
 		std::string name = ent->d_name;
@@ -50,7 +85,7 @@ std::vector<std::string> LocalRasterDBBackend::enumerateSources() {
 	return sourcenames;
 }
 std::string LocalRasterDBBackend::readJSON(const std::string &sourcename) {
-	std::string basepath = Configuration::get("rasterdb.local.path", "") + sourcename;
+	std::string basepath = location + sourcename;
 	filename_json = basepath + ".json";
 	std::ifstream file(filename_json.c_str());
 	if (!file.is_open())
@@ -72,7 +107,7 @@ void LocalRasterDBBackend::open(const std::string &_sourcename, bool writeable) 
 	sourcename = _sourcename;
 	is_writeable = writeable;
 
-	std::string basepath = Configuration::get("rasterdb.local.path", "") + sourcename;
+	std::string basepath = location + sourcename;
 
 	filename_json = basepath + ".json";
 	filename_data = basepath + ".dat";
@@ -466,3 +501,6 @@ std::unique_ptr<ByteBuffer> LocalRasterDBBackend::readTile(const TileDescription
 #endif
 	return buffer;
 }
+
+
+REGISTER_RASTERDB_BACKEND(LocalRasterDBBackend, "local");

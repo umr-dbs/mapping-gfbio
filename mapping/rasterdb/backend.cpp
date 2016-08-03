@@ -2,6 +2,8 @@
 #include "rasterdb/backend.h"
 #include "util/binarystream.h"
 
+#include <unordered_map>
+
 
 RasterDBBackend::TileDescription::TileDescription(BinaryReadBuffer &buffer) {
 	buffer.read(&tileid);
@@ -55,4 +57,28 @@ void RasterDBBackend::writeTile(rasterid_t rasterid, ByteBuffer &buffer, uint32_
 
 void RasterDBBackend::linkRaster(int channelid, double time_of_reference, double time_start, double time_end) {
 	throw std::runtime_error("RasterDBBackend::linkRaster() not implemented in this backend");
+}
+
+
+
+// RasterDB registration
+typedef std::unique_ptr<RasterDBBackend> (*BackendConstructor)(const std::string &location);
+
+static std::unordered_map< std::string, BackendConstructor > *getRegisteredConstructorsMap() {
+	static std::unordered_map< std::string, BackendConstructor > registered_constructors;
+	return &registered_constructors;
+}
+
+RasterDBBackendRegistration::RasterDBBackendRegistration(const char *name, BackendConstructor constructor) {
+	auto map = getRegisteredConstructorsMap();
+	(*map)[std::string(name)] = constructor;
+}
+
+std::unique_ptr<RasterDBBackend> RasterDBBackend::create(const std::string &backend, const std::string &location) {
+	auto map = getRegisteredConstructorsMap();
+	if (map->count(backend) != 1)
+		throw ArgumentException(concat("Unknown rasterdb backend: ", backend));
+
+	auto constructor = map->at(backend);
+	return constructor(location);
 }

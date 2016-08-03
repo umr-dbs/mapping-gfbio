@@ -56,6 +56,7 @@ class BinaryStream {
 		BinaryStream &operator=(BinaryStream &&);
 
 		// Static constructors
+		static BinaryStream connectURL(const std::string &url);
 		static BinaryStream connectUNIX(const char *server_path);
 		static BinaryStream connectTCP(const char *hostname, int port, bool no_delay = false);
 		static BinaryStream fromAcceptedSocket(int socket, bool no_delay = false);

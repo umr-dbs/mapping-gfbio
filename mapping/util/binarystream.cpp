@@ -59,6 +59,26 @@ BinaryStream &BinaryStream::operator=(BinaryStream &&other) {
  * BinaryStream
  * Static constructors
  */
+BinaryStream BinaryStream::connectURL(const std::string &url) {
+	if (url.substr(0, 4) == "tcp:") {
+		auto host_and_port = url.substr(4);
+		auto colon = host_and_port.find(':');
+		if (colon == std::string::npos)
+			throw ArgumentException("BinaryStream::connectURL invalid format, use tcp:host:port");
+		auto host = host_and_port.substr(0, colon);
+		auto port = atoi(host_and_port.substr(colon+1).c_str());
+
+		if (host.size() < 1 || port <= 0)
+			throw ArgumentException("BinaryStream::connectURL invalid format, use tcp:host:port");
+		return connectTCP(host.c_str(), port);
+	}
+	else if (url.substr(0, 5) == "unix:") {
+		auto path = url.substr(5);
+		return connectUNIX(path.c_str());
+	}
+	throw ArgumentException("BinaryStream::connectURL unknown schema, use tcp:host:port or unix:/path/to/socket");
+}
+
 BinaryStream BinaryStream::connectUNIX(const char *server_path) {
 	int new_fd = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (new_fd < 0)

@@ -19,17 +19,10 @@
 
 
 RemoteRasterDBBackend::RemoteRasterDBBackend(const std::string &location) {
-	// TODO: actually parse location
-
-	auto servername = Configuration::get("rasterdb.remote.host");
-	auto serverport = Configuration::get("rasterdb.remote.port");
+	// TODO: is a global cache ok, or do we want to manually configure this for unittests?
 	cache_directory = Configuration::get("rasterdb.remote.cache", "");
 
-	int portnr = atoi(serverport.c_str());
-
-	//printf("Connecting to %s port %d\n", servername.c_str(), portnr);
-
-	stream = BinaryStream::connectTCP(servername.c_str(), portnr, true);
+	stream = BinaryStream::connectURL(location);
 }
 
 RemoteRasterDBBackend::~RemoteRasterDBBackend() {

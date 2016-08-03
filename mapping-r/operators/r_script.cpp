@@ -78,9 +78,8 @@ void RScriptOperator::writeSemanticParameters(std::ostringstream& stream) {
 #ifndef MAPPING_OPERATOR_STUBS
 std::unique_ptr<BinaryReadBuffer> RScriptOperator::runScript(const QueryRectangle &rect, char requested_type, QueryProfiler &profiler) {
 
-	auto &host = Configuration::get("operators.r.host");
-	auto port = Configuration::getInt("operators.r.port");
-	BinaryStream stream = BinaryStream::connectTCP(host.c_str(), port);
+	auto host = Configuration::get("operators.r.location");
+	BinaryStream stream = BinaryStream::connectURL(host);
 
 	BinaryWriteBuffer request;
 	request.write(RSERVER_MAGIC_NUMBER);

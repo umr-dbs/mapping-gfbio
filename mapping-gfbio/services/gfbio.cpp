@@ -32,8 +32,8 @@ public:
 		: public std::runtime_error { using std::runtime_error::runtime_error; };
 
 private:
-	std::string authenticateWithPortal(const std::string &token);
-	Json::Value getUserDetailsFromPortal(const std::string &userId);
+	size_t authenticateWithPortal(const std::string &token);
+	Json::Value getUserDetailsFromPortal(const size_t userId);
 
 	static constexpr const char* EXTERNAL_ID_PREFIX = "GFBIO:";
 
@@ -46,13 +46,20 @@ REGISTER_HTTP_SERVICE(GFBioService, "gfbio");
  * authenticate user token with portal
  * @return portaluserId of the user
  */
-std::string GFBioService::authenticateWithPortal(const std::string &token) {
-	std::ostringstream data;
+size_t GFBioService::authenticateWithPortal(const std::string &token) {
+	std::stringstream data;
 	cURL curl;
-	curl.setOpt(CURLOPT_URL, Configuration::get("userdb.gfbio.authenticationurl").c_str());
+	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+	curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get("gfbio.portal.user"), ":", Configuration::get("gfbio.portal.password")).c_str());
+	curl.setOpt(CURLOPT_URL, (Configuration::get("gfbio.portal.authenticateurl") + "/token/" + token).c_str());
+
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
+	curl.setOpt(CURLOPT_POST, 1);
+
+	curl.setOpt(CURLOPT_POSTFIELDS, ("token=" + token).c_str());
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
-	//TODO: token as parameter
+
 
 	try {
 		curl.perform();
@@ -65,22 +72,30 @@ std::string GFBioService::authenticateWithPortal(const std::string &token) {
 	if (!reader.parse(data.str(), response))
 		throw GFBioService::GFBioServiceException("GFBioService: Portal response invalid (malformed JSON)");
 
-	if(response.get("success", false).asBool()) {
-		if(!response.isMember("userId"))
+
+	 // return 0 : success, 1 : token expired,
+	 // 2 : no record found, 3 non-admin user,
+	 // 4 : unknown error;
+	if(response.size() == 1 && response[0].get("success", 4).asInt() == 0) {
+		if(!response[0].isMember("userid"))
 			throw GFBioService::GFBioServiceException("GFBioService: Portal response invalid (missing userId)");
 
-		return response["userId"].asString();
+		return response[0]["userid"].asInt();
 	} else
 		throw GFBioService::GFBioServiceException("GFBioService: wrong portal credentials");
 }
 
 /**
  * get user details from portal for given userId
+ * @return the first element from the portal's JSON response array
  */
-Json::Value GFBioService::getUserDetailsFromPortal(const std::string &userId) {
-	std::ostringstream data;
+Json::Value GFBioService::getUserDetailsFromPortal(const size_t userId) {
+	std::stringstream data;
 	cURL curl;
-	curl.setOpt(CURLOPT_URL, Configuration::get("gfbio.portal.userdetailswebserviceurl").c_str());
+	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+	curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get("gfbio.portal.user"), ":", Configuration::get("gfbio.portal.password")).c_str());
+	curl.setOpt(CURLOPT_URL, (concat(Configuration::get("gfbio.portal.userdetailswebserviceurl"), "?userId=", userId)).c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
 
@@ -92,10 +107,10 @@ Json::Value GFBioService::getUserDetailsFromPortal(const std::string &userId) {
 
 	Json::Reader reader(Json::Features::strictMode());
 	Json::Value response;
-	if (!reader.parse(data.str(), response))
+	if (!reader.parse(data.str(), response) || response.size() < 1 || !response[0].isMember("emailAddress"))
 		throw GFBioService::GFBioServiceException("GFBioService: Portal response invalid (malformed JSON)");
 
-	return response;
+	return response[0];
 }
 
 void GFBioService::run() {
@@ -103,26 +118,31 @@ void GFBioService::run() {
 		std::string request = params.get("request");
 
 		if(request == "login"){
+			// login to the vat system using GFBio portal token
 			std::string token = params.get("token");
 
-			std::string gfbioId = authenticateWithPortal(token);
-			std::string externalId = EXTERNAL_ID_PREFIX + gfbioId;
+			size_t gfbioId = authenticateWithPortal(token);
+			std::string externalId = EXTERNAL_ID_PREFIX + std::to_string(gfbioId);
 
 			std::shared_ptr<UserDB::Session> session;
 			try {
+				// create session for user if he already exists
 				session = UserDB::createSessionForExternalUser(externalId, 8 * 3600);
-			} catch (const UserDB::authentication_error&) {
-				//user does not exist locally => create
-				Json::Value userDetails = getUserDetailsFromPortal(externalId);
-				UserDB::createExternalUser(userDetails.get("email", "").asString(),
-										   userDetails.get("name", "").asString(),
-										   userDetails.get("email", "").asString(), externalId);
+			} catch (const UserDB::authentication_error& e) {
+				// user does not exist locally => create
+				Json::Value userDetails = getUserDetailsFromPortal(gfbioId);
+				try {
+					UserDB::createExternalUser(userDetails.get("emailAddress", "").asString(),
+											   userDetails.get("firstName", "").asString() + " " + userDetails.get("lastName", "").asString(),
+											   userDetails.get("emailAddress", "").asString(), externalId);
 
-				session = UserDB::createSessionForExternalUser(externalId, 8 * 3600);
+					session = UserDB::createSessionForExternalUser(externalId, 8 * 3600);
+				} catch (const std::exception&) {
+					throw GFBioService::GFBioServiceException("GFBioService: Could not create new user from GFBio portal.");
+				}
 			}
 
 			response.sendSuccessJSON("session", session->getSessiontoken());
-
 			return;
 		}
 
@@ -219,11 +239,10 @@ void GFBioService::run() {
 			// get baskets from portal
 			std::stringstream data;
 			cURL curl;
+			curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
 			curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-			std::string auth = Configuration::get("gfbio.portal.user") + ":" + Configuration::get("gfbio.portal.password");
 			curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get("gfbio.portal.user"), ":", Configuration::get("gfbio.portal.password")).c_str());
 			curl.setOpt(CURLOPT_URL, concat(Configuration::get("gfbio.portal.basketwebserviceurl"), "?userId=", gfbioId).c_str());
-			curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy").c_str());
 			curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 			curl.setOpt(CURLOPT_WRITEDATA, &data);
 
@@ -272,13 +291,13 @@ void GFBioService::run() {
 				}
 			}
 
-			Json::Value json(Json::arrayValue);
+			Json::Value json(Json::objectValue);
 			json["baskets"] = jsonBaskets;
 			response.sendSuccessJSON(json);
 
 			return;
 		}
-
+		response.sendFailureJSON("GFBioService: Invalid request");
 	}
 	catch (const std::exception &e) {
 		response.sendFailureJSON(e.what());

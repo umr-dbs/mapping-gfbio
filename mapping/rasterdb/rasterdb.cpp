@@ -153,9 +153,11 @@ class RasterDBChannel {
 
 std::unique_ptr<RasterDBBackend> instantiate_backend() {
 	auto backendtype = Configuration::get("rasterdb.backend", "local");
-	auto backendlocation = Configuration::get("rasterdb." + backendtype + ".location");
+	auto params = Configuration::getPrefixedParameters("rasterdb." + backendtype + ".");
+	auto backendlocation = params.get("location");
+	params.erase("location");
 
-	return RasterDBBackend::create(backendtype, backendlocation);
+	return RasterDBBackend::create(backendtype, backendlocation, params);
 }
 
 

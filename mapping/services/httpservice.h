@@ -2,6 +2,7 @@
 #define SERVICES_HTTPSERVICES_H
 
 #include "util/make_unique.h"
+#include "util/configuration.h" // Parameters class
 
 #include <memory>
 #include <string>
@@ -15,21 +16,6 @@
  */
 class HTTPService {
 	public:
-		// class Params
-		class Params : public std::map<std::string, std::string> {
-			public:
-				bool hasParam(const std::string& key) const {
-					return find(key) != end();
-				}
-
-				std::string get(const std::string &name) const;
-				std::string get(const std::string &name, const std::string &defaultValue) const;
-				int getInt(const std::string &name) const;
-				int getInt(const std::string &name, int defaultValue) const;
-				bool getBool(const std::string &name) const;
-				bool getBool(const std::string &name, bool defaultValue) const;
-		};
-
 		// class ResponseStream
 		class HTTPResponseStream : public std::ostream {
 			public:
@@ -83,15 +69,15 @@ class HTTPService {
 				bool headers_sent;
 		};
 
-		HTTPService(const Params& params, HTTPResponseStream& response, std::ostream &error);
+		HTTPService(const Parameters& params, HTTPResponseStream& response, std::ostream &error);
 	protected:
 		HTTPService(const HTTPService &other) = delete;
 		HTTPService &operator=(const HTTPService &other) = delete;
 
 		virtual void run() = 0;
-		static std::unique_ptr<HTTPService> getRegisteredService(const std::string &name,const Params& params, HTTPResponseStream& response, std::ostream &error);
+		static std::unique_ptr<HTTPService> getRegisteredService(const std::string &name,const Parameters &params, HTTPResponseStream &response, std::ostream &error);
 
-		const Params &params;
+		const Parameters &params;
 		HTTPResponseStream &response;
 		std::ostream &error;
 	public:
@@ -104,10 +90,10 @@ class HTTPService {
 
 class HTTPServiceRegistration {
 	public:
-		HTTPServiceRegistration(const char *name, std::unique_ptr<HTTPService> (*constructor)(const HTTPService::Params &params, HTTPService::HTTPResponseStream &response, std::ostream &error));
+		HTTPServiceRegistration(const char *name, std::unique_ptr<HTTPService> (*constructor)(const Parameters &params, HTTPService::HTTPResponseStream &response, std::ostream &error));
 };
 
-#define REGISTER_HTTP_SERVICE(classname, name) static std::unique_ptr<HTTPService> create##classname(const HTTPService::Params &params, HTTPService::HTTPResponseStream &response, std::ostream &error) { return make_unique<classname>(params, response, error); } static HTTPServiceRegistration register_##classname(name, create##classname)
+#define REGISTER_HTTP_SERVICE(classname, name) static std::unique_ptr<HTTPService> create##classname(const Parameters &params, HTTPService::HTTPResponseStream &response, std::ostream &error) { return make_unique<classname>(params, response, error); } static HTTPServiceRegistration register_##classname(name, create##classname)
 
 
 #endif

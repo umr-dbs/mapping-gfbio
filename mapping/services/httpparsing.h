@@ -3,8 +3,8 @@
 
 #include "services/httpservice.h"
 
-void parseQuery(const std::string& query, HTTPService::Params &params);
-void parseGetData(HTTPService::Params &params);
-void parsePostData(HTTPService::Params &params, std::istream &in);
+void parseQuery(const std::string& query, Parameters &params);
+void parseGetData(Parameters &params);
+void parsePostData(Parameters &params, std::istream &in);
 
 #endif

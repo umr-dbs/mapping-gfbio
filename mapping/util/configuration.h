@@ -3,6 +3,23 @@
 #define UTIL_CONFIGURATION_H_
 
 #include <string>
+#include <map>
+
+class Parameters : public std::map<std::string, std::string> {
+	public:
+		bool hasParam(const std::string& key) const;
+
+		const std::string &get(const std::string &name) const;
+		const std::string &get(const std::string &name, const std::string &defaultValue) const;
+		int getInt(const std::string &name) const;
+		int getInt(const std::string &name, int defaultValue) const;
+		bool getBool(const std::string &name) const;
+		bool getBool(const std::string &name, bool defaultValue) const;
+
+		// These do throw exceptions when the string cannot be parsed.
+		static int parseInt(const std::string &str);
+		static bool parseBool(const std::string &str);
+};
 
 /**
  * Class for loading the configuration of the application.
@@ -20,19 +37,26 @@ class Configuration {
 		static void loadFromEnvironment();
 		static void parseLine(const std::string &line);
 	public:
-		static const std::string &get(const std::string &name);
-		static const std::string &get(const std::string &name, const std::string &defaultValue);
-		static int getInt(const std::string &name);
-		static int getInt(const std::string &name, const int defaultValue);
-		static bool getBool(const std::string &name);
-		static bool getBool(const std::string &name, const bool defaultValue);
-
-		// These parsers are helper methods.
-		// They're only exported publicly because HTTPService::Params wants to use them.
-		// They do throw exceptions when the string cannot be parsed.
-		static int parseInt(const std::string &str);
-		static bool parseBool(const std::string &str);
-
+		static const std::string &get(const std::string &name) {
+			return parameters.get(name);
+		}
+		static const std::string &get(const std::string &name, const std::string &defaultValue) {
+			return parameters.get(name, defaultValue);
+		}
+		static int getInt(const std::string &name) {
+			return parameters.getInt(name);
+		}
+		static int getInt(const std::string &name, const int defaultValue) {
+			return parameters.getInt(name, defaultValue);
+		}
+		static bool getBool(const std::string &name) {
+			return parameters.getBool(name);
+		}
+		static bool getBool(const std::string &name, const bool defaultValue) {
+			return parameters.getBool(name, defaultValue);
+		}
+	private:
+		static Parameters parameters;
 };
 
 #endif

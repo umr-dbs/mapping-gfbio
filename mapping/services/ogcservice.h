@@ -15,8 +15,8 @@ class OGCService : public HTTPService {
 	protected:
 		using HTTPService::HTTPService;
 
-		epsg_t parseEPSG(const Params &params, const std::string &key, epsg_t def = EPSG_WEBMERCATOR);
-		TemporalReference parseTime(const Params &params) const;
+		epsg_t parseEPSG(const Parameters &params, const std::string &key, epsg_t def = EPSG_WEBMERCATOR);
+		TemporalReference parseTime(const Parameters &params) const;
 		SpatialReference parseBBOX(const std::string bbox_str, epsg_t epsg = EPSG_WEBMERCATOR, bool allow_infinite = false);
 
 		void outputImage(GenericRaster *raster, bool flipx = false, bool flipy = false, const std::string &colors = "", Raster2D<uint8_t> *overlay = nullptr);

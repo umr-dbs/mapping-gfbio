@@ -68,6 +68,17 @@ bool Parameters::getBool(const std::string &name, const bool defaultValue) const
 	return parseBool(it->second);
 }
 
+Parameters Parameters::getPrefixedParameters(const std::string &prefix) {
+	Parameters result;
+	for (auto &it : *this) {
+		auto &key = it.first;
+		if (key.length() > prefix.length() && key.substr(0, prefix.length()) == prefix) {
+			result[ key.substr(prefix.length()) ] = it.second;
+		}
+	}
+	return result;
+}
+
 
 int Parameters::parseInt(const std::string &str) {
 	return std::stoi(str); // stoi throws if no conversion could be performed

@@ -16,6 +16,19 @@ class Parameters : public std::map<std::string, std::string> {
 		bool getBool(const std::string &name) const;
 		bool getBool(const std::string &name, bool defaultValue) const;
 
+		/**
+		 * Returns all parameters with a given prefix, with the prefix stripped.
+		 * For example, if you have the configurations
+		 *  my.module.paramA = 50
+		 *  my.module.paramB = 20
+		 * then parameters.getPrefixedParameters("my.module.") will return a Parameters object with
+		 *  paramA = 50
+		 *  paramB = 20
+		 *
+		 * @param prefix the prefix of the interesting parameter names. Usually, this should end with a dot.
+		 */
+		Parameters getPrefixedParameters(const std::string &prefix);
+
 		// These do throw exceptions when the string cannot be parsed.
 		static int parseInt(const std::string &str);
 		static bool parseBool(const std::string &str);
@@ -54,6 +67,9 @@ class Configuration {
 		}
 		static bool getBool(const std::string &name, const bool defaultValue) {
 			return parameters.getBool(name, defaultValue);
+		}
+		static Parameters getPrefixedParameters(const std::string &prefix) {
+			return parameters.getPrefixedParameters(prefix);
 		}
 	private:
 		static Parameters parameters;

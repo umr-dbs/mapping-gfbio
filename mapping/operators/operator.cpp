@@ -7,8 +7,6 @@
 
 #include "operators/operator.h"
 #include "cache/manager.h"
-#include "cache/common.h"
-#include "cache/priv/caching_strategy.h"
 
 
 #include <unordered_map>

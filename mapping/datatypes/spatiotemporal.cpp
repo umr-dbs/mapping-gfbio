@@ -3,7 +3,6 @@
 #include "operators/operator.h"
 #include "util/binarystream.h"
 #include "util/debug.h"
-#include "cache/common.h"
 
 #include <math.h>
 #include <limits>
@@ -128,7 +127,7 @@ void TimeInterval::serialize(BinaryWriteBuffer &buffer, bool) const {
 
 void TimeInterval::validate() const {
 	if (t1 >= t2)
-		throw ArgumentException(concat("TimeInterval invalid, requires t1:", t1, " < t2:", t2, "\n", CacheCommon::get_stacktrace()));
+		throw ArgumentException(concat("TimeInterval invalid, requires t1:", t1, " < t2:", t2));
 }
 
 void TimeInterval::validate(double beginning_of_time, double end_of_time) const {

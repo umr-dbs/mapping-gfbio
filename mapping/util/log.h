@@ -7,10 +7,9 @@
 
 #ifndef UTIL_LOG_H_
 #define UTIL_LOG_H_
-//#define DISABLE_LOGGING
 
 #include <string>
-#include <cstdio>
+#include <ostream>
 #include <stdarg.h>
 
 /**
@@ -22,20 +21,34 @@ public:
 		OFF, ERROR, WARN, INFO, DEBUG, TRACE
 	};
 
-	static void setLogFd(FILE *fd);
-	static void setLevel( const std::string &level );
-	static void setLevel(LogLevel level);
+	/**
+	 * Logs to a stream, usually std::cerr
+	 * There can only be one stream at a time. Calling this again will remove the previous stream.
+	 *
+	 * Note that it is the caller's responsibility to ensure that the lifetime of the stream is larger than the lifetime of the log.
+	 */
+	static void logToStream(const std::string &level, std::ostream *stream);
+	static void logToStream(LogLevel level, std::ostream *stream);
+	/**
+	 * Enables logging to memory. It is possible to log both to a stream and to memory at the same time, even with different loglevels.
+	 */
+	static void logToMemory(const std::string &level);
+	static void logToMemory(LogLevel level);
+	/**
+	 * Turns logging off.
+	 */
+	static void off();
+
 	static void error(const char *msg, ...);
+	static void error(const std::string &msg);
 	static void warn(const char *msg, ...);
+	static void warn(const std::string &msg);
 	static void info(const char *msg, ...);
+	static void info(const std::string &msg);
 	static void debug(const char *msg, ...);
+	static void debug(const std::string &msg);
 	static void trace(const char *msg, ...);
-private:
-	static void trace_time( const std::string &msg );
-	static void log(const std::string &level, const char *msg, va_list vargs);
-	static LogLevel level;
-	static FILE *fd;
-	friend class ExecTimer;
+	static void trace(const std::string &msg);
 };
 
 #endif /* LOG_H_ */

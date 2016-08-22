@@ -60,7 +60,7 @@ void execute( Spec &s ) {
 int main(int argc, const char* argv[]) {
 	Configuration::loadFromDefaultPaths();
 	Configuration::load("cluster_experiment.conf");
-	Log::setLevel( Configuration::get("log.level") );
+	Log::logToStream( Configuration::get("log.level"), &std::cerr );
 
 	std::vector<Spec> specs{
 		Spec( cache_exp::avg_temp, 32, 256 ),

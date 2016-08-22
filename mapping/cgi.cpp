@@ -40,6 +40,7 @@ JPEG32: 120703 (90%)
 
 int main() {
 	Configuration::loadFromDefaultPaths();
+	Log::off();
 
 	/*
 	 * Initialize Cache

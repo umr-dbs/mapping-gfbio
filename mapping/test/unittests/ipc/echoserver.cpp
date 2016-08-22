@@ -167,8 +167,7 @@ static void run_client(int id) {
 
 // Spawn a server and hammer it with concurrent requests. See if communication fails somewhere.
 TEST(NonblockingServer, EchoServer) {
-	//Log::setLogFd(stdout);
-	Log::setLevel("off");
+	Log::off();
 	all_clients_successful = true;
 	server_thread_failed = false;
 

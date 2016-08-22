@@ -58,7 +58,7 @@ int main(void) {
 #endif
 	CachingStrategy::init();
 
-	Log::setLevel(Log::LogLevel::INFO);
+	Log::logToStream(Log::LogLevel::INFO, &std::cerr);
 
 	size_t capacity = 50 * 1024 * 1024;
 

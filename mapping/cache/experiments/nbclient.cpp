@@ -273,7 +273,7 @@ std::queue<QTriple> replay_logs(const char *logfile) {
 
 	// this is an ostream without a streambuf. The library *should* handle that and simply output nothing.
 	std::ostream nullstream(nullptr);
-	HTTPService::Params _p;
+	Parameters _p;
 	HTTPService::HTTPResponseStream _hrs(nullptr);
 	OGCServiceWrapper ogc(_p, _hrs, nullstream);
 
@@ -290,7 +290,7 @@ std::queue<QTriple> replay_logs(const char *logfile) {
 			l = l.substr(pos+1);
 
 		try {
-			HTTPService::Params params;
+			Parameters params;
 			parseQuery(l, params);
 
 			auto service = params.get("service");
@@ -409,7 +409,7 @@ std::queue<QTriple> create_run( int argc, char *argv[] ) {
 
 int main(int argc, char *argv[]) {
 	Configuration::loadFromDefaultPaths();
-	Log::setLevel(Log::LogLevel::INFO);
+	Log::logToStream(Log::LogLevel::INFO, &std::cerr);
 
 	std::queue<QTriple> qs;
 	int inter_arrival;

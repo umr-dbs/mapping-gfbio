@@ -11,7 +11,7 @@
  *
  * Mostly used for parameter parsing. Don't use it for enums with lots of values.
  *
- * For an example how to use this, see operators/points/csvpointsource.cpp
+ * For an example how to use this, see operators/source/csv_source.cpp
  */
 template<typename T>
 class EnumConverter {

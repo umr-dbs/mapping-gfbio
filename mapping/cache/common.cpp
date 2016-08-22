@@ -64,7 +64,7 @@ ExecTimer::~ExecTimer() {
 	buffer << "Exit " << name << ". Duration: " << dur << "ms" << std::endl;
 	depth--;
 	if ( depth == 0 ) {
-		Log::trace_time(buffer.str());
+		Log::trace(buffer.str());
 		buffer.str("");
 	}
 }

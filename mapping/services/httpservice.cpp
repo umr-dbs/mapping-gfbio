@@ -2,8 +2,9 @@
 #include "services/httpservice.h"
 #include "services/httpparsing.h"
 #include "util/exceptions.h"
-#include "util/debug.h"
 #include "util/configuration.h"
+#include "util/debug.h"
+#include "util/log.h"
 
 #include <map>
 #include <unordered_map>
@@ -46,6 +47,8 @@ void HTTPService::run(std::streambuf *in, std::streambuf *out, std::streambuf *e
 	std::istream input(in);
 	std::ostream error(err);
 	HTTPResponseStream response(out);
+
+	Log::logToStream(Log::LogLevel::INFO, &error);
 	try {
 		// Parse all entries
 		Parameters params;
@@ -61,6 +64,7 @@ void HTTPService::run(std::streambuf *in, std::streambuf *out, std::streambuf *e
 		error << "Request failed with an exception: " << e.what() << "\n";
 		response.send500("invalid request");
 	}
+	Log::logToStream(Log::LogLevel::OFF, nullptr);
 }
 
 

@@ -21,7 +21,7 @@ int main(int argc, const char* argv[]) {
 	CachingStrategy::init();
 	Configuration::loadFromDefaultPaths();
 	Configuration::load("local_experiments.conf");
-	Log::setLevel( Configuration::get("log.level") );
+	Log::logToStream( Configuration::get("log.level"), &std::cerr );
 
 	// Init opencl
 #ifndef MAPPING_NO_OPENCL

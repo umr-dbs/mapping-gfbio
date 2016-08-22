@@ -73,6 +73,7 @@ void UserService::run() {
 			json["username"] = user.getUsername();
 			json["realname"] = user.getRealname();
 			json["email"] = user.getEmail();
+			json["externalid"] = user.getExternalid();
 
 			response.sendSuccessJSON(json);
 			return;

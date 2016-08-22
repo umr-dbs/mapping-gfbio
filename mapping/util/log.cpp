@@ -60,13 +60,14 @@ static void log(Log::LogLevel level, const std::string &msg) {
 	std::ostringstream ss;
 	ss << "[" << buf << std::setfill('0') << std::setw(3) << (millis % 1000) << "] ";
 	ss << "[" << LogLevelConverter.to_string(level) << "] ";
-	ss << "[" << std::this_thread::get_id() << "] " << msg << std::endl;
+	ss << "[" << std::hex << std::this_thread::get_id() << "] " << msg;
 
+	std::string message = ss.str();
 	// Do the actual logging
 	if (level <= memorylog_level)
-		memorylog.push_back(msg);
+		memorylog.push_back(message);
 	if (level <= streamlog_level && streamlog)
-		(*streamlog) << msg << std::endl;
+		(*streamlog) << message << std::endl;
 }
 
 static Log::LogLevel levelFromString(const std::string &level) {
@@ -76,8 +77,19 @@ static Log::LogLevel levelFromString(const std::string &level) {
 	return LogLevelConverter.from_string(upper);
 }
 
-static std::string sprintf(const char *msg, ...) {
-	return std::string(msg); // TODO
+static std::string sprintf(const char *msg, va_list arglist) {
+	va_list arglist2;
+	va_copy(arglist2, arglist);
+
+	auto len = std::vsnprintf(nullptr, 0, msg, arglist);
+	len = std::max(1, len+1);
+	char *result = new char[len];
+	std::vsnprintf(result, len, msg, arglist2);
+	va_end(arglist2);
+
+	std::string str(result);
+	delete(result);
+	return str;
 }
 
 
@@ -102,6 +114,10 @@ void Log::logToMemory(LogLevel level) {
 	maxLogLevel = std::max(memorylog_level, streamlog_level);
 }
 
+const std::vector<std::string> &Log::getMemoryMessages() {
+	return memorylog;
+}
+
 void Log::off() {
 	memorylog_level = LogLevel::OFF;
 	memorylog.clear();
@@ -110,6 +126,9 @@ void Log::off() {
 	maxLogLevel = LogLevel::OFF;
 }
 
+/*
+ * Implement the actual loglevels
+ */
 void Log::error(const char* msg, ...) {
 	if ( LogLevel::ERROR > maxLogLevel )
 		return;

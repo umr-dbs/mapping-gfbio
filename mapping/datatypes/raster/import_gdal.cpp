@@ -1,7 +1,6 @@
 
 #include "datatypes/raster/raster_priv.h"
 #include "util/gdal.h"
-#include "util/debug.h"
 
 #include <stdint.h>
 #include <cstdlib>
@@ -96,12 +95,6 @@ static std::unique_ptr<GenericRaster> GDALImporter_loadRaster(GDALDataset *datas
 
 		pixel_width = pixel_x2 - pixel_x1 + 1;
 		pixel_height = pixel_y2 - pixel_y1 + 1;
-	}
-
-	{
-		std::ostringstream msg;
-		msg << "GDAL: loading " << pixel_x1 << "," << pixel_y1 << " -> +" << pixel_width << ",+" << pixel_height;
-		d(msg.str());
 	}
 
 	double x1 = origin_x + scale_x * (pixel_x1 - 0.5);

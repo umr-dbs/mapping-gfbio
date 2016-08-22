@@ -2,7 +2,6 @@
 #include "util/exceptions.h"
 #include "operators/operator.h"
 #include "util/binarystream.h"
-#include "util/debug.h"
 
 #include <math.h>
 #include <limits>

@@ -15,7 +15,7 @@ OBJS_CORE += o/core/rasterdb/rasterdb.o o/core/rasterdb/backend.o o/core/rasterd
 OBJS_CORE += o/core/rasterdb/converters/converter.o o/core/rasterdb/converters/raw.o
 # userdb: move to core for now
 OBJS_CORE += o/core/userdb/userdb.o o/core/userdb/backend_sqlite.o
-OBJS_CORE += o/core/util/gdal.o o/core/util/sha1.o o/core/util/curl.o o/core/util/sqlite.o o/core/util/binarystream.o o/core/util/csvparser.o o/core/util/base64.o o/core/util/configuration.o o/core/util/formula.o o/core/util/debug.o o/core/util/timemodification.o o/core/util/log.o o/core/util/timeparser.o o/core/util/sizeutil.o
+OBJS_CORE += o/core/util/gdal.o o/core/util/sha1.o o/core/util/curl.o o/core/util/sqlite.o o/core/util/binarystream.o o/core/util/csvparser.o o/core/util/base64.o o/core/util/configuration.o o/core/util/formula.o o/core/util/timemodification.o o/core/util/log.o o/core/util/timeparser.o o/core/util/sizeutil.o
 # operator and query base must be in core for now
 OBJS_CORE += o/core/operators/operator.o o/core/operators/provenance.o o/core/operators/queryrectangle.o o/core/operators/queryprofiler.o
 

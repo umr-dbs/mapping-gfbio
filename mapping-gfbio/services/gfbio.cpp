@@ -275,12 +275,21 @@ void GFBioService::run() {
 						std::string metadataLink = result["metadatalink"].asString();
 						entry["metadataLink"] = metadataLink;
 
+
 						// better way to determine dataCenter that's equally robust?
 						if(metadataLink.find("doi.pangaea.de/") != std::string::npos) {
 							entry["type"] = "pangaea";
 							entry["doi"] = metadataLink.substr(metadataLink.find("doi.pangaea.de/") + strlen("doi.pangaea.de/"));
+							entry["dataLink"] = result["datalink"];
+							entry["format"] = result["format"];
+
+							entry["available"] = entry["format"].asString().find("text/tab-separated-values") != std::string::npos;
 						} else {
 							entry["type"] = "abcd";
+							entry["dataLink"] = result["parentIdentifier"];
+							entry["unitId"] = result["dcIdentifier"];
+
+							entry["available"] = true; // TODO: should only be available if archive exists and contains geo referenced data
 						}
 
 						basket["results"].append(entry);

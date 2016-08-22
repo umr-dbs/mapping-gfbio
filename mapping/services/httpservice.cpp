@@ -13,7 +13,7 @@
 
 
 // The magic of type registration, see REGISTER_SERVICE in httpservice.h
-typedef std::unique_ptr<HTTPService> (*ServiceConstructor)(const HTTPService::Params& params, HTTPService::HTTPResponseStream& response, std::ostream &error);
+typedef std::unique_ptr<HTTPService> (*ServiceConstructor)(const Parameters& params, HTTPService::HTTPResponseStream& response, std::ostream &error);
 
 static std::unordered_map< std::string, ServiceConstructor > *getRegisteredConstructorsMap() {
 	static std::unordered_map< std::string, ServiceConstructor > registered_constructors;
@@ -26,7 +26,7 @@ HTTPServiceRegistration::HTTPServiceRegistration(const char *name, ServiceConstr
 }
 
 
-std::unique_ptr<HTTPService> HTTPService::getRegisteredService(const std::string &name, const Params& params, HTTPResponseStream& response, std::ostream &error) {
+std::unique_ptr<HTTPService> HTTPService::getRegisteredService(const std::string &name, const Parameters& params, HTTPResponseStream& response, std::ostream &error) {
 	auto map = getRegisteredConstructorsMap();
 	auto it = map->find(name);
 	if (it == map->end())
@@ -38,7 +38,7 @@ std::unique_ptr<HTTPService> HTTPService::getRegisteredService(const std::string
 	return ptr;
 }
 
-HTTPService::HTTPService(const Params& params, HTTPResponseStream& response, std::ostream &error)
+HTTPService::HTTPService(const Parameters& params, HTTPResponseStream& response, std::ostream &error)
 	: params(params), response(response), error(error) {
 }
 
@@ -48,7 +48,7 @@ void HTTPService::run(std::streambuf *in, std::streambuf *out, std::streambuf *e
 	HTTPResponseStream response(out);
 	try {
 		// Parse all entries
-		HTTPService::Params params;
+		Parameters params;
 		parseGetData(params);
 		parsePostData(params, input);
 
@@ -61,46 +61,6 @@ void HTTPService::run(std::streambuf *in, std::streambuf *out, std::streambuf *e
 		error << "Request failed with an exception: " << e.what() << "\n";
 		response.send500("invalid request");
 	}
-}
-
-
-/*
- * Service::Params
- */
-std::string HTTPService::Params::get(const std::string &key) const {
-	auto it = find(key);
-	if (it == end())
-		throw ArgumentException(concat("No parameter with key ", key));
-	return it->second;
-}
-
-std::string HTTPService::Params::get(const std::string &key, const std::string &defaultvalue) const {
-	auto it = find(key);
-	if (it == end())
-		return defaultvalue;
-	return it->second;
-}
-
-int HTTPService::Params::getInt(const std::string &key) const {
-	return Configuration::parseInt(get(key));
-}
-
-int HTTPService::Params::getInt(const std::string &key, int defaultvalue) const {
-	auto it = find(key);
-	if (it == end())
-		return defaultvalue;
-	return Configuration::parseInt(it->second);
-}
-
-bool HTTPService::Params::getBool(const std::string &key) const {
-	return Configuration::parseBool(get(key));
-}
-
-bool HTTPService::Params::getBool(const std::string &key, bool defaultvalue) const {
-	auto it = find(key);
-	if (it == end())
-		return defaultvalue;
-	return Configuration::parseBool(it->second);
 }
 
 

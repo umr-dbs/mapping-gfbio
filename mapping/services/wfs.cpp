@@ -54,7 +54,7 @@ class WFSService : public OGCService {
 
 		// helper functions
 		std::pair<FeatureType, Json::Value> parseTypeNames(const std::string &typeNames) const;
-		std::unique_ptr<PointCollection> clusterPoints(const PointCollection &points, const Params &params) const;
+		std::unique_ptr<PointCollection> clusterPoints(const PointCollection &points, const Parameters &params) const;
 
 		const std::map<std::string, WFSServiceType> stringToRequest {
 			{"GetCapabilities", WFSServiceType::GetCapabilities},
@@ -206,7 +206,7 @@ void WFSService::getFeature() {
 
 
 
-std::unique_ptr<PointCollection> WFSService::clusterPoints(const PointCollection &points, const Params &params) const {
+std::unique_ptr<PointCollection> WFSService::clusterPoints(const PointCollection &points, const Parameters &params) const {
 
 	if(!params.hasParam("resolution")) {
 		throw ArgumentException("WFSService: Cluster operation needs a resolution specified");

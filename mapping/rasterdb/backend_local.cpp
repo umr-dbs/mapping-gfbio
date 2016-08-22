@@ -17,7 +17,7 @@
 
 class LocalRasterDBBackend : public RasterDBBackend {
 	public:
-		LocalRasterDBBackend(const std::string &location);
+		LocalRasterDBBackend(const std::string &location, const Parameters &params);
 		virtual ~LocalRasterDBBackend();
 
 		virtual std::vector<std::string> enumerateSources();
@@ -52,7 +52,7 @@ class LocalRasterDBBackend : public RasterDBBackend {
 };
 
 
-LocalRasterDBBackend::LocalRasterDBBackend(const std::string &location) : lockedfile(-1), location(location) {
+LocalRasterDBBackend::LocalRasterDBBackend(const std::string &location, const Parameters &params) : lockedfile(-1), location(location) {
 }
 
 LocalRasterDBBackend::~LocalRasterDBBackend() {

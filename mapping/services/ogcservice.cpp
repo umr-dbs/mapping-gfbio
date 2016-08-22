@@ -10,13 +10,13 @@
 #include <vector>
 
 
-epsg_t OGCService::parseEPSG(const Params &params, const std::string &key, epsg_t defaultValue) {
+epsg_t OGCService::parseEPSG(const Parameters &params, const std::string &key, epsg_t defaultValue) {
 	if (!params.hasParam(key))
 		return defaultValue;
 	return epsgCodeFromSrsString(params.get(key));
 }
 
-TemporalReference OGCService::parseTime(const Params &parameters) const {
+TemporalReference OGCService::parseTime(const Parameters &parameters) const {
 	TemporalReference tref(TIMETYPE_UNIX);
 	if(parameters.hasParam("time")){
 		//time is specified in ISO8601, it can either be an instant (single datetime) or an interval

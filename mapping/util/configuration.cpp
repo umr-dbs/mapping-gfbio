@@ -18,9 +18,93 @@
 #include <string.h>
 extern char **environ;
 
-static std::map<std::string, std::string> values;
+
+/*
+ * Parameters
+ */
+bool Parameters::hasParam(const std::string& key) const {
+	return find(key) != end();
+}
+
+const std::string &Parameters::get(const std::string &name) const {
+	auto it = find(name);
+	if (it == end())
+		throw ArgumentException(concat("No configuration found for key ", name));
+	return it->second;
+}
+
+const std::string &Parameters::get(const std::string &name, const std::string &defaultValue) const {
+	auto it = find(name);
+	if (it == end())
+		return defaultValue;
+	return it->second;
+}
+
+int Parameters::getInt(const std::string &name) const {
+	auto it = find(name);
+	if (it == end())
+		throw ArgumentException(concat("No configuration found for key ", name));
+	return parseInt(it->second);
+}
+
+int Parameters::getInt(const std::string &name, const int defaultValue) const {
+	auto it = find(name);
+	if (it == end())
+		return defaultValue;
+	return parseInt(it->second);
+}
+
+bool Parameters::getBool(const std::string &name) const {
+	auto it = find(name);
+	if (it == end())
+		throw ArgumentException(concat("No configuration found for key ", name));
+	return parseBool(it->second);
+}
+
+bool Parameters::getBool(const std::string &name, const bool defaultValue) const {
+	auto it = find(name);
+	if (it == end())
+		return defaultValue;
+	return parseBool(it->second);
+}
+
+Parameters Parameters::getPrefixedParameters(const std::string &prefix) {
+	Parameters result;
+	for (auto &it : *this) {
+		auto &key = it.first;
+		if (key.length() > prefix.length() && key.substr(0, prefix.length()) == prefix) {
+			result[ key.substr(prefix.length()) ] = it.second;
+		}
+	}
+	return result;
+}
 
 
+int Parameters::parseInt(const std::string &str) {
+	return std::stoi(str); // stoi throws if no conversion could be performed
+}
+
+bool Parameters::parseBool(const std::string &str) {
+	if (str == "1")
+		return true;
+	if (str == "0")
+		return false;
+	std::string strtl;
+	strtl.resize( str.length() );
+	std::transform(str.cbegin(), str.cend(), strtl.begin(), ::tolower);
+
+	if (strtl == "true" || strtl == "yes")
+		return true;
+	if (strtl == "false" || strtl == "no")
+		return false;
+
+	throw ArgumentException(concat("'", str, "' is not a boolean value (try setting 0/1, yes/no or true/false)"));
+}
+
+
+/*
+ * Helpers for Configuration
+ */
 static std::string stripWhitespace(const std::string &str) {
 	const char *whitespace = " \t\r\n";
 	auto start = str.find_first_not_of(whitespace);
@@ -55,6 +139,10 @@ static std::string normalizeKey(const std::string &_key) {
 	return key;
 }
 
+/*
+ * Configuration
+ */
+Parameters Configuration::parameters;
 
 void Configuration::parseLine(const std::string &_line) {
 	auto line = stripWhitespace(_line);
@@ -72,7 +160,7 @@ void Configuration::parseLine(const std::string &_line) {
 		return;
 	std::string value = stripWhitespace(line.substr(pos+1));
 
-	values[key] = value;
+	parameters[key] = value;
 }
 
 
@@ -141,70 +229,4 @@ void Configuration::loadFromDefaultPaths() {
 
 	load("./mapping.conf");
 	loadFromEnvironment();
-}
-
-
-const std::string &Configuration::get(const std::string &name) {
-	auto it = values.find(name);
-	if (it == values.end())
-		throw ArgumentException(concat("No configuration found for key ", name));
-	return it->second;
-}
-
-
-const std::string &Configuration::get(const std::string &name, const std::string &defaultValue) {
-	auto it = values.find(name);
-	if (it == values.end())
-		return defaultValue;
-	return it->second;
-}
-
-int Configuration::getInt(const std::string &name) {
-	auto it = values.find(name);
-	if (it == values.end())
-		throw ArgumentException(concat("No configuration found for key ", name));
-	return parseInt(it->second);
-}
-
-int Configuration::getInt(const std::string &name, const int defaultValue) {
-	auto it = values.find(name);
-	if (it == values.end())
-		return defaultValue;
-	return parseInt(it->second);
-}
-
-bool Configuration::getBool(const std::string &name) {
-	auto it = values.find(name);
-	if (it == values.end())
-		throw ArgumentException(concat("No configuration found for key ", name));
-	return parseBool(it->second);
-}
-
-bool Configuration::getBool(const std::string &name, const bool defaultValue) {
-	auto it = values.find(name);
-	if (it == values.end())
-		return defaultValue;
-	return parseBool(it->second);
-}
-
-
-int Configuration::parseInt(const std::string &str) {
-	return std::stoi(str); // stoi throws if no conversion could be performed
-}
-
-bool Configuration::parseBool(const std::string &str) {
-	if (str == "1")
-		return true;
-	if (str == "0")
-		return false;
-	std::string strtl;
-	strtl.resize( str.length() );
-	std::transform(str.cbegin(), str.cend(), strtl.begin(), ::tolower);
-
-	if (strtl == "true" || strtl == "yes")
-		return true;
-	if (strtl == "false" || strtl == "no")
-		return false;
-
-	throw ArgumentException(concat("'", str, "' is not a boolean value (try setting 0/1, yes/no or true/false)"));
 }

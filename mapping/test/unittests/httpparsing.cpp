@@ -6,7 +6,7 @@
 #include <util/exceptions.h>
 #include <algorithm>
 
-void parseCGIEnvironment(HTTPService::Params &params, std::string method,
+void parseCGIEnvironment(Parameters &params, std::string method,
 		const std::string &url, const std::string &query_string,
 		const std::string &postmethod = "", const std::string &postdata = "") {
 
@@ -41,7 +41,7 @@ void parseCGIEnvironment(HTTPService::Params &params, std::string method,
 
 // Test a parameter that appears multiple times and has special characters
 TEST(HTTPParsing, getrepeated) {
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "GET", "/cgi-bin/bla",
 			"PARAM=one&PARAM=two&pArAm=%C3%A4%C3%B6%C3%BC%C3%9F");
 
@@ -50,7 +50,7 @@ TEST(HTTPParsing, getrepeated) {
 
 // Test a parameter that has no value.
 TEST(HTTPParsing, getnovalue) {
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "GET", "/cgi-bin/bla",
 			"flag1&flag2&flag3&value1=3&value2=4");
 
@@ -63,7 +63,7 @@ TEST(HTTPParsing, getnovalue) {
 
 // Test an empty query string
 TEST(HTTPParsing, emptyget) {
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "GET", "/cgi-bin/bla", "");
 
 	EXPECT_EQ(params.size(), 0);
@@ -71,7 +71,7 @@ TEST(HTTPParsing, emptyget) {
 
 // Test urlencoded postdata
 TEST(HTTPParsing, posturlencoded) {
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "POST", "/cgi-bin/bla", "",
 			"application/x-www-form-urlencoded",
 			"flag1&param=one&PARAM=two&flag2&pArAm=%C3%A4%C3%B6%C3%BC%C3%9F");
@@ -83,7 +83,7 @@ TEST(HTTPParsing, posturlencoded) {
 
 // Test weird query string formats
 TEST(HTTPParsing, testquerystringspecialchars) {
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "GET", "/cgi-bin/bla",
 			"p1&p2=1=2=%C3%A4%C3%B6%C3%BC%C3%9F&p3=&p4&&p5&?????&&&====&=&???&&p6==?");
 
@@ -98,7 +98,7 @@ TEST(HTTPParsing, testquerystringspecialchars) {
 
 // Test weird query string formats
 TEST(HTTPParsing, testparameteroverwrites) {
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "GET", "/cgi-bin/bla", "p1=a&p1=b&p1=c&p1");
 
 	EXPECT_EQ(params.get("p1", "-"), "");
@@ -106,7 +106,7 @@ TEST(HTTPParsing, testparameteroverwrites) {
 
 // Test illegal percent encoding
 TEST(HTTPParsing, illegalpercentencoding) {
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "GET", "/cgi-bin/bla", "p1=%22%ZZ%5F");
 
 	EXPECT_EQ(params.get("p1", "-"), "\"%ZZ_");
@@ -167,14 +167,14 @@ const std::string multipart_message4 =
 
 TEST(HTTPParsing, multipart) {
 	// Since frontier is not a form-data content disposition, this test should read nothing (but succeed).
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "POST", "/cgi-bin/bla", "","multipart/mixed; boundary=frontier", multipart_message);
 	EXPECT_TRUE(params.empty());
 }
 
 TEST(HTTPParsing, multipart_escaped_boundary) {
 	// This test should read the params "file1" and "file2".
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "POST", "/cgi-bin/bla", "","multipart/form-data; boundary=--myboundary                ", multipart_message2);
 
 	EXPECT_TRUE(params.hasParam("file1"));
@@ -184,7 +184,7 @@ TEST(HTTPParsing, multipart_escaped_boundary) {
 TEST(HTTPParsing, multipart_unnamed_formdata) {
 	// This test should fail because the message contains form-data without a valid name.
 	// Expected: Throw ArgumentException "
-	HTTPService::Params params;
+	Parameters params;
 	EXPECT_THROW(parseCGIEnvironment(params, "POST", "/cgi-bin/bla", "","multipart/form-data; boundary=xyz", multipart_message3),
 			ArgumentException);
 }
@@ -192,7 +192,7 @@ TEST(HTTPParsing, multipart_unnamed_formdata) {
 TEST(HTTPParsing, multipart_malformed_boundary) {
 	// This test should fail because the message is malformed (missing the closing tag of the boundary).
 	// Expected: Throw runtime_error "Unexpected end of stream".
-	HTTPService::Params params;
+	Parameters params;
 	EXPECT_THROW(parseCGIEnvironment(params, "POST", "/cgi-bin/bla", "","multipart/form-data; boundary=xyz", multipart_message4),
 			std::runtime_error);
 
@@ -201,14 +201,14 @@ TEST(HTTPParsing, multipart_malformed_boundary) {
 TEST(HTTPParsing, multipart_missing_boundary) {
 	// This test should fail because the message is missing the specified boundary label.
 	// Expected: Throw runtime_error "Unexpected end of stream".
-	HTTPService::Params params;
+	Parameters params;
 	EXPECT_THROW(parseCGIEnvironment(params, "POST", "/cgi-bin/bla", "","multipart/form-data; boundary=xyz", ""),
 			std::runtime_error);
 }
 
 TEST(HTTPParsing, multipart_unspecified_boundary) {
 	// This test should succeed. No parameters should be read, because no boundary has been specified.
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "POST", "/cgi-bin/bla", "","multipart/mixed", multipart_message);
 	EXPECT_TRUE(params.empty());
 }
@@ -216,7 +216,7 @@ TEST(HTTPParsing, multipart_unspecified_boundary) {
 TEST(HTTPParsing, parse_illegal_content_type) {
 	// This test should fail due to the unknown content-type.
 	// Expected: Throw ArgumentException "Unknown content type in POST request".
-	HTTPService::Params params;
+	Parameters params;
 	EXPECT_THROW(parseCGIEnvironment(params, "POST", "/cgi-bin/bla", "","you-dont/know-me", multipart_message),
 			ArgumentException);
 
@@ -225,7 +225,7 @@ TEST(HTTPParsing, parse_illegal_content_type) {
 TEST(HTTPParsing, case_insensitive_request_method_post) {
 	// The test is exactly the same as the multipart_escaped_boundary test, the only difference being the character case in the REQUEST_METHOD parameter.
 	// This should NOT fail as per design, but shouldn't parse any parameters as well.
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "PoST", "/cgi-bin/bla", "","multipart/form-data; boundary=--myboundary", multipart_message2);
 	EXPECT_TRUE(params.empty());
 
@@ -233,7 +233,7 @@ TEST(HTTPParsing, case_insensitive_request_method_post) {
 
 TEST(HTTPParsing, case_insensitive_request_method_get) {
 	// The same test using GET. This time get parameters should exist.
-	HTTPService::Params params;
+	Parameters params;
 	parseCGIEnvironment(params, "PoST", "/cgi-bin/bla", "a=1&b=2&c=3","multipart/form-data; boundary=--myboundary", multipart_message2);
 	EXPECT_EQ(3, params.size());
 	EXPECT_EQ(1, params.getInt("a"));

@@ -10,7 +10,7 @@
 
 class RemoteRasterDBBackend : public RasterDBBackend {
 	public:
-		RemoteRasterDBBackend(const std::string &location);
+		RemoteRasterDBBackend(const std::string &location, const Parameters &params);
 		virtual ~RemoteRasterDBBackend();
 
 		static const uint8_t COMMAND_EXIT = 1;

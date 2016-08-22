@@ -123,7 +123,7 @@ static void parseKeyValuePair(const std::string& q, std::map<std::string, std::s
 /**
  * Parses a query string into a given Params structure.
  */
-void parseQuery(const std::string& query, HTTPService::Params &params) {
+void parseQuery(const std::string& query, Parameters &params) {
 	if (query.length() == 0)
 		return;
 
@@ -159,7 +159,7 @@ void parseQuery(const std::string& query, HTTPService::Params &params) {
 /**
  * Parses a url encoded POST request
  */
-static void parsePostUrlEncoded(HTTPService::Params &params, std::istream &in) {
+static void parsePostUrlEncoded(Parameters &params, std::istream &in) {
 	std::string query = getPostData(in);
 	parseQuery(query, params);
 }
@@ -183,9 +183,9 @@ bool parseMultipartParameter(const std::string& line, std::map<std::string, std:
 	return false;
 }
 
-static void parseMultipartSubBoundary(HTTPService::Params &params, std::istream& in, std::map<std::string, std::string>& pars);
+static void parseMultipartSubBoundary(Parameters &params, std::istream& in, std::map<std::string, std::string>& pars);
 
-static void parseMultipartBoundary(HTTPService::Params &params, std::istream& in, const std::string& boundary) {
+static void parseMultipartBoundary(Parameters &params, std::istream& in, const std::string& boundary) {
 
 	const std::string boundary_start = "--" + boundary;
 	const std::string boundary_end = boundary_start + "--";
@@ -240,7 +240,7 @@ static void parseMultipartBoundary(HTTPService::Params &params, std::istream& in
 
 }
 
-static void parseMultipartSubBoundary(HTTPService::Params &params, std::istream& in, std::map<std::string, std::string>& pars) {
+static void parseMultipartSubBoundary(Parameters &params, std::istream& in, std::map<std::string, std::string>& pars) {
 
 	// see RFC 1341 ch 7.2.1
 	// This method may be used as recursive in order to support nested sub-boundaries.
@@ -398,7 +398,7 @@ static void parseMultipartSubBoundary(HTTPService::Params &params, std::istream&
 /**
  * Parses a multipart POST request
  */
-static void parsePostMultipart(HTTPService::Params &params, std::istream &in) {
+static void parsePostMultipart(Parameters &params, std::istream &in) {
 
 	// This is merely a wrapper around parseMultipartSubBoundary() that will forward the
 	// content type provided in the system environment variables.
@@ -420,7 +420,7 @@ static void parsePostMultipart(HTTPService::Params &params, std::istream &in) {
 /**
  * Parses POST data from a HTTP request
  */
-void parsePostData(HTTPService::Params &params, std::istream &in) {
+void parsePostData(Parameters &params, std::istream &in) {
 
 	// Methods are always case-sensitive (RFC 2616 ch. 5.1.1)
 	std::string request_method = getenv_str("REQUEST_METHOD", false);
@@ -442,7 +442,7 @@ void parsePostData(HTTPService::Params &params, std::istream &in) {
 /**
  * Parses GET data from a HTTP request
  */
-void parseGetData(HTTPService::Params &params) {
+void parseGetData(Parameters &params) {
 	std::string query_string = getenv_str("QUERY_STRING");
 
 	parseQuery(query_string, params);

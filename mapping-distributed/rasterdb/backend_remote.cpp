@@ -2,7 +2,6 @@
 #include "rasterdb/backend_remote.h"
 
 #include "util/binarystream.h"
-#include "util/configuration.h"
 #include "util/make_unique.h"
 #include "util/log.h"
 
@@ -18,9 +17,8 @@
 #include <unistd.h>
 
 
-RemoteRasterDBBackend::RemoteRasterDBBackend(const std::string &location) {
-	// TODO: is a global cache ok, or do we want to manually configure this for unittests?
-	cache_directory = Configuration::get("rasterdb.remote.cache", "");
+RemoteRasterDBBackend::RemoteRasterDBBackend(const std::string &location, const Parameters &params) {
+	cache_directory = params.get("cache", "");
 
 	stream = BinaryStream::connectURL(location);
 }

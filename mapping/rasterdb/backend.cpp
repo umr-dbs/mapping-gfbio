@@ -62,7 +62,7 @@ void RasterDBBackend::linkRaster(int channelid, double time_of_reference, double
 
 
 // RasterDB registration
-typedef std::unique_ptr<RasterDBBackend> (*BackendConstructor)(const std::string &location);
+typedef std::unique_ptr<RasterDBBackend> (*BackendConstructor)(const std::string &location, const Parameters &params);
 
 static std::unordered_map< std::string, BackendConstructor > *getRegisteredConstructorsMap() {
 	static std::unordered_map< std::string, BackendConstructor > registered_constructors;
@@ -74,11 +74,11 @@ RasterDBBackendRegistration::RasterDBBackendRegistration(const char *name, Backe
 	(*map)[std::string(name)] = constructor;
 }
 
-std::unique_ptr<RasterDBBackend> RasterDBBackend::create(const std::string &backend, const std::string &location) {
+std::unique_ptr<RasterDBBackend> RasterDBBackend::create(const std::string &backend, const std::string &location, const Parameters &params) {
 	auto map = getRegisteredConstructorsMap();
 	if (map->count(backend) != 1)
 		throw ArgumentException(concat("Unknown rasterdb backend: ", backend));
 
 	auto constructor = map->at(backend);
-	return constructor(location);
+	return constructor(location, params);
 }

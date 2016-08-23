@@ -37,9 +37,9 @@ public:
 	static void logToMemory(const std::string &level);
 	static void logToMemory(LogLevel level);
 	/**
-	 * Retrieves all messages that were logged to memory
+	 * Retrieves all messages that were logged to memory and flushes the message buffer.
 	 */
-	static const std::vector<std::string> &getMemoryMessages();
+	static std::vector<std::string> getMemoryMessages();
 
 	/**
 	 * Turns logging off.

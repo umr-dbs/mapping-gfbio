@@ -15,6 +15,7 @@
 #include <iomanip>
 #include <chrono>
 #include <algorithm>
+#include <mutex>
 
 
 /*
@@ -34,13 +35,15 @@ EnumConverter<Log::LogLevel> LogLevelConverter(LogLevelMap);
 /*
  * Static logging functions
  */
-Log::LogLevel maxLogLevel = Log::LogLevel::OFF;
+static Log::LogLevel maxLogLevel = Log::LogLevel::OFF;
 
-std::vector<std::string> memorylog;
-Log::LogLevel memorylog_level = Log::LogLevel::OFF;
+static std::vector<std::string> memorylog;
+static Log::LogLevel memorylog_level = Log::LogLevel::OFF;
 
-std::ostream *streamlog = nullptr;
-Log::LogLevel streamlog_level = Log::LogLevel::OFF;
+static std::ostream *streamlog = nullptr;
+static Log::LogLevel streamlog_level = Log::LogLevel::OFF;
+
+static std::mutex log_mutex;
 
 
 static void log(Log::LogLevel level, const std::string &msg) {
@@ -64,6 +67,7 @@ static void log(Log::LogLevel level, const std::string &msg) {
 
 	std::string message = ss.str();
 	// Do the actual logging
+	std::lock_guard<std::mutex> guard(log_mutex);
 	if (level <= memorylog_level)
 		memorylog.push_back(message);
 	if (level <= streamlog_level && streamlog)
@@ -100,6 +104,7 @@ void Log::logToStream(const std::string &level, std::ostream *stream) {
 	logToStream(levelFromString(level), stream);
 }
 void Log::logToStream(LogLevel level, std::ostream *stream) {
+	std::lock_guard<std::mutex> guard(log_mutex);
 	streamlog_level = level;
 	streamlog = stream;
 	maxLogLevel = std::max(memorylog_level, streamlog_level);
@@ -110,15 +115,20 @@ void Log::logToMemory(const std::string &level) {
 }
 
 void Log::logToMemory(LogLevel level) {
+	std::lock_guard<std::mutex> guard(log_mutex);
 	memorylog_level = level;
 	maxLogLevel = std::max(memorylog_level, streamlog_level);
 }
 
-const std::vector<std::string> &Log::getMemoryMessages() {
-	return memorylog;
+std::vector<std::string> Log::getMemoryMessages() {
+	std::lock_guard<std::mutex> guard(log_mutex);
+	std::vector<std::string> result;
+	std::swap(memorylog, result);
+	return result;
 }
 
 void Log::off() {
+	std::lock_guard<std::mutex> guard(log_mutex);
 	memorylog_level = LogLevel::OFF;
 	memorylog.clear();
 	streamlog_level = LogLevel::OFF;

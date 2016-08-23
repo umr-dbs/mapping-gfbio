@@ -2,6 +2,7 @@
 
 #include "datatypes/raster.h"
 #include "util/gdal.h"
+#include "util/log.h"
 
 #include <stdint.h>
 #include <cstdlib>
@@ -20,9 +21,40 @@ namespace GDAL {
 
 static std::once_flag gdal_init_once;
 
+static void MyGDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg) {
+	if (msg == nullptr || *msg == '\0')
+		return;
+
+	// Workaround: Reprojection of MSG data will trigger this message many many times.
+	// Reduce its log level to reduce log clutter.
+	if (eErrClass == CE_Failure && err_no == CPLE_AppDefined &&
+		(strcmp("tolerance condition error", msg) == 0 ||
+		 strncmp("Reprojection failed", msg, 19) == 0)) {
+		eErrClass = CE_Debug;
+	}
+
+
+	if (eErrClass == CE_Warning) {
+		Log::warn("GDAL Warning [%d] %s", err_no, msg);
+	}
+	else if (eErrClass == CE_Failure) {
+		Log::error("GDAL Failure [%d] %s", err_no, msg);
+	}
+	else if (eErrClass == CE_Fatal) {
+		Log::error("GDAL Fatal [%d] %s", err_no, msg);
+		// GDAL says that the error handler should not return on a CE_Fatal error.
+		exit(5);
+	}
+	else {
+		// Make sure not to lose any messages, but put everything else under "debug".
+		Log::debug("GDAL Debug [%d] %s", err_no, msg);
+	}
+}
+
 void init() {
 	std::call_once(gdal_init_once, []{
 		GDALAllRegister();
+		CPLSetErrorHandler(MyGDALErrorHandler);
 		//GetGDALDriverManager()->AutoLoadDrivers();
 	});
 }
@@ -78,6 +110,8 @@ std::string SRSFromEPSG(epsg_t epsg) {
 
 
 CRSTransformer::CRSTransformer(epsg_t in_epsg, epsg_t out_epsg) : in_epsg(in_epsg), out_epsg(out_epsg), transformer(nullptr) {
+	init();
+
 	if (in_epsg == EPSG_UNKNOWN || out_epsg == EPSG_UNKNOWN)
 		throw GDALException("in- or out-epsg is UNKNOWN");
 	if (in_epsg == out_epsg)

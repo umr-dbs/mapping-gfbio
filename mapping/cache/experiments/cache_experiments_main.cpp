@@ -28,9 +28,6 @@ int main(int argc, const char* argv[]) {
 	RasterOpenCL::init();
 #endif
 
-	// Disable GDAL Error Messages
-	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
-
 	// Open all dbs
 	std::vector<std::shared_ptr<RasterDB>> dbs{
 		RasterDB::open("srtm", RasterDB::READ_ONLY),

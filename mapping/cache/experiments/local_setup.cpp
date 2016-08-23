@@ -50,9 +50,6 @@ int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 
-	// Disable GDAL Error Messages
-	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
-
 #ifndef MAPPING_NO_OPENCL
 	RasterOpenCL::init();
 #endif

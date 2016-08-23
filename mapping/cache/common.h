@@ -149,11 +149,6 @@ class CacheCommon {
 public:
 
 	/**
-	 * Method to be set as GDALs error handler. Swallaws all output.
-	 */
-	static void GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg);
-
-	/**
 	 * @return the time since epoch in ms.
 	 */
 	static time_t time_millis();

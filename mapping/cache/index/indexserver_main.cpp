@@ -11,6 +11,7 @@
 #include "util/configuration.h"
 #include "util/log.h"
 #include <signal.h>
+#include <iostream>
 
 IndexServer *instance = nullptr;
 

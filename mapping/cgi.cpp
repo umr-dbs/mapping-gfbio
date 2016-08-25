@@ -4,6 +4,7 @@
 
 #include "services/httpservice.h"
 #include "userdb/userdb.h"
+#include "util/log.h"
 
 #include <cstdio>
 #include <cstdlib>

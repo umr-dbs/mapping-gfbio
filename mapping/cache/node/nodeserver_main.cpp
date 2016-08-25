@@ -13,6 +13,7 @@
 #include "util/log.h"
 #include "raster/opencl.h"
 #include <signal.h>
+#include <iostream>
 
 NodeServer *instance = nullptr;
 

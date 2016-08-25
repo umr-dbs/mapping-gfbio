@@ -16,6 +16,7 @@
 #include "datatypes/plot.h"
 
 #include "util/make_unique.h"
+#include "util/log.h"
 
 #include <limits>
 

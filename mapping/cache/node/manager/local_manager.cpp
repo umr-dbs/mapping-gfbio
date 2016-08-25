@@ -15,6 +15,7 @@
 #include "datatypes/polygoncollection.h"
 #include "datatypes/plot.h"
 
+#include "util/log.h"
 
 
 template<class T>

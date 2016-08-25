@@ -3,6 +3,7 @@
 #include "datatypes/plot.h"
 #include "util/binarystream.h"
 #include "util/sizeutil.h"
+#include "util/log.h"
 
 #include "operators/operator.h"
 #include "cache/manager.h"

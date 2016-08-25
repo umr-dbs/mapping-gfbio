@@ -8,21 +8,10 @@
 #ifndef CACHE_COMMON_H_
 #define CACHE_COMMON_H_ 1
 
-#include "util/binarystream.h"
-#include "util/exceptions.h"
-#include "util/log.h"
 #include "util/shared_mutex.h"
 
-#include <gdal_priv.h>
 #include <memory>
-
 #include <sstream>
-#include <cstring>
-#include <sys/select.h>
-#include <errno.h>
-#include <chrono>
-#include <iostream>
-#include <mutex>
 
 //#define ENABLE_TIMING
 

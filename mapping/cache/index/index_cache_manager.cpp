@@ -6,6 +6,7 @@
  */
 
 #include "cache/index/index_cache_manager.h"
+#include "util/log.h"
 
 
 ////////////////////////////////////////////////////////////

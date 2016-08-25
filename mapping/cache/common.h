@@ -11,6 +11,8 @@
 #include "util/binarystream.h"
 #include "util/exceptions.h"
 #include "util/log.h"
+#include "util/shared_mutex.h"
+
 #include <gdal_priv.h>
 #include <memory>
 
@@ -64,82 +66,10 @@ private:
 };
 
 
-/**
- * Simple multi-reader, single writer lock
- */
-class RWLock {
-public:
-	RWLock() : read_count(0) {};
-
-	void lock_shared() {
-		std::lock_guard<std::mutex> g(w_prio);
-		std::lock_guard<std::mutex> g2(mtx);
-		read_count++;
-		if ( read_count == 1 )
-			w_lock.lock();
-	};
-
-	void unlock_shared() {
-		std::lock_guard<std::mutex> g(mtx);
-		read_count--;
-		if ( read_count == 0 )
-			w_lock.unlock();
-	}
-
-	void lock_exclusive() {
-		std::lock_guard<std::mutex> g(w_prio);
-		w_lock.lock();
-	};
-
-	void unlock_exclusive() {
-		w_lock.unlock();
-	};
-private:
-	int read_count;
-	std::mutex w_prio;
-	std::mutex mtx;
-	std::mutex w_lock;
-};
-
-/**
- * Guard for obtaining a read-lock
- */
-class SharedLockGuard {
-public:
-	SharedLockGuard() = delete;
-	SharedLockGuard( SharedLockGuard &&) = delete;
-	SharedLockGuard( const SharedLockGuard &) = delete;
-	SharedLockGuard& operator=(const SharedLockGuard &) = delete;
-	SharedLockGuard& operator=(SharedLockGuard &&) = delete;
-	SharedLockGuard( RWLock &lock ) : lock(lock) {
-		lock.lock_shared();
-	}
-	~SharedLockGuard() {
-		lock.unlock_shared();
-	}
-private:
-	RWLock &lock;
-};
-
-/**
- * Guard for obtaining a write-lock
- */
-class ExclusiveLockGuard {
-public:
-	ExclusiveLockGuard() = delete;
-	ExclusiveLockGuard( ExclusiveLockGuard &&) = delete;
-	ExclusiveLockGuard( const ExclusiveLockGuard &) = delete;
-	ExclusiveLockGuard& operator=(const ExclusiveLockGuard &) = delete;
-	ExclusiveLockGuard& operator=(ExclusiveLockGuard &&) = delete;
-	ExclusiveLockGuard( RWLock &lock ) : lock(lock) {
-		lock.lock_exclusive();
-	}
-	~ExclusiveLockGuard() {
-		lock.unlock_exclusive();
-	}
-private:
-	RWLock &lock;
-};
+// TODO: migrate all code to the proper names
+using RWLock = shared_mutex;
+using SharedLockGuard = shared_lock_guard;
+using ExclusiveLockGuard = unique_lock_guard;
 
 
 /**

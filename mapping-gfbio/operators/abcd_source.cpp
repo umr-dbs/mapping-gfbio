@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <cctype>
 
 #include <xercesc/parsers/XercesDOMParser.hpp>
 #include <xercesc/parsers/DOMLSParserImpl.hpp>
@@ -63,13 +64,26 @@ static const XMLCh tagNameDetails[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,c
  * Operator that reads a given ABCD file and loads all units
  *
  * Parameters:
- * - path: the path of the ABCD file
+ * - archive: the path of the ABCD file
  */
 class ABCDSourceOperator : public GenericOperator {
 	public:
 		ABCDSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 			assumeSources(0);
-			inputFile = params.get("path", "").asString();
+			archive = params.get("path", "").asString();
+
+			// map archive url to local file
+			std::stringstream ss;
+			for(char& c : archive) {
+				if (isalnum(c))
+					ss << c;
+				else
+					ss << '_';
+			}
+			ss << ".xml";
+
+			inputFile = ss.str();
+			fprintf(stderr, inputFile.c_str());
 		}
 
 #ifndef MAPPING_OPERATOR_STUBS
@@ -77,12 +91,13 @@ class ABCDSourceOperator : public GenericOperator {
 		virtual void getProvenance(ProvenanceCollection &pc);
 #endif
 		void writeSemanticParameters(std::ostringstream& stream) {
-			stream << "{\"path\":\"" << inputFile << "\"}";
+			stream << "{\"path\":\"" << archive << "\"}";
 		}
 
 		virtual ~ABCDSourceOperator(){};
 
 	private:
+		std::string archive;
 		std::string inputFile;
 
 #ifndef MAPPING_OPERATOR_STUBS

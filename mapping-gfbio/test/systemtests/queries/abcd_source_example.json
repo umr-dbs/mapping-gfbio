@@ -17,7 +17,7 @@
 	{
 		"params" : 
 		{
-			"path" : "abcd_example.xml"
+			"path" : "abcd_example"
 		},
 		"type" : "abcd_source"
 	},

@@ -17,7 +17,8 @@
 	{
 		"params" : 
 		{
-			"path" : "abcd_example"
+			"path" : "abcd_example",
+			"units" : ["0"]
 		},
 		"type" : "abcd_source"
 	},

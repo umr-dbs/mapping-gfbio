@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <cctype>
+#include <unordered_set>
 
 #include <xercesc/parsers/XercesDOMParser.hpp>
 #include <xercesc/parsers/DOMLSParserImpl.hpp>
@@ -46,6 +47,7 @@ using namespace xercesc;
 static const XMLCh tagNameDataSet[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_D,chLatin_a,chLatin_t,chLatin_a,chLatin_S,chLatin_e,chLatin_t,chNull};
 static const XMLCh tagNameUnits[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_U,chLatin_n,chLatin_i,chLatin_t,chLatin_s,chNull};
 static const XMLCh tagNameUnit[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_U,chLatin_n,chLatin_i,chLatin_t,chNull};
+static const XMLCh tagNameUnitID[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_U,chLatin_n,chLatin_i,chLatin_t,chLatin_I,chLatin_D,chNull};
 static const XMLCh tagNameGathering[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_G,chLatin_a,chLatin_t,chLatin_h,chLatin_e,chLatin_r,chLatin_i,chLatin_n,chLatin_g,chNull};
 static const XMLCh tagNameCoordinatesLatLong[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_C,chLatin_o,chLatin_o,chLatin_r,chLatin_d,chLatin_i,chLatin_n,chLatin_a,chLatin_t,chLatin_e,chLatin_s,chLatin_L,chLatin_a,chLatin_t,chLatin_L,chLatin_o,chLatin_n,chLatin_g,chNull};
 static const XMLCh tagNameLongitudeDecimal[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,chColon,chLatin_L,chLatin_o,chLatin_n,chLatin_g,chLatin_i,chLatin_t,chLatin_u,chLatin_d,chLatin_e,chLatin_D,chLatin_e,chLatin_c,chLatin_i,chLatin_m,chLatin_a,chLatin_l,chNull};
@@ -65,6 +67,7 @@ static const XMLCh tagNameDetails[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,c
  *
  * Parameters:
  * - archive: the path of the ABCD file
+ * - units: an array with unit ddentifiers that specifies the units that are returned (optional)
  */
 class ABCDSourceOperator : public GenericOperator {
 	public:
@@ -83,7 +86,15 @@ class ABCDSourceOperator : public GenericOperator {
 			ss << ".xml";
 
 			inputFile = ss.str();
-			fprintf(stderr, inputFile.c_str());
+
+			// filters on unitId
+			if (params.isMember("units") && params["units"].size() > 0) {
+				filterUnitsById = true;
+				for (Json::Value &unit : params["units"]) {
+					units.emplace(unit.asString());
+				}
+			}
+
 		}
 
 #ifndef MAPPING_OPERATOR_STUBS
@@ -99,6 +110,9 @@ class ABCDSourceOperator : public GenericOperator {
 	private:
 		std::string archive;
 		std::string inputFile;
+
+		bool filterUnitsById = false;
+		std::unordered_set<std::string> units;
 
 #ifndef MAPPING_OPERATOR_STUBS
 		std::unique_ptr<PointCollection> points;
@@ -330,6 +344,12 @@ void ABCDSourceOperator::handleXMLAttributes(DOMNode& node, std::string path,
  * handle given unit, extract and insert into point collection
  */
 void ABCDSourceOperator::handleUnit(DOMElement& unit) {
+	if (filterUnitsById) {
+		// TODO: transcode unit filter ids to XMLCh* rather than all contained ids to string
+		std::string unitId = transcode(unit.getElementsByTagName(tagNameUnitID)->item(0)->getTextContent());
+		if (units.count(unitId) == 0)
+			return;
+	}
 	bool newFeature = handleGathering(unit);
 
 	std::function<void(const std::string&, double)> fn = std::bind(&ABCDSourceOperator::setFeatureDoubleAttribute, this, std::placeholders::_1, std::placeholders::_2);

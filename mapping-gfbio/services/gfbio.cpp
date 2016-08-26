@@ -240,11 +240,10 @@ void GFBioService::run() {
 		if (request == "baskets") {
 
 			std::string gfbioId = session->getUser().getExternalid();
-			//	if(gfbioId.find(EXTERNAL_ID_PREFIX) != 0)
-			//		throw GFBioServiceException("GFBioService: This service is only available for GFBio user.");
-			//
-			//	gfbioId = gfbioId.substr(strlen(EXTERNAL_ID_PREFIX));
-			gfbioId = "12932"; //TODO: remove
+			if(gfbioId.find(EXTERNAL_ID_PREFIX) != 0)
+				throw GFBioServiceException("GFBioService: This service is only available for GFBio user.");
+
+			gfbioId = gfbioId.substr(strlen(EXTERNAL_ID_PREFIX));
 
 			//TODO: cache baskets locally
 			//TODO: implement pagination

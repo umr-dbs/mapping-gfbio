@@ -10,6 +10,7 @@
 #include <cstring>
 #include <sstream>
 #include <json/json.h>
+#include <algorithm>
 
 #include <fstream>
 
@@ -35,12 +36,37 @@ private:
 	size_t authenticateWithPortal(const std::string &token);
 	Json::Value getUserDetailsFromPortal(const size_t userId);
 
+	Json::Value getGFBioDataCentersJSON();
+
 	static constexpr const char* EXTERNAL_ID_PREFIX = "GFBIO:";
 
 	virtual void run();
 };
 
 REGISTER_HTTP_SERVICE(GFBioService, "gfbio");
+
+
+/**
+ * read the GFBio data centers file and return as Json object
+ * TODO: manage data centers in a database and map them to a c++ class
+ * @return a json object containing the available data centers
+ */
+Json::Value GFBioService::getGFBioDataCentersJSON() {
+	auto path = Configuration::get("gfbio.abcd.datapath");
+
+	std::ifstream file(path + "gfbio_datacenters.json");
+	if (!file.is_open()) {
+		throw GFBioServiceException("gfbio_datacenters.json missing");
+	}
+
+	Json::Reader reader(Json::Features::strictMode());
+	Json::Value root;
+	if (!reader.parse(file, root)) {
+		throw GFBioServiceException("gfbio_datacenters.json invalid");
+	}
+
+	return root;
+}
 
 /**
  * authenticate user token with portal
@@ -201,22 +227,9 @@ void GFBioService::run() {
 		}
 
 		if(request == "abcd") {
-			auto path = Configuration::get("gfbio.abcd.datapath");
+			Json::Value dataCenters = getGFBioDataCentersJSON();
 
-			std::ifstream file(path + "gfbio_datacenters.json");
-			if (!file.is_open()) {
-				response.sendFailureJSON("gfbio_datacenters.json missing");
-				return;
-			}
-
-			Json::Reader reader(Json::Features::strictMode());
-			Json::Value root;
-			if (!reader.parse(file, root)) {
-				response.sendFailureJSON("gfbio_datacenters.json invalid");
-				return;
-			}
-
-			response.sendSuccessJSON(root);
+			response.sendSuccessJSON(dataCenters);
 			return;
 		}
 
@@ -258,6 +271,13 @@ void GFBioService::run() {
 				throw GFBioServiceException("GFBioService: could not parse baskets from portal");
 
 
+			// get available abcd archives
+			Json::Value dataCenters = getGFBioDataCentersJSON();
+			std::vector<std::string> availableArchives;
+			for(Json::Value &dataCenter : dataCenters["archives"]) {
+				availableArchives.push_back(dataCenter.get("file", "").asString());
+			}
+
 			// parse relevant info, build mapping response
 			Json::Value jsonBaskets(Json::arrayValue);
 			for(auto portalBasket : jsonResponse) {
@@ -269,9 +289,9 @@ void GFBioService::run() {
 					basket["results"] = Json::Value(Json::arrayValue);
 					for(auto result : portalBasket["basketContent"][0]["selected"]) {
 						Json::Value entry(Json::objectValue);
-						entry["title"] = result["title"].asString();
-						entry["authors"] = result["authors"].asString();
-						entry["dataCenter"] = result["dataCenter"].asString();
+						entry["title"] = result["title"];
+						entry["authors"] = result["authors"];
+						entry["dataCenter"] = result["dataCenter"];
 						std::string metadataLink = result["metadatalink"].asString();
 						entry["metadataLink"] = metadataLink;
 
@@ -289,7 +309,11 @@ void GFBioService::run() {
 							entry["dataLink"] = result["parentIdentifier"];
 							entry["unitId"] = result["dcIdentifier"];
 
-							entry["available"] = true; // TODO: should only be available if archive exists and contains geo referenced data
+							entry["available"] = std::find(
+									availableArchives.begin(),
+									availableArchives.end(),
+									entry["dataLink"].asString())
+									!= availableArchives.end();
 						}
 
 						basket["results"].append(entry);

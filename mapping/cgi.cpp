@@ -1,10 +1,10 @@
 #include "util/configuration.h"
-#include "util/debug.h"
 #include "cache/manager.h"
 #include "util/timeparser.h"
 
 #include "services/httpservice.h"
 #include "userdb/userdb.h"
+#include "util/log.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -40,6 +40,7 @@ JPEG32: 120703 (90%)
 
 int main() {
 	Configuration::loadFromDefaultPaths();
+	Log::off();
 
 	/*
 	 * Initialize Cache

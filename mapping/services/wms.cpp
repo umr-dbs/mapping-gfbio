@@ -6,7 +6,8 @@
 #include "datatypes/plot.h"
 #include "datatypes/colorizer.h"
 #include "util/configuration.h"
-#include "util/debug.h"
+#include "util/log.h"
+
 
 /**
  * Implementation of the OGC WMS standard http://www.opengeospatial.org/standards/wms
@@ -104,9 +105,9 @@ void WMSService::run() {
 					overlay->print(overlay->width-4-8*msg_brs.length(), overlay->height-12, 1, msg_brs.c_str());
 
 					if (result_raster->height >= 512) {
-						auto messages = get_debug_messages();
+						const auto &messages = Log::getMemoryMessages();
 						int ypos = 46;
-						for (auto &msg : messages) {
+						for (const auto &msg : messages) {
 							overlay->print(4, ypos, 1, msg.c_str());
 							ypos += 10;
 						}

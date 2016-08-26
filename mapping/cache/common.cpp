@@ -64,7 +64,7 @@ ExecTimer::~ExecTimer() {
 	buffer << "Exit " << name << ". Duration: " << dur << "ms" << std::endl;
 	depth--;
 	if ( depth == 0 ) {
-		Log::trace_time(buffer.str());
+		Log::trace(buffer.str());
 		buffer.str("");
 	}
 }
@@ -171,10 +171,4 @@ bool CacheCommon::resolution_matches(double scalex1, double scaley1,
 time_t CacheCommon::time_millis() {
 	return std::chrono::duration_cast<std::chrono::milliseconds>(
 		std::chrono::system_clock::now().time_since_epoch()).count();
-}
-
-void CacheCommon::GDALErrorHandler(CPLErr eErrClass, int err_no, const char *msg) {
-	(void) eErrClass;
-	(void) err_no;
-	(void) msg;
 }

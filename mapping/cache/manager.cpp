@@ -15,6 +15,7 @@
 #include "datatypes/plot.h"
 
 #include "util/binarystream.h"
+#include "util/log.h"
 
 //
 // Cache-Manager

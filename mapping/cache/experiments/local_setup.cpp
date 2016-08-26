@@ -50,15 +50,12 @@ int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 
-	// Disable GDAL Error Messages
-	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
-
 #ifndef MAPPING_NO_OPENCL
 	RasterOpenCL::init();
 #endif
 	CachingStrategy::init();
 
-	Log::setLevel(Log::LogLevel::INFO);
+	Log::logToStream(Log::LogLevel::INFO, &std::cerr);
 
 	size_t capacity = 50 * 1024 * 1024;
 

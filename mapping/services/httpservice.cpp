@@ -2,8 +2,8 @@
 #include "services/httpservice.h"
 #include "services/httpparsing.h"
 #include "util/exceptions.h"
-#include "util/debug.h"
 #include "util/configuration.h"
+#include "util/log.h"
 
 #include <map>
 #include <unordered_map>
@@ -46,6 +46,9 @@ void HTTPService::run(std::streambuf *in, std::streambuf *out, std::streambuf *e
 	std::istream input(in);
 	std::ostream error(err);
 	HTTPResponseStream response(out);
+
+	Log::logToStream(Log::LogLevel::WARN, &error);
+	Log::logToMemory(Log::LogLevel::INFO);
 	try {
 		// Parse all entries
 		Parameters params;
@@ -61,6 +64,7 @@ void HTTPService::run(std::streambuf *in, std::streambuf *out, std::streambuf *e
 		error << "Request failed with an exception: " << e.what() << "\n";
 		response.send500("invalid request");
 	}
+	Log::off();
 }
 
 
@@ -88,10 +92,10 @@ void HTTPService::HTTPResponseStream::sendContentType(const std::string &content
 }
 
 void HTTPService::HTTPResponseStream::sendDebugHeader() {
-	auto msgs = get_debug_messages();
+	const auto &msgs = Log::getMemoryMessages();
 	*this << "Profiling-header: ";
-	for (auto &str : msgs) {
-		*this << str.c_str() << ", ";
+	for (const auto &str : msgs) {
+		*this << str << ", ";
 	}
 	*this << "\r\n";
 }

@@ -6,6 +6,8 @@
 #include "util/server_nonblocking.h"
 #include "util/log.h"
 
+#include <iostream>
+
 class TileServerConnection : public NonblockingServer::Connection {
 	public:
 		TileServerConnection(NonblockingServer &server, int fd, int id);
@@ -19,7 +21,7 @@ class TileServerConnection : public NonblockingServer::Connection {
 
 TileServerConnection::TileServerConnection(NonblockingServer &server, int fd, int id) : Connection(server, fd, id) {
 	Log::info("%d: connected", id);
-	backend = RasterDBBackend::create("local", Configuration::get("rasterdb.local.location"));
+	backend = RasterDBBackend::create("local", Configuration::get("rasterdb.local.location"), Parameters());
 }
 
 TileServerConnection::~TileServerConnection() {
@@ -198,8 +200,7 @@ std::unique_ptr<NonblockingServer::Connection> TileServer::createConnection(int 
 int main(void) {
 	Configuration::loadFromDefaultPaths();
 
-	Log::setLogFd(stdout);
-	Log::setLevel(Configuration::get("rasterdb.tileserver.loglevel", "info"));
+	Log::logToStream(Configuration::get("rasterdb.tileserver.loglevel", "info"), &std::cout);
 
 	auto portnr = Configuration::getInt("rasterdb.tileserver.port");
 

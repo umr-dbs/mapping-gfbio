@@ -6,6 +6,7 @@
  */
 
 #include "cache/index/query_manager/late_query_manager.h"
+#include "util/log.h"
 
 LateJob::LateJob(const BaseRequest& request, IndexCacheManager &caches, SystemStats &stats) : caches(caches), request(request),
 	orig_query(this->request.query),

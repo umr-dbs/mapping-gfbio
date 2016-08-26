@@ -2,7 +2,6 @@
 #include "services/httpservice.h"
 #include "userdb/userdb.h"
 #include "util/configuration.h"
-#include "util/debug.h"
 
 #include "rasterdb/rasterdb.h"
 

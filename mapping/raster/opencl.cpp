@@ -8,8 +8,7 @@
 #include "raster/opencl.h"
 #include "operators/operator.h" // For QueryProfiler
 #include "util/configuration.h"
-#include "util/debug.h"
-
+#include "util/log.h"
 
 #include <sstream>
 #include <mutex>
@@ -57,9 +56,7 @@ void init() {
 			for (size_t i=0;i<platformList.size();i++) {
 				std::string platformName;
 				platformList[i].getInfo((cl_platform_info)CL_PLATFORM_NAME, &platformName);
-				std::ostringstream msg;
-				msg << "CL vendor " << i << ": " << platformName;
-				d(msg.str());
+				Log::info(concat("CL vendor ", i, ": ", platformName));
 
 				if ( platformName[platformName.length()-1] == 0 )
 					platformName = platformName.substr(0,platformName.length()-1);
@@ -70,7 +67,7 @@ void init() {
 
 			if (selectedPlatform < 0) {
 				if (preferredPlatformName != "" || platformList.size() > 0)
-					d("Configured openCL platform not found, using the first one offered");
+					Log::debug("Configured openCL platform not found, using the first one offered");
 				selectedPlatform = 0;
 			}
 			platform = platformList[selectedPlatform];

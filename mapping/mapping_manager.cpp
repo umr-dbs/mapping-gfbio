@@ -15,7 +15,7 @@
 #include "util/binarystream.h"
 #include "util/configuration.h"
 #include "util/gdal.h"
-#include "util/debug.h"
+#include "util/log.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -388,11 +388,6 @@ static void runquery(int argc, char *argv[]) {
 		printf("Unknown result type: %s\n", result.c_str());
 		exit(5);
 	}
-
-	auto msgs = get_debug_messages();
-	for (auto &m : msgs) {
-		printf("%s\n", m.c_str());
-	}
 }
 
 static void testsemantic(GenericOperator *graph) {
@@ -678,6 +673,8 @@ int main(int argc, char *argv[]) {
 	// FIXME
 	NopCacheManager cm;
 	CacheManager::init(&cm);
+
+	Log::logToStream(Log::LogLevel::WARN, &std::cerr);
 
 	const char *command = argv[1];
 

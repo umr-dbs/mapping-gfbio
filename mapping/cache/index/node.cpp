@@ -10,6 +10,7 @@
 #include "cache/common.h"
 #include "util/concat.h"
 #include "util/exceptions.h"
+#include "util/log.h"
 
 
 ////////////////////////////////////////////////////////////

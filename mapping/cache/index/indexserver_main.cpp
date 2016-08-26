@@ -11,6 +11,7 @@
 #include "util/configuration.h"
 #include "util/log.h"
 #include <signal.h>
+#include <iostream>
 
 IndexServer *instance = nullptr;
 
@@ -57,10 +58,7 @@ int main(void) {
 	set_signal_handler();
 	Configuration::loadFromDefaultPaths();
 
-	// Disable GDAL Error Messages
-	CPLSetErrorHandler(CacheCommon::GDALErrorHandler);
-
-	Log::setLevel(Configuration::get("log.level","info"));
+	Log::logToStream(Configuration::get("log.level","info"), &std::cerr);
 
 	auto cfg = IndexConfig::fromConfiguration();
 

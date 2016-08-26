@@ -8,6 +8,7 @@
 #include "cache/index/query_manager/simple_query_manager.h"
 #include "cache/index/query_manager/default_query_manager.h"
 #include "util/exceptions.h"
+#include "util/log.h"
 
 SimpleJob::SimpleJob(const BaseRequest &request, uint32_t node_id) : PendingQuery(), request(request), node_id(node_id) {
 }

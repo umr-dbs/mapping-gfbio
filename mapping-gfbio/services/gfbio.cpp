@@ -302,7 +302,31 @@ void GFBioService::run() {
 							entry["dataLink"] = result["datalink"];
 							entry["format"] = result["format"];
 
-							entry["available"] = entry["format"].asString().find("text/tab-separated-values") != std::string::npos;
+							bool isTabSeparated = entry["format"].asString().find("text/tab-separated-values") != std::string::npos;
+
+
+							// check if parameters LATITUDE and LONGITUDE exist
+							bool isGeoReferenced = false;
+							if (isTabSeparated && result.isMember("parameter")) {
+								bool hasLatitude = false, hasLongitude = false;
+
+								auto parameters = result["parameter"];
+								for (Json::ValueIterator parameter = parameters.begin(); parameter != parameters.end(); ++parameter) {
+									std::string p = (*parameter).asCString();
+									// TODO: also allow other lat/lon parameters
+									if (p == "LATITUDE")
+										hasLatitude = true;
+									else if (p == "LONGITUDE")
+										hasLongitude = true;
+								}
+
+								isGeoReferenced = hasLatitude && hasLongitude;
+							}
+
+							entry["isTabSeparated"] = isTabSeparated;
+							entry["isGeoreferenced"] = isGeoReferenced;
+							entry["available"] = isTabSeparated && isGeoReferenced;
+
 						} else {
 							entry["type"] = "abcd";
 							entry["dataLink"] = result["parentIdentifier"];

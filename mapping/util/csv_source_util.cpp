@@ -34,6 +34,7 @@ CSVSourceUtil::CSVSourceUtil(GeometrySpecification geometry_specification,
 	// TODO instantiate TimeParsers according to time specification
 }
 
+
 CSVSourceUtil::CSVSourceUtil(Json::Value &params) : params(params) {
 	auto configured_separator = params.get("separator", ",").asString();
 	if (configured_separator.length() != 1)

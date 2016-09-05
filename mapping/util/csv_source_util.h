@@ -85,7 +85,6 @@ class CSVSourceUtil {
 		std::unique_ptr<LineCollection> getLineCollection(std::istream &data, const QueryRectangle &rect);
 		std::unique_ptr<PolygonCollection> getPolygonCollection(std::istream &data, const QueryRectangle &rect);
 
-	private:
 		void readAnyCollection(SimpleFeatureCollection *collection, std::istream &data, const QueryRectangle &rect,
 					std::function<bool(const std::string &,const std::string &)> addFeature);
 

@@ -295,6 +295,11 @@ class AttributeArrays {
 		 */
 		AttributeArray<std::string> &addTextualAttribute(const std::string &key, const Unit &unit, std::vector<std::string> &&values);
 
+
+		void renameNumericAttribute(const std::string &oldKey, const std::string &newKey);
+
+		void renameTextualAttribute(const std::string &oldKey, const std::string &newKey);
+
 		/**
 		 * Returns an iterable collection containing the names of all numeric attributes
 		 *

@@ -365,3 +365,17 @@ void AttributeArrays::resize(size_t size) {
 		numeric(key).resize(size);
 	}
 }
+
+void AttributeArrays::renameNumericAttribute(const std::string &oldKey, const std::string &newKey) {
+	auto temp = _numeric.at(oldKey);
+
+	_numeric.erase(oldKey);
+	_numeric.insert(std::make_pair(newKey, std::move(temp)));
+}
+
+void AttributeArrays::renameTextualAttribute(const std::string &oldKey, const std::string &newKey) {
+	auto temp = _textual.at(oldKey);
+
+	_textual.erase(oldKey);
+	_textual.insert(std::make_pair(newKey, std::move(temp)));
+}

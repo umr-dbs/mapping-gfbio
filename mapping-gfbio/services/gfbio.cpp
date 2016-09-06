@@ -11,6 +11,7 @@
 #include <sstream>
 #include <json/json.h>
 #include <algorithm>
+#include <pqxx/pqxx>
 
 #include <fstream>
 
@@ -33,6 +34,24 @@ public:
 		: public std::runtime_error { using std::runtime_error::runtime_error; };
 
 private:
+
+	class PangaeaParameter {
+		public:
+		PangaeaParameter(const std::string &identifier,
+				const std::string &fullName, const std::string &shortName,
+				const std::string &unit) :
+				identifier(identifier), fullName(fullName), shortName(
+						shortName), unit(unit) {
+
+		}
+			std::string identifier;
+			std::string fullName;
+			std::string shortName;
+			std::string unit;
+	};
+
+	PangaeaParameter getPangaeaParameterByFullName(pqxx::connection &connection, const std::string &fullName);
+
 	size_t authenticateWithPortal(const std::string &token);
 	Json::Value getUserDetailsFromPortal(const size_t userId);
 
@@ -139,6 +158,23 @@ Json::Value GFBioService::getUserDetailsFromPortal(const size_t userId) {
 	return response[0];
 }
 
+/**
+ * get pangaea parameter by full name from postgres table pangaea.parameters
+ * throws Exception if not parameter is found
+ */
+GFBioService::PangaeaParameter GFBioService::getPangaeaParameterByFullName(pqxx::connection &connection, const std::string &fullName) {
+	connection.prepare("pangaea_parameter", "SELECT identifier, short_name, coalesce(unit, '') as unit FROM pangaea.parameters WHERE full_name = $1");
+	pqxx::work work(connection);
+
+	pqxx::result result = work.prepared("pangaea_parameter")(fullName).exec();
+
+	if (result.size() < 1)
+		throw GFBioServiceException("GFBioService: pangaea parameter not found:" + fullName);
+
+	auto row = result[0];
+	return PangaeaParameter(row[0].as<std::string>(), fullName, row[1].as<std::string>(), row[2].as<std::string>());
+}
+
 void GFBioService::run() {
 	try {
 		std::string request = params.get("request");
@@ -238,6 +274,8 @@ void GFBioService::run() {
 		auto session = UserDB::loadSession(params.get("sessiontoken"));
 
 		if (request == "baskets") {
+			// connection for resolving pangaea parameters
+			pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
 
 			std::string gfbioId = session->getUser().getExternalid();
 			if(gfbioId.find(EXTERNAL_ID_PREFIX) != 0)
@@ -297,6 +335,7 @@ void GFBioService::run() {
 
 						// better way to determine dataCenter that's equally robust?
 						if(metadataLink.find("doi.pangaea.de/") != std::string::npos) {
+							// entry is from pangaea
 							entry["type"] = "pangaea";
 							entry["doi"] = metadataLink.substr(metadataLink.find("doi.pangaea.de/") + strlen("doi.pangaea.de/"));
 							entry["dataLink"] = result["datalink"];
@@ -312,7 +351,7 @@ void GFBioService::run() {
 
 								auto parameters = result["parameter"];
 								for (Json::ValueIterator parameter = parameters.begin(); parameter != parameters.end(); ++parameter) {
-									std::string p = (*parameter).asCString();
+									std::string p = (*parameter).asString();
 									// TODO: also allow other lat/lon parameters
 									if (p == "LATITUDE")
 										hasLatitude = true;
@@ -322,6 +361,32 @@ void GFBioService::run() {
 
 								isGeoReferenced = hasLatitude && hasLongitude;
 							}
+
+							// TODO: handle geocodes
+
+							//resolve parameters
+							auto parameters = result["parameter"];
+							Json::Value entryParameters(Json::arrayValue);
+							for (Json::ValueIterator parameter = parameters.begin(); parameter != parameters.end(); ++parameter) {
+								Json::Value jsonParameter(Json::objectValue);
+
+								std::string parameterString = (*parameter).asString();
+								try {
+									PangaeaParameter pangaeaParameter = getPangaeaParameterByFullName(connection, parameterString);
+
+									jsonParameter["name"] = pangaeaParameter.fullName;
+									jsonParameter["unit"] = pangaeaParameter.unit;
+									jsonParameter["numeric"] = pangaeaParameter.unit != "";
+								} catch(const GFBioServiceException& e) {
+									jsonParameter["name"] = parameterString;
+									jsonParameter["unit"] = "";
+									jsonParameter["numeric"] = false;
+									fprintf(stderr, e.what());
+								}
+
+								entryParameters.append(jsonParameter);
+							}
+							entry["parameters"] = entryParameters;
 
 							entry["isTabSeparated"] = isTabSeparated;
 							entry["isGeoreferenced"] = isGeoReferenced;

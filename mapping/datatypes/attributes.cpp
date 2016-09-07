@@ -367,15 +367,25 @@ void AttributeArrays::resize(size_t size) {
 }
 
 void AttributeArrays::renameNumericAttribute(const std::string &oldKey, const std::string &newKey) {
-	auto temp = _numeric.at(oldKey);
+	if (_numeric.count(oldKey) < 1)
+		throw ArgumentException("AttributeArray::rename oldKey does not exist");
 
-	_numeric.erase(oldKey);
+	if (_numeric.count(newKey) > 0)
+		throw ArgumentException("AttributeArray::rename newKey already exist");
+
+	AttributeArray<double> &temp = _numeric.at(oldKey);
 	_numeric.insert(std::make_pair(newKey, std::move(temp)));
+	_numeric.erase(oldKey);
 }
 
 void AttributeArrays::renameTextualAttribute(const std::string &oldKey, const std::string &newKey) {
-	auto temp = _textual.at(oldKey);
+	if (_textual.count(oldKey) < 1)
+		throw ArgumentException("AttributeArray::rename oldKey does not exist");
 
-	_textual.erase(oldKey);
+	if (_textual.count(newKey) > 0)
+		throw ArgumentException("AttributeArray::rename newKey already exist");
+
+	AttributeArray<std::string> &temp = _textual.at(oldKey);
 	_textual.insert(std::make_pair(newKey, std::move(temp)));
+	_textual.erase(oldKey);
 }

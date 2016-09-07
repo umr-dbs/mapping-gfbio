@@ -35,7 +35,7 @@ SANITIZE_FLAGS:=-fsanitize=address -fsanitize=undefined -fno-omit-frame-pointer
 # -fno-sanitize-recover=undefined would exit on undefined behaviour, but needs a more recent version of clang
 # -fsanitize=integer for warnings on (defined) unsigned overflows
 
-LDFLAGS := -lpthread -pthread -lbz2 -lturbojpeg -lgeos -lboost_date_time -lboost_regex
+LDFLAGS := -lpthread -pthread -lbz2 -lturbojpeg -lgeos -lboost_date_time
 LDFLAGS_CL := -lOpenCL
 
 

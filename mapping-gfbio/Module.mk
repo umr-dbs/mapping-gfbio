@@ -12,3 +12,4 @@ OBJS_SERVICES += o/mapping-gfbio/services/gfbio.o
 
 PKGLIBS_CORE += xerces-c
 
+LDFLAGS += -lboost_regex

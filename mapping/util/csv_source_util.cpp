@@ -106,11 +106,12 @@ Json::Value CSVSourceUtil::getParameters() {
 
 	params["geometry"] = GeometrySpecificationConverter.to_string(geometry_specification);
 	params["time"] = TimeSpecificationConverter.to_string(time_specification);
-	if (time_specification == TimeSpecification::START)
+	if (time_specification == TimeSpecification::START) {
 		if(time_duration == -1.0)
 			params["duration"] = "inf";
 		else
 			params["duration"] = time_duration;
+	}
 
 	Json::Value columns(Json::ValueType::objectValue);
 	columns["x"] = column_x;

@@ -16,7 +16,7 @@ class MatrixOperator : public GenericOperator {
 		virtual ~MatrixOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -102,8 +102,8 @@ struct matrixkernel{
 
 #include "operators/processing/raster/matrixkernel.cl.h"
 
-std::unique_ptr<GenericRaster> MatrixOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto raster_in = getRasterFromSource(0, rect, profiler);
+std::unique_ptr<GenericRaster> MatrixOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
+	auto raster_in = getRasterFromSource(0, rect, tools);
 
 #ifndef MAPPING_NO_OPENCL
 	RasterOpenCL::init();
@@ -116,7 +116,7 @@ std::unique_ptr<GenericRaster> MatrixOperator::getRaster(const QueryRectangle &r
 
 	try {
 		RasterOpenCL::CLProgram prog;
-		prog.setProfiler(profiler);
+		prog.setProfiler(tools.profiler);
 		prog.addInRaster(raster_in.get());
 		prog.addOutRaster(raster_out.get());
 		prog.compile(operators_processing_raster_matrixkernel, "matrixkernel");

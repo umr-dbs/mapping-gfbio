@@ -28,10 +28,10 @@ class ProjectionOperator : public GenericOperator {
 		virtual ~ProjectionOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream &stream);
@@ -47,7 +47,7 @@ class MeteosatLatLongOperator : public GenericOperator {
 	MeteosatLatLongOperator(int sourcecount, GenericOperator *sources[]);
 		virtual ~MeteosatLatLongOperator();
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &toolss);
 };
 #endif
 
@@ -241,19 +241,19 @@ QueryRectangle ProjectionOperator::projectQueryRectangle(const QueryRectangle &r
 }
 
 //GenericRaster *ProjectionOperator::execute(int timestamp, double x1, double y1, double x2, double y2, int xres, int yres) {
-std::unique_ptr<GenericRaster> ProjectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> ProjectionOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	if (dest_epsg != rect.epsg) {
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 	}
 	if (src_epsg == dest_epsg) {
-		return getRasterFromSource(0, rect, profiler);
+		return getRasterFromSource(0, rect, tools);
 	}
 
 	GDAL::CRSTransformer transformer(dest_epsg, src_epsg);
 
 	QueryRectangle src_rect = projectQueryRectangle(rect, transformer);
 
-	auto raster_in = getRasterFromSource(0, src_rect, profiler);
+	auto raster_in = getRasterFromSource(0, src_rect, tools);
 
 	if (src_epsg != raster_in->stref.epsg)
 		throw OperatorException("ProjectionOperator: Source Raster not in expected projection");
@@ -262,11 +262,11 @@ std::unique_ptr<GenericRaster> ProjectionOperator::getRaster(const QueryRectangl
 }
 
 
-std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 	if (src_epsg == dest_epsg)
-		return getPointCollectionFromSource(0, rect, profiler);
+		return getPointCollectionFromSource(0, rect, tools);
 
 
 	// Need to transform "backwards" to project the query rectangle..
@@ -277,7 +277,7 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const Qu
 	GDAL::CRSTransformer transformer(src_epsg, dest_epsg);
 
 
-	auto points_in = getPointCollectionFromSource(0, src_rect, profiler);
+	auto points_in = getPointCollectionFromSource(0, src_rect, tools);
 
 	if (src_epsg != points_in->stref.epsg) {
 		std::ostringstream msg;
@@ -317,7 +317,7 @@ std::unique_ptr<PointCollection> ProjectionOperator::getPointCollection(const Qu
 
 
 
-std::unique_ptr<LineCollection> ProjectionOperator::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<LineCollection> ProjectionOperator::getLineCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 
@@ -326,7 +326,7 @@ std::unique_ptr<LineCollection> ProjectionOperator::getLineCollection(const Quer
 
 	GDAL::CRSTransformer transformer(src_epsg, dest_epsg);
 
-	auto lines_in = getLineCollectionFromSource(0, src_rect, profiler);
+	auto lines_in = getLineCollectionFromSource(0, src_rect, tools);
 
 	if (src_epsg != lines_in->stref.epsg) {
 		std::ostringstream msg;
@@ -369,7 +369,7 @@ std::unique_ptr<LineCollection> ProjectionOperator::getLineCollection(const Quer
 }
 
 //TODO: why is this in raster folder?
-std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	if (dest_epsg != rect.epsg)
 		throw OperatorException("Projection: asked to transform to a different CRS than specified in QueryRectangle");
 
@@ -379,7 +379,7 @@ std::unique_ptr<PolygonCollection> ProjectionOperator::getPolygonCollection(cons
 	GDAL::CRSTransformer transformer(src_epsg, dest_epsg);
 
 
-	auto polygons_in = getPolygonCollectionFromSource(0, src_rect, profiler);
+	auto polygons_in = getPolygonCollectionFromSource(0, src_rect, tools);
 
 	if (src_epsg != polygons_in->stref.epsg) {
 		std::ostringstream msg;
@@ -483,8 +483,8 @@ MeteosatLatLongOperator::MeteosatLatLongOperator(int sourcecount, GenericOperato
 MeteosatLatLongOperator::~MeteosatLatLongOperator() {
 }
 
-std::unique_ptr<GenericRaster> MeteosatLatLongOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto raster_in = getRasterFromSource(0, rect, profiler);
+std::unique_ptr<GenericRaster> MeteosatLatLongOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
+	auto raster_in = getRasterFromSource(0, rect, tools);
 
 	return callUnaryOperatorFunc<meteosat_draw_latlong>(raster_in.get());
 }

@@ -98,7 +98,7 @@ class ABCDSourceOperator : public GenericOperator {
 		}
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
 		virtual void getProvenance(ProvenanceCollection &pc);
 #endif
 		void writeSemanticParameters(std::ostringstream& stream) {
@@ -429,7 +429,7 @@ std::unique_ptr<DOMLSParserImpl> ABCDSourceOperator::createParser() {
 	return parser;
 }
 
-std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
+std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools){
 	points = make_unique<PointCollection>(rect);
 
 	//TODO: catch XML exceptions and throw OperatorException instead?

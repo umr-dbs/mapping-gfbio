@@ -29,7 +29,7 @@ class MeteosatPansharpeningOperator : public GenericOperator {
 		virtual ~MeteosatPansharpeningOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -62,7 +62,7 @@ void MeteosatPansharpeningOperator::writeSemanticParameters(std::ostringstream& 
 
 #ifndef MAPPING_OPERATOR_STUBS
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("MSG_Pansharpening_Operator: cannot be executed without OpenCL support");
 }
 #else
@@ -72,17 +72,17 @@ std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const Qu
 #include "operators/processing/meteosat/pansharpening_regression.cl.h"
 #include "operators/processing/meteosat/pansharpening_interpolate.cl.h"
 
-std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	RasterOpenCL::init();
 
-	auto raster_lowres = getRasterFromSource(1, rect, profiler, RasterQM::LOOSE);
+	auto raster_lowres = getRasterFromSource(1, rect, tools, RasterQM::LOOSE);
 
 	// query the HRV canal with triple the resolution
 	QueryRectangle rect2(*raster_lowres);
 	rect2.xres = raster_lowres->width * 3;
 	rect2.yres = raster_lowres->height * 3;
 
-	auto raster_hrv = getRasterFromSource(0, rect2, profiler, RasterQM::EXACT);
+	auto raster_hrv = getRasterFromSource(0, rect2, tools, RasterQM::EXACT);
 
 	Profiler::Profiler p("CL_PANSHARPENING_OPERATOR");
 	raster_hrv->setRepresentation(GenericRaster::OPENCL);
@@ -113,7 +113,7 @@ std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const Qu
 	auto low_high_matrix = GenericRaster::create(raster_lowres->dd, *raster_lowres, GenericRaster::OPENCL);
 
 	RasterOpenCL::CLProgram prog_degenerate;
-	prog_degenerate.setProfiler(profiler);
+	prog_degenerate.setProfiler(tools.profiler);
 	prog_degenerate.addInRaster(raster_hrv.get());
 	prog_degenerate.addOutRaster(low_high_matrix.get());
 	if (!spatial) {
@@ -133,7 +133,7 @@ std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const Qu
 	auto reg_low_b = GenericRaster::create(raster_lowres->dd, *raster_lowres, GenericRaster::OPENCL);
 
 	RasterOpenCL::CLProgram prog_regression;
-	prog_regression.setProfiler(profiler);
+	prog_regression.setProfiler(tools.profiler);
 	prog_regression.addInRaster(raster_lowres.get());
 	prog_regression.addInRaster(low_high_matrix.get());
 	prog_regression.addOutRaster(reg_low_a.get());
@@ -154,7 +154,7 @@ std::unique_ptr<GenericRaster> MeteosatPansharpeningOperator::getRaster(const Qu
 	auto raster_out = GenericRaster::create(raster_lowres->dd, stref, raster_hrv->width, raster_hrv->height, 0, GenericRaster::OPENCL);
 
 	RasterOpenCL::CLProgram prog_interpolate;
-	prog_interpolate.setProfiler(profiler);
+	prog_interpolate.setProfiler(tools.profiler);
 	prog_interpolate.addInRaster(reg_low_a.get());
 	prog_interpolate.addInRaster(reg_low_b.get());
 	prog_interpolate.addInRaster(raster_hrv.get());

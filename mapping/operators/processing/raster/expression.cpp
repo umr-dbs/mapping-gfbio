@@ -32,7 +32,7 @@ class ExpressionOperator : public GenericOperator {
 		virtual ~ExpressionOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -76,11 +76,11 @@ void ExpressionOperator::writeSemanticParameters(std::ostringstream& stream) {
 #ifndef MAPPING_OPERATOR_STUBS
 
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("ExpressionOperator: cannot be executed without OpenCL support");
 }
 #else
-std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	int rastercount = getRasterSourceCount();
 	if (rastercount < 1 || rastercount > 26)
 		throw OperatorException("ExpressionOperator: need between 1 and 26 input rasters");
@@ -91,7 +91,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	in_rasters.reserve(rastercount);
 
 	// Load all sources and migrate to opencl
-	in_rasters.push_back(getRasterFromSource(0, rect, profiler, RasterQM::LOOSE));
+	in_rasters.push_back(getRasterFromSource(0, rect, tools, RasterQM::LOOSE));
 	// The first raster determines the data type and sizes
 	GenericRaster *raster_in = in_rasters[0].get();
 	raster_in->setRepresentation(GenericRaster::OPENCL);
@@ -105,7 +105,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 		QueryResolution::pixels(raster_in->width,raster_in->height)
 	);
 	for (int i=1;i<rastercount;i++) {
-		in_rasters.push_back(getRasterFromSource(i, exact_rect, profiler, RasterQM::EXACT));
+		in_rasters.push_back(getRasterFromSource(i, exact_rect, tools, RasterQM::EXACT));
 		in_rasters[i]->setRepresentation(GenericRaster::OPENCL);
 		tref.intersect(in_rasters[i]->stref);
 	}
@@ -168,7 +168,7 @@ std::unique_ptr<GenericRaster> ExpressionOperator::getRaster(const QueryRectangl
 	 * Run the kernel
 	 */
 	RasterOpenCL::CLProgram prog;
-	prog.setProfiler(profiler);
+	prog.setProfiler(tools.profiler);
 	for (int i=0;i<rastercount;i++) {
 		if (i > 0) {
 			if (in_rasters[i]->width != raster_in->width || in_rasters[i]->height != raster_in->height)

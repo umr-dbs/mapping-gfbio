@@ -23,7 +23,7 @@ class FeatureAttributesPlotOperator: public GenericOperator {
 		virtual ~FeatureAttributesPlotOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -95,8 +95,8 @@ auto FeatureAttributesPlotOperator::createXYGraph(PointCollection& points) -> st
 	return std::move(xyGraph);
 }
 
-std::unique_ptr<GenericPlot> FeatureAttributesPlotOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointCollectionFromSource(0, QueryRectangle(rect, rect, QueryResolution::none()), profiler);
+std::unique_ptr<GenericPlot> FeatureAttributesPlotOperator::getPlot(const QueryRectangle &rect, const QueryTools &tools) {
+	auto points = getPointCollectionFromSource(0, QueryRectangle(rect, rect, QueryResolution::none()), tools);
 
 	// TODO: GENERALIZE
 	if (attributeNames.size() == 2) {

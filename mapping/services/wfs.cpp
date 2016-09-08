@@ -127,13 +127,13 @@ void WFSService::getFeature() {
 
 	switch (featureType){
 	case FeatureType::POINTS:
-		features = graph->getCachedPointCollection(rect, profiler);
+		features = graph->getCachedPointCollection(rect, QueryTools(profiler));
 		break;
 	case FeatureType::LINES:
-		features = graph->getCachedLineCollection(rect, profiler);
+		features = graph->getCachedLineCollection(rect, QueryTools(profiler));
 		break;
 	case FeatureType::POLYGONS:
-		features = graph->getCachedPolygonCollection(rect, profiler);
+		features = graph->getCachedPolygonCollection(rect, QueryTools(profiler));
 		break;
 	}
 

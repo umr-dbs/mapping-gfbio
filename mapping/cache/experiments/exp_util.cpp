@@ -598,20 +598,20 @@ void CacheExperiment::execute_query(GenericOperator& op,
 		const QueryRectangle& query, CacheType type, QueryProfiler &qp) {
 	switch (type) {
 	case CacheType::RASTER: {
-		op.getCachedRaster(query, qp);
+		op.getCachedRaster(query, QueryTools(qp));
 		break;
 	}
 	case CacheType::POINT:
-		op.getCachedPointCollection(query, qp);
+		op.getCachedPointCollection(query, QueryTools(qp));
 		break;
 	case CacheType::LINE:
-		op.getCachedLineCollection(query, qp);
+		op.getCachedLineCollection(query, QueryTools(qp));
 		break;
 	case CacheType::POLYGON:
-		op.getCachedPolygonCollection(query, qp);
+		op.getCachedPolygonCollection(query, QueryTools(qp));
 		break;
 	case CacheType::PLOT:
-		op.getCachedPlot(query, qp);
+		op.getCachedPlot(query, QueryTools(qp));
 		break;
 	default:
 		throw ArgumentException("Illegal query type");

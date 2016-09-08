@@ -20,8 +20,8 @@ class MeteosatGccThermThresholdDetectionOperator : public GenericOperator {
 		virtual ~MeteosatGccThermThresholdDetectionOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 
 	private:
@@ -51,10 +51,10 @@ REGISTER_OPERATOR(MeteosatGccThermThresholdDetectionOperator, "meteosat_gcctherm
 
 #ifndef MAPPING_OPERATOR_STUBS
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> MeteosatGccThermThresholdDetectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatGccThermThresholdDetectionOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("MSATGccThermThresholdDetectionOperator: cannot be executed without OpenCL support");
 }
-std::unique_ptr<GenericPlot> MeteosatGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericPlot> MeteosatGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("MSATGccThermThresholdDetectionOperator: cannot be executed without OpenCL support");
 }
 #else
@@ -259,10 +259,10 @@ double MeteosatGccThermThresholdDetectionOperator::findGccThermThreshold(Histogr
 	}
 }
 
-std::unique_ptr<GenericRaster> MeteosatGccThermThresholdDetectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatGccThermThresholdDetectionOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	//get the input rasters
-	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, profiler);
-	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, profiler);
+	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, tools);
+	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, tools);
 
 	// TODO: verify units of the source rasters
 	if (!bt108_minus_bt039_raster->dd.unit.hasMinMax())
@@ -313,7 +313,7 @@ std::unique_ptr<GenericRaster> MeteosatGccThermThresholdDetectionOperator::getRa
 
 	//Use the OpenCL classification kernel to fill a raster with the values
 	RasterOpenCL::CLProgram prog;
-	prog.setProfiler(profiler);
+	prog.setProfiler(tools.profiler);
 	prog.addOutRaster(raster_out.get());
 	prog.addInRaster(solar_zenith_angle_raster.get());
 	prog.compile(operators_processing_raster_classification_kernels, "replacementByRangeKernel");
@@ -329,10 +329,10 @@ std::unique_ptr<GenericRaster> MeteosatGccThermThresholdDetectionOperator::getRa
 	return (raster_out);
 }
 
-std::unique_ptr<GenericPlot> MeteosatGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericPlot> MeteosatGccThermThresholdDetectionOperator::getPlot(const QueryRectangle &rect, const QueryTools &tools) {
 	//get the input rasters
-	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, profiler);
-	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, profiler);
+	auto solar_zenith_angle_raster = getRasterFromSource(0, rect, tools);
+	auto bt108_minus_bt039_raster = getRasterFromSource(1, rect, tools);
 
 	// TODO: verify units of the source rasters
 	if (!bt108_minus_bt039_raster->dd.unit.hasMinMax())

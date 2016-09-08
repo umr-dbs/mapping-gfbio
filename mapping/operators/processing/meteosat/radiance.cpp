@@ -18,7 +18,7 @@ class MeteosatRadianceOperator : public GenericOperator {
 		virtual ~MeteosatRadianceOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -49,16 +49,16 @@ void MeteosatRadianceOperator::writeSemanticParameters(std::ostringstream& strea
 
 #ifndef MAPPING_OPERATOR_STUBS
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> MeteosatRadianceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatRadianceOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("MSATRadianceOperator: cannot be executed without OpenCL support");
 }
 #else
 
 #include "operators/processing/meteosat/radiance.cl.h"
 
-std::unique_ptr<GenericRaster> MeteosatRadianceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatRadianceOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	RasterOpenCL::init();
-	auto raster = getRasterFromSource(0, rect, profiler);
+	auto raster = getRasterFromSource(0, rect, tools);
 
 	if (raster->dd.unit.getMeasurement() != "raw" || !raster->dd.unit.hasMinMax())
 		throw OperatorException("Input raster does not appear to be a raw meteosat raster");
@@ -89,7 +89,7 @@ std::unique_ptr<GenericRaster> MeteosatRadianceOperator::getRaster(const QueryRe
 	auto raster_out = GenericRaster::create(out_dd, *raster, GenericRaster::Representation::OPENCL);
 
 	RasterOpenCL::CLProgram prog;
-	prog.setProfiler(profiler);
+	prog.setProfiler(tools.profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_processing_meteosat_radiance, "radianceConvertedKernel");

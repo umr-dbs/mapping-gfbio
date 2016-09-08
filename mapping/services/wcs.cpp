@@ -133,7 +133,7 @@ void WCSService::run() {
 			QueryResolution::pixels(sizeX, sizeY)
 		);
 		QueryProfiler profiler;
-		auto result_raster = graph->getCachedRaster(query_rect,profiler);
+		auto result_raster = graph->getCachedRaster(query_rect,QueryTools(profiler));
 
 		auto format = params.get("format", "image/tiff");
 		fprintf(stderr,format.c_str());

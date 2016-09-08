@@ -44,7 +44,7 @@ class PangaeaSourceOperator : public GenericOperator {
 		PangaeaSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
 		virtual void getProvenance(ProvenanceCollection &pc);
 
 		void parseDataDescription(std::string& dataDescription);
@@ -168,7 +168,7 @@ std::string PangaeaSourceOperator::mapNameToFullName(std::string shortName, std:
 	throw std::runtime_error("PangaeaSource: invalid parameter name " + shortName);
 }
 
-std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler){
+std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools){
 	std::stringstream data;
 
 	getStringFromServer(data);

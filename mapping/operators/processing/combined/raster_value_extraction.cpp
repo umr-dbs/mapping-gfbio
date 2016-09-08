@@ -30,7 +30,7 @@ class RasterValueExtractionOperator: public GenericOperator {
 		virtual ~RasterValueExtractionOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -132,8 +132,8 @@ static void enhance(PointCollection &points, GenericRaster &raster, const std::s
 #endif
 }
 
-std::unique_ptr<PointCollection> RasterValueExtractionOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
+std::unique_ptr<PointCollection> RasterValueExtractionOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
+	auto points = getPointCollectionFromSource(0, rect, tools, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
 
 	if (points->hasTime()) {
 		// sort by time, iterate over all timestamps, fetch the correct raster, then add the attribute
@@ -162,7 +162,7 @@ std::unique_ptr<PointCollection> RasterValueExtractionOperator::getPointCollecti
 						TemporalReference(rect.timetype, temporal_index[current_idx].second),
 						QueryResolution::pixels(xResolution, yResolution));
 				try {
-					auto raster = getRasterFromSource(r, rect2, profiler);
+					auto raster = getRasterFromSource(r, rect2, tools);
 					while (current_idx < featurecount && temporal_index[current_idx].second < raster->stref.t2) {
 						// load point and add
 						auto featureidx = temporal_index[current_idx].first;
@@ -192,9 +192,9 @@ std::unique_ptr<PointCollection> RasterValueExtractionOperator::getPointCollecti
 		QueryRectangle rect2(rect, rect,
 				QueryResolution::pixels(xResolution, yResolution));
 		for (int r=0;r<rasters;r++) {
-			auto raster = getRasterFromSource(r, rect2, profiler);
+			auto raster = getRasterFromSource(r, rect2, tools);
 			Profiler::Profiler p("RASTER_VALUE_TO_POINTS_OPERATOR");
-			enhance(*points, *raster, names.at(r), profiler);
+			enhance(*points, *raster, names.at(r), tools.profiler);
 			if (r == 0)
 				tref = raster->stref;
 			else

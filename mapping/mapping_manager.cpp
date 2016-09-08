@@ -36,19 +36,19 @@ template<typename T> struct queryFeature {};
 template<> struct queryFeature<PointCollection> {
 	static std::unique_ptr<PointCollection> query(GenericOperator *graph, const QueryRectangle &rect) {
 		QueryProfiler profiler;
-		return graph->getCachedPointCollection(rect, profiler);
+		return graph->getCachedPointCollection(rect, QueryTools(profiler));
 	}
 };
 template<> struct queryFeature<LineCollection> {
 	static std::unique_ptr<LineCollection> query(GenericOperator *graph, const QueryRectangle &rect) {
 		QueryProfiler profiler;
-		return graph->getCachedLineCollection(rect, profiler);
+		return graph->getCachedLineCollection(rect, QueryTools(profiler));
 	}
 };
 template<> struct queryFeature<PolygonCollection> {
 	static std::unique_ptr<PolygonCollection> query(GenericOperator *graph, const QueryRectangle &rect) {
 		QueryProfiler profiler;
-		return graph->getCachedPolygonCollection(rect, profiler);
+		return graph->getCachedPolygonCollection(rect, QueryTools(profiler));
 	}
 };
 
@@ -340,7 +340,7 @@ static void runquery(int argc, char *argv[]) {
 			exit(5);
 		}
 
-		auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
+		auto raster = graph->getCachedRaster(qrect, QueryTools(profiler), queryMode);
 		printf("flip: %d %d\n", flipx, flipy);
 		printf("QRect(%f,%f -> %f,%f)\n", qrect.x1, qrect.y1, qrect.x2, qrect.y2);
 		if (flipx || flipy)
@@ -372,7 +372,7 @@ static void runquery(int argc, char *argv[]) {
 	}
 	else if (result == "plot") {
 			QueryProfiler profiler;
-			auto plot = graph->getCachedPlot(qrect, profiler);
+			auto plot = graph->getCachedPlot(qrect, QueryTools(profiler));
 			auto json = plot->toJSON();
 			if (out_filename) {
 				FILE *f = fopen(out_filename, "w");
@@ -523,7 +523,7 @@ static int testquery(int argc, char *argv[]) {
 				return 5;
 			}
 
-			auto raster = graph->getCachedRaster(qrect, profiler, queryMode);
+			auto raster = graph->getCachedRaster(qrect, QueryTools(profiler), queryMode);
 			if (flipx || flipy)
 				raster = raster->flip(flipx, flipy);
 			real_hash = getIPCHash(*raster);
@@ -546,7 +546,7 @@ static int testquery(int argc, char *argv[]) {
 		}
 		else if (result == "plot") {
 			QueryProfiler profiler;
-			auto plot = graph->getCachedPlot(qrect, profiler);
+			auto plot = graph->getCachedPlot(qrect, QueryTools(profiler));
 			real_hash = getStringHash(plot->toJSON());
 			real_hash2 = getStringHash(plot->clone()->toJSON());
 		}

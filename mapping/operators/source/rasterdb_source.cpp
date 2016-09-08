@@ -27,7 +27,7 @@ class RasterDBSourceOperator : public GenericOperator {
 
 #ifndef MAPPING_OPERATOR_STUBS
 		virtual void getProvenance(ProvenanceCollection &pc);
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream &stream);
@@ -72,8 +72,8 @@ void RasterDBSourceOperator::getProvenance(ProvenanceCollection &pc) {
 		pc.add(Provenance(sp->citation, sp->license, sp->uri, local_identifier));
 }
 
-std::unique_ptr<GenericRaster> RasterDBSourceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
-	return rasterdb->query(rect, profiler, channel, transform);
+std::unique_ptr<GenericRaster> RasterDBSourceOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
+	return rasterdb->query(rect, tools.profiler, channel, transform);
 }
 #endif
 

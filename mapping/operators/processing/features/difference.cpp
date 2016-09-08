@@ -27,7 +27,7 @@ class DifferenceOperator: public GenericOperator {
 		virtual ~DifferenceOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -57,9 +57,9 @@ static double point_distance(const Coordinate &p1, const Coordinate &p2) {
 	return sqrt(dx*dx + dy*dy);
 }
 //TODO: migrate to new multi semantics
-std::unique_ptr<PointCollection> DifferenceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto pointsMinuend = getPointCollectionFromSource(0, rect, profiler);
-	auto pointsSubtrahend = getPointCollectionFromSource(1, rect, profiler);
+std::unique_ptr<PointCollection> DifferenceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
+	auto pointsMinuend = getPointCollectionFromSource(0, rect, tools);
+	auto pointsSubtrahend = getPointCollectionFromSource(1, rect, tools);
 
 	//fprintf(stderr, "Minuend: %lu, Subtrahend: %lu\n", pointsMinuend->collection.size(), pointsSubtrahend->collection.size());
 
@@ -92,7 +92,7 @@ std::unique_ptr<PointCollection> DifferenceOperator::getPointCollection(const Qu
 
 	try {
 		RasterOpenCL::CLProgram prog;
-		prog.setProfiler(profiler);
+		prog.setProfiler(tools.profiler);
 		prog.addPointCollection(pointsMinuend.get());
 		prog.addPointCollection(pointsSubtrahend.get());
 		prog.compile(operators_processing_features_difference, "difference");

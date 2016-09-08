@@ -25,10 +25,10 @@ class TimeShiftOperator : public GenericOperator {
 		TimeShiftOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 		virtual ~TimeShiftOperator();
 
-		virtual auto getRaster(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<GenericRaster>;
-		virtual auto getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<PointCollection>;
-		virtual auto getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<LineCollection>;
-		virtual auto getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<PolygonCollection>;
+		virtual auto getRaster(const QueryRectangle &rect, const QueryTools &tools) -> std::unique_ptr<GenericRaster>;
+		virtual auto getPointCollection(const QueryRectangle &rect, const QueryTools &tools) -> std::unique_ptr<PointCollection>;
+		virtual auto getLineCollection(const QueryRectangle &rect, const QueryTools &tools) -> std::unique_ptr<LineCollection>;
+		virtual auto getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools) -> std::unique_ptr<PolygonCollection>;
 
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -304,28 +304,18 @@ inline auto TimeShiftOperator::reverseElements(TimeModification& time_modificati
 	}
 }
 
-auto TimeShiftOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<GenericRaster> {
+auto TimeShiftOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) -> std::unique_ptr<GenericRaster> {
 	TimeModification time_modification = createTimeModification(rect);
-	auto result = getRasterFromSource(0, shift(time_modification, rect), profiler);
+	auto result = getRasterFromSource(0, shift(time_modification, rect), tools);
 
 	reverse(time_modification, *result);
 
 	return result;
 }
 
-auto TimeShiftOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<PointCollection> {
+auto TimeShiftOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) -> std::unique_ptr<PointCollection> {
 	TimeModification time_modification = createTimeModification(rect);
-	auto result = getPointCollectionFromSource(0, shift(time_modification, rect), profiler);
-
-	reverse(time_modification, *result);
-	reverseElements(time_modification, *result);
-
-	return result;
-}
-
-auto TimeShiftOperator::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<LineCollection> {
-	TimeModification time_modification = createTimeModification(rect);
-	auto result = getLineCollectionFromSource(0, shift(time_modification, rect), profiler);
+	auto result = getPointCollectionFromSource(0, shift(time_modification, rect), tools);
 
 	reverse(time_modification, *result);
 	reverseElements(time_modification, *result);
@@ -333,9 +323,19 @@ auto TimeShiftOperator::getLineCollection(const QueryRectangle &rect, QueryProfi
 	return result;
 }
 
-auto TimeShiftOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) -> std::unique_ptr<PolygonCollection> {
+auto TimeShiftOperator::getLineCollection(const QueryRectangle &rect, const QueryTools &tools) -> std::unique_ptr<LineCollection> {
 	TimeModification time_modification = createTimeModification(rect);
-	auto result = getPolygonCollectionFromSource(0, shift(time_modification, rect), profiler);
+	auto result = getLineCollectionFromSource(0, shift(time_modification, rect), tools);
+
+	reverse(time_modification, *result);
+	reverseElements(time_modification, *result);
+
+	return result;
+}
+
+auto TimeShiftOperator::getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools) -> std::unique_ptr<PolygonCollection> {
+	TimeModification time_modification = createTimeModification(rect);
+	auto result = getPolygonCollectionFromSource(0, shift(time_modification, rect), tools);
 
 	reverse(time_modification, *result);
 	reverseElements(time_modification, *result);

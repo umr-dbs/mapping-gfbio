@@ -28,7 +28,7 @@ class MeteosatSolarAngleOperator : public GenericOperator {
 		virtual ~MeteosatSolarAngleOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -64,16 +64,16 @@ void MeteosatSolarAngleOperator::writeSemanticParameters(std::ostringstream& str
 
 #ifndef MAPPING_OPERATOR_STUBS
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> MeteosatSolarAngleOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatSolarAngleOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("MSATSolarAngleOperator: cannot be executed without OpenCL support");
 }
 #else
 
 #include "operators/processing/meteosat/solarangle.cl.h"
 
-std::unique_ptr<GenericRaster> MeteosatSolarAngleOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatSolarAngleOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	RasterOpenCL::init();
-	auto raster = getRasterFromSource(0, rect, profiler);
+	auto raster = getRasterFromSource(0, rect, tools);
 
 	// TODO: do we have any requirement for the input raster?
 
@@ -141,7 +141,7 @@ std::unique_ptr<GenericRaster> MeteosatSolarAngleOperator::getRaster(const Query
 		throw OperatorException(std::string("MSATSolarAngleOperator:: Trying to initiate OpenCL kernel for an invalid SolarAngle!"));
 
 	RasterOpenCL::CLProgram prog;
-	prog.setProfiler(profiler);
+	prog.setProfiler(tools.profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_processing_meteosat_solarangle, kernelName.c_str());

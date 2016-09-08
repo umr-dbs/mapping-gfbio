@@ -22,7 +22,7 @@ class MeteosatCo2CorrectionOperator : public GenericOperator {
 		virtual ~MeteosatCo2CorrectionOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 };
 
@@ -39,19 +39,19 @@ REGISTER_OPERATOR(MeteosatCo2CorrectionOperator, "meteosat_co2_correction");
 
 #ifndef MAPPING_OPERATOR_STUBS
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> MeteosatCo2CorrectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatCo2CorrectionOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("MSATCo2CorrectionOperator: cannot be executed without OpenCL support");
 }
 #else
 
 #include "operators/processing/meteosat/co2correction.cl.h"
 
-std::unique_ptr<GenericRaster> MeteosatCo2CorrectionOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatCo2CorrectionOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	RasterOpenCL::init();
-	auto raster_bt039 = getRasterFromSource(0, rect, profiler, RasterQM::LOOSE);
+	auto raster_bt039 = getRasterFromSource(0, rect, tools, RasterQM::LOOSE);
 	QueryRectangle exact_rect(*raster_bt039);
-	auto raster_bt108 = getRasterFromSource(1, exact_rect, profiler, RasterQM::EXACT);
-	auto raster_bt134 = getRasterFromSource(2, exact_rect, profiler, RasterQM::EXACT);
+	auto raster_bt108 = getRasterFromSource(1, exact_rect, tools, RasterQM::EXACT);
+	auto raster_bt134 = getRasterFromSource(2, exact_rect, tools, RasterQM::EXACT);
 
 	Profiler::Profiler p("CL_MSATCO2CORRECTION_OPERATOR");
 	raster_bt039->setRepresentation(GenericRaster::OPENCL);

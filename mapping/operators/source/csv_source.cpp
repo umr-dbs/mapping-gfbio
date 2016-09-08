@@ -65,9 +65,9 @@ class CSVSourceOperator : public GenericOperator {
 		virtual ~CSVSourceOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -150,25 +150,25 @@ void CSVSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	pc.add(provenance);
 }
 
-std::unique_ptr<PointCollection> CSVSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PointCollection> CSVSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	filesize = getFilesize(filename.c_str());
-	profiler.addIOCost(filesize);
+	tools.profiler.addIOCost(filesize);
 
 	std::ifstream data(filename);
 	return csvSourceUtil->getPointCollection(data, rect);
 }
 
-std::unique_ptr<LineCollection> CSVSourceOperator::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<LineCollection> CSVSourceOperator::getLineCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	filesize = getFilesize(filename.c_str());
-	profiler.addIOCost(filesize);
+	tools.profiler.addIOCost(filesize);
 
 	std::ifstream data(filename);
 	return csvSourceUtil->getLineCollection(data, rect);
 }
 
-std::unique_ptr<PolygonCollection> CSVSourceOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PolygonCollection> CSVSourceOperator::getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	filesize = getFilesize(filename.c_str());
-	profiler.addIOCost(filesize);
+	tools.profiler.addIOCost(filesize);
 
 	std::ifstream data(filename);
 	return csvSourceUtil->getPolygonCollection(data, rect);

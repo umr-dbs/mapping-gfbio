@@ -24,7 +24,7 @@ class PointInPolygonFilterOperator : public GenericOperator {
 		virtual ~PointInPolygonFilterOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
 
 		std::unique_ptr<PointCollection> filterWithTime(const QueryRectangle &rect, PointCollection &points, PolygonCollection &multiPolygons);
 #endif
@@ -44,9 +44,9 @@ REGISTER_OPERATOR(PointInPolygonFilterOperator, "point_in_polygon_filter");
 
 #ifndef MAPPING_OPERATOR_STUBS
 
-std::unique_ptr<PointCollection> PointInPolygonFilterOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointCollectionFromSource(0, rect, profiler, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
-	auto multiPolygons = getPolygonCollectionFromSource(0, rect, profiler, FeatureCollectionQM::ANY_FEATURE);
+std::unique_ptr<PointCollection> PointInPolygonFilterOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
+	auto points = getPointCollectionFromSource(0, rect, tools, FeatureCollectionQM::SINGLE_ELEMENT_FEATURES);
+	auto multiPolygons = getPolygonCollectionFromSource(0, rect, tools, FeatureCollectionQM::ANY_FEATURE);
 
 	if(!points->hasTime() && !multiPolygons->hasTime()) {
 		//filter only based on geometry

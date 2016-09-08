@@ -27,7 +27,7 @@ class RasterizationOperator : public GenericOperator {
 		virtual ~RasterizationOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -57,8 +57,8 @@ void RasterizationOperator::writeSemanticParameters(std::ostringstream& stream) 
 
 #ifndef MAPPING_OPERATOR_STUBS
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
-	throw OperatorException("PointsToRasterOperator: cannot be executed without OpenCL support");
+std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
+	throw OperatorException("RasterizationOperator: cannot be executed without OpenCL support");
 }
 #else
 
@@ -66,7 +66,7 @@ std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRecta
 #include "operators/processing/combined/points2raster_value.cl.h"
 
 
-std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 
 	RasterOpenCL::init();
 
@@ -74,7 +74,7 @@ std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRecta
 	rect_larger.enlargePixels(radius);
 
 	QueryRectangle rect_points(rect_larger, rect_larger, QueryResolution::none());
-	auto points = getPointCollectionFromSource(0, rect_points, profiler);
+	auto points = getPointCollectionFromSource(0, rect_points, tools);
 
 	if (renderattribute == "") {
 		Unit unit_acc = Unit::unknown();
@@ -105,7 +105,7 @@ std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRecta
 		auto blurred = GenericRaster::create(dd_blur, rect, rect.xres, rect.yres, 0, GenericRaster::Representation::OPENCL);
 
 		RasterOpenCL::CLProgram prog;
-		prog.setProfiler(profiler);
+		prog.setProfiler(tools.profiler);
 		prog.addInRaster(accumulator.get());
 		prog.addOutRaster(blurred.get());
 		prog.compile(operators_processing_combined_points2raster_frequency, "blur_frequency");
@@ -157,7 +157,7 @@ std::unique_ptr<GenericRaster> RasterizationOperator::getRaster(const QueryRecta
 		auto blurred = GenericRaster::create(dd_blur, rect, rect.xres, rect.yres, 0, GenericRaster::Representation::OPENCL);
 
 		RasterOpenCL::CLProgram prog;
-		prog.setProfiler(profiler);
+		prog.setProfiler(tools.profiler);
 		prog.addInRaster(r_count.get());
 		prog.addInRaster(r_sum.get());
 		prog.addOutRaster(blurred.get());

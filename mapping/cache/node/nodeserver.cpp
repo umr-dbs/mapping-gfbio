@@ -115,27 +115,27 @@ void NodeServer::process_create_request(BlockingConnection &index_con,
 	QueryProfiler profiler;
 	switch ( request.type ) {
 		case CacheType::RASTER: {
-			auto res = op->getCachedRaster( request.query, profiler );
+			auto res = op->getCachedRaster( request.query, QueryTools(profiler) );
 			finish_request( index_con, std::shared_ptr<const GenericRaster>(res.release()) );
 			break;
 		}
 		case CacheType::POINT: {
-			auto res = op->getCachedPointCollection( request.query, profiler );
+			auto res = op->getCachedPointCollection( request.query, QueryTools(profiler) );
 			finish_request( index_con, std::shared_ptr<const PointCollection>(res.release()) );
 			break;
 		}
 		case CacheType::LINE: {
-			auto res = op->getCachedLineCollection(request.query, profiler );
+			auto res = op->getCachedLineCollection(request.query, QueryTools(profiler) );
 			finish_request( index_con, std::shared_ptr<const LineCollection>(res.release()) );
 			break;
 		}
 		case CacheType::POLYGON: {
-			auto res = op->getCachedPolygonCollection(request.query, profiler );
+			auto res = op->getCachedPolygonCollection(request.query, QueryTools(profiler) );
 			finish_request( index_con, std::shared_ptr<const PolygonCollection>(res.release()) );
 			break;
 		}
 		case CacheType::PLOT: {
-			auto res = op->getCachedPlot(request.query, profiler );
+			auto res = op->getCachedPlot(request.query, QueryTools(profiler) );
 			finish_request( index_con, std::shared_ptr<const GenericPlot>(res.release()) );
 			break;
 		}

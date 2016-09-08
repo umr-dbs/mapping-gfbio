@@ -23,7 +23,7 @@ class MeteosatTemperatureOperator : public GenericOperator {
 		virtual ~MeteosatTemperatureOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -47,7 +47,7 @@ void MeteosatTemperatureOperator::writeSemanticParameters(std::ostringstream& st
 
 #ifndef MAPPING_OPERATOR_STUBS
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> MeteosatTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatTemperatureOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("MSATTemperatureOperator: cannot be executed without OpenCL support");
 }
 #else
@@ -69,9 +69,9 @@ static double calculateTempFromEffectiveRadiance(double wavenumber, double alpha
 	return temp;
 }
 
-std::unique_ptr<GenericRaster> MeteosatTemperatureOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MeteosatTemperatureOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	RasterOpenCL::init();
-	auto raster = getRasterFromSource(0, rect, profiler);
+	auto raster = getRasterFromSource(0, rect, tools);
 
 	if (raster->dd.unit.getMeasurement() != "raw" || raster->dd.unit.getMin() != 0 || raster->dd.unit.getMax() != 1023)
 		throw OperatorException("Input raster does not appear to be a raw meteosat raster");
@@ -127,7 +127,7 @@ std::unique_ptr<GenericRaster> MeteosatTemperatureOperator::getRaster(const Quer
 	auto raster_out = GenericRaster::create(out_dd, *raster, GenericRaster::Representation::OPENCL);
 
 	RasterOpenCL::CLProgram prog;
-	prog.setProfiler(profiler);
+	prog.setProfiler(tools.profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	prog.compile(operators_processing_meteosat_temperature, "temperaturekernel");

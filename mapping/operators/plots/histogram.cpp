@@ -40,7 +40,7 @@ class HistogramOperator : public GenericOperator {
 		virtual ~HistogramOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -221,21 +221,21 @@ std::unique_ptr<GenericPlot> createHistogram(SimpleFeatureCollection &features, 
 	return std::unique_ptr<GenericPlot>(std::move(histogram));
 }
 
-std::unique_ptr<GenericPlot> HistogramOperator::getPlot(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericPlot> HistogramOperator::getPlot(const QueryRectangle &rect, const QueryTools &tools) {
 	Profiler::Profiler p("HISTOGRAM_OPERATOR");
 
 	if(getRasterSourceCount() == 1) {
-		auto raster = getRasterFromSource(0, rect, profiler);
+		auto raster = getRasterFromSource(0, rect, tools);
 
 		return callUnaryOperatorFunc<histogram>(raster.get(), rangeMode, min, max, buckets);
 	} else {
 		std::unique_ptr<SimpleFeatureCollection> features;
 		if(getPointCollectionSourceCount() == 1)
-			features = getPointCollectionFromSource(0, rect, profiler);
+			features = getPointCollectionFromSource(0, rect, tools);
 		if(getLineCollectionSourceCount() == 1)
-			features = getLineCollectionFromSource(0, rect, profiler);
+			features = getLineCollectionFromSource(0, rect, tools);
 		if(getPolygonCollectionSourceCount() == 1)
-			features = getPolygonCollectionFromSource(0, rect, profiler);
+			features = getPolygonCollectionFromSource(0, rect, tools);
 
 		return createHistogram(*features, attribute, rangeMode, min, max, buckets);
 	}

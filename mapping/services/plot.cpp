@@ -53,7 +53,7 @@ void PlotService::run() {
 		qres
 	);
 
-	auto plot = graph->getCachedPlot(rect, profiler);
+	auto plot = graph->getCachedPlot(rect, QueryTools(profiler));
 
 	response.sendContentType("application/json");
 	response.finishHeaders();

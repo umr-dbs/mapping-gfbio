@@ -25,9 +25,9 @@ class NumericAttributeFilterOperator: public GenericOperator {
 		virtual ~NumericAttributeFilterOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -85,19 +85,19 @@ std::vector<bool> filter(const SimpleFeatureCollection &collection, const std::s
 	return keep;
 }
 
-std::unique_ptr<PointCollection> NumericAttributeFilterOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto points = getPointCollectionFromSource(0, rect, profiler);
+std::unique_ptr<PointCollection> NumericAttributeFilterOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
+	auto points = getPointCollectionFromSource(0, rect, tools);
 	auto keep = filter(*points, name, rangeMin, rangeMax, includeNoData);
 	return points->filter(keep);
 }
 
-std::unique_ptr<LineCollection> NumericAttributeFilterOperator::getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto lines = getLineCollectionFromSource(0, rect, profiler);
+std::unique_ptr<LineCollection> NumericAttributeFilterOperator::getLineCollection(const QueryRectangle &rect, const QueryTools &tools) {
+	auto lines = getLineCollectionFromSource(0, rect, tools);
 	auto keep = filter(*lines, name, rangeMin, rangeMax, includeNoData);
 	return lines->filter(keep);
 }
-std::unique_ptr<PolygonCollection> NumericAttributeFilterOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
-	auto polys = getPolygonCollectionFromSource(0, rect, profiler);
+std::unique_ptr<PolygonCollection> NumericAttributeFilterOperator::getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools) {
+	auto polys = getPolygonCollectionFromSource(0, rect, tools);
 	auto keep = filter(*polys, name, rangeMin, rangeMax, includeNoData);
 	return polys->filter(keep);
 }

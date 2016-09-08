@@ -30,8 +30,8 @@ class GFBioSourceOperator : public GenericOperator {
 		virtual ~GFBioSourceOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools);
 		virtual void getProvenance(ProvenanceCollection &pc);
 #endif
 	protected:
@@ -90,7 +90,7 @@ void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
 }
 
 
-std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	//connect
 	//TODO: reuse
 	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
@@ -135,7 +135,7 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
 }
 
 
-std::unique_ptr<PolygonCollection> GFBioSourceOperator::getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PolygonCollection> GFBioSourceOperator::getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	//connect
 	//TODO: reuse
 	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));

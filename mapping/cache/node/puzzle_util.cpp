@@ -228,7 +228,7 @@ std::unique_ptr<T> PuzzleUtil::compute(GenericOperator& op,
 template<>
 std::unique_ptr<GenericRaster> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	auto res = op.getCachedRaster(query, qp);
+	auto res = op.getCachedRaster(query, QueryTools(qp));
 	res->setRepresentation(GenericRaster::Representation::CPU);
 	return res;
 }
@@ -236,25 +236,25 @@ std::unique_ptr<GenericRaster> PuzzleUtil::compute(GenericOperator& op,
 template<>
 std::unique_ptr<PointCollection> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	return op.getCachedPointCollection(query, qp);
+	return op.getCachedPointCollection(query, QueryTools(qp));
 }
 
 template<>
 std::unique_ptr<LineCollection> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	return op.getCachedLineCollection(query, qp);
+	return op.getCachedLineCollection(query, QueryTools(qp));
 }
 
 template<>
 std::unique_ptr<PolygonCollection> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	return op.getCachedPolygonCollection(query, qp);
+	return op.getCachedPolygonCollection(query, QueryTools(qp));
 }
 
 template<>
 std::unique_ptr<GenericPlot> PuzzleUtil::compute(GenericOperator& op,
 		const QueryRectangle& query, QueryProfiler& qp) {
-	return op.getCachedPlot(query, qp);
+	return op.getCachedPlot(query, QueryTools(qp));
 }
 
 //

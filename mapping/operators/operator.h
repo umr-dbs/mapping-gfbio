@@ -4,7 +4,7 @@
 #include "datatypes/spatiotemporal.h"
 #include "operators/provenance.h"
 #include "operators/queryrectangle.h"
-#include "operators/queryprofiler.h"
+#include "operators/querytools.h"
 
 #include <ctime>
 #include <string>
@@ -68,11 +68,11 @@ class GenericOperator {
 
 		virtual ~GenericOperator();
 
-		std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
-		std::unique_ptr<PointCollection> getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
-		std::unique_ptr<LineCollection> getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
-		std::unique_ptr<PolygonCollection> getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
-		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+		std::unique_ptr<GenericRaster> getCachedRaster(const QueryRectangle &rect, const QueryTools &tools, RasterQM query_mode = RasterQM::LOOSE);
+		std::unique_ptr<PointCollection> getCachedPointCollection(const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<LineCollection> getCachedLineCollection(const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<PolygonCollection> getCachedPolygonCollection(const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<GenericPlot> getCachedPlot(const QueryRectangle &rect, const QueryTools &tools);
 
 		std::unique_ptr<ProvenanceCollection> getFullProvenance();
 
@@ -91,16 +91,16 @@ class GenericOperator {
 		int getLineCollectionSourceCount() { return sourcecounts[2]; }
 		int getPolygonCollectionSourceCount() { return sourcecounts[3]; }
 
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, QueryProfiler &profiler);
-		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<LineCollection> getLineCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<GenericPlot> getPlot(const QueryRectangle &rect, const QueryTools &tools);
 
-		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode = RasterQM::LOOSE);
-		std::unique_ptr<PointCollection> getPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
-		std::unique_ptr<LineCollection> getLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
-		std::unique_ptr<PolygonCollection> getPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<GenericRaster> getRasterFromSource(int idx, const QueryRectangle &rect, const QueryTools &tools, RasterQM query_mode = RasterQM::LOOSE);
+		std::unique_ptr<PointCollection> getPointCollectionFromSource(int idx, const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<LineCollection> getLineCollectionFromSource(int idx, const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
+		std::unique_ptr<PolygonCollection> getPolygonCollectionFromSource(int idx, const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode = FeatureCollectionQM::ANY_FEATURE);
 		// there is no getPlotFromSource, because plots are by definition the final step of a chain
 
 	private:

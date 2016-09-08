@@ -20,7 +20,7 @@ class ClassificationOperator : public GenericOperator {
 		virtual ~ClassificationOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -97,8 +97,8 @@ std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRect
 
 #include "operators/processing/raster/classification_kernels.cl.h"
 
-std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
-	const auto raster_in = getRasterFromSource(0, rect, profiler);
+std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
+	const auto raster_in = getRasterFromSource(0, rect, tools);
 
 	RasterOpenCL::init();
 	raster_in->setRepresentation(GenericRaster::Representation::OPENCL);
@@ -119,7 +119,7 @@ std::unique_ptr<GenericRaster> ClassificationOperator::getRaster(const QueryRect
 	auto raster_out = GenericRaster::create(out_data_description, *raster_in, GenericRaster::Representation::OPENCL);
 
 	RasterOpenCL::CLProgram prog;
-	prog.setProfiler(profiler);
+	prog.setProfiler(tools.profiler);
 	prog.addOutRaster(raster_out.get());
 	prog.addInRaster(raster_in.get());
 	prog.compile(operators_processing_raster_classification_kernels, "classificationByRangeKernel");

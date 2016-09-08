@@ -22,7 +22,7 @@ class PostgresSourceOperator : public GenericOperator {
 		virtual ~PostgresSourceOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -58,7 +58,7 @@ void PostgresSourceOperator::writeSemanticParameters(std::ostringstream& stream)
 }
 
 #ifndef MAPPING_OPERATOR_STUBS
-std::unique_ptr<PointCollection> PostgresSourceOperator::getPointCollection(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<PointCollection> PostgresSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
 
 	if (rect.epsg != EPSG_WEBMERCATOR)
 		throw OperatorException("PGPointSourceOperator: Shouldn't load points in a projection other than webmercator");

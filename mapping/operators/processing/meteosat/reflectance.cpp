@@ -24,7 +24,7 @@ class MSATReflectanceOperator : public GenericOperator {
 		virtual ~MSATReflectanceOperator();
 
 #ifndef MAPPING_OPERATOR_STUBS
-		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, QueryProfiler &profiler);
+		virtual std::unique_ptr<GenericRaster> getRaster(const QueryRectangle &rect, const QueryTools &tools);
 #endif
 	protected:
 		void writeSemanticParameters(std::ostringstream& stream);
@@ -61,7 +61,7 @@ void MSATReflectanceOperator::writeSemanticParameters(std::ostringstream& stream
 
 #ifndef MAPPING_OPERATOR_STUBS
 #ifdef MAPPING_NO_OPENCL
-std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	throw OperatorException("MSATReflectanceOperator: cannot be executed without OpenCL support");
 }
 #else
@@ -75,9 +75,9 @@ double calculateESD(int dayOfYear){
 	return 1.0 - 0.0167 * cos(2.0 * acos(-1.0) * ((dayOfYear - 3.0) / 365.0));
 }
 
-std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect, QueryProfiler &profiler) {
+std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRectangle &rect, const QueryTools &tools) {
 	RasterOpenCL::init();
-	auto raster = getRasterFromSource(0, rect, profiler);
+	auto raster = getRasterFromSource(0, rect, tools);
 
 	if (raster->dd.unit.getMeasurement() != "radiance") // || raster->dd.unit.getUnit() != "W·m^(-2)·sr^(-1)·cm^(-1)")
 		throw OperatorException(concat("Input raster does not appear to be a meteosat radiance raster, unit: ", raster->dd.unit.toJson()));
@@ -158,7 +158,7 @@ std::unique_ptr<GenericRaster> MSATReflectanceOperator::getRaster(const QueryRec
 	auto raster_out = GenericRaster::create(out_dd, *raster, GenericRaster::Representation::OPENCL);
 
 	RasterOpenCL::CLProgram prog;
-	prog.setProfiler(profiler);
+	prog.setProfiler(tools.profiler);
 	prog.addInRaster(raster.get());
 	prog.addOutRaster(raster_out.get());
 	if(solarCorrection){

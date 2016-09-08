@@ -103,19 +103,19 @@ void GenericOperator::validateResult(const QueryRectangle &rect, SpatioTemporalR
 
 
 
-std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &, QueryProfiler &) {
+std::unique_ptr<GenericRaster> GenericOperator::getRaster(const QueryRectangle &, const QueryTools &) {
 	throw OperatorException("getRaster() called on an operator that doesn't return rasters");
 }
-std::unique_ptr<PointCollection> GenericOperator::getPointCollection(const QueryRectangle &, QueryProfiler &) {
+std::unique_ptr<PointCollection> GenericOperator::getPointCollection(const QueryRectangle &, const QueryTools &) {
 	throw OperatorException("getPointCollection() called on an operator that doesn't return points");
 }
-std::unique_ptr<LineCollection> GenericOperator::getLineCollection(const QueryRectangle &, QueryProfiler &) {
+std::unique_ptr<LineCollection> GenericOperator::getLineCollection(const QueryRectangle &, const QueryTools &) {
 	throw OperatorException("getLineCollection() called on an operator that doesn't return lines");
 }
-std::unique_ptr<PolygonCollection> GenericOperator::getPolygonCollection(const QueryRectangle &, QueryProfiler &) {
+std::unique_ptr<PolygonCollection> GenericOperator::getPolygonCollection(const QueryRectangle &, const QueryTools &) {
 	throw OperatorException("getPolygonCollection() called on an operator that doesn't return polygons");
 }
-std::unique_ptr<GenericPlot> GenericOperator::getPlot(const QueryRectangle &, QueryProfiler &) {
+std::unique_ptr<GenericPlot> GenericOperator::getPlot(const QueryRectangle &, const QueryTools &) {
 	throw OperatorException("getPlot() called on an operator that doesn't return data vectors");
 }
 
@@ -143,7 +143,8 @@ static void d_profile(int depth, const std::string &type, const char *result, Qu
 	Log::info(msg.str());
 }
 
-std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, QueryProfiler &parent_profiler, RasterQM query_mode) {
+std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRectangle &rect, const QueryTools &tools, RasterQM query_mode) {
+	QueryProfiler &parent_profiler = tools.profiler;
 	QueryProfilerSimpleGuard parent_guard(parent_profiler);
 
 	validateQRect(rect, ResolutionRequirement::REQUIRED);
@@ -158,7 +159,7 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
 			TIME_EXEC("Operator.getRaster");
-			result = getRaster(rect,exec_profiler);
+			result = getRaster(rect,QueryTools(exec_profiler));
 		}
 		d_profile(depth, type, "raster", exec_profiler);
 		if ( cache.put(semantic_id,result,rect,exec_profiler) ) {
@@ -172,7 +173,8 @@ std::unique_ptr<GenericRaster> GenericOperator::getCachedRaster(const QueryRecta
 	return result;
 }
 
-std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode) {
+	QueryProfiler &parent_profiler = tools.profiler;
 	QueryProfilerSimpleGuard parent_guard(parent_profiler);
 
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
@@ -186,7 +188,7 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
 			TIME_EXEC("Operator.getPointCollection");
-			result = getPointCollection(rect,exec_profiler);
+			result = getPointCollection(rect,QueryTools(exec_profiler));
 		}
 		d_profile(depth, type, "points", exec_profiler);
 		if ( cache.put(semantic_id,result,rect,exec_profiler) )
@@ -201,7 +203,8 @@ std::unique_ptr<PointCollection> GenericOperator::getCachedPointCollection(const
 		throw OperatorException("Operator did not return Features consisting only of single points");
 	return result;
 }
-std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode) {
+	QueryProfiler &parent_profiler = tools.profiler;
 	QueryProfilerSimpleGuard parent_guard(parent_profiler);
 
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
@@ -215,7 +218,7 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
 			TIME_EXEC("Operator.getLineCollection");
-			result = getLineCollection(rect,exec_profiler);
+			result = getLineCollection(rect,QueryTools(exec_profiler));
 		}
 		d_profile(depth, type, "lines", exec_profiler);
 		if ( cache.put(semantic_id,result,rect,exec_profiler) )
@@ -230,7 +233,8 @@ std::unique_ptr<LineCollection> GenericOperator::getCachedLineCollection(const Q
 		throw OperatorException("Operator did not return Features consisting only of single lines");
 	return result;
 }
-std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(const QueryRectangle &rect, QueryProfiler &parent_profiler, FeatureCollectionQM query_mode) {
+std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode) {
+	QueryProfiler &parent_profiler = tools.profiler;
 	QueryProfilerSimpleGuard parent_guard(parent_profiler);
 
 	validateQRect(rect, ResolutionRequirement::FORBIDDEN);
@@ -244,7 +248,7 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 		{
 			QueryProfilerRunningGuard guard(parent_profiler, exec_profiler);
 			TIME_EXEC("Operator.getPolygonCollection");
-			result = getPolygonCollection(rect,exec_profiler);
+			result = getPolygonCollection(rect,QueryTools(exec_profiler));
 		}
 		d_profile(depth, type, "polygon", exec_profiler);
 		if ( cache.put(semantic_id,result,rect,exec_profiler) )
@@ -259,7 +263,8 @@ std::unique_ptr<PolygonCollection> GenericOperator::getCachedPolygonCollection(c
 		throw OperatorException("Operator did not return Features consisting only of single polygons");
 	return result;
 }
-std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle &rect, QueryProfiler &parent_profiler) {
+std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle &rect, const QueryTools &tools) {
+	QueryProfiler &parent_profiler = tools.profiler;
 	//	TODO: do we want plots to allow resolutions?
 	validateQRect(rect, ResolutionRequirement::OPTIONAL);
 
@@ -269,7 +274,7 @@ std::unique_ptr<GenericPlot> GenericOperator::getCachedPlot(const QueryRectangle
 	{
 		QueryProfilerRunningGuard guard(parent_profiler, profiler);
 		TIME_EXEC("Operator.getPlot");
-		result = getPlot(rect, profiler);
+		result = getPlot(rect, QueryTools(profiler));
 	}
 	d_profile(depth, type, "plot", profiler);
 	return result;
@@ -290,38 +295,38 @@ std::unique_ptr<ProvenanceCollection> GenericOperator::getFullProvenance() {
 }
 
 
-std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, RasterQM query_mode) {
+std::unique_ptr<GenericRaster> GenericOperator::getRasterFromSource(int idx, const QueryRectangle &rect, const QueryTools &tools, RasterQM query_mode) {
 	if (idx < 0 || idx >= sourcecounts[0])
 		throw OperatorException("getChildRaster() called on invalid index");
-	QueryProfilerStoppingGuard guard(profiler);
-	auto result = sources[idx]->getCachedRaster(rect, profiler, query_mode);
+	QueryProfilerStoppingGuard guard(tools.profiler);
+	auto result = sources[idx]->getCachedRaster(rect, tools, query_mode);
 	return result;
 }
-std::unique_ptr<PointCollection> GenericOperator::getPointCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode) {
+std::unique_ptr<PointCollection> GenericOperator::getPointCollectionFromSource(int idx, const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode) {
 	if (idx < 0 || idx >= sourcecounts[1])
 		throw OperatorException("getChildPoints() called on invalid index");
-	QueryProfilerStoppingGuard guard(profiler);
+	QueryProfilerStoppingGuard guard(tools.profiler);
 	int offset = sourcecounts[0] + idx;
-	auto result = sources[offset]->getCachedPointCollection(rect, profiler, query_mode);
+	auto result = sources[offset]->getCachedPointCollection(rect, tools, query_mode);
 	return result;
 }
-std::unique_ptr<LineCollection> GenericOperator::getLineCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode) {
+std::unique_ptr<LineCollection> GenericOperator::getLineCollectionFromSource(int idx, const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode) {
 	if (idx < 0 || idx >= sourcecounts[2])
 		throw OperatorException("getChildLines() called on invalid index");
-	QueryProfilerStoppingGuard guard(profiler);
+	QueryProfilerStoppingGuard guard(tools.profiler);
 	int offset = sourcecounts[0] + sourcecounts[1] + idx;
-	auto result = sources[offset]->getCachedLineCollection(rect, profiler, query_mode);
+	auto result = sources[offset]->getCachedLineCollection(rect, tools, query_mode);
 	return result;
 }
-std::unique_ptr<PolygonCollection> GenericOperator::getPolygonCollectionFromSource(int idx, const QueryRectangle &rect, QueryProfiler &profiler, FeatureCollectionQM query_mode) {
+std::unique_ptr<PolygonCollection> GenericOperator::getPolygonCollectionFromSource(int idx, const QueryRectangle &rect, const QueryTools &tools, FeatureCollectionQM query_mode) {
 	if (idx < 0 || idx >= sourcecounts[3]){
 		std::stringstream sstm;
 		sstm << "getChildPolygons() called on invalid index: " << idx;
 		throw OperatorException(sstm.str());
 	}
-	QueryProfilerStoppingGuard guard(profiler);
+	QueryProfilerStoppingGuard guard(tools.profiler);
 	int offset = sourcecounts[0] + sourcecounts[1] + sourcecounts[2] + idx;
-	auto result = sources[offset]->getCachedPolygonCollection(rect, profiler, query_mode);
+	auto result = sources[offset]->getCachedPolygonCollection(rect, tools, query_mode);
 	return result;
 }
 

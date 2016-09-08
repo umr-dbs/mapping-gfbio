@@ -69,7 +69,7 @@ void WMSService::run() {
 			if (format == "application/json") {
 				auto graph = GenericOperator::fromJSON(params.get("layers"));
 				QueryProfiler profiler;
-				std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect, profiler);
+				std::unique_ptr<GenericPlot> dataVector = graph->getCachedPlot(qrect, QueryTools(profiler));
 
 				response.sendContentType("application/json");
 				response.finishHeaders();
@@ -80,7 +80,7 @@ void WMSService::run() {
 				double bbox[4] = {sref.x1, sref.y1, sref.x2, sref.y2};
 				auto graph = GenericOperator::fromJSON(params.get("layers"));
 				QueryProfiler profiler;
-				auto result_raster = graph->getCachedRaster(qrect,profiler,GenericOperator::RasterQM::EXACT);
+				auto result_raster = graph->getCachedRaster(qrect,QueryTools(profiler),GenericOperator::RasterQM::EXACT);
 				bool flipx = (bbox[2] > bbox[0]) != (result_raster->pixel_scale_x > 0);
 				bool flipy = (bbox[3] > bbox[1]) == (result_raster->pixel_scale_y > 0);
 
@@ -188,7 +188,7 @@ void WMSService::run() {
 
 		auto graph = GenericOperator::fromJSON(params.get("layers"));
 		QueryProfiler profiler;
-		auto result_raster = graph->getCachedRaster(qrect,profiler,GenericOperator::RasterQM::LOOSE);
+		auto result_raster = graph->getCachedRaster(qrect,QueryTools(profiler),GenericOperator::RasterQM::LOOSE);
 
 		auto unit = result_raster->dd.unit;
 		auto colorizer = Colorizer::fromUnit(unit);

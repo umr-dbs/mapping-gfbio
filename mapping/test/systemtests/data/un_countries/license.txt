@@ -1,8 +1,0 @@
-Country polygons public domain from http://www.naturalearthdata.com/:
-"No permission is needed to use Natural Earth. Crediting the authors is unnecessary."
-
-UN member state information is public information from
-https://treaties.un.org/pages/ViewDetails.aspx?src=TREATY&mtdsg_no=I-1&chapter=1&lang=en
-https://treaties.un.org/pages/ViewDetails.aspx?src=TREATY&mtdsg_no=I-2&chapter=1&lang=en
-
-Incorporated via https://en.wikipedia.org/wiki/Member_states_of_the_United_Nations as of 02.11.2015

@@ -246,13 +246,13 @@ void GFBioService::run() {
 
 			Json::Value gbif(Json::objectValue);
 			gbif["name"] = "GBIF";
-			gbif["count"] = (unsigned long long) GFBioDataUtil::countGBIFResults(scientificName);
+			gbif["count"] = (Json::Int) GFBioDataUtil::countGBIFResults(scientificName);
 
 			sources.append(gbif);
 
 			Json::Value iucn(Json::objectValue);
 			iucn["name"] = "IUCN";
-			iucn["count"] = (unsigned long long) GFBioDataUtil::countIUCNResults(scientificName);
+			iucn["count"] = (Json::Int) GFBioDataUtil::countIUCNResults(scientificName);
 
 			sources.append(iucn);
 

@@ -1,3 +1,0 @@
-from http://neo.sci.gsfc.nasa.gov/about/ :
-Image Use Policy
-The images available in NEO are freely available for public use without further permission. Please use the credit statement attached to each dataset, or at the very least credit NASA Earth Observations as the source.

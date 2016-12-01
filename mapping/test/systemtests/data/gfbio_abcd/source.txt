@@ -1,4 +1,0 @@
-abcd_example.xml was manually created.
-
-ABCD_2.06.XSD from http://www.bgbm.org/TDWG/CODATA/Schema/
-Access to Biological Collections Data task group. 2007. Access to Biological Collection Data (ABCD), Version 2.06. Biodiversity Information Standards (TDWG) http://www.tdwg.org/standards/115

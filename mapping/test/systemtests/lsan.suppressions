@@ -1,5 +1,0 @@
-
-# AMDs OpenCL implementation always leaks
-leak:libamdocl64.so
-leak:libOpenCL.so
-

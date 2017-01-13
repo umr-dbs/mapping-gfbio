@@ -14,14 +14,15 @@
 #include <sstream>
 #include <iostream>
 #include <json/json.h>
-#include <boost/regex.hpp>
+#include <regex>
 
 
 /**
  * Operator that gets points from pangaea
  *
  * Parameters:
- * - doi: the DOI of the dataset
+ * - dataLink: the link to the tab separated data file
+ * - other csv columns
  */
 class PangaeaSourceOperator : public GenericOperator {
 	private:
@@ -97,15 +98,11 @@ PangaeaSourceOperator::PangaeaSourceOperator(int sourcecounts[], GenericOperator
 
 void PangaeaSourceOperator::parseDataDescription(std::string& dataDescription) {
 
-	boost::regex regex(R"(Citation:\t([^:]+\(\d+\)): ([^\n]+)[.,;] doi:([PANGE0-9.\/]+).*\n.*License:\t([^\n]+)\n)");
+	std::regex regex(R"(Citation:\t([^:]+\(\d+\)): ([^\n]+)[.,;] doi:([PANGE0-9.\/]+).*\n.*License:\t([^\n]+)\n)");
 
-	boost::smatch sm;
+	std::smatch sm;
 
-	if(boost::regex_search (dataDescription, sm, regex)) {
-		for (size_t i = 0; i < sm.size(); ++i) {
-			fprintf(stderr, ">%s<", sm[i].str().c_str());
-		}
-
+	if(std::regex_search (dataDescription, sm, regex)) {
 		citation = sm[1].str() + ": " + sm[2].str();
 		uri = "https://doi.pangaea.de/" + sm[3].str();
 		license = sm[4].str();
@@ -113,14 +110,15 @@ void PangaeaSourceOperator::parseDataDescription(std::string& dataDescription) {
 }
 
 std::vector<PangaeaSourceOperator::Parameter> PangaeaSourceOperator::extractParameters(std::string dataDescription) {
+
 	std::vector<Parameter> parameters;
 
 	// extract parameters part of data description
-	boost::regex extractParameters(R"(Parameter\(s\):(.*)License:)");
-	boost::smatch sm;
+	std::regex extractParameters(R"(Parameter\(s\):((?:.|\r|\n)*)License:)");
+	std::smatch sm;
 
 	std::string parametersString;
-	if(boost::regex_search (dataDescription, sm, extractParameters)) {
+	if(std::regex_search (dataDescription, sm, extractParameters)) {
 		if(sm.size() > 0)
 			parametersString = sm[0].str();
 	} else {
@@ -128,20 +126,19 @@ std::vector<PangaeaSourceOperator::Parameter> PangaeaSourceOperator::extractPara
 	}
 
 	// extract parameters
-	boost::regex regex(R"(\t(([^\(\[]+)(\([^\)]+\))? (\[([^\]]+)])?) ?\(([^\)]+)\)(\n|( \*)))");
+	std::regex regex(R"(\t(([^\(\[]+)(\([^\)]+\))? (\[([^\]]+)])?) ?\(([^\)]+)\)(\n|( \*)))");
 
-	boost::sregex_iterator iter(parametersString.begin(), parametersString.end(), regex);
-	boost::sregex_iterator end;
+	std::sregex_iterator iter(parametersString.begin(), parametersString.end(), regex);
+	std::sregex_iterator end;
 
 	for (; iter != end; ++iter) {
 		auto match = (*iter);
 		std::string fullName = match[1];
-		std::string name = match[2] + match[3];
+		std::string name = match[2].str() + match[3].str();
 		std::string unit = match[5];
 		std::string shortName = match[6];
 
 		parameters.push_back(Parameter(fullName, name, unit, shortName));
-		fprintf(stderr, "fullName: %s, name: %s, unit: %s, shortName: %s\n", fullName.c_str(), name.c_str(), unit.c_str(), shortName.c_str());
 	}
 
 	return parameters;
@@ -175,7 +172,7 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 
 
 	// skip initial comment
-	size_t offset = data.str().find("*/\n") + 2;
+	size_t offset = data.str().find("*/\n") + 3;
 	std::string dataString = data.str().substr(offset);
 
 	std::string dataDescription = data.str().substr(0, offset);
@@ -205,17 +202,20 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 	if(column_y != "")
 		csvUtil->column_y = mapParameterNameToColumnName(csvUtil->column_y, parameters);
 
-
 	// parse the .tab file
 	std::istringstream iss(dataString);
 	auto points = csvUtil->getPointCollection(iss, rect);
 
 	// map column names back to parameters
 	for(size_t i = 0; i < columns_numeric.size(); ++i) {
-		points->feature_attributes.renameNumericAttribute(csvUtil->columns_numeric[i], columns_numeric[i]);
+		if(csvUtil->columns_numeric[i] != columns_numeric[i]) {
+			points->feature_attributes.renameNumericAttribute(csvUtil->columns_numeric[i], columns_numeric[i]);
+		}
 	}
 	for(size_t i = 0; i < columns_textual.size(); ++i) {
-		points->feature_attributes.renameTextualAttribute(csvUtil->columns_textual[i], columns_textual[i]);
+		if(csvUtil->columns_textual[i] != columns_textual[i]) {
+			points->feature_attributes.renameTextualAttribute(csvUtil->columns_textual[i], columns_textual[i]);
+		}
 	}
 
 	// TODO name of geo columns...
@@ -224,7 +224,6 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 }
 
 void PangaeaSourceOperator::getStringFromServer(std::stringstream& data) {
-//	fprintf(stderr, "url: %s\n", dataLink.c_str());
 	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
 	curl.setOpt(CURLOPT_URL, dataLink.c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
@@ -242,7 +241,6 @@ void PangaeaSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	// skip initial comment
 	size_t offset = data.str().find("*/\n") + 2;
 	std::string dataDescription = data.str().substr(0, offset);
-	fprintf(stderr, dataDescription.c_str());
 
 	parseDataDescription(dataDescription);
 

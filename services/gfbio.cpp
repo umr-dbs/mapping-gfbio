@@ -352,10 +352,10 @@ void GFBioService::run() {
 								auto parameters = result["parameter"];
 								for (Json::ValueIterator parameter = parameters.begin(); parameter != parameters.end(); ++parameter) {
 									std::string p = (*parameter).asString();
-									// TODO: also allow other lat/lon parameters
-									if (p == "LATITUDE")
+
+									if (p == "LATITUDE" || p.find("Latitude") != std::string::npos)
 										hasLatitude = true;
-									else if (p == "LONGITUDE")
+									else if (p == "LONGITUDE" || p.find("Longitude") != std::string::npos)
 										hasLongitude = true;
 								}
 
@@ -377,14 +377,21 @@ void GFBioService::run() {
 									jsonParameter["name"] = pangaeaParameter.fullName;
 									jsonParameter["unit"] = pangaeaParameter.unit;
 									jsonParameter["numeric"] = pangaeaParameter.unit != "";
+									entryParameters.append(jsonParameter);
 								} catch(const GFBioServiceException& e) {
-									jsonParameter["name"] = parameterString;
-									jsonParameter["unit"] = "";
-									jsonParameter["numeric"] = false;
+
+									// TODO handle geocodes
+									if (parameterString == "Latitude of event" || parameterString == "Longitude of event") {
+										jsonParameter["name"] = parameterString;
+										jsonParameter["unit"] = "";
+										jsonParameter["numeric"] = true;
+										entryParameters.append(jsonParameter);
+									}
+
 									fprintf(stderr, e.what());
 								}
 
-								entryParameters.append(jsonParameter);
+
 							}
 							entry["parameters"] = entryParameters;
 

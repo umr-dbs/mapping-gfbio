@@ -51,9 +51,7 @@ class PangaeaSourceOperator : public GenericOperator {
 		void parseDataDescription(std::string& dataDescription);
 		std::vector<Parameter> extractParameters(std::string dataDescription);
 #endif
-		void writeSemanticParameters(std::ostringstream& stream) {
-			stream << "\"dataLink\":\"" << dataLink;
-		}
+		void writeSemanticParameters(std::ostringstream& stream);
 
 		virtual ~PangaeaSourceOperator(){};
 
@@ -91,7 +89,13 @@ PangaeaSourceOperator::PangaeaSourceOperator(int sourcecounts[], GenericOperator
 	csvUtil = make_unique<CSVSourceUtil>(params);
 }
 
+void PangaeaSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	Json::Value params = csvUtil->getParameters();
+	params["dataLink"] = dataLink;
 
+	Json::FastWriter writer;
+	stream << writer.write(params);
+}
 
 
 #ifndef MAPPING_OPERATOR_STUBS
@@ -110,7 +114,6 @@ void PangaeaSourceOperator::parseDataDescription(std::string& dataDescription) {
 }
 
 std::vector<PangaeaSourceOperator::Parameter> PangaeaSourceOperator::extractParameters(std::string dataDescription) {
-
 	std::vector<Parameter> parameters;
 
 	// extract parameters part of data description
@@ -179,16 +182,49 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 
 	std::vector<Parameter> parameters = extractParameters(dataDescription);
 
-	// map parameters to the column name (short name + unit)
+	// map parameters to the column name (short name + unit). FAIL: column name can also contain comment
+	std::stringstream headerStream(dataString);
+	CSVParser csvParser(headerStream, csvUtil->field_separator);
+	std::vector<std::string> csvColumns = csvParser.readHeaders();
+
+	std::map<std::string, std::string> columnNameToParameter;
+
 	std::vector<std::string> columns_numeric = csvUtil->columns_numeric;
 	std::vector<std::string> shortName_numeric;
-	for(auto& column : columns_numeric)
-		shortName_numeric.push_back(mapParameterNameToColumnName(column, parameters));
-
+	fprintf(stderr, "YOO");
+	std::vector<std::string> failed_numeric, failed_textual; // requested columns that couldn't be resolved an will be returned empty
+	for(auto& column : columns_numeric) {
+		try {
+			std::string columnName = mapParameterNameToColumnName(column, parameters);
+			if(std::find(csvColumns.begin(), csvColumns.end(), columnName) != csvColumns.end()) {
+				// mapped column name exists
+				shortName_numeric.push_back(columnName);
+				columnNameToParameter.emplace(columnName, column);
+			} else {
+				failed_numeric.push_back(column);
+			}
+		} catch (...) {
+			failed_numeric.push_back(column);
+		}
+	}
+	fprintf(stderr, "YOO");
 	std::vector<std::string> columns_textual = csvUtil->columns_textual;
 	std::vector<std::string> shortName_textual;
-	for(auto& column : columns_textual)
-		shortName_textual.push_back(mapParameterNameToColumnName(column, parameters));
+	for(auto& column : columns_textual) {
+		try {
+			std::string columnName = mapParameterNameToColumnName(column, parameters);
+			if(std::find(csvColumns.begin(), csvColumns.end(), columnName) != csvColumns.end()) {
+				// mapped column name exists
+				shortName_textual.push_back(columnName);
+				columnNameToParameter.emplace(columnName, column);
+			} else {
+				failed_textual.push_back(column);
+			}
+		} catch (...) {
+			failed_textual.push_back(column);
+		}
+	}
+	fprintf(stderr, "aaaa");
 
 	csvUtil->columns_numeric = shortName_numeric;
 	csvUtil->columns_textual = shortName_textual;
@@ -200,22 +236,39 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 		csvUtil->column_x = mapParameterNameToColumnName(column_x, parameters);
 
 	if(column_y != "")
-		csvUtil->column_y = mapParameterNameToColumnName(csvUtil->column_y, parameters);
+		csvUtil->column_y = mapParameterNameToColumnName(column_y, parameters);
 
+	fprintf(stderr, "bbb");
 	// parse the .tab file
 	std::istringstream iss(dataString);
 	auto points = csvUtil->getPointCollection(iss, rect);
 
+	AttributeArrays mapped_attributes;
+
 	// map column names back to parameters
-	for(size_t i = 0; i < columns_numeric.size(); ++i) {
-		if(csvUtil->columns_numeric[i] != columns_numeric[i]) {
-			points->feature_attributes.renameNumericAttribute(csvUtil->columns_numeric[i], columns_numeric[i]);
-		}
+	for(size_t i = 0; i < csvUtil->columns_numeric.size(); ++i) {
+		std::string &column = csvUtil->columns_numeric[i];
+		std::string &parameter = columnNameToParameter[column];
+		auto &attribute = mapped_attributes.addNumericAttribute(parameter, points->feature_attributes.numeric(column).unit);
+		attribute = std::move(points->feature_attributes.numeric(column));
 	}
-	for(size_t i = 0; i < columns_textual.size(); ++i) {
-		if(csvUtil->columns_textual[i] != columns_textual[i]) {
-			points->feature_attributes.renameTextualAttribute(csvUtil->columns_textual[i], columns_textual[i]);
-		}
+	for(size_t i = 0; i < csvUtil->columns_textual.size(); ++i) {
+		std::string &column = csvUtil->columns_textual[i];
+		std::string &parameter = columnNameToParameter[column];
+		auto &attribute = mapped_attributes.addTextualAttribute(parameter, points->feature_attributes.textual(column).unit);
+		attribute = std::move(points->feature_attributes.textual(column));
+	}
+
+	points->feature_attributes = std::move(mapped_attributes);
+
+	// failed columns
+	for(std::string &column : failed_numeric) {
+		points->feature_attributes.addNumericAttribute(column, Unit::unknown());
+		points->feature_attributes.numeric(column).resize(points->getFeatureCount());
+	}
+	for(std::string &column : failed_textual) {
+		points->feature_attributes.addTextualAttribute(column, Unit::unknown());
+		points->feature_attributes.textual(column).resize(points->getFeatureCount());
 	}
 
 	// TODO name of geo columns...

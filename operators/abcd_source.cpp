@@ -7,10 +7,12 @@
 #include <sstream>
 #include <json/json.h>
 #include <algorithm>
+#include <string>
 #include <functional>
 #include <memory>
 #include <cctype>
 #include <unordered_set>
+#include <vector>
 
 #include <xercesc/parsers/XercesDOMParser.hpp>
 #include <xercesc/parsers/DOMLSParserImpl.hpp>
@@ -68,42 +70,18 @@ static const XMLCh tagNameDetails[] = {chLatin_a,chLatin_b,chLatin_c,chLatin_d,c
  * Parameters:
  * - archive: the path of the ABCD file
  * - units: an array with unit ddentifiers that specifies the units that are returned (optional)
+ * 	- columns:
+ * 		- numeric: array of column names of numeric type, XML path relative to DataSets/DataSet/Units/Unit
+ * 		- textual: array of column names of textual type, XML path relative to DataSets/DataSet/Units/Unit
  */
 class ABCDSourceOperator : public GenericOperator {
 	public:
-		ABCDSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
-			assumeSources(0);
-			archive = params.get("path", "").asString();
-
-			// map archive url to local file
-			std::stringstream ss;
-			for(char& c : archive) {
-				if (isalnum(c))
-					ss << c;
-				else
-					ss << '_';
-			}
-			ss << ".xml";
-
-			inputFile = ss.str();
-
-			// filters on unitId
-			if (params.isMember("units") && params["units"].size() > 0) {
-				filterUnitsById = true;
-				for (Json::Value &unit : params["units"]) {
-					units.emplace(unit.asString());
-				}
-			}
-
-		}
-
+		ABCDSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params);
 #ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
 		virtual void getProvenance(ProvenanceCollection &pc);
 #endif
-		void writeSemanticParameters(std::ostringstream& stream) {
-			stream << "{\"path\":\"" << archive << "\"}";
-		}
+		void writeSemanticParameters(std::ostringstream& stream);
 
 		virtual ~ABCDSourceOperator(){};
 
@@ -114,6 +92,9 @@ class ABCDSourceOperator : public GenericOperator {
 		bool filterUnitsById = false;
 		std::unordered_set<std::string> units;
 
+		std::vector<std::string> numeric_attributes;
+		std::vector<std::string> textual_attributes;
+
 #ifndef MAPPING_OPERATOR_STUBS
 		std::unique_ptr<PointCollection> points;
 
@@ -121,7 +102,7 @@ class ABCDSourceOperator : public GenericOperator {
 		void handleGlobalAttributes(DOMElement& dataSet);
 		void handleUnit(DOMElement& unit);
 		bool handleGathering(DOMElement& gathering);
-		void handleXMLAttributes(DOMNode& node, std::string path,
+		void handleXMLAttributes(DOMElement& element, std::string path,
 				std::function<void(const std::string&, double)> setDoubleAttribute,
 				std::function<void(const std::string&, const std::string&)> setStringAttribute);
 
@@ -147,6 +128,78 @@ class ABCDSourceOperator : public GenericOperator {
 };
 REGISTER_OPERATOR(ABCDSourceOperator, "abcd_source");
 
+
+
+ABCDSourceOperator::ABCDSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
+	assumeSources(0);
+	archive = params.get("path", "").asString();
+
+	// map archive url to local file
+	std::stringstream ss;
+	for(char& c : archive) {
+		if (isalnum(c))
+			ss << c;
+		else
+			ss << '_';
+	}
+	ss << ".xml";
+
+	inputFile = ss.str();
+
+	// filters on unitId
+	if (params.isMember("units") && params["units"].size() > 0) {
+		filterUnitsById = true;
+		for (Json::Value &unit : params["units"]) {
+			units.emplace(unit.asString());
+		}
+	}
+
+	// attributes to be extracted
+	if(!params.isMember("columns") || !params["columns"].isObject())
+		throw ArgumentException("ABCDSourceOperator: columns are not specified");
+
+	auto columns = params["columns"];
+	if(!columns.isMember("numeric") || !columns["numeric"].isArray())
+		throw ArgumentException("ABCDSourceOperator: numeric columns are not specified");
+
+	if(!columns.isMember("textual") || !columns["textual"].isArray())
+		throw ArgumentException("ABCDSourceOperator: textual columns are not specified");
+
+	for(auto &attribute : columns["numeric"])
+		numeric_attributes.push_back(attribute.asString());
+
+	for(auto &attribute : columns["textual"])
+		textual_attributes.push_back(attribute.asString());
+}
+
+void ABCDSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
+	Json::Value json(Json::objectValue);
+	json["path"] = archive;
+
+	// TODO: sort values to avoid unnecessary cache misses
+
+	Json::Value jsonUnits(Json::arrayValue);
+	for(auto &unit : units)
+		jsonUnits.append(unit);
+	json["units"] = jsonUnits;
+
+
+	Json::Value columns(Json::objectValue);
+
+	Json::Value jsonNumeric(Json::arrayValue);
+	for (auto &attribute : numeric_attributes)
+		jsonNumeric.append(attribute);
+	columns["numeric"] = jsonNumeric;
+
+	Json::Value jsonTextual(Json::arrayValue);
+	for (auto &attribute : textual_attributes)
+		jsonTextual.append(attribute);
+	columns["textual"] = jsonTextual;
+
+	json["columns"] = columns;
+
+	stream << json;
+}
 
 #ifndef MAPPING_OPERATOR_STUBS
 
@@ -245,8 +298,8 @@ void ABCDSourceOperator::setFeatureStringAttribute(const std::string& attribute,
 	try {
 		points->feature_attributes.textual(attribute).set(position, value);
 	} catch (const std::out_of_range& e){
-		points->feature_attributes.addTextualAttribute(attribute, Unit::unknown());
-		points->feature_attributes.textual(attribute).set(position, value);
+//		points->feature_attributes.addTextualAttribute(attribute, Unit::unknown());
+//		points->feature_attributes.textual(attribute).set(position, value);
 	}
 }
 
@@ -258,8 +311,8 @@ void ABCDSourceOperator::setFeatureDoubleAttribute(const std::string& attribute,
 	try {
 		points->feature_attributes.numeric(attribute).set(position, value);
 	} catch (const std::out_of_range& e){
-		points->feature_attributes.addNumericAttribute(attribute, Unit::unknown());
-		points->feature_attributes.numeric(attribute).set(position, value);
+//		points->feature_attributes.addNumericAttribute(attribute, Unit::unknown());
+//		points->feature_attributes.numeric(attribute).set(position, value);
 	}
 }
 
@@ -277,66 +330,74 @@ void ABCDSourceOperator::setGlobalDoubleAttribute(const std::string& attribute, 
 /**
  * recursively extract attributes from XML subtree by flattening
  */
-void ABCDSourceOperator::handleXMLAttributes(DOMNode& node, std::string path,
+void ABCDSourceOperator::handleXMLAttributes(DOMElement& element, std::string path,
 		std::function<void(const std::string&, double)> setDoubleAttribute,
 		std::function<void(const std::string&, const std::string&)> setStringAttribute) {
-	if(node.getNodeType() == xercesc::DOMNode::NodeType::ELEMENT_NODE) {
-		xercesc::DOMElement& element = (xercesc::DOMElement&) node;
 
-		path += "/" + transcode(element.getTagName());
-		if(node.hasAttributes()) {
-			auto size = node.getAttributes()->getLength();
-			for(XMLSize_t attribute = 0; attribute < size; ++attribute) {
-				xercesc::DOMNode& attributeNode = *node.getAttributes()->item(attribute);
-				xercesc::DOMAttr& attr = (xercesc::DOMAttr&) attributeNode;
+	path += transcode(element.getLocalName());
+	if (element.hasAttributes()) {
+		auto size = element.getAttributes()->getLength();
+		for (XMLSize_t attribute = 0; attribute < size; ++attribute) {
+			xercesc::DOMNode& attributeNode = *element.getAttributes()->item(
+					attribute);
+			xercesc::DOMAttr& attr = (xercesc::DOMAttr&) attributeNode;
 
-				std::string attributePath = path + ":" + transcode(attr.getName());
+			std::string attributePath = path + ":" + transcode(attr.getName());
 
-				if(isNumeric(*attr.getSchemaTypeInfo())) {
-					setDoubleAttribute(attributePath, parseDouble(attr.getValue()));
-				}
-				else {
-					std::string value = transcode(attr.getValue());
-					setStringAttribute(attributePath, value);
-				}
-
+			if (isNumeric(*attr.getSchemaTypeInfo())) {
+				setDoubleAttribute(attributePath, parseDouble(attr.getValue()));
+			} else {
+				std::string value = transcode(attr.getValue());
+				setStringAttribute(attributePath, value);
 			}
+
 		}
-
-		//visit children
-		if(node.hasChildNodes()) {
-			auto size = node.getChildNodes()->getLength();
-			for(XMLSize_t child = 0; child < size; ++child){
-				handleXMLAttributes(*node.getChildNodes()->item(child), path, setDoubleAttribute, setStringAttribute);
-			}
-		}
-
-
-	} else if (node.getNodeType() == xercesc::DOMNode::NodeType::TEXT_NODE){
-		xercesc::DOMText& text = (xercesc::DOMText&) node;
-		if(!text.isIgnorableWhitespace()){
-			bool numeric = false;
-			//have to check parent to find out datatype
-			if(node.getParentNode()->getNodeType() == DOMNode::NodeType::ELEMENT_NODE) {
-				DOMElement& parent = dynamic_cast<DOMElement&>(*node.getParentNode());
-				numeric = isNumeric(*parent.getSchemaTypeInfo());
-			}
-
-			if(numeric) {
-				setDoubleAttribute(path, parseDouble(node.getNodeValue()));
-			}
-			else {
-				try {
-					std::string value = transcode(node.getTextContent());
-					setStringAttribute(path, value);
-				} catch(...){
-					fprintf(stderr, "Error transcoding path %s\n", path.c_str());
-				}
-			}
-		}
-	} else {
-
 	}
+
+	//visit children
+	if (element.hasChildNodes()) {
+		auto size = element.getChildNodes()->getLength();
+		for (XMLSize_t child = 0; child < size; ++child) {
+
+			DOMNode& childNode = *element.getChildNodes()->item(child);
+
+			if (childNode.getNodeType()
+					== xercesc::DOMNode::NodeType::ELEMENT_NODE) {
+				handleXMLAttributes(dynamic_cast<DOMElement&>(childNode), path + "/", setDoubleAttribute,
+						setStringAttribute);
+			} else if (childNode.getNodeType() == xercesc::DOMNode::NodeType::TEXT_NODE) {
+				xercesc::DOMText& text = (xercesc::DOMText&) childNode;
+				if (!text.isIgnorableWhitespace()) {
+					bool numeric = false;
+					//have to check parent to find out datatype
+					if (childNode.getParentNode()->getNodeType()
+							== DOMNode::NodeType::ELEMENT_NODE) {
+						DOMElement& parent =
+								dynamic_cast<DOMElement&>(*childNode.getParentNode());
+						numeric = isNumeric(*parent.getSchemaTypeInfo());
+					}
+
+					if (numeric) {
+						setDoubleAttribute(path,
+								parseDouble(childNode.getNodeValue()));
+					} else {
+						try {
+							std::string value = transcode(
+									childNode.getTextContent());
+							setStringAttribute(path, value);
+						} catch (...) {
+							fprintf(stderr, "Error transcoding path %s\n",
+									path.c_str());
+						}
+					}
+				}
+			} else {
+
+			}
+
+		}
+	}
+
 
 }
 
@@ -370,7 +431,7 @@ void ABCDSourceOperator::handleUnit(DOMElement& unit) {
 			try {
 				points->feature_attributes.textual(key).get(points->start_feature.size() - 2);
 			} catch (const std::out_of_range& e) {
-				points->feature_attributes.textual(key).set(points->start_feature.size() - 2, "n/a");
+				points->feature_attributes.textual(key).set(points->start_feature.size() - 2, "");
 			}
 		}
 		for(std::string key : points->feature_attributes.getNumericKeys()){
@@ -432,15 +493,25 @@ std::unique_ptr<DOMLSParserImpl> ABCDSourceOperator::createParser() {
 std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools){
 	points = make_unique<PointCollection>(rect);
 
+	// add attributes
+	for(auto &attribute: numeric_attributes) {
+		points->feature_attributes.addNumericAttribute(attribute, Unit::unknown());
+	}
+
+	for(auto &attribute: textual_attributes) {
+		points->feature_attributes.addTextualAttribute(attribute, Unit::unknown());
+	}
+
 	//TODO: catch XML exceptions and throw OperatorException instead?
 
 	XMLPlatformUtils::Initialize(); //TODO: only do this once for long running process
 	{
 		auto parser = createParser();
-		parser->parseURI((Configuration::get("gfbio.abcd.datapath") + "/" +inputFile).c_str());
+		std::string filePath = Configuration::get("gfbio.abcd.datapath") + "/" +inputFile;
+		parser->parseURI(filePath.c_str());
 		DOMDocument* doc = parser->getDocument(); //deleted by parser when done
 		if(doc == nullptr)
-			throw OperatorException(concat("ABCDSource: could not parse document document null:", inputFile));
+			throw OperatorException(concat("ABCDSource: could not parse document (doc == null): ", filePath));
 
 		//handle DataSet metadata
 		DOMNodeList* dataSets = doc->getElementsByTagName(tagNameDataSet);
@@ -451,7 +522,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 		handleUnits(*doc);
 	}
 	delete transcoder; //transcoder has to be deleted before Terminate, thus wrapping member with unique_ptr not possible here
-	XMLPlatformUtils::Terminate(); //TODO: only do this once for long running process
+	//XMLPlatformUtils::Terminate(); //TODO: only do this once for long running process
 	points->validate();
 	return points->filterBySpatioTemporalReferenceIntersection(rect);
 }

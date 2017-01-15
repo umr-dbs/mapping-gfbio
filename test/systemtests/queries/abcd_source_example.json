@@ -18,9 +18,13 @@
 		"params" : 
 		{
 			"path" : "abcd_example",
-			"units" : ["0"]
+			"units" : ["0"],
+			"columns" : {
+				"numeric" : [],
+				"textual" : ["UnitGUID"]
+			}
 		},
 		"type" : "abcd_source"
 	},
-	"query_expected_hash" : "24a044dbd8e442c4f12bf5600b1dc06b31305ac8"
+	"query_expected_hash" : "79e0c1f37b224067f9a15127dcb953e05f11bce8"
 }

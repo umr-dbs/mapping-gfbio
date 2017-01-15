@@ -52,7 +52,7 @@ class GFBioSourceOperator : public GenericOperator {
 		std::vector<std::string> numeric_attributes;
 		std::vector<std::string> textual_attributes;
 
-		const std::set<std::string> gbif_columns {"id","dataset_id","institution_code","collection_code","catalog_number","basis_of_record","scientific_name","scientific_name_author","taxon_id","kingdom","phylum","class","order","family","genus","specific_epithet","kingdom_id","phylum_id","class_id","order_id","family_id","genus_id","species_id","country_code","host_country","latitude","longitude","year","month","event_date","elevation_in_meters","depth_in_meters","verbatim_scientific_name","taxon_rank","verbatim_kingdom","verbatim_phylum","verbatim_class","verbatim_order","verbatim_family","verbatim_genus","verbatim_specific_epithet","verbatim_infraspecific_epithet","verbatim_latitude","verbatim_longitude","coordinate_precision","maximum_elevation_in_meters","minimum_elevation_in_meters","elevation_precision","minimum_depth_in_meters","maximum_depth_in_meters","depth_precision","continent_ocean","state_province","county","country","recorded_by","locality","verbatim_year","verbatim_month","day","verbatim_basis_of_record","identified_by","date_identified","created","modified"};
+		const std::set<std::string> gbif_columns {"gbifid", "datasetkey", "occurrenceid", "kingdom", "phylum", "class", "order", "family", "genus", "species", "infraspecificepithet", "taxonrank", "scientificname", "countrycode", "locality", "publishingorgkey", "decimallatitude", "decimallongitude", "coordinateuncertaintyinmeters", "coordinateprecision", "elevation", "elevationaccuracy", "depth", "depthaccuracy", "eventdate", "day", "month", "year", "taxonkey", "specieskey", "basisofrecord", "institutioncode", "collectioncode", "catalognumber", "recordnumber", "identifiedby", "license", "rightsholder", "recordedby", "typestatus", "establishmentmeans", "lastinterpreted", "mediatype", "issue"};
 };
 
 
@@ -164,14 +164,14 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
 		}
 
 		std::string query =
-				"SELECT longitude::double precision, latitude::double precision, extract(epoch from to_timestamp(event_date, 'YYYY-MM-DD\"T\"HH24:MI\"Z\"')::timestamp without time zone)"
+				"SELECT longitude::double precision, latitude::double precision, extract(epoch from eventdate)"
 						+ columns.str()
-						+ " from gbif.gbif WHERE taxon_id = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), ST_SetSRID(ST_MakePoint(longitude::double precision, latitude::double precision),4326))";
+						+ " from gbif.gbif WHERE taxonkey = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), ST_SetSRID(ST_MakePoint(decimallongitude::double precision, decimallatitude::double precision),4326))";
 
 		connection.prepare("occurrences", query);
 	}
 	else
-		connection.prepare("occurrences", "SELECT ST_X(geom) x, ST_Y(geom) y, extract(epoch from event_date) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
+		connection.prepare("occurrences", "SELECT ST_X(geom) x, ST_Y(geom) y, extract(epoch from eventdate) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
 
 	pqxx::work work(connection);
 	pqxx::result result = work.prepared("occurrences")(taxa)(rect.x1)(rect.y1)(rect.x2)(rect.y2).exec();

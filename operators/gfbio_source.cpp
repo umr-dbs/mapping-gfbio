@@ -118,7 +118,7 @@ void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
 		std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
 
 
-		connection.prepare("provenance", "SELECT DISTINCT key, citation, uri from gbif.gbif_lite_time join gbif.gbif using (id) join gbif2.datasets ON (key = dataset_id) WHERE taxon = ANY($1)");
+		connection.prepare("provenance", "SELECT DISTINCT key, citation, uri from gbif.gbif_lite_time join gbif.datasets ON (uid = key) WHERE taxon = ANY($1)");
 		pqxx::work work(connection);
 		pqxx::result result = work.prepared("provenance")(taxa).exec();
 
@@ -164,7 +164,7 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
 		}
 
 		std::string query =
-				"SELECT longitude::double precision, latitude::double precision, extract(epoch from eventdate)"
+				"SELECT decimallongitude::double precision, decimallatitude::double precision, extract(epoch from eventdate)"
 						+ columns.str()
 						+ " from gbif.gbif WHERE taxonkey = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), ST_SetSRID(ST_MakePoint(decimallongitude::double precision, decimallatitude::double precision),4326))";
 

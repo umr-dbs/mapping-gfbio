@@ -218,7 +218,7 @@ void GFBioService::run() {
 
 			pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
 
-			connection.prepare("searchSpecies", "SELECT name FROM gbif.gbif_taxon_to_name WHERE lower(name) like lower($1)");
+			connection.prepare("searchSpecies", "SELECT DISTINCT name FROM gbif.gbif_taxon_to_name WHERE lower(name) like lower($1) ORDER BY name ASC");
 			pqxx::work work(connection);
 			pqxx::result result = work.prepared("searchSpecies")(term + "%").exec();
 

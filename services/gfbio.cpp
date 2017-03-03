@@ -194,9 +194,17 @@ void GFBioService::run() {
 				// user does not exist locally => create
 				Json::Value userDetails = getUserDetailsFromPortal(gfbioId);
 				try {
-					UserDB::createExternalUser(userDetails.get("emailAddress", "").asString(),
+					auto user = UserDB::createExternalUser(userDetails.get("emailAddress", "").asString(),
 											   userDetails.get("firstName", "").asString() + " " + userDetails.get("lastName", "").asString(),
 											   userDetails.get("emailAddress", "").asString(), externalId);
+
+					try {
+						auto gfbioGroup = UserDB::loadGroup("gfbio");
+						user->joinGroup(*gfbioGroup);
+					} catch (const UserDB::database_error&) {
+						auto gfbioGroup = UserDB::createGroup("gfbio");
+						user->joinGroup(*gfbioGroup);
+					}
 
 					session = UserDB::createSessionForExternalUser(externalId, 8 * 3600);
 				} catch (const std::exception&) {

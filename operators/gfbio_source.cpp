@@ -124,10 +124,10 @@ void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
 
 		for(size_t i = 0; i < result.size(); ++i) {
 			auto row = result[i];
-			pc.add(Provenance(row[1].as<std::string>(), "", row[2].as<std::string>(), ""));
+			pc.add(Provenance(row[1].as<std::string>(), "", row[2].as<std::string>(), "data.gfbio_source.gbif"));
 		}
 	} else {
-		pc.add(Provenance("IUCN 2014. The IUCN Red List of Threatened Species. Version 2014.1. http://www.iucnredlist.org. Downloaded on 06/01/2014.", "", "http://www.iucnredlist.org/", "http://spatial-data.s3.amazonaws.com/groups/Red%20List%20Terms%20&%20Conditions%20of%20Use.pdf"));
+		pc.add(Provenance("IUCN 2014. The IUCN Red List of Threatened Species. Version 2014.1. http://www.iucnredlist.org. Downloaded on 06/01/2014.", "http://spatial-data.s3.amazonaws.com/groups/Red%20List%20Terms%20&%20Conditions%20of%20Use.pdf", "http://www.iucnredlist.org/", "data.gfbio_source.iucn"));
 	}
 }
 

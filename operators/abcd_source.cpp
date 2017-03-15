@@ -529,7 +529,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 
 void ABCDSourceOperator::handleIPRStatements(DOMElement& element, ProvenanceCollection &pc) {
 	Provenance provenance;
-	provenance.local_identifier = "data." + getType() + "." + inputFile;
+	provenance.local_identifier = "data." + getType();
 
 	//the IPR statements itself
 	DOMElement* child = element.getFirstElementChild();

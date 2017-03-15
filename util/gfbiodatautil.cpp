@@ -56,7 +56,6 @@ size_t GFBioDataUtil::countIUCNResults(std::string &scientificName) {
 	pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
 
 	std::string taxa = resolveTaxaNames(connection, scientificName);
-	fprintf(stderr, taxa.c_str());
 	connection.prepare("occurrences", "SELECT count(*) FROM iucn.expert_ranges_all WHERE lower(binomial) = ANY($1)");
 
 	pqxx::work work(connection);

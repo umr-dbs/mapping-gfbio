@@ -328,7 +328,7 @@ void GFBioService::run() {
 			for(auto portalBasket : jsonResponse) {
 				try {
 					Json::Value basket(Json::objectValue);
-					basket["query"] = portalBasket["queryJSON"][0]["query"]["function_score"]["query"]["filtered"]["query"]["simple_query_string"]["query"].asString();
+					basket["query"] = portalBasket.get("queryKeyword", portalBasket["queryJSON"][0]["query"]["function_score"]["query"]["filtered"]["query"]["simple_query_string"]["query"]).asString();
 					basket["timestamp"] = portalBasket["lastModifiedDate"].asString(); //TODO parse and reformat
 
 					basket["results"] = Json::Value(Json::arrayValue);

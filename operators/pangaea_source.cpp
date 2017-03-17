@@ -191,7 +191,6 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 
 	std::vector<std::string> columns_numeric = csvUtil->columns_numeric;
 	std::vector<std::string> shortName_numeric;
-	fprintf(stderr, "YOO");
 	std::vector<std::string> failed_numeric, failed_textual; // requested columns that couldn't be resolved an will be returned empty
 	for(auto& column : columns_numeric) {
 		try {
@@ -207,7 +206,6 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 			failed_numeric.push_back(column);
 		}
 	}
-	fprintf(stderr, "YOO");
 	std::vector<std::string> columns_textual = csvUtil->columns_textual;
 	std::vector<std::string> shortName_textual;
 	for(auto& column : columns_textual) {
@@ -224,7 +222,6 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 			failed_textual.push_back(column);
 		}
 	}
-	fprintf(stderr, "aaaa");
 
 	csvUtil->columns_numeric = shortName_numeric;
 	csvUtil->columns_textual = shortName_textual;
@@ -238,7 +235,6 @@ std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const
 	if(column_y != "")
 		csvUtil->column_y = mapParameterNameToColumnName(column_y, parameters);
 
-	fprintf(stderr, "bbb");
 	// parse the .tab file
 	std::istringstream iss(dataString);
 	auto points = csvUtil->getPointCollection(iss, rect);

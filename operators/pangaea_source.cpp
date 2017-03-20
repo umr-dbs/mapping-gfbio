@@ -102,7 +102,7 @@ void PangaeaSourceOperator::writeSemanticParameters(std::ostringstream& stream) 
 
 void PangaeaSourceOperator::parseDataDescription(std::string& dataDescription) {
 
-	std::regex regex(R"(Citation:\t([^:]+\(\d+\)): ([^\n]+)[.,;] doi:([PANGE0-9.\/]+).*\n.*License:\t([^\n]+)\n)");
+	std::regex regex(R"(Citation:\t([^:]+\(\d+\)): ([^\n]+)[.,;] doi:([PANGE0-9.\/]+)(?:.|\r|\n)*License:\t([^\n]+)\n)");
 
 	std::smatch sm;
 

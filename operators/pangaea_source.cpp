@@ -293,6 +293,6 @@ void PangaeaSourceOperator::getProvenance(ProvenanceCollection &pc) {
 
 	parseDataDescription(dataDescription);
 
-	pc.add(Provenance(citation, license, uri, "data.pangaea"));
+	pc.add(Provenance(citation, license, uri, "data.pangaea_source"));
 }
 #endif

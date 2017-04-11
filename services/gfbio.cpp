@@ -409,8 +409,14 @@ void GFBioService::run() {
 
 						} else {
 							entry["type"] = "abcd";
-							entry["dataLink"] = result["parentIdentifier"];
-							entry["unitId"] = result["dcIdentifier"];
+							if(entry.isMember("parentIdentifier")) {
+								// Entry is a unit
+								entry["dataLink"] = result["parentIdentifier"];
+								entry["unitId"] = result["dcIdentifier"];
+							} else {
+								// Entry is a data set
+								entry["dataLink"] = result["datalink"];
+							}
 
 							entry["available"] = std::find(
 									availableArchives.begin(),

@@ -409,7 +409,7 @@ void GFBioService::run() {
 
 						} else {
 							entry["type"] = "abcd";
-							if(entry.isMember("parentIdentifier")) {
+							if(result.isMember("parentIdentifier")) {
 								// Entry is a unit
 								entry["dataLink"] = result["parentIdentifier"];
 								entry["unitId"] = result["dcIdentifier"];

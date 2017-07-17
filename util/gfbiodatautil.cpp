@@ -39,11 +39,11 @@ std::string GFBioDataUtil::resolveTaxaNames(pqxx::connection &connection, std::s
 }
 
 size_t GFBioDataUtil::countGBIFResults(std::string &scientificName) {
-	pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
+	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
 
 	std::string taxa = resolveTaxa(connection, scientificName);
 
-	connection.prepare("occurrences", "SELECT count(*) FROM gbif.gbif_lite_time WHERE taxon = ANY($1)");
+	connection.prepare("occurrences", "SELECT count(*) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND geom IS NOT NULL");
 
 	pqxx::work work(connection);
 	pqxx::result result = work.prepared("occurrences")(taxa).exec();
@@ -53,7 +53,7 @@ size_t GFBioDataUtil::countGBIFResults(std::string &scientificName) {
 }
 
 size_t GFBioDataUtil::countIUCNResults(std::string &scientificName) {
-	pqxx::connection connection (Configuration::get("operators.gbifsource.dbcredentials"));
+	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
 
 	std::string taxa = resolveTaxaNames(connection, scientificName);
 	connection.prepare("occurrences", "SELECT count(*) FROM iucn.expert_ranges_all WHERE lower(binomial) = ANY($1)");

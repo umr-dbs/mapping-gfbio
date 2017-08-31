@@ -143,16 +143,13 @@ void ABCDSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 std::unique_ptr<PointCollection> ABCDSourceOperator::createFeatureCollectionWithAttributes(const QueryRectangle &rect) {
 	auto points = make_unique<PointCollection>(rect);
 
-	// TODO filter according to parameters
-
-	auto unit_numeric_attributes = split(Configuration::get("gfbio.abcd.numericattributes", ""), ' ');
 	auto unit_textual_attributes = split(Configuration::get("gfbio.abcd.textualattributes", ""), ' ');
 
-	for(auto& attribute : unit_numeric_attributes) {
+	for(auto& attribute : numeric_attributes) {
 		points->feature_attributes.addNumericAttribute(attribute, Unit::unknown());
 	}
 
-	for(auto& attribute : unit_textual_attributes) {
+	for(auto& attribute : textual_attributes) {
 		points->feature_attributes.addTextualAttribute(attribute, Unit::unknown());
 	}
 
@@ -224,7 +221,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 		}
 
 
-		// mandatory fields
+		// attributes
 		for(auto& attribute : points->feature_attributes.getNumericKeys()) {
 			std::string query = getXPathQuery(attribute);
 			double value = unit.select_node(query.c_str()).node().text().as_double(NAN);

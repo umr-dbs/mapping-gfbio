@@ -189,7 +189,8 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 
 	pugi::xml_document doc;
 
-	pugi::xml_parse_result result = doc.load_file(inputFile.c_str());
+	std::string filePath = Configuration::get("gfbio.abcd.datapath") + "/" +inputFile;
+	pugi::xml_parse_result result = doc.load_file(filePath.c_str());
 
 	if(!result) {
 		throw OperatorException("ABCDSouce: Could not load file with given name");
@@ -245,7 +246,8 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	pugi::xml_document doc;
 
-	pugi::xml_parse_result result = doc.load_file(inputFile.c_str());
+	std::string filePath = Configuration::get("gfbio.abcd.datapath") + "/" +inputFile;
+	pugi::xml_parse_result result = doc.load_file(filePath.c_str());
 
 	if(!result) {
 		throw OperatorException("ABCDSouce: Could not load file with given name");

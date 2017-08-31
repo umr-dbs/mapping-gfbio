@@ -10,4 +10,4 @@ OBJS_OPERATORS += o/mapping-gfbio/operators/abcd_source.o o/mapping-gfbio/operat
 OBJS_SERVICES += o/mapping-gfbio/services/gfbio.o
 
 
-PKGLIBS_CORE += xerces-c
+LDFLAGS += -lpugixml

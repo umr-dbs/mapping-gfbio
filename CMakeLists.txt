@@ -5,6 +5,7 @@ project(mapping_gfbio
 
 # CMake Settings
 cmake_minimum_required(VERSION 3.5)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 ## Debug
 set(CMAKE_VERBOSE_MAKEFILE off)
@@ -31,11 +32,10 @@ include(LinkLibrariesInternal)
 
 add_library(mapping_gfbio_base_lib util/gfbiodatautil.cpp)
 target_include_directories(mapping_gfbio_base_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-# TODO: think of better solution for dependency injection
 target_include_directories(mapping_gfbio_base_lib PUBLIC ${MAPPING_CORE_PATH})
 
 add_library(mapping_gfbio_operators_lib
-        #        operators/abcd_source.cpp # TODO: comment in and add dependency
+        operators/abcd_source.cpp
         operators/gfbio_source.cpp
         operators/pangaea_source.cpp
         )
@@ -49,7 +49,9 @@ target_link_libraries_internal(mapping_gfbio_services_lib mapping_gfbio_base_lib
 # Dependencies
 include(DownloadProject)
 
-#find_package(Xerces) # TODO: match to abcd_source
+find_package(PugiXML REQUIRED)
+target_include_directories(mapping_gfbio_operators_lib PRIVATE "${PUGIXML_INCLUDE_DIR}")
+target_link_libraries(mapping_gfbio_operators_lib "${PUGIXML_LIBRARIES}")
 
 if (NOT is_mapping_module)
     download_project(PROJ jsoncpp

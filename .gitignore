@@ -1,6 +1,7 @@
 .project
 .cproject
 .settings
+.idea
 *.tmp.*
 _*
 datasources
@@ -29,3 +30,14 @@ docs/waveDoc/*
 htdocs/doc/wave/*
 docs/mappingDoc/*
 htdocs/doc/mapping/*
+
+# cmake
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CMakeFiles
+cmake-build-*
+## libraries
+mapping_gfbio.cbp
+libmapping_*
+jsoncpp-*

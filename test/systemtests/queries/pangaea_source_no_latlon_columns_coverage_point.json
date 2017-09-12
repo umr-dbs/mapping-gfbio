@@ -17,17 +17,15 @@
 	{
 		"params" : 
 		{
-			"doi" :"10.1594/PANGAEA.57721",
-			"geometry": "xy",
+			"doi" :"10.1594/PANGAEA.879192",
+			"geometry": "wkt",
 			"time": "none",
 			"separator" : "\t",
 			"columns": {
-				"x": "LATITUDE",
-				"y": "LONGITUDE",
-				"numeric": ["Ice extent"]
+				"textual": ["Species"]
 			}
 		},
 		"type" : "pangaea_source"
 	},
-	"query_expected_hash" : "435ee1087abcfbd2057686364c3feba0380cddeb"
+	"query_expected_hash" : ""
 }

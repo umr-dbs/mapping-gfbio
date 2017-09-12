@@ -6,14 +6,13 @@
 #include "util/exceptions.h"
 #include "util/curl.h"
 #include "util/gfbiodatautil.h"
+#include "portal/basketapi.h"
 
 #include <cstring>
 #include <sstream>
 #include <json/json.h>
 #include <algorithm>
 #include <pqxx/pqxx>
-
-#include <fstream>
 
 /*
  * This class provides methods for GFBio users
@@ -35,27 +34,8 @@ public:
 
 private:
 
-	class PangaeaParameter {
-		public:
-		PangaeaParameter(const std::string &identifier,
-				const std::string &fullName, const std::string &shortName,
-				const std::string &unit) :
-				identifier(identifier), fullName(fullName), shortName(
-						shortName), unit(unit) {
-
-		}
-			std::string identifier;
-			std::string fullName;
-			std::string shortName;
-			std::string unit;
-	};
-
-	PangaeaParameter getPangaeaParameterByFullName(pqxx::connection &connection, const std::string &fullName);
-
 	size_t authenticateWithPortal(const std::string &token);
 	Json::Value getUserDetailsFromPortal(const size_t userId);
-
-	Json::Value getGFBioDataCentersJSON();
 
 	static constexpr const char* EXTERNAL_ID_PREFIX = "GFBIO:";
 
@@ -64,28 +44,6 @@ private:
 
 REGISTER_HTTP_SERVICE(GFBioService, "gfbio");
 
-
-/**
- * read the GFBio data centers file and return as Json object
- * TODO: manage data centers in a database and map them to a c++ class
- * @return a json object containing the available data centers
- */
-Json::Value GFBioService::getGFBioDataCentersJSON() {
-	auto path = Configuration::get("gfbio.abcd.datapath");
-
-	std::ifstream file(path + "gfbio_datacenters.json");
-	if (!file.is_open()) {
-		throw GFBioServiceException("gfbio_datacenters.json missing");
-	}
-
-	Json::Reader reader(Json::Features::strictMode());
-	Json::Value root;
-	if (!reader.parse(file, root)) {
-		throw GFBioServiceException("gfbio_datacenters.json invalid");
-	}
-
-	return root;
-}
 
 /**
  * authenticate user token with portal
@@ -156,23 +114,6 @@ Json::Value GFBioService::getUserDetailsFromPortal(const size_t userId) {
 		throw GFBioService::GFBioServiceException("GFBioService: Portal response invalid (malformed JSON)");
 
 	return response[0];
-}
-
-/**
- * get pangaea parameter by full name from postgres table pangaea.parameters
- * throws Exception if not parameter is found
- */
-GFBioService::PangaeaParameter GFBioService::getPangaeaParameterByFullName(pqxx::connection &connection, const std::string &fullName) {
-	connection.prepare("pangaea_parameter", "SELECT identifier, short_name, coalesce(unit, '') as unit FROM pangaea.parameters WHERE full_name = $1");
-	pqxx::work work(connection);
-
-	pqxx::result result = work.prepared("pangaea_parameter")(fullName).exec();
-
-	if (result.size() < 1)
-		throw GFBioServiceException("GFBioService: pangaea parameter not found:" + fullName);
-
-	auto row = result[0];
-	return PangaeaParameter(row[0].as<std::string>(), fullName, row[1].as<std::string>(), row[2].as<std::string>());
 }
 
 void GFBioService::run() {
@@ -271,7 +212,7 @@ void GFBioService::run() {
 		}
 
 		if(request == "abcd") {
-			Json::Value dataCenters = getGFBioDataCentersJSON();
+			Json::Value dataCenters = GFBioDataUtil::getGFBioDataCentersJSON();
 
 			response.sendSuccessJSON(dataCenters);
 			return;
@@ -281,156 +222,19 @@ void GFBioService::run() {
 		//protected methods
 		auto session = UserDB::loadSession(params.get("sessiontoken"));
 
+		std::string gfbioId = session->getUser().getExternalid();
+		if(gfbioId.find(EXTERNAL_ID_PREFIX) != 0)
+			throw GFBioServiceException("GFBioService: This service is only available for GFBio user.");
+
+		gfbioId = gfbioId.substr(strlen(EXTERNAL_ID_PREFIX));
+
 		if (request == "baskets") {
-			// connection for resolving pangaea parameters
-			pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
-
-			std::string gfbioId = session->getUser().getExternalid();
-			if(gfbioId.find(EXTERNAL_ID_PREFIX) != 0)
-				throw GFBioServiceException("GFBioService: This service is only available for GFBio user.");
-
-			gfbioId = gfbioId.substr(strlen(EXTERNAL_ID_PREFIX));
-
-			//TODO: cache baskets locally
-			//TODO: implement pagination
-
-			// get baskets from portal
-			std::stringstream data;
-			cURL curl;
-			curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
-			curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-			curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get("gfbio.portal.user"), ":", Configuration::get("gfbio.portal.password")).c_str());
-			curl.setOpt(CURLOPT_URL, concat(Configuration::get("gfbio.portal.basketwebserviceurl"), "?userId=", gfbioId).c_str());
-			curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
-			curl.setOpt(CURLOPT_WRITEDATA, &data);
-
-			try {
-				curl.perform();
-			} catch (const cURLException&) {
-				throw GFBioServiceException("GFBioService: could not retrieve baskets from portal");
-			}
-
-			Json::Reader reader(Json::Features::strictMode());
-			Json::Value jsonResponse;
-			if (!reader.parse(data.str(), jsonResponse))
-				throw GFBioServiceException("GFBioService: could not parse baskets from portal");
-
-
-			// get available abcd archives
-			Json::Value dataCenters = getGFBioDataCentersJSON();
-			std::vector<std::string> availableArchives;
-			for(Json::Value &dataCenter : dataCenters["archives"]) {
-				availableArchives.push_back(dataCenter.get("file", "").asString());
-			}
-
 			// parse relevant info, build mapping response
 			Json::Value jsonBaskets(Json::arrayValue);
-			for(auto portalBasket : jsonResponse) {
-				try {
-					Json::Value basket(Json::objectValue);
-					basket["query"] = portalBasket.get("queryKeyword", portalBasket["queryJSON"][0]["query"]["function_score"]["query"]["filtered"]["query"]["simple_query_string"]["query"]).asString();
-					basket["timestamp"] = portalBasket["lastModifiedDate"].asString(); //TODO parse and reformat
 
-					basket["results"] = Json::Value(Json::arrayValue);
-					for(auto result : portalBasket["basketContent"][0]["selected"]) {
-						Json::Value entry(Json::objectValue);
-						entry["title"] = result["title"];
-						entry["authors"] = result["authors"];
-						entry["dataCenter"] = result["dataCenter"];
-						std::string metadataLink = result["metadatalink"].asString();
-						entry["metadataLink"] = metadataLink;
-
-
-						// better way to determine dataCenter that's equally robust?
-						if(metadataLink.find("doi.pangaea.de/") != std::string::npos) {
-							// entry is from pangaea
-							entry["type"] = "pangaea";
-							entry["doi"] = metadataLink.substr(metadataLink.find("doi.pangaea.de/") + strlen("doi.pangaea.de/"));
-							entry["dataLink"] = result["datalink"];
-							entry["format"] = result["format"];
-
-							bool isTabSeparated = entry["format"].asString().find("text/tab-separated-values") != std::string::npos;
-
-
-							// check if parameters LATITUDE and LONGITUDE exist
-							bool isGeoReferenced = false;
-							if (isTabSeparated && result.isMember("parameter")) {
-								bool hasLatitude = false, hasLongitude = false;
-
-								auto parameters = result["parameter"];
-								for (Json::ValueIterator parameter = parameters.begin(); parameter != parameters.end(); ++parameter) {
-									std::string p = (*parameter).asString();
-
-									if (p == "LATITUDE" || p.find("Latitude") != std::string::npos)
-										hasLatitude = true;
-									else if (p == "LONGITUDE" || p.find("Longitude") != std::string::npos)
-										hasLongitude = true;
-								}
-
-								isGeoReferenced = hasLatitude && hasLongitude;
-							}
-
-							// TODO: handle geocodes
-
-							//resolve parameters
-							auto parameters = result["parameter"];
-							Json::Value entryParameters(Json::arrayValue);
-							for (Json::ValueIterator parameter = parameters.begin(); parameter != parameters.end(); ++parameter) {
-								Json::Value jsonParameter(Json::objectValue);
-
-								std::string parameterString = (*parameter).asString();
-								try {
-									PangaeaParameter pangaeaParameter = getPangaeaParameterByFullName(connection, parameterString);
-
-									jsonParameter["name"] = pangaeaParameter.fullName;
-									jsonParameter["unit"] = pangaeaParameter.unit;
-									jsonParameter["numeric"] = pangaeaParameter.unit != "";
-									entryParameters.append(jsonParameter);
-								} catch(const GFBioServiceException& e) {
-
-									// TODO handle geocodes
-									if (parameterString == "Latitude of event" || parameterString == "Longitude of event") {
-										jsonParameter["name"] = parameterString;
-										jsonParameter["unit"] = "";
-										jsonParameter["numeric"] = true;
-										entryParameters.append(jsonParameter);
-									}
-
-									fprintf(stderr, e.what());
-								}
-
-
-							}
-							entry["parameters"] = entryParameters;
-
-							entry["isTabSeparated"] = isTabSeparated;
-							entry["isGeoreferenced"] = isGeoReferenced;
-							entry["available"] = isTabSeparated && isGeoReferenced;
-
-						} else {
-							entry["type"] = "abcd";
-							if(result.isMember("parentIdentifier")) {
-								// Entry is a unit
-								entry["dataLink"] = result["parentIdentifier"];
-								entry["unitId"] = result["dcIdentifier"];
-							} else {
-								// Entry is a data set
-								entry["dataLink"] = result["datalink"];
-							}
-
-							entry["available"] = std::find(
-									availableArchives.begin(),
-									availableArchives.end(),
-									entry["dataLink"].asString())
-									!= availableArchives.end();
-						}
-
-						basket["results"].append(entry);
-					}
-					jsonBaskets.append(basket);
-				} catch(const std::exception& ) {
-					// ignore malformed baskets
-				}
+			std::vector<BasketAPI::Basket> baskets = BasketAPI::getBaskets(gfbioId);
+			for(BasketAPI::Basket &basket : baskets) {
+				jsonBaskets.append(basket.toJson());
 			}
 
 			Json::Value json(Json::objectValue);

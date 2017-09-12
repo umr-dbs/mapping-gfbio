@@ -7,6 +7,7 @@
 #include "util/csv_source_util.h"
 #include "util/timeparser.h"
 #include "util/csvparser.h"
+#include "util/pangaeaapi.h"
 
 
 #include <vector>
@@ -46,6 +47,7 @@ class PangaeaSourceOperator : public GenericOperator {
 
 #ifndef MAPPING_OPERATOR_STUBS
 		virtual std::unique_ptr<PointCollection> getPointCollection(const QueryRectangle &rect, const QueryTools &tools);
+		virtual std::unique_ptr<PolygonCollection> getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools);
 		virtual void getProvenance(ProvenanceCollection &pc);
 
 		void parseDataDescription(std::string& dataDescription);
@@ -56,7 +58,7 @@ class PangaeaSourceOperator : public GenericOperator {
 		virtual ~PangaeaSourceOperator(){};
 
 	private:
-		std::string dataLink;
+		std::string doi;
 		cURL curl;
 
 		std::vector<std::string> columns_textual;
@@ -75,8 +77,14 @@ class PangaeaSourceOperator : public GenericOperator {
 #ifndef MAPPING_OPERATOR_STUBS
 		void getStringFromServer(std::stringstream& data);
 
-		std::string mapParameterNameToColumnName(std::string fullName, std::vector<PangaeaSourceOperator::Parameter> parameters);
-		std::string mapNameToFullName(std::string shortName, std::vector<PangaeaSourceOperator::Parameter> parameters);
+		/**
+		 * check if lat/lon parameters exist
+		 * */
+		bool hasGeoReference(const std::vector<PangaeaAPI::Parameter> parameters);
+
+		std::string buildCSVHeader(const std::vector<PangaeaAPI::Parameter> parameters);
+
+		std::string extractCSV(std::stringstream &data, PangaeaAPI::MetaData &metaData);
 #endif
 };
 REGISTER_OPERATOR(PangaeaSourceOperator, "pangaea_source");
@@ -84,14 +92,14 @@ REGISTER_OPERATOR(PangaeaSourceOperator, "pangaea_source");
 
 PangaeaSourceOperator::PangaeaSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
-	dataLink = params.get("dataLink", "").asString();
+	doi = params.get("doi", "").asString();
 
 	csvUtil = make_unique<CSVSourceUtil>(params);
 }
 
 void PangaeaSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 	Json::Value params = csvUtil->getParameters();
-	params["dataLink"] = dataLink;
+	params["doi"] = doi;
 
 	Json::FastWriter writer;
 	stream << writer.write(params);
@@ -100,181 +108,90 @@ void PangaeaSourceOperator::writeSemanticParameters(std::ostringstream& stream) 
 
 #ifndef MAPPING_OPERATOR_STUBS
 
-void PangaeaSourceOperator::parseDataDescription(std::string& dataDescription) {
+bool PangaeaSourceOperator::hasGeoReference(const std::vector<PangaeaAPI::Parameter> parameters) {
+	bool hasLat = false;
+	bool hasLon = false;
 
-	std::regex regex(R"(Citation:\t([^:]+\(\d+\)): ([^\n]+)[.,;] doi:([PANGE0-9.\/]+)(?:.|\r|\n)*License:\t([^\n]+)\n)");
-
-	std::smatch sm;
-
-	if(std::regex_search (dataDescription, sm, regex)) {
-		citation = sm[1].str() + ": " + sm[2].str();
-		uri = "https://doi.pangaea.de/" + sm[3].str();
-		license = sm[4].str();
-	}
-}
-
-std::vector<PangaeaSourceOperator::Parameter> PangaeaSourceOperator::extractParameters(std::string dataDescription) {
-	std::vector<Parameter> parameters;
-
-	// extract parameters part of data description
-	std::regex extractParameters(R"(Parameter\(s\):((?:.|\r|\n)*)License:)");
-	std::smatch sm;
-
-	std::string parametersString;
-	if(std::regex_search (dataDescription, sm, extractParameters)) {
-		if(sm.size() > 0)
-			parametersString = sm[0].str();
-	} else {
-		return parameters;
-	}
-
-	// extract parameters
-	std::regex regex(R"(\t(([^\(\[]+)(\([^\)]+\))? (\[([^\]]+)])?) ?\(([^\)]+)\)(\n|( \*)))");
-
-	std::sregex_iterator iter(parametersString.begin(), parametersString.end(), regex);
-	std::sregex_iterator end;
-
-	for (; iter != end; ++iter) {
-		auto match = (*iter);
-		std::string fullName = match[1];
-		std::string name = match[2].str() + match[3].str();
-		std::string unit = match[5];
-		std::string shortName = match[6];
-
-		parameters.push_back(Parameter(fullName, name, unit, shortName));
-	}
-
-	return parameters;
-}
-
-
-std::string PangaeaSourceOperator::mapParameterNameToColumnName(std::string name, std::vector<PangaeaSourceOperator::Parameter> parameters) {
-	for(auto& parameter : parameters) {
-		if(parameter.name == name) {
-			std::string columnName = parameter.shortName;
-			if(parameter.unit != "")
-				columnName += " [" + parameter.unit + "]";
-			return columnName;
+	for(auto& parameter: parameters) {
+		if(parameter.name == "Latitude" || parameter.name == "LATITUDE") {
+			hasLat = true;
+		} else if (parameter.name == "Longitude" || parameter.name == "LONGITUDE") {
+			hasLon = true;
 		}
 	}
-	throw std::runtime_error("PangaeaSource: invalid parameter name " + name);
+
+	return hasLat && hasLon;
 }
 
-std::string PangaeaSourceOperator::mapNameToFullName(std::string shortName, std::vector<PangaeaSourceOperator::Parameter> parameters) {
-	for(auto& parameter : parameters) {
-		if(parameter.shortName == shortName)
-			return parameter.name;
+std::string PangaeaSourceOperator::buildCSVHeader(const std::vector<PangaeaAPI::Parameter> parameters) {
+	std::stringstream ss;
+
+	for(size_t i = 0; i < parameters.size(); ++i) {
+		if(i > 0) {
+			ss << csvUtil->field_separator;
+		}
+		ss << "\"" << parameters[i].name << "\"";
 	}
-	throw std::runtime_error("PangaeaSource: invalid parameter name " + shortName);
+
+	ss << "\n";
+
+	return ss.str();
+}
+
+std::string PangaeaSourceOperator::extractCSV(std::stringstream &data, PangaeaAPI::MetaData &metaData) {
+	// skip initial comment
+	std::string str = data.str();
+	size_t offset = str.find("*/\n") + 3;
+	// skip header column
+	// TODO handle \n in column headers
+	offset = str.find("\n", offset) + 1;
+
+	std::string dataString = buildCSVHeader(metaData.parameters);
+	dataString += data.str().substr(offset);
+
+	return dataString;
 }
 
 std::unique_ptr<PointCollection> PangaeaSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools){
-	std::stringstream data;
+	PangaeaAPI::MetaData metaData = PangaeaAPI::getMetaData(doi);
 
+	std::stringstream data;
 	getStringFromServer(data);
 
+	std::string dataString = extractCSV(data, metaData);
 
-	// skip initial comment
-	size_t offset = data.str().find("*/\n") + 3;
-	std::string dataString = data.str().substr(offset);
-
-	std::string dataDescription = data.str().substr(0, offset);
-
-	std::vector<Parameter> parameters = extractParameters(dataDescription);
-
-	// map parameters to the column name (short name + unit). FAIL: column name can also contain comment
-	std::stringstream headerStream(dataString);
-	CSVParser csvParser(headerStream, csvUtil->field_separator);
-	std::vector<std::string> csvColumns = csvParser.readHeaders();
-
-	std::map<std::string, std::string> columnNameToParameter;
-
-	std::vector<std::string> columns_numeric = csvUtil->columns_numeric;
-	std::vector<std::string> shortName_numeric;
-	std::vector<std::string> failed_numeric, failed_textual; // requested columns that couldn't be resolved an will be returned empty
-	for(auto& column : columns_numeric) {
-		try {
-			std::string columnName = mapParameterNameToColumnName(column, parameters);
-			if(std::find(csvColumns.begin(), csvColumns.end(), columnName) != csvColumns.end()) {
-				// mapped column name exists
-				shortName_numeric.push_back(columnName);
-				columnNameToParameter.emplace(columnName, column);
-			} else {
-				failed_numeric.push_back(column);
-			}
-		} catch (...) {
-			failed_numeric.push_back(column);
-		}
-	}
-	std::vector<std::string> columns_textual = csvUtil->columns_textual;
-	std::vector<std::string> shortName_textual;
-	for(auto& column : columns_textual) {
-		try {
-			std::string columnName = mapParameterNameToColumnName(column, parameters);
-			if(std::find(csvColumns.begin(), csvColumns.end(), columnName) != csvColumns.end()) {
-				// mapped column name exists
-				shortName_textual.push_back(columnName);
-				columnNameToParameter.emplace(columnName, column);
-			} else {
-				failed_textual.push_back(column);
-			}
-		} catch (...) {
-			failed_textual.push_back(column);
-		}
+	if(!hasGeoReference(metaData.parameters)) {
+		csvUtil->default_x = metaData.spatialCoverageWKT;
 	}
 
-	csvUtil->columns_numeric = shortName_numeric;
-	csvUtil->columns_textual = shortName_textual;
-
-	std::string column_x = csvUtil->column_x;
-	std::string column_y = csvUtil->column_y;
-
-	if(column_x != "")
-		csvUtil->column_x = mapParameterNameToColumnName(column_x, parameters);
-
-	if(column_y != "")
-		csvUtil->column_y = mapParameterNameToColumnName(column_y, parameters);
-
-	// parse the .tab file
 	std::istringstream iss(dataString);
 	auto points = csvUtil->getPointCollection(iss, rect);
-
-	AttributeArrays mapped_attributes;
-
-	// map column names back to parameters
-	for(size_t i = 0; i < csvUtil->columns_numeric.size(); ++i) {
-		std::string &column = csvUtil->columns_numeric[i];
-		std::string &parameter = columnNameToParameter[column];
-		auto &attribute = mapped_attributes.addNumericAttribute(parameter, points->feature_attributes.numeric(column).unit);
-		attribute = std::move(points->feature_attributes.numeric(column));
-	}
-	for(size_t i = 0; i < csvUtil->columns_textual.size(); ++i) {
-		std::string &column = csvUtil->columns_textual[i];
-		std::string &parameter = columnNameToParameter[column];
-		auto &attribute = mapped_attributes.addTextualAttribute(parameter, points->feature_attributes.textual(column).unit);
-		attribute = std::move(points->feature_attributes.textual(column));
-	}
-
-	points->feature_attributes = std::move(mapped_attributes);
-
-	// failed columns
-	for(std::string &column : failed_numeric) {
-		points->feature_attributes.addNumericAttribute(column, Unit::unknown());
-		points->feature_attributes.numeric(column).resize(points->getFeatureCount());
-	}
-	for(std::string &column : failed_textual) {
-		points->feature_attributes.addTextualAttribute(column, Unit::unknown());
-		points->feature_attributes.textual(column).resize(points->getFeatureCount());
-	}
-
-	// TODO name of geo columns...
 
 	return points;
 }
 
+std::unique_ptr<PolygonCollection> PangaeaSourceOperator::getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools){
+	PangaeaAPI::MetaData metaData = PangaeaAPI::getMetaData(doi);
+
+	std::stringstream data;
+	getStringFromServer(data);
+
+	std::string dataString = extractCSV(data, metaData);
+
+	if(!hasGeoReference(metaData.parameters)) {
+		csvUtil->default_x = metaData.spatialCoverageWKT;
+		fprintf(stderr, ">> %s", metaData.spatialCoverageWKT.c_str());
+	}
+
+	std::istringstream iss(dataString);
+	auto polygons = csvUtil->getPolygonCollection(iss, rect);
+
+	return polygons;
+}
+
 void PangaeaSourceOperator::getStringFromServer(std::stringstream& data) {
 	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
-	curl.setOpt(CURLOPT_URL, dataLink.c_str());
+	curl.setOpt(CURLOPT_URL, concat("https://doi.pangaea.de/", doi, "?format=textfile").c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
 
@@ -282,17 +199,19 @@ void PangaeaSourceOperator::getStringFromServer(std::stringstream& data) {
 }
 
 void PangaeaSourceOperator::getProvenance(ProvenanceCollection &pc) {
-	// TODO avoid loading ALL data again
 	std::stringstream data;
 
-	getStringFromServer(data);
+	Provenance provenance;
 
-	// skip initial comment
-	size_t offset = data.str().find("*/\n") + 2;
-	std::string dataDescription = data.str().substr(0, offset);
+	provenance.citation = PangaeaAPI::getCitation(doi);
 
-	parseDataDescription(dataDescription);
+	PangaeaAPI::MetaData metaData = PangaeaAPI::getMetaData(doi);
 
-	pc.add(Provenance(citation, license, uri, "data.pangaea_source"));
+	provenance.license = metaData.license;
+	provenance.uri = metaData.url;
+
+	provenance.local_identifier =  "data." + getType();
+
+	pc.add(provenance);
 }
 #endif

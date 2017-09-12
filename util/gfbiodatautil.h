@@ -16,6 +16,11 @@ public:
 	static size_t countGBIFResults(std::string &scientificName);
 
 	static size_t countIUCNResults(std::string &scientificName);
+
+	static std::vector<std::string> getAvailableABCDArchives();
+
+	static Json::Value getGFBioDataCentersJSON();
+
 };
 
 

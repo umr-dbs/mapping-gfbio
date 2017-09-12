@@ -5,6 +5,8 @@
 #include "gfbiodatautil.h"
 #include "util/configuration.h"
 
+#include <fstream>
+
 
 std::string GFBioDataUtil::resolveTaxa(pqxx::connection &connection, std::string &scientificName) {
 	connection.prepare("taxa", "SELECT DISTINCT taxon FROM gbif.gbif_taxon_to_name WHERE name ILIKE $1");
@@ -64,3 +66,36 @@ size_t GFBioDataUtil::countIUCNResults(std::string &scientificName) {
 
 	return result[0][0].as<size_t>();
 }
+
+/**
+ * read the GFBio data centers file and return as Json object
+ * TODO: manage data centers in a database and map them to a c++ class
+ * @return a json object containing the available data centers
+ */
+Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
+	auto path = Configuration::get("gfbio.abcd.datapath");
+
+	std::ifstream file(path + "gfbio_datacenters.json");
+	if (!file.is_open()) {
+		throw std::runtime_error("gfbio_datacenters.json missing");
+	}
+
+	Json::Reader reader(Json::Features::strictMode());
+	Json::Value root;
+	if (!reader.parse(file, root)) {
+		throw std::runtime_error("gfbio_datacenters.json invalid");
+	}
+
+	return root;
+}
+
+
+std::vector<std::string> GFBioDataUtil::getAvailableABCDArchives() {
+	Json::Value dataCenters = getGFBioDataCentersJSON();
+	std::vector<std::string> availableArchives;
+	for(Json::Value &dataCenter : dataCenters["archives"]) {
+		availableArchives.push_back(dataCenter.get("file", "").asString());
+	}
+	return availableArchives;
+}
+

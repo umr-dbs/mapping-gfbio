@@ -1,6 +1,6 @@
 {
 	"name" : "Pangaea",	
-	"query_result": "points",
+	"query_result": "polygons",
     "temporal_reference": {
         "type": "UNIX",
         "start": 0,
@@ -17,17 +17,16 @@
 	{
 		"params" : 
 		{
-			"doi" :"10.1594/PANGAEA.57721",
-			"geometry": "xy",
+			"doi" :"10.1594/PANGAEA.874146",
+			"geometry": "wkt",
 			"time": "none",
 			"separator" : "\t",
 			"columns": {
-				"x": "LATITUDE",
-				"y": "LONGITUDE",
-				"numeric": ["Ice extent"]
-			}
+				"numeric": ["Velocity, compressional wave"]
+			},
+			"on_error": "skip"
 		},
 		"type" : "pangaea_source"
 	},
-	"query_expected_hash" : "435ee1087abcfbd2057686364c3feba0380cddeb"
+	"query_expected_hash" : ""
 }

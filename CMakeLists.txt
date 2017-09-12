@@ -32,6 +32,8 @@ include(LinkLibrariesInternal)
 
 add_library(mapping_gfbio_base_lib OBJECT
         util/gfbiodatautil.cpp
+        util/pangaeaapi.cpp
+        portal/basketapi.cpp
         )
 target_include_directories(mapping_gfbio_base_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(mapping_gfbio_base_lib PRIVATE ${MAPPING_CORE_PATH})

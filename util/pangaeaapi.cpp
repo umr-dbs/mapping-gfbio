@@ -129,3 +129,12 @@ std::string PangaeaAPI::getCitation(const std::string &dataSetDOI) {
 
 	return data.str();
 }
+
+
+bool PangaeaAPI::Parameter::isLongitudeColumn() const {
+	return name == "LONGITUDE" || name.find("Longitude") == 0;
+}
+
+bool PangaeaAPI::Parameter::isLatitudeColumn() const {
+	return name == "LATITUDE" || name.find("Latitude") == 0;
+}

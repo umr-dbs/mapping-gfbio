@@ -113,9 +113,9 @@ bool PangaeaSourceOperator::hasGeoReference(const std::vector<PangaeaAPI::Parame
 	bool hasLon = false;
 
 	for(auto& parameter: parameters) {
-		if(parameter.name == "Latitude" || parameter.name == "LATITUDE") {
+		if(parameter.isLatitudeColumn()) {
 			hasLat = true;
-		} else if (parameter.name == "Longitude" || parameter.name == "LONGITUDE") {
+		} else if (parameter.isLongitudeColumn()) {
 			hasLon = true;
 		}
 	}

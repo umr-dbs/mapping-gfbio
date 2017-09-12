@@ -124,16 +124,15 @@ BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const Json::Value &json) : Bas
 	for (auto & parameter : metaData.parameters) {
 		std::string p = parameter.name;
 
-		if (p == "LATITUDE" || p.find("Latitude") != std::string::npos) {
+		if (parameter.isLatitudeColumn()) {
 			hasLatitude = true;
 			latitudeColumn = p;
-		}
-		else if (p == "LONGITUDE" || p.find("Longitude") != std::string::npos) {
+		} else if (parameter.isLongitudeColumn()) {
 			hasLongitude = true;
 			longitudeColumn = p;
+		} else {
+			parameters.push_back(Parameter(parameter.name, parameter.unit, parameter.numeric));
 		}
-
-		parameters.push_back(Parameter(parameter.name, parameter.unit, parameter.numeric));
 	}
 
 	isGeoReferenced = globalSpatialCoverage || (hasLatitude && hasLongitude);

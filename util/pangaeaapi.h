@@ -19,6 +19,9 @@ public:
 		std::string unit;
 		bool numeric;
 
+		bool isLongitudeColumn() const;
+		bool isLatitudeColumn() const;
+
 		Json::Value toJson();
 	};
 

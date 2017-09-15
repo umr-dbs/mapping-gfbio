@@ -46,11 +46,9 @@ public:
 
 		ResultType resultType;
 
-		virtual Json::Value toJson();
+		virtual Json::Value toJson() const;
 
-	private:
-		std::vector<Parameter> getParameters(const std::string &dataSetDOI);
-	};
+    };
 
 	class ABCDBasketEntry : public BasketEntry {
 	public:
@@ -58,7 +56,7 @@ public:
 
 		std::string unitId;
 
-		virtual Json::Value toJson();
+		virtual Json::Value toJson() const;
 	};
 
 	class PangaeaBasketEntry : public BasketEntry {
@@ -75,7 +73,7 @@ public:
 		std::string column_x;
 		std::string column_y;
 
-		virtual Json::Value toJson();
+		virtual Json::Value toJson() const;
 	};
 
 	class Basket {
@@ -87,20 +85,39 @@ public:
 
 		std::vector<std::unique_ptr<BasketEntry>> entries;
 
-		Json::Value toJson();
+		Json::Value toJson() const;
 	};
 
+    class BasketOverview {
+    public:
+        BasketOverview(const Json::Value &json);
+
+        std::string query;
+        std::string timestamp;
+        size_t basketId;
+
+        Json::Value toJson() const;
+    };
+
+	class BasketsOverview {
+	public:
+		BasketsOverview(const Json::Value &json);
+
+		size_t totalNumberOfBaskets;
+		std::vector<BasketOverview> baskets;
+
+		Json::Value toJson() const;
+	};
 
 	BasketAPI();
 	virtual ~BasketAPI();
 
-	static std::vector<Basket> getBaskets(const std::string &userId);
+	static BasketsOverview getBaskets(const std::string &userId, size_t offset = 0, size_t limit = 10);
+    static Basket getBasket(size_t basketId);
 
 	struct BasketAPIException
 			: public std::runtime_error { using std::runtime_error::runtime_error; };
 
-private:
-	static std::vector<Basket> parseBaskets(Json::Value json);
 };
 
 #endif /* PORTAL_BASKETAPI_H_ */

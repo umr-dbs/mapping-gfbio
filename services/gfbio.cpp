@@ -21,7 +21,13 @@
  * - request = login: login using gfbio portal token
  *   - parameters:
  *     - token
- * - request = baskets: get baskets from portal
+ * - request = baskets: get baskets (overview) from portal
+ *   - parameters:
+ *     - offset: the first basket to retrieve
+ *     - limit: the number of baskets to retrieve
+ * - request = basket: get a specific basket from portal
+ *   - parameters:
+ *     - id: the id of the basket
  * - request = abcd: get list of available abcd archives
  */
 class GFBioService : public HTTPService {
@@ -229,20 +235,27 @@ void GFBioService::run() {
 		gfbioId = gfbioId.substr(strlen(EXTERNAL_ID_PREFIX));
 
 		if (request == "baskets") {
-			// parse relevant info, build mapping response
+            size_t offset = params.getInt("offset", 0);
+            size_t limit = params.getInt("limit", 10);
+
 			Json::Value jsonBaskets(Json::arrayValue);
 
-			std::vector<BasketAPI::Basket> baskets = BasketAPI::getBaskets(gfbioId);
-			for(BasketAPI::Basket &basket : baskets) {
-				jsonBaskets.append(basket.toJson());
-			}
-
-			Json::Value json(Json::objectValue);
-			json["baskets"] = jsonBaskets;
+			BasketAPI::BasketsOverview baskets = BasketAPI::getBaskets(gfbioId, offset, limit);
+            Json::Value json = baskets.toJson();
 			response.sendSuccessJSON(json);
 
 			return;
 		}
+
+        if (request == "basket") {
+            size_t basketId = params.getLong("id");
+
+            const BasketAPI::Basket &basket = BasketAPI::getBasket(basketId);
+            Json::Value json = basket.toJson();
+            response.sendSuccessJSON(json);
+            return;
+        }
+
 		response.sendFailureJSON("GFBioService: Invalid request");
 	}
 	catch (const std::exception &e) {

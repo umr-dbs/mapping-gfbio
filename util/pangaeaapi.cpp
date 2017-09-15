@@ -44,19 +44,15 @@ Json::Value PangaeaAPI::getMetaDataFromPangaea(const std::string &dataSetDOI) {
 	try {
 		curl.perform();
 	} catch (const cURLException&) {
-		throw std::runtime_error("PangaeaAPI: could not retrieve metadata from pangaea");
+		throw std::runtime_error(concat("PangaeaAPI: could not retrieve metadata from pangaea doi ", dataSetDOI));
 	}
 
 	Json::Reader reader(Json::Features::strictMode());
 	Json::Value jsonResponse;
 	if (!reader.parse(data.str(), jsonResponse))
-		throw std::runtime_error("PangaeaAPI: could not parse metadata from pangaea");
+		throw std::runtime_error(concat("PangaeaAPI: could not parse metadata from pangaea dataset ", dataSetDOI));
 
 	return jsonResponse;
-}
-
-std::vector<PangaeaAPI::Parameter> PangaeaAPI::getParameters(const std::string &dataSetDOI) {
-	return parseParameters(getMetaDataFromPangaea(dataSetDOI));
 }
 
 void PangaeaAPI::MetaData::initSpatialCoverage(const Json::Value &json) {

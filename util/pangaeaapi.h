@@ -13,7 +13,7 @@ public:
 
 	class Parameter {
 	public:
-		Parameter(const Json::Value &json);
+		explicit Parameter(const Json::Value &json);
 
 		std::string name;
 		std::string unit;
@@ -28,7 +28,7 @@ public:
 
 	class MetaData {
 	public:
-		MetaData(const Json::Value &json);
+		explicit MetaData(const Json::Value &json);
 
 		enum class SpatialCoverageType {
 			NONE, BOX, POINT
@@ -43,11 +43,7 @@ public:
 
 		void initSpatialCoverage(const Json::Value &json);
 
-	private:
-		static std::string parseSpatialCoverage(const Json::Value &json);
 	};
-
-	static std::vector<Parameter> getParameters(const std::string &dataSetDOI);
 
 	static MetaData getMetaData(const std::string &dataSetDOI);
 

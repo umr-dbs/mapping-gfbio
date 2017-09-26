@@ -337,7 +337,7 @@ BasketAPI::Basket BasketAPI::getBasket(size_t basketId) {
     if (!reader.parse(data.str(), jsonResponse))
         throw BasketAPIException("BasketAPI: could not parse baskets from portal");
 
-    return Basket::Basket(jsonResponse, GFBioDataUtil::getAvailableABCDArchives());
+    return Basket(jsonResponse, GFBioDataUtil::getAvailableABCDArchives());
 }
 
 

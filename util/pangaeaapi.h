@@ -40,6 +40,12 @@ public:
 			NONE, BOX, POINT
 		};
 
+		std::string title;
+		std::vector<std::string> authors;
+        std::string dataLink;
+        std::string metaDataLink;
+        std::string format;
+
 		std::vector<Parameter> parameters;
 		std::string spatialCoverageWKT;
 		SpatialCoverageType spatialCoverageType;
@@ -49,16 +55,18 @@ public:
 
 		void initSpatialCoverage(const Json::Value &json);
 
-	};
+        void parseFormat(const Json::Value &json);
+    };
 
 	static MetaData getMetaData(const std::string &dataSetDOI);
 
 	static std::string getCitation(const std::string &dataSetDOI);
 
-private:
-	static Json::Value getMetaDataFromPangaea(const std::string &dataSetDOI);
+    static Json::Value getMetaDataFromPangaea(const std::string &dataSetDOI);
 
-	static std::vector<Parameter> parseParameters(const Json::Value &json);
+private:
+
+    static std::vector<Parameter> parseParameters(const Json::Value &json);
 
 
 };

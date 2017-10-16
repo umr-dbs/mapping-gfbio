@@ -12,7 +12,7 @@ public:
 
 	class Parameter {
 	public:
-		Parameter(const Json::Value &json);
+        explicit Parameter(const Json::Value &json);
 		Parameter(const std::string &name, const std::string& unit, bool numeric);
 
 		std::string name;
@@ -26,9 +26,11 @@ public:
 	public:
 		static std::unique_ptr<BasketAPI::BasketEntry> fromJson(const Json::Value &json, const std::vector<std::string> &availableArchives);
 
-		BasketEntry(const Json::Value &json);
+        explicit BasketEntry(const Json::Value &json);
 
-		enum class ResultType {
+        BasketEntry();
+
+        enum class ResultType {
 			NONE, POINTS, LINES, POLYGONS, RASTER
 		};
 
@@ -56,14 +58,14 @@ public:
 
 		std::string unitId;
 
-		virtual Json::Value toJson() const;
+        Json::Value toJson() const override;
 	};
 
 	class PangaeaBasketEntry : public BasketEntry {
 	public:
-		PangaeaBasketEntry(const Json::Value &json);
+        explicit PangaeaBasketEntry(const std::string &doi);
 
-		std::string doi;
+        std::string doi;
 		std::string format;
 
 		bool isTabSeparated;
@@ -73,8 +75,8 @@ public:
 		std::string column_x;
 		std::string column_y;
 
-		virtual Json::Value toJson() const;
-	};
+        Json::Value toJson() const override;
+    };
 
 	class Basket {
 	public:
@@ -90,7 +92,7 @@ public:
 
     class BasketOverview {
     public:
-        BasketOverview(const Json::Value &json);
+        explicit BasketOverview(const Json::Value &json);
 
         std::string query;
         std::string timestamp;
@@ -101,7 +103,7 @@ public:
 
 	class BasketsOverview {
 	public:
-		BasketsOverview(const Json::Value &json);
+        explicit BasketsOverview(const Json::Value &json);
 
 		size_t totalNumberOfBaskets;
 		std::vector<BasketOverview> baskets;

@@ -31,7 +31,12 @@ std::unique_ptr<BasketAPI::BasketEntry> BasketAPI::BasketEntry::fromJson(const J
 	std::string metadataLink = json.get("metadatalink", "").asString();
 
 	if(metadataLink.find("doi.pangaea.de/") != std::string::npos) {
-		return make_unique<BasketAPI::PangaeaBasketEntry>(json);
+        std::string doi = metadataLink.substr(metadataLink.find("doi.pangaea.de/") + std::strlen("doi.pangaea.de/"));
+        if(doi.empty()) {
+            throw ArgumentException("Pangaea dataset has no DOI");
+        }
+
+		return make_unique<BasketAPI::PangaeaBasketEntry>(doi);
 	} else {
 		return make_unique<BasketAPI::ABCDBasketEntry>(json, availableArchives);
 	}
@@ -90,29 +95,36 @@ Json::Value BasketAPI::BasketEntry::toJson() const {
 	return json;
 }
 
+BasketAPI::BasketEntry::BasketEntry() = default;
 
-BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const Json::Value &json) : BasketAPI::BasketEntry(json) {
-	doi = metadataLink.substr(metadataLink.find("doi.pangaea.de/") + std::strlen("doi.pangaea.de/"));
-    if(doi.empty()) {
-        throw ArgumentException("Pangaea dataset has no DOI");
-    }
+BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const std::string &doi) {
+    PangaeaAPI::MetaData metaData = PangaeaAPI::getMetaData(doi);
+    this->doi = doi;
 
-	dataLink = json.get("datalink", "").asString();
-	format = json.get("format", "").asString();
+    this->authors = metaData.authors;
 
-	isTabSeparated = format.find("text/tab-separated-values") != std::string::npos;
+    this->title = metaData.title;
+    this->dataCenter = "PANGAEA: Data Publisher for Earth & Environmental Science";
+    this->dataLink = metaData.dataLink;
+    this->metadataLink = metaData.metaDataLink;
 
-	PangaeaAPI::MetaData metaData = PangaeaAPI::getMetaData(doi);
+    this->available = false;
 
-	// check if parameters LATITUDE and LONGITUDE exist
-	bool globalSpatialCoverage = metaData.spatialCoverageType != PangaeaAPI::MetaData::SpatialCoverageType::NONE;
-	bool isBox = metaData.spatialCoverageType == PangaeaAPI::MetaData::SpatialCoverageType::BOX;
 
-	bool hasLatitude = false, hasLongitude = false;
+    this->dataLink = metaData.dataLink;
+    this->format = metaData.format;
 
-	std::string longitudeColumn;
-	std::string latitudeColumn;
-	for (auto & parameter : metaData.parameters) {
+    this->isTabSeparated = this->format.find("text/tab-separated-values") != std::string::npos;
+
+    // check if parameters LATITUDE and LONGITUDE exist
+    bool globalSpatialCoverage = metaData.spatialCoverageType != PangaeaAPI::MetaData::SpatialCoverageType::NONE;
+    bool isBox = metaData.spatialCoverageType == PangaeaAPI::MetaData::SpatialCoverageType::BOX;
+
+    bool hasLatitude = false, hasLongitude = false;
+
+    std::string longitudeColumn;
+    std::string latitudeColumn;
+    for (auto & parameter : metaData.parameters) {
 		std::string p = parameter.name;
 
 		if (parameter.isLatitudeColumn()) {
@@ -122,33 +134,33 @@ BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const Json::Value &json) : Bas
 			hasLongitude = true;
 			longitudeColumn = p;
 		} else {
-			parameters.emplace_back(parameter.name, parameter.unit, parameter.numeric);
+			this->parameters.emplace_back(parameter.name, parameter.unit, parameter.numeric);
 		}
 	}
 
-	isGeoReferenced = globalSpatialCoverage || (hasLatitude && hasLongitude);
+    this->isGeoReferenced = globalSpatialCoverage || (hasLatitude && hasLongitude);
 
-	if(isGeoReferenced) {
+    if(this->isGeoReferenced) {
 		if(hasLatitude && hasLongitude) {
-			geometrySpecification = GeometrySpecification::XY;
-			column_x = longitudeColumn;
-			column_y = latitudeColumn;
-			resultType = ResultType::POINTS;
+			this->geometrySpecification = GeometrySpecification::XY;
+			this->column_x = longitudeColumn;
+			this->column_y = latitudeColumn;
+			this->resultType = BasketAPI::BasketEntry::ResultType::POINTS;
 		} else {
-			geometrySpecification = GeometrySpecification::WKT;
+			this->geometrySpecification = GeometrySpecification::WKT;
 
 			if(isBox) {
-				resultType = ResultType::POLYGONS;
+				this->resultType = BasketAPI::BasketEntry::ResultType::POLYGONS;
 			} else {
-				resultType = ResultType::POINTS;
+				this->resultType = BasketAPI::BasketEntry::ResultType::POINTS;
 			}
 
 		}
 	} else {
-		geometrySpecification = GeometrySpecification::NONE;
+		this->geometrySpecification = GeometrySpecification::NONE;
 	}
 
-	available = isTabSeparated && isGeoReferenced;
+    this->available = this->isTabSeparated && this->isGeoReferenced;
 }
 
 
@@ -219,7 +231,7 @@ BasketAPI::Basket::Basket(const Json::Value &json, const std::vector<std::string
     std::vector<std::future<std::unique_ptr<BasketEntry>>> futures;
     for(auto &basket : json["basketContent"]["selected"]) {
         futures.push_back(std::async(std::launch::async, [basket, availableArchives](){
-            return BasketEntry::fromJson(basket, availableArchives);
+           return BasketEntry::fromJson(basket, availableArchives);
         })
         );
     }

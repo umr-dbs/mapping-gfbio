@@ -13,6 +13,7 @@
 #include <json/json.h>
 #include <algorithm>
 #include <pqxx/pqxx>
+#include <util/pangaeaapi.h>
 
 /*
  * This class provides methods for GFBio users
@@ -223,6 +224,17 @@ void GFBioService::run() {
 			response.sendSuccessJSON(dataCenters);
 			return;
 		}
+
+        if(request == "pangaeaDataSet") {
+            std::string doi = params.get("doi");
+
+            BasketAPI::PangaeaBasketEntry pangaeaBasket(doi);
+
+            Json::Value json = pangaeaBasket.toJson();
+            response.sendSuccessJSON(json);
+
+			return;
+        }
 
 
 		//protected methods

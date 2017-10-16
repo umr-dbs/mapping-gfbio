@@ -13,9 +13,9 @@ public:
 
 	class Parameter {
 	public:
-		explicit Parameter(const Json::Value &json);
+        Parameter(const Json::Value &json, const std::vector<Parameter> &parameters);
 
-		std::string name;
+        std::string name;
 		std::string unit;
 		bool numeric;
 
@@ -23,6 +23,12 @@ public:
 		bool isLatitudeColumn() const;
 
 		Json::Value toJson();
+
+		/**
+		 * resolve name collisions with existing parameters
+		 * @param parameters
+		 */
+		void handleNameCollision(const std::vector<Parameter> &parameters);
 	};
 
 

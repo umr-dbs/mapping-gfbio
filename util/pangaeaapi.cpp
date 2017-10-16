@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "pangaeaapi.h"
 
 #include "util/concat.h"
@@ -6,14 +7,37 @@
 #include "util/configuration.h"
 #include "util/exceptions.h"
 
-PangaeaAPI::Parameter::Parameter(const Json::Value &json) {
+PangaeaAPI::Parameter::Parameter(const Json::Value &json, const std::vector<Parameter> &parameters) {
 	name = json.get("name", "").asString();
 	if(json.isMember("description")) {
-		// todo: numerate the parameters instead?
 		name += " " + json.get("description", "").asString();
 	}
+
+	handleNameCollision(parameters);
+
 	unit = json.get("unitText", "").asString();
 	numeric = unit != "";
+}
+
+void PangaeaAPI::Parameter::handleNameCollision(const std::vector<PangaeaAPI::Parameter> &parameters) {
+	std::string originalName = this->name;
+	size_t counter = 1;
+	bool collision;
+	do {
+		std::vector::const_iterator it = find_if(parameters.begin(), parameters.end(),
+												 [](const PangaeaAPI::Parameter & p) -> bool { return p.name ==
+																									  this->name;});
+
+		collision = it != parameters.end();
+		if(collision) {
+			this->name = concat(originalName, counter++);
+		}
+
+	} while (collision && counter < 1000);
+
+	if(collision) {
+		throw MustNotHappenException("Pangaea Parameter name collision could not be resolved");
+	}
 }
 
 Json::Value PangaeaAPI::Parameter::toJson() {
@@ -27,7 +51,7 @@ Json::Value PangaeaAPI::Parameter::toJson() {
 std::vector<PangaeaAPI::Parameter> PangaeaAPI::parseParameters(const Json::Value &json) {
 	std::vector<PangaeaAPI::Parameter> parameters;
 	for(auto &parameter: json.get("variableMeasured", Json::Value(Json::arrayValue))) {
-		parameters.emplace_back(parameter);
+		parameters.emplace_back(parameter, parameters);
 	}
 	return parameters;
 }

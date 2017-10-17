@@ -101,8 +101,7 @@ void PangaeaSourceOperator::writeSemanticParameters(std::ostringstream& stream) 
 	Json::Value params = csvUtil->getParameters();
 	params["doi"] = doi;
 
-	Json::FastWriter writer;
-	stream << writer.write(params);
+	stream << params;
 }
 
 
@@ -199,8 +198,6 @@ void PangaeaSourceOperator::getStringFromServer(std::stringstream& data) {
 }
 
 void PangaeaSourceOperator::getProvenance(ProvenanceCollection &pc) {
-	std::stringstream data;
-
 	Provenance provenance;
 
 	provenance.citation = PangaeaAPI::getCitation(doi);

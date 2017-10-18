@@ -208,7 +208,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 
 	for (pugi::xml_node unit = units.child(prefix("Unit").c_str()); unit; unit = unit.next_sibling(prefix("Unit").c_str())) {
 		if(filterUnitsById) {
-			std::string guid = unit.child(prefix("GUID").c_str()).text().get();
+			std::string guid = unit.child(prefix("UnitID").c_str()).text().get();
 
 			if(unitIds.count(guid) == 0) {
 				continue;

@@ -24,7 +24,7 @@
  *
  * Parameters:
  * - archive: the path of the ABCD file
- * - units: an array with unit ddentifiers that specifies the units that are returned (optional)
+ * - units: an array with unit identifiers that specifies the units that are returned (optional)
  * - columns:
  * 		- numeric: array of column names of numeric type, XML path relative to DataSets/DataSet/Units/Unit
  * 		- textual: array of column names of textual type, XML path relative to DataSets/DataSet/Units/Unit
@@ -45,7 +45,7 @@ class ABCDSourceOperator : public GenericOperator {
 		std::string inputFile;
 
 		bool filterUnitsById = false;
-		std::unordered_set<std::string> units;
+		std::unordered_set<std::string> unitIds;
 
 #ifndef MAPPING_OPERATOR_STUBS
 		std::string abcdPrefix;
@@ -87,7 +87,7 @@ ABCDSourceOperator::ABCDSourceOperator(int sourcecounts[], GenericOperator *sour
 	if (params.isMember("units") && params["units"].size() > 0) {
 		filterUnitsById = true;
 		for (Json::Value &unit : params["units"]) {
-			units.emplace(unit.asString());
+			unitIds.emplace(unit.asString());
 		}
 	}
 
@@ -116,7 +116,7 @@ void ABCDSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 	// TODO: sort values to avoid unnecessary cache misses
 
 	Json::Value jsonUnits(Json::arrayValue);
-	for(auto &unit : units)
+	for(auto &unit : unitIds)
 		jsonUnits.append(unit);
 	json["units"] = jsonUnits;
 
@@ -207,6 +207,14 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 	pugi::xml_node units = dataSet.child(prefix("Units").c_str());
 
 	for (pugi::xml_node unit = units.child(prefix("Unit").c_str()); unit; unit = unit.next_sibling(prefix("Unit").c_str())) {
+		if(filterUnitsById) {
+			std::string guid = unit.child(prefix("GUID").c_str()).text().get();
+
+			if(unitIds.count(guid) == 0) {
+				continue;
+			}
+		}
+
 		// coordinates
 		auto gathering = unit.child(prefix("Gathering").c_str());
 		auto coordinates = gathering.child(prefix("SiteCoordinateSets").c_str()).child(prefix("SiteCoordinates").c_str()).child(prefix("CoordinatesLatLong").c_str());

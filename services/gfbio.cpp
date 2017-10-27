@@ -263,6 +263,11 @@ void GFBioService::run() {
             size_t basketId = params.getLong("id");
 
             const BasketAPI::Basket &basket = BasketAPI::getBasket(basketId);
+
+            if (concat(basket.userId) != gfbioId) {
+                throw GFBioServiceException("Access denied for basket");
+            }
+
             Json::Value json = basket.toJson();
             response.sendSuccessJSON(json);
             return;

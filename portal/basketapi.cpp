@@ -227,6 +227,7 @@ BasketAPI::Basket::Basket(const Json::Value &json, const std::vector<std::string
 
 	query = json.get("queryKeyword", json["queryJSON"]["query"]["function_score"]["query"]["filtered"]["query"]["simple_query_string"]["query"]).asString();
 	timestamp = json.get("lastModifiedDate", "").asString(); //TODO parse and reformat
+    userId = json.get("userID", -1).asInt64();
 
     std::vector<std::future<std::unique_ptr<BasketEntry>>> futures;
     for(auto &basket : json["basketContent"]["selected"]) {

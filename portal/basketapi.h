@@ -84,6 +84,7 @@ public:
 
 		std::string query;
 		std::string timestamp;
+        long userId;
 
 		std::vector<std::unique_ptr<BasketEntry>> entries;
 

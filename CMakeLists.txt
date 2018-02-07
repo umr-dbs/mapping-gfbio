@@ -30,33 +30,10 @@ get_directory_property(is_mapping_module PARENT_DIRECTORY)
 # Libraries
 include(LinkLibrariesInternal)
 
-add_library(mapping_gfbio_base_lib OBJECT
-        util/gfbiodatautil.cpp
-        util/pangaeaapi.cpp
-        portal/basketapi.cpp
-        )
-target_include_directories(mapping_gfbio_base_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(mapping_gfbio_base_lib PRIVATE ${MAPPING_CORE_PATH})
-
-add_library(mapping_gfbio_operators_lib OBJECT
-        operators/abcd_source.cpp
-        operators/gfbio_source.cpp
-        operators/pangaea_source.cpp
-        )
-target_include_directories(mapping_gfbio_operators_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(mapping_gfbio_operators_lib PRIVATE ${MAPPING_CORE_PATH})
-
-add_library(mapping_gfbio_services_lib OBJECT
-        services/gfbio.cpp
-        )
-target_include_directories(mapping_gfbio_services_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_include_directories(mapping_gfbio_services_lib PRIVATE ${MAPPING_CORE_PATH})
-
 # Dependencies
 include(DownloadProject)
 
 find_package(PugiXML REQUIRED)
-target_include_directories(mapping_gfbio_operators_lib PRIVATE "${PUGIXML_INCLUDE_DIR}")
 
 
 if (NOT is_mapping_module)
@@ -67,10 +44,6 @@ if (NOT is_mapping_module)
             )
     add_subdirectory(${jsoncpp_SOURCE_DIR} ${jsoncpp_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif (NOT is_mapping_module)
-target_include_directories(mapping_gfbio_base_lib PRIVATE ${jsoncpp_SOURCE_DIR}/include)
-target_include_directories(mapping_gfbio_operators_lib PRIVATE ${jsoncpp_SOURCE_DIR}/include)
-target_include_directories(mapping_gfbio_services_lib PRIVATE ${jsoncpp_SOURCE_DIR}/include)
-
 
 # Add libraries for inlcuding them in the core build process
 if (is_mapping_module)
@@ -81,3 +54,5 @@ if (is_mapping_module)
 
     set(MAPPING_ADD_TO_SERVICES_OBJECTS ${MAPPING_ADD_TO_OPERATORS_SOURCES} mapping_gfbio_services_lib PARENT_SCOPE)
 endif (is_mapping_module)
+
+add_subdirectory(src)

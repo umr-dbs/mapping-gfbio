@@ -41,7 +41,7 @@ std::string GFBioDataUtil::resolveTaxaNames(pqxx::connection &connection, std::s
 }
 
 size_t GFBioDataUtil::countGBIFResults(std::string &scientificName) {
-	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
+	pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
 	std::string taxa = resolveTaxa(connection, scientificName);
 
@@ -55,7 +55,7 @@ size_t GFBioDataUtil::countGBIFResults(std::string &scientificName) {
 }
 
 size_t GFBioDataUtil::countIUCNResults(std::string &scientificName) {
-	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
+	pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
 	std::string taxa = resolveTaxaNames(connection, scientificName);
 	connection.prepare("occurrences", "SELECT count(*) FROM iucn.expert_ranges_all WHERE lower(binomial) = ANY($1)");
@@ -73,7 +73,7 @@ size_t GFBioDataUtil::countIUCNResults(std::string &scientificName) {
  * @return a json object containing the available data centers
  */
 Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
-	auto path = Configuration::get("gfbio.abcd.datapath");
+	auto path = Configuration::get<std::string>("gfbio.abcd.datapath");
 
 	std::ifstream file(path + "gfbio_datacenters.json");
 	if (!file.is_open()) {

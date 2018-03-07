@@ -189,7 +189,7 @@ std::unique_ptr<PolygonCollection> PangaeaSourceOperator::getPolygonCollection(c
 }
 
 void PangaeaSourceOperator::getStringFromServer(std::stringstream& data) {
-	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+	curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
 	curl.setOpt(CURLOPT_URL, concat("https://doi.pangaea.de/", doi, "?format=textfile").c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);

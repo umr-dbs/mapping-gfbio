@@ -60,7 +60,7 @@ Json::Value PangaeaAPI::getMetaDataFromPangaea(const std::string &dataSetDOI) {
 	// get parameters from pangae
 	std::stringstream data;
 	cURL curl;
-	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+	curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
 	curl.setOpt(CURLOPT_URL, concat("https://doi.pangaea.de/", dataSetDOI, "?format=metadata_jsonld").c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
@@ -174,7 +174,7 @@ std::string PangaeaAPI::getCitation(const std::string &dataSetDOI) {
 	// get parameters from pangaea
 	std::stringstream data;
 	cURL curl;
-	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+	curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
 	curl.setOpt(CURLOPT_URL, concat("https://doi.pangaea.de/", dataSetDOI, "?format=citation_text").c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);

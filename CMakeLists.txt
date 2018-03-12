@@ -43,16 +43,13 @@ if (NOT is_mapping_module)
             UPDATE_DISCONNECTED 1
             )
     add_subdirectory(${jsoncpp_SOURCE_DIR} ${jsoncpp_BINARY_DIR} EXCLUDE_FROM_ALL)
+    download_project(PROJ       cpptoml
+            GIT_REPOSITORY      https://github.com/skystrife/cpptoml.git
+            GIT_TAG             master
+            UPDATE_DISCONNECTED 1
+            PREFIX CMakeFiles/Download
+            )
+    add_subdirectory(${cpptoml_SOURCE_DIR} ${cpptoml_BINARY_DIR} EXCLUDE_FROM_ALL)
 endif (NOT is_mapping_module)
-
-# Add libraries for inlcuding them in the core build process
-if (is_mapping_module)
-    set(MAPPING_ADD_TO_BASE_OBJECTS ${MAPPING_ADD_TO_BASE_OBJECTS} mapping_gfbio_base_lib PARENT_SCOPE)
-
-    set(MAPPING_ADD_TO_OPERATORS_OBJECTS ${MAPPING_ADD_TO_OPERATORS_OBJECTS} mapping_gfbio_operators_lib PARENT_SCOPE)
-    set(MAPPING_ADD_TO_OPERATORS_LIBRARIES ${MAPPING_ADD_TO_OPERATORS_LIBRARIES} ${PUGIXML_LIBRARIES} PARENT_SCOPE)
-
-    set(MAPPING_ADD_TO_SERVICES_OBJECTS ${MAPPING_ADD_TO_OPERATORS_SOURCES} mapping_gfbio_services_lib PARENT_SCOPE)
-endif (is_mapping_module)
 
 add_subdirectory(src)

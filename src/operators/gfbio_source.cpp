@@ -113,7 +113,7 @@ void GFBioSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 
 void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	if(dataSource == "GBIF") {
-		pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
+		pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
 		std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
 
@@ -135,7 +135,7 @@ void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
 std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	//connect
 	//TODO: reuse
-	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
+	pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
 	std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
 
@@ -226,7 +226,7 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
 std::unique_ptr<PolygonCollection> GFBioSourceOperator::getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools) {
 	//connect
 	//TODO: reuse
-	pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
+	pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
 	std::string taxa = GFBioDataUtil::resolveTaxaNames(connection, scientificName);
 

@@ -59,10 +59,10 @@ REGISTER_HTTP_SERVICE(GFBioService, "gfbio");
 size_t GFBioService::authenticateWithPortal(const std::string &token) {
 	std::stringstream data;
 	cURL curl;
-	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+	curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
 	curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get("gfbio.portal.user"), ":", Configuration::get("gfbio.portal.password")).c_str());
-	curl.setOpt(CURLOPT_URL, (Configuration::get("gfbio.portal.authenticateurl") + "/token/" + token).c_str());
+	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get<std::string>("gfbio.portal.user"), ":", Configuration::get<std::string>("gfbio.portal.password")).c_str());
+	curl.setOpt(CURLOPT_URL, (Configuration::get<std::string>("gfbio.portal.authenticateurl") + "/token/" + token).c_str());
 
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_POST, 1);
@@ -102,10 +102,10 @@ size_t GFBioService::authenticateWithPortal(const std::string &token) {
 Json::Value GFBioService::getUserDetailsFromPortal(const size_t userId) {
 	std::stringstream data;
 	cURL curl;
-	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+	curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
 	curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get("gfbio.portal.user"), ":", Configuration::get("gfbio.portal.password")).c_str());
-	curl.setOpt(CURLOPT_URL, (concat(Configuration::get("gfbio.portal.userdetailswebserviceurl"), "?userId=", userId)).c_str());
+	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get<std::string>("gfbio.portal.user"), ":", Configuration::get<std::string>("gfbio.portal.password")).c_str());
+	curl.setOpt(CURLOPT_URL, (concat(Configuration::get<std::string>("gfbio.portal.userdetailswebserviceurl"), "?userId=", userId)).c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
 
@@ -172,7 +172,7 @@ void GFBioService::run() {
 				return;
 			}
 
-			pqxx::connection connection (Configuration::get("operators.gfbiosource.dbcredentials"));
+			pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
 			connection.prepare("searchSpecies", "SELECT DISTINCT name FROM gbif.gbif_taxon_to_name WHERE lower(name) like lower($1) ORDER BY name ASC");
 			pqxx::work work(connection);

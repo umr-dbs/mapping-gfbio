@@ -304,11 +304,11 @@ BasketAPI::BasketsOverview BasketAPI::getBaskets(const std::string &userId, size
 	// get baskets from portal
 	std::stringstream data;
 	cURL curl;
-	curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+	curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
 	curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get("gfbio.portal.user"), ":", Configuration::get("gfbio.portal.password")).c_str());
+	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get<std::string>("gfbio.portal.user"), ":", Configuration::get<std::string>("gfbio.portal.password")).c_str());
     curl.setOpt(CURLOPT_URL,
-                concat(Configuration::get("gfbio.portal.basketsbyuseridwebserviceurl"), "?userId=", userId, "&isMinimal=true&from=", offset + 1,
+                concat(Configuration::get<std::string>("gfbio.portal.basketsbyuseridwebserviceurl"), "?userId=", userId, "&isMinimal=true&from=", offset + 1,
                        "&count=", limit).c_str());
 	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
 	curl.setOpt(CURLOPT_WRITEDATA, &data);
@@ -331,11 +331,11 @@ BasketAPI::Basket BasketAPI::getBasket(size_t basketId) {
     // get basket from portal
     std::stringstream data;
     cURL curl;
-    curl.setOpt(CURLOPT_PROXY, Configuration::get("proxy", "").c_str());
+    curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
     curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-    curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get("gfbio.portal.user"), ":", Configuration::get("gfbio.portal.password")).c_str());
+    curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get<std::string>("gfbio.portal.user"), ":", Configuration::get<std::string>("gfbio.portal.password")).c_str());
     curl.setOpt(CURLOPT_URL,
-                concat(Configuration::get("gfbio.portal.basketbyidwebserviceurl"), "?basketId=", basketId, "&isMinimal=false").c_str());
+                concat(Configuration::get<std::string>("gfbio.portal.basketbyidwebserviceurl"), "?basketId=", basketId, "&isMinimal=false").c_str());
     curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
     curl.setOpt(CURLOPT_WRITEDATA, &data);
 

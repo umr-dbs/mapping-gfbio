@@ -143,7 +143,7 @@ void ABCDSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 std::unique_ptr<PointCollection> ABCDSourceOperator::createFeatureCollectionWithAttributes(const QueryRectangle &rect) {
 	auto points = make_unique<PointCollection>(rect);
 
-	auto unit_textual_attributes = split(Configuration::get("gfbio.abcd.textualattributes", ""), ' ');
+	auto unit_textual_attributes = split(Configuration::get<std::string>("gfbio.abcd.textualattributes", ""), ' ');
 
 	for(auto& attribute : numeric_attributes) {
 		points->feature_attributes.addNumericAttribute(attribute, Unit::unknown());
@@ -186,7 +186,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 
 	pugi::xml_document doc;
 
-	std::string filePath = Configuration::get("gfbio.abcd.datapath") + "/" +inputFile;
+	std::string filePath = Configuration::get<std::string>("gfbio.abcd.datapath") + "/" +inputFile;
 	pugi::xml_parse_result result = doc.load_file(filePath.c_str());
 
 	if(!result) {
@@ -251,7 +251,7 @@ std::unique_ptr<PointCollection> ABCDSourceOperator::getPointCollection(const Qu
 void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	pugi::xml_document doc;
 
-	std::string filePath = Configuration::get("gfbio.abcd.datapath") + "/" +inputFile;
+	std::string filePath = Configuration::get<std::string>("gfbio.abcd.datapath") + "/" +inputFile;
 	pugi::xml_parse_result result = doc.load_file(filePath.c_str());
 
 	if(!result) {

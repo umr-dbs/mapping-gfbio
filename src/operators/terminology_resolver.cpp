@@ -74,7 +74,7 @@ TerminologyResolver::getPointCollection(const QueryRectangle &rect, const QueryT
     auto &old_attribute_array = points->feature_attributes.textual(column);
     //create new textual column and fill it with resolved labels from the Terminology class
     auto &new_vector = points->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::requestLabels(old_attribute_array.array, new_vector.array, terminology, on_not_resolvable);
+    Terminology::request_labels(old_attribute_array.array, new_vector.array, terminology, on_not_resolvable);
 
     return points;
 }
@@ -87,7 +87,7 @@ TerminologyResolver::getLineCollection(const QueryRectangle &rect, const QueryTo
     auto &old_attribute_array = lines->feature_attributes.textual(column);
     //create new textual column and fill it with resolved labels from the Terminology class
     auto &new_vector = lines->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::requestLabels(old_attribute_array.array, new_vector.array, terminology, on_not_resolvable);
+    Terminology::request_labels(old_attribute_array.array, new_vector.array, terminology, on_not_resolvable);
 
     return lines;
 }
@@ -99,7 +99,7 @@ TerminologyResolver::getPolygonCollection(const QueryRectangle &rect, const Quer
     auto &old_attribute_array = polygons->feature_attributes.textual(column);
     //create new textual column and fill it with resolved labels from the Terminology class
     auto &new_vector = polygons->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::requestLabels(old_attribute_array.array, new_vector.array, terminology, on_not_resolvable);
+    Terminology::request_labels(old_attribute_array.array, new_vector.array, terminology, on_not_resolvable);
 
     return polygons;
 }

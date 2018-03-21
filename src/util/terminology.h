@@ -17,24 +17,39 @@ enum HandleNotResolvable {
 
 class Terminology {
     public:
-        static std::string requestLabel(const std::string &name, const std::string &terminology, const HandleNotResolvable onNotResolvable);
+        static std::string request_label(const std::string &name, const std::string &terminology,
+                                         const HandleNotResolvable onNotResolvable);
 
-        static void requestLabels(const std::vector<std::string> &names_in,
-                                  std::vector<std::string> &names_out, const std::string &terminology,
-                                  const HandleNotResolvable on_not_resolvable);
+        static void request_labels(const std::vector<std::string> &names_in,
+                                   std::vector<std::string> &names_out,
+                                   const std::string &terminology,
+                                   const HandleNotResolvable on_not_resolvable);
 
         static void requestLabelsAllConcurrent(const std::vector<std::string> &names_in,
-                                               std::vector<std::string> &names_out, const std::string &terminology,
+                                               std::vector<std::string> &names_out,
+                                               const std::string &terminology,
                                                const HandleNotResolvable on_not_resolvable);
+
         static void requestLabelsBatch(const std::vector<std::string> &names_in,
-                                       std::vector<std::string> &names_out, const std::string &terminology,
+                                       std::vector<std::string> &names_out,
+                                       const std::string &terminology,
                                        const HandleNotResolvable on_not_resolvable);
-        static void requestLabelsThreadPool(const std::vector<std::string> &names_in,
-                                            std::vector<std::string> &names_out, const std::string &terminology,
-                                            const HandleNotResolvable on_not_resolvable);
+
+        static void request_labels_thread_pool(const std::vector<std::string> &names_in,
+                                               std::vector<std::string> &names_out,
+                                               const std::string &terminology,
+                                               const HandleNotResolvable on_not_resolvable);
 
     private:
-        static Json::Value getHttpsResponse(Poco::URI uri);
+        static std::string resolve_single_name_set_session_ptr(Poco::Net::Context::Ptr &context,
+                                                               Poco::Net::Session::Ptr *session_ptr,
+                                                               const std::string &name,
+                                                               const std::string &terminology,
+                                                               const HandleNotResolvable on_not_resolvable);
+    static std::string resolve_single_name(Poco::Net::Context::Ptr &context, Poco::Net::Session::Ptr &session_ptr,
+                                           std::string &name, std::string &terminology,
+                                           HandleNotResolvable &on_not_resolvable);
+    static Json::Value get_https_response(Poco::URI uri);
 
 };
 

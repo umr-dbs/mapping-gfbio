@@ -17,25 +17,30 @@ enum HandleNotResolvable {
 
 class Terminology {
     public:
-        static std::string requestSingleLabel(const std::string &name,
-                                              const std::string &terminology,
-                                              HandleNotResolvable onNotResolvable);
+        static std::string resolveSingle(const std::string &name,
+                                         const std::string &terminology,
+                                         HandleNotResolvable onNotResolvable);
 
-        static void requestLabels(const std::vector<std::string> &names_in,
-                                  std::vector<std::string> &names_out,
-                                  const std::string &terminology,
-                                  HandleNotResolvable on_not_resolvable);
+        static void resolveMultiple(const std::vector<std::string> &names_in,
+                                    std::vector<std::string> &names_out,
+                                    const std::string &terminology,
+                                    const std::string &key,
+                                    const HandleNotResolvable on_not_resolvable);
 
     private:
         static std::string resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
                                                           Poco::Net::Session::Ptr *session_ptr,
                                                           const std::string &name,
                                                           const std::string &terminology,
+                                                          const std::string &key,
                                                           HandleNotResolvable on_not_resolvable);
 
-        static std::string resolveSingleName(Poco::Net::Context::Ptr &context, Poco::Net::Session::Ptr &session_ptr,
-                                             std::string &name, std::string &terminology,
-                                             HandleNotResolvable &on_not_resolvable);
+        static std::string resolveSingleNameInternal(Poco::Net::Context::Ptr &context,
+                                                     Poco::Net::Session::Ptr &session_ptr,
+                                                     const std::string &name,
+                                                     const std::string &terminology,
+                                                     const std::string &key,
+                                                     HandleNotResolvable &on_not_resolvable);
 };
 
 #endif //MAPPING_CORE_TERMINOLOGY_H

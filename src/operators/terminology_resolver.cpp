@@ -13,6 +13,7 @@
  * parameters:
  *  - column: name of the textual column to resolve
  *  - terminology: the terminology used to resolve
+ *  - key: the json field to be returned
  *  - name_appendix: name of the next column for the resolved text values
  *      - "terminology": name will be "column terminology" with column and terminology being the parameters above
  *      - a custom string: name will be the custom string.
@@ -37,6 +38,7 @@ protected:
 private:
     std::string column;
     std::string terminology;
+    std::string key;
     std::string new_column;
     HandleNotResolvable on_not_resolvable;
 
@@ -47,6 +49,7 @@ TerminologyResolver::TerminologyResolver(int *sourcecounts, GenericOperator **so
 {
     column          = params.get("column", "").asString();
     terminology     = params.get("terminology", "").asString();
+    key             = params.get("key", "label").asString();
 
     std::string name_appendix = params.get("name_appendix", "").asString();
     if(name_appendix.empty())
@@ -75,7 +78,8 @@ TerminologyResolver::getPointCollection(const QueryRectangle &rect, const QueryT
 
     auto &old_attribute_array = points->feature_attributes.textual(column);
     auto &new_attribute_array = points->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::requestLabels(old_attribute_array.array, new_attribute_array.array, terminology, on_not_resolvable);
+    Terminology::resolveMultiple(old_attribute_array.array, new_attribute_array.array, terminology, key,
+                                 on_not_resolvable);
 
     return points;
 }
@@ -86,7 +90,8 @@ TerminologyResolver::getLineCollection(const QueryRectangle &rect, const QueryTo
 
     auto &old_attribute_array = lines->feature_attributes.textual(column);
     auto &new_attribute_array = lines->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::requestLabels(old_attribute_array.array, new_attribute_array.array, terminology, on_not_resolvable);
+    Terminology::resolveMultiple(old_attribute_array.array, new_attribute_array.array, terminology, key,
+                                 on_not_resolvable);
 
     return lines;
 }
@@ -97,7 +102,8 @@ TerminologyResolver::getPolygonCollection(const QueryRectangle &rect, const Quer
 
     auto &old_attribute_array = polygons->feature_attributes.textual(column);
     auto &new_attribute_array = polygons->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::requestLabels(old_attribute_array.array, new_attribute_array.array, terminology, on_not_resolvable);
+    Terminology::resolveMultiple(old_attribute_array.array, new_attribute_array.array, terminology, key,
+                                 on_not_resolvable);
 
     return polygons;
 }
@@ -107,6 +113,7 @@ void TerminologyResolver::writeSemanticParameters(std::ostringstream &stream) {
 
     json["column"]              = column;
     json["terminology"]         = terminology;
+    json["key"]                 = key;
     json["new_column"]          = new_column;
     json["on_not_resolvable"]   = (on_not_resolvable == EMPTY) ? "EMPTY" : "NOT_EMPTY";
 

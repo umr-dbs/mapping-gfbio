@@ -10,6 +10,8 @@
 #include <Poco/Net/HTTPResponse.h>
 #include "datatypes/simplefeaturecollection.h"
 
+typedef std::pair<std::string, std::string> string_pair;
+
 enum HandleNotResolvable {
     EMPTY,
     OLD_NAME
@@ -28,14 +30,14 @@ class Terminology {
                                     const HandleNotResolvable on_not_resolvable);
 
     private:
-        static std::string resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
+        static string_pair resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
                                                           Poco::Net::Session::Ptr *session_ptr,
                                                           const std::string &name,
                                                           const std::string &terminology,
                                                           const std::string &key,
                                                           HandleNotResolvable on_not_resolvable);
 
-        static std::string resolveSingleNameInternal(Poco::Net::Context::Ptr &context,
+        static string_pair resolveSingleNameInternal(Poco::Net::Context::Ptr &context,
                                                      Poco::Net::Session::Ptr &session_ptr,
                                                      const std::string &name,
                                                      const std::string &terminology,

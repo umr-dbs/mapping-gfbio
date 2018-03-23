@@ -49,7 +49,11 @@ TerminologyResolver::TerminologyResolver(int *sourcecounts, GenericOperator **so
 {
     column          = params.get("column", "").asString();
     terminology     = params.get("terminology", "").asString();
+    if(terminology.find(',') != std::string::npos){
+        throw ArgumentException("TerminologyResolver: Only one terminology should be requestet, not multiple concatenated by ','.");
+    }
     key             = params.get("key", "label").asString();
+
 
     std::string name_appendix = params.get("name_appendix", "").asString();
     if(name_appendix.empty())

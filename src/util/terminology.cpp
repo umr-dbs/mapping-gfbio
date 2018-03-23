@@ -12,9 +12,15 @@
 #include <boost/asio.hpp>
 #include <boost/move/move.hpp>
 
-typedef boost::packaged_task<std::string> task_t;
+typedef boost::packaged_task<string_pair> task_t;
 typedef boost::shared_ptr<task_t> ptask_t;
 
+///
+/// \param names_in
+/// \param names_out
+/// \param terminology
+/// \param key
+/// \param on_not_resolvable
 void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
                                   std::vector<std::string> &names_out,
                                   const std::string &terminology,
@@ -37,7 +43,17 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
         threads.create_thread(boost::bind(&boost::asio::io_service::run, &io_service));
     }
 
-    std::vector<boost::shared_future<std::string>> pending_results;
+    std::vector<boost::shared_future<string_pair>> pending_results;
+
+    //get a set with all names to be resolved (so we don't request the same name multiple times)
+    std::set<std::string> to_resolve;
+    std::map<std::string, std::string> resolved_pairs;
+
+    for(auto &name : names_in){
+        to_resolve.insert(name);
+    }
+
+
 
     // create context, enable session cache. First name has to be resolved seperately and not in thread to
     // set the session ptr. Because the Session::Ptr can not be assigned a new value the local session_ptr
@@ -51,27 +67,47 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
     );
     context->enableSessionCache(true);
     Poco::Net::Session::Ptr session_ptr;
-    std::string first_resolved = resolveSingleNameSetSessionPtr(context, &session_ptr, names_in[0], terminology, key,
-                                                                on_not_resolvable);
-    names_out.push_back(first_resolved);
 
-    //push tasks to resolve all names into the thread pool
-    for(int i = 1; i < names_in.size(); i++) {
-        const std::string &name = names_in[i];
+
+    // declare iterator here to take first element, resolve it no in thread
+    auto begin = to_resolve.begin();
+
+    string_pair first_resolved = resolveSingleNameSetSessionPtr(context, &session_ptr,
+                                                                *begin,
+                                                                terminology,
+                                                                key,
+                                                                on_not_resolvable);
+    resolved_pairs.insert(first_resolved);
+    // move iterator to next element
+    begin++;
+
+    int count = 1;
+
+    // use iterator to push tasks for all names left into the thread pool
+    for(auto it = begin; it != to_resolve.end(); it++) {
+        count++;
+        const std::string &name = *it;
         ptask_t task = boost::make_shared<task_t>(
                 boost::bind(resolveSingleNameInternal, context, session_ptr, name, terminology, key, on_not_resolvable));
-        boost::shared_future<std::string> future(task->get_future());
+        boost::shared_future<string_pair> future(task->get_future());
         pending_results.push_back(future);
         io_service.post(boost::bind(&task_t::operator(), task));
     }
 
-    //get the results from the futures
+    //get the resolved pairs from the futures
     for(auto &future : pending_results){
-        names_out.push_back(future.get());
-    }}
+        resolved_pairs.insert(future.get());
+    }
+
+    //insert values from resolved pairs into names_out
+    for(auto &name : names_in){
+        names_out.push_back(resolved_pairs[name]);
+    }
+    
+}
 
 
-std::string Terminology::resolveSingleNameInternal(Poco::Net::Context::Ptr &context,
+string_pair Terminology::resolveSingleNameInternal(Poco::Net::Context::Ptr &context,
                                                    Poco::Net::Session::Ptr &session_ptr,
                                                    const std::string &name,
                                                    const std::string &terminology,
@@ -100,20 +136,20 @@ std::string Terminology::resolveSingleNameInternal(Poco::Net::Context::Ptr &cont
 
     if (response_json.isNull())
     {
-        return not_resolved;
+        return std::make_pair(name, not_resolved);
     } else
     {
         Json::Value results = response_json["results"];
 
         Json::Value val = results[0].get(key, not_resolved);
         if(val.isArray())
-            return val[0].asString();
+            return std::make_pair(name, val[0].asString());
         else
-            return val.asString();
+            return std::make_pair(name, val.asString());
     }
 }
 
-std::string Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
+string_pair Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
                                                         Poco::Net::Session::Ptr *session_ptr,
                                                         const std::string &name,
                                                         const std::string &terminology,
@@ -146,16 +182,16 @@ std::string Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr 
 
     if (response_json.isNull())
     {
-        return not_resolved;
+        return std::make_pair(name, not_resolved);
     } else
     {
         Json::Value results = response_json["results"];
 
         Json::Value val = results[0].get(key, not_resolved);
         if(val.isArray())
-            return val[0].asString();
+            return std::make_pair(name, val[0].asString());
         else
-            return val.asString();
+            return std::make_pair(name, val.asString());
     }
 }
 

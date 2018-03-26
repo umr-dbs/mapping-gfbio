@@ -1,0 +1,48 @@
+{
+	"name": "Textual Point Filter Contains",
+	"query_result": "points",
+    "temporal_reference": {
+        "type": "UNIX",
+        "start": 0
+    },
+    "spatial_reference": {
+        "projection": "EPSG:4326",
+        "x1": -180,
+        "x2": 180,
+        "y1": -90,
+        "y2": 90
+    },	
+	"query" :
+	{
+		"params" : 
+		{
+			"column" : "Name",
+			"terminology" : "NCBITAXON",
+			"key" : "label",
+			"on_not_resolvable" : "OLD_NAME",
+			"name_appendix" : "bla"
+		},
+		"sources" : 
+		{
+			"points" : 
+			[
+				
+				{
+					"params": {       		
+			            "filename": "../../../mapping-gfbio/test/systemtests/data/terminology_test.csv",
+			            "on_error" : "abort",
+			            "time" : "none",
+			            "columns" : {
+			                "x" : "X",
+			                "y" : "Y",
+			                "textual" : ["Name", "Num"]
+			            }
+			        },
+			        "type": "ogr_source"
+				}
+			]
+		},
+		"type" : "terminology_resolver"
+	},
+	"query_expected_hash" : ""
+}

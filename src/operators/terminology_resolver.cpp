@@ -9,11 +9,12 @@
 #include "../util/terminology.h"
 
 /**
+ * Operator for resolving strings with the terminologies service from gfbio: https://terminologies.gfbio.org/
  *
  * parameters:
  *  - column: name of the textual column to resolve
  *  - terminology: the terminology used to resolve
- *  - key: the json field to be returned
+ *  - key: the json field of the result to be saved in the new column. Will be "label" if not provided.
  *  - name_appendix: name of the next column for the resolved text values
  *      - "terminology": name will be "column terminology" with column and terminology being the parameters above
  *      - a custom string: name will be the custom string.

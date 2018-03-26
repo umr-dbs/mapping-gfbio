@@ -12,15 +12,6 @@
 #include <boost/asio.hpp>
 #include <boost/move/move.hpp>
 
-typedef boost::packaged_task<string_pair> task_t;
-typedef boost::shared_ptr<task_t> ptask_t;
-
-///
-/// \param names_in
-/// \param names_out
-/// \param terminology
-/// \param key
-/// \param on_not_resolvable
 void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
                                   std::vector<std::string> &names_out,
                                   const std::string &terminology,
@@ -29,6 +20,10 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
 
     if(names_in.empty())
         return;
+
+    //typedefs only needed in this method.
+    typedef boost::packaged_task<string_pair> task_t;
+    typedef boost::shared_ptr<task_t> ptask_t;
 
     //init thread pool
     int threads_num = Configuration::get<int>("terminology.threads",16);
@@ -53,9 +48,7 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
         to_resolve.insert(name);
     }
 
-
-
-    // create context, enable session cache. First name has to be resolved seperately and not in thread to
+    // create context, enable session cache. First name has to be resolved separately and not in a thread to
     // set the session ptr. Because the Session::Ptr can not be assigned a new value the local session_ptr
     // variable is passed as a raw pointer to the method.
     Poco::Net::Context::Ptr context = new Poco::Net::Context(
@@ -66,26 +59,20 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
             true
     );
     context->enableSessionCache(true);
-    Poco::Net::Session::Ptr session_ptr;
-
 
     // declare iterator here to take first element, resolve it no in thread
     auto begin = to_resolve.begin();
 
-    string_pair first_resolved = resolveSingleNameSetSessionPtr(context, &session_ptr,
-                                                                *begin,
-                                                                terminology,
-                                                                key,
-                                                                on_not_resolvable);
-    resolved_pairs.insert(first_resolved);
+    //pair<string_pair, Session::Ptr>
+    auto first_resolved = resolveSingleNameSetSessionPtr(context, *begin, terminology, key, on_not_resolvable);
+    Poco::Net::Session::Ptr session_ptr = first_resolved.second;
+    resolved_pairs.insert(first_resolved.first);
+
     // move iterator to next element
     begin++;
 
-    int count = 1;
-
     // use iterator to push tasks for all names left into the thread pool
     for(auto it = begin; it != to_resolve.end(); it++) {
-        count++;
         const std::string &name = *it;
         ptask_t task = boost::make_shared<task_t>(
                 boost::bind(resolveSingleNameInternal, context, session_ptr, name, terminology, key, on_not_resolvable));
@@ -94,7 +81,7 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
         io_service.post(boost::bind(&task_t::operator(), task));
     }
 
-    //get the resolved pairs from the futures
+    //get the resolved pairs from the futures, insert into map
     for(auto &future : pending_results){
         resolved_pairs.insert(future.get());
     }
@@ -106,13 +93,16 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
     
 }
 
-
-string_pair Terminology::resolveSingleNameInternal(Poco::Net::Context::Ptr &context,
+/**
+ *
+ * @return a pair of strings, first string is the string to be resolved and the second is the resolved string.
+ */
+Terminology::string_pair Terminology::resolveSingleNameInternal(Poco::Net::Context::Ptr &context,
                                                    Poco::Net::Session::Ptr &session_ptr,
                                                    const std::string &name,
                                                    const std::string &terminology,
                                                    const std::string &key,
-                                                   HandleNotResolvable &on_not_resolvable){
+                                                   const HandleNotResolvable &on_not_resolvable){
     Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
     uri.addQueryParameter("query", name);
     uri.addQueryParameter("terminologies", terminology);
@@ -123,8 +113,9 @@ string_pair Terminology::resolveSingleNameInternal(Poco::Net::Context::Ptr &cont
 
     session.sendRequest(request);
     std::istream& respStream = session.receiveResponse(response);
-    Json::Value response_json;
 
+    //read response stream into json object
+    Json::Value response_json;
     if (response.getStatus() == Poco::Net::HTTPResponse::HTTP_OK)
     {
         respStream >> response_json;
@@ -132,8 +123,8 @@ string_pair Terminology::resolveSingleNameInternal(Poco::Net::Context::Ptr &cont
         response_json = Json::Value::null;
     }
 
+    //retrieve wanted element from result json, if not valid result return not_resolved.
     std::string not_resolved = (on_not_resolvable == EMPTY) ? "" : name;
-
     if (response_json.isNull())
     {
         return std::make_pair(name, not_resolved);
@@ -149,12 +140,16 @@ string_pair Terminology::resolveSingleNameInternal(Poco::Net::Context::Ptr &cont
     }
 }
 
-string_pair Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
-                                                        Poco::Net::Session::Ptr *session_ptr,
-                                                        const std::string &name,
-                                                        const std::string &terminology,
-                                                        const std::string &key,
-                                                        HandleNotResolvable on_not_resolvable) {
+/**
+ * Same method as resolveSingleNameInternal, but also return the session_ptr to the sslSession of the created HttpsClientSession.
+ * @return a pair, first element is a string_pair as in resolveSingleNameInternal, second element is the Session::Ptr.
+ */
+Terminology::string_session_ptr_pair
+Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
+                                            const std::string &name,
+                                            const std::string &terminology,
+                                            const std::string &key,
+                                            const HandleNotResolvable on_not_resolvable) {
 
     Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
     uri.addQueryParameter("query", name);
@@ -165,9 +160,6 @@ string_pair Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr 
     Poco::Net::HTTPResponse response;
 
     session.sendRequest(request);
-
-    *session_ptr = session.sslSession();
-
     std::istream& respStream = session.receiveResponse(response);
     Json::Value response_json;
 
@@ -182,22 +174,23 @@ string_pair Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr 
 
     if (response_json.isNull())
     {
-        return std::make_pair(name, not_resolved);
+        return std::make_pair(std::make_pair(name, not_resolved), session.sslSession());
     } else
     {
         Json::Value results = response_json["results"];
 
         Json::Value val = results[0].get(key, not_resolved);
         if(val.isArray())
-            return std::make_pair(name, val[0].asString());
+            return std::make_pair(std::make_pair(name, val[0].asString()), session.sslSession());
         else
-            return std::make_pair(name, val.asString());
+            return std::make_pair(std::make_pair(name, val.asString()), session.sslSession());
     }
 }
 
 std::string Terminology::resolveSingle(const std::string &name,
                                        const std::string &terminology,
-                                       HandleNotResolvable onNotResolvable)
+                                       const std::string &key,
+                                       const HandleNotResolvable onNotResolvable)
 {
     Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
     uri.addQueryParameter("query", name);
@@ -226,7 +219,10 @@ std::string Terminology::resolveSingle(const std::string &name,
     } else
     {
         Json::Value results = response_json["results"];
-        Json::Value first = results[0];
-        return first.get("label", not_resolved).asString();
+        Json::Value val = results[0].get(key, not_resolved);
+        if(val.isArray())
+            return val[0].asString();
+        else
+            return val.asString();
     }
 }

@@ -81,10 +81,27 @@ std::unique_ptr<PointCollection>
 TerminologyResolver::getPointCollection(const QueryRectangle &rect, const QueryTools &tools) {
     auto points = getPointCollectionFromSource(0, rect, tools);
 
+    // with AttributeArray being private, with no direct access to the underlying vector the strings have
+    // to be copied into a new vector first.
+    // the AttributeArray can not be passed to Terminology, because the class is private.
+
     auto &old_attribute_array = points->feature_attributes.textual(column);
     auto &new_attribute_array = points->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::resolveMultiple(old_attribute_array.array, new_attribute_array.array, terminology, key,
+
+    std::vector<std::string> names_in;
+    for(int i = 0; i < points->getFeatureCount(); i++){
+        names_in.push_back(old_attribute_array.get(i));
+    }
+
+    std::vector<std::string> names_out;
+
+    Terminology::resolveMultiple(names_in, names_out, terminology, key,
                                  on_not_resolvable);
+
+    // insert the resolved strings into the new attribute array.
+    for(int i = 0; i < names_out.size(); i++){
+        new_attribute_array.set(i, names_out[i]);
+    }
 
     return points;
 }
@@ -95,8 +112,21 @@ TerminologyResolver::getLineCollection(const QueryRectangle &rect, const QueryTo
 
     auto &old_attribute_array = lines->feature_attributes.textual(column);
     auto &new_attribute_array = lines->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::resolveMultiple(old_attribute_array.array, new_attribute_array.array, terminology, key,
+
+    std::vector<std::string> names_in;
+    for(int i = 0; i < lines->getFeatureCount(); i++){
+        names_in.push_back(old_attribute_array.get(i));
+    }
+
+    std::vector<std::string> names_out;
+
+    Terminology::resolveMultiple(names_in, names_out, terminology, key,
                                  on_not_resolvable);
+
+    // insert the resolved strings into the new attribute array.
+    for(int i = 0; i < names_out.size(); i++){
+        new_attribute_array.set(i, names_out[i]);
+    }
 
     return lines;
 }
@@ -107,8 +137,21 @@ TerminologyResolver::getPolygonCollection(const QueryRectangle &rect, const Quer
 
     auto &old_attribute_array = polygons->feature_attributes.textual(column);
     auto &new_attribute_array = polygons->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
-    Terminology::resolveMultiple(old_attribute_array.array, new_attribute_array.array, terminology, key,
+
+    std::vector<std::string> names_in;
+    for(int i = 0; i < polygons->getFeatureCount(); i++){
+        names_in.push_back(old_attribute_array.get(i));
+    }
+
+    std::vector<std::string> names_out;
+
+    Terminology::resolveMultiple(names_in, names_out, terminology, key,
                                  on_not_resolvable);
+
+    // insert the resolved strings into the new attribute array.
+    for(int i = 0; i < names_out.size(); i++){
+        new_attribute_array.set(i, names_out[i]);
+    }
 
     return polygons;
 }

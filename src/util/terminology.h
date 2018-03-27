@@ -32,6 +32,8 @@ class Terminology {
         static std::string resolveSingle(const std::string &name,
                                          const std::string &terminology,
                                          const std::string &key,
+                                         const std::string &match_type,
+                                         const bool first_hit,
                                          const HandleNotResolvable onNotResolvable);
 
         /**

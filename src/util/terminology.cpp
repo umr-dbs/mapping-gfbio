@@ -203,11 +203,16 @@ Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
 std::string Terminology::resolveSingle(const std::string &name,
                                        const std::string &terminology,
                                        const std::string &key,
+                                       const std::string &match_type,
+                                       const bool first_hit,
                                        const HandleNotResolvable onNotResolvable)
 {
     Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
     uri.addQueryParameter("query", name);
     uri.addQueryParameter("terminologies", terminology);
+    uri.addQueryParameter("match_type", match_type);
+    if(first_hit)
+        uri.addQueryParameter("first_hit", "true");
 
     Poco::Net::HTTPSClientSession session(uri.getHost(), uri.getPort());
     Poco::Net::HTTPRequest request(Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery(), Poco::Net::HTTPRequest::HTTP_1_1);

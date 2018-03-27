@@ -46,6 +46,8 @@ class Terminology {
                                     std::vector<std::string> &names_out,
                                     const std::string &terminology,
                                     const std::string &key,
+                                    const std::string &match_type,
+                                    const bool first_hit,
                                     const HandleNotResolvable on_not_resolvable);
 
     private:
@@ -56,6 +58,8 @@ class Terminology {
                                                                       const std::string &name,
                                                                       const std::string &terminology,
                                                                       const std::string &key,
+                                                                      const std::string &match_type,
+                                                                      const bool first_hit,
                                                                       const HandleNotResolvable on_not_resolvable);
 
         static string_pair resolveSingleNameInternal(Poco::Net::Context::Ptr &context,
@@ -63,6 +67,8 @@ class Terminology {
                                                      const std::string &name,
                                                      const std::string &terminology,
                                                      const std::string &key,
+                                                     const std::string &match_type,
+                                                     const bool first_hit,
                                                      const HandleNotResolvable &on_not_resolvable);
 };
 

@@ -9,12 +9,15 @@
 #include "../util/terminology.h"
 
 /**
- * Operator for resolving strings with the terminologies service from gfbio: https://terminologies.gfbio.org/
+ * Operator for resolving strings with the terminology service from gfbio: https://terminologies.gfbio.org/
  *
  * parameters:
  *  - column: name of the textual column to resolve
  *  - terminology: the terminology used to resolve
- *  - key: the json field of the result to be saved in the new column. Will be "label" if not provided.
+ *  - key: the json field of the result to be saved in the new column. "label" if not provided.
+ *         if requested field is an array, the first element will be returned.
+ *  - match_type: "exact", "included", "regex", see TerminologyService search API. "exact" if not provided.
+ *  - first_hit: bool, see TerminologyService search API. true if not provided.
  *  - name_appendix: name of the next column for the resolved text values
  *      - "terminology": name will be "column terminology" with column and terminology being the parameters above
  *      - a custom string: name will be the custom string.
@@ -41,6 +44,8 @@ private:
     std::string terminology;
     std::string key;
     std::string new_column;
+    std::string match_type;
+    bool first_hit;
     HandleNotResolvable on_not_resolvable;
 
 };
@@ -71,6 +76,12 @@ TerminologyResolver::TerminologyResolver(int *sourcecounts, GenericOperator **so
         on_not_resolvable = OLD_NAME;
     else
         throw ArgumentException("Terminology Resolver: on_not_resolvable was not a valid value: " + not_resolvable + ". Must be EMPTY or OLD_NAME.");
+
+    match_type = params.get("match_type", "exact").asString();
+    if(match_type != "exact" && match_type != "included" && match_type != "regex")
+        throw ArgumentException("Terminology Resolver: unknown match_type (must be exact, included or regex) -> " + match_type);
+
+    first_hit  = params.get("first_hit", "true").asBool();
 }
 
 TerminologyResolver::~TerminologyResolver() { }
@@ -95,8 +106,7 @@ TerminologyResolver::getPointCollection(const QueryRectangle &rect, const QueryT
 
     std::vector<std::string> names_out;
 
-    Terminology::resolveMultiple(names_in, names_out, terminology, key,
-                                 on_not_resolvable);
+    Terminology::resolveMultiple(names_in, names_out, terminology, key, match_type, first_hit, on_not_resolvable);
 
     // insert the resolved strings into the new attribute array.
     for(int i = 0; i < names_out.size(); i++){
@@ -120,8 +130,7 @@ TerminologyResolver::getLineCollection(const QueryRectangle &rect, const QueryTo
 
     std::vector<std::string> names_out;
 
-    Terminology::resolveMultiple(names_in, names_out, terminology, key,
-                                 on_not_resolvable);
+    Terminology::resolveMultiple(names_in, names_out, terminology, key, match_type, first_hit, on_not_resolvable);
 
     // insert the resolved strings into the new attribute array.
     for(int i = 0; i < names_out.size(); i++){
@@ -145,8 +154,7 @@ TerminologyResolver::getPolygonCollection(const QueryRectangle &rect, const Quer
 
     std::vector<std::string> names_out;
 
-    Terminology::resolveMultiple(names_in, names_out, terminology, key,
-                                 on_not_resolvable);
+    Terminology::resolveMultiple(names_in, names_out, terminology, key, match_type, first_hit, on_not_resolvable);
 
     // insert the resolved strings into the new attribute array.
     for(int i = 0; i < names_out.size(); i++){
@@ -162,6 +170,8 @@ void TerminologyResolver::writeSemanticParameters(std::ostringstream &stream) {
     json["column"]              = column;
     json["terminology"]         = terminology;
     json["key"]                 = key;
+    json["match_type"]          = match_type;
+    json["first_hit"]           = first_hit;
     json["new_column"]          = new_column;
     json["on_not_resolvable"]   = (on_not_resolvable == EMPTY) ? "EMPTY" : "NOT_EMPTY";
 

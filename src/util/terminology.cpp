@@ -16,6 +16,8 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
                                   std::vector<std::string> &names_out,
                                   const std::string &terminology,
                                   const std::string &key,
+                                  const std::string &match_type,
+                                  const bool first_hit,
                                   const HandleNotResolvable on_not_resolvable){
 
     if(names_in.empty())
@@ -64,7 +66,7 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
     auto begin = to_resolve.begin();
 
     //pair<string_pair, Session::Ptr>
-    auto first_resolved = resolveSingleNameSetSessionPtr(context, *begin, terminology, key, on_not_resolvable);
+    auto first_resolved = resolveSingleNameSetSessionPtr(context, *begin, terminology, key, match_type, first_hit, on_not_resolvable);
     Poco::Net::Session::Ptr session_ptr = first_resolved.second;
     resolved_pairs.insert(first_resolved.first);
 
@@ -75,7 +77,7 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
     for(auto it = begin; it != to_resolve.end(); it++) {
         const std::string &name = *it;
         ptask_t task = boost::make_shared<task_t>(
-                boost::bind(resolveSingleNameInternal, context, session_ptr, name, terminology, key, on_not_resolvable));
+                boost::bind(resolveSingleNameInternal, context, session_ptr, name, terminology, key, match_type, first_hit, on_not_resolvable));
         boost::shared_future<string_pair> future(task->get_future());
         pending_results.push_back(future);
         io_service.post(boost::bind(&task_t::operator(), task));
@@ -102,10 +104,16 @@ Terminology::string_pair Terminology::resolveSingleNameInternal(Poco::Net::Conte
                                                    const std::string &name,
                                                    const std::string &terminology,
                                                    const std::string &key,
-                                                   const HandleNotResolvable &on_not_resolvable){
+                                                   const std::string &match_type,
+                                                   const bool first_hit,
+                                                   const HandleNotResolvable &on_not_resolvable)
+{
     Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
     uri.addQueryParameter("query", name);
     uri.addQueryParameter("terminologies", terminology);
+    uri.addQueryParameter("match_type", match_type);
+    if(first_hit)
+        uri.addQueryParameter("first_hit", "true");
 
     Poco::Net::HTTPSClientSession session(uri.getHost(), uri.getPort(), context, session_ptr);
     Poco::Net::HTTPRequest request(Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery(), Poco::Net::HTTPRequest::HTTP_1_1);
@@ -149,11 +157,16 @@ Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
                                             const std::string &name,
                                             const std::string &terminology,
                                             const std::string &key,
+                                            const std::string &match_type,
+                                            const bool first_hit,
                                             const HandleNotResolvable on_not_resolvable) {
 
     Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
     uri.addQueryParameter("query", name);
     uri.addQueryParameter("terminologies", terminology);
+    uri.addQueryParameter("match_type", match_type);
+    if(first_hit)
+        uri.addQueryParameter("first_hit", "true");
 
     Poco::Net::HTTPSClientSession session(uri.getHost(), uri.getPort(), context);
     Poco::Net::HTTPRequest request(Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery(), Poco::Net::HTTPRequest::HTTP_1_1);

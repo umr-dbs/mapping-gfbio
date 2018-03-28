@@ -25,6 +25,7 @@ before_install:
   $DOCKER_IMAGE
 - docker exec -t
   -w "$DOCKER_CONTAINER_HOME"
+  $DOCKER_CONTAINER
   git clone --depth 1 https://github.com/$MAPPING_CORE.git $MAPPING_CORE
 
 script:

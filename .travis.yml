@@ -1,0 +1,42 @@
+language: cpp
+dist: trusty
+sudo: required
+
+services:
+- docker
+
+addons:
+  apt:
+    packages:
+    - docker-ce
+
+env:
+  global:
+  - DOCKER_IMAGE="umrdbs/mapping-dependencies:latest"
+  - DOCKER_CONTAINER="mapping_container"
+  - DOCKER_CONTAINER_HOME="/app"
+  - MAPPING_CORE="umr-dbs/mapping-core"
+
+before_install:
+- docker pull $DOCKER_IMAGE
+- docker run -d
+  --name $DOCKER_CONTAINER 
+  --volume "$(pwd)":"$DOCKER_CONTAINER_HOME/$TRAVIS_REPO_SLUG"
+  $DOCKER_IMAGE
+- docker exec -t
+  -w "$DOCKER_CONTAINER_HOME"
+  git clone --depth 1 https://github.com/$MAPPING_CORE.git $MAPPING_CORE
+
+script:
+- docker exec -t 
+  -w "$DOCKER_CONTAINER_HOME/$MAPPING_CORE"
+  $DOCKER_CONTAINER
+  cmake -DCMAKE_BUILD_TYPE=Release -DMAPPING_MODULES="mapping-gfbio" .
+- docker exec -t
+  -w "$DOCKER_CONTAINER_HOME/$MAPPING_CORE"
+  $DOCKER_CONTAINER make
+  -j$(cat /proc/cpuinfo | grep processor | wc -l)
+- docker exec -t
+  -w "$DOCKER_CONTAINER_HOME/$MAPPING_CORE"
+  $DOCKER_CONTAINER
+  make test

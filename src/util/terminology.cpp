@@ -12,25 +12,34 @@
 #include <boost/asio.hpp>
 #include <boost/move/move.hpp>
 
-void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
-                                  std::vector<std::string> &names_out,
-                                  const std::string &terminology,
-                                  const std::string &key,
-                                  const std::string &match_type,
-                                  const bool first_hit,
-                                  const HandleNotResolvable on_not_resolvable){
+std::vector<std::string> Terminology::resolveMultiple(const std::vector<std::string> &names_in,
+                                                      const std::string &terminology,
+                                                      const std::string &key,
+                                                      const std::string &match_type,
+                                                      const bool first_hit,
+                                                      const HandleNotResolvable on_not_resolvable){
 
+    std::vector<std::string> names_out;
     if(names_in.empty())
-        return;
+        return names_out;
+    names_out.reserve(names_in.size());
 
-    //typedefs only needed in this method.
-    typedef boost::packaged_task<string_pair> task_t;
-    typedef boost::shared_ptr<task_t> ptask_t;
+    //get a set with all names to be resolved (so we don't request the same name multiple times)
+    std::set<std::string> to_resolve;
+    std::map<std::string, std::string> resolved_pairs;
+
+    for(auto &name : names_in){
+        to_resolve.insert(name);
+    }
+
+    //aliases only needed in this method.
+    using task_t  = boost::packaged_task<string_pair>;
+    using ptask_t = boost::shared_ptr<task_t>;
 
     //init thread pool
     int threads_num = Configuration::get<int>("terminology.threads",16);
-    if(threads_num > names_in.size())
-        threads_num = names_in.size();
+    if(threads_num > to_resolve.size())
+        threads_num = to_resolve.size();
 
     boost::asio::io_service io_service;
     boost::thread_group threads;
@@ -42,17 +51,8 @@ void Terminology::resolveMultiple(const std::vector<std::string> &names_in,
 
     std::vector<boost::shared_future<string_pair>> pending_results;
 
-    //get a set with all names to be resolved (so we don't request the same name multiple times)
-    std::set<std::string> to_resolve;
-    std::map<std::string, std::string> resolved_pairs;
-
-    for(auto &name : names_in){
-        to_resolve.insert(name);
-    }
-
-    // create context, enable session cache. First name has to be resolved separately and not in a thread to
-    // set the session ptr. Because the Session::Ptr can not be assigned a new value the local session_ptr
-    // variable is passed as a raw pointer to the method.
+    // create context, enable session cache. First name has to be resolved separately
+    // and not in a thread to retrieve the session ptr.
     Poco::Net::Context::Ptr context = new Poco::Net::Context(
             Poco::Net::Context::CLIENT_USE,
             "",
@@ -108,7 +108,8 @@ Terminology::string_pair Terminology::resolveSingleNameInternal(Poco::Net::Conte
                                                    const bool first_hit,
                                                    const HandleNotResolvable &on_not_resolvable)
 {
-    Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
+    std::string uri_string = Configuration::get<std::string>("terminology.url_search");
+    Poco::URI uri(uri_string);
     uri.addQueryParameter("query", name);
     uri.addQueryParameter("terminologies", terminology);
     uri.addQueryParameter("match_type", match_type);
@@ -132,19 +133,26 @@ Terminology::string_pair Terminology::resolveSingleNameInternal(Poco::Net::Conte
     }
 
     //retrieve wanted element from result json, if not valid result return not_resolved.
-    std::string not_resolved = (on_not_resolvable == EMPTY) ? "" : name;
+    std::string not_resolved = (on_not_resolvable == HandleNotResolvable::EMPTY) ? "" : name;
     if (response_json.isNull())
     {
         return std::make_pair(name, not_resolved);
     } else
     {
         Json::Value results = response_json["results"];
+        if(results.empty())
+            return std::make_pair(name, not_resolved);
 
         Json::Value val = results[0].get(key, not_resolved);
-        if(val.isArray())
-            return std::make_pair(name, val[0].asString());
-        else
+        if(val.isArray()){
+            if(val.empty())
+                return std::make_pair(name, not_resolved);
+            else
+                return std::make_pair(name, val[0].asString());
+        }
+        else {
             return std::make_pair(name, val.asString());
+        }
     }
 }
 
@@ -161,7 +169,8 @@ Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
                                             const bool first_hit,
                                             const HandleNotResolvable on_not_resolvable) {
 
-    Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
+    std::string uri_string = Configuration::get<std::string>("terminology.url_search");
+    Poco::URI uri(uri_string);
     uri.addQueryParameter("query", name);
     uri.addQueryParameter("terminologies", terminology);
     uri.addQueryParameter("match_type", match_type);
@@ -183,7 +192,7 @@ Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
         response_json = Json::Value::null;
     }
 
-    std::string not_resolved = (on_not_resolvable == EMPTY) ? "" : name;
+    std::string not_resolved = (on_not_resolvable == HandleNotResolvable::EMPTY) ? "" : name;
 
     if (response_json.isNull())
     {
@@ -191,12 +200,19 @@ Terminology::resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
     } else
     {
         Json::Value results = response_json["results"];
+        if(results.empty())
+            return std::make_pair(std::make_pair(name, not_resolved), session.sslSession());
 
         Json::Value val = results[0].get(key, not_resolved);
-        if(val.isArray())
-            return std::make_pair(std::make_pair(name, val[0].asString()), session.sslSession());
-        else
+        if(val.isArray()){
+            if(val.empty())
+                return std::make_pair(std::make_pair(name, not_resolved), session.sslSession());
+            else
+                return std::make_pair(std::make_pair(name, val[0].asString()), session.sslSession());
+        }
+        else {
             return std::make_pair(std::make_pair(name, val.asString()), session.sslSession());
+        }
     }
 }
 
@@ -207,7 +223,8 @@ std::string Terminology::resolveSingle(const std::string &name,
                                        const bool first_hit,
                                        const HandleNotResolvable onNotResolvable)
 {
-    Poco::URI uri("https://terminologies.gfbio.org/api/terminologies/search");
+    std::string uri_string = Configuration::get<std::string>("terminology.url_search");
+    Poco::URI uri(uri_string);
     uri.addQueryParameter("query", name);
     uri.addQueryParameter("terminologies", terminology);
     uri.addQueryParameter("match_type", match_type);
@@ -229,18 +246,25 @@ std::string Terminology::resolveSingle(const std::string &name,
         response_json = Json::Value::null;
     }
 
-    std::string not_resolved = (onNotResolvable == EMPTY) ? "" : name;
-
+    std::string not_resolved = (onNotResolvable == HandleNotResolvable::EMPTY) ? "" : name;
     if (response_json.isNull())
     {
         return not_resolved;
     } else
     {
         Json::Value results = response_json["results"];
+        if(results.empty())
+            return not_resolved;
+
         Json::Value val = results[0].get(key, not_resolved);
-        if(val.isArray())
-            return val[0].asString();
-        else
+        if(val.isArray()){
+            if(val.empty())
+                return not_resolved;
+            else
+                return val[0].asString();
+        }
+        else {
             return val.asString();
+        }
     }
 }

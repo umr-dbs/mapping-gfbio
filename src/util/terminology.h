@@ -10,9 +10,9 @@
 #include <Poco/Net/HTTPResponse.h>
 #include "datatypes/simplefeaturecollection.h"
 
-enum HandleNotResolvable {
+enum class HandleNotResolvable {
     EMPTY,
-    OLD_NAME
+    KEEP
 };
 
 
@@ -39,22 +39,23 @@ class Terminology {
         /**
          * Resolve a vector of strings
          * @param names_in vector of strings to be resolved
-         * @param names_out vector to push resolved strings into
          * @param terminology name of the terminology used
          * @param key the field in the result json from terminologies taken as a result
+         * @param match_type parameter for terminology search api
+         * @param first_hit parameter for terminology search api
          * @param on_not_resolvable how to handle a not resolvable string: EMPTY or OLD_NAME
+         * @return vector of resolved terms, order of names_in preserved.
          */
-        static void resolveMultiple(const std::vector<std::string> &names_in,
-                                    std::vector<std::string> &names_out,
-                                    const std::string &terminology,
-                                    const std::string &key,
-                                    const std::string &match_type,
-                                    const bool first_hit,
-                                    const HandleNotResolvable on_not_resolvable);
+        static std::vector<std::string> resolveMultiple(const std::vector<std::string> &names_in,
+                                                        const std::string &terminology,
+                                                        const std::string &key,
+                                                        const std::string &match_type,
+                                                        const bool first_hit,
+                                                        const HandleNotResolvable on_not_resolvable);
 
     private:
-        typedef std::pair<std::string, std::string> string_pair;
-        typedef std::pair<Terminology::string_pair, Poco::Net::Session::Ptr> string_session_ptr_pair;
+        using string_pair = std::pair<std::string, std::string>;
+        using string_session_ptr_pair = std::pair<Terminology::string_pair, Poco::Net::Session::Ptr>;
 
         static string_session_ptr_pair resolveSingleNameSetSessionPtr(Poco::Net::Context::Ptr &context,
                                                                       const std::string &name,

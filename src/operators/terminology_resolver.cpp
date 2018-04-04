@@ -2,29 +2,24 @@
 #include "datatypes/pointcollection.h"
 #include "datatypes/linecollection.h"
 #include "datatypes/polygoncollection.h"
-
 #include "operators/operator.h"
-
 #include <json/json.h>
-#include "../util/terminology.h"
+#include "util/terminology.h"
 
 /**
- * Operator for resolving strings with the terminology service from gfbio: https://terminologies.gfbio.org/
+ * Operator for resolving attributes using the terminology service from gfbio (search api): https://terminologies.gfbio.org/
  *
  * parameters:
- *  - column: name of the textual column to resolve
- *  - terminology: the terminology used to resolve
- *  - key: the json field of the result to be saved in the new column. "label" if not provided.
+ *  - attribute_name: name of the textual attribute to resolve.
+ *  - resolved_attribute: name of the new attribute for the resolved terms.
+ *  - terminology: name of the terminology used to resolve.
+ *  - key: the json field of the result to be saved in the resolved attribute. "label" if not provided.
  *         if requested field is an array, the first element will be returned.
  *  - match_type: "exact", "included", "regex", see TerminologyService search API. "exact" if not provided.
  *  - first_hit: bool, see TerminologyService search API. true if not provided.
- *  - name_appendix: name of the next column for the resolved text values
- *      - "terminology": name will be "column terminology" with column and terminology being the parameters above
- *      - a custom string: name will be the custom string.
- *      - if not provided the name will be "column resolved" with column being the parameter above.
- *  - on_not_resolvable: if no label for the string was found, what to insert into new column
- *      - "EMPTY"
- *      - "OLD_NAME"
+ *  - on_not_resolvable: if no label for the term was found, what to insert into resolved attribute.
+ *      - "EMPTY" inserts an empty string
+ *      - "KEEP" inserts the original term
  */
 
 class TerminologyResolver : public GenericOperator {
@@ -40,10 +35,10 @@ protected:
     void writeSemanticParameters(std::ostringstream& stream) override;
 
 private:
-    std::string column;
+    std::string attribute_name;
     std::string terminology;
     std::string key;
-    std::string new_column;
+    std::string resolved_attribute;
     std::string match_type;
     bool first_hit;
     HandleNotResolvable on_not_resolvable;
@@ -53,29 +48,24 @@ private:
 TerminologyResolver::TerminologyResolver(int *sourcecounts, GenericOperator **sources, Json::Value &params)
         : GenericOperator(sourcecounts, sources)
 {
-    column          = params.get("column", "").asString();
-    terminology     = params.get("terminology", "").asString();
+    terminology         = params.get("terminology", "").asString();
     if(terminology.find(',') != std::string::npos){
-        throw ArgumentException("TerminologyResolver: Only one terminology should be requestet, not multiple concatenated by ','.");
+        throw ArgumentException("TerminologyResolver: Only one terminology should be requested, not multiple concatenated by ','.");
     }
-    key             = params.get("key", "label").asString();
-
-
-    std::string name_appendix = params.get("name_appendix", "").asString();
-    if(name_appendix.empty())
-        new_column = column + " resolved";
-    else if(name_appendix == "terminology")
-        new_column = column + " " + terminology;
-    else
-        new_column = name_appendix;
+    attribute_name      = params.get("attribute_name", "").asString();
+    key                 = params.get("key", "label").asString();
+    resolved_attribute  = params.get("resolved_attribute", "").asString();
+    if(resolved_attribute == attribute_name){
+        throw OperatorException("Terminology Resolver: name of resolved attribute has to be different from existing attribute.");
+    }
 
     std::string not_resolvable = params.get("on_not_resolvable", "").asString();
     if(not_resolvable == "EMPTY")
-        on_not_resolvable = EMPTY;
-    else if(not_resolvable == "OLD_NAME")
-        on_not_resolvable = OLD_NAME;
+        on_not_resolvable = HandleNotResolvable::EMPTY;
+    else if(not_resolvable == "KEEP")
+        on_not_resolvable = HandleNotResolvable::KEEP;
     else
-        throw ArgumentException("Terminology Resolver: on_not_resolvable was not a valid value: " + not_resolvable + ". Must be EMPTY or OLD_NAME.");
+        throw ArgumentException("Terminology Resolver: on_not_resolvable was not a valid value: " + not_resolvable + ". Must be EMPTY or KEEP.");
 
     match_type = params.get("match_type", "exact").asString();
     if(match_type != "exact" && match_type != "included" && match_type != "regex")
@@ -96,17 +86,20 @@ TerminologyResolver::getPointCollection(const QueryRectangle &rect, const QueryT
     // to be copied into a new vector first.
     // the AttributeArray can not be passed to Terminology, because the class is private.
 
-    auto &old_attribute_array = points->feature_attributes.textual(column);
-    auto &new_attribute_array = points->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
+    auto &old_attribute_array = points->feature_attributes.textual(attribute_name);
+    auto &new_attribute_array = points->feature_attributes.addTextualAttribute(resolved_attribute, old_attribute_array.unit);
 
     std::vector<std::string> names_in;
-    for(int i = 0; i < points->getFeatureCount(); i++){
+    size_t feature_count = points->getFeatureCount();
+    names_in.reserve(feature_count);
+
+    for(int i = 0; i < feature_count; i++){
         names_in.push_back(old_attribute_array.get(i));
     }
 
-    std::vector<std::string> names_out;
+    auto names_out = Terminology::resolveMultiple(names_in, terminology, key, match_type, first_hit, on_not_resolvable);
 
-    Terminology::resolveMultiple(names_in, names_out, terminology, key, match_type, first_hit, on_not_resolvable);
+    new_attribute_array.reserve(names_out.size());
 
     // insert the resolved strings into the new attribute array.
     for(int i = 0; i < names_out.size(); i++){
@@ -120,17 +113,20 @@ std::unique_ptr<LineCollection>
 TerminologyResolver::getLineCollection(const QueryRectangle &rect, const QueryTools &tools) {
     auto lines = getLineCollectionFromSource(0, rect, tools);
 
-    auto &old_attribute_array = lines->feature_attributes.textual(column);
-    auto &new_attribute_array = lines->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
+    auto &old_attribute_array = lines->feature_attributes.textual(attribute_name);
+    auto &new_attribute_array = lines->feature_attributes.addTextualAttribute(resolved_attribute, old_attribute_array.unit);
 
     std::vector<std::string> names_in;
-    for(int i = 0; i < lines->getFeatureCount(); i++){
+    size_t feature_count = lines->getFeatureCount();
+    names_in.reserve(feature_count);
+
+    for(int i = 0; i < feature_count; i++){
         names_in.push_back(old_attribute_array.get(i));
     }
 
-    std::vector<std::string> names_out;
+    auto names_out = Terminology::resolveMultiple(names_in, terminology, key, match_type, first_hit, on_not_resolvable);
 
-    Terminology::resolveMultiple(names_in, names_out, terminology, key, match_type, first_hit, on_not_resolvable);
+    new_attribute_array.reserve(names_out.size());
 
     // insert the resolved strings into the new attribute array.
     for(int i = 0; i < names_out.size(); i++){
@@ -144,17 +140,20 @@ std::unique_ptr<PolygonCollection>
 TerminologyResolver::getPolygonCollection(const QueryRectangle &rect, const QueryTools &tools) {
     auto polygons = getPolygonCollectionFromSource(0, rect, tools);
 
-    auto &old_attribute_array = polygons->feature_attributes.textual(column);
-    auto &new_attribute_array = polygons->feature_attributes.addTextualAttribute(new_column, old_attribute_array.unit);
+    auto &old_attribute_array = polygons->feature_attributes.textual(attribute_name);
+    auto &new_attribute_array = polygons->feature_attributes.addTextualAttribute(resolved_attribute, old_attribute_array.unit);
 
     std::vector<std::string> names_in;
-    for(int i = 0; i < polygons->getFeatureCount(); i++){
+    size_t feature_count = polygons->getFeatureCount();
+    names_in.reserve(feature_count);
+
+    for(int i = 0; i < feature_count; i++){
         names_in.push_back(old_attribute_array.get(i));
     }
 
-    std::vector<std::string> names_out;
+    auto names_out = Terminology::resolveMultiple(names_in, terminology, key, match_type, first_hit, on_not_resolvable);
 
-    Terminology::resolveMultiple(names_in, names_out, terminology, key, match_type, first_hit, on_not_resolvable);
+    new_attribute_array.reserve(names_out.size());
 
     // insert the resolved strings into the new attribute array.
     for(int i = 0; i < names_out.size(); i++){
@@ -167,13 +166,13 @@ TerminologyResolver::getPolygonCollection(const QueryRectangle &rect, const Quer
 void TerminologyResolver::writeSemanticParameters(std::ostringstream &stream) {
     Json::Value json(Json::objectValue);
 
-    json["column"]              = column;
+    json["attribute_name"]      = attribute_name;
+    json["resolved_attribute"]  = resolved_attribute;
     json["terminology"]         = terminology;
     json["key"]                 = key;
     json["match_type"]          = match_type;
     json["first_hit"]           = first_hit;
-    json["new_column"]          = new_column;
-    json["on_not_resolvable"]   = (on_not_resolvable == EMPTY) ? "EMPTY" : "NOT_EMPTY";
+    json["on_not_resolvable"]   = (on_not_resolvable == HandleNotResolvable::EMPTY) ? "EMPTY" : "KEEP";
 
     stream << json;
 }

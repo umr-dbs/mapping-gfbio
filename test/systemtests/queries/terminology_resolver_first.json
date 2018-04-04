@@ -16,13 +16,13 @@
 	{
 		"params" : 
 		{
-			"column" : "Name",
+			"attribute_name" : "Name",
+			"resolved_attribute" : "bla",
 			"terminology" : "NCBITAXON",
 			"key" : "label",
 			"match_type" : "exact",
 			"first_hit" : true, 
-			"on_not_resolvable" : "OLD_NAME",
-			"name_appendix" : "bla"
+			"on_not_resolvable" : "KEEP"
 		},
 		"sources" : 
 		{

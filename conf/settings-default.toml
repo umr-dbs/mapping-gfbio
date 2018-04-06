@@ -1,3 +1,4 @@
+
 [gfbio.portal]
 user="user@gfbio.org" # Admin user at GFBio portal
 password="xyz" # Password of admin user
@@ -11,3 +12,7 @@ userdetailswebserviceurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.
 
 [operators.gfbiosource]
 dbcredentials="user = 'user' host = 'localhost' password = 'xyz' dbname = 'gfbio'" # postgres connection string
+
+[terminology]
+threads=16 # number of threads used for sending https requests to terminologies.gfbio.org
+url_search="https://terminologies.gfbio.org/api/terminologies/search" # base url for http requests to search api of terminologies

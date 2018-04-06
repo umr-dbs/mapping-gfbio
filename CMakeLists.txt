@@ -34,7 +34,7 @@ include(LinkLibrariesInternal)
 include(DownloadProject)
 
 find_package(PugiXML REQUIRED)
-
+find_package(Boost COMPONENTS thread system REQUIRED)
 
 if (NOT is_mapping_module)
     download_project(PROJ jsoncpp
@@ -54,12 +54,20 @@ endif (NOT is_mapping_module)
 
 add_subdirectory(src)
 
+add_subdirectory(test)
+
 # Add libraries for inlcuding them in the core build process
 if (is_mapping_module)
     set(MAPPING_ADD_TO_BASE_OBJECTS ${MAPPING_ADD_TO_BASE_OBJECTS} mapping_gfbio_base_lib PARENT_SCOPE)
 
     set(MAPPING_ADD_TO_OPERATORS_OBJECTS ${MAPPING_ADD_TO_OPERATORS_OBJECTS} mapping_gfbio_operators_lib PARENT_SCOPE)
-    set(MAPPING_ADD_TO_OPERATORS_LIBRARIES ${MAPPING_ADD_TO_OPERATORS_LIBRARIES} ${PUGIXML_LIBRARIES} PARENT_SCOPE)
+
+    set(MAPPING_ADD_TO_OPERATORS_LIBRARIES ${MAPPING_ADD_TO_OPERATORS_LIBRARIES} ${PUGIXML_LIBRARIES} ${Boost_LIBRARIES} PARENT_SCOPE)
+    set(MAPPING_ADD_TO_BASE_LIBRARIES ${MAPPING_ADD_TO_BASE_LIBRARIES} PocoFoundation PocoNet PocoNetSSL PARENT_SCOPE)
 
     set(MAPPING_ADD_TO_SERVICES_OBJECTS ${MAPPING_ADD_TO_SERVICES_OBJECTS} mapping_gfbio_services_lib PARENT_SCOPE)
+
+    set(MAPPING_ADD_TO_UNITTESTS_LIBRARIES_INTERNAL ${MAPPING_ADD_TO_UNITTESTS_LIBRARIES_INTERNAL} mapping_gfbio_unittests_lib PARENT_SCOPE)
+    set(SYSTEMTESTS_mapping-gfbio_INTERNAL ${systemtests} PARENT_SCOPE)
+
 endif (is_mapping_module)

@@ -1,2 +1,4 @@
 build dependencies,runtime dependencies
+libboost-all-dev,libboost-thread1.58.0
+libpoco-dev,libpoconetssl46
 libpugixml-dev,libpugixml1v5

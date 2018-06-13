@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/umr-dbs/mapping-gfbio.svg?branch=master)](https://travis-ci.org/umr-dbs/mapping-gfbio)
+
 # MAPPING GFBio Module
 
 ## Requirements

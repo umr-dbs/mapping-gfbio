@@ -96,12 +96,25 @@ RUN \
     mv docker-files/mapping-service.sh /etc/service/mapping/run && \
     chmod +x /etc/service/mapping/run && \
     ln -sfT /dev/stderr /var/log/mapping.log && \
+    # Serve through apache httpd
+    apt-get install --yes apache2 && \
+    a2enmod proxy_fcgi && \
+    awk '{ if ($0 == "</VirtualHost>") print "\n\tProxyPass /cgi-bin/mapping_cgi fcgi://localhost:10100\n</VirtualHost>"; else print $0}' \
+        /etc/apache2/sites-enabled/000-default.conf > /etc/apache2/sites-enabled/tmp.conf && \
+    mv -f /etc/apache2/sites-enabled/tmp.conf /etc/apache2/sites-enabled/000-default.conf && \
+    # service apache2 restart && \
+    mkdir --parents /etc/service/apache/ && \
+    echo "#!/bin/sh\n\napachectl -DFOREGROUND 2>&1" > /etc/service/apache/run && \
+    chmod +x /etc/service/apache/run && \
+    ln -sfT /dev/stdout /var/log/apache2/access.log && \
+    ln -sfT /dev/stderr /var/log/apache2/error.log && \
     # Clean APT and install scripts
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /app/docker-files
 
 # Make port 10100 available to the world outside this container
-EXPOSE 10100
+# EXPOSE 10100
+EXPOSE 80
 
 # Expose mountable volumes
 VOLUME /app/gdalsources_data \

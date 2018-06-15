@@ -104,7 +104,16 @@ RUN \
     mv -f /etc/apache2/sites-enabled/tmp.conf /etc/apache2/sites-enabled/000-default.conf && \
     # service apache2 restart && \
     mkdir --parents /etc/service/apache/ && \
-    echo "#!/bin/sh\n\napachectl -DFOREGROUND 2>&1" > /etc/service/apache/run && \
+        echo "#!/bin/sh\n\
+\n\
+set -e\n\
+\n\
+. /etc/apache2/envvars\
+\n\
+exec /usr/sbin/apache2 -f /etc/apache2/apache2.conf -DNO_DETACH\n\
+    " > /etc/service/apache/run && \
+    mkdir /var/lock/apache2 && \
+    mkdir /var/run/apache2 && \
     chmod +x /etc/service/apache/run && \
     ln -sfT /dev/stdout /var/log/apache2/access.log && \
     ln -sfT /dev/stderr /var/log/apache2/error.log && \

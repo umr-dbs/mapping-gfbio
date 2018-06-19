@@ -80,6 +80,8 @@ RUN \
     chown www-data:www-data . && \
     touch userdb.sqlite && \
     chown www-data:www-data userdb.sqlite && \
+    mkdir rastersources && \
+    chown www-data:www-data rastersources && \
     mkdir gdalsources_data && \
     chown www-data:www-data gdalsources_data && \
     mkdir gdalsources_description && \
@@ -88,6 +90,8 @@ RUN \
     chown www-data:www-data ogrsources_data && \
     mkdir ogrsources_description && \
     chown www-data:www-data ogrsources_description && \
+    # Copy default config
+    cp docker-files/settings.toml /etc/mapping.conf && \
     # module mounts
     mkdir abcd_files && \
     chown www-data:www-data abcd_files && \
@@ -110,7 +114,7 @@ set -e\n\
 \n\
 . /etc/apache2/envvars\
 \n\
-exec /usr/sbin/apache2 -f /etc/apache2/apache2.conf -DNO_DETACH\n\
+exec /usr/sbin/apache2 -f /etc/apache2/apache2.conf -DNO_DETACH 2>&1\n\
     " > /etc/service/apache/run && \
     mkdir /var/lock/apache2 && \
     mkdir /var/run/apache2 && \
@@ -126,7 +130,8 @@ exec /usr/sbin/apache2 -f /etc/apache2/apache2.conf -DNO_DETACH\n\
 EXPOSE 80
 
 # Expose mountable volumes
-VOLUME /app/gdalsources_data \
+VOLUME /app/rastersources \
+       /app/gdalsources_data \
        /app/gdalsources_description \
        # /app/userdb.sqlite \
        # /app/conf/settings.toml \

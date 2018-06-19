@@ -92,7 +92,8 @@ std::vector<std::string> Terminology::resolveMultiple(const std::vector<std::str
     for(auto &name : names_in){
         names_out.push_back(resolved_pairs[name]);
     }
-    
+
+    return names_out;
 }
 
 /**

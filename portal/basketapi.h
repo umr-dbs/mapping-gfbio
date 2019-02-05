@@ -49,7 +49,6 @@ public:
 		ResultType resultType;
 
 		virtual Json::Value toJson() const;
-
     };
 
 	class ABCDBasketEntry : public BasketEntry {
@@ -63,7 +62,7 @@ public:
 
 	class PangaeaBasketEntry : public BasketEntry {
 	public:
-        explicit PangaeaBasketEntry(const std::string &doi);
+        explicit PangaeaBasketEntry(const std::string &doi, bool vatVisualizable = true);
 
         std::string doi;
 		std::string format;

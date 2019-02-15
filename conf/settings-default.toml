@@ -15,6 +15,7 @@ dbcredentials="user = 'user' host = 'localhost' password = 'xyz' dbname = 'gfbio
 
 [operators.abcdsource]
 dbcredentials="user = 'user' host = 'localhost' password = 'xyz' dbname = 'gfbio'" # postgres connection string
+schema="abcd"
 
 [terminology]
 threads=16 # number of threads used for sending https requests to terminologies.gfbio.org

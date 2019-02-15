@@ -80,13 +80,14 @@ size_t GFBioDataUtil::countIUCNResults(std::string &scientificName) {
  */
 Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
     pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
+    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
 
     const auto view_table = "dataset_listing";
     connection.prepare(
             "abcd_info",
             concat(
                     "SELECT link, dataset, file, provider, available, isGeoReferenced",
-                    " FROM ", view_table, ";"
+                    " FROM ", schema, ".", view_table, ";"
             )
     );
 
@@ -116,11 +117,12 @@ Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
 
 std::vector<std::string> GFBioDataUtil::getAvailableABCDArchives() {
     pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
+    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
 
     const auto view_table = "dataset_listing";
     connection.prepare(
             "abcd_info_available",
-            concat("SELECT file FROM ", view_table, "WHERE available;")
+            concat("SELECT file FROM ", schema, ".", view_table, "WHERE available;")
     );
 
     pqxx::work work(connection);

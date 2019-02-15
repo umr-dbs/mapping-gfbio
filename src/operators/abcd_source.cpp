@@ -192,6 +192,7 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
     const auto latitude_column_hash = hash(latitude_column);
 
     pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
+    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
 
     const auto numeric_columns = join(numeric_attribute_hashes, "\",\"");
     const auto textual_columns = join(textual_attribute_hashes, "\",\"");
@@ -208,7 +209,7 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
                     textual_columns,
                     textual_columns.empty() ? "" : "\"",
                     " ",
-                    "FROM abcd_datasets JOIN abcd_units USING(dataset_id) ",
+                    "FROM ", schema, ".abcd_datasets JOIN abcd_units USING(dataset_id) ",
                     "WHERE dataset_path = $1 ",
                     "AND ", filterUnitsById ? "? IN ($2) " : "$2 ",
                     "AND \"", longitude_column_hash, "\" IS NOT NULL ",
@@ -270,6 +271,7 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
     const auto license_path_hash = hash(license_path);
 
     pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
+    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
 
     connection.prepare(
             "abcd_provenance",
@@ -279,7 +281,7 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
                     "\"", citation_path_hash, "\", ",
                     "\"", uri_path_hash, "\", ",
                     "\"", license_path_hash, "\" ",
-                    "FROM abcd_datasets ",
+                    "FROM ", schema, ".abcd_datasets ",
                     "WHERE dataset_path = $1 ",
                     ";"
             )

@@ -209,7 +209,7 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
                     textual_columns,
                     textual_columns.empty() ? "" : "\"",
                     " ",
-                    "FROM ", schema, ".abcd_datasets JOIN abcd_units USING(dataset_id) ",
+                    "FROM ", schema, ".abcd_datasets JOIN ", schema, ".abcd_units USING(dataset_id) ",
                     "WHERE dataset_path = $1 ",
                     "AND ", filterUnitsById ? "? IN ($2) " : "$2 ",
                     "AND \"", longitude_column_hash, "\" IS NOT NULL ",

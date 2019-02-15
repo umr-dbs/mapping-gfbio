@@ -292,7 +292,7 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
         throw ArgumentException(concat("The ABCD dataset ", archive, "does not exist."));
     }
 
-    const auto row = result.[0]; // single row result
+    const auto row = result[0]; // single row result
 
     Provenance provenance;
     provenance.citation += row[title_path_hash].is_null() ? "" : row[title_path_hash].as<std::string>();

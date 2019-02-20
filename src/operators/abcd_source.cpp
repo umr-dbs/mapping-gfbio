@@ -197,9 +197,22 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
     const auto numeric_columns = join(numeric_attribute_hashes, "\",\"");
     const auto textual_columns = join(textual_attribute_hashes, "\",\"");
 
+    const auto MAX_RETURN_ITEMS = 100000;
+    const auto TABLE_SAMPLE_SEED = .618651;
+
     connection.prepare(
             "abcd_query",
             concat(
+                    "WITH JOINED_TBL AS ( ",
+                    "SELECT *"
+                    "FROM ", schema, ".abcd_datasets JOIN ", schema, ".abcd_units USING(dataset_id) ",
+                    "WHERE dataset_path = $1 ",
+                    "AND ", filterUnitsById ? "? IN ($2) " : "$2 ",
+                    "AND \"", longitude_column_hash, "\" IS NOT NULL ",
+                    "AND \"", latitude_column_hash, "\" IS NOT NULL ",
+                    "AND \"", longitude_column_hash, "\" BETWEEN $3 and $4 ",
+                    "AND \"", latitude_column_hash, "\" BETWEEN $5 and $6 ",
+                    ") ",
                     "SELECT ",
                     "\"", longitude_column_hash, "\",\"", latitude_column_hash, "\"",
                     numeric_columns.empty() ? "" : ",\"",
@@ -209,17 +222,13 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
                     textual_columns,
                     textual_columns.empty() ? "" : "\"",
                     " ",
-                    "FROM ", schema, ".abcd_datasets JOIN ", schema, ".abcd_units USING(dataset_id) ",
-                    "WHERE dataset_path = $1 ",
-                    "AND ", filterUnitsById ? "? IN ($2) " : "$2 ",
-                    "AND \"", longitude_column_hash, "\" IS NOT NULL ",
-                    "AND \"", latitude_column_hash, "\" IS NOT NULL ",
-                    "AND \"", longitude_column_hash, "\" BETWEEN $3 and $4 ",
-                    "AND \"", latitude_column_hash, "\" BETWEEN $5 and $6 ",
+                    "FROM JOINED_TBL "
+                    "WHERE RANDOM()<=(", MAX_RETURN_ITEMS, "::float / (SELECT COUNT(*)::float FROM JOINED_TBL)) ",
                     ";"
             )
     );
     pqxx::work work{connection};
+    work.exec(concat("SELECT SETSEED(", TABLE_SAMPLE_SEED, ")")); // set seed for random
     pqxx::result result = work.prepared("abcd_query")
                     (archive)
                     (unit_filter.str())
@@ -241,7 +250,7 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
             const auto attribute = numeric_attributes[i];
             const auto hash = numeric_attribute_hashes[i];
             const auto entry = row[hash];
-            // TODO: defaul value? null value?
+            // TODO: default value? null value?
             auto value = entry.is_null() ? NAN : row[hash].as<double>();
             points->feature_attributes.numeric(attribute).set(points->getFeatureCount() - 1, value);
         }
@@ -249,7 +258,7 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
             const auto attribute = textual_attributes[i];
             const auto hash = textual_attribute_hashes[i];
             const auto entry = row[hash];
-            // TODO: defaul value? null value?
+            // TODO: default value? null value?
             auto value = entry.is_null() ? "" : row[hash].as<std::string>();
             points->feature_attributes.textual(attribute).set(points->getFeatureCount() - 1, value);
         }

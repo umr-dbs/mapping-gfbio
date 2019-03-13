@@ -5,7 +5,6 @@
 #include "util/curl.h"
 #include "util/csvparser.h"
 #include "util/configuration.h"
-#include "util/make_unique.h"
 #include "util/gfbiodatautil.h"
 #include "datatypes/simplefeaturecollections/wkbutil.h"
 
@@ -140,7 +139,7 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
 	std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
 
 	//fetch occurrences
-	auto points = make_unique<PointCollection>(rect);
+	auto points = std::make_unique<PointCollection>(rect);
 	if(textual_attributes.size() > 0 || numeric_attributes.size() > 0) {
 		std::stringstream columns;
 

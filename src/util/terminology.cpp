@@ -3,7 +3,6 @@
 #include <vector>
 #include <iostream>
 #include <future>
-#include "util/make_unique.h"
 #include "util/configuration.h"
 
 #include <boost/shared_ptr.hpp>

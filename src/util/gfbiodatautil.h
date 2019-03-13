@@ -1,7 +1,6 @@
 #ifndef UTIL_GFBIODATAUTIL_H_
 #define UTIL_GFBIODATAUTIL_H_
 
-#include "util/make_unique.h"
 #include "datatypes/spatiotemporal.h"
 
 #include <pqxx/pqxx>

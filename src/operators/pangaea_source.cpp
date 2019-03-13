@@ -1,7 +1,6 @@
 #include "operators/operator.h"
 #include "datatypes/pointcollection.h"
 
-#include "util/make_unique.h"
 #include "util/curl.h"
 #include "util/configuration.h"
 #include "util/csv_source_util.h"
@@ -94,7 +93,7 @@ PangaeaSourceOperator::PangaeaSourceOperator(int sourcecounts[], GenericOperator
 	assumeSources(0);
 	doi = params.get("doi", "").asString();
 
-	csvUtil = make_unique<CSVSourceUtil>(params);
+	csvUtil = std::make_unique<CSVSourceUtil>(params);
 }
 
 void PangaeaSourceOperator::writeSemanticParameters(std::ostringstream& stream) {

@@ -1,6 +1,5 @@
 #include "operators/operator.h"
 #include "datatypes/pointcollection.h"
-#include "util/make_unique.h"
 #include "util/exceptions.h"
 #include "util/configuration.h"
 #include "util/stringsplit.h"
@@ -168,7 +167,7 @@ void ABCDSourceOperator::writeSemanticParameters(std::ostringstream &stream) {
 #ifndef MAPPING_OPERATOR_STUBS
 
 std::unique_ptr<PointCollection> ABCDSourceOperator::createFeatureCollectionWithAttributes(const QueryRectangle &rect) {
-    auto points = make_unique<PointCollection>(rect);
+    auto points = std::make_unique<PointCollection>(rect);
 
     for (auto &attribute : numeric_attributes) {
         points->feature_attributes.addNumericAttribute(attribute, Unit::unknown());

@@ -263,13 +263,11 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	Provenance provenance;
 	provenance.local_identifier = "data." + getType();
 
-	std::string titlePath = "DataSets/DataSet/Metadata/Description/Representation/Title";
 	std::string citationPath = "DataSets/DataSet/Metadata/IPRStatements/Citations/Citation/Text";
 	std::string uriPath = "DataSets/DataSet/Metadata/Description/Representation/URI";
 	std::string licensePath = "DataSets/DataSet/Metadata/IPRStatements/Licenses/License/Text";
-//
-	provenance.citation = doc.select_node(getXPathQuery(titlePath).c_str()).node().text().get();
-	provenance.citation += doc.select_node(getXPathQuery(citationPath).c_str()).node().text().get();
+
+	provenance.citation = doc.select_node(getXPathQuery(citationPath).c_str()).node().text().get();
 	provenance.uri += doc.select_node(getXPathQuery(uriPath).c_str()).node().text().get();
 	provenance.license += doc.select_node(getXPathQuery(licensePath).c_str()).node().text().get();
 

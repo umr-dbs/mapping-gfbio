@@ -285,7 +285,6 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
             "abcd_provenance",
             concat(
                     "SELECT ",
-                    "\"", title_path_hash, "\", ",
                     "\"", citation_path_hash, "\", ",
                     "\"", uri_path_hash, "\", ",
                     "\"", license_path_hash, "\" ",
@@ -305,11 +304,9 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
     const auto row = result[0]; // single row result
 
     Provenance provenance;
-    provenance.citation += row[title_path_hash].is_null() ? "" : row[title_path_hash].as<std::string>();
-    provenance.citation += '\n';
-    provenance.citation += row[citation_path_hash].is_null() ? "" : row[citation_path_hash].as<std::string>();
-    provenance.uri += row[uri_path_hash].is_null() ? "" : row[uri_path_hash].as<std::string>();
-    provenance.license += row[license_path_hash].is_null() ? "" : row[license_path_hash].as<std::string>();
+    provenance.citation = row[citation_path_hash].is_null() ? "" : row[citation_path_hash].as<std::string>();
+    provenance.uri = row[uri_path_hash].is_null() ? "" : row[uri_path_hash].as<std::string>();
+    provenance.license = row[license_path_hash].is_null() ? "" : row[license_path_hash].as<std::string>();
 
     pc.add(provenance);
 }

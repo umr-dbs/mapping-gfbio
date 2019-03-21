@@ -172,11 +172,13 @@ void GFBioService::run() {
 				return;
 			}
 
+			std::string level = params.get("level");
+
 			pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
-			connection.prepare("searchSpecies", "SELECT DISTINCT name FROM gbif.gbif_taxon_to_name WHERE lower(name) like lower($1) ORDER BY name ASC");
+			connection.prepare("searchSpecies", "SELECT term FROM gbif.taxonomy WHERE term ilike $1 AND level = lower($2) ORDER BY term ASC");
 			pqxx::work work(connection);
-			pqxx::result result = work.prepared("searchSpecies")(term + "%").exec();
+			pqxx::result result = work.prepared("searchSpecies")(term + "%")(level).exec();
 
 			Json::Value json(Json::objectValue);
 			Json::Value names(Json::arrayValue);
@@ -191,24 +193,26 @@ void GFBioService::run() {
 		}
 
 		if(request == "queryDataSources") {
-			std::string scientificName = params.get("term");
-			if(scientificName.size() < 3) {
+			std::string term = params.get("term");
+			if(term.size() < 3) {
 				response.sendFailureJSON("Term has to be >= 3 characters");
 				return;
 			}
+
+			std::string level = params.get("level");
 
 			Json::Value json(Json::objectValue);
 			Json::Value sources(Json::arrayValue);
 
 			Json::Value gbif(Json::objectValue);
 			gbif["name"] = "GBIF";
-			gbif["count"] = (Json::Int) GFBioDataUtil::countGBIFResults(scientificName);
+			gbif["count"] = (Json::Int) GFBioDataUtil::countGBIFResults(term, level);
 
 			sources.append(gbif);
 
 			Json::Value iucn(Json::objectValue);
 			iucn["name"] = "IUCN";
-			iucn["count"] = (Json::Int) GFBioDataUtil::countIUCNResults(scientificName);
+			iucn["count"] = (Json::Int) GFBioDataUtil::countIUCNResults(term ,level);
 
 			sources.append(iucn);
 

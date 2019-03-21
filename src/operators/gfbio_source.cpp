@@ -26,7 +26,8 @@
  *
  * - Parameters:
  * 	- dataSource: gbif | iucn
- * 	- scientificName: the name of the species
+ * 	- term: the search term
+ * 	- level: the taxonomy level (family, kingdom, species, ...)
  * 	- columns:
  * 		- numeric: array of column names of numeric type
  * 		- textual: array of column names of textual type
@@ -45,7 +46,8 @@ class GFBioSourceOperator : public GenericOperator {
 		void writeSemanticParameters(std::ostringstream& stream);
 
 	private:
-		std::string scientificName;
+		std::string term;
+		std::string level;
 		std::string dataSource;
 
 		std::vector<std::string> numeric_attributes;
@@ -58,10 +60,11 @@ class GFBioSourceOperator : public GenericOperator {
 GFBioSourceOperator::GFBioSourceOperator(int sourcecounts[], GenericOperator *sources[], Json::Value &params) : GenericOperator(sourcecounts, sources) {
 	assumeSources(0);
 
-	scientificName = params.get("scientificName", "").asString();
+	term = params.get("term", "").asString();
+	level = params.get("level", "").asString();
 	dataSource = params.get("dataSource", "").asString();
 
-	if(scientificName.length() < 3)
+	if(term.length() < 3)
 		throw ArgumentException("GFBioSourceOperator: scientificName must contain at least 3 characters");
 
 	// attributes to be extracted
@@ -88,7 +91,9 @@ REGISTER_OPERATOR(GFBioSourceOperator, "gfbio_source");
 
 void GFBioSourceOperator::writeSemanticParameters(std::ostringstream& stream) {
 	Json::Value json(Json::objectValue);
-	json["scientificName"] = scientificName;
+	json["term"] = term;
+	json["level"] = level;
+	json["datasource"] = dataSource;
 
 	Json::Value columns(Json::objectValue);
 
@@ -114,7 +119,7 @@ void GFBioSourceOperator::getProvenance(ProvenanceCollection &pc) {
 	if(dataSource == "GBIF") {
 		pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
-		std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
+		std::string taxa = GFBioDataUtil::resolveTaxa(connection, term, level);
 
 
 		connection.prepare("provenance", "SELECT DISTINCT key, citation, uri from gbif.gbif_lite_time join gbif.datasets ON (uid = key) WHERE taxon = ANY($1)");
@@ -136,7 +141,7 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
 	//TODO: reuse
 	pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
-	std::string taxa = GFBioDataUtil::resolveTaxa(connection, scientificName);
+	std::string taxa = GFBioDataUtil::resolveTaxa(connection, term, level);
 
 	//fetch occurrences
 	auto points = std::make_unique<PointCollection>(rect);
@@ -170,7 +175,7 @@ std::unique_ptr<PointCollection> GFBioSourceOperator::getPointCollection(const Q
 		connection.prepare("occurrences", query);
 	}
 	else
-		connection.prepare("occurrences", "SELECT ST_X(geom) x, ST_Y(geom) y, extract(epoch from eventdate) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
+		connection.prepare("occurrences", "SELECT ST_X(geom) x, ST_Y(geom) y, extract(epoch from event_date) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND ST_CONTAINS(ST_MakeEnvelope($2, $3, $4, $5, 4326), geom)");
 
 	pqxx::work work(connection);
 	pqxx::result result = work.prepared("occurrences")(taxa)(rect.x1)(rect.y1)(rect.x2)(rect.y2).exec();
@@ -227,7 +232,7 @@ std::unique_ptr<PolygonCollection> GFBioSourceOperator::getPolygonCollection(con
 	//TODO: reuse
 	pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
-	std::string taxa = GFBioDataUtil::resolveTaxaNames(connection, scientificName);
+	std::string taxa = GFBioDataUtil::resolveTaxaNames(connection, term, level);
 
 
 	connection.prepare("occurrences", "SELECT ST_AsEWKT(ST_Collect(geom)) FROM iucn.expert_ranges_all WHERE lower(binomial) = ANY ($1)");

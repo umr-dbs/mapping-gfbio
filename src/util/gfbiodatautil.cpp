@@ -7,10 +7,10 @@
 #include <fstream>
 
 
-std::string GFBioDataUtil::resolveTaxa(pqxx::connection &connection, std::string &scientificName) {
-	connection.prepare("taxa", "SELECT DISTINCT taxon FROM gbif.gbif_taxon_to_name WHERE name ILIKE $1");
+std::string GFBioDataUtil::resolveTaxa(pqxx::connection &connection, std::string &term, std::string &level) {
+	connection.prepare("taxa", "SELECT DISTINCT taxon FROM gbif.taxon_to_term WHERE level = lower($1) and term ILIKE $2");
 	pqxx::work work(connection);
-	pqxx::result result = work.prepared("taxa")(scientificName + "%").exec();
+	pqxx::result result = work.prepared("taxa")(level)(term + "%").exec();
 
 	std::stringstream taxa;
 	taxa << "{";
@@ -23,26 +23,28 @@ std::string GFBioDataUtil::resolveTaxa(pqxx::connection &connection, std::string
 	return taxa.str();
 }
 
-std::string GFBioDataUtil::resolveTaxaNames(pqxx::connection &connection, std::string &scientificName) {
-	connection.prepare("taxa", "SELECT DISTINCT lower(name) FROM gbif.gbif_taxon_to_name WHERE name ILIKE $1");
-	pqxx::work work(connection);
-	pqxx::result result = work.prepared("taxa")(scientificName + "%").exec();
+std::string GFBioDataUtil::resolveTaxaNames(pqxx::connection &connection, std::string &term, std::string &level) {
+	std::string taxa = resolveTaxa(connection, term, level);
 
-	std::stringstream taxa;
-	taxa << "{";
+	connection.prepare("taxaNames", "SELECT DISTINCT lower(name) FROM gbif.gbif_taxon_to_name WHERE taxon = ANY($1) AND name != ''");
+	pqxx::work work(connection);
+	pqxx::result result = work.prepared("taxaNames")(taxa).exec();
+
+	std::stringstream taxaNames;
+	taxaNames << "{";
 	for(size_t i = 0; i < result.size(); ++i) {
 		if(i != 0)
-			taxa << ",";
-		taxa << result[i][0];
+			taxaNames << ",";
+		taxaNames << result[i][0];
 	}
-	taxa << "}";
-	return taxa.str();
+	taxaNames << "}";
+	return taxaNames.str();
 }
 
-size_t GFBioDataUtil::countGBIFResults(std::string &scientificName) {
+size_t GFBioDataUtil::countGBIFResults(std::string &term, std::string &level) {
 	pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
-	std::string taxa = resolveTaxa(connection, scientificName);
+	std::string taxa = resolveTaxa(connection, term, level);
 
 	connection.prepare("occurrences", "SELECT count(*) FROM gbif.gbif_lite_time WHERE taxon = ANY($1) AND geom IS NOT NULL");
 
@@ -53,10 +55,10 @@ size_t GFBioDataUtil::countGBIFResults(std::string &scientificName) {
 	return result[0][0].as<size_t>();
 }
 
-size_t GFBioDataUtil::countIUCNResults(std::string &scientificName) {
+size_t GFBioDataUtil::countIUCNResults(std::string &term, std::string &level) {
 	pqxx::connection connection (Configuration::get<std::string>("operators.gfbiosource.dbcredentials"));
 
-	std::string taxa = resolveTaxaNames(connection, scientificName);
+	std::string taxa = resolveTaxaNames(connection, term, level);
 	connection.prepare("occurrences", "SELECT count(*) FROM iucn.expert_ranges_all WHERE lower(binomial) = ANY($1)");
 
 	pqxx::work work(connection);

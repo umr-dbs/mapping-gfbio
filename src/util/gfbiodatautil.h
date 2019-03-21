@@ -9,12 +9,12 @@
 class GFBioDataUtil {
 public:
 
-	static std::string resolveTaxa(pqxx::connection &connection, std::string &scientificName);
-	static std::string resolveTaxaNames(pqxx::connection &connection, std::string &scientificName);
+	static std::string resolveTaxa(pqxx::connection &connection, std::string &term, std::string &level);
+	static std::string resolveTaxaNames(pqxx::connection &connection, std::string &term, std::string &level);
 
-	static size_t countGBIFResults(std::string &scientificName);
+	static size_t countGBIFResults(std::string &term, std::string &level);
 
-	static size_t countIUCNResults(std::string &scientificName);
+	static size_t countIUCNResults(std::string &term, std::string &level);
 
 	static std::vector<std::string> getAvailableABCDArchives();
 

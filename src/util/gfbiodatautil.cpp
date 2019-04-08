@@ -122,7 +122,7 @@ std::vector<std::string> GFBioDataUtil::getAvailableABCDArchives() {
     const auto view_table = "dataset_listing";
     connection.prepare(
             "abcd_info_available",
-            concat("SELECT file FROM ", schema, ".", view_table, "WHERE available;")
+            concat("SELECT file FROM ", schema, ".", view_table, " WHERE available;")
     );
 
     pqxx::work work(connection);

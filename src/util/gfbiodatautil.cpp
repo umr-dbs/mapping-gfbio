@@ -71,32 +71,69 @@ size_t GFBioDataUtil::countIUCNResults(std::string &term, std::string &level) {
 /**
  * read the GFBio data centers file and return as Json object
  * TODO: manage data centers in a database and map them to a c++ class
+ * Structure:
+ * [{
+ * 		"link": <string>, "dataset": <string>, "file": <string>,
+ * 		"provider": <string>, "available": <bool>,"isGeoReferenced": <bool>
+ * }, ...]
  * @return a json object containing the available data centers
  */
 Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
-	auto path = Configuration::get<std::string>("gfbio.abcd.datapath");
+    pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
+    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
 
-	std::ifstream file(path + "gfbio_datacenters.json");
-	if (!file.is_open()) {
-		throw std::runtime_error("gfbio_datacenters.json missing");
-	}
+    const auto view_table = "dataset_listing";
+    connection.prepare(
+            "abcd_info",
+            concat(
+                    "SELECT link, dataset, file, provider, available, isGeoReferenced",
+                    " FROM ", schema, ".", view_table, ";"
+            )
+    );
 
-	Json::Reader reader(Json::Features::strictMode());
-	Json::Value root;
-	if (!reader.parse(file, root)) {
-		throw std::runtime_error("gfbio_datacenters.json invalid");
-	}
+    pqxx::work work(connection);
+    pqxx::result result = work.prepared("abcd_info").exec();
+    work.commit();
 
-	return root;
+    Json::Value archives{Json::arrayValue};
+    for (const auto &row : result) {
+        Json::Value archive{Json::objectValue};
+
+        archive["link"] = row["link"].as<std::string>();
+        archive["dataset"] = row["dataset"].as<std::string>();
+        archive["file"] = row["file"].as<std::string>();
+        archive["provider"] = row["provider"].as<std::string>();
+        archive["available"] = row["available"].as<bool>();
+        archive["isGeoReferenced"] = row["isGeoReferenced"].as<bool>();
+
+        archives.append(archive);
+    }
+
+    Json::Value root{Json::objectValue};
+    root["archives"] = archives;
+    return root;
 }
 
 
 std::vector<std::string> GFBioDataUtil::getAvailableABCDArchives() {
-	Json::Value dataCenters = getGFBioDataCentersJSON();
-	std::vector<std::string> availableArchives;
-	for(Json::Value &dataCenter : dataCenters["archives"]) {
-		availableArchives.push_back(dataCenter.get("file", "").asString());
-	}
-	return availableArchives;
+    pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
+    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
+
+    const auto view_table = "dataset_listing";
+    connection.prepare(
+            "abcd_info_available",
+            concat("SELECT file FROM ", schema, ".", view_table, " WHERE available;")
+    );
+
+    pqxx::work work(connection);
+    pqxx::result result = work.prepared("abcd_info_available").exec();
+    work.commit();
+
+    std::vector<std::string> files;
+    for (const auto &row : result) {
+        files.push_back(row["file"].as<std::string>());
+    }
+
+    return files;
 }
 

@@ -36,9 +36,9 @@ std::unique_ptr<BasketAPI::BasketEntry> BasketAPI::BasketEntry::fromJson(const J
             throw ArgumentException("Pangaea dataset has no DOI");
         }
 
-		return make_unique<BasketAPI::PangaeaBasketEntry>(doi);
+		return std::make_unique<BasketAPI::PangaeaBasketEntry>(doi);
 	} else {
-		return make_unique<BasketAPI::ABCDBasketEntry>(json, availableArchives);
+		return std::make_unique<BasketAPI::ABCDBasketEntry>(json, availableArchives);
 	}
 }
 

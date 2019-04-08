@@ -1,6 +1,5 @@
 #include "operators/operator.h"
 #include "datatypes/pointcollection.h"
-#include "util/make_unique.h"
 #include "util/exceptions.h"
 #include "util/configuration.h"
 #include "util/stringsplit.h"
@@ -168,7 +167,7 @@ void ABCDSourceOperator::writeSemanticParameters(std::ostringstream &stream) {
 #ifndef MAPPING_OPERATOR_STUBS
 
 std::unique_ptr<PointCollection> ABCDSourceOperator::createFeatureCollectionWithAttributes(const QueryRectangle &rect) {
-    auto points = make_unique<PointCollection>(rect);
+    auto points = std::make_unique<PointCollection>(rect);
 
     for (auto &attribute : numeric_attributes) {
         points->feature_attributes.addNumericAttribute(attribute, Unit::unknown());
@@ -286,7 +285,6 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
             "abcd_provenance",
             concat(
                     "SELECT ",
-                    "\"", title_path_hash, "\", ",
                     "\"", citation_path_hash, "\", ",
                     "\"", uri_path_hash, "\", ",
                     "\"", license_path_hash, "\" ",
@@ -306,11 +304,9 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
     const auto row = result[0]; // single row result
 
     Provenance provenance;
-    provenance.citation += row[title_path_hash].is_null() ? "" : row[title_path_hash].as<std::string>();
-    provenance.citation += '\n';
-    provenance.citation += row[citation_path_hash].is_null() ? "" : row[citation_path_hash].as<std::string>();
-    provenance.uri += row[uri_path_hash].is_null() ? "" : row[uri_path_hash].as<std::string>();
-    provenance.license += row[license_path_hash].is_null() ? "" : row[license_path_hash].as<std::string>();
+    provenance.citation = row[citation_path_hash].is_null() ? "" : row[citation_path_hash].as<std::string>();
+    provenance.uri = row[uri_path_hash].is_null() ? "" : row[uri_path_hash].as<std::string>();
+    provenance.license = row[license_path_hash].is_null() ? "" : row[license_path_hash].as<std::string>();
 
     pc.add(provenance);
 }

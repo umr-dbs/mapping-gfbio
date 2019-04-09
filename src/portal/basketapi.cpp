@@ -36,7 +36,7 @@ std::unique_ptr<BasketAPI::BasketEntry> BasketAPI::BasketEntry::fromJson(const J
             throw ArgumentException("Pangaea dataset has no DOI");
         }
 
-		return std::make_unique<BasketAPI::PangaeaBasketEntry>(doi);
+		return std::make_unique<BasketAPI::PangaeaBasketEntry>(doi, json.get("vatVisualizable", false).asBool());
 	} else {
 		return std::make_unique<BasketAPI::ABCDBasketEntry>(json, availableArchives);
 	}
@@ -97,7 +97,7 @@ Json::Value BasketAPI::BasketEntry::toJson() const {
 
 BasketAPI::BasketEntry::BasketEntry() = default;
 
-BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const std::string &doi) {
+BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const std::string &doi, const bool vatVisualizable) {
     PangaeaAPI::MetaData metaData = PangaeaAPI::getMetaData(doi);
     this->doi = doi;
 
@@ -109,7 +109,6 @@ BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const std::string &doi) {
     this->metadataLink = metaData.metaDataLink;
 
     this->available = false;
-
 
     this->dataLink = metaData.dataLink;
     this->format = metaData.format;
@@ -160,7 +159,7 @@ BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const std::string &doi) {
 		this->geometrySpecification = GeometrySpecification::NONE;
 	}
 
-    this->available = this->isTabSeparated && this->isGeoReferenced;
+    this->available = this->isTabSeparated && this->isGeoReferenced && vatVisualizable;
 }
 
 
@@ -208,6 +207,8 @@ BasketAPI::ABCDBasketEntry::ABCDBasketEntry(const Json::Value &json, const std::
 			availableArchives.end(),
 			dataLink)
 			!= availableArchives.end();
+
+	available = available && json.get("vatVisualizable", false).asBool();
 }
 
 Json::Value BasketAPI::ABCDBasketEntry::toJson() const {

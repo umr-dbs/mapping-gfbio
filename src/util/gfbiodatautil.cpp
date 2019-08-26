@@ -69,24 +69,24 @@ size_t GFBioDataUtil::countIUCNResults(std::string &term, std::string &level) {
 }
 
 /**
- * read the GFBio data centers file and return as Json object
+ * read the GFBio data centers ids and return as Json object
  * TODO: manage data centers in a database and map them to a c++ class
  * Structure:
  * [{
- * 		"link": <string>, "dataset": <string>, "file": <string>,
+ * 		"link": <string>, "dataset": <string>, "id": <string>,
  * 		"provider": <string>, "available": <bool>,"isGeoReferenced": <bool>
  * }, ...]
  * @return a json object containing the available data centers
  */
 Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
     pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
-    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
+    const auto schema = Configuration::get<std::string>("operators.abcdsource.schema");
 
     const auto view_table = "dataset_listing";
     connection.prepare(
             "abcd_info",
             concat(
-                    "SELECT link, dataset, file, provider, available, isGeoReferenced",
+                    "SELECT link, dataset, id, provider, available, isGeoReferenced",
                     " FROM ", schema, ".", view_table, ";"
             )
     );
@@ -101,7 +101,7 @@ Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
 
         archive["link"] = row["link"].as<std::string>();
         archive["dataset"] = row["dataset"].as<std::string>();
-        archive["file"] = row["file"].as<std::string>();
+        archive["file"] = row["id"].as<std::string>(); // TODO: rename to `id`
         archive["provider"] = row["provider"].as<std::string>();
         archive["available"] = row["available"].as<bool>();
         archive["isGeoReferenced"] = row["isGeoReferenced"].as<bool>();
@@ -117,23 +117,23 @@ Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
 
 std::vector<std::string> GFBioDataUtil::getAvailableABCDArchives() {
     pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
-    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
+    const auto schema = Configuration::get<std::string>("operators.abcdsource.schema");
 
     const auto view_table = "dataset_listing";
     connection.prepare(
             "abcd_info_available",
-            concat("SELECT file FROM ", schema, ".", view_table, " WHERE available;")
+            concat("SELECT id FROM ", schema, ".", view_table, " WHERE available;")
     );
 
     pqxx::work work(connection);
     pqxx::result result = work.prepared("abcd_info_available").exec();
     work.commit();
 
-    std::vector<std::string> files;
+    std::vector<std::string> ids;
     for (const auto &row : result) {
-        files.push_back(row["file"].as<std::string>());
+        ids.push_back(row["id"].as<std::string>());
     }
 
-    return files;
+    return ids;
 }
 

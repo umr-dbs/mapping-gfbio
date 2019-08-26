@@ -204,8 +204,8 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
             concat(
                     "WITH JOINED_TBL AS ( ",
                     "SELECT *"
-                    "FROM ", schema, ".abcd_datasets JOIN ", schema, ".abcd_units USING(dataset_id) ",
-                    "WHERE dataset_path = $1 ",
+                    "FROM ", schema, ".abcd_datasets JOIN ", schema, ".abcd_units USING(surrogate_key) ",
+                    "WHERE dataset_id = $1 ",
                     "AND ", filterUnitsById ? "? IN ($2) " : "$2 ",
                     "AND \"", longitude_column_hash, "\" IS NOT NULL ",
                     "AND \"", latitude_column_hash, "\" IS NOT NULL ",
@@ -289,7 +289,7 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
                     "\"", uri_path_hash, "\", ",
                     "\"", license_path_hash, "\" ",
                     "FROM ", schema, ".abcd_datasets ",
-                    "WHERE dataset_path = $1 ",
+                    "WHERE dataset_id = $1 ",
                     ";"
             )
     );

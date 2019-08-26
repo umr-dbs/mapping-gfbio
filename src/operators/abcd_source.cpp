@@ -190,6 +190,8 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
     const auto longitude_column_hash = hash(longitude_column);
     const auto latitude_column_hash = hash(latitude_column);
 
+    const auto unit_id_column_hash = hash("/DataSets/DataSet/Units/Unit/UnitID");
+
     pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
     std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
 
@@ -206,7 +208,7 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
                     "SELECT *"
                     "FROM ", schema, ".abcd_datasets JOIN ", schema, ".abcd_units USING(surrogate_key) ",
                     "WHERE dataset_id = $1 ",
-                    "AND ", filterUnitsById ? "? IN ($2) " : "$2 ",
+                    "AND ", filterUnitsById ? concat(unit_id_column_hash, " IN ($2) ") : "$2 ",
                     "AND \"", longitude_column_hash, "\" IS NOT NULL ",
                     "AND \"", latitude_column_hash, "\" IS NOT NULL ",
                     "AND \"", longitude_column_hash, "\" BETWEEN $3 and $4 ",

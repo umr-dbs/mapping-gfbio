@@ -2,20 +2,15 @@
 #include "datatypes/pointcollection.h"
 #include "util/exceptions.h"
 #include "util/configuration.h"
-#include "util/stringsplit.h"
+#include "util/sha1.h"
 
-#include <sstream>
 #include <json/json.h>
 #include <algorithm>
 #include <string>
-#include <functional>
 #include <memory>
-#include <cctype>
 #include <unordered_set>
 #include <vector>
-#include <pugixml.hpp>
 #include <iostream>
-#include <numeric>
 #include <pqxx/pqxx>
 
 
@@ -102,11 +97,8 @@ ABCDSourceOperator::ABCDSourceOperator(int sourcecounts[], GenericOperator *sour
         filterUnitsById = true;
         for (Json::Value &unit : params["units"]) {
             unitIds.emplace(unit.asString());
-            unit_filter << unit.asString() << "','";
         }
-        this->unit_filter << unit_id_field_hash << "{'";
-        this->unit_filter << join(unitIds, "','");
-        this->unit_filter << "'}";
+        this->unit_filter << "{{" << join(unitIds, "},{") << "}}";
     } else {
         this->unit_filter << "true";
     }
@@ -208,7 +200,7 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
                     "SELECT *"
                     "FROM ", schema, ".abcd_datasets JOIN ", schema, ".abcd_units USING(surrogate_key) ",
                     "WHERE dataset_id = $1 ",
-                    "AND ", filterUnitsById ? concat(unit_id_column_hash, " IN ($2) ") : "$2 ",
+                    "AND ", filterUnitsById ? concat(unit_id_column_hash, " = ANY ($2::text[]) ") : "$2 ",
                     "AND \"", longitude_column_hash, "\" IS NOT NULL ",
                     "AND \"", latitude_column_hash, "\" IS NOT NULL ",
                     "AND \"", longitude_column_hash, "\" BETWEEN $3 and $4 ",

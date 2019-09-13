@@ -3,6 +3,7 @@
 #include "util/make_unique.h"
 #include "util/exceptions.h"
 #include "util/configuration.h"
+#include "util/sha1.h"
 #include "util/stringsplit.h"
 
 #include <sstream>

@@ -78,8 +78,8 @@ size_t GFBioDataUtil::countIUCNResults(std::string &scientificName) {
  * @return a json object containing the available data centers
  */
 Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
-    pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
-    const auto schema = Configuration::get<std::string>("operators.abcdsource.schema");
+    pqxx::connection connection{Configuration::get("operators.abcdsource.dbcredentials")};
+    const auto schema = Configuration::get("operators.abcdsource.schema");
 
     const auto view_table = "dataset_listing";
     connection.prepare(
@@ -115,8 +115,8 @@ Json::Value GFBioDataUtil::getGFBioDataCentersJSON() {
 
 
 std::vector<std::string> GFBioDataUtil::getAvailableABCDArchives() {
-    pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
-    const auto schema = Configuration::get<std::string>("operators.abcdsource.schema");
+    pqxx::connection connection{Configuration::get("operators.abcdsource.dbcredentials")};
+    const auto schema = Configuration::get("operators.abcdsource.schema");
 
     const auto view_table = "dataset_listing";
     connection.prepare(

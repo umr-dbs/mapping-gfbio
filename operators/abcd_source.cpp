@@ -193,8 +193,8 @@ ABCDSourceOperator::getPointCollection(const QueryRectangle &rect, const QueryTo
 
     const auto unit_id_column_hash = hash("/DataSets/DataSet/Units/Unit/UnitID");
 
-    pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
-    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
+    pqxx::connection connection{Configuration::get("operators.abcdsource.dbcredentials")};
+    std::string schema = Configuration::get("operators.abcdsource.schema");
 
     const auto numeric_columns = join(numeric_attribute_hashes, "\",\"");
     const auto textual_columns = join(textual_attribute_hashes, "\",\"");
@@ -281,8 +281,8 @@ void ABCDSourceOperator::getProvenance(ProvenanceCollection &pc) {
     const auto uri_path_hash = hash(uri_path);
     const auto license_path_hash = hash(license_path);
 
-    pqxx::connection connection{Configuration::get<std::string>("operators.abcdsource.dbcredentials")};
-    std::string schema = Configuration::get<std::string>("operators.abcdsource.schema");
+    pqxx::connection connection{Configuration::get("operators.abcdsource.dbcredentials")};
+    std::string schema = Configuration::get("operators.abcdsource.schema");
 
     connection.prepare(
             "abcd_provenance",

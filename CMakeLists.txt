@@ -37,6 +37,10 @@ find_package(PugiXML REQUIRED)
 find_package(Boost COMPONENTS thread system REQUIRED)
 
 if (NOT is_mapping_module)
+    # Disable options from cpptoml
+    option(ENABLE_LIBCXX "Use libc++ for the C++ standard library" OFF)
+    option(CPPTOML_BUILD_EXAMPLES "Build examples" OFF)
+
     download_project(PROJ jsoncpp
             GIT_REPOSITORY https://github.com/open-source-parsers/jsoncpp.git
             GIT_TAG 1.7.7

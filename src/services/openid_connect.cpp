@@ -12,6 +12,7 @@
 #include <pqxx/pqxx>
 #include <jwt/jwt.hpp>
 #include <cppcodec/base64_url_unpadded.hpp>
+#include <util/log.h>
 
 /// This class provides methods for user authentication with OpenId Connect
 class OpenIdConnectService : public HTTPService {
@@ -173,8 +174,14 @@ auto OpenIdConnectService::download_jwks(const std::string &url) const -> Json::
     Json::Value response;
     if (!reader.parse(data.str(), response)
         || response.empty() || !response.isMember("keys")
-        || !response["keys"][0].isMember("n") || !response["keys"][0].isMember("e") || !response["keys"][0].isMember("alg"))
+        || !response["keys"][0].isMember("n") || !response["keys"][0].isMember("e") || !response["keys"][0].isMember("alg")) {
+        Log::error(concat(
+                "OpenIdConnectService: JSON Web Key Set is invalid (malformed JSON)",
+                '\n',
+                data.str()
+        ));
         throw OpenIdConnectService::OpenIdConnectServiceException("OpenIdConnectService: JSON Web Key Set is invalid (malformed JSON)");
+    }
 
     // return first key
     return response["keys"][0];
@@ -201,8 +208,14 @@ auto OpenIdConnectService::download_user_data(const std::string &url, const std:
     Json::Value response;
 
     if (!reader.parse(data.str(), response) || response.empty()
-        || !response.isMember("goe_id") || !response.isMember("email"))
+        || !response.isMember("goe_id") || !response.isMember("email")) {
+        Log::error(concat(
+                "OpenIdConnectService: User data is invalid (malformed JSON)",
+                '\n',
+                data.str()
+        ));
         throw OpenIdConnectService::OpenIdConnectServiceException("OpenIdConnectService: User data is invalid (malformed JSON)");
+    }
 
     return response;
 }

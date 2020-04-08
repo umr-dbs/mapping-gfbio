@@ -20,3 +20,8 @@ schema="abcd"
 [terminology]
 threads=16 # number of threads used for sending https requests to terminologies.gfbio.org
 url_search="https://terminologies.gfbio.org/api/terminologies/search" # base url for http requests to search api of terminologies
+
+[oidc]
+jwks_endpoint = "https://sso.gfbio.org/simplesaml/module.php/oidc/jwks.php"
+user_endpoint = "https://sso.gfbio.org/simplesaml/module.php/oidc/userinfo.php"
+allowed_clock_skew_seconds = 10

@@ -2,10 +2,8 @@
 [gfbio.portal]
 user="user@gfbio.org" # Admin user at GFBio portal
 password="xyz" # Password of admin user
-authenticateurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.basket/authenticate" # WS URL for authentication
-basketsbyuseridwebserviceurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.basket/get-baskets-by-user-id" # WS URL for basket by user id
+basketsbyuseridwebserviceurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.basket/get-basket-ids-by-goestern-id" # WS URL for basket by user id
 basketbyidwebserviceurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.basket/get-basket-by-id" # WS URL for basket by id
-userdetailswebserviceurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.basket/get-user-detail" # WS URL for user details
 
 [gfbio.abcd]
 #datapath="" # path to ABCD files

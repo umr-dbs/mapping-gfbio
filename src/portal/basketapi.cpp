@@ -10,89 +10,90 @@
 #include <future>
 
 BasketAPI::Parameter::Parameter(const Json::Value &json) {
-	name = json.get("name", "").asString();
-	unit = json.get("unitText", "").asString();
-	numeric = !unit.empty();
+    name = json.get("name", "").asString();
+    unit = json.get("unitText", "").asString();
+    numeric = !unit.empty();
 }
 
 Json::Value BasketAPI::Parameter::toJson() {
-	Json::Value json(Json::objectValue);
-	json["name"] = name;
-	json["unit"] = unit;
-	json["numeric"] = numeric;
-	return json;
+    Json::Value json(Json::objectValue);
+    json["name"] = name;
+    json["unit"] = unit;
+    json["numeric"] = numeric;
+    return json;
 }
 
-BasketAPI::Parameter::Parameter(const std::string &name, const std::string& unit, bool numeric) : name(name), unit(unit), numeric(numeric) {
+BasketAPI::Parameter::Parameter(const std::string &name, const std::string &unit, bool numeric) : name(name), unit(unit), numeric(numeric) {
 }
 
 
-std::unique_ptr<BasketAPI::BasketEntry> BasketAPI::BasketEntry::fromJson(const Json::Value &json, const std::vector<std::string> &availableArchives) {
-	std::string metadataLink = json.get("metadatalink", "").asString();
+std::unique_ptr<BasketAPI::BasketEntry>
+BasketAPI::BasketEntry::fromJson(const Json::Value &json, const std::vector<std::string> &availableArchives) {
+    std::string metadataLink = json.get("metadatalink", "").asString();
 
-	if(metadataLink.find("doi.pangaea.de/") != std::string::npos) {
+    if (metadataLink.find("doi.pangaea.de/") != std::string::npos) {
         std::string doi = metadataLink.substr(metadataLink.find("doi.pangaea.de/") + std::strlen("doi.pangaea.de/"));
-        if(doi.empty()) {
+        if (doi.empty()) {
             throw ArgumentException("Pangaea dataset has no DOI");
         }
 
-		return std::make_unique<BasketAPI::PangaeaBasketEntry>(doi, json.get("vatVisualizable", false).asBool());
-	} else {
-		return std::make_unique<BasketAPI::ABCDBasketEntry>(json, availableArchives);
-	}
+        return std::make_unique<BasketAPI::PangaeaBasketEntry>(doi, json.get("vatVisualizable", false).asBool());
+    } else {
+        return std::make_unique<BasketAPI::ABCDBasketEntry>(json, availableArchives);
+    }
 }
 
-BasketAPI::BasketEntry::BasketEntry(const Json::Value &json){
-	for(auto& author : json.get("authors", Json::Value(Json::arrayValue))) {
-		authors.push_back(author.asString());
-	}
-	title = json.get("title", "").asString();
-	dataCenter = json.get("dataCenter", "").asString();
-	dataLink = json.get("dataLink", "").asString();
-	metadataLink = json.get("metadatalink", "").asString();
+BasketAPI::BasketEntry::BasketEntry(const Json::Value &json) {
+    for (auto &author : json.get("authors", Json::Value(Json::arrayValue))) {
+        authors.push_back(author.asString());
+    }
+    title = json.get("title", "").asString();
+    dataCenter = json.get("dataCenter", "").asString();
+    dataLink = json.get("dataLink", "").asString();
+    metadataLink = json.get("metadatalink", "").asString();
 
-	available = false;
-	resultType = ResultType::NONE;
+    available = false;
+    resultType = ResultType::NONE;
 }
 
 Json::Value BasketAPI::BasketEntry::toJson() const {
-	Json::Value json(Json::objectValue);
+    Json::Value json(Json::objectValue);
 
-	json["authors"] = Json::Value(Json::arrayValue);
-	for(auto& author : authors) {
-		json["authors"].append(author);
-	}
+    json["authors"] = Json::Value(Json::arrayValue);
+    for (auto &author : authors) {
+        json["authors"].append(author);
+    }
 
-	json["title"] = title;
+    json["title"] = title;
 
-	json["dataCenter"] = dataCenter;
-	json["metadataLink"] = metadataLink;
-	json["dataLink"] = dataLink;
+    json["dataCenter"] = dataCenter;
+    json["metadataLink"] = metadataLink;
+    json["dataLink"] = dataLink;
 
-	json["available"] = available;
+    json["available"] = available;
 
-	json["parameters"] = Json::Value(Json::arrayValue);
-	for(auto& parameter : parameters) {
-		Json::Value jsonParameter = Json::Value(Json::objectValue);
-		jsonParameter["name"] = parameter.name;
-		jsonParameter["unit"] = parameter.unit;
-		jsonParameter["numeric"] = parameter.numeric;
-		json["parameters"].append(jsonParameter);
-	}
+    json["parameters"] = Json::Value(Json::arrayValue);
+    for (auto &parameter : parameters) {
+        Json::Value jsonParameter = Json::Value(Json::objectValue);
+        jsonParameter["name"] = parameter.name;
+        jsonParameter["unit"] = parameter.unit;
+        jsonParameter["numeric"] = parameter.numeric;
+        json["parameters"].append(jsonParameter);
+    }
 
-	if(resultType == ResultType::NONE) {
-		json["resultType"] = "none";
-	} else if(resultType == ResultType::POINTS) {
-		json["resultType"] = "points";
-	} else if(resultType == ResultType::LINES) {
-		json["resultType"] = "lines";
-	} else if(resultType == ResultType::POLYGONS) {
-		json["resultType"] = "polygons";
-	} else if(resultType == ResultType::RASTER) {
-		json["resultType"] = "raster";
-	}
+    if (resultType == ResultType::NONE) {
+        json["resultType"] = "none";
+    } else if (resultType == ResultType::POINTS) {
+        json["resultType"] = "points";
+    } else if (resultType == ResultType::LINES) {
+        json["resultType"] = "lines";
+    } else if (resultType == ResultType::POLYGONS) {
+        json["resultType"] = "polygons";
+    } else if (resultType == ResultType::RASTER) {
+        json["resultType"] = "raster";
+    }
 
-	return json;
+    return json;
 }
 
 BasketAPI::BasketEntry::BasketEntry() = default;
@@ -123,138 +124,139 @@ BasketAPI::PangaeaBasketEntry::PangaeaBasketEntry(const std::string &doi, const 
 
     std::string longitudeColumn;
     std::string latitudeColumn;
-    for (auto & parameter : metaData.parameters) {
-		std::string p = parameter.name;
+    for (auto &parameter : metaData.parameters) {
+        std::string p = parameter.name;
 
-		if (parameter.isLatitudeColumn()) {
-			hasLatitude = true;
-			latitudeColumn = p;
-		} else if (parameter.isLongitudeColumn()) {
-			hasLongitude = true;
-			longitudeColumn = p;
-		} else {
-			this->parameters.emplace_back(parameter.name, parameter.unit, parameter.numeric);
-		}
-	}
+        if (parameter.isLatitudeColumn()) {
+            hasLatitude = true;
+            latitudeColumn = p;
+        } else if (parameter.isLongitudeColumn()) {
+            hasLongitude = true;
+            longitudeColumn = p;
+        } else {
+            this->parameters.emplace_back(parameter.name, parameter.unit, parameter.numeric);
+        }
+    }
 
     this->isGeoReferenced = globalSpatialCoverage || (hasLatitude && hasLongitude);
 
-    if(this->isGeoReferenced) {
-		if(hasLatitude && hasLongitude) {
-			this->geometrySpecification = GeometrySpecification::XY;
-			this->column_x = longitudeColumn;
-			this->column_y = latitudeColumn;
-			this->resultType = BasketAPI::BasketEntry::ResultType::POINTS;
-		} else {
-			this->geometrySpecification = GeometrySpecification::WKT;
+    if (this->isGeoReferenced) {
+        if (hasLatitude && hasLongitude) {
+            this->geometrySpecification = GeometrySpecification::XY;
+            this->column_x = longitudeColumn;
+            this->column_y = latitudeColumn;
+            this->resultType = BasketAPI::BasketEntry::ResultType::POINTS;
+        } else {
+            this->geometrySpecification = GeometrySpecification::WKT;
 
-			if(isBox) {
-				this->resultType = BasketAPI::BasketEntry::ResultType::POLYGONS;
-			} else {
-				this->resultType = BasketAPI::BasketEntry::ResultType::POINTS;
-			}
+            if (isBox) {
+                this->resultType = BasketAPI::BasketEntry::ResultType::POLYGONS;
+            } else {
+                this->resultType = BasketAPI::BasketEntry::ResultType::POINTS;
+            }
 
-		}
-	} else {
-		this->geometrySpecification = GeometrySpecification::NONE;
-	}
+        }
+    } else {
+        this->geometrySpecification = GeometrySpecification::NONE;
+    }
 
     this->available = this->isTabSeparated && this->isGeoReferenced && vatVisualizable;
 }
 
 
 Json::Value BasketAPI::PangaeaBasketEntry::toJson() const {
-	Json::Value json = BasketEntry::toJson();
-	json["type"] = "pangaea";
-	json["doi"] = doi;
-	json["format"] = format;
-	json["isTabSeparated"] = isTabSeparated;
-	json["isGeoReferenced"] = isGeoReferenced;
+    Json::Value json = BasketEntry::toJson();
+    json["type"] = "pangaea";
+    json["doi"] = doi;
+    json["format"] = format;
+    json["isTabSeparated"] = isTabSeparated;
+    json["isGeoReferenced"] = isGeoReferenced;
 
-	json["geometrySpecification"] = GeometrySpecificationConverter.to_string(geometrySpecification);
-	if(geometrySpecification == GeometrySpecification::XY) {
-		json["column_x"] = column_x;
-		json["column_y"] = column_y;
-	}
+    json["geometrySpecification"] = GeometrySpecificationConverter.to_string(geometrySpecification);
+    if (geometrySpecification == GeometrySpecification::XY) {
+        json["column_x"] = column_x;
+        json["column_y"] = column_y;
+    }
 
-	if(resultType == ResultType::NONE) {
-		json["resultType"] = "none";
-	} else if(resultType == ResultType::POINTS) {
-		json["resultType"] = "points";
-	} else if(resultType == ResultType::LINES) {
-		json["resultType"] = "lines";
-	} else if(resultType == ResultType::POLYGONS) {
-		json["resultType"] = "polygons";
-	} else if(resultType == ResultType::RASTER) {
-		json["resultType"] = "raster";
-	}
+    if (resultType == ResultType::NONE) {
+        json["resultType"] = "none";
+    } else if (resultType == ResultType::POINTS) {
+        json["resultType"] = "points";
+    } else if (resultType == ResultType::LINES) {
+        json["resultType"] = "lines";
+    } else if (resultType == ResultType::POLYGONS) {
+        json["resultType"] = "polygons";
+    } else if (resultType == ResultType::RASTER) {
+        json["resultType"] = "raster";
+    }
 
-	return json;
+    return json;
 }
 
-BasketAPI::ABCDBasketEntry::ABCDBasketEntry(const Json::Value &json, const std::vector<std::string> &availableArchives) : BasketAPI::BasketEntry(json){
-	if(json.isMember("parentIdentifier")) {
-		// Entry is a unit
-		dataLink = json.get("parentIdentifier", "").asString();
-		unitId = json.get("dcIdentifier", "").asString();
-	} else {
-		// Entry is a data set
-		dataLink = json.get("datalink", "").asString();
-	}
+BasketAPI::ABCDBasketEntry::ABCDBasketEntry(const Json::Value &json, const std::vector<std::string> &availableArchives)
+        : BasketAPI::BasketEntry(json) {
+    if (json.isMember("parentIdentifier")) {
+        // Entry is a unit
+        dataLink = json.get("parentIdentifier", "").asString();
+        unitId = json.get("dcIdentifier", "").asString();
+    } else {
+        // Entry is a data set
+        dataLink = json.get("datalink", "").asString();
+    }
 
-	available = !dataLink.empty() && std::find(
-			availableArchives.begin(),
-			availableArchives.end(),
-			dataLink)
-			!= availableArchives.end();
+    available = !dataLink.empty() && std::find(
+            availableArchives.begin(),
+            availableArchives.end(),
+            dataLink)
+                                     != availableArchives.end();
 
-	available = available && json.get("vatVisualizable", false).asBool();
+    available = available && json.get("vatVisualizable", false).asBool();
 }
 
 Json::Value BasketAPI::ABCDBasketEntry::toJson() const {
-	Json::Value json = BasketEntry::toJson();
+    Json::Value json = BasketEntry::toJson();
 
-	json["type"] = "abcd";
-	json["unitId"] = unitId;
-	json["resultType"] = "points";
+    json["type"] = "abcd";
+    json["unitId"] = unitId;
+    json["resultType"] = "points";
 
-	return json;
+    return json;
 }
 
 BasketAPI::Basket::Basket(const Json::Value &json, const std::vector<std::string> &availableArchives) {
-    if(!json.isMember("lastModifiedDate")) {
+    if (!json.isMember("lastModifiedDate")) {
         throw ArgumentException("BasketAPI: basket not found");
     }
 
-	query = json.get("queryKeyword", json["queryJSON"]["query"]["function_score"]["query"]["filtered"]["query"]["simple_query_string"]["query"]).asString();
-	timestamp = json.get("lastModifiedDate", "").asString(); //TODO parse and reformat
-    userId = json.get("userID", -1).asInt64();
+    query = json.get("queryKeyword",
+                     json["queryJSON"]["query"]["function_score"]["query"]["filtered"]["query"]["simple_query_string"]["query"]).asString();
+    timestamp = json.get("lastModifiedDate", "").asString(); //TODO parse and reformat
+    goestern_id = json.get("goesternId", "").asString();
 
     std::vector<std::future<std::unique_ptr<BasketEntry>>> futures;
-    for(auto &basket : json["basketContent"]["selected"]) {
-        futures.push_back(std::async(std::launch::async, [basket, availableArchives](){
-           return BasketEntry::fromJson(basket, availableArchives);
-        })
+    for (auto &basket : json["basketContent"]["selected"]) {
+        futures.push_back(std::async(std::launch::async, [basket, availableArchives]() {
+                              return BasketEntry::fromJson(basket, availableArchives);
+                          })
         );
     }
 
-	for(auto &future : futures) {
-		entries.push_back(future.get());
-	}
+    for (auto &future : futures) {
+        entries.push_back(future.get());
+    }
 }
 
 
 Json::Value BasketAPI::Basket::toJson() const {
-	Json::Value json(Json::objectValue);
-	json["query"] = query;
-	json["timestamp"] = timestamp;
-	json["results"] = Json::Value(Json::arrayValue);
-	for(auto &entry : entries) {
-		json["results"].append(entry->toJson());
-	}
-	return json;
+    Json::Value json(Json::objectValue);
+    json["query"] = query;
+    json["timestamp"] = timestamp;
+    json["results"] = Json::Value(Json::arrayValue);
+    for (auto &entry : entries) {
+        json["results"].append(entry->toJson());
+    }
+    return json;
 }
-
 
 
 BasketAPI::BasketAPI() = default;
@@ -264,7 +266,7 @@ BasketAPI::~BasketAPI() = default;
 BasketAPI::BasketOverview::BasketOverview(const Json::Value &json) {
     query = json.get("queryKeyword", "").asString();
     timestamp = json.get("lastModifiedDate", "").asString(); //TODO parse and reformat
-	basketId = static_cast<size_t>(json.get("basketID", 0).asInt64());
+    basketId = static_cast<size_t>(json.get("basketID", 0).asInt64());
 }
 
 
@@ -273,7 +275,7 @@ Json::Value BasketAPI::BasketOverview::toJson() const {
 
     json["query"] = query;
     json["timestamp"] = timestamp;
-	json["basketId"] = basketId;
+    json["basketId"] = basketId;
 
     return json;
 }
@@ -281,7 +283,7 @@ Json::Value BasketAPI::BasketOverview::toJson() const {
 BasketAPI::BasketsOverview::BasketsOverview(const Json::Value &json) {
     totalNumberOfBaskets = static_cast<size_t>(json.get("totalNumberOfBaskets", 0).asInt64());
 
-    for(auto& basket : json.get("results", Json::Value(Json::arrayValue))) {
+    for (auto &basket : json.get("results", Json::Value(Json::arrayValue))) {
         baskets.emplace_back(basket);
     }
 }
@@ -292,7 +294,7 @@ Json::Value BasketAPI::BasketsOverview::toJson() const {
     json["totalNumberOfBaskets"] = totalNumberOfBaskets;
 
     Json::Value result(Json::arrayValue);
-    for(auto& basket : baskets) {
+    for (auto &basket : baskets) {
         result.append(basket.toJson());
     }
 
@@ -301,31 +303,37 @@ Json::Value BasketAPI::BasketsOverview::toJson() const {
     return json;
 }
 
-BasketAPI::BasketsOverview BasketAPI::getBaskets(const std::string &userId, size_t offset, size_t limit) {
-	// get baskets from portal
-	std::stringstream data;
-	cURL curl;
-	curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
-	curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-	curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get<std::string>("gfbio.portal.user"), ":", Configuration::get<std::string>("gfbio.portal.password")).c_str());
-    curl.setOpt(CURLOPT_URL,
-                concat(Configuration::get<std::string>("gfbio.portal.basketsbyuseridwebserviceurl"), "?userId=", userId, "&isMinimal=true&from=", offset + 1,
-                       "&count=", limit).c_str());
-	curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
-	curl.setOpt(CURLOPT_WRITEDATA, &data);
+BasketAPI::BasketsOverview BasketAPI::getBaskets(const std::string &goestern_id, size_t offset, size_t limit) {
+    const auto &authentication = concat(Configuration::get<std::string>("gfbio.portal.user"), ":",
+                                       Configuration::get<std::string>("gfbio.portal.password"));
+    const auto &url = concat(Configuration::get<std::string>("gfbio.portal.basketsbyuseridwebserviceurl"), "?goesternId=",
+                                    goestern_id, "&isMinimal=true&from=", offset + 1,
+                                    "&count=", limit);
 
-	try {
-		curl.perform();
-	} catch (const cURLException&) {
-		throw BasketAPIException("BasketAPI: could not retrieve baskets from portal");
-	}
+    std::stringstream data;
+
+    cURL curl;
+    curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
+    curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+    curl.setOpt(CURLOPT_USERPWD, authentication.c_str());
+    curl.setOpt(CURLOPT_URL, url.c_str());
+    curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
+    curl.setOpt(CURLOPT_WRITEDATA, &data);
+
+    try {
+        curl.perform();
+    } catch (const cURLException &) {
+        throw BasketAPIException("BasketAPI: could not retrieve baskets from portal");
+    }
+
+    const auto &response = data.str();
 
     Json::Reader reader(Json::Features::strictMode());
-	Json::Value jsonResponse;
-	if (!reader.parse(data.str(), jsonResponse))
-		throw BasketAPIException("BasketAPI: could not parse baskets from portal");
+    Json::Value jsonResponse;
+    if (!reader.parse(response, jsonResponse))
+        throw BasketAPIException("BasketAPI: could not parse baskets from portal");
 
-	return BasketsOverview(jsonResponse);
+    return BasketsOverview(jsonResponse);
 }
 
 BasketAPI::Basket BasketAPI::getBasket(size_t basketId) {
@@ -334,15 +342,17 @@ BasketAPI::Basket BasketAPI::getBasket(size_t basketId) {
     cURL curl;
     curl.setOpt(CURLOPT_PROXY, Configuration::get<std::string>("proxy", "").c_str());
     curl.setOpt(CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-    curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get<std::string>("gfbio.portal.user"), ":", Configuration::get<std::string>("gfbio.portal.password")).c_str());
+    curl.setOpt(CURLOPT_USERPWD, concat(Configuration::get<std::string>("gfbio.portal.user"), ":",
+                                        Configuration::get<std::string>("gfbio.portal.password")).c_str());
     curl.setOpt(CURLOPT_URL,
-                concat(Configuration::get<std::string>("gfbio.portal.basketbyidwebserviceurl"), "?basketId=", basketId, "&isMinimal=false").c_str());
+                concat(Configuration::get<std::string>("gfbio.portal.basketbyidwebserviceurl"), "?basketId=", basketId,
+                       "&isMinimal=false").c_str());
     curl.setOpt(CURLOPT_WRITEFUNCTION, cURL::defaultWriteFunction);
     curl.setOpt(CURLOPT_WRITEDATA, &data);
 
     try {
         curl.perform();
-    } catch (const cURLException&) {
+    } catch (const cURLException &) {
         throw BasketAPIException("BasketAPI: could not retrieve basket from portal");
     }
 

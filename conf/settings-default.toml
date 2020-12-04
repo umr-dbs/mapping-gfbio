@@ -2,7 +2,7 @@
 [gfbio.portal]
 user="user@gfbio.org" # Admin user at GFBio portal
 password="xyz" # Password of admin user
-basketsbyuseridwebserviceurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.basket/get-basket-ids-by-goestern-id" # WS URL for basket by user id
+basketsbyuseridwebserviceurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.basket/get-baskets-by-goestern-id"  # WS URL for basket by user id
 basketbyidwebserviceurl="https://www.gfbio.org/api/jsonws/GFBioProject-portlet.basket/get-basket-by-id" # WS URL for basket by id
 
 [gfbio.abcd]

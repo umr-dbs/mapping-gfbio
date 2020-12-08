@@ -21,8 +21,7 @@ target_include_directories(mapping_gfbio_operators_lib PRIVATE ${MAPPING_CORE_PA
 # SERVICES
 add_library(mapping_gfbio_services_lib OBJECT
         services/gfbio.cpp
-        services/openid_connect.cpp
-        )
+        services/openid_connect.cpp)
 target_include_directories(mapping_gfbio_services_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 target_include_directories(mapping_gfbio_services_lib PRIVATE ${MAPPING_CORE_PATH}/src)
 

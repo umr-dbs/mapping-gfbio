@@ -83,7 +83,7 @@ public:
 
 		std::string query;
 		std::string timestamp;
-        long userId;
+        std::string goestern_id;
 
 		std::vector<std::unique_ptr<BasketEntry>> entries;
 
@@ -114,7 +114,8 @@ public:
 	BasketAPI();
 	virtual ~BasketAPI();
 
-	static BasketsOverview getBaskets(const std::string &userId, size_t offset = 0, size_t limit = 10);
+	/// get baskets from portal
+	static BasketsOverview getBaskets(const std::string &goestern_id, size_t offset = 0, size_t limit = 10);
     static Basket getBasket(size_t basketId);
 
 	struct BasketAPIException

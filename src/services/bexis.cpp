@@ -21,7 +21,11 @@ auto BexisService::register_external_url(const std::string &secretToken, const s
     static const auto groupName = Configuration::get<std::string>("bexis.mapping_group_name");
 
     if (std::find(secretTokens.cbegin(), secretTokens.cend(), secretToken) == secretTokens.cend()) {
-        return response.send500("Invalid token");
+        return response.sendFailureJSON("Invalid token");
+    }
+
+    if ((url.rfind("http://", 0) != 0) && (url.rfind("https://", 0) != 0)) {
+        return response.sendFailureJSON("URL must start with `http://` or `https://`");
     }
 
     const auto group = UserDB::loadGroup(groupName);

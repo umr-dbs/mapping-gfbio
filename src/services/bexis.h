@@ -16,7 +16,7 @@
 #include <cppcodec/base64_url_unpadded.hpp>
 #include <util/log.h>
 
-/// This class provides methods for user authentication with OpenId Connect
+/// This class provides methods for BExIS communication
 class BexisService : public HTTPService {
     public:
         using HTTPService::HTTPService;

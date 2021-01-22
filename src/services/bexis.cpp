@@ -19,13 +19,28 @@ auto BexisService::run() -> void {
 auto BexisService::register_external_url(const std::string &secretToken, const std::string &url) -> void {
     static const auto secretTokens = Configuration::getVector<std::string>("bexis.tokens");
     static const auto groupName = Configuration::get<std::string>("bexis.mapping_group_name");
+    static const auto valid_prefixes = std::vector<std::string> {
+        "/vsicurl/http://",
+        "/vsicurl/https://",
+        "/vsicurl_streaming/http://",
+        "/vsicurl_streaming/https://"
+    };
 
     if (std::find(secretTokens.cbegin(), secretTokens.cend(), secretToken) == secretTokens.cend()) {
         return response.sendFailureJSON("Invalid token");
     }
 
-    if ((url.rfind("http://", 0) != 0) && (url.rfind("https://", 0) != 0)) {
-        return response.sendFailureJSON("URL must start with `http://` or `https://`");
+    auto invalid_prefix = true;
+
+    for (const auto &prefix : valid_prefixes) {
+        if (url.rfind(prefix, 0) == 0) {
+            invalid_prefix = false;
+            break;
+        }
+    }
+
+    if (invalid_prefix) {
+        return response.sendFailureJSON("URL must start with `/vsicurl/` or `/vsicurl_streaming/` and then http://` or `https://`");
     }
 
     const auto group = UserDB::loadGroup(groupName);
